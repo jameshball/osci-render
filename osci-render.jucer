@@ -197,6 +197,9 @@
         <FILE id="LoSvg13" name="lottie_logo2.svg" compile="0" resource="1"
               file="Resources/svg/lottie_logo2.svg"/>
         <FILE id="LoSvg14" name="lottie_pin.svg" compile="0" resource="1" file="Resources/svg/lottie_pin.svg"/>
+        <FILE id="LoSvg15" name="lottie_cat.svg" compile="0" resource="1" file="Resources/svg/lottie_cat.svg"/>
+        <FILE id="LoSvg16" name="lottie_dice.svg" compile="0" resource="1"
+              file="Resources/svg/lottie_dice.svg"/>
         <FILE id="SkgUSk" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
         <FILE id="HCK5B8" name="yinyang.svg" compile="0" resource="1" file="Resources/svg/yinyang.svg"/>
       </GROUP>
@@ -219,6 +222,8 @@
               file="Resources/lottie/lottie_logo_1.lottie"/>
         <FILE id="Lo1004" name="switch.lottie" compile="0" resource="1" file="Resources/lottie/switch.lottie"/>
         <FILE id="Lo1005" name="heart.lottie" compile="0" resource="1" file="Resources/lottie/heart.lottie"/>
+        <FILE id="Lo1012" name="cat.lottie" compile="0" resource="1" file="Resources/lottie/cat.lottie"/>
+        <FILE id="Lo1013" name="dice.lottie" compile="0" resource="1" file="Resources/lottie/dice.lottie"/>
         <FILE id="Lo1006" name="pin_jump.lottie" compile="0" resource="1" file="Resources/lottie/pin_jump.lottie"/>
         <FILE id="Lo1007" name="lottie_logo_2.lottie" compile="0" resource="1"
               file="Resources/lottie/lottie_logo_2.lottie"/>
@@ -737,6 +742,10 @@
           <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/parser/svg/SvgParser.h"/>
         </GROUP>
         <GROUP id="{9A3C1F4E-4B12-4E6B-8A7D-2F6E11C5D901}" name="lottie">
+          <FILE id="DotLot1" name="DotLottieArchive.cpp" compile="1" resource="0"
+                file="Source/parser/lottie/DotLottieArchive.cpp"/>
+          <FILE id="DotLot2" name="DotLottieArchive.h" compile="0" resource="0"
+                file="Source/parser/lottie/DotLottieArchive.h"/>
           <FILE id="LotPr01" name="LottieParser.cpp" compile="1" resource="0"
                 file="Source/parser/lottie/LottieParser.cpp"/>
           <FILE id="LotPr02" name="LottieParser.h" compile="0" resource="0" file="Source/parser/lottie/LottieParser.h"/>

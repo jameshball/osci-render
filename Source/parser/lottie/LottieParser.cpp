@@ -101,11 +101,88 @@ namespace {
         float len = 0.0f;
     };
 
+    float cubicLength(tvg::Point p0, tvg::Point p1, tvg::Point p2, tvg::Point p3, int depth = 5);
+
+    bool collectSubpaths(const tvg::Shape* shape, std::vector<std::vector<PathPrim>>& subpaths) {
+        const tvg::PathCommand* cmds = nullptr;
+        const tvg::Point* pts = nullptr;
+        uint32_t cmdCnt = 0, ptsCnt = 0;
+        if (shape->path(&cmds, &cmdCnt, &pts, &ptsCnt) != tvg::Result::Success) return false;
+        if (cmdCnt == 0 || ptsCnt == 0) return false;
+
+        std::vector<PathPrim> current;
+        tvg::Point cursor{0.0f, 0.0f};
+        tvg::Point start{0.0f, 0.0f};
+        uint32_t pointIndex = 0;
+        auto finishSubpath = [&]() {
+            if (!current.empty()) {
+                subpaths.push_back(std::move(current));
+                current.clear();
+            }
+        };
+
+        for (uint32_t commandIndex = 0; commandIndex < cmdCnt; ++commandIndex) {
+            switch (cmds[commandIndex]) {
+                case tvg::PathCommand::MoveTo: {
+                    if (pointIndex >= ptsCnt) break;
+                    finishSubpath();
+                    cursor = pts[pointIndex++];
+                    start = cursor;
+                    break;
+                }
+                case tvg::PathCommand::LineTo: {
+                    if (pointIndex >= ptsCnt) break;
+                    auto next = pts[pointIndex++];
+                    PathPrim primitive;
+                    primitive.cubic = false;
+                    primitive.p0 = cursor;
+                    primitive.p3 = next;
+                    primitive.len = std::hypot(next.x - cursor.x, next.y - cursor.y);
+                    current.push_back(primitive);
+                    cursor = next;
+                    break;
+                }
+                case tvg::PathCommand::CubicTo: {
+                    if (pointIndex + 2 >= ptsCnt) break;
+                    auto control1 = pts[pointIndex++];
+                    auto control2 = pts[pointIndex++];
+                    auto end = pts[pointIndex++];
+                    PathPrim primitive;
+                    primitive.cubic = true;
+                    primitive.p0 = cursor;
+                    primitive.p1 = control1;
+                    primitive.p2 = control2;
+                    primitive.p3 = end;
+                    primitive.len = cubicLength(cursor, control1, control2, end);
+                    current.push_back(primitive);
+                    cursor = end;
+                    break;
+                }
+                case tvg::PathCommand::Close: {
+                    if (std::hypot(start.x - cursor.x, start.y - cursor.y) > 1.0e-5f) {
+                        PathPrim primitive;
+                        primitive.cubic = false;
+                        primitive.p0 = cursor;
+                        primitive.p3 = start;
+                        primitive.len = std::hypot(start.x - cursor.x, start.y - cursor.y);
+                        current.push_back(primitive);
+                    }
+                    cursor = start;
+                    finishSubpath();
+                    break;
+                }
+            }
+        }
+        finishSubpath();
+
+        return !subpaths.empty();
+    }
+
     inline tvg::Point lerp(tvg::Point a, tvg::Point b, float t) {
         return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t};
     }
 
-    float cubicLength(tvg::Point p0, tvg::Point p1, tvg::Point p2, tvg::Point p3, int depth = 5) {
+    float cubicLength(tvg::Point p0, tvg::Point p1, tvg::Point p2, tvg::Point p3, int depth) {
         auto chord = std::hypot(p3.x - p0.x, p3.y - p0.y);
         auto control = std::hypot(p1.x - p0.x, p1.y - p0.y)
                      + std::hypot(p2.x - p1.x, p2.y - p1.y)
@@ -148,6 +225,21 @@ namespace {
         q0 = d3; q1 = e2; q2 = f1; q3 = a3;
     }
 
+    void normaliseTrimRange(float& begin, float& end) {
+        auto loop = true;
+
+        if (begin > 1.0f && end > 1.0f) loop = false;
+        if (begin < 0.0f && end < 0.0f) loop = false;
+        if (begin >= 0.0f && begin <= 1.0f && end >= 0.0f && end <= 1.0f) loop = false;
+
+        if (begin > 1.0f) begin -= 1.0f;
+        if (begin < 0.0f) begin += 1.0f;
+        if (end > 1.0f) end -= 1.0f;
+        if (end < 0.0f) end += 1.0f;
+
+        if ((loop && begin < end) || (!loop && begin > end)) std::swap(begin, end);
+    }
+
     // Given a subpath's primitives, emit the portion in arclength range [b*L, e*L].
     template <typename Emit>
     void emitTrimmed(const std::vector<PathPrim>& prims, float begin, float end, Emit emit) {
@@ -156,8 +248,10 @@ namespace {
         for (auto& p : prims) totalLen += p.len;
         if (totalLen <= 0.0f) return;
 
-        // Lottie/thorvg trim can wrap: if begin > end when loop, thorvg swaps.
-        // We keep the simple case: if begin > end, emit two ranges: [begin, 1] and [0, end].
+        normaliseTrimRange(begin, end);
+
+        // Lottie trim offset can push begin/end outside [0, 1]. After matching
+        // ThorVG's normalisation, begin >= end means the visible range wraps.
         auto emitRange = [&](float b, float e) {
             if (e <= b) return;
             float bLen = b * totalLen;
@@ -279,15 +373,30 @@ OsciLottieParser::OsciLottieParser(juce::String jsonContent) {
         frameRate = static_cast<double>(totalFrames) / static_cast<double>(duration);
     }
 
+    constexpr int frameWarningThreshold = 1200;
+    constexpr size_t shapeWarningThreshold = 150000;
+    if (totalFrames > frameWarningThreshold) {
+        showWarning("Large Lottie Animation",
+                    "This Lottie contains " + juce::String(totalFrames)
+                    + " frames. It will continue loading, but may take extra time and memory.");
+    }
+
     // Pre-render every frame up front so setFrame/draw are O(1) and
     // realtime-safe (the audio thread calls setFrame from processBlock).
     framesCache.resize(totalFrames);
+    size_t cachedShapeCount = 0;
     for (int i = 0; i < totalFrames; ++i) {
         animation->frame(static_cast<float>(i));
         // Force scene-tree update at the current frame by requesting bounds.
         float bx = 0.0f, by = 0.0f, bw = 0.0f, bh = 0.0f;
         picture->bounds(&bx, &by, &bw, &bh);
         extractShapesAtCurrentFrame(framesCache[i]);
+        cachedShapeCount += framesCache[i].size();
+    }
+    if (cachedShapeCount > shapeWarningThreshold) {
+        showWarning("Complex Lottie Animation",
+                    "This Lottie cached " + juce::String((juce::int64) cachedShapeCount)
+                    + " shape segments. It will continue loading, but may use extra memory.");
     }
     currentFrame = 0;
 }
@@ -337,8 +446,8 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
     //   visible region intersected with (or subtracted from) the target's
     //   fill polygon.
     std::unordered_set<const tvg::Paint*> maskTargets;
-    struct ClipScope { const tvg::Paint* target; bool invert; };
-    std::unordered_map<const tvg::Paint*, ClipScope> clipScopes;
+    struct ClipScope { const tvg::Paint* target; bool invert; bool pathOnly; };
+    std::unordered_map<const tvg::Paint*, std::vector<ClipScope>> clipScopes;
     {
         auto addSubtree = [&](const tvg::Paint* target) {
             if (target == nullptr) return;
@@ -351,7 +460,7 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
 
         struct CollectCtx {
             std::function<void(const tvg::Paint*)>* addSubtree;
-            std::unordered_map<const tvg::Paint*, ClipScope>* clipScopes;
+            std::unordered_map<const tvg::Paint*, std::vector<ClipScope>>* clipScopes;
         };
         std::function<void(const tvg::Paint*)> addSubtreeFn = addSubtree;
         CollectCtx collectCtx { &addSubtreeFn, &clipScopes };
@@ -373,18 +482,15 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
                 const bool sceneTarget = maskTarget->type() == tvg::Type::Scene;
                 if (sceneTarget) {
                     if (method == tvg::MaskMethod::Alpha) {
-                        (*cctx->clipScopes)[paint] = { maskTarget, false };
+                        (*cctx->clipScopes)[paint].push_back({ maskTarget, false, false });
                     } else if (method == tvg::MaskMethod::InvAlpha) {
-                        (*cctx->clipScopes)[paint] = { maskTarget, true };
+                        (*cctx->clipScopes)[paint].push_back({ maskTarget, true, false });
                     }
                 }
             }
             if (auto* clipper = paint->clip()) {
                 (*cctx->addSubtree)(clipper);
-                // Same caveat: only trust scene-level clips.
-                if (clipper->type() == tvg::Type::Scene) {
-                    (*cctx->clipScopes)[paint] = { clipper, false };
-                }
+                (*cctx->clipScopes)[paint].push_back({ clipper, false, true });
             }
             return true;
         }, &collectCtx);
@@ -396,6 +502,7 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
         float trimBegin = 0.0f, trimEnd = 1.0f;
         bool simultaneous = true;
         bool hasTrim = false;
+        bool hasFill = false;
         bool opaqueFill = false;
         tvg::FillRule fillRule = tvg::FillRule::NonZero;
         const tvg::Paint* paint = nullptr; // used to resolve ancestor clips
@@ -447,75 +554,13 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
         // opacity, and no trim path (trim trims both fill and stroke in
         // Lottie so a trimmed fill isn't a reliable solid occluder).
         uint8_t fr = 0, fg = 0, fb = 0, fa = 0;
-        const bool solidFill = (shape->fill(&fr, &fg, &fb, &fa) == tvg::Result::Success) && fa == 255;
-        const bool noGradient = shape->fill() == nullptr;
-        cs.opaqueFill = solidFill && noGradient && !cs.hasTrim && inheritedOpacity >= 0.999f;
+        const bool solidFill = (shape->fill(&fr, &fg, &fb, &fa) == tvg::Result::Success) && fa > 0;
+        const bool hasGradientFill = shape->fill() != nullptr;
+        cs.hasFill = solidFill || hasGradientFill;
+        cs.opaqueFill = solidFill && fa == 255 && !hasGradientFill && !cs.hasTrim && inheritedOpacity >= 0.999f;
         cs.fillRule = shape->fillRule();
 
-        // Parse commands into subpaths.
-        std::vector<PathPrim> current;
-        tvg::Point cursor{0.0f, 0.0f};
-        tvg::Point start{0.0f, 0.0f};
-        uint32_t pi = 0;
-        auto finishSubpath = [&]() {
-            if (!current.empty()) {
-                cs.subpaths.push_back(std::move(current));
-                current.clear();
-            }
-        };
-        for (uint32_t i = 0; i < cmdCnt; ++i) {
-            switch (cmds[i]) {
-                case tvg::PathCommand::MoveTo: {
-                    if (pi >= ptsCnt) break;
-                    finishSubpath();
-                    cursor = pts[pi++];
-                    start = cursor;
-                    break;
-                }
-                case tvg::PathCommand::LineTo: {
-                    if (pi >= ptsCnt) break;
-                    auto next = pts[pi++];
-                    PathPrim p;
-                    p.cubic = false;
-                    p.p0 = cursor;
-                    p.p3 = next;
-                    p.len = std::hypot(next.x - cursor.x, next.y - cursor.y);
-                    current.push_back(p);
-                    cursor = next;
-                    break;
-                }
-                case tvg::PathCommand::CubicTo: {
-                    if (pi + 2 >= ptsCnt) break;
-                    auto c1 = pts[pi++];
-                    auto c2 = pts[pi++];
-                    auto end = pts[pi++];
-                    PathPrim p;
-                    p.cubic = true;
-                    p.p0 = cursor;
-                    p.p1 = c1;
-                    p.p2 = c2;
-                    p.p3 = end;
-                    p.len = cubicLength(cursor, c1, c2, end);
-                    current.push_back(p);
-                    cursor = end;
-                    break;
-                }
-                case tvg::PathCommand::Close: {
-                    if (std::hypot(start.x - cursor.x, start.y - cursor.y) > 1.0e-5f) {
-                        PathPrim p;
-                        p.cubic = false;
-                        p.p0 = cursor;
-                        p.p3 = start;
-                        p.len = std::hypot(start.x - cursor.x, start.y - cursor.y);
-                        current.push_back(p);
-                    }
-                    cursor = start;
-                    finishSubpath();
-                    break;
-                }
-            }
-        }
-        finishSubpath();
+        collectSubpaths(shape, cs.subpaths);
 
         if (!cs.subpaths.empty()) {
             ctx->collected->push_back(std::move(cs));
@@ -558,33 +603,48 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
     // --- Compute per-paint clip polygon cache. For each `ClipScope` target
     //     (matte or clip source) we flatten its subtree's fills into a
     //     world-space closed polygon set.
-    std::unordered_map<const tvg::Paint*, Clipper2Lib::PathsD> targetPolyCache;
-    auto computeTargetPolygon = [&](const tvg::Paint* target) -> const Clipper2Lib::PathsD& {
-        auto it2 = targetPolyCache.find(target);
-        if (it2 != targetPolyCache.end()) return it2->second;
+    std::unordered_map<const tvg::Paint*, Clipper2Lib::PathsD> paintedTargetPolyCache;
+    std::unordered_map<const tvg::Paint*, Clipper2Lib::PathsD> pathTargetPolyCache;
+    auto computeTargetPolygon = [&](const tvg::Paint* target, bool pathOnly) -> const Clipper2Lib::PathsD& {
+        auto& cache = pathOnly ? pathTargetPolyCache : paintedTargetPolyCache;
+        auto it2 = cache.find(target);
+        if (it2 != cache.end()) return it2->second;
         Clipper2Lib::PathsD rings;
         struct WalkCtx {
             const tvg::Paint* worldRoot;
             Clipper2Lib::PathsD* rings;
             std::function<Clipper2Lib::FillRule(tvg::FillRule)>* toFR;
+            bool pathOnly;
         };
         std::function<Clipper2Lib::FillRule(tvg::FillRule)> toFR = toClipperFillRule;
-        WalkCtx wctx { picture, &rings, &toFR };
+        WalkCtx wctx { picture, &rings, &toFR, pathOnly };
         std::unique_ptr<tvg::Accessor> acc(tvg::Accessor::gen());
         acc->set(const_cast<tvg::Paint*>(target), [](const tvg::Paint* p, void* d) -> bool {
             auto* wc = static_cast<WalkCtx*>(d);
             if (p->type() != tvg::Type::Shape) return true;
             auto shape = static_cast<const tvg::Shape*>(p);
-            const tvg::PathCommand* cmds = nullptr;
-            const tvg::Point* pts = nullptr;
-            uint32_t cc = 0, pc = 0;
-            if (shape->path(&cmds, &cc, &pts, &pc) != tvg::Result::Success) return true;
-            if (cc == 0 || pc == 0) return true;
-            uint8_t fr = 0, fg = 0, fb = 0, fa = 0;
-            const bool solid = (shape->fill(&fr, &fg, &fb, &fa) == tvg::Result::Success && fa > 0);
-            const bool grad = shape->fill() != nullptr;
+            if (accumulatedOpacity(p, wc->worldRoot) <= 0.0f) return true;
+
+            if (!wc->pathOnly) {
+                uint8_t fr = 0, fg = 0, fb = 0, fa = 0;
+                const bool solid = (shape->fill(&fr, &fg, &fb, &fa) == tvg::Result::Success && fa > 0);
+                const bool grad = shape->fill() != nullptr;
+                if (!solid && !grad) return true;
+            }
+
+            std::vector<std::vector<PathPrim>> subpaths;
+            if (!collectSubpaths(shape, subpaths)) return true;
+
+            float trimBegin = 0.0f, trimEnd = 1.0f;
+            const bool simultaneous = shape->trimpath(&trimBegin, &trimEnd);
+            if (std::abs(trimEnd - trimBegin) < 1.0e-4f) return true;
+            const bool hasTrim = std::abs(trimEnd - trimBegin - 1.0f) > 1.0e-4f
+                              || std::abs(trimBegin) > 1.0e-4f;
+
+            const auto xform = accumulatedTransform(p, wc->worldRoot);
             Clipper2Lib::PathsD shapeRings;
-            auto flushRing = [&]() {
+            std::vector<tvg::Point> ring;
+            auto flushRing = [&] {
                 if (ring.size() >= 3) {
                     Clipper2Lib::PathD pd;
                     pd.reserve(ring.size());
@@ -592,43 +652,52 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
                         auto wp = applyMatrix(xform, pt);
                         pd.push_back({wp.x, wp.y});
                     }
-                    shapeRings. = applyMatrix(xform, pt);
-                        pd.push_back({wp.x, wp.y});
-                    }
-                    wc->rings->push_back(std::move(pd));
+                    shapeRings.push_back(std::move(pd));
                 }
                 ring.clear();
             };
-            tvg::Point cursor{0, 0}, start{0, 0};
-            uint32_t pi = 0;
-            for (uint32_t i = 0; i < cc; ++i) {
-                switch (cmds[i]) {
-                    case tvg::PathCommand::MoveTo:
-                        flushRing();
-                        if (pi < pc) {
-                            cursor = pts[pi++];
-                            start = cursor;
-                            ring.push_back(cursor);
-                        }
-                        break;
-                    case tvg::PathCommand::LineTo:
-                        if (pi < pc) {
-                            cursor = pts[pi++];
-                            ring.push_back(cursor);
-                        }
-                        break;
-                    case tvg::PathCommand::CubicTo:
-                        if (pi + 2 < pc) {
-                            auto c1 = pts[pi++];
-                            auto c2 = pts[pi++];
-                            auto e = pts[pi++];
-                            flattenCubic(cursor, c1, c2, e, ring);
-                            cursor = e;
-                        }
-                        break;
-                    case tvg::PathCommand::Close:
-                        flushRing();
-                        cursor = start;
+
+            auto emitToRing = [&](bool cubic, tvg::Point start, tvg::Point control1, tvg::Point control2, tvg::Point end) {
+                if (ring.empty()) {
+                    ring.push_back(start);
+                } else if (std::hypot(ring.back().x - start.x, ring.back().y - start.y) > 1.0e-5f) {
+                    flushRing();
+                    ring.push_back(start);
+                }
+
+                if (cubic) {
+                    flattenCubic(start, control1, control2, end, ring);
+                } else {
+                    ring.push_back(end);
+                }
+            };
+
+            auto emitSubpath = [&](const std::vector<PathPrim>& subpath) {
+                ring.clear();
+                if (!hasTrim) {
+                    for (auto& primitive : subpath) {
+                        emitToRing(primitive.cubic, primitive.p0, primitive.p1, primitive.p2, primitive.p3);
+                    }
+                } else {
+                    emitTrimmed(subpath, trimBegin, trimEnd, emitToRing);
+                }
+                flushRing();
+            };
+
+            if (!hasTrim || simultaneous) {
+                for (auto& subpath : subpaths) {
+                    emitSubpath(subpath);
+                }
+            } else {
+                std::vector<PathPrim> joined;
+                for (auto& subpath : subpaths) {
+                    for (auto& primitive : subpath) {
+                        joined.push_back(primitive);
+                    }
+                }
+                emitSubpath(joined);
+            }
+
             // Resolve this shape's own fill under its declared fill rule so
             // the emitted rings are non-overlapping, then append to the
             // matte-target accumulator. The outer union can then safely use
@@ -641,10 +710,6 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
                           (*wc->toFR)(shape->fillRule()), sClosed, sOpen);
                 for (auto& r : sClosed) wc->rings->push_back(std::move(r));
             }
-                        break;
-                }
-            }
-            flushRing();
             return true;
         }, &wctx);
         if (!rings.empty()) {
@@ -655,7 +720,7 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
                       Clipper2Lib::FillRule::NonZero, closed, open);
             rings = std::move(closed);
         }
-        return targetPolyCache.emplace(target, std::move(rings)).first->second;
+        return cache.emplace(target, std::move(rings)).first->second;
     };
 
     // Resolve the effective clip polygon for a paint by walking up its
@@ -665,44 +730,47 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
         bool has = false;
         Clipper2Lib::PathsD clipRegion;
         for (auto p = paint; p != nullptr && p != picture; p = p->parent()) {
+            if (p->parent() == picture) continue;
+
             auto itc = clipScopes.find(p);
             if (itc == clipScopes.end()) continue;
-            const auto& scope = itc->second;
-            auto& poly = computeTargetPolygon(scope.target);
-            if (poly.empty()) {
-                // If the target polygon can't be resolved (e.g. stroke-only
-                // mask, degenerate geometry), treat this scope as a no-op
-                // rather than clipping everything to nothing.
-                continue;
-            }
-            if (!has) {
-                has = true;
-                if (scope.invert) {
-                    // First clip is inverse: need complement. Use a huge
-                    // bounding rectangle and subtract the target polygon.
-                    // (Alternative: accumulate all clips then subtract.)
-                    Clipper2Lib::PathD huge = {
-                        {-1e7, -1e7}, {1e7, -1e7}, {1e7, 1e7}, {-1e7, 1e7}
-                    };
+            for (const auto& scope : itc->second) {
+                auto& poly = computeTargetPolygon(scope.target, scope.pathOnly);
+                if (poly.empty()) {
+                    // If the target polygon can't be resolved (e.g. stroke-only
+                    // mask, degenerate geometry), treat this scope as a no-op
+                    // rather than clipping everything to nothing.
+                    continue;
+                }
+                if (!has) {
+                    has = true;
+                    if (scope.invert) {
+                        // First clip is inverse: need complement. Use a huge
+                        // bounding rectangle and subtract the target polygon.
+                        // (Alternative: accumulate all clips then subtract.)
+                        Clipper2Lib::PathD huge = {
+                            {-1e7, -1e7}, {1e7, -1e7}, {1e7, 1e7}, {-1e7, 1e7}
+                        };
+                        Clipper2Lib::ClipperD c(kClipperPrecision);
+                        c.AddSubject(Clipper2Lib::PathsD{huge});
+                        c.AddClip(poly);
+                        Clipper2Lib::PathsD closed, open;
+                        c.Execute(Clipper2Lib::ClipType::Difference,
+                                  Clipper2Lib::FillRule::NonZero, closed, open);
+                        clipRegion = std::move(closed);
+                    } else {
+                        clipRegion = poly;
+                    }
+                } else {
                     Clipper2Lib::ClipperD c(kClipperPrecision);
-                    c.AddSubject(Clipper2Lib::PathsD{huge});
+                    c.AddSubject(clipRegion);
                     c.AddClip(poly);
                     Clipper2Lib::PathsD closed, open;
-                    c.Execute(Clipper2Lib::ClipType::Difference,
+                    c.Execute(scope.invert ? Clipper2Lib::ClipType::Difference
+                                           : Clipper2Lib::ClipType::Intersection,
                               Clipper2Lib::FillRule::NonZero, closed, open);
                     clipRegion = std::move(closed);
-                } else {
-                    clipRegion = poly;
                 }
-            } else {
-                Clipper2Lib::ClipperD c(kClipperPrecision);
-                c.AddSubject(clipRegion);
-                c.AddClip(poly);
-                Clipper2Lib::PathsD closed, open;
-                c.Execute(scope.invert ? Clipper2Lib::ClipType::Difference
-                                       : Clipper2Lib::ClipType::Intersection,
-                          Clipper2Lib::FillRule::NonZero, closed, open);
-                clipRegion = std::move(closed);
             }
         }
         return { has, std::move(clipRegion) };
@@ -772,54 +840,114 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
                 }
             }
         } else {
-            // Flatten pieces into polylines and clip them.
-            Clipper2Lib::PathsD subjects;
-            for (auto& piece : pieces) {
-                if (piece.empty()) continue;
-                std::vector<tvg::Point> world;
-                world.reserve(piece.size() * 8);
-                bool first = true;
-                for (auto& pr : piece) {
-                    flattenPrim(cs.xform, pr.cubic, pr.p0, pr.p1, pr.p2, pr.p3, world, first);
-                    first = false;
-                }
-                if (world.size() < 2) continue;
-                Clipper2Lib::PathD pd;
-                pd.reserve(world.size());
-                for (auto& p : world) pd.push_back({p.x, p.y});
-                subjects.push_back(std::move(pd));
-            }
-
-            if (!subjects.empty()) {
-                // If we have a clip, first intersect the open paths with it.
-                if (hasClip) {
-                    Clipper2Lib::ClipperD clipper(kClipperPrecision);
-                    clipper.AddOpenSubject(subjects);
-                    clipper.AddClip(clipPoly);
-                    Clipper2Lib::PathsD closed, open;
-                    clipper.Execute(Clipper2Lib::ClipType::Intersection,
-                                    Clipper2Lib::FillRule::NonZero,
-                                    closed, open);
-                    subjects = std::move(open);
+            if (cs.hasFill) {
+                Clipper2Lib::PathsD subjects;
+                for (auto& piece : pieces) {
+                    if (piece.empty()) continue;
+                    std::vector<tvg::Point> world;
+                    world.reserve(piece.size() * 8);
+                    bool first = true;
+                    for (auto& pr : piece) {
+                        flattenPrim(cs.xform, pr.cubic, pr.p0, pr.p1, pr.p2, pr.p3, world, first);
+                        first = false;
+                    }
+                    if (world.size() < 3) continue;
+                    Clipper2Lib::PathD pd;
+                    pd.reserve(world.size());
+                    for (auto& p : world) pd.push_back({p.x, p.y});
+                    subjects.push_back(std::move(pd));
                 }
 
-                // Then subtract the occluder.
-                if (hasOccluder && !subjects.empty()) {
-                    Clipper2Lib::ClipperD clipper(kClipperPrecision);
-                    clipper.AddOpenSubject(subjects);
-                    clipper.AddClip(occluder);
-                    Clipper2Lib::PathsD closed, open;
-                    clipper.Execute(Clipper2Lib::ClipType::Difference,
-                                    Clipper2Lib::FillRule::NonZero,
-                                    closed, open);
-                    subjects = std::move(open);
+                if (!subjects.empty()) {
+                    {
+                        Clipper2Lib::ClipperD clipper(kClipperPrecision);
+                        clipper.AddSubject(subjects);
+                        Clipper2Lib::PathsD closed, open;
+                        clipper.Execute(Clipper2Lib::ClipType::Union,
+                                        toClipperFillRule(cs.fillRule), closed, open);
+                        subjects = std::move(closed);
+                    }
+
+                    if (hasClip && !subjects.empty()) {
+                        Clipper2Lib::ClipperD clipper(kClipperPrecision);
+                        clipper.AddSubject(subjects);
+                        clipper.AddClip(clipPoly);
+                        Clipper2Lib::PathsD closed, open;
+                        clipper.Execute(Clipper2Lib::ClipType::Intersection,
+                                        Clipper2Lib::FillRule::NonZero,
+                                        closed, open);
+                        subjects = std::move(closed);
+                    }
+
+                    if (hasOccluder && !subjects.empty()) {
+                        Clipper2Lib::ClipperD clipper(kClipperPrecision);
+                        clipper.AddSubject(subjects);
+                        clipper.AddClip(occluder);
+                        Clipper2Lib::PathsD closed, open;
+                        clipper.Execute(Clipper2Lib::ClipType::Difference,
+                                        Clipper2Lib::FillRule::NonZero,
+                                        closed, open);
+                        subjects = std::move(closed);
+                    }
+
+                    for (auto& pl : subjects) {
+                        if (pl.size() < 2) continue;
+                        for (size_t k = 0; k < pl.size(); ++k) {
+                            auto a = worldToOsci({(float)pl[k].x, (float)pl[k].y});
+                            auto b = worldToOsci({(float)pl[(k + 1) % pl.size()].x, (float)pl[(k + 1) % pl.size()].y});
+                            out.push_back(std::make_unique<osci::Line>(a, b));
+                        }
+                    }
+                }
+            } else {
+                Clipper2Lib::PathsD subjects;
+                for (auto& piece : pieces) {
+                    if (piece.empty()) continue;
+                    std::vector<tvg::Point> world;
+                    world.reserve(piece.size() * 8);
+                    bool first = true;
+                    for (auto& pr : piece) {
+                        flattenPrim(cs.xform, pr.cubic, pr.p0, pr.p1, pr.p2, pr.p3, world, first);
+                        first = false;
+                    }
+                    if (world.size() < 2) continue;
+                    Clipper2Lib::PathD pd;
+                    pd.reserve(world.size());
+                    for (auto& p : world) pd.push_back({p.x, p.y});
+                    subjects.push_back(std::move(pd));
                 }
 
-                for (auto& pl : subjects) {
-                    for (size_t k = 0; k + 1 < pl.size(); ++k) {
-                        auto a = worldToOsci({(float)pl[k].x, (float)pl[k].y});
-                        auto b = worldToOsci({(float)pl[k + 1].x, (float)pl[k + 1].y});
-                        out.push_back(std::make_unique<osci::Line>(a, b));
+                if (!subjects.empty()) {
+                    // If we have a clip, first intersect the open paths with it.
+                    if (hasClip) {
+                        Clipper2Lib::ClipperD clipper(kClipperPrecision);
+                        clipper.AddOpenSubject(subjects);
+                        clipper.AddClip(clipPoly);
+                        Clipper2Lib::PathsD closed, open;
+                        clipper.Execute(Clipper2Lib::ClipType::Intersection,
+                                        Clipper2Lib::FillRule::NonZero,
+                                        closed, open);
+                        subjects = std::move(open);
+                    }
+
+                    // Then subtract the occluder.
+                    if (hasOccluder && !subjects.empty()) {
+                        Clipper2Lib::ClipperD clipper(kClipperPrecision);
+                        clipper.AddOpenSubject(subjects);
+                        clipper.AddClip(occluder);
+                        Clipper2Lib::PathsD closed, open;
+                        clipper.Execute(Clipper2Lib::ClipType::Difference,
+                                        Clipper2Lib::FillRule::NonZero,
+                                        closed, open);
+                        subjects = std::move(open);
+                    }
+
+                    for (auto& pl : subjects) {
+                        for (size_t k = 0; k + 1 < pl.size(); ++k) {
+                            auto a = worldToOsci({(float)pl[k].x, (float)pl[k].y});
+                            auto b = worldToOsci({(float)pl[k + 1].x, (float)pl[k + 1].y});
+                            out.push_back(std::make_unique<osci::Line>(a, b));
+                        }
                     }
                 }
             }
@@ -857,6 +985,18 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
                                  toClipperFillRule(cs.fillRule),
                                  selfClosed, selfOpen);
                 }
+                if (hasClip && !selfClosed.empty()) {
+                    Clipper2Lib::ClipperD clippedSelf(kClipperPrecision);
+                    clippedSelf.AddSubject(selfClosed);
+                    clippedSelf.AddClip(clipPoly);
+                    Clipper2Lib::PathsD clippedClosed, clippedOpen;
+                    clippedSelf.Execute(Clipper2Lib::ClipType::Intersection,
+                                        Clipper2Lib::FillRule::NonZero,
+                                        clippedClosed, clippedOpen);
+                    selfClosed = std::move(clippedClosed);
+                }
+                if (selfClosed.empty()) continue;
+
                 Clipper2Lib::ClipperD clipper(kClipperPrecision);
                 if (!occluder.empty()) clipper.AddSubject(occluder);
                 clipper.AddSubject(selfClosed);
@@ -876,6 +1016,13 @@ void OsciLottieParser::showError(juce::String message) {
     juce::MessageManager::callAsync([message] {
         juce::AlertWindow::showMessageBoxAsync(
             juce::AlertWindow::AlertIconType::WarningIcon, "Error", message);
+    });
+}
+
+void OsciLottieParser::showWarning(juce::String title, juce::String message) {
+    juce::MessageManager::callAsync([title, message] {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::AlertIconType::WarningIcon, title, message);
     });
 }
 

@@ -28,6 +28,7 @@ public:
 private:
     void extractShapesAtCurrentFrame(std::vector<std::unique_ptr<osci::Shape>>& out);
     void showError(juce::String message);
+    void showWarning(juce::String title, juce::String message);
     void fallbackShapes();
 
     // Retained JSON buffer (thorvg loads with copy=false so we must keep it alive).

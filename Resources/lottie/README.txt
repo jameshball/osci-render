@@ -20,6 +20,8 @@ Files obtained from LottieFiles:
   blinking_eye.lottie      -> "Blinking Eye"
   spinning_squares.lottie  -> "Loading"
   wave.lottie              -> "Material wave loading"
+  cat.lottie               -> "Cat Movement"
+  dice.lottie              -> "Dice roll"
 
 If you are the author of one of these animations and would like the file
 removed or attribution updated, please open an issue on the osci-render

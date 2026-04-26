@@ -1,6 +1,7 @@
 #include "FileParser.h"
 #include <numbers>
 #include "../PluginProcessor.h"
+#include "lottie/DotLottieArchive.h"
 
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
     : errorCallback(errorCallback), audioProcessor(p) {}
@@ -115,20 +116,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		showFileSizeWarning(fileName, bytesRead, 10, "Lottie", [this, buffer, extension]() {
 			juce::String jsonContent;
 			if (extension == ".lottie") {
-				juce::MemoryInputStream zipStream(*buffer, false);
-				juce::ZipFile zip(zipStream);
-				for (int i = 0; i < zip.getNumEntries(); ++i) {
-					auto* entry = zip.getEntry(i);
-					if (entry == nullptr) continue;
-					auto name = entry->filename.toLowerCase();
-					if (name.startsWith("animations/") && name.endsWith(".json")) {
-						std::unique_ptr<juce::InputStream> entryStream(zip.createStreamForEntry(i));
-						if (entryStream != nullptr) {
-							jsonContent = entryStream->readEntireStreamAsString();
-							break;
-						}
-					}
-				}
+				jsonContent = osci::lottie::extractAnimationJsonFromDotLottie(*buffer);
 				if (jsonContent.isEmpty()) {
 					juce::MessageManager::callAsync([] {
 						juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon,
