@@ -124,9 +124,14 @@ if [ "$OS" = "linux" ]; then
     # gives CI something useful and non-empty to upload.
     LINUX_STDOUT_LOG="$PLUGINVAL_LOG_DIR/pluginval-linux-${TARGET}-stdout.log"
 
-    # Linux CI needs a virtual display for JUCE GUI
+    # Linux CI needs a virtual display for JUCE GUI.
+    # NOTE: the backslash-escaped quotes around `-screen 0 1280x720x24` are
+    # required so that, after `eval` re-parses the command line, the geometry
+    # string is passed as a SINGLE argument to xvfb-run's `-s` flag. Without
+    # them xvfb-run sees `-s -screen` and treats `0 1280x720x24` as the
+    # command to run (which fails immediately).
     if command -v xvfb-run &> /dev/null; then
-        eval xvfb-run -a -s "-screen 0 1280x720x24" $PLUGINVAL_CMD 2>&1 | tee "$LINUX_STDOUT_LOG"
+        eval xvfb-run -a -s \"-screen 0 1280x720x24\" $PLUGINVAL_CMD 2>&1 | tee "$LINUX_STDOUT_LOG"
         PLUGINVAL_EXIT=${PIPESTATUS[0]}
     else
         eval $PLUGINVAL_CMD 2>&1 | tee "$LINUX_STDOUT_LOG"
