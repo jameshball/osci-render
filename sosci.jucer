@@ -267,6 +267,10 @@
               file="Source/visualiser/VisualiserComponent.h"/>
         <FILE id="IzKiqO" name="VisualiserParameters.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserParameters.h"/>
+        <FILE id="SsSvgC" name="VisualiserSvgExporter.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserSvgExporter.cpp"/>
+        <FILE id="SsSvgH" name="VisualiserSvgExporter.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserSvgExporter.h"/>
         <FILE id="A9Zk5z" name="VisualiserRenderer.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserRenderer.cpp"/>
         <FILE id="XquFmM" name="VisualiserRenderer.h" compile="0" resource="0"

@@ -64,6 +64,7 @@ public:
     bool isMirrorMode() const { return mirrorSource.load() != nullptr; }
 
     void getFrame(std::vector<unsigned char>& frame);
+    juce::String createCurrentFrameSvg();
     void drawFrame();    juce::Rectangle<int> getViewportArea() const { return viewportArea; }
     void setViewportArea(juce::Rectangle<int> area) {
         viewportArea = area;
@@ -119,6 +120,8 @@ private:
     std::vector<float> smoothedRSamples;
     std::vector<float> smoothedGSamples;
     std::vector<float> smoothedBSamples;
+    int smoothedSampleBufferCount = -1;
+    RenderMode smoothedSampleRenderMode = RenderMode::XY;
     std::atomic<int> sampleBufferCount = 0;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;

@@ -96,6 +96,11 @@ private:
     SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+    SvgButton svgExportButton{
+        "svgExport",
+        R"svg(<svg xmlns="http://www.w3.org/2000/svg" id="mdi-file-export-outline" viewBox="0 0 24 24"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20M16 11V18.1L13.9 16L11.1 18.8L8.3 16L11.1 13.2L8.9 11H16Z" /></svg>)svg",
+        juce::Colours::white,
+        juce::Colours::white};
 
 #if OSCI_PREMIUM
     SharedTextureManager& sharedTextureManager;
@@ -128,12 +133,14 @@ private:
     SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::FileChooser> svgExportChooser;
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
     AudioRecorder audioRecorder;
 
     juce::Rectangle<int> buttonRow;
 
     void popoutWindow();
+    void exportCurrentFrameAsSvg();
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void stopTask() override;
