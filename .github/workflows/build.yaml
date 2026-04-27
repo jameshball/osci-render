@@ -45,7 +45,7 @@ jobs:
         with:
           token: ${{ secrets.ACCESS_TOKEN || github.token }}
           submodules: recursive
-          fetch-depth: 1
+          fetch-depth: 0
 
       # ── Caches ────────────────────────────────────────────────
       # ccache: compile-time cache for Projucer-generated builds. Wired into
