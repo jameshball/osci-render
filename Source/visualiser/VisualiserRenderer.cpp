@@ -244,7 +244,7 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
     }
 
     // this just triggers a repaint
-    triggerAsyncUpdate();
+    openGLContext.triggerRepaint();
     // wait for rendering on the OpenGLRenderer thread to complete
     if (!renderingSemaphore.acquire()) {
         juce::String info;
@@ -383,7 +383,11 @@ void VisualiserRenderer::newOpenGLContextCreated() {
     glGenBuffers(1, &quadIndexBuffer);
     glGenBuffers(1, &vertexIndexBuffer);
 
-    setupTextures(resolution);
+    setupTextures(resolution.load());
+
+    // Textures are now sized for the current resolution, so any pending request that
+    // arrived before the context was ready can be discarded.
+    pendingResolution.store(-1);
 }
 
 void VisualiserRenderer::openGLContextClosing() {
@@ -425,14 +429,17 @@ void VisualiserRenderer::openGLContextClosing() {
     scratchVertices.clear();
 }
 
-void VisualiserRenderer::handleAsyncUpdate() {
-    repaint();
-}
-
 void VisualiserRenderer::renderOpenGL() {
     using namespace juce::gl;
 
     if (openGLContext.isActive()) {
+        if (const int requestedResolution = pendingResolution.exchange(-1); requestedResolution > 0) {
+            glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+            lineTexture = makeTexture(requestedResolution, requestedResolution, lineTexture.id);
+            renderTexture = makeTexture(requestedResolution, requestedResolution, renderTexture.id);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+
         // One-time DPI diagnostics: log before anything modifies the viewport.
         // JUCE sets glViewport to the physical pixel area just before calling
         // renderOpenGL(), so reading it here captures the true JUCE viewport.
@@ -721,30 +728,24 @@ Texture VisualiserRenderer::makeTexture(int width, int height, GLuint textureID)
 }
 
 void VisualiserRenderer::setResolution(int resolution) {
-    using namespace juce::gl;
-
-    if (this->resolution != resolution) {
-        this->resolution = resolution;
-
-        // Release semaphore to prevent deadlocks during texture rebuilding
-        renderingSemaphore.release();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-
-        lineTexture = makeTexture(resolution, resolution, lineTexture.id);
-        renderTexture = makeTexture(resolution, resolution, renderTexture.id);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
+    if (resolution <= 0) {
+        return;
+    }
+    if (this->resolution.load() != resolution) {
+        this->resolution.store(resolution);
+        pendingResolution.store(resolution);
+        openGLContext.triggerRepaint();
     }
 }
 
 void VisualiserRenderer::setFrameRate(double frameRate) {
-    using namespace juce::gl;
-
     if (this->frameRate != frameRate) {
         this->frameRate = frameRate;
-        prepare(sampleRate, -1);
-        setupArrays(RESAMPLE_RATIO * sampleRate / frameRate);
+
+        if (sampleRate > 0.0) {
+            prepare(sampleRate, -1);
+            setupArrays(RESAMPLE_RATIO * sampleRate / frameRate);
+        }
     }
 }
 
