@@ -33,7 +33,13 @@ platform_build() {
   if [ "$OS" = "linux" ]; then
     cd "$ROOT/Builds/$PLUGIN/LinuxMakefile"
     if [ "$clean" = "--clean" ]; then make clean CONFIG=Release; fi
-    make -j$(nproc) CONFIG=Release
+    # Use ccache as a compiler launcher when available (CI installs it via setup-env).
+    # Pass via -e so make uses our value even though the JUCE-generated Makefile sets CXX itself.
+    if command -v ccache >/dev/null 2>&1; then
+      make -j$(nproc) -e CONFIG=Release CXX="ccache g++" CC="ccache gcc"
+    else
+      make -j$(nproc) CONFIG=Release
+    fi
   fi
 
   if [ "$OS" = "win" ]; then

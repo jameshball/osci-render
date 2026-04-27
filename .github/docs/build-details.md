@@ -2,20 +2,38 @@
 
 Supplementary build documentation. See [copilot-instructions.md](../copilot-instructions.md) for primary guide.
 
-## ccache + PCH (macOS)
+## ccache + PCH
 
-Debug builds use two compile-time optimisations wired into the `.jucer` files:
+Both Debug and Release builds use:
 
 - **PCH** — `Source/pch.h` pre-parses `<JuceHeader.h>` once. Halves clean build time (~2m49s → ~1m12s).
-- **ccache** — compiler output cached by preprocessed-source hash. Wired via `ci/ccache-clang` / `ci/ccache-clang++`.
+- **ccache** — compiler output cached by preprocessed-source hash. Wired via `ci/ccache-clang` / `ci/ccache-clang++` on macOS, and via `CXX="ccache g++"` env in `ci/build.sh` / `ci/test.sh` on Linux.
 
-**One-time setup (required on a new machine):**
+**One-time setup (macOS, required on a new machine):**
 ```bash
 brew install ccache
 ccache --set-config sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime
 ```
 
 Without the sloppiness config, every build reports "uncacheable" and the cache is never used.
+
+**CI** uses `hendrikmuhs/ccache-action` to persist ccache state across runs via the GitHub Actions cache.
+
+**Windows ccache follow-up:** the Projucer-generated MSBuild `.vcxproj` doesn't expose a clean compiler-launcher hook, so CI Windows builds currently run without a compile cache. Migrating to a CMake/Ninja + sccache workflow on Windows is the cleanest fix — tracked as a follow-up.
+
+## CI architecture
+
+`.github/workflows/build.yaml` runs a 9-job matrix (3 OS × {osci-free, osci-premium, sosci}) with:
+
+- **Compile cache** — `hendrikmuhs/ccache-action` for macOS + Linux (Windows pending)
+- **LuaJIT cache** — keyed on runner image, `modules/LuaJIT` submodule SHA, and the LuaJIT build recipe
+- **pluginval cache** — keyed on runner image, `modules/pluginval` submodule SHA, and the pluginval build recipe; pluginval.sh skips rebuild when `Builds/.osci_built` exists
+- **apt cache** — `awalsh128/cache-apt-pkgs-action` on Linux runners
+- **NuGet cache** — `~/.nuget/packages` keyed on project files
+- **Packages installer cache** — caches `Packages_1211_dev.dmg` between macOS runs
+- **Concurrency** — older in-progress runs are auto-cancelled when a new one starts on the same ref
+- **Parallel pluginval** — effect + instrument validation run concurrently in the same job
+- **Ninja** — pluginval CMake build uses Ninja when available (significantly faster than Xcode/MSBuild generators)
 
 ## Building (Windows)
 

@@ -381,7 +381,8 @@
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,CC=$(SRCROOT)/../../../ci/ccache-clang,CXX=$(SRCROOT)/../../../ci/ccache-clang++"
                        usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+        <CONFIGURATION name="Release" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,CC=$(SRCROOT)/../../../ci/ccache-clang,CXX=$(SRCROOT)/../../../ci/ccache-clang++"
+                       usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="sosci" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>

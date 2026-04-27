@@ -1,9 +1,49 @@
 #!/bin/bash -e
 
-# linux specific stiff
-if [ $OS = "linux" ]; then
-  sudo apt-get update
-  sudo apt-get install clang git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
+# Linux build dependencies are installed by `awalsh128/cache-apt-pkgs-action`
+# in the workflow, but keep a fallback so direct callers of this script still
+# get a complete environment on fresh Ubuntu/Debian systems.
+if [ "$OS" = "linux" ]; then
+  LINUX_PACKAGES=(
+    ccache ninja-build clang git ladspa-sdk freeglut3-dev g++
+    libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev
+    libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev
+    mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
+  )
+
+  if command -v apt-get >/dev/null 2>&1 && command -v dpkg-query >/dev/null 2>&1; then
+    MISSING_PACKAGES=()
+    for package in "${LINUX_PACKAGES[@]}"; do
+      if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
+        MISSING_PACKAGES+=("$package")
+      fi
+    done
+
+    if [ "${#MISSING_PACKAGES[@]}" -gt 0 ]; then
+      sudo apt-get update
+      sudo apt-get install -y "${MISSING_PACKAGES[@]}"
+    fi
+  else
+    echo "Skipping Linux package install fallback: apt-get/dpkg-query not available."
+  fi
+fi
+
+# macOS-specific tooling (ccache for compile cache, ninja for pluginval CMake build)
+if [ "$OS" = "mac" ]; then
+  if ! command -v ccache >/dev/null 2>&1; then
+    brew install ccache
+  fi
+  if ! command -v ninja >/dev/null 2>&1; then
+    brew install ninja
+  fi
+fi
+
+# Configure ccache for JUCE/Projucer builds. The "sloppiness" flags allow PCH and
+# time/file macros to hit the cache; without them most TUs are reported uncacheable.
+if command -v ccache >/dev/null 2>&1; then
+  ccache --set-config sloppiness=pch_defines,time_macros,include_file_mtime,include_file_ctime
+  ccache --set-config max_size=2G
+  ccache -z >/dev/null 2>&1 || true
 fi
 
 ROOT=$(pwd)

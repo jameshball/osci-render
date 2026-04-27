@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 # pluginval validation script
-# Usage (CI):   source ./ci/pluginval.sh "osci-render"
-# Usage (CI):   source ./ci/pluginval.sh "osci-render" "osci-render (instrument)"
+# Usage (CI):   bash ./ci/pluginval.sh "osci-render"
+# Usage (CI):   bash ./ci/pluginval.sh "osci-render" "osci-render-instrument"
 # Usage (local): ROOT=$(pwd) OS=win ./ci/pluginval.sh "osci-render"
 #
 # Requires: cmake, a C++ toolchain, and a previously-built plugin.
@@ -18,6 +18,33 @@ SKIP_GUI="${PLUGINVAL_SKIP_GUI:-}"
 ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PLUGINVAL_SRC="$ROOT/modules/pluginval"
 PLUGINVAL_BUILD="$PLUGINVAL_SRC/Builds"
+PLUGINVAL_BUILD_LOCK="$PLUGINVAL_SRC/.osci_build.lock"
+PLUGINVAL_BUILD_LOCK_ACQUIRED=0
+
+release_pluginval_build_lock() {
+    if [ "$PLUGINVAL_BUILD_LOCK_ACQUIRED" -eq 1 ]; then
+        rmdir "$PLUGINVAL_BUILD_LOCK" 2>/dev/null || true
+        PLUGINVAL_BUILD_LOCK_ACQUIRED=0
+    fi
+}
+
+acquire_pluginval_build_lock() {
+    local waited_seconds=0
+    local timeout_seconds="${PLUGINVAL_BUILD_LOCK_TIMEOUT:-1200}"
+
+    while ! mkdir "$PLUGINVAL_BUILD_LOCK" 2>/dev/null; do
+        if [ "$waited_seconds" -ge "$timeout_seconds" ]; then
+            echo "ERROR: timed out waiting for pluginval build lock: $PLUGINVAL_BUILD_LOCK" >&2
+            exit 1
+        fi
+
+        sleep 2
+        waited_seconds=$((waited_seconds + 2))
+    done
+
+    PLUGINVAL_BUILD_LOCK_ACQUIRED=1
+    trap release_pluginval_build_lock EXIT
+}
 
 # ── Detect OS if not already set ───────────────────────────────
 
@@ -38,15 +65,33 @@ echo "============================================="
 
 cd "$PLUGINVAL_SRC"
 
-# pluginval_IS_TOP_LEVEL is auto-set by CMake >= 3.21; force it for older versions
-CMAKE_EXTRA_ARGS="-Dpluginval_IS_TOP_LEVEL=ON"
+acquire_pluginval_build_lock
 
-if [ "$OS" = "win" ]; then
-    # Windows: use Visual Studio generator
-    cmake -B Builds -DCMAKE_BUILD_TYPE=Release -DPLUGINVAL_VST3_VALIDATOR=OFF $CMAKE_EXTRA_ARGS .
-    cmake --build Builds --config Release --parallel
+# Skip rebuild if a cached binary is already present (CI restores it via actions/cache).
+PLUGINVAL_CACHE_MARKER="$PLUGINVAL_BUILD/.osci_built"
+CMAKE_CACHE="$PLUGINVAL_BUILD/CMakeCache.txt"
+if [ -f "$CMAKE_CACHE" ] && ! grep -Fxq "CMAKE_HOME_DIRECTORY:INTERNAL=$PLUGINVAL_SRC" "$CMAKE_CACHE"; then
+    echo "Removing stale pluginval build directory for a different source path"
+    rm -rf "$PLUGINVAL_BUILD"
+fi
+
+if [ -f "$PLUGINVAL_CACHE_MARKER" ]; then
+    echo "Reusing cached pluginval build at $PLUGINVAL_BUILD"
 else
-    cmake -B Builds -DCMAKE_BUILD_TYPE=Release -DPLUGINVAL_VST3_VALIDATOR=OFF $CMAKE_EXTRA_ARGS .
+    CMAKE_GEN_ARGS=()
+
+    # Prefer Ninja when available on Unix-like runners. Windows keeps the
+    # Visual Studio generator because this step does not initialize vcvars.
+    if [ "$OS" != "win" ] && command -v ninja >/dev/null 2>&1; then
+        CMAKE_GEN_ARGS=(-G Ninja)
+    fi
+
+    cmake -B Builds \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DPLUGINVAL_VST3_VALIDATOR=OFF \
+        -Dpluginval_IS_TOP_LEVEL=ON \
+        "${CMAKE_GEN_ARGS[@]}" \
+        .
     cmake --build Builds --config Release --parallel
 fi
 
@@ -64,10 +109,22 @@ if [ ! -f "$PLUGINVAL" ]; then
     echo "ERROR: pluginval binary not found at $PLUGINVAL"
     echo "Searching for it..."
     find "$PLUGINVAL_BUILD" -name "pluginval*" -type f 2>/dev/null || true
+    rm -f "$PLUGINVAL_CACHE_MARKER"
     exit 1
 fi
 
+touch "$PLUGINVAL_CACHE_MARKER"
+
+release_pluginval_build_lock
+trap - EXIT
+
 echo "pluginval binary: $PLUGINVAL"
+
+if [ -n "${PLUGINVAL_BUILD_ONLY:-}" ]; then
+    echo "pluginval build is ready"
+    cd "$ROOT"
+    exit 0
+fi
 
 # ── Locate the built VST3 plugin ──────────────────────────────
 
@@ -93,7 +150,10 @@ echo "VST3 plugin: $VST3_PATH"
 
 # ── Run pluginval ──────────────────────────────────────────────
 
-PLUGINVAL_LOG_DIR="$ROOT/bin/pluginval-logs"
+PLUGINVAL_LOG_BASE_DIR="${PLUGINVAL_LOG_DIR:-$ROOT/bin/pluginval-logs}"
+PLUGINVAL_RUN_NAME="${PLUGINVAL_LOG_NAME:-$TARGET-strictness-$STRICTNESS}"
+PLUGINVAL_RUN_NAME="$(printf '%s' "$PLUGINVAL_RUN_NAME" | tr -cs 'A-Za-z0-9._-' '_')"
+PLUGINVAL_LOG_DIR="$PLUGINVAL_LOG_BASE_DIR/$PLUGINVAL_RUN_NAME"
 mkdir -p "$PLUGINVAL_LOG_DIR"
 
 PLUGINVAL_TIMEOUT="${PLUGINVAL_TIMEOUT:-60000}"

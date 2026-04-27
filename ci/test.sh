@@ -32,7 +32,11 @@ fi
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/Test/LinuxMakefile"
-  make -j$(nproc) CONFIG=Release
+  if command -v ccache >/dev/null 2>&1; then
+    make -j$(nproc) -e CONFIG=Release CXX="ccache g++" CC="ccache gcc"
+  else
+    make -j$(nproc) CONFIG=Release
+  fi
 
   cd build
   echo "Running the test"

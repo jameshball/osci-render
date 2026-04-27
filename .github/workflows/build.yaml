@@ -4,6 +4,10 @@ on:
     branches:
       - develop
     paths:
+      - .github/workflows/build.yaml
+      - .github/docs/build-details.md
+      - ci/**
+      - luajit_linux_macos.sh
       - osci-render.jucer
       - sosci.jucer
       - packaging/osci-render.iss
@@ -12,10 +16,15 @@ on:
       - packaging/sosci.pkgproj
   workflow_dispatch:
 
+# Cancel in-progress runs for the same ref + event when a new run starts.
+# Saves runner minutes when CI is triggered repeatedly in quick succession.
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -32,10 +41,97 @@ jobs:
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
 
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: recursive
+          fetch-depth: 1
+
+      # ── Caches ────────────────────────────────────────────────
+      # ccache: compile-time cache for Projucer-generated builds. Wired into
+      # macOS Xcode configs (CC=ccache-clang) and into the Linux Makefile via
+      # the CXX="ccache g++" override in ci/build.sh and ci/test.sh.
+      # Windows MSBuild is not currently wrapped — that's a follow-up.
+      - name: Set up ccache
+        if: matrix.os != 'windows-2022'
+        # Pinned to upstream v1.2.
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639
+        with:
+          key: ccache-${{ matrix.os }}-${{ matrix.project }}-${{ matrix.version }}
+          # Allow restoring from any matching key on the same OS/project even if
+          # the variant differs (large overlap between free/premium and effect/instrument).
+          restore-keys: |
+            ccache-${{ matrix.os }}-${{ matrix.project }}-
+          max-size: 2G
+
+      # LuaJIT is built from source by ci/test.sh and by the Projucer-generated
+      # build (linked statically). Cache outputs by runner image, submodule SHA,
+      # and the build script so SDK/toolchain or recipe changes force a rebuild.
+      - name: Resolve submodule SHAs for cache keys
+        id: submodule_shas
+        shell: bash
+        run: |
+          echo "luajit_sha=$(git -C modules/LuaJIT rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "pluginval_sha=$(git -C modules/pluginval rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "image_os=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "image_version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache LuaJIT build
+        id: cache_luajit
+        uses: actions/cache@v4
+        with:
+          key: luajit-${{ matrix.os }}-${{ runner.arch }}-${{ steps.submodule_shas.outputs.image_os }}-${{ steps.submodule_shas.outputs.image_version }}-${{ steps.submodule_shas.outputs.luajit_sha }}-${{ hashFiles('luajit_linux_macos.sh', 'ci/test.sh') }}
+          path: |
+            modules/LuaJIT/src/libluajit.a
+            modules/LuaJIT/src/lua51.lib
+            modules/LuaJIT/src/luajit51.lib
+            modules/LuaJIT/src/lua51.dll
+            modules/LuaJIT/src/lua51.exp
+            modules/LuaJIT/src/luajit.exe
+            modules/LuaJIT/src/libluajit_x86_64.a
+            modules/LuaJIT/src/libluajit_arm64.a
+            modules/LuaJIT/src/.luajit-build-x86_64.stamp
+            modules/LuaJIT/src/.luajit-build-arm64.stamp
+            modules/LuaJIT/src/.luajit-build-linux.stamp
+
+      # Cache the entire pluginval Builds/ directory by runner image, submodule
+      # SHA, and build recipe so toolchain or script changes force a rebuild.
+      - name: Cache pluginval build
+        id: cache_pluginval
+        uses: actions/cache@v4
+        with:
+          key: pluginval-${{ matrix.os }}-${{ runner.arch }}-${{ steps.submodule_shas.outputs.image_os }}-${{ steps.submodule_shas.outputs.image_version }}-${{ steps.submodule_shas.outputs.pluginval_sha }}-${{ hashFiles('ci/pluginval.sh', '.github/workflows/build.yaml') }}
+          path: |
+            modules/pluginval/Builds
+
+      # Cache the Packages installer .dmg between macOS runs (~60MB download).
+      - name: Cache Packages installer image (macOS)
+        id: cache_packages
+        if: matrix.os == 'macos-latest'
+        uses: actions/cache@v4
+        with:
+          key: packages-installer-1211
+          path: Packages_1211_dev.dmg
+
+      # apt packages: heavy install on every Linux run. cache-apt-pkgs-action
+      # restores .deb archives from cache when available.
+      - name: Cache apt packages (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        # Pinned to upstream v1.6.0.
+        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05
+        with:
+          packages: ccache ninja-build clang git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
+          version: 1.0
+
+      # NuGet packages restored by MSBuild on every Windows run.
+      - name: Cache NuGet packages (Windows)
+        if: matrix.os == 'windows-2022'
+        uses: actions/cache@v4
+        with:
+          key: nuget-${{ runner.os }}-${{ hashFiles('*.jucer') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+          path: ~/.nuget/packages
 
       - name: Set platform variables
         shell: bash
@@ -169,29 +265,82 @@ jobs:
           choco install procdump -y --no-progress
           procdump -accepteula || true
 
-      - name: Validate plugin with pluginval
-        id: pluginval_effect
+      # Build pluginval once, then run effect + instrument validation in
+      # parallel within the same runner. continue-on-error keeps the rest of the
+      # job alive even on validation failure; the `Check pluginval results` step
+      # at the end fails the job if either failed.
+      - name: Validate plugin with pluginval (effect + instrument in parallel)
+        id: pluginval
         if: steps.ci_flags.outputs.skip_validation != 'true'
         continue-on-error: true
         shell: bash
         env:
           PLUGINVAL_SKIP_GUI: "1"
           PLUGINVAL_TIMEOUT: "1200000"
-          PLUGINVAL_STRICTNESS: "10"
         run: |
-          source ./ci/pluginval.sh "${{ matrix.project }}"
+          set +e
+          mkdir -p bin/pluginval-logs
 
-      - name: Validate instrument plugin with pluginval
-        id: pluginval_instrument
-        if: matrix.project == 'osci-render' && steps.ci_flags.outputs.skip_validation != 'true'
-        continue-on-error: true
-        shell: bash
-        env:
-          PLUGINVAL_SKIP_GUI: "1"
-          PLUGINVAL_TIMEOUT: "1200000"
-          PLUGINVAL_STRICTNESS: "5"
-        run: |
-          source ./ci/pluginval.sh "${{ matrix.project }}" "${{ matrix.project }}-instrument"
+          PLUGINVAL_BUILD_LOG=bin/pluginval-logs/pluginval-build.log
+          PLUGINVAL_BUILD_ONLY=1 \
+            bash ./ci/pluginval.sh "${{ matrix.project }}" \
+            > "$PLUGINVAL_BUILD_LOG" 2>&1
+          BUILD_EXIT=$?
+
+          if [ "$BUILD_EXIT" -ne 0 ]; then
+            echo "$BUILD_EXIT" > bin/pluginval-logs/pluginval-effect.exitcode
+            if [ "${{ matrix.project }}" = "osci-render" ]; then
+              echo "$BUILD_EXIT" > bin/pluginval-logs/pluginval-instrument.exitcode
+            fi
+          else
+            # Effect run (strictness 10)
+            (
+              PLUGINVAL_STRICTNESS=10 \
+                PLUGINVAL_LOG_NAME=effect \
+                bash ./ci/pluginval.sh "${{ matrix.project }}" \
+                > bin/pluginval-logs/pluginval-effect.log 2>&1
+              echo $? > bin/pluginval-logs/pluginval-effect.exitcode
+            ) &
+            PID_EFFECT=$!
+
+            # Instrument run (osci-render only, strictness 5)
+            PID_INSTRUMENT=
+            if [ "${{ matrix.project }}" = "osci-render" ]; then
+              (
+                PLUGINVAL_STRICTNESS=5 \
+                  PLUGINVAL_LOG_NAME=instrument \
+                  bash ./ci/pluginval.sh "${{ matrix.project }}" "${{ matrix.project }}-instrument" \
+                  > bin/pluginval-logs/pluginval-instrument.log 2>&1
+                echo $? > bin/pluginval-logs/pluginval-instrument.exitcode
+              ) &
+              PID_INSTRUMENT=$!
+            fi
+
+            wait "$PID_EFFECT"
+            if [ -n "$PID_INSTRUMENT" ]; then wait "$PID_INSTRUMENT"; fi
+          fi
+
+          # Stream logs into the workflow output for visibility.
+          echo "===== pluginval build log ====="
+          cat "$PLUGINVAL_BUILD_LOG" || true
+          echo "===== pluginval (effect) log ====="
+          cat bin/pluginval-logs/pluginval-effect.log || true
+          if [ -f bin/pluginval-logs/pluginval-instrument.log ]; then
+            echo "===== pluginval (instrument) log ====="
+            cat bin/pluginval-logs/pluginval-instrument.log || true
+          fi
+
+          EFFECT_EXIT=$(cat bin/pluginval-logs/pluginval-effect.exitcode 2>/dev/null || echo 1)
+          INSTRUMENT_EXIT=0
+          if [ "${{ matrix.project }}" = "osci-render" ]; then
+            INSTRUMENT_EXIT=$(cat bin/pluginval-logs/pluginval-instrument.exitcode 2>/dev/null || echo 1)
+          fi
+
+          echo "effect_exit=$EFFECT_EXIT" >> "$GITHUB_OUTPUT"
+          echo "instrument_exit=$INSTRUMENT_EXIT" >> "$GITHUB_OUTPUT"
+
+          # Don't fail this step — `Check pluginval results` decides job outcome.
+          exit 0
 
       # Upload pluginval logs and crash dumps to MEGA (runs even if pluginval failed)
       - name: Upload pluginval logs to MEGA (Unix)
@@ -230,7 +379,7 @@ jobs:
 
       # macOS packaging & notarization
       - name: Download Packages installer build tool
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && steps.cache_packages.outputs.cache-hit != 'true'
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
 
       - name: Mount Packages image
@@ -346,16 +495,32 @@ jobs:
 
       # Fail the job if pluginval failed (after all logs and binaries have been uploaded)
       - name: Check pluginval results
-        if: always()
+        if: always() && steps.ci_flags.outputs.skip_validation != 'true'
         shell: bash
         run: |
           FAILED=0
-          if [[ "${{ steps.pluginval_effect.outcome }}" == "failure" ]]; then
-            echo "::error::pluginval (effect) failed"
+          if [ "${{ steps.pluginval.outcome }}" = "skipped" ]; then
+            echo "pluginval step was skipped; preserving earlier job result."
+            exit 0
+          fi
+          if [ "${{ steps.pluginval.outcome }}" = "failure" ]; then
+            echo "::error::pluginval step failed before publishing complete outputs"
             FAILED=1
           fi
-          if [[ "${{ steps.pluginval_instrument.outcome }}" == "failure" ]]; then
-            echo "::error::pluginval (instrument) failed"
+          EFFECT_EXIT="${{ steps.pluginval.outputs.effect_exit }}"
+          INSTRUMENT_EXIT="${{ steps.pluginval.outputs.instrument_exit }}"
+          if [ -z "$EFFECT_EXIT" ]; then
+            echo "::error::pluginval (effect) did not publish an exit code"
+            FAILED=1
+          elif [ "$EFFECT_EXIT" != "0" ]; then
+            echo "::error::pluginval (effect) failed with exit code $EFFECT_EXIT"
+            FAILED=1
+          fi
+          if [ -z "$INSTRUMENT_EXIT" ]; then
+            echo "::error::pluginval (instrument) did not publish an exit code"
+            FAILED=1
+          elif [ "$INSTRUMENT_EXIT" != "0" ]; then
+            echo "::error::pluginval (instrument) failed with exit code $INSTRUMENT_EXIT"
             FAILED=1
           fi
           exit $FAILED
