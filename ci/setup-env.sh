@@ -131,12 +131,39 @@ int main(int argc, char** argv)
         }
     }
 
+    char realClDir[MAX_PATH] = "";
+    strncpy(realClDir, realClPath, sizeof(realClDir));
+    realClDir[sizeof(realClDir) - 1] = '\0';
+    char* realClSlash = strrchr(realClDir, '\\');
+    if (realClSlash != NULL)
+    {
+        *realClSlash = '\0';
+
+        DWORD pathLen = GetEnvironmentVariableA("PATH", NULL, 0);
+        if (pathLen > 0)
+        {
+            char* currentPath = (char*) malloc(pathLen);
+            if (currentPath != NULL && GetEnvironmentVariableA("PATH", currentPath, pathLen) > 0)
+            {
+                size_t newPathLen = strlen(realClDir) + 1 + strlen(currentPath) + 1;
+                char* newPath = (char*) malloc(newPathLen);
+                if (newPath != NULL)
+                {
+                    snprintf(newPath, newPathLen, "%s;%s", realClDir, currentPath);
+                    _putenv_s("PATH", newPath);
+                    free(newPath);
+                }
+            }
+            free(currentPath);
+        }
+    }
+
     char** childArgs = (char**) calloc((size_t) argc + 2, sizeof(char*));
     if (childArgs == NULL)
         return 1;
 
     childArgs[0] = sccachePath;
-    childArgs[1] = realClPath;
+    childArgs[1] = "cl.exe";
     for (int i = 1; i < argc; ++i)
         childArgs[i + 1] = argv[i];
     childArgs[argc + 1] = NULL;
