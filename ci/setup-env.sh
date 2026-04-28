@@ -53,17 +53,100 @@ mkdir bin
 
 MSBUILD_CACHE_ARGS=()
 
-BRANCH=${GITHUB_REF##*/}
-echo "$BRANCH"
+configure_msvc_sccache() {
+  MSBUILD_CACHE_ARGS=()
 
-cd "$ROOT/ci"
-rm -Rf bin
-mkdir bin
+  if [ "$OS" != "win" ] || ! command -v sccache >/dev/null 2>&1; then
+    return 0
+  fi
 
-if [ "$OS" = "win" ] && command -v sccache >/dev/null 2>&1; then
+  if ! command -v cl.exe >/dev/null 2>&1; then
+    echo "Skipping Windows sccache wrapper: cl.exe is not on PATH yet."
+    return 0
+  fi
+
   SCCACHE_MSVC_DIR="$ROOT/ci/bin/sccache-msvc"
   mkdir -p "$SCCACHE_MSVC_DIR"
-  cp "$(command -v sccache)" "$SCCACHE_MSVC_DIR/cl.exe"
+  cp "$(command -v sccache)" "$SCCACHE_MSVC_DIR/sccache.exe"
+
+  cat > "$SCCACHE_MSVC_DIR/cl-wrapper.c" <<'EOF'
+#include <process.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+
+int main(int argc, char** argv)
+{
+    char modulePath[MAX_PATH];
+    if (GetModuleFileNameA(NULL, modulePath, MAX_PATH) == 0)
+        return 1;
+
+    char selfPath[MAX_PATH];
+    strncpy(selfPath, modulePath, sizeof(selfPath));
+    selfPath[sizeof(selfPath) - 1] = '\0';
+
+    char* slash = strrchr(modulePath, '\\');
+    if (slash != NULL)
+        slash[1] = '\0';
+    else
+        modulePath[0] = '\0';
+
+    char sccachePath[MAX_PATH];
+    snprintf(sccachePath, sizeof(sccachePath), "%ssccache.exe", modulePath);
+
+    char realClPath[MAX_PATH] = "cl.exe";
+    char* pathEnv = getenv("PATH");
+    if (pathEnv != NULL)
+    {
+      char* paths = _strdup(pathEnv);
+      if (paths != NULL)
+      {
+        char* context = NULL;
+        for (char* dir = strtok_s(paths, ";", &context); dir != NULL; dir = strtok_s(NULL, ";", &context))
+        {
+          char candidate[MAX_PATH];
+          snprintf(candidate, sizeof(candidate), "%s\\cl.exe", dir);
+          DWORD attrs = GetFileAttributesA(candidate);
+          if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0 && _stricmp(candidate, selfPath) != 0)
+          {
+            strncpy(realClPath, candidate, sizeof(realClPath));
+            realClPath[sizeof(realClPath) - 1] = '\0';
+            break;
+          }
+        }
+        free(paths);
+      }
+    }
+
+    char** childArgs = (char**) calloc((size_t) argc + 2, sizeof(char*));
+    if (childArgs == NULL)
+        return 1;
+
+    childArgs[0] = sccachePath;
+    childArgs[1] = realClPath;
+    for (int i = 1; i < argc; ++i)
+        childArgs[i + 1] = argv[i];
+    childArgs[argc + 1] = NULL;
+
+    int result = _spawnv(_P_WAIT, sccachePath, childArgs);
+    if (result == -1)
+    {
+        perror("sccache cl.exe");
+        free(childArgs);
+        return 1;
+    }
+
+    free(childArgs);
+    return result;
+}
+EOF
+
+  WRAPPER_EXE_WIN=$(cygpath -w "$SCCACHE_MSVC_DIR/cl.exe")
+  WRAPPER_OBJ_WIN=$(cygpath -w "$SCCACHE_MSVC_DIR/cl-wrapper.obj")
+  WRAPPER_SOURCE_WIN=$(cygpath -w "$SCCACHE_MSVC_DIR/cl-wrapper.c")
+  cl.exe -nologo -O2 -Fe"$WRAPPER_EXE_WIN" -Fo"$WRAPPER_OBJ_WIN" "$WRAPPER_SOURCE_WIN"
+
   MSBUILD_CACHE_ARGS=(
     "//p:TrackFileAccess=false"
     "//p:UseMultiToolTask=true"
@@ -71,7 +154,14 @@ if [ "$OS" = "win" ] && command -v sccache >/dev/null 2>&1; then
     "//p:CLToolPath=$(cygpath -w "$SCCACHE_MSVC_DIR")"
   )
   echo "Using sccache for Windows MSVC builds: $SCCACHE_MSVC_DIR/cl.exe"
-fi
+}
+
+BRANCH=${GITHUB_REF##*/}
+echo "$BRANCH"
+
+cd "$ROOT/ci"
+rm -Rf bin
+mkdir bin
 
 # Get the Projucer
 cd "$ROOT/ci/bin"
