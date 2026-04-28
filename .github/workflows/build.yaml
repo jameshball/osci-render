@@ -51,7 +51,6 @@ jobs:
       # ccache: compile-time cache for Projucer-generated builds. Wired into
       # macOS Xcode configs (CC=ccache-clang) and into the Linux Makefile via
       # the CXX="ccache g++" override in ci/build.sh and ci/test.sh.
-      # Windows MSBuild is not currently wrapped — that's a follow-up.
       - name: Set up ccache
         if: matrix.os != 'windows-2022'
         # Pinned to upstream v1.2.
@@ -63,6 +62,16 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.os }}-${{ matrix.project }}-
           max-size: 2G
+
+      # sccache: compile-time cache for Windows MSVC builds. ci/setup-env.sh
+      # creates a fake cl.exe wrapper and ci/build.sh / ci/test.sh pass it to
+      # MSBuild via CLToolExe/CLToolPath.
+      - name: Set up sccache (Windows)
+        if: matrix.os == 'windows-2022'
+        # Pinned to upstream v0.0.10.
+        uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696
+        with:
+          version: "v0.10.0"
 
       # LuaJIT is built from source by ci/test.sh and by the Projucer-generated
       # build (linked statically). Cache outputs by runner image, submodule SHA,
@@ -214,6 +223,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCCACHE_GHA_ENABLED: "true"
         run: |
           source ./ci/setup-env.sh
           source ./ci/test.sh
@@ -222,6 +232,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCCACHE_GHA_ENABLED: "true"
         run: |
           source ./ci/setup-env.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"

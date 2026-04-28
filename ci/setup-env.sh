@@ -51,12 +51,27 @@ echo "$ROOT"
 rm -Rf bin
 mkdir bin
 
+MSBUILD_CACHE_ARGS=()
+
 BRANCH=${GITHUB_REF##*/}
 echo "$BRANCH"
 
 cd "$ROOT/ci"
 rm -Rf bin
 mkdir bin
+
+if [ "$OS" = "win" ] && command -v sccache >/dev/null 2>&1; then
+  SCCACHE_MSVC_DIR="$ROOT/ci/bin/sccache-msvc"
+  mkdir -p "$SCCACHE_MSVC_DIR"
+  cp "$(command -v sccache)" "$SCCACHE_MSVC_DIR/cl.exe"
+  MSBUILD_CACHE_ARGS=(
+    "//p:TrackFileAccess=false"
+    "//p:UseMultiToolTask=true"
+    "//p:CLToolExe=cl.exe"
+    "//p:CLToolPath=$(cygpath -w "$SCCACHE_MSVC_DIR")"
+  )
+  echo "Using sccache for Windows MSVC builds: $SCCACHE_MSVC_DIR/cl.exe"
+fi
 
 # Get the Projucer
 cd "$ROOT/ci/bin"

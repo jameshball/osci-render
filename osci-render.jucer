@@ -779,7 +779,7 @@
                        libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
                        prebuildCommand="call ..\..\..\luajit_win.bat"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
-                       debugInformationFormat="ProgramDatabase" winWarningLevel="2"
+                       debugInformationFormat="OldStyle" winWarningLevel="2"
                        libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
                        prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>

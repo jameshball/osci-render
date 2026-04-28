@@ -54,7 +54,12 @@ platform_build() {
       "//p:Platform=x64" \
       "//p:PreferredToolArchitecture=x64" \
       "//restore" \
-      "//p:RestorePackagesConfig=true"
+      "//p:RestorePackagesConfig=true" \
+      "${MSBUILD_CACHE_ARGS[@]}"
+
+    if command -v sccache >/dev/null 2>&1; then
+      sccache --show-stats || true
+    fi
   fi
 }
 

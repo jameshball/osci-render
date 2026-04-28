@@ -7,7 +7,7 @@ Supplementary build documentation. See [copilot-instructions.md](../copilot-inst
 Both Debug and Release builds use:
 
 - **PCH** — `Source/pch.h` pre-parses `<JuceHeader.h>` once. Halves clean build time (~2m49s → ~1m12s).
-- **ccache** — compiler output cached by preprocessed-source hash. Wired via `ci/ccache-clang` / `ci/ccache-clang++` on macOS, and via `CXX="ccache g++"` env in `ci/build.sh` / `ci/test.sh` on Linux.
+- **ccache/sccache** — compiler output cached by preprocessed-source hash. Wired via `ci/ccache-clang` / `ci/ccache-clang++` on macOS, via `CXX="ccache g++"` env in `ci/build.sh` / `ci/test.sh` on Linux, and via `sccache` as a fake `cl.exe` for Windows MSVC builds.
 
 **One-time setup (macOS, required on a new machine):**
 ```bash
@@ -17,15 +17,13 @@ ccache --set-config sloppiness=pch_defines,time_macros,include_file_mtime,includ
 
 Without the sloppiness config, every build reports "uncacheable" and the cache is never used.
 
-**CI** uses `hendrikmuhs/ccache-action` to persist ccache state across runs via the GitHub Actions cache.
-
-**Windows ccache follow-up:** the Projucer-generated MSBuild `.vcxproj` doesn't expose a clean compiler-launcher hook, so CI Windows builds currently run without a compile cache. Migrating to a CMake/Ninja + sccache workflow on Windows is the cleanest fix — tracked as a follow-up.
+**CI** uses `hendrikmuhs/ccache-action` for macOS/Linux and `mozilla-actions/sccache-action` for Windows to persist compiler cache state across runs via the GitHub Actions cache.
 
 ## CI architecture
 
 `.github/workflows/build.yaml` runs a 9-job matrix (3 OS × {osci-free, osci-premium, sosci}) with:
 
-- **Compile cache** — `hendrikmuhs/ccache-action` for macOS + Linux (Windows pending)
+- **Compile cache** — `hendrikmuhs/ccache-action` for macOS/Linux and `mozilla-actions/sccache-action` for Windows MSVC builds
 - **LuaJIT cache** — keyed on runner image, `modules/LuaJIT` submodule SHA, and the LuaJIT build recipe
 - **pluginval cache** — keyed on runner image, `modules/pluginval` submodule SHA, and the pluginval build recipe; pluginval.sh skips rebuild when `Builds/.osci_built` exists
 - **apt cache** — `awalsh128/cache-apt-pkgs-action` on Linux runners
