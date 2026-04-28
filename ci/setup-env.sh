@@ -65,6 +65,9 @@ configure_msvc_sccache() {
     return 0
   fi
 
+  REAL_CL_PATH=$(command -v cl.exe)
+  export OSCI_MSVC_REAL_CL="$(cygpath -w "$REAL_CL_PATH")"
+
   SCCACHE_MSVC_DIR="$ROOT/ci/bin/sccache-msvc"
   mkdir -p "$SCCACHE_MSVC_DIR"
   cp "$(command -v sccache)" "$SCCACHE_MSVC_DIR/sccache.exe"
@@ -96,27 +99,36 @@ int main(int argc, char** argv)
     snprintf(sccachePath, sizeof(sccachePath), "%ssccache.exe", modulePath);
 
     char realClPath[MAX_PATH] = "cl.exe";
-    char* pathEnv = getenv("PATH");
-    if (pathEnv != NULL)
+    char* configuredCl = getenv("OSCI_MSVC_REAL_CL");
+    if (configuredCl != NULL && configuredCl[0] != '\0')
     {
-      char* paths = _strdup(pathEnv);
-      if (paths != NULL)
-      {
-        char* context = NULL;
-        for (char* dir = strtok_s(paths, ";", &context); dir != NULL; dir = strtok_s(NULL, ";", &context))
+        strncpy(realClPath, configuredCl, sizeof(realClPath));
+        realClPath[sizeof(realClPath) - 1] = '\0';
+    }
+    else
+    {
+        char* pathEnv = getenv("PATH");
+        if (pathEnv != NULL)
         {
-          char candidate[MAX_PATH];
-          snprintf(candidate, sizeof(candidate), "%s\\cl.exe", dir);
-          DWORD attrs = GetFileAttributesA(candidate);
-          if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0 && _stricmp(candidate, selfPath) != 0)
-          {
-            strncpy(realClPath, candidate, sizeof(realClPath));
-            realClPath[sizeof(realClPath) - 1] = '\0';
-            break;
-          }
+            char* paths = _strdup(pathEnv);
+            if (paths != NULL)
+            {
+                char* context = NULL;
+                for (char* dir = strtok_s(paths, ";", &context); dir != NULL; dir = strtok_s(NULL, ";", &context))
+                {
+                    char candidate[MAX_PATH];
+                    snprintf(candidate, sizeof(candidate), "%s\\cl.exe", dir);
+                    DWORD attrs = GetFileAttributesA(candidate);
+                    if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0 && _stricmp(candidate, selfPath) != 0)
+                    {
+                        strncpy(realClPath, candidate, sizeof(realClPath));
+                        realClPath[sizeof(realClPath) - 1] = '\0';
+                        break;
+                    }
+                }
+                free(paths);
+            }
         }
-        free(paths);
-      }
     }
 
     char** childArgs = (char**) calloc((size_t) argc + 2, sizeof(char*));
@@ -153,6 +165,7 @@ EOF
     "//p:CLToolExe=cl.exe"
     "//p:CLToolPath=$(cygpath -w "$SCCACHE_MSVC_DIR")"
   )
+  echo "Using real MSVC compiler for sccache: $OSCI_MSVC_REAL_CL"
   echo "Using sccache for Windows MSVC builds: $SCCACHE_MSVC_DIR/cl.exe"
 }
 
