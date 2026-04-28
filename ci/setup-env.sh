@@ -68,8 +68,13 @@ configure_msvc_sccache() {
   REAL_CL_PATH=$(command -v cl.exe)
   export OSCI_MSVC_REAL_CL="$(cygpath -w "$REAL_CL_PATH")"
 
-  SCCACHE_MSVC_DIR="$ROOT/ci/bin/sccache-msvc"
-  mkdir -p "$SCCACHE_MSVC_DIR"
+  SCCACHE_TEMP_ROOT="${RUNNER_TEMP:-$ROOT/.tmp}"
+  if command -v cygpath >/dev/null 2>&1; then
+    SCCACHE_TEMP_ROOT=$(cygpath -u "$SCCACHE_TEMP_ROOT")
+  fi
+  SCCACHE_MSVC_BASE="$SCCACHE_TEMP_ROOT/osci-sccache-msvc"
+  mkdir -p "$SCCACHE_MSVC_BASE"
+  SCCACHE_MSVC_DIR=$(mktemp -d "$SCCACHE_MSVC_BASE/wrapper.XXXXXX")
   cp "$(command -v sccache)" "$SCCACHE_MSVC_DIR/sccache.exe"
 
   cat > "$SCCACHE_MSVC_DIR/cl-wrapper.c" <<'EOF'
