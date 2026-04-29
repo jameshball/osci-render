@@ -292,20 +292,42 @@ jobs:
             if [ -n "$PID_INSTRUMENT" ]; then wait "$PID_INSTRUMENT"; fi
           fi
 
-          # Stream logs into the workflow output for visibility.
-          echo "===== pluginval build log ====="
-          cat "$PLUGINVAL_BUILD_LOG" || true
-          echo "===== pluginval (effect) log ====="
-          cat bin/pluginval-logs/pluginval-effect.log || true
-          if [ -f bin/pluginval-logs/pluginval-instrument.log ]; then
-            echo "===== pluginval (instrument) log ====="
-            cat bin/pluginval-logs/pluginval-instrument.log || true
-          fi
-
           EFFECT_EXIT=$(cat bin/pluginval-logs/pluginval-effect.exitcode 2>/dev/null || echo 1)
           INSTRUMENT_EXIT=0
+          HAS_INSTRUMENT=0
           if [ "${{ matrix.project }}" = "osci-render" ]; then
+            HAS_INSTRUMENT=1
             INSTRUMENT_EXIT=$(cat bin/pluginval-logs/pluginval-instrument.exitcode 2>/dev/null || echo 1)
+          fi
+
+          SHOULD_STREAM_LOGS=0
+          if [ "$BUILD_EXIT" -ne 0 ] || [ "$EFFECT_EXIT" != "0" ]; then
+            SHOULD_STREAM_LOGS=1
+          fi
+          if [ "$HAS_INSTRUMENT" -eq 1 ] && [ "$INSTRUMENT_EXIT" != "0" ]; then
+            SHOULD_STREAM_LOGS=1
+          fi
+
+          echo "===== pluginval summary ====="
+          echo "build_exit=$BUILD_EXIT"
+          echo "effect_exit=$EFFECT_EXIT"
+          if [ "$HAS_INSTRUMENT" -eq 1 ]; then
+            echo "instrument_exit=$INSTRUMENT_EXIT"
+          fi
+          echo "log files:"
+          find bin/pluginval-logs -type f -size +0c -print 2>/dev/null | sort || true
+
+          if [ "$SHOULD_STREAM_LOGS" -eq 1 ]; then
+            echo "===== pluginval build log ====="
+            cat "$PLUGINVAL_BUILD_LOG" || true
+            echo "===== pluginval (effect) log ====="
+            cat bin/pluginval-logs/pluginval-effect.log || true
+            if [ -f bin/pluginval-logs/pluginval-instrument.log ]; then
+              echo "===== pluginval (instrument) log ====="
+              cat bin/pluginval-logs/pluginval-instrument.log || true
+            fi
+          else
+            echo "pluginval passed; full logs are kept in bin/pluginval-logs and uploaded by the following log-upload step."
           fi
 
           echo "effect_exit=$EFFECT_EXIT" >> "$GITHUB_OUTPUT"
