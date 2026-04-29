@@ -269,13 +269,6 @@ jobs:
           Write-Host "Contents: $(Get-ChildItem $megaDir -Name -ErrorAction SilentlyContinue)"
           echo $megaDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install procdump (Windows)
-        if: matrix.os == 'windows-2022'
-        shell: bash
-        run: |
-          choco install procdump -y --no-progress
-          procdump -accepteula || true
-
       # Build pluginval once, then run effect + instrument validation in
       # parallel within the same runner. continue-on-error keeps the rest of the
       # job alive even on validation failure; the `Check pluginval results` step

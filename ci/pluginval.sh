@@ -242,22 +242,11 @@ LLDB_EOF
         eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     fi
 else
-    # Windows: use procdump to capture a minidump on crash (SIGSEGV, unhandled exception).
-    # procdump must be on PATH (installed in the CI workflow).
-    PROCDUMP_DIR="$PLUGINVAL_LOG_DIR/crashdumps"
-    mkdir -p "$PROCDUMP_DIR"
+    if [ -n "${PLUGINVAL_USE_PROCDUMP:-}" ] && command -v procdump &> /dev/null; then
+        PROCDUMP_DIR="$PLUGINVAL_LOG_DIR/crashdumps"
+        mkdir -p "$PROCDUMP_DIR"
 
-    if command -v procdump &> /dev/null; then
         echo "Running pluginval under procdump (crash dump dir: $PROCDUMP_DIR)"
-        # -e 1 = write dump on first-chance unhandled exception
-        # -ma  = full memory dump (needed for useful stack analysis)
-        # -accepteula = suppress EULA prompt in CI
-        # -x   = launch process mode: -x <dump_folder> <application> [args]
-        #
-        # procdump's exit code in -x mode is UNRELIABLE: it returns non-zero
-        # when "dump count not reached" (i.e. no crash occurred). We ignore
-        # procdump's exit code entirely and instead check the pluginval log
-        # file for the SUCCESS marker.
         procdump -e 1 -ma -accepteula \
             -x "$PROCDUMP_DIR" \
             "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
@@ -267,12 +256,10 @@ else
                 --validate "$VST3_PATH" \
             || true
 
-        # Check the pluginval log for SUCCESS instead of trusting procdump's exit code
         if ! grep -rq '^SUCCESS$' "$PLUGINVAL_LOG_DIR"/ 2>/dev/null; then
             PLUGINVAL_EXIT=1
         fi
 
-        # Report any generated dump files
         DUMP_FILES=($(find "$PROCDUMP_DIR" -name '*.dmp' 2>/dev/null))
         if [ ${#DUMP_FILES[@]} -gt 0 ]; then
             echo ""
@@ -283,7 +270,6 @@ else
                 echo "  $(basename "$d") ($(du -h "$d" | cut -f1))"
             done
 
-            # Try to extract a basic stack trace using cdb if available
             if command -v cdb &> /dev/null; then
                 CDB_LOG="$PLUGINVAL_LOG_DIR/pluginval_crash_bt.log"
                 for d in "${DUMP_FILES[@]}"; do
@@ -292,12 +278,10 @@ else
                     cdb -z "$d" -c "!analyze -v; ~*k; q" 2>&1 | tee -a "$CDB_LOG" | tail -80
                 done
             else
-                echo "(cdb not found — install Windows SDK Debugging Tools to get inline stack traces)"
-                echo "Dump files will be uploaded to MEGA for offline analysis with WinDbg."
+                echo "(cdb not found; dump files will be uploaded for offline analysis with WinDbg.)"
             fi
         fi
     else
-        echo "WARNING: procdump not found, running pluginval without crash dump capture"
         eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     fi
 fi
