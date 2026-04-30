@@ -217,6 +217,12 @@ jobs:
           else
             echo "skip_validation=false" >> "$GITHUB_OUTPUT"
           fi
+          if [[ "$MSG" == *"[release]"* ]]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Commit requests release: signed artifacts will be published to api.osci-render.com."
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run unit tests
         if: steps.ci_flags.outputs.skip_validation != 'true'
@@ -485,3 +491,61 @@ jobs:
             FAILED=1
           fi
           exit $FAILED
+
+      # ── Release publish ──────────────────────────────────────
+      # When the commit message contains [release] (added by `bump_version
+      # --release`), upload the signed installer artifact to api.osci-render.com
+      # so the JUCE in-plugin updater can fetch it. Skipped for the free osci
+      # variant (only premium users get auto-updates) and for Linux (no
+      # installer artifact today).
+      - name: Publish release artifact
+        if: >-
+          steps.ci_flags.outputs.release == 'true' &&
+          matrix.version == 'premium' &&
+          matrix.os != 'ubuntu-24.04'
+        shell: bash
+        env:
+          PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
+          RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.RELEASE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PUBLISH_API_TOKEN:-}" ]] || [[ -z "${RELEASE_SIGNING_PRIVATE_KEY:-}" ]]; then
+            echo "::error::PUBLISH_API_TOKEN or RELEASE_SIGNING_PRIVATE_KEY GitHub secrets are not set"
+            exit 1
+          fi
+          python3 -m pip install --quiet pynacl
+
+          # Map matrix \u2192 (product gumroad id, platform, artifact path, kind)
+          case "${{ matrix.project }}" in
+            osci-render) PRODUCT='wHBxF-jb7oyeVNPRzKDorA==' ;;
+            sosci)       PRODUCT='Hsr9C58_YhTxYP0MNvsIow==' ;;
+            *) echo "::error::unknown project ${{ matrix.project }}"; exit 1 ;;
+          esac
+
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            PLATFORM='mac-universal'
+            ARTIFACT="bin/${OUTPUT_NAME}-mac.pkg"
+            KIND='pkg'
+          elif [[ "${{ matrix.os }}" == windows* ]]; then
+            PLATFORM='win-x86_64'
+            ARTIFACT="bin/${OUTPUT_NAME}-windows.zip"
+            KIND='zip'
+          else
+            echo "::warning::skipping publish for unsupported OS ${{ matrix.os }}"
+            exit 0
+          fi
+
+          if [[ ! -f "${ARTIFACT}" ]]; then
+            echo "::error::expected artifact ${ARTIFACT} not found"
+            ls -la bin/ || true
+            exit 1
+          fi
+
+          python3 ci/publish_release.py \
+            --product "${PRODUCT}" \
+            --semver "${{ steps.version.outputs.version }}" \
+            --platform "${PLATFORM}" \
+            --channel stable \
+            --artifact-kind "${KIND}" \
+            --artifact "${ARTIFACT}" \
+            --notes "Auto-published by CI from $(git log -1 --format=%H)"
