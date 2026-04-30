@@ -495,14 +495,11 @@ jobs:
       # ── Release publish ──────────────────────────────────────
       # When the commit message contains [release] (added by `bump_version
       # --release`), upload the signed installer artifact to api.osci-render.com
-      # so the JUCE in-plugin updater can fetch it. Skipped for the free osci
-      # variant (only premium users get auto-updates) and for Linux (no
-      # installer artifact today).
+      # so the JUCE in-plugin updater can fetch it. Publishes every (project,
+      # variant, OS) combination present in the build matrix; the API stores a
+      # separate Version row per (product, semver, platform, variant).
       - name: Publish release artifact
-        if: >-
-          steps.ci_flags.outputs.release == 'true' &&
-          matrix.version == 'premium' &&
-          matrix.os != 'ubuntu-24.04'
+        if: steps.ci_flags.outputs.release == 'true'
         shell: bash
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
@@ -530,6 +527,10 @@ jobs:
             PLATFORM='win-x86_64'
             ARTIFACT="bin/${OUTPUT_NAME}-windows.zip"
             KIND='zip'
+          elif [[ "${{ matrix.os }}" == ubuntu* ]]; then
+            PLATFORM='linux-x86_64'
+            ARTIFACT="bin/${OUTPUT_NAME}-linux.zip"
+            KIND='zip'
           else
             echo "::warning::skipping publish for unsupported OS ${{ matrix.os }}"
             exit 0
@@ -546,6 +547,7 @@ jobs:
             --semver "${{ steps.version.outputs.version }}" \
             --platform "${PLATFORM}" \
             --channel stable \
+            --variant "${{ matrix.version }}" \
             --artifact-kind "${KIND}" \
             --artifact "${ARTIFACT}" \
             --notes "Auto-published by CI from $(git log -1 --format=%H)"

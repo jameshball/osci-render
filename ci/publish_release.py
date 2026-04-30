@@ -120,6 +120,8 @@ def main(argv: list[str]) -> int:
     p.add_argument('--platform', required=True,
                    choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64'])
     p.add_argument('--channel', default='stable', choices=['stable', 'beta'])
+    p.add_argument('--variant', default='premium', choices=['free', 'premium'],
+                   help='Licensing variant of the build (free or premium); separate Version row per variant.')
     p.add_argument('--artifact-kind', required=True, choices=['pkg', 'exe', 'zip', 'appimage', 'tar.gz'])
     p.add_argument('--artifact', required=True, type=Path,
                    help='Path to the artifact file on disk; uploaded as-is to R2')
@@ -166,6 +168,7 @@ def main(argv: list[str]) -> int:
         'semver': args.semver,
         'platform': args.platform,
         'channel': args.channel,
+        'variant': args.variant,
         'artifact_kind': args.artifact_kind,
         'filename': filename,
         'sha256': sha256,
