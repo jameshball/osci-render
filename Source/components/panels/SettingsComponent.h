@@ -7,6 +7,7 @@
 
 #include "../../LookAndFeel.h"
 #include "EffectsComponent.h"
+#include "FrameSettingsComponent.h"
 #include "LuaComponent.h"
 #include "MidiComponent.h"
 #include "QuickControlsBar.h"
@@ -45,6 +46,7 @@ private:
 
     FileControlsComponent fileControls{audioProcessor, pluginEditor};
     QuickControlsBar quickControls{audioProcessor, pluginEditor};
+    FrameSettingsComponent frame{audioProcessor, pluginEditor};
     EffectsComponent effects{audioProcessor, pluginEditor};
     MidiComponent midi{audioProcessor, pluginEditor};
 #if OSCI_PREMIUM
@@ -61,6 +63,7 @@ private:
     juce::CustomMidiKeyboardComponent keyboard;
 
     bool examplesVisible = false;
+    bool frameSettingsVisible = false;
 
     // Horizontal layout for top section: visColumn | resizer | effectsColumn
     juce::StretchableLayoutManager mainLayout;

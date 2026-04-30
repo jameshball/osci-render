@@ -82,6 +82,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 #endif
     addAndMakeVisible(midi);
     addChildComponent(quickControls);
+    addChildComponent(frame);
 #if OSCI_PREMIUM
     addChildComponent(fractalEditor);
 #endif
@@ -318,8 +319,15 @@ void SettingsComponent::layoutChildren() {
     // --- Effects column (shared by both modes) ---
     auto layoutEffectsColumn = [&](juce::Rectangle<int> effectsBounds) {
         if (!examplesVisible) {
+            frame.setVisible(frameSettingsVisible);
+            if (frameSettingsVisible) {
+                frame.resized();
+                int preferredHeight = frame.getPreferredHeight();
+                frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
+                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+            }
 #if OSCI_PREMIUM
-            if (fractalEditor.isVisible()) {
+            else if (fractalEditor.isVisible()) {
                 int preferredHeight = juce::jmin(210, effectsBounds.getHeight() / 2);
                 fractalEditor.setBounds(effectsBounds.removeFromBottom(preferredHeight));
                 effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
@@ -333,6 +341,7 @@ void SettingsComponent::layoutChildren() {
             midi.setVisible(false);
 #endif
             effects.setVisible(false);
+            frame.setVisible(false);
             examples.setVisible(true);
             examples.setBounds(effectsBounds);
         } else {
@@ -564,6 +573,8 @@ void SettingsComponent::paint(juce::Graphics& g) {
 // syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
+    frameSettingsVisible = false;
+    frame.setVisible(false);
 #if OSCI_PREMIUM
     fractalEditor.setVisible(false);
 #endif
@@ -605,6 +616,11 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
+    } else if (isImage) {
+        frameSettingsVisible = true;
+        frame.setAnimated(isAnimated);
+        frame.setImage(true);
+        frame.resized();
     }
     fileControls.updateFileLabel();
     resized();

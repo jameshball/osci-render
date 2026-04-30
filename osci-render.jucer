@@ -577,6 +577,10 @@
                 file="Source/components/panels/EffectsComponent.cpp"/>
           <FILE id="qxxNX3" name="EffectsComponent.h" compile="0" resource="0"
                 file="Source/components/panels/EffectsComponent.h"/>
+          <FILE id="FrStCp" name="FrameSettingsComponent.cpp" compile="1" resource="0"
+                file="Source/components/panels/FrameSettingsComponent.cpp"/>
+          <FILE id="FrStCh" name="FrameSettingsComponent.h" compile="0" resource="0"
+                file="Source/components/panels/FrameSettingsComponent.h"/>
           <FILE id="X26RjJ" name="LuaComponent.cpp" compile="1" resource="0"
                 file="Source/components/panels/LuaComponent.cpp"/>
           <FILE id="g5xRHT" name="LuaComponent.h" compile="0" resource="0" file="Source/components/panels/LuaComponent.h"/>
