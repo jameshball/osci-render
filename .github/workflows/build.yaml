@@ -109,7 +109,7 @@ jobs:
         id: cache_pluginval
         uses: actions/cache@v4
         with:
-          key: pluginval-${{ matrix.os }}-${{ runner.arch }}-${{ steps.submodule_shas.outputs.image_os }}-${{ steps.submodule_shas.outputs.image_version }}-${{ steps.submodule_shas.outputs.pluginval_sha }}-${{ hashFiles('ci/pluginval.sh', '.github/workflows/build.yaml') }}
+          key: pluginval-${{ matrix.os }}-${{ runner.arch }}-${{ steps.submodule_shas.outputs.image_os }}-${{ steps.submodule_shas.outputs.image_version }}-${{ steps.submodule_shas.outputs.pluginval_sha }}-${{ hashFiles('ci/pluginval.sh') }}
           path: |
             modules/pluginval/Builds
 
@@ -350,102 +350,29 @@ jobs:
       - name: Install MEGAcmd (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            wget -q https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb
-            sudo apt-get update -y >/dev/null
-            sudo apt-get install -y ./megacmd-xUbuntu_24.04_amd64.deb >/dev/null
-          else
-            brew install --cask megacmd
-            echo "/Applications/MEGAcmd.app/Contents/MacOS" >> $GITHUB_PATH
-          fi
+        run: bash ./ci/mega.sh install
 
       - name: Install MEGAcmd (Windows)
         if: runner.os == 'Windows'
         shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          function Add-MegaPath {
-            $megaDir = $null
-            if (Test-Path "$env:LOCALAPPDATA\MEGAcmd") {
-              $megaDir = "$env:LOCALAPPDATA\MEGAcmd"
-            } elseif (Test-Path "C:\Users\runneradmin\AppData\Local\MEGAcmd") {
-              $megaDir = "C:\Users\runneradmin\AppData\Local\MEGAcmd"
-            } else {
-              $megaLogin = Get-Command mega-login -ErrorAction SilentlyContinue
-              if ($megaLogin -and $megaLogin.Source) {
-                $megaDir = Split-Path $megaLogin.Source
-              }
-            }
-
-            if ($megaDir -and (Test-Path $megaDir)) {
-              Write-Host "MEGAcmd directory: $megaDir"
-              Write-Host "Contents: $(Get-ChildItem $megaDir -Name -ErrorAction SilentlyContinue)"
-              echo $megaDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-              return $true
-            }
-
-            return $false
-          }
-
-          if (Add-MegaPath) {
-            exit 0
-          }
-
-          $installed = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            Write-Host "Installing MEGAcmd with Chocolatey (attempt $attempt/3)"
-            choco install megacmd -y --no-progress
-            if ($LASTEXITCODE -eq 0 -and (Add-MegaPath)) {
-              $installed = $true
-              break
-            }
-
-            if ($attempt -lt 3) {
-              Start-Sleep -Seconds (15 * $attempt)
-            }
-          }
-
-          if (-not $installed) {
-            Write-Error "MEGAcmd installation not found after Chocolatey install attempts."
-            exit 1
-          }
+        run: ./ci/mega.ps1 -Task Install
 
       # Upload pluginval logs and crash dumps to MEGA (runs even if pluginval failed)
       - name: Upload pluginval logs to MEGA (Unix)
         if: always() && runner.os != 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
         shell: bash
-        run: |
-          set -euo pipefail
-          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}" || true
-          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
-          find bin/pluginval-logs -type f -size +0c -print0 2>/dev/null | while IFS= read -r -d '' f; do
-            echo "Uploading $f -> $DEST"
-            mega-put -c "$f" "$DEST/" || echo "WARNING: failed to upload $f"
-          done
-          mega-logout || true
+        env:
+          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: bash ./ci/mega.sh upload-pluginval-logs "${{ matrix.project }}" "${{ steps.version.outputs.version }}" "${{ env.OS_ARTIFACT }}"
 
       - name: Upload pluginval logs to MEGA (Windows)
         if: always() && runner.os == 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
         shell: powershell
-        run: |
-          $ErrorActionPreference = 'Continue'
-          # Ensure MEGAcmd is on PATH
-          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
-            $p = "$env:LOCALAPPDATA\MEGAcmd"
-            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
-          }
-          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
-          $logDir = "bin/pluginval-logs"
-          if (Test-Path $logDir) {
-            Get-ChildItem $logDir -File -Recurse | Where-Object { $_.Length -gt 0 } | ForEach-Object {
-              Write-Host "Uploading $($_.FullName) -> $dest"
-              mega-put -c $_.FullName $dest/
-            }
-          }
-          mega-logout
+        env:
+          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: ./ci/mega.ps1 -Task UploadPluginvalLogs -Project "${{ matrix.project }}" -ProjectVersion "${{ steps.version.outputs.version }}" -OsArtifact "${{ env.OS_ARTIFACT }}"
 
       # macOS packaging & notarization
       - name: Download Packages installer build tool
@@ -513,55 +440,19 @@ jobs:
       - name: Upload binaries to MEGA (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
-        run: |
-          set -euo pipefail
-          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          # sosci has no free/premium variants, so upload flat under the version dir
-          if [[ "${{ matrix.project }}" == "sosci" ]]; then
-            DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}"
-          else
-            DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
-          fi
-          ls -1 bin || true
-          # Upload all produced artifacts (files only) into variant subdirectory
-          shopt -s nullglob
-          for f in bin/*; do
-            if [[ -f "$f" ]]; then
-              echo "Uploading $f -> $DEST"
-              mega-put -c "$f" "$DEST/"
-            fi
-          done
-          mega-logout
+        env:
+          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: bash ./ci/mega.sh upload-binaries "${{ matrix.project }}" "${{ steps.version.outputs.version }}" "${{ matrix.version }}"
 
       # Combined MEGA upload (Windows)
       - name: Upload binaries to MEGA (Windows)
         if: runner.os == 'Windows'
         shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          # Ensure MEGAcmd is on PATH
-          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
-            $p = "$env:LOCALAPPDATA\MEGAcmd"
-            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
-          }
-          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          $root = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
-          # sosci has no free/premium variants, so upload flat under the version dir
-          if ('${{ matrix.project }}' -eq 'sosci') {
-            $variant = $root
-          } else {
-            $variant = "$root/${{ matrix.version }}"
-          }
-          Get-ChildItem bin -File | ForEach-Object {
-            if ($_.Extension -eq '.pdb') {
-              Write-Host "Uploading $($_.FullName) -> $root (debug info)"
-              mega-put -c $_.FullName $root/
-            } else {
-              Write-Host "Uploading $($_.FullName) -> $variant"
-              mega-put -c $_.FullName $variant/
-            }
-          }
-          mega-logout
+        env:
+          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: ./ci/mega.ps1 -Task UploadBinaries -Project "${{ matrix.project }}" -ProjectVersion "${{ steps.version.outputs.version }}" -Variant "${{ matrix.version }}"
 
       # Fail the job if pluginval failed (after all logs and binaries have been uploaded)
       - name: Check pluginval results
