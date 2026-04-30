@@ -108,7 +108,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
 #endif
         options.resizable = false;
 
-        juce::DialogWindow* dw = options.launchAsync();
+        options.launchAsync();
     });
     addMenuItem(aboutMenu, "Open Log File", [this] {
         audioProcessor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();

@@ -3,8 +3,8 @@
 #include <array>
 
 SplashScreenComponent::SplashScreenComponent() {
-    const auto headingFont = juce::Font(26.0f, juce::Font::bold);
-    const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
+    const auto headingFont = juce::Font(juce::FontOptions(26.0f, juce::Font::bold));
+    const auto subtitleFont = juce::Font(juce::FontOptions(17.0f, juce::Font::plain));
     configureLabel(titleLabel, headingFont, juce::Justification::centred);
     titleLabel.setText("Upgrade to osci-render Premium", juce::NotificationType::dontSendNotification);
 
@@ -18,7 +18,7 @@ SplashScreenComponent::SplashScreenComponent() {
     benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark());
     addAndMakeVisible(benefitsGrid);
 
-    configureLabel(supportLabel, juce::Font(14.5f, juce::Font::italic), juce::Justification::centred);
+    configureLabel(supportLabel, juce::Font(juce::FontOptions(14.5f, juce::Font::italic)), juce::Justification::centred);
     supportLabel.setColour(juce::Label::textColourId, Colours::accentColor().brighter(0.2f));
     supportLabel.setText("Purchasing premium directly supports ongoing development. Thank you!", juce::NotificationType::dontSendNotification);
     addAndMakeVisible(supportLabel);

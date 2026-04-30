@@ -5,7 +5,7 @@ LineArtParser::LineArtParser(juce::String json) {
     frames.clear();
     numFrames = 0;
     frames = parseJsonFrames(json);
-    numFrames = frames.size();
+    numFrames = static_cast<int>(frames.size());
 }
 
 LineArtParser::LineArtParser(char* data, int dataLength) {
@@ -13,7 +13,7 @@ LineArtParser::LineArtParser(char* data, int dataLength) {
     numFrames = 0;
     int parsedRate = 0;
     frames = parseBinaryFrames(data, dataLength, &parsedRate);
-    numFrames = frames.size();
+    numFrames = static_cast<int>(frames.size());
     if (parsedRate > 0) frameRate = static_cast<double>(parsedRate);
     if (numFrames == 0) frames = epicFail();
 }
@@ -38,7 +38,7 @@ std::vector<std::vector<osci::Line>> LineArtParser::epicFail() {
 
 std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* bytes, int bytesLength, int* outFrameRate) {
     int64_t* data = (int64_t*)bytes;
-    int dataLength = bytesLength / 8;
+    int dataLength = static_cast<int>(bytesLength / 8);
     std::vector<std::vector<osci::Line>> tFrames;
 
     if (dataLength < 4) return epicFail();
@@ -85,9 +85,9 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* byte
         index++;
 
         if (strcmp(tag, "fCount  ") == 0) {
-            reportedNumFrames = rawData;
+            reportedNumFrames = static_cast<int>(rawData);
         } else if (strcmp(tag, "fRate   ") == 0) {
-            frameRate = rawData;
+            frameRate = static_cast<int>(rawData);
             if (outFrameRate != nullptr) *outFrameRate = frameRate;
         }
 
@@ -173,7 +173,7 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* byte
                                             if (index >= dataLength) return epicFail();
                                             rawData = data[index];
                                             index++;
-                                            vertexCount = rawData;
+                                            vertexCount = static_cast<int>(rawData);
                                         }
                                         else if (strcmp(tag, "VERTICES") == 0) {
                                             double x = 0;

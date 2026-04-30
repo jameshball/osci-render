@@ -23,7 +23,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     addAndMakeVisible(redoButton);
     addAndMakeVisible(undoLabel);
     undoLabel.setJustificationType(juce::Justification::centredRight);
-    undoLabel.setFont(juce::Font(12.0f));
+    undoLabel.setFont(juce::Font(juce::FontOptions(12.0f)));
     undoLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.7f));
     redoButton.setTooltip("Redo");
     undoButton.setEnabled(false);
@@ -318,7 +318,7 @@ void CommonPluginEditor::openProject(const juce::File& file) {
     if (file != juce::File()) {
         auto data = juce::MemoryBlock();
         if (file.loadFileAsData(data)) {
-            audioProcessor.setStateInformation(data.getData(), data.getSize());
+            audioProcessor.setStateInformation(data.getData(), static_cast<int>(data.getSize()));
         }
         audioProcessor.currentProjectFile = file.getFullPathName();
         audioProcessor.setLastOpenedDirectory(file.getParentDirectory());

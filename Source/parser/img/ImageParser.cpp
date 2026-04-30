@@ -281,7 +281,7 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
     int framesRead = 0;
     
     while (framesRead < MAX_FRAMES) {
-        size_t bytesRead = ffmpegProcess.readProcessOutput(frameBuffer.data(), frameBuffer.size());
+        const auto bytesRead = ffmpegProcess.readProcessOutput(frameBuffer.data(), static_cast<int>(frameBuffer.size()));
         
         if (bytesRead != frameBuffer.size()) {
             break; // End of video or error
@@ -329,7 +329,8 @@ void ImageParser::handleError(juce::String message) {
 void ImageParser::setFrame(int index) {
     // Ensure that the frame number is within the bounds of the number of frames
     // This weird modulo trick is to handle negative numbers
-    index = (frames.size() + (index % frames.size())) % frames.size();
+    const int numFrames = static_cast<int>(frames.size());
+    index = (numFrames + (index % numFrames)) % numFrames;
     
     frameIndex = index;
     resetPosition();

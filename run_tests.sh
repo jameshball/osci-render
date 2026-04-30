@@ -15,6 +15,7 @@
 #   ./run_tests.sh --asan --pluginval               # pluginval under ASan
 #   ./run_tests.sh --standalone                     # build standalone for manual testing
 #   ./run_tests.sh --tsan --standalone              # standalone with TSan
+#   ./run_tests.sh --free --pluginval               # pluginval on osci-render free (OSCI_PREMIUM=0)
 #   ./run_tests.sh --no-build                       # reuse existing builds
 #
 # Environment:
@@ -36,6 +37,7 @@ NO_BUILD=false
 CONFIG="Debug"
 STRICTNESS=5
 TEST_CATEGORY=""
+FREE_BUILD=false
 PLUGINVAL_TIMEOUT="${PLUGINVAL_TIMEOUT:-120000}"
 
 # ── Parse args ───────────────────────────────────────────────────────────
@@ -57,6 +59,8 @@ while [[ $# -gt 0 ]]; do
         --release)    CONFIG="Release"; shift ;;
         --strictness) STRICTNESS="$2"; shift 2 ;;
         --category)   TEST_CATEGORY="$2"; RUN_TESTS=true; shift 2 ;;
+        --free|--premium=0)
+                      FREE_BUILD=true; shift ;;
         *)            echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -142,6 +146,54 @@ if [[ -n "$SANITIZER" ]]; then
     mkdir -p "$LOG_DIR"
 fi
 
+# ── Premium/Free flag handling ──────────────────────────────────────────
+# When --free is given, we flip OSCI_PREMIUM=1 → OSCI_PREMIUM=0 in the .jucer
+# files before building, and restore them on exit (or on error/interruption).
+PATCHED_JUCERS=()
+
+restore_jucers() {
+    local f
+    for f in "${PATCHED_JUCERS[@]:-}"; do
+        if [[ -n "$f" && -f "$f.premium_bak" ]]; then
+            mv "$f.premium_bak" "$f"
+        fi
+    done
+}
+trap restore_jucers EXIT INT TERM
+
+patch_jucer_to_free() {
+    local JUCER="$1"
+    if [[ ! -f "$JUCER" ]]; then
+        return
+    fi
+    if ! grep -q 'OSCI_PREMIUM=1' "$JUCER"; then
+        return
+    fi
+    cp "$JUCER" "$JUCER.premium_bak"
+    PATCHED_JUCERS+=("$JUCER")
+    if [[ "$OS_TYPE" == "Darwin" ]]; then
+        sed -i '' 's/OSCI_PREMIUM=1/OSCI_PREMIUM=0/g' "$JUCER"
+    else
+        sed -i 's/OSCI_PREMIUM=1/OSCI_PREMIUM=0/g' "$JUCER"
+    fi
+}
+
+if $FREE_BUILD; then
+    echo "==> Free build requested — patching .jucer files to OSCI_PREMIUM=0"
+    for PLUGIN in "${PLUGINS[@]}"; do
+        patch_jucer_to_free "$ROOT/$PLUGIN.jucer"
+    done
+    if $RUN_TESTS; then
+        patch_jucer_to_free "$ROOT/osci-render-test.jucer"
+    fi
+fi
+
+# Tag used in sanitizer log filenames to distinguish premium/free runs
+BUILD_TAG=""
+if $FREE_BUILD; then
+    BUILD_TAG="-free"
+fi
+
 # ── Print banner ─────────────────────────────────────────────────────────
 echo "============================================="
 echo " Config:    $CONFIG"
@@ -149,6 +201,11 @@ if [[ -n "$SANITIZER" ]]; then
     echo " Sanitizer: $SAN_LABEL"
 fi
 echo " Plugins:   ${PLUGINS[*]}"
+if $FREE_BUILD; then
+    echo " Premium:   OFF (OSCI_PREMIUM=0, free build)"
+else
+    echo " Premium:   ON  (OSCI_PREMIUM=1)"
+fi
 echo " Modes:     $(${RUN_TESTS} && echo "tests ")$(${RUN_PLUGINVAL} && echo "pluginval ")$(${RUN_STANDALONE} && echo "standalone")"
 if $RUN_PLUGINVAL; then
     echo " Strictness: $STRICTNESS"
@@ -167,7 +224,7 @@ build_xcode() {
 
     local LOG_FILE="/dev/null"
     if [[ -n "$SANITIZER" ]]; then
-        LOG_FILE="$LOG_DIR/${SANITIZER}-build-${TIMESTAMP}.log"
+        LOG_FILE="$LOG_DIR/${SANITIZER}${BUILD_TAG}-build-${TIMESTAMP}.log"
     fi
 
     local XCODE_ARGS=(
@@ -336,6 +393,9 @@ run_pluginval() {
     echo ""
     echo "============================================="
     echo " Running pluginval on $PLUGIN"
+    if $FREE_BUILD; then
+        echo "   Build:      FREE (OSCI_PREMIUM=0)"
+    fi
     if [[ -n "$SAN_LABEL" ]]; then
         echo "   Sanitizer:  $SAN_LABEL"
     fi
@@ -352,7 +412,7 @@ run_pluginval() {
 
     local EXIT_CODE=0
     if [[ -n "$SAN_ENV" ]]; then
-        local LOG_FILE="$LOG_DIR/${SANITIZER}-pluginval-${PLUGIN}-${TIMESTAMP}.log"
+        local LOG_FILE="$LOG_DIR/${SANITIZER}${BUILD_TAG}-pluginval-${PLUGIN}-${TIMESTAMP}.log"
         env $SAN_ENV "$PLUGINVAL" "${PLUGINVAL_ARGS[@]}" 2>&1 | tee "$LOG_FILE" || EXIT_CODE=$?
         echo ""
         summarize_log "$LOG_FILE" "$PLUGIN (pluginval)" "$EXIT_CODE"
@@ -399,7 +459,7 @@ run_unit_tests() {
 
     local EXIT_CODE=0
     if [[ -n "$SAN_ENV" ]]; then
-        local LOG_FILE="$LOG_DIR/${SANITIZER}-tests-${TIMESTAMP}.log"
+        local LOG_FILE="$LOG_DIR/${SANITIZER}${BUILD_TAG}-tests-${TIMESTAMP}.log"
         if [[ -n "$TEST_CATEGORY" ]]; then
             env $SAN_ENV "$BINARY" "$TEST_CATEGORY" 2>&1 | tee "$LOG_FILE" || EXIT_CODE=$?
         else
@@ -537,7 +597,7 @@ if [[ -n "$SANITIZER" ]]; then
     else
         echo " WARNING: $SAN_LABEL issues detected — see logs in $LOG_DIR"
     fi
-    echo "   Logs: $LOG_DIR/${SANITIZER}-*-${TIMESTAMP}.log"
+    echo "   Logs: $LOG_DIR/${SANITIZER}${BUILD_TAG}-*-${TIMESTAMP}.log"
     echo "============================================="
 fi
 

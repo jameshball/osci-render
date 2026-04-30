@@ -34,7 +34,7 @@ public:
               "slider_u+slider_v+slider_w+slider_x+slider_y+slider_z+step, 0}" },
         };
 
-        logHeader("Before vs After Optimization — End-to-End");
+        logHeader("Before vs After Optimization -- End-to-End");
         juce::Logger::outputDebugString(
             "  Before: all 43 globals set + std::find + sethook x2 + vector<float> return");
         juce::Logger::outputDebugString(

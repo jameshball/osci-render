@@ -222,7 +222,7 @@ void ModulationSourceComponent::DepthIndicator::startTextEdit() {
 void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     if (!valuePopup) {
         valuePopup = std::make_unique<juce::Label>();
-        valuePopup->setFont(juce::Font(11.0f, juce::Font::bold));
+        valuePopup->setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
         valuePopup->setColour(juce::Label::backgroundColourId, Dracula::background);
         valuePopup->setColour(juce::Label::textColourId, Dracula::foreground);
         valuePopup->setJustificationType(juce::Justification::centred);
@@ -238,7 +238,7 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     int pct = (int)(depth * 100.0f);
     valuePopup->setText(paramName + " " + juce::String(pct) + "%", juce::dontSendNotification);
 
-    int popupW = valuePopup->getFont().getStringWidth(valuePopup->getText()) + 14;
+    int popupW = juce::GlyphArrangement::getStringWidthInt(valuePopup->getFont(), valuePopup->getText()) + 14;
     int popupH = 20;
     auto screenPos = localPointToGlobal(juce::Point<int>(getWidth() / 2, 0));
     valuePopup->setBounds(screenPos.x - popupW / 2, screenPos.y - popupH - 4, popupW, popupH);
@@ -310,7 +310,7 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
         labelBounds.setLeft(labelLeft);
         labelBounds = labelBounds.withHeight(18).translated(0, 1);
         g.setColour((active || ownerCollapsed) ? juce::Colours::white : juce::Colours::white.withAlpha(0.35f));
-        g.setFont(juce::Font(13.0f));
+        g.setFont(juce::Font(juce::FontOptions(13.0f)));
         g.drawText(label, labelBounds, juce::Justification::centred);
     }
 
@@ -444,7 +444,6 @@ void ModulationSourceComponent::ModTabHandle::resized() {
     if (n == 0) return;
 
     int trackW = 12;
-    int labelW = 0;
     // If no depth indicators we don't need to reserve label space separately
     // With indicators, reserve space for the label at top
     int labelH = 16;

@@ -1,7 +1,7 @@
 #include "ComponentList.h"
 
 int ComponentListModel::getNumRows() {
-	return components.size();
+	return static_cast<int>(components.size());
 }
 
 void ComponentListModel::paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) {}

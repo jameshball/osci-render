@@ -9,7 +9,7 @@ class LabelledTextBox : public juce::Component {
         addAndMakeVisible(textBox);
         label.setText(text, juce::dontSendNotification);
         label.setJustificationType(juce::Justification::centredLeft);
-        label.setFont(juce::Font(14.0f));
+        label.setFont(juce::Font(juce::FontOptions(14.0f)));
      }
 
     ~LabelledTextBox() override {}

@@ -318,7 +318,7 @@ void NodeGraphComponent::paintLogarithmicTimeGrid(juce::Graphics& g, int w, int 
         const double start = std::ceil(domainMin / step) * step;
         const double end = domainMax + (step * 0.5);
 
-        juce::Font labelFont(11.0f, juce::Font::bold);
+        juce::Font labelFont(juce::FontOptions(11.0f, juce::Font::bold));
         const float labelY = (float)h - 2.0f - labelFont.getHeight();
 
         for (double domain = start; domain <= end; domain += step) {
@@ -372,7 +372,7 @@ void NodeGraphComponent::paintDecibelGrid(juce::Graphics& g, int w, int h) {
         if (alpha <= 0.001f || lineVis <= 0.001f)
             return;
 
-        juce::Font labelFont(11.0f, juce::Font::bold);
+        juce::Font labelFont(juce::FontOptions(11.0f, juce::Font::bold));
         const float labelH = labelFont.getHeight();
         const float labelY = (float)h - 2.0f - labelH;
         const int labelW = 70;

@@ -171,6 +171,8 @@ public:
             expect(val >= 0.0f && val <= 1.0f,
                    "Modulated value at sample " + juce::String(i) + " out of range: " + juce::String(val));
         }
+
+        testutil::cleanupLfoParams(lfoParams);
     }
 };
 

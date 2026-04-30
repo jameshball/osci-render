@@ -15,17 +15,20 @@ VisualiserComponent::VisualiserComponent(
     RecordingSettings &recordingSettings,
     VisualiserComponent *parent,
     bool visualiserOnly) : VisualiserRenderer(settings.parameters, processor.threadManager),
-                           settings(settings),
+                           parent(parent),
                            audioProcessor(processor),
-                           ffmpegFile(ffmpegFile),
-#if OSCI_PREMIUM
-                           sharedTextureManager(sharedTextureManager),
-                           ffmpegEncoderManager(ffmpegFile),
-#endif
+                           editor(pluginEditor),
+                           settings(settings),
                            recordingSettings(recordingSettings),
                            visualiserOnly(visualiserOnly),
-                           parent(parent),
-                           editor(pluginEditor) {
+#if OSCI_PREMIUM
+                           sharedTextureManager(sharedTextureManager),
+#endif
+                           ffmpegFile(ffmpegFile)
+#if OSCI_PREMIUM
+                           , ffmpegEncoderManager(ffmpegFile)
+#endif
+                           {
     // Sync active state with the parameter for the primary visualiser
     if (isPrimaryVisualiser()) {
         active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
@@ -91,6 +94,12 @@ VisualiserComponent::VisualiserComponent(
         editor.showPremiumSplashScreen();
     };
 #endif
+
+    addAndMakeVisible(svgExportButton);
+    svgExportButton.setTooltip("Exports the current oscilloscope frame as an SVG.");
+    svgExportButton.onClick = [this] {
+        exportCurrentFrameAsSvg();
+    };
 
     fullScreenButton.onClick = [this]() {
         if (this->parent != nullptr) {
@@ -540,6 +549,7 @@ void VisualiserComponent::resized() {
         settingsButton.setVisible(false);
         audioInputButton.setVisible(false);
         sharedTextureButton.setVisible(false);
+        svgExportButton.setVisible(false);
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
@@ -574,6 +584,9 @@ void VisualiserComponent::resized() {
     sharedTextureButton.setVisible(true);
     sharedTextureButton.setBounds(buttons.removeFromRight(30));
 
+    svgExportButton.setVisible(true);
+    svgExportButton.setBounds(buttons.removeFromRight(30));
+
     record.setVisible(true);
     record.setBounds(buttons.removeFromRight(25));
     if (record.getToggleState()) {
@@ -599,6 +612,50 @@ void VisualiserComponent::resized() {
     }
 
     setViewportArea(area);
+}
+
+void VisualiserComponent::exportCurrentFrameAsSvg() {
+    const auto svg = createCurrentFrameSvg();
+
+    if (svg.isEmpty()) {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::AlertWindow::WarningIcon,
+            "Export SVG",
+            "There is no visualiser frame ready to export yet.");
+        return;
+    }
+
+    svgExportChooser = std::make_unique<juce::FileChooser>(
+        "Export SVG",
+        audioProcessor.getLastOpenedDirectory(),
+        "*.svg");
+
+    auto flags = juce::FileBrowserComponent::saveMode
+               | juce::FileBrowserComponent::canSelectFiles
+               | juce::FileBrowserComponent::warnAboutOverwriting;
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    svgExportChooser->launchAsync(flags, [safeThis, svg](const juce::FileChooser& chooser) {
+        if (safeThis == nullptr)
+            return;
+
+        auto file = chooser.getResult();
+        if (file == juce::File())
+            return;
+
+        if (!file.hasFileExtension("svg"))
+            file = file.withFileExtension("svg");
+
+        if (!file.replaceWithText(svg)) {
+            juce::AlertWindow::showMessageBoxAsync(
+                juce::AlertWindow::WarningIcon,
+                "Export SVG",
+                "Could not write the SVG file.");
+            return;
+        }
+
+        safeThis->audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+    });
 }
 
 void VisualiserComponent::popoutWindow() {

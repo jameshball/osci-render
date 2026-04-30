@@ -19,7 +19,7 @@ public:
         // --- Title ---
         titleLabel.setText(param->name, juce::dontSendNotification);
         titleLabel.setJustificationType(juce::Justification::centred);
-        titleLabel.setFont(juce::Font(13.0f, juce::Font::bold));
+        titleLabel.setFont(juce::Font(juce::FontOptions(13.0f, juce::Font::bold)));
         titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
         addAndMakeVisible(titleLabel);
 
@@ -184,7 +184,7 @@ private:
                          const juce::String& name, osci::FloatParameter* sliderParam) {
         lbl.setText(name, juce::dontSendNotification);
         lbl.setJustificationType(juce::Justification::centred);
-        lbl.setFont(juce::Font(10.0f, juce::Font::bold));
+        lbl.setFont(juce::Font(juce::FontOptions(10.0f, juce::Font::bold)));
         lbl.setColour(juce::Label::textColourId, juce::Colours::white);
         addAndMakeVisible(lbl);
 

@@ -6,6 +6,7 @@
 
 class FrameSource {
 public:
+	virtual ~FrameSource() = default;
 	virtual std::vector<std::unique_ptr<osci::Shape>> nextFrame() = 0;
 	virtual osci::Point nextSample() = 0;
 	virtual bool isSample() = 0;

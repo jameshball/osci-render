@@ -18,7 +18,7 @@ public:
 
     void setFrame(int index);
     osci::Point getSample(int blockSampleIndex = 0);
-    int getNumFrames() { return frames.size(); }
+    int getNumFrames() { return static_cast<int>(frames.size()); }
     int getCurrentFrame() const { return frameIndex; }
     double getFrameRate() const { return frameRate; }
 

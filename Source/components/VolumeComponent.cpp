@@ -68,8 +68,6 @@ void VolumeComponent::paint(juce::Graphics& g) {
     r.removeFromBottom(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
 
     auto channelHeight = r.getHeight();
-    auto leftVolumeHeight = channelHeight * leftVolume;
-    auto rightVolumeHeight = channelHeight * rightVolume;
 
     auto overallRect = r;
 

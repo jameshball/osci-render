@@ -38,12 +38,12 @@ GridItemComponent::TextLayoutMetrics GridItemComponent::computeTextLayouts(int t
 GridItemComponent::GridItemComponent(const juce::String& name, const juce::String& icon, const juce::String& id, juce::Colour iconTint)
     : itemName(name)
     , itemId(id)
-    , iconColour(iconTint)
     , lockIcon(
         "gridItemLock",
         juce::String::createStringFromData(BinaryData::lock_svg, BinaryData::lock_svgSize),
         juce::Colours::white.withAlpha(0.9f),
         juce::Colours::white.withAlpha(0.9f))
+    , iconColour(iconTint)
 {
     juce::String iconSvg = icon;
     if (icon.isEmpty()) {
@@ -165,7 +165,7 @@ void GridItemComponent::resized()
     auto yOffset = -animationProgress * HOVER_LIFT_AMOUNT;
 
     iconButton->setTransform(canAnimate ? juce::AffineTransform::translation(0, yOffset)
-                                        : juce::AffineTransform::identity);
+                                        : juce::AffineTransform());
 
     const int lockSize = 22;
     auto lockBounds = bounds.withSizeKeepingCentre(lockSize, lockSize);

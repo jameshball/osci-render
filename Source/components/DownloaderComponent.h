@@ -4,7 +4,7 @@
 
 class DownloaderThread : public juce::Thread {
 public:
-    DownloaderThread(juce::URL url, juce::File file, juce::URL::DownloadTaskListener* listener, juce::CriticalSection& taskLock, std::unique_ptr<juce::URL::DownloadTask>& task) : juce::Thread("Downloader Thread"), url(url), file(file), listener(listener), taskLock(taskLock), task(task) {};
+    DownloaderThread(juce::URL url, juce::File file, juce::URL::DownloadTaskListener* listener, juce::CriticalSection& taskLock, std::unique_ptr<juce::URL::DownloadTask>& task) : juce::Thread("Downloader Thread"), url(url), file(file), taskLock(taskLock), listener(listener), task(task) {};
     
     void run() override {
         juce::CriticalSection::ScopedLockType lock(taskLock);

@@ -33,14 +33,14 @@ public:
         g.fillEllipse(centre.x - rx, centre.y - ry, rx * 2.0f, ry * 2.0f);
 
         g.setColour(juce::Colours::white.withAlpha(0.7f));
-        g.setFont(juce::Font(13.0f).boldened());
+        g.setFont(juce::Font(juce::FontOptions(13.0f)).boldened());
 
         if (subText.isEmpty()) {
             g.drawText(text, bounds, juce::Justification::centred, false);
         } else {
             auto textArea = bounds.withHeight(bounds.getHeight() * 0.5f);
             g.drawText(text, textArea, juce::Justification::centredBottom, false);
-            g.setFont(juce::Font(11.0f));
+            g.setFont(juce::Font(juce::FontOptions(11.0f)));
             g.setColour(juce::Colours::white.withAlpha(0.5f));
             auto subArea = bounds.withTop(textArea.getBottom());
             g.drawText(subText, subArea, juce::Justification::centredTop, false);

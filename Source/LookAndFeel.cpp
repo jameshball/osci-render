@@ -251,7 +251,7 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
     const float textEdgeGap = 4.0f;
     auto cs = 5.0f;
 
-    juce::Font f(textH);
+    juce::Font f{ juce::FontOptions(textH) };
 
     juce::Path p;
     auto x = indent;
@@ -264,7 +264,7 @@ void OscirenderLookAndFeel::drawGroupComponentOutline(juce::Graphics& g, int wid
     auto textW = text.isEmpty() ? 0
         : juce::jlimit(0.0f,
             juce::jmax(0.0f, w - cs2 - textEdgeGap * 2),
-            (float)f.getStringWidth(text) + textEdgeGap * 2.0f);
+            (float)juce::GlyphArrangement::getStringWidth(f, text) + textEdgeGap * 2.0f);
     auto textX = cs + textEdgeGap;
 
     if (position.testFlags(juce::Justification::horizontallyCentred))
@@ -469,7 +469,7 @@ juce::TextLayout OscirenderLookAndFeel::layoutTooltipText(const juce::String& te
 
     juce::AttributedString s;
     s.setJustification (juce::Justification::centred);
-    s.append (text, juce::Font (tooltipFontSize, juce::Font::bold), colour);
+    s.append (text, juce::Font(juce::FontOptions(tooltipFontSize, juce::Font::bold)), colour);
 
     juce::TextLayout tl;
     tl.createLayoutWithBalancedLineLengths (s, (float) maxToolTipWidth);
@@ -697,7 +697,7 @@ void OscirenderLookAndFeel::drawAlertBox(juce::Graphics& g, juce::AlertWindow& a
         }
 
         juce::GlyphArrangement ga;
-        ga.addFittedText(juce::Font((float)iconRect.getHeight() * 0.9f, juce::Font::bold),
+        ga.addFittedText(juce::Font(juce::FontOptions((float)iconRect.getHeight() * 0.9f, juce::Font::bold)),
                          juce::String::charToString((juce::juce_wchar)(juce::uint8)character),
                          static_cast<float>(iconRect.getX()), static_cast<float>(iconRect.getY()),
                          static_cast<float>(iconRect.getWidth()), static_cast<float>(iconRect.getHeight()),
@@ -722,15 +722,15 @@ void OscirenderLookAndFeel::drawAlertBox(juce::Graphics& g, juce::AlertWindow& a
 int OscirenderLookAndFeel::getAlertWindowButtonHeight() { return 40; }
 
 juce::Font OscirenderLookAndFeel::getAlertWindowTitleFont() {
-    return juce::Font(boldTypeface).withHeight(18.0f);
+    return juce::Font(juce::FontOptions(boldTypeface)).withHeight(18.0f);
 }
 
 juce::Font OscirenderLookAndFeel::getAlertWindowMessageFont() {
-    return juce::Font(regularTypeface).withHeight(15.0f);
+    return juce::Font(juce::FontOptions(regularTypeface)).withHeight(15.0f);
 }
 
 juce::Font OscirenderLookAndFeel::getAlertWindowFont() {
-    return juce::Font(regularTypeface).withHeight(14.0f);
+    return juce::Font(juce::FontOptions(regularTypeface)).withHeight(14.0f);
 }
 
 void OscirenderLookAndFeel::drawStretchableLayoutResizerBar(juce::Graphics& g, int w, int h, bool isVerticalBar, bool isMouseOver, bool isMouseDragging) {
@@ -794,7 +794,7 @@ void OscirenderLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rec
     if (textColour != nullptr)
         textColourToUse = *textColour;
 
-    auto font = juce::Font(13.0f);
+    auto font = juce::Font(juce::FontOptions(13.0f));
     g.setFont(font);
     g.setColour(textColourToUse);
 
@@ -831,7 +831,7 @@ void OscirenderLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rec
 
     if (shortcutKeyText.isNotEmpty()) {
         g.setColour(textColourToUse.withAlpha(0.5f));
-        g.setFont(juce::Font(11.0f));
+        g.setFont(juce::Font(juce::FontOptions(11.0f)));
         g.drawText(shortcutKeyText, textArea, juce::Justification::centredRight, true);
     }
 }
@@ -844,8 +844,8 @@ void OscirenderLookAndFeel::getIdealPopupMenuItemSize(const juce::String& text, 
         return;
     }
 
-    auto font = juce::Font(13.0f);
-    idealWidth = font.getStringWidth(text) + 40;
+    auto font = juce::Font(juce::FontOptions(13.0f));
+    idealWidth = juce::GlyphArrangement::getStringWidthInt(font, text) + 40;
     idealHeight = 28;
 }
 

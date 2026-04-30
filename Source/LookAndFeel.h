@@ -116,7 +116,7 @@ namespace Dracula {
 
 namespace LookAndFeelHelpers
 {
-    static juce::Colour createBaseColour(juce::Colour buttonColour, bool hasKeyboardFocus, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown, bool isEnabled) noexcept {
+    [[maybe_unused]] static juce::Colour createBaseColour(juce::Colour buttonColour, bool hasKeyboardFocus, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown, bool isEnabled) noexcept {
         const juce::Colour baseColour(buttonColour.withMultipliedAlpha(isEnabled ? 1.0f : 0.5f));
 
         if (shouldDrawButtonAsDown) return baseColour.contrasting (0.15f);
@@ -126,13 +126,13 @@ namespace LookAndFeelHelpers
     }
 
 
-    static juce::TextLayout layoutTooltipText(const juce::String& text, juce::Colour colour) noexcept {
+    [[maybe_unused]] static juce::TextLayout layoutTooltipText(const juce::String& text, juce::Colour colour) noexcept {
         const float tooltipFontSize = 13.0f;
         const int maxToolTipWidth = 400;
 
         juce::AttributedString s;
         s.setJustification (juce::Justification::centred);
-        s.append (text, juce::Font (tooltipFontSize, juce::Font::bold), colour);
+        s.append (text, juce::Font(juce::FontOptions(tooltipFontSize, juce::Font::bold)), colour);
 
         juce::TextLayout tl;
         tl.createLayoutWithBalancedLineLengths (s, (float) maxToolTipWidth);

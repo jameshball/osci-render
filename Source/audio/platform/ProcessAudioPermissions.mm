@@ -24,7 +24,9 @@ namespace ProcessAudioPermissions
 
 bool isProcessTapAvailable()
 {
-  return __builtin_available (macOS 14.2, *);
+  if (@available (macOS 14.2, *))
+    return true;
+  return false;
 }
 
 namespace

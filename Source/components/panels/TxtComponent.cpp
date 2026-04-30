@@ -22,7 +22,7 @@ TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 			return;
 		}
 
-		audioProcessor.font = juce::Font(installedFonts[selectedIndex], audioProcessor.FONT_SIZE, juce::Font::plain);
+		audioProcessor.font = juce::Font(juce::FontOptions(installedFonts[selectedIndex], audioProcessor.FONT_SIZE, juce::Font::plain));
     };
 }
 
@@ -74,7 +74,7 @@ void TxtComponent::FontPreviewLookAndFeel::drawPopupMenuItem(juce::Graphics& g, 
 
 	auto baseFont = juce::LookAndFeel_V4::getPopupMenuFont();
 	auto fontHeight = juce::jmin(baseFont.getHeight(), (float)r.getHeight() - 2.0f);
-	juce::Font itemFont(text, fontHeight, juce::Font::plain);
+	juce::Font itemFont(juce::FontOptions(text, fontHeight, juce::Font::plain));
 
 	auto defaultTextColour = findColour(isHighlighted ? juce::PopupMenu::highlightedTextColourId
 													  : juce::PopupMenu::textColourId);

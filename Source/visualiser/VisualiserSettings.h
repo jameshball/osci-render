@@ -16,7 +16,7 @@ class OscirenderAudioProcessor;
 
 class GroupedSettings : public juce::GroupComponent {
 public:
-    GroupedSettings(std::vector<std::shared_ptr<EffectComponent>> effects, juce::String label) : effects(effects), juce::GroupComponent(label, label) {
+    GroupedSettings(std::vector<std::shared_ptr<EffectComponent>> effects, juce::String label) : juce::GroupComponent(label, label), effects(effects) {
         for (auto effect : effects) {
             addAndMakeVisible(effect.get());
         }
@@ -42,7 +42,7 @@ public:
     }
 
     int getHeight() {
-        return 40 + effects.size() * 30;
+        return 40 + static_cast<int>(effects.size()) * 30;
     }
 
 private:
@@ -178,7 +178,7 @@ private:
 class SettingsWindow : public juce::DialogWindow {
 public:
     SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker(), true, true), component(component), componentHeight(componentHeight) {
-        setContentComponent(&viewport);
+        setContentNonOwned(&viewport, false);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);
         setResizable(true, false);

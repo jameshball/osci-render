@@ -23,7 +23,7 @@ static void drawStemmedNote(juce::Graphics& g, float headCx, float headCy,
 }
 
 void ModulationRateComponent::drawHzIcon(juce::Graphics& g, juce::Rectangle<float> area) {
-    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
     g.drawText("Hz", area, juce::Justification::centred);
 }
 
@@ -67,7 +67,7 @@ void ModulationRateComponent::drawTripletNoteIcon(juce::Graphics& g, juce::Recta
     float beamRight = xs[2] + headRx + stemW * 0.5f;
     g.fillRect(beamLeft, beamY, beamRight - beamLeft, beamH);
     float labelY = beamY - 8.0f;
-    g.setFont(juce::Font(7.5f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(7.5f, juce::Font::bold)));
     g.drawText("3", juce::Rectangle<float>(beamLeft, labelY, beamRight - beamLeft, 8.0f),
                juce::Justification::centred);
 }

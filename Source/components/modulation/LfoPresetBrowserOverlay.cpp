@@ -16,7 +16,7 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
                                                 juce::Colours::white.withAlpha(0.3f));
     browserPanel.addAndMakeVisible(viewport);
 
-    saveEditor.setFont(juce::Font(13.0f));
+    saveEditor.setFont(juce::Font(juce::FontOptions(13.0f)));
     saveEditor.setTextToShowWhenEmpty("Preset name...", juce::Colours::white.withAlpha(0.3f));
     saveEditor.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark());
     saveEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
@@ -120,7 +120,7 @@ void LfoPresetBrowserOverlay::PresetRow::paint(juce::Graphics& g) {
         textBounds.removeFromRight(kDeleteButtonSize + 4);
 
     g.setColour(isActive ? juce::Colours::white : juce::Colours::white.withAlpha(0.75f));
-    g.setFont(juce::Font(12.5f));
+    g.setFont(juce::Font(juce::FontOptions(12.5f)));
 
     juce::String displayName = name;
     if (isDefault)
@@ -183,7 +183,7 @@ void LfoPresetBrowserOverlay::PresetRow::paintOverChildren(juce::Graphics& g) {
 
 void LfoPresetBrowserOverlay::SectionHeader::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::white.withAlpha(0.4f));
-    g.setFont(juce::Font(11.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
     g.drawText(title, getLocalBounds().reduced(8, 0).toFloat(), juce::Justification::centredLeft);
 
     auto bounds = getLocalBounds().toFloat();

@@ -15,17 +15,22 @@ You are a QA engineer specializing in C++ audio plugin testing. Your job is to r
 
 Run every combination below. Each is an independent step:
 
-| # | Suite | Plugin | Sanitizer | Command |
-|---|-------|--------|-----------|---------|
-| 1 | Unit tests | — | None | `./run_tests.sh` |
-| 2 | Unit tests | — | TSan | `./run_tests.sh --tsan` |
-| 3 | Unit tests | — | ASan | `./run_tests.sh --asan` |
-| 4 | Pluginval | osci-render | None | `./run_tests.sh --pluginval --strictness 10` |
-| 5 | Pluginval | sosci | None | `./run_tests.sh --pluginval --plugin sosci --strictness 10` |
-| 6 | Pluginval | osci-render | TSan | `./run_tests.sh --tsan --pluginval --strictness 10` |
-| 7 | Pluginval | sosci | TSan | `./run_tests.sh --tsan --pluginval --plugin sosci --strictness 10` |
-| 8 | Pluginval | osci-render | ASan | `./run_tests.sh --asan --pluginval --strictness 10` |
-| 9 | Pluginval | sosci | ASan | `./run_tests.sh --asan --pluginval --plugin sosci --strictness 10` |
+| #  | Suite | Plugin | Build | Sanitizer | Command |
+|----|-------|--------|-------|-----------|---------|
+| 1  | Unit tests | — | Premium | None | `./run_tests.sh` |
+| 2  | Unit tests | — | Premium | TSan | `./run_tests.sh --tsan` |
+| 3  | Unit tests | — | Premium | ASan | `./run_tests.sh --asan` |
+| 4  | Pluginval | osci-render | Premium (`OSCI_PREMIUM=1`) | None | `./run_tests.sh --pluginval --strictness 10` |
+| 5  | Pluginval | osci-render | **Free** (`OSCI_PREMIUM=0`) | None | `./run_tests.sh --pluginval --free --strictness 10` |
+| 6  | Pluginval | sosci | Premium | None | `./run_tests.sh --pluginval --plugin sosci --strictness 10` |
+| 7  | Pluginval | osci-render | Premium | TSan | `./run_tests.sh --tsan --pluginval --strictness 10` |
+| 8  | Pluginval | osci-render | **Free** | TSan | `./run_tests.sh --tsan --pluginval --free --strictness 10` |
+| 9  | Pluginval | sosci | Premium | TSan | `./run_tests.sh --tsan --pluginval --plugin sosci --strictness 10` |
+| 10 | Pluginval | osci-render | Premium | ASan | `./run_tests.sh --asan --pluginval --strictness 10` |
+| 11 | Pluginval | osci-render | **Free** | ASan | `./run_tests.sh --asan --pluginval --free --strictness 10` |
+| 12 | Pluginval | sosci | Premium | ASan | `./run_tests.sh --asan --pluginval --plugin sosci --strictness 10` |
+
+**Note on `--free`**: `run_tests.sh --free` (alias `--premium=0`) patches the `.jucer` file(s) to set `OSCI_PREMIUM=0`, resaves via Projucer, builds, then automatically restores the original `.jucer` on exit (including interrupts). Free-build sanitizer logs are tagged with `-free` in their filenames (e.g. `tsan-free-pluginval-osci-render-*.log`). Running the free matrix is mandatory — premium and free ship as separate products and the preprocessor flag gates significant code paths.
 
 ## Approach
 
@@ -39,9 +44,9 @@ Run every combination below. Each is an independent step:
 
 ### Test Matrix Results
 
-| # | Suite | Plugin | Sanitizer | Result | Notes |
-|---|-------|--------|-----------|--------|-------|
-| {N} | {suite} | {plugin} | {sanitizer} | **PASS**/**FAIL** | {brief note} |
+| # | Suite | Plugin | Build | Sanitizer | Result | Notes |
+|---|-------|--------|-------|-----------|--------|-------|
+| {N} | {suite} | {plugin} | {premium/free} | {sanitizer} | **PASS**/**FAIL** | {brief note} |
 
 ### Failures / Issues
 

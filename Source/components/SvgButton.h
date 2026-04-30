@@ -152,7 +152,7 @@ private:
     juce::String svgSource;
 
     void changeSvgColour(juce::XmlElement* xml, juce::Colour colour) {
-        forEachXmlChildElement(*xml, xmlnode) {
+        for (auto* xmlnode : xml->getChildIterator()) {
             xmlnode->setAttribute("fill", '#' + colour.toDisplayString(false));
         }
     }

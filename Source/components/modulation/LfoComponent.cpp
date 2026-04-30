@@ -48,7 +48,7 @@ void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     }
 
     g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
     auto textArea = bounds.toNearestInt();
     textArea.removeFromLeft(leftArrowArea.getWidth());
     textArea.removeFromRight(rightArrowArea.getWidth());

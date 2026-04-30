@@ -39,7 +39,7 @@ inline void paintBackground(juce::Graphics& g,
         g.fillPath(labelPath);
 
         g.setColour(juce::Colours::white);
-        g.setFont(juce::Font(10.0f));
+        g.setFont(juce::Font(juce::FontOptions(10.0f)));
         g.drawText(labelText, labelBounds, juce::Justification::centred);
     } else {
         g.setColour(Colours::evenDarker());

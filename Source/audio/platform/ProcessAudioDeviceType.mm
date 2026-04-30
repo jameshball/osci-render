@@ -16,6 +16,14 @@
 
 #if JUCE_MAC && OSCI_PREMIUM
 
+// Many APIs below (CATapDescription, AudioHardwareCreateProcessTap, etc.) are
+// gated behind explicit runtime checks using __builtin_available inside
+// createTapAndAggregateDevice. Clang's static checker can't always reason about
+// those guards, so we silence the availability warnings here.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+#pragma clang diagnostic ignored "-Wunsupported-availability-guard"
+
 #import <CoreAudio/CoreAudio.h>
 #import <AudioToolbox/AudioToolbox.h>
 
@@ -438,7 +446,7 @@ struct ProcessTapBackend
         NSString* tapUUID = [tapDesc.UUID UUIDString];
         NSString* outputUIDStr = [NSString stringWithUTF8String: outputUID.toUTF8()];
         NSString* aggUID = [[NSUUID UUID] UUIDString];
-        NSString* aggName = [NSString stringWithFormat:@"osci-render Tap (%s)", process.name.toUTF8()];
+        NSString* aggName = [NSString stringWithFormat:@"osci-render Tap (%s)", (const char*) process.name.toUTF8()];
 
         NSDictionary* description = @{
             @(kAudioAggregateDeviceNameKey): aggName,
@@ -1337,5 +1345,7 @@ AudioIODevice* ProcessAudioDeviceType::createDevice (const String& outputDeviceN
                                    outputChoiceIDs.getReference (outIndex),
                                    /*muteOutputToDevice*/ outputNoneSelected);
 }
+
+#pragma clang diagnostic pop
 
 #endif // JUCE_MAC && OSCI_PREMIUM

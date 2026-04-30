@@ -50,7 +50,7 @@ public:
 
         float value = getValue();
 
-        g.setFont(juce::Font(13.0f));
+        g.setFont(juce::Font(juce::FontOptions(13.0f)));
         g.setColour(juce::Colours::white.withAlpha(0.9f));
 
         juce::String text = integerMode ? juce::String((int)value)

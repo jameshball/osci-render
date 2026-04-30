@@ -23,7 +23,6 @@ public:
     ThresholdLookAndFeel(int thumbRadius) : ThumbRadiusLookAndFeel(thumbRadius) {}
 
     void drawLinearSliderThumb(juce::Graphics& g, int x, int y, int width, int height, float sliderPos, float minSliderPos, float maxSliderPos, const juce::Slider::SliderStyle style, juce::Slider& slider) override {
-        float kx = (float) x + (float) width * 0.5f;
         float ky = sliderPos;
 
         auto sliderRadius = (float) getSliderThumbRadius(slider);

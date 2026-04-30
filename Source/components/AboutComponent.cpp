@@ -48,19 +48,19 @@ void AboutComponent::paint(juce::Graphics& g) {
     area.removeFromTop(6.0f);
 
     // Product name
-    g.setFont(juce::Font(22.0f).boldened());
+    g.setFont(juce::Font(juce::FontOptions(22.0f)).boldened());
     g.setColour(juce::Colours::white);
     g.drawText(info.productName, area.removeFromTop(24.0f), juce::Justification::centred);
 
     // "by Company"
-    g.setFont(juce::Font(13.0f));
+    g.setFont(juce::Font(juce::FontOptions(13.0f)));
     g.setColour(juce::Colours::white.withAlpha(0.75f));
     g.drawText("by " + info.companyName, area.removeFromTop(18.0f), juce::Justification::centred);
 
     // Version · Premium/Free
     juce::String status = "Version " + info.versionString + "  \xc2\xb7  ";
     status += info.isPremium ? "Premium" : "Free";
-    g.setFont(juce::Font(12.0f));
+    g.setFont(juce::Font(juce::FontOptions(12.0f)));
     g.setColour(juce::Colours::white.withAlpha(0.65f));
     g.drawText(status, area.removeFromTop(16.0f), juce::Justification::centred);
 
@@ -74,24 +74,24 @@ void AboutComponent::paint(juce::Graphics& g) {
         auto inner = card.reduced(kCardPad + 4.0f, kCardPad);
 
         // Title
-        g.setFont(juce::Font(11.0f).boldened());
+        g.setFont(juce::Font(juce::FontOptions(11.0f)).boldened());
         g.setColour(juce::Colours::white.withAlpha(0.75f));
         g.drawText("CONTRIBUTORS", inner.removeFromTop(20.0f), juce::Justification::centredLeft);
 
         // Entries
         for (auto& c : info.credits) {
             auto nameRow = inner.removeFromTop(18.0f);
-            g.setFont(juce::Font(13.0f).boldened());
+            g.setFont(juce::Font(juce::FontOptions(13.0f)).boldened());
             g.setColour(juce::Colours::white);
             g.drawText(c.name, nameRow, juce::Justification::centredLeft);
 
             auto descRow = inner.removeFromTop(16.0f);
-            g.setFont(juce::Font(12.0f));
+            g.setFont(juce::Font(juce::FontOptions(12.0f)));
             g.setColour(juce::Colours::white.withAlpha(0.7f));
             g.drawText(c.contribution, descRow, juce::Justification::centredLeft);
         }
 
-        g.setFont(juce::Font(11.0f).withStyle(juce::Font::italic));
+        g.setFont(juce::Font(juce::FontOptions(11.0f)).withStyle(juce::Font::italic));
         g.setColour(juce::Colours::white.withAlpha(0.6f));
         g.drawText("...and all the community!", inner.removeFromTop(18.0f), juce::Justification::centredLeft);
     }
@@ -105,7 +105,7 @@ void AboutComponent::paint(juce::Graphics& g) {
         paintCard(g, card);
         auto inner = card.reduced(kCardPad + 4.0f, kCardPad);
 
-        g.setFont(juce::Font(12.0f));
+        g.setFont(juce::Font(juce::FontOptions(12.0f)));
         g.setColour(juce::Colours::white.withAlpha(0.65f));
 
         juce::String buildInfo = juce::String("Built ") + __DATE__ + "  \xc2\xb7  " + juce::SystemStats::getJUCEVersion();

@@ -68,7 +68,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     slider.addListener(this);
     lfoSlider.addListener(this);
 
-    label.setFont(juce::Font(14.0f));
+    label.setFont(juce::Font(juce::FontOptions(14.0f)));
 
     if (lfoEnabled) {
         lfo.addItem("Static", static_cast<int>(osci::LfoType::Static));
