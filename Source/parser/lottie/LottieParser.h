@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include <atomic>
 
 // Forward-declare thorvg types so this header does not leak thorvg's globals.
 namespace tvg {
@@ -42,8 +43,8 @@ private:
     // so setFrame/draw are O(1) and safe to call on the audio thread.
     std::vector<std::vector<std::unique_ptr<osci::Shape>>> framesCache;
 
-    int totalFrames = 1;
-    int currentFrame = -1; // force rebuild on first setFrame
+    std::atomic<int> totalFrames{1};
+    std::atomic<int> currentFrame{-1}; // force rebuild on first setFrame
     float pictureWidth = 0.0f;
     float pictureHeight = 0.0f;
     double frameRate = 30.0;

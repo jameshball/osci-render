@@ -364,28 +364,29 @@ OsciLottieParser::OsciLottieParser(juce::String jsonContent) {
     pictureWidth = (w > 0.0f) ? w : 1.0f;
     pictureHeight = (h > 0.0f) ? h : 1.0f;
 
-    totalFrames = std::max(1, (int) std::floor(animation->totalFrame() + 0.5f));
-    if (totalFrames < 1) totalFrames = 1;
+    int frameCount = std::max(1, (int) std::floor(animation->totalFrame() + 0.5f));
+    if (frameCount < 1) frameCount = 1;
+    totalFrames.store(frameCount, std::memory_order_relaxed);
 
     // thorvg reports total animation duration in seconds. Derive fps.
     float duration = animation->duration();
-    if (duration > 0.0f && totalFrames > 0) {
-        frameRate = static_cast<double>(totalFrames) / static_cast<double>(duration);
+    if (duration > 0.0f && frameCount > 0) {
+        frameRate = static_cast<double>(frameCount) / static_cast<double>(duration);
     }
 
     constexpr int frameWarningThreshold = 1200;
     constexpr size_t shapeWarningThreshold = 150000;
-    if (totalFrames > frameWarningThreshold) {
+    if (frameCount > frameWarningThreshold) {
         showWarning("Large Lottie Animation",
-                    "This Lottie contains " + juce::String(totalFrames)
+                    "This Lottie contains " + juce::String(frameCount)
                     + " frames. It will continue loading, but may take extra time and memory.");
     }
 
     // Pre-render every frame up front so setFrame/draw are O(1) and
     // realtime-safe (the audio thread calls setFrame from processBlock).
-    framesCache.resize(totalFrames);
+    framesCache.resize((size_t) frameCount);
     size_t cachedShapeCount = 0;
-    for (int i = 0; i < totalFrames; ++i) {
+    for (int i = 0; i < frameCount; ++i) {
         animation->frame(static_cast<float>(i));
         // Force scene-tree update at the current frame by requesting bounds.
         float bx = 0.0f, by = 0.0f, bw = 0.0f, bh = 0.0f;
@@ -398,7 +399,7 @@ OsciLottieParser::OsciLottieParser(juce::String jsonContent) {
                     "This Lottie cached " + juce::String((juce::int64) cachedShapeCount)
                     + " shape segments. It will continue loading, but may use extra memory.");
     }
-    currentFrame = 0;
+    currentFrame.store(0, std::memory_order_relaxed);
 }
 
 OsciLottieParser::~OsciLottieParser() {
@@ -407,19 +408,21 @@ OsciLottieParser::~OsciLottieParser() {
     releaseThorVG();
 }
 
-int OsciLottieParser::getNumFrames() const { return totalFrames; }
-int OsciLottieParser::getCurrentFrame() const { return juce::jmax(0, currentFrame); }
+int OsciLottieParser::getNumFrames() const { return totalFrames.load(std::memory_order_relaxed); }
+int OsciLottieParser::getCurrentFrame() const { return juce::jmax(0, currentFrame.load(std::memory_order_relaxed)); }
 
 void OsciLottieParser::setFrame(int index) {
-    if (totalFrames <= 0) return;
-    index = juce::jlimit(0, totalFrames - 1, index);
-    currentFrame = index;
+    const int frameCount = totalFrames.load(std::memory_order_relaxed);
+    if (frameCount <= 0) return;
+    index = juce::jlimit(0, frameCount - 1, index);
+    currentFrame.store(index, std::memory_order_relaxed);
 }
 
 std::vector<std::unique_ptr<osci::Shape>> OsciLottieParser::draw() {
     std::vector<std::unique_ptr<osci::Shape>> out;
-    if (currentFrame < 0 || currentFrame >= (int) framesCache.size()) return out;
-    auto& src = framesCache[currentFrame];
+    const int frame = currentFrame.load(std::memory_order_relaxed);
+    if (frame < 0 || frame >= (int) framesCache.size()) return out;
+    auto& src = framesCache[(size_t) frame];
     out.reserve(src.size());
     for (auto& s : src) {
         out.push_back(s->clone());
@@ -1031,6 +1034,6 @@ void OsciLottieParser::fallbackShapes() {
     framesCache.resize(1);
     framesCache[0].push_back(std::make_unique<osci::Line>(-0.5, -0.5, 0.5, 0.5));
     framesCache[0].push_back(std::make_unique<osci::Line>(-0.5, 0.5, 0.5, -0.5));
-    totalFrames = 1;
-    currentFrame = 0;
+    totalFrames.store(1, std::memory_order_relaxed);
+    currentFrame.store(0, std::memory_order_relaxed);
 }

@@ -29,10 +29,10 @@ public:
 	void enable();
 	bool consumeDirty();
     
-    int getNumFrames();
-    int getCurrentFrame();
+	int getNumFrames();
+	int getCurrentFrame();
     void setFrame(int frame);
-    double getFrameRate();
+    double getFrameRate() const;
 	
 	std::shared_ptr<WorldObject> getObject();
 	std::shared_ptr<SvgParser> getSvg();
@@ -56,6 +56,7 @@ private:
 
 	bool active = true;
 	bool sampleSource = false;
+	std::atomic<double> frameRate{30.0};
 	juce::SpinLock lock;
 
 	std::shared_ptr<WorldObject> object;

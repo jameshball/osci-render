@@ -616,10 +616,10 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if (isImage) {
+    } else if (isAnimated || isImage) {
         frameSettingsVisible = true;
         frame.setAnimated(isAnimated);
-        frame.setImage(true);
+        frame.setImage(isImage);
         frame.resized();
     }
     fileControls.updateFileLabel();

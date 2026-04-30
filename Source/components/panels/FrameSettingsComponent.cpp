@@ -7,7 +7,6 @@ FrameSettingsComponent::FrameSettingsComponent(OscirenderAudioProcessor& p, Osci
     setText("Frame Settings");
 
     if (!juce::JUCEApplicationBase::isStandaloneApp()) {
-        addAndMakeVisible(animate);
         addAndMakeVisible(sync);
         addAndMakeVisible(offsetLabel);
         addAndMakeVisible(offsetBox);
@@ -57,10 +56,10 @@ void FrameSettingsComponent::resized()
 
     auto firstColumn = area.removeFromLeft(220);
     auto toggleBounds = isPlugin && (animated || image) ? firstColumn.removeFromTop(rowHeight) : juce::Rectangle<int>();
-    const int toggleWidth = juce::jmin(toggleBounds.getWidth() / 3, 150);
+    const int visibleToggles = (animated ? 1 : 0) + (image ? 1 : 0);
+    const int toggleWidth = visibleToggles > 0 ? juce::jmin(toggleBounds.getWidth() / visibleToggles, 150) : 0;
 
     if (animated && isPlugin) {
-        animate.setBounds(toggleBounds.removeFromLeft(toggleWidth));
         sync.setBounds(toggleBounds.removeFromLeft(toggleWidth));
         toggleRowUsed = true;
 
@@ -120,7 +119,6 @@ void FrameSettingsComponent::setAnimated(bool shouldBeAnimated)
 {
     animated = shouldBeAnimated;
     const bool showAnimationControls = animated && !juce::JUCEApplicationBase::isStandaloneApp();
-    animate.setVisible(showAnimationControls);
     sync.setVisible(showAnimationControls);
     offsetBox.setVisible(showAnimationControls);
     offsetLabel.setVisible(showAnimationControls);

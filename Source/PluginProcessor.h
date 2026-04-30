@@ -79,14 +79,17 @@ private:
     std::vector<Entry> entries;
 };
 
-#if OSCI_PREMIUM
 // Extensions recognised as Lottie animation files (with or without the leading dot).
 inline bool isLottieExtension(const juce::String& extension) {
+#if OSCI_PREMIUM
     auto e = extension.toLowerCase();
     return e == "json" || e == "lottie" || e == "lot"
         || e == ".json" || e == ".lottie" || e == ".lot";
-}
+#else
+    (void) extension;
+    return false;
 #endif
+}
 
 /**
  */

@@ -34,7 +34,6 @@ private:
     bool image = true;
     mutable int cachedPreferredHeight = 0;
 
-    jux::SwitchButton animate{audioProcessor.animateFrames};
     jux::SwitchButton sync{audioProcessor.animationSyncBPM};
     juce::Label offsetLabel{"Offset", "Offset"};
     DoubleTextBox offsetBox{audioProcessor.animationOffset->min, audioProcessor.animationOffset->max};

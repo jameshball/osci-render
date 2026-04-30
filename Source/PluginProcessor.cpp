@@ -1061,11 +1061,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         double nativeRate = 30.0;
         {
             juce::SpinLock::ScopedLockType lock1(parsersLock);
-            if (currentFile >= 0 && currentFile < sounds.size() && sounds[currentFile]->parser != nullptr) {
-                nativeRate = sounds[currentFile]->parser->getFrameRate();
+            const int fileIndex = currentFile.load(std::memory_order_relaxed);
+            if (fileIndex >= 0 && fileIndex < (int)sounds.size() && sounds[(size_t)fileIndex]->parser != nullptr) {
+                nativeRate = sounds[(size_t)fileIndex]->parser->getFrameRate();
             }
         }
-        const double rate = nativeRate * animationSpeed->parameters[0]->getValueUnnormalised();
+        const double speed = animationSpeed->getAnimatedValue(0, (size_t) juce::jmax(0, numSamples - 1));
+        const double rate = nativeRate * speed;
         double frameIncrement;
         if (juce::JUCEApplicationBase::isStandaloneApp()) {
             frameIncrement = sTimeSec * rate * numSamples;
@@ -1083,17 +1085,22 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-        if (currentFile >= 0 && sounds[currentFile]->parser->isAnimatable) {
-            int totalFrames = sounds[currentFile]->parser->getNumFrames();
-            if (loopAnimation->getBoolValue()) {
-                // Euclidean-style modulo so negative speeds wrap instead of clamp to 0.
-                double wrapped = std::fmod(animationFrame.load(), (double)totalFrames);
-                if (wrapped < 0.0) wrapped += (double)totalFrames;
-                animationFrame = wrapped;
-            } else {
-                animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
+        const int fileIndex = currentFile.load(std::memory_order_relaxed);
+        if (fileIndex >= 0 && fileIndex < (int)sounds.size() && sounds[(size_t)fileIndex]->parser != nullptr
+            && sounds[(size_t)fileIndex]->parser->isAnimatable) {
+            auto parser = sounds[(size_t)fileIndex]->parser;
+            int totalFrames = parser->getNumFrames();
+            if (totalFrames > 0) {
+                if (loopAnimation->getBoolValue()) {
+                    // Euclidean-style modulo so negative speeds wrap instead of clamp to 0.
+                    double wrapped = std::fmod(animationFrame.load(), (double)totalFrames);
+                    if (wrapped < 0.0) wrapped += (double)totalFrames;
+                    animationFrame = wrapped;
+                } else {
+                    animationFrame = juce::jlimit(0.0, (double)totalFrames - 1, animationFrame.load());
+                }
+                parser->setFrame(animationFrame);
             }
-            sounds[currentFile]->parser->setFrame(animationFrame);
         }
     }
 
@@ -1280,6 +1287,36 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
         juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
 
+        bool hasLegacyAnimationRate = false;
+        double legacyAnimationRate = 30.0;
+        bool hasSavedAnimationSpeed = false;
+
+        if (auto* effectsXmlForMigration = xml->getChildByName("effects")) {
+            for (auto* effectXml : effectsXmlForMigration->getChildIterator()) {
+                if (effectXml->getStringAttribute("id") == "animationSpeed") {
+                    hasSavedAnimationSpeed = true;
+                    break;
+                }
+                for (auto* parameterXml : effectXml->getChildIterator()) {
+                    if (parameterXml->getStringAttribute("id") == "animationSpeed") {
+                        hasSavedAnimationSpeed = true;
+                        break;
+                    }
+                }
+                if (hasSavedAnimationSpeed) break;
+            }
+        }
+
+        if (auto* floatParametersXmlForMigration = xml->getChildByName("floatParameters")) {
+            for (auto* parameterXml : floatParametersXmlForMigration->getChildIterator()) {
+                if (parameterXml->getStringAttribute("id") == "animationRate" && parameterXml->hasAttribute("value")) {
+                    hasLegacyAnimationRate = true;
+                    legacyAnimationRate = parameterXml->getDoubleAttribute("value", legacyAnimationRate);
+                    break;
+                }
+            }
+        }
+
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
@@ -1367,6 +1404,31 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             juce::Logger::writeToLog("setStateInformation: no files section found");
         }
         changeCurrentFile(xml->getIntAttribute("currentFile", -1));
+
+        if (hasLegacyAnimationRate && !hasSavedAnimationSpeed) {
+            double nativeRate = 30.0;
+            const int fileIndex = currentFile.load(std::memory_order_relaxed);
+            if (fileIndex >= 0 && fileIndex < (int)sounds.size() && sounds[(size_t)fileIndex]->parser != nullptr) {
+                nativeRate = sounds[(size_t)fileIndex]->parser->getFrameRate();
+            }
+            if (!std::isfinite(nativeRate) || std::abs(nativeRate) < 1.0e-9) {
+                nativeRate = 30.0;
+            }
+
+            const double migratedSpeed = legacyAnimationRate / nativeRate;
+            if (std::isfinite(migratedSpeed)) {
+                auto* speedParameter = animationSpeed->parameters[0];
+                if (migratedSpeed < speedParameter->min.load()) {
+                    speedParameter->min.store((float)migratedSpeed);
+                }
+                if (migratedSpeed > speedParameter->max.load()) {
+                    speedParameter->max.store((float)migratedSpeed);
+                }
+                speedParameter->setUnnormalisedValueNotifyingHost((float)migratedSpeed);
+                juce::Logger::writeToLog("setStateInformation: migrated animationRate "
+                    + juce::String(legacyAnimationRate) + " to animationSpeed " + juce::String(migratedSpeed));
+            }
+        }
 
         // Load global LFO waveforms & assignments (premium only)
 #if OSCI_PREMIUM

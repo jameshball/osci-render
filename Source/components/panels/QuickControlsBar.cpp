@@ -124,6 +124,15 @@ void QuickControlsBar::paint(juce::Graphics& g) {
 }
 
 void QuickControlsBar::setAnimated(bool animated) {
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+        juce::Component::SafePointer<QuickControlsBar> safeThis(this);
+        juce::MessageManager::callAsync([safeThis, animated] {
+            if (safeThis != nullptr)
+                safeThis->setAnimated(animated);
+        });
+        return;
+    }
+
     if (animationSpeedKnob.isVisible() == animated) return;
     animationSpeedKnob.setVisible(animated);
     resized();

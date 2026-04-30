@@ -1,7 +1,33 @@
 #include "FileParser.h"
 #include <numbers>
 #include "../PluginProcessor.h"
+#if OSCI_PREMIUM
 #include "lottie/DotLottieArchive.h"
+#endif
+
+#if OSCI_PREMIUM
+namespace {
+bool looksLikeLottieJson(const juce::String& jsonContent) {
+	auto parsed = juce::JSON::parse(jsonContent);
+	auto* object = parsed.getDynamicObject();
+	if (object == nullptr) return false;
+
+	return object->hasProperty(juce::Identifier("v"))
+		&& object->hasProperty(juce::Identifier("fr"))
+		&& object->hasProperty(juce::Identifier("op"))
+		&& object->getProperty(juce::Identifier("layers")).isArray();
+}
+
+void showInvalidLottieJsonWarning() {
+	juce::MessageManager::callAsync([] {
+		juce::AlertWindow::showMessageBoxAsync(
+			juce::AlertWindow::AlertIconType::WarningIcon,
+			"Unsupported JSON",
+			"The selected JSON file does not look like a Lottie animation.");
+	});
+}
+}
+#endif
 
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
     : errorCallback(errorCallback), audioProcessor(p) {}
@@ -59,6 +85,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	lua = nullptr;
 	img = nullptr;
 	wav = nullptr;
+	frameRate.store(30.0, std::memory_order_relaxed);
 #if OSCI_PREMIUM
 	fractal = nullptr;
 	lottie = nullptr;
@@ -94,6 +121,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			stream->setPosition(0);
 			gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 		}
+		frameRate.store(gpla->getFrameRate(), std::memory_order_relaxed);
 	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mp4" || extension == ".mov") {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
@@ -101,6 +129,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		showFileSizeWarning(fileName, bytesRead, 20, (extension == ".mp4" || extension == ".mov") ? "video" : "image",
 			[this, buffer, extension]() {
 				img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
+                frameRate.store(img->getFrameRate(), std::memory_order_relaxed);
                 isAnimatable = extension == ".gif" || extension == ".mp4" || extension == ".mov";
                 sampleSource = true;
 			}
@@ -128,7 +157,12 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 				jsonContent = juce::String::fromUTF8(static_cast<const char*>(buffer->getData()),
 					(int) buffer->getSize());
 			}
+			if (!looksLikeLottieJson(jsonContent)) {
+				showInvalidLottieJsonWarning();
+				return;
+			}
 			lottie = std::make_shared<OsciLottieParser>(jsonContent);
+			frameRate.store(lottie->getFrameRate(), std::memory_order_relaxed);
 			isAnimatable = true;
 			sampleSource = false;
 		});
@@ -310,19 +344,6 @@ void FileParser::setFrame(int frame) {
 #endif
 }
 
-double FileParser::getFrameRate() {
-    juce::SpinLock::ScopedLockType scope(lock);
-
-#if OSCI_PREMIUM
-    if (lottie != nullptr) {
-        return lottie->getFrameRate();
-    }
-#endif
-    if (gpla != nullptr) {
-        return gpla->getFrameRate();
-    }
-    if (img != nullptr) {
-        return img->getFrameRate();
-    }
-    return 30.0;
+double FileParser::getFrameRate() const {
+	return frameRate.load(std::memory_order_relaxed);
 }
