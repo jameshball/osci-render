@@ -6,7 +6,6 @@ PLUGIN="osci-render-test"
 # use Projucer postExportShellCommand because of its 60-second timeout)
 if [ "$OS" = "win" ]; then
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
-  configure_msvc_sccache
   cd "$ROOT/modules/LuaJIT/src"
   cmd //c msvcbuild.bat static
   cp lua51.lib luajit51.lib
@@ -33,11 +32,7 @@ fi
 # Build linux version
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/Test/LinuxMakefile"
-  if command -v ccache >/dev/null 2>&1; then
-    make -j$(nproc) -e CONFIG=Release CXX="ccache g++" CC="ccache gcc"
-  else
-    make -j$(nproc) CONFIG=Release
-  fi
+  make -j$(nproc) CONFIG=Release
 
   cd build
   echo "Running the test"
@@ -53,11 +48,7 @@ if [ "$OS" = "win" ]; then
   echo $MSBUILD_EXE
 
   cd "$ROOT/Builds/Test/VisualStudio2022"
-  "$MSBUILD_EXE" "//m" "$PLUGIN.sln" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=32"  "//p:VisualStudioVersion=16.0" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64" "${MSBUILD_CACHE_ARGS[@]}"
-
-  if command -v sccache >/dev/null 2>&1; then
-    sccache --show-stats || true
-  fi
+  "$MSBUILD_EXE" "//m" "$PLUGIN.sln" "//p:MultiProcessorCompilation=true" "//p:CL_MPCount=32"  "//p:VisualStudioVersion=16.0" "//t:Build" "//p:Configuration=Release" "//p:Platform=x64" "//p:PreferredToolArchitecture=x64"
   
   cd "x64/Release/ConsoleApp"
   echo "Running the test"

@@ -4,10 +4,6 @@ on:
     branches:
       - develop
     paths:
-      - .github/workflows/build.yaml
-      - .github/docs/build-details.md
-      - ci/**
-      - luajit_linux_macos.sh
       - osci-render.jucer
       - sosci.jucer
       - packaging/osci-render.iss
@@ -16,15 +12,10 @@ on:
       - packaging/sosci.pkgproj
   workflow_dispatch:
 
-# Cancel in-progress runs for the same ref + event when a new run starts.
-# Saves runner minutes when CI is triggered repeatedly in quick succession.
-concurrency:
-  group: build-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
-
 jobs:
   build:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -41,106 +32,10 @@ jobs:
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
         with:
-          token: ${{ secrets.ACCESS_TOKEN || github.token }}
+          token: ${{ secrets.ACCESS_TOKEN }}
           submodules: recursive
-          fetch-depth: 0
-
-      # ── Caches ────────────────────────────────────────────────
-      # ccache: compile-time cache for Projucer-generated builds. Wired into
-      # macOS Xcode configs (CC=ccache-clang) and into the Linux Makefile via
-      # the CXX="ccache g++" override in ci/build.sh and ci/test.sh.
-      - name: Set up ccache
-        if: matrix.os != 'windows-2022'
-        # Pinned to upstream v1.2.
-        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639
-        with:
-          key: ccache-${{ matrix.os }}-${{ matrix.project }}-${{ matrix.version }}
-          # Allow restoring from any matching key on the same OS/project even if
-          # the variant differs (large overlap between free/premium and effect/instrument).
-          restore-keys: |
-            ccache-${{ matrix.os }}-${{ matrix.project }}-
-          max-size: 2G
-
-      # sccache: compile-time cache for Windows MSVC builds. ci/setup-env.sh
-      # creates a fake cl.exe wrapper and ci/build.sh / ci/test.sh pass it to
-      # MSBuild via CLToolExe/CLToolPath.
-      - name: Set up sccache (Windows)
-        if: matrix.os == 'windows-2022'
-        # Pinned to upstream v0.14.0.
-        uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696
-        with:
-          version: "v0.14.0"
-
-      # LuaJIT is built from source by ci/test.sh and by the Projucer-generated
-      # build (linked statically). Cache outputs by runner image, submodule SHA,
-      # and the build script so SDK/toolchain or recipe changes force a rebuild.
-      - name: Resolve submodule SHAs for cache keys
-        id: submodule_shas
-        shell: bash
-        run: |
-          echo "luajit_sha=$(git -C modules/LuaJIT rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "pluginval_sha=$(git -C modules/pluginval rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "image_os=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
-          echo "image_version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
-
-      - name: Cache LuaJIT build
-        id: cache_luajit
-        uses: actions/cache@v4
-        with:
-          key: luajit-${{ matrix.os }}-${{ runner.arch }}-${{ steps.submodule_shas.outputs.image_os }}-${{ steps.submodule_shas.outputs.image_version }}-${{ steps.submodule_shas.outputs.luajit_sha }}-${{ hashFiles('luajit_linux_macos.sh', 'ci/test.sh') }}
-          path: |
-            modules/LuaJIT/src/libluajit.a
-            modules/LuaJIT/src/lua51.lib
-            modules/LuaJIT/src/luajit51.lib
-            modules/LuaJIT/src/lua51.dll
-            modules/LuaJIT/src/lua51.exp
-            modules/LuaJIT/src/luajit.exe
-            modules/LuaJIT/src/libluajit_x86_64.a
-            modules/LuaJIT/src/libluajit_arm64.a
-            modules/LuaJIT/src/.luajit-build-x86_64.stamp
-            modules/LuaJIT/src/.luajit-build-arm64.stamp
-            modules/LuaJIT/src/.luajit-build-linux.stamp
-
-      # Cache the entire pluginval Builds/ directory by runner image, submodule
-      # SHA, and build recipe so toolchain or script changes force a rebuild.
-      - name: Cache pluginval build
-        id: cache_pluginval
-        uses: actions/cache@v4
-        with:
-          key: pluginval-${{ matrix.os }}-${{ runner.arch }}-${{ steps.submodule_shas.outputs.image_os }}-${{ steps.submodule_shas.outputs.image_version }}-${{ steps.submodule_shas.outputs.pluginval_sha }}-${{ hashFiles('ci/pluginval.sh') }}
-          path: |
-            modules/pluginval/Builds
-
-      # Cache the Packages installer .dmg between macOS runs (~60MB download).
-      - name: Cache Packages installer image (macOS)
-        id: cache_packages
-        if: matrix.os == 'macos-latest'
-        uses: actions/cache@v4
-        with:
-          key: packages-installer-1211
-          path: Packages_1211_dev.dmg
-
-      # apt packages: heavy install on every Linux run. cache-apt-pkgs-action
-      # restores .deb archives from cache when available.
-      - name: Cache apt packages (Linux)
-        if: startsWith(matrix.os, 'ubuntu')
-        # Pinned to upstream v1.6.0.
-        uses: awalsh128/cache-apt-pkgs-action@acb598e5ddbc6f68a970c5da0688d2f3a9f04d05
-        with:
-          packages: ccache ninja-build clang git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
-          version: 1.0
-
-      # NuGet packages restored by MSBuild on every Windows run.
-      - name: Cache NuGet packages (Windows)
-        if: matrix.os == 'windows-2022'
-        uses: actions/cache@v4
-        with:
-          key: nuget-${{ runner.os }}-${{ hashFiles('*.jucer') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-          path: ~/.nuget/packages
 
       - name: Set platform variables
         shell: bash
@@ -229,7 +124,6 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SCCACHE_GHA_ENABLED: "true"
         run: |
           source ./ci/setup-env.sh
           source ./ci/test.sh
@@ -238,151 +132,111 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SCCACHE_GHA_ENABLED: "true"
         run: |
           source ./ci/setup-env.sh
           source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
 
-      # Build pluginval once, then run effect + instrument validation in
-      # parallel within the same runner. continue-on-error keeps the rest of the
-      # job alive even on validation failure; the `Check pluginval results` step
-      # at the end fails the job if either failed.
-      - name: Validate plugin with pluginval (effect + instrument in parallel)
-        id: pluginval
+      # Install MEGAcmd early so both pluginval-log and binary uploads can use it
+      - name: Install MEGAcmd (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            wget -q https://mega.nz/linux/repo/xUbuntu_24.04/amd64/megacmd-xUbuntu_24.04_amd64.deb
+            sudo apt-get update -y >/dev/null
+            sudo apt-get install -y ./megacmd-xUbuntu_24.04_amd64.deb >/dev/null
+          else
+            brew install --cask megacmd
+            echo "/Applications/MEGAcmd.app/Contents/MacOS" >> $GITHUB_PATH
+          fi
+
+      - name: Install MEGAcmd (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install megacmd -y --no-progress
+          # Find where MEGAcmd was installed
+          $megaDir = if (Test-Path "$env:LOCALAPPDATA\MEGAcmd") { "$env:LOCALAPPDATA\MEGAcmd" }
+                     elseif (Test-Path "C:\Users\runneradmin\AppData\Local\MEGAcmd") { "C:\Users\runneradmin\AppData\Local\MEGAcmd" }
+                     else { (Get-Command mega-login -ErrorAction SilentlyContinue).Source | Split-Path }
+          if (-not $megaDir -or -not (Test-Path $megaDir)) {
+            Write-Error "MEGAcmd installation not found. Checked LOCALAPPDATA, hardcoded path, and PATH."
+            exit 1
+          }
+          Write-Host "MEGAcmd directory: $megaDir"
+          Write-Host "Contents: $(Get-ChildItem $megaDir -Name -ErrorAction SilentlyContinue)"
+          echo $megaDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install procdump (Windows)
+        if: matrix.os == 'windows-2022'
+        shell: bash
+        run: |
+          choco install procdump -y --no-progress
+          procdump -accepteula || true
+
+      - name: Validate plugin with pluginval
+        id: pluginval_effect
         if: steps.ci_flags.outputs.skip_validation != 'true'
         continue-on-error: true
         shell: bash
         env:
           PLUGINVAL_SKIP_GUI: "1"
           PLUGINVAL_TIMEOUT: "1200000"
+          PLUGINVAL_STRICTNESS: "10"
         run: |
-          set +e
-          mkdir -p bin/pluginval-logs
+          source ./ci/pluginval.sh "${{ matrix.project }}"
 
-          PLUGINVAL_BUILD_LOG=bin/pluginval-logs/pluginval-build.log
-          PLUGINVAL_BUILD_ONLY=1 \
-            bash ./ci/pluginval.sh "${{ matrix.project }}" \
-            > "$PLUGINVAL_BUILD_LOG" 2>&1
-          BUILD_EXIT=$?
-
-          if [ "$BUILD_EXIT" -ne 0 ]; then
-            echo "$BUILD_EXIT" > bin/pluginval-logs/pluginval-effect.exitcode
-            if [ "${{ matrix.project }}" = "osci-render" ]; then
-              echo "$BUILD_EXIT" > bin/pluginval-logs/pluginval-instrument.exitcode
-            fi
-          else
-            # Effect run (strictness 10)
-            (
-              PLUGINVAL_STRICTNESS=10 \
-                PLUGINVAL_LOG_NAME=effect \
-                bash ./ci/pluginval.sh "${{ matrix.project }}" \
-                > bin/pluginval-logs/pluginval-effect.log 2>&1
-              echo $? > bin/pluginval-logs/pluginval-effect.exitcode
-            ) &
-            PID_EFFECT=$!
-
-            # Instrument run (osci-render only, strictness 5)
-            PID_INSTRUMENT=
-            if [ "${{ matrix.project }}" = "osci-render" ]; then
-              (
-                PLUGINVAL_STRICTNESS=5 \
-                  PLUGINVAL_LOG_NAME=instrument \
-                  bash ./ci/pluginval.sh "${{ matrix.project }}" "${{ matrix.project }}-instrument" \
-                  > bin/pluginval-logs/pluginval-instrument.log 2>&1
-                echo $? > bin/pluginval-logs/pluginval-instrument.exitcode
-              ) &
-              PID_INSTRUMENT=$!
-            fi
-
-            wait "$PID_EFFECT"
-            if [ -n "$PID_INSTRUMENT" ]; then wait "$PID_INSTRUMENT"; fi
-          fi
-
-          EFFECT_EXIT=$(cat bin/pluginval-logs/pluginval-effect.exitcode 2>/dev/null || echo 1)
-          INSTRUMENT_EXIT=0
-          HAS_INSTRUMENT=0
-          if [ "${{ matrix.project }}" = "osci-render" ]; then
-            HAS_INSTRUMENT=1
-            INSTRUMENT_EXIT=$(cat bin/pluginval-logs/pluginval-instrument.exitcode 2>/dev/null || echo 1)
-          fi
-
-          SHOULD_STREAM_LOGS=0
-          if [ "$BUILD_EXIT" -ne 0 ] || [ "$EFFECT_EXIT" != "0" ]; then
-            SHOULD_STREAM_LOGS=1
-          fi
-          if [ "$HAS_INSTRUMENT" -eq 1 ] && [ "$INSTRUMENT_EXIT" != "0" ]; then
-            SHOULD_STREAM_LOGS=1
-          fi
-
-          echo "===== pluginval summary ====="
-          echo "build_exit=$BUILD_EXIT"
-          echo "effect_exit=$EFFECT_EXIT"
-          if [ "$HAS_INSTRUMENT" -eq 1 ]; then
-            echo "instrument_exit=$INSTRUMENT_EXIT"
-          fi
-          echo "log files:"
-          find bin/pluginval-logs -type f -size +0c -print 2>/dev/null | sort || true
-
-          if [ "$SHOULD_STREAM_LOGS" -eq 1 ]; then
-            echo "===== pluginval build log ====="
-            cat "$PLUGINVAL_BUILD_LOG" || true
-            echo "===== pluginval (effect) log ====="
-            cat bin/pluginval-logs/pluginval-effect.log || true
-            if [ -f bin/pluginval-logs/pluginval-instrument.log ]; then
-              echo "===== pluginval (instrument) log ====="
-              cat bin/pluginval-logs/pluginval-instrument.log || true
-            fi
-          else
-            echo "pluginval passed; full logs are kept in bin/pluginval-logs and uploaded by the following log-upload step."
-          fi
-
-          echo "effect_exit=$EFFECT_EXIT" >> "$GITHUB_OUTPUT"
-          echo "instrument_exit=$INSTRUMENT_EXIT" >> "$GITHUB_OUTPUT"
-
-          # Don't fail this step — `Check pluginval results` decides job outcome.
-          exit 0
-
-      - name: Cache MEGAcmd (Windows)
-        id: cache_megacmd_windows
-        if: runner.os == 'Windows'
-        uses: actions/cache@v4
-        with:
-          key: megacmd-windows-1.4.1
-          path: |
-            ~\AppData\Local\MEGAcmd
-
-      # Install MEGAcmd after pluginval so validation still runs if package
-      # mirrors are temporarily unavailable. The binary upload steps below use it.
-      - name: Install MEGAcmd (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Validate instrument plugin with pluginval
+        id: pluginval_instrument
+        if: matrix.project == 'osci-render' && steps.ci_flags.outputs.skip_validation != 'true'
+        continue-on-error: true
         shell: bash
-        run: bash ./ci/mega.sh install
-
-      - name: Install MEGAcmd (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: ./ci/mega.ps1 -Task Install
+        env:
+          PLUGINVAL_SKIP_GUI: "1"
+          PLUGINVAL_TIMEOUT: "1200000"
+          PLUGINVAL_STRICTNESS: "5"
+        run: |
+          source ./ci/pluginval.sh "${{ matrix.project }}" "${{ matrix.project }}-instrument"
 
       # Upload pluginval logs and crash dumps to MEGA (runs even if pluginval failed)
       - name: Upload pluginval logs to MEGA (Unix)
         if: always() && runner.os != 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
         shell: bash
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-        run: bash ./ci/mega.sh upload-pluginval-logs "${{ matrix.project }}" "${{ steps.version.outputs.version }}" "${{ env.OS_ARTIFACT }}"
+        run: |
+          set -euo pipefail
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}" || true
+          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
+          find bin/pluginval-logs -type f -size +0c -print0 2>/dev/null | while IFS= read -r -d '' f; do
+            echo "Uploading $f -> $DEST"
+            mega-put -c "$f" "$DEST/" || echo "WARNING: failed to upload $f"
+          done
+          mega-logout || true
 
       - name: Upload pluginval logs to MEGA (Windows)
-        if: always() && runner.os == 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
+        if: always() && runner.os == 'Windows'
         shell: powershell
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-        run: ./ci/mega.ps1 -Task UploadPluginvalLogs -Project "${{ matrix.project }}" -ProjectVersion "${{ steps.version.outputs.version }}" -OsArtifact "${{ env.OS_ARTIFACT }}"
+        run: |
+          $ErrorActionPreference = 'Continue'
+          # Ensure MEGAcmd is on PATH
+          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
+            $p = "$env:LOCALAPPDATA\MEGAcmd"
+            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
+          }
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
+          $dest = "/${{ matrix.project }}/${{ steps.version.outputs.version }}/pluginval-logs/${{ env.OS_ARTIFACT }}"
+          $logDir = "bin/pluginval-logs"
+          if (Test-Path $logDir) {
+            Get-ChildItem $logDir -File -Recurse | Where-Object { $_.Length -gt 0 } | ForEach-Object {
+              Write-Host "Uploading $($_.FullName) -> $dest"
+              mega-put -c $_.FullName $dest/
+            }
+          }
+          mega-logout
 
       # macOS packaging & notarization
       - name: Download Packages installer build tool
-        if: matrix.os == 'macos-latest' && steps.cache_packages.outputs.cache-hit != 'true'
+        if: matrix.os == 'macos-latest'
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
 
       - name: Mount Packages image
@@ -446,58 +300,77 @@ jobs:
       - name: Upload binaries to MEGA (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-        run: bash ./ci/mega.sh upload-binaries "${{ matrix.project }}" "${{ steps.version.outputs.version }}" "${{ matrix.version }}"
+        run: |
+          set -euo pipefail
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
+          # sosci has no free/premium variants, so upload flat under the version dir
+          if [[ "${{ matrix.project }}" == "sosci" ]]; then
+            DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          else
+            DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
+          fi
+          ls -1 bin || true
+          # Upload all produced artifacts (files only) into variant subdirectory
+          shopt -s nullglob
+          for f in bin/*; do
+            if [[ -f "$f" ]]; then
+              echo "Uploading $f -> $DEST"
+              mega-put -c "$f" "$DEST/"
+            fi
+          done
+          mega-logout
 
       # Combined MEGA upload (Windows)
       - name: Upload binaries to MEGA (Windows)
         if: runner.os == 'Windows'
         shell: powershell
-        env:
-          MEGA_USERNAME: ${{ secrets.MEGA_USERNAME }}
-          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
-        run: ./ci/mega.ps1 -Task UploadBinaries -Project "${{ matrix.project }}" -ProjectVersion "${{ steps.version.outputs.version }}" -Variant "${{ matrix.version }}"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Ensure MEGAcmd is on PATH
+          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
+            $p = "$env:LOCALAPPDATA\MEGAcmd"
+            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
+          }
+          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
+          $root = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
+          # sosci has no free/premium variants, so upload flat under the version dir
+          if ('${{ matrix.project }}' -eq 'sosci') {
+            $variant = $root
+          } else {
+            $variant = "$root/${{ matrix.version }}"
+          }
+          Get-ChildItem bin -File | ForEach-Object {
+            if ($_.Extension -eq '.pdb') {
+              Write-Host "Uploading $($_.FullName) -> $root (debug info)"
+              mega-put -c $_.FullName $root/
+            } else {
+              Write-Host "Uploading $($_.FullName) -> $variant"
+              mega-put -c $_.FullName $variant/
+            }
+          }
+          mega-logout
 
       # Fail the job if pluginval failed (after all logs and binaries have been uploaded)
       - name: Check pluginval results
-        if: always() && steps.ci_flags.outputs.skip_validation != 'true'
+        if: always()
         shell: bash
         run: |
           FAILED=0
-          if [ "${{ steps.pluginval.outcome }}" = "skipped" ]; then
-            echo "pluginval step was skipped; preserving earlier job result."
-            exit 0
-          fi
-          if [ "${{ steps.pluginval.outcome }}" = "failure" ]; then
-            echo "::error::pluginval step failed before publishing complete outputs"
+          if [[ "${{ steps.pluginval_effect.outcome }}" == "failure" ]]; then
+            echo "::error::pluginval (effect) failed"
             FAILED=1
           fi
-          EFFECT_EXIT="${{ steps.pluginval.outputs.effect_exit }}"
-          INSTRUMENT_EXIT="${{ steps.pluginval.outputs.instrument_exit }}"
-          if [ -z "$EFFECT_EXIT" ]; then
-            echo "::error::pluginval (effect) did not publish an exit code"
-            FAILED=1
-          elif [ "$EFFECT_EXIT" != "0" ]; then
-            echo "::error::pluginval (effect) failed with exit code $EFFECT_EXIT"
-            FAILED=1
-          fi
-          if [ -z "$INSTRUMENT_EXIT" ]; then
-            echo "::error::pluginval (instrument) did not publish an exit code"
-            FAILED=1
-          elif [ "$INSTRUMENT_EXIT" != "0" ]; then
-            echo "::error::pluginval (instrument) failed with exit code $INSTRUMENT_EXIT"
+          if [[ "${{ steps.pluginval_instrument.outcome }}" == "failure" ]]; then
+            echo "::error::pluginval (instrument) failed"
             FAILED=1
           fi
           exit $FAILED
 
-      # ── Release publish ──────────────────────────────────────
+      # -- Release publish ----------------------------------------
       # When the commit message contains [release] (added by `bump_version
       # --release`), upload the signed installer artifact to api.osci-render.com
-      # so the JUCE in-plugin updater can fetch it. Publishes every (project,
-      # variant, OS) combination present in the build matrix; the API stores a
-      # separate Version row per (product, semver, platform, variant).
+      # so the JUCE in-plugin updater can fetch it. Runs for all matrix combos
+      # (osci-render free + premium, sosci premium, all OSes).
       - name: Publish release artifact
         if: steps.ci_flags.outputs.release == 'true'
         shell: bash
@@ -510,7 +383,11 @@ jobs:
             echo "::error::PUBLISH_API_TOKEN or RELEASE_SIGNING_PRIVATE_KEY GitHub secrets are not set"
             exit 1
           fi
-          python3 -m pip install --quiet --user --break-system-packages pynacl
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            python3 -m pip install --quiet --user --break-system-packages pynacl
+          else
+            python3 -m pip install --quiet pynacl
+          fi
 
           # Map matrix -> (product gumroad id, platform, artifact path, kind)
           case "${{ matrix.project }}" in
@@ -546,8 +423,8 @@ jobs:
             --product "${PRODUCT}" \
             --semver "${{ steps.version.outputs.version }}" \
             --platform "${PLATFORM}" \
-            --channel stable \
             --variant "${{ matrix.version }}" \
+            --channel stable \
             --artifact-kind "${KIND}" \
             --artifact "${ARTIFACT}" \
             --notes "Auto-published by CI from $(git log -1 --format=%H)"

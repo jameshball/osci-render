@@ -113,7 +113,7 @@
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
                        libraryPath="..\..\..\modules\LuaJIT\src"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src" debugInformationFormat="OldStyle"/>
+                       libraryPath="..\..\..\modules\LuaJIT\src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>

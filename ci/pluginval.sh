@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 # pluginval validation script
-# Usage (CI):   bash ./ci/pluginval.sh "osci-render"
-# Usage (CI):   bash ./ci/pluginval.sh "osci-render" "osci-render-instrument"
+# Usage (CI):   source ./ci/pluginval.sh "osci-render"
+# Usage (CI):   source ./ci/pluginval.sh "osci-render" "osci-render (instrument)"
 # Usage (local): ROOT=$(pwd) OS=win ./ci/pluginval.sh "osci-render"
 #
 # Requires: cmake, a C++ toolchain, and a previously-built plugin.
@@ -18,33 +18,6 @@ SKIP_GUI="${PLUGINVAL_SKIP_GUI:-}"
 ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PLUGINVAL_SRC="$ROOT/modules/pluginval"
 PLUGINVAL_BUILD="$PLUGINVAL_SRC/Builds"
-PLUGINVAL_BUILD_LOCK="$PLUGINVAL_SRC/.osci_build.lock"
-PLUGINVAL_BUILD_LOCK_ACQUIRED=0
-
-release_pluginval_build_lock() {
-    if [ "$PLUGINVAL_BUILD_LOCK_ACQUIRED" -eq 1 ]; then
-        rmdir "$PLUGINVAL_BUILD_LOCK" 2>/dev/null || true
-        PLUGINVAL_BUILD_LOCK_ACQUIRED=0
-    fi
-}
-
-acquire_pluginval_build_lock() {
-    local waited_seconds=0
-    local timeout_seconds="${PLUGINVAL_BUILD_LOCK_TIMEOUT:-1200}"
-
-    while ! mkdir "$PLUGINVAL_BUILD_LOCK" 2>/dev/null; do
-        if [ "$waited_seconds" -ge "$timeout_seconds" ]; then
-            echo "ERROR: timed out waiting for pluginval build lock: $PLUGINVAL_BUILD_LOCK" >&2
-            exit 1
-        fi
-
-        sleep 2
-        waited_seconds=$((waited_seconds + 2))
-    done
-
-    PLUGINVAL_BUILD_LOCK_ACQUIRED=1
-    trap release_pluginval_build_lock EXIT
-}
 
 # ── Detect OS if not already set ───────────────────────────────
 
@@ -65,33 +38,15 @@ echo "============================================="
 
 cd "$PLUGINVAL_SRC"
 
-acquire_pluginval_build_lock
+# pluginval_IS_TOP_LEVEL is auto-set by CMake >= 3.21; force it for older versions
+CMAKE_EXTRA_ARGS="-Dpluginval_IS_TOP_LEVEL=ON"
 
-# Skip rebuild if a cached binary is already present (CI restores it via actions/cache).
-PLUGINVAL_CACHE_MARKER="$PLUGINVAL_BUILD/.osci_built"
-CMAKE_CACHE="$PLUGINVAL_BUILD/CMakeCache.txt"
-if [ -f "$CMAKE_CACHE" ] && ! grep -Fxq "CMAKE_HOME_DIRECTORY:INTERNAL=$PLUGINVAL_SRC" "$CMAKE_CACHE"; then
-    echo "Removing stale pluginval build directory for a different source path"
-    rm -rf "$PLUGINVAL_BUILD"
-fi
-
-if [ -f "$PLUGINVAL_CACHE_MARKER" ]; then
-    echo "Reusing cached pluginval build at $PLUGINVAL_BUILD"
+if [ "$OS" = "win" ]; then
+    # Windows: use Visual Studio generator
+    cmake -B Builds -DCMAKE_BUILD_TYPE=Release -DPLUGINVAL_VST3_VALIDATOR=OFF $CMAKE_EXTRA_ARGS .
+    cmake --build Builds --config Release --parallel
 else
-    CMAKE_GEN_ARGS=()
-
-    # Prefer Ninja when available on Unix-like runners. Windows keeps the
-    # Visual Studio generator because this step does not initialize vcvars.
-    if [ "$OS" != "win" ] && command -v ninja >/dev/null 2>&1; then
-        CMAKE_GEN_ARGS=(-G Ninja)
-    fi
-
-    cmake -B Builds \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DPLUGINVAL_VST3_VALIDATOR=OFF \
-        -Dpluginval_IS_TOP_LEVEL=ON \
-        "${CMAKE_GEN_ARGS[@]}" \
-        .
+    cmake -B Builds -DCMAKE_BUILD_TYPE=Release -DPLUGINVAL_VST3_VALIDATOR=OFF $CMAKE_EXTRA_ARGS .
     cmake --build Builds --config Release --parallel
 fi
 
@@ -109,22 +64,10 @@ if [ ! -f "$PLUGINVAL" ]; then
     echo "ERROR: pluginval binary not found at $PLUGINVAL"
     echo "Searching for it..."
     find "$PLUGINVAL_BUILD" -name "pluginval*" -type f 2>/dev/null || true
-    rm -f "$PLUGINVAL_CACHE_MARKER"
     exit 1
 fi
 
-touch "$PLUGINVAL_CACHE_MARKER"
-
-release_pluginval_build_lock
-trap - EXIT
-
 echo "pluginval binary: $PLUGINVAL"
-
-if [ -n "${PLUGINVAL_BUILD_ONLY:-}" ]; then
-    echo "pluginval build is ready"
-    cd "$ROOT"
-    exit 0
-fi
 
 # ── Locate the built VST3 plugin ──────────────────────────────
 
@@ -150,10 +93,7 @@ echo "VST3 plugin: $VST3_PATH"
 
 # ── Run pluginval ──────────────────────────────────────────────
 
-PLUGINVAL_LOG_BASE_DIR="${PLUGINVAL_LOG_DIR:-$ROOT/bin/pluginval-logs}"
-PLUGINVAL_RUN_NAME="${PLUGINVAL_LOG_NAME:-$TARGET-strictness-$STRICTNESS}"
-PLUGINVAL_RUN_NAME="$(printf '%s' "$PLUGINVAL_RUN_NAME" | tr -cs 'A-Za-z0-9._-' '_')"
-PLUGINVAL_LOG_DIR="$PLUGINVAL_LOG_BASE_DIR/$PLUGINVAL_RUN_NAME"
+PLUGINVAL_LOG_DIR="$ROOT/bin/pluginval-logs"
 mkdir -p "$PLUGINVAL_LOG_DIR"
 
 PLUGINVAL_TIMEOUT="${PLUGINVAL_TIMEOUT:-60000}"
@@ -242,11 +182,22 @@ LLDB_EOF
         eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     fi
 else
-    if [ -n "${PLUGINVAL_USE_PROCDUMP:-}" ] && command -v procdump &> /dev/null; then
-        PROCDUMP_DIR="$PLUGINVAL_LOG_DIR/crashdumps"
-        mkdir -p "$PROCDUMP_DIR"
+    # Windows: use procdump to capture a minidump on crash (SIGSEGV, unhandled exception).
+    # procdump must be on PATH (installed in the CI workflow).
+    PROCDUMP_DIR="$PLUGINVAL_LOG_DIR/crashdumps"
+    mkdir -p "$PROCDUMP_DIR"
 
+    if command -v procdump &> /dev/null; then
         echo "Running pluginval under procdump (crash dump dir: $PROCDUMP_DIR)"
+        # -e 1 = write dump on first-chance unhandled exception
+        # -ma  = full memory dump (needed for useful stack analysis)
+        # -accepteula = suppress EULA prompt in CI
+        # -x   = launch process mode: -x <dump_folder> <application> [args]
+        #
+        # procdump's exit code in -x mode is UNRELIABLE: it returns non-zero
+        # when "dump count not reached" (i.e. no crash occurred). We ignore
+        # procdump's exit code entirely and instead check the pluginval log
+        # file for the SUCCESS marker.
         procdump -e 1 -ma -accepteula \
             -x "$PROCDUMP_DIR" \
             "$PLUGINVAL" --strictness-level $STRICTNESS --verbose \
@@ -256,10 +207,12 @@ else
                 --validate "$VST3_PATH" \
             || true
 
+        # Check the pluginval log for SUCCESS instead of trusting procdump's exit code
         if ! grep -rq '^SUCCESS$' "$PLUGINVAL_LOG_DIR"/ 2>/dev/null; then
             PLUGINVAL_EXIT=1
         fi
 
+        # Report any generated dump files
         DUMP_FILES=($(find "$PROCDUMP_DIR" -name '*.dmp' 2>/dev/null))
         if [ ${#DUMP_FILES[@]} -gt 0 ]; then
             echo ""
@@ -270,6 +223,7 @@ else
                 echo "  $(basename "$d") ($(du -h "$d" | cut -f1))"
             done
 
+            # Try to extract a basic stack trace using cdb if available
             if command -v cdb &> /dev/null; then
                 CDB_LOG="$PLUGINVAL_LOG_DIR/pluginval_crash_bt.log"
                 for d in "${DUMP_FILES[@]}"; do
@@ -278,10 +232,12 @@ else
                     cdb -z "$d" -c "!analyze -v; ~*k; q" 2>&1 | tee -a "$CDB_LOG" | tail -80
                 done
             else
-                echo "(cdb not found; dump files will be uploaded for offline analysis with WinDbg.)"
+                echo "(cdb not found — install Windows SDK Debugging Tools to get inline stack traces)"
+                echo "Dump files will be uploaded to MEGA for offline analysis with WinDbg."
             fi
         fi
     else
+        echo "WARNING: procdump not found, running pluginval without crash dump capture"
         eval $PLUGINVAL_CMD || PLUGINVAL_EXIT=$?
     fi
 fi
