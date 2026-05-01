@@ -510,9 +510,9 @@ jobs:
             echo "::error::PUBLISH_API_TOKEN or RELEASE_SIGNING_PRIVATE_KEY GitHub secrets are not set"
             exit 1
           fi
-          python3 -m pip install --quiet pynacl
+          python3 -m pip install --quiet --user --break-system-packages pynacl
 
-          # Map matrix \u2192 (product gumroad id, platform, artifact path, kind)
+          # Map matrix -> (product gumroad id, platform, artifact path, kind)
           case "${{ matrix.project }}" in
             osci-render) PRODUCT='wHBxF-jb7oyeVNPRzKDorA==' ;;
             sosci)       PRODUCT='Hsr9C58_YhTxYP0MNvsIow==' ;;

@@ -180,7 +180,7 @@ def main(argv: list[str]) -> int:
         body['min_supported_from'] = args.min_supported_from
 
     if args.dry_run:
-        print('DRY RUN \u2014 would POST:')
+        print('DRY RUN -- would POST:')
         print(json.dumps(body, indent=2))
         return 0
 
@@ -192,14 +192,14 @@ def main(argv: list[str]) -> int:
     )
     print(f'  registered version_id={resp["version_id"]} object_key={resp["object_key"]}')
 
-    print(f'PUT artifact \u2192 R2 (expires {resp["expires_at"]})...', flush=True)
+    print(f'PUT artifact -> R2 (expires {resp["expires_at"]})...', flush=True)
     status = http_put_file(resp['upload_url'], args.artifact)
     print(f'  upload status: {status}')
 
     if status not in (200, 204):
         raise SystemExit(f'unexpected upload status: {status}')
 
-    print(f'\nDONE: {args.product} {args.semver} {args.platform} \u2192 {resp["object_key"]}')
+    print(f'\nDONE: {args.product} {args.semver} {args.platform} -> {resp["object_key"]}')
     return 0
 
 
