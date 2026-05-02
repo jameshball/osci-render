@@ -40,3 +40,7 @@
 [submodule "modules/juce_mts_esp"]
 	path = modules/juce_mts_esp
 	url = https://github.com/jameshball/juce_mts_esp.git
+[submodule "modules/osci_licensing"]
+	path = modules/osci_licensing
+	url = https://github.com/jameshball/osci_licensing.git
+	branch = main
