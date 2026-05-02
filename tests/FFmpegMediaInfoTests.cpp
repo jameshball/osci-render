@@ -8,20 +8,7 @@ public:
 
     void runTest() override
     {
-        beginTest("ffprobe output parses dimensions and rational frame rate");
-        {
-            const auto info = osci::video::detail::parseFFprobeOutput(
-                "width=1920\n"
-                "height=1080\n"
-                "avg_frame_rate=30000/1001\n"
-                "r_frame_rate=30/1\n");
-
-            expectEquals(info.width, 1920);
-            expectEquals(info.height, 1080);
-            expectWithinAbsoluteError(info.frameRate, 30000.0 / 1001.0, 0.0001);
-        }
-
-        beginTest("ffmpeg fallback only parses video stream metadata");
+        beginTest("ffmpeg parses video stream metadata");
         {
             const auto info = osci::video::detail::parseFFmpegInputOutput(
                 "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'clip.mp4':\n"

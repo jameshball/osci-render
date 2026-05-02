@@ -46,39 +46,6 @@ inline double parsePositiveRate(const std::string& text)
     }
 }
 
-inline juce::File findSiblingFFprobe(const juce::File& ffmpegFile)
-{
-#if JUCE_WINDOWS
-    return ffmpegFile.getSiblingFile("ffprobe.exe");
-#else
-    return ffmpegFile.getSiblingFile("ffprobe");
-#endif
-}
-
-inline FFmpegMediaInfo parseFFprobeOutput(const juce::String& output)
-{
-    FFmpegMediaInfo info;
-    juce::StringArray lines;
-    lines.addLines(output);
-
-    for (const auto& line : lines)
-    {
-        const auto key = line.upToFirstOccurrenceOf("=", false, false).trim();
-        const auto value = line.fromFirstOccurrenceOf("=", false, false).trim();
-
-        if (key == "width")
-            info.width = value.getIntValue();
-        else if (key == "height")
-            info.height = value.getIntValue();
-        else if (key == "avg_frame_rate")
-            info.frameRate = parsePositiveRate(value.toStdString());
-        else if (key == "r_frame_rate" && info.frameRate <= 0.0)
-            info.frameRate = parsePositiveRate(value.toStdString());
-    }
-
-    return info;
-}
-
 inline FFmpegMediaInfo parseFFmpegInputOutput(const juce::String& output)
 {
     FFmpegMediaInfo info;
@@ -118,26 +85,6 @@ inline FFmpegMediaInfo parseFFmpegInputOutput(const juce::String& output)
 
 inline FFmpegMediaInfo probeFFmpegMediaInfo(const juce::File& ffmpegFile, const juce::File& mediaFile)
 {
-    const auto ffprobeFile = detail::findSiblingFFprobe(ffmpegFile);
-    if (ffprobeFile.existsAsFile())
-    {
-        juce::StringArray ffprobeCommand;
-        ffprobeCommand.add(ffprobeFile.getFullPathName());
-        ffprobeCommand.add("-v");
-        ffprobeCommand.add("error");
-        ffprobeCommand.add("-select_streams");
-        ffprobeCommand.add("v:0");
-        ffprobeCommand.add("-show_entries");
-        ffprobeCommand.add("stream=width,height,avg_frame_rate,r_frame_rate");
-        ffprobeCommand.add("-of");
-        ffprobeCommand.add("default=noprint_wrappers=1:nokey=0");
-        ffprobeCommand.add(mediaFile.getFullPathName());
-
-        auto info = detail::parseFFprobeOutput(detail::runProcess(ffprobeCommand));
-        if (info.width > 0 && info.height > 0)
-            return info;
-    }
-
     juce::StringArray ffmpegCommand;
     ffmpegCommand.add(ffmpegFile.getFullPathName());
     ffmpegCommand.add("-hide_banner");
