@@ -234,7 +234,8 @@ public:
     // Processes MIDI note events for LFO triggering and computes per-sample LFO values.
     template<int MaxVoices>
     void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi,
-                          double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices]) {
+                          double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices],
+                          double syncStartSeconds = 0.0, bool useHostSync = false) {
         if (numSamples <= 0) return;
 
         // Process MIDI note events to drive LFO triggering for non-Free modes
@@ -333,8 +334,12 @@ public:
 
                 int advanceSamples = numSamples - delaySkipSamples;
                 if (advanceSamples > 0) {
+                    double segmentSyncStartSeconds = syncStartSeconds;
+                    if (useHostSync && sampleRate > 0.0)
+                        segmentSyncStartSeconds += (double)delaySkipSamples / sampleRate;
                     audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples,
-                                                r, sr, waveforms[l], md, phaseOff);
+                                                r, sr, waveforms[l], md, phaseOff,
+                                                segmentSyncStartSeconds, useHostSync);
                 }
                 if (md == LfoMode::Sync && !effectiveVoiceActive) {
                     for (int s = 0; s < numSamples; ++s)

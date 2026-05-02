@@ -212,7 +212,8 @@ struct LfoAudioState {
     // Fill an output buffer for an entire block, dispatching mode once.
     // This avoids a per-sample switch in the hot path.
     void advanceBlock(float* output, int numSamples, float rateHz, float sampleRate,
-                      const LfoWaveform& waveform, LfoMode mode, float phaseOffset) {
+                      const LfoWaveform& waveform, LfoMode mode, float phaseOffset,
+                      double syncStartSeconds = 0.0, bool useHostSync = false) {
         if (sampleRate <= 0.0f) {
             std::fill(output, output + numSamples, 0.0f);
             return;
@@ -221,9 +222,20 @@ struct LfoAudioState {
 
         switch (mode) {
             case LfoMode::Free:
-            case LfoMode::Sync:
                 for (int s = 0; s < numSamples; ++s)
                     output[s] = advanceFreeOrSync(phaseInc, waveform);
+                return;
+
+            case LfoMode::Sync:
+                if (useHostSync) {
+                    double sampleDuration = 1.0 / (double)sampleRate;
+                    for (int s = 0; s < numSamples; ++s)
+                        output[s] = advanceSync(syncStartSeconds + (double)s * sampleDuration,
+                                                rateHz, waveform, phaseOffset);
+                } else {
+                    for (int s = 0; s < numSamples; ++s)
+                        output[s] = advanceFreeOrSync(phaseInc, waveform);
+                }
                 return;
 
             case LfoMode::Trigger:
@@ -259,6 +271,22 @@ private:
         phase += phaseInc;
         if (phase >= 1.0f) phase -= std::floor(phase);
         return waveform.evaluate(phase);
+    }
+
+    float advanceSync(double seconds, float rateHz, const LfoWaveform& waveform, float phaseOffset) {
+        phase = wrapPhase(getCycleOffsetFromSeconds(seconds, rateHz) + phaseOffset);
+        return waveform.evaluate(phase);
+    }
+
+    static float getCycleOffsetFromSeconds(double seconds, float rateHz) {
+        if (rateHz <= 0.0f) return 0.0f;
+        double cycles = (double)rateHz * seconds;
+        return (float)(cycles - std::floor(cycles));
+    }
+
+    static float wrapPhase(float value) {
+        value -= std::floor(value);
+        return value;
     }
 
     float advanceTrigger(float phaseInc, const LfoWaveform& waveform) {

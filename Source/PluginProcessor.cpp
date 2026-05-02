@@ -837,6 +837,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // MIDI transport info variables (defaults to 60bpm, 4/4 time signature at zero seconds and not playing)
     double bpm = 60;
     double playTimeSeconds = 0;
+    double ppqPosition = 0;
+    bool hasPlayTimeSeconds = false;
+    bool hasPpqPosition = false;
     bool isPlaying = false;
     juce::AudioPlayHead::TimeSignature timeSig;
 
@@ -847,7 +850,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (pos.hasValue()) {
             juce::AudioPlayHead::PositionInfo pi = *pos;
             bpm = pi.getBpm().orFallback(bpm);
-            playTimeSeconds = pi.getTimeInSeconds().orFallback(playTimeSeconds);
+            auto timeSeconds = pi.getTimeInSeconds();
+            if (timeSeconds.hasValue()) {
+                playTimeSeconds = *timeSeconds;
+                hasPlayTimeSeconds = true;
+            }
+            auto ppq = pi.getPpqPosition();
+            if (ppq.hasValue()) {
+                ppqPosition = *ppq;
+                hasPpqPosition = true;
+            }
             isPlaying = pi.getIsPlaying();
             timeSig = pi.getTimeSignature().orFallback(timeSig);
         }
@@ -861,10 +873,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Publish BPM for UI components (LFO rate display, etc.)
     currentBpm.store(bpm, std::memory_order_relaxed);
 
-    // Calculated number of beats
-    // TODO: To make this more resilient to changing BPMs, we should change how this is calculated
-    // or use another property of the AudioPlayHead::PositionInfo
-    double playTimeBeats = bpm * playTimeSeconds / 60;
+    double playTimeBeats = hasPpqPosition ? ppqPosition : bpm * playTimeSeconds / 60;
+    double lfoSyncStartSeconds = lfoSyncTimeSeconds;
+    if (hasPpqPosition && bpm > 0.0)
+        lfoSyncStartSeconds = ppqPosition / (bpm / 60.0);
+    else if (hasPlayTimeSeconds)
+        lfoSyncStartSeconds = playTimeSeconds;
 
     // Calculated time per sample in seconds and beats
     double sTimeSec = 1.f / sampleRate;
@@ -974,7 +988,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 #if OSCI_PREMIUM
         // Fill modulation block buffers (type-specific generation)
         lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                       currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+                                       currentBpm.load(std::memory_order_relaxed),
+                                       uiVoiceActive, lfoSyncStartSeconds, true);
         envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
         randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
                                           currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
@@ -987,6 +1002,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         // Apply all modulation buffers to animated parameter values (generic)
         modulationEngine.applyAllModulation(numSamples);
     }
+
+    if (sampleRate > 0.0)
+        lfoSyncTimeSeconds = lfoSyncStartSeconds + (double)numSamples / sampleRate;
 
     outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
     outputBuffer3d.clear();

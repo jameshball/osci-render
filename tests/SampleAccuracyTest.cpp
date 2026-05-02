@@ -287,3 +287,50 @@ public:
 };
 
 static LfoPhaseContinuityTest lfoPhaseContinuityTest;
+
+// ============================================================================
+// Test 6: Synced global LFO derives phase from host timeline seconds
+// ============================================================================
+class LfoSyncTimelineAnchorTest : public juce::UnitTest {
+public:
+    LfoSyncTimelineAnchorTest() : juce::UnitTest("LFO Sync Timeline Anchor", "LFO") {}
+
+    void runTest() override {
+        beginTest("Sync mode uses host timeline seconds instead of stored phase");
+
+        const int blockSize = 4;
+        const double sampleRate = 100.0;
+        juce::MidiBuffer emptyMidi;
+        std::atomic<bool> voiceActive[1] = {};
+        voiceActive[0].store(true, std::memory_order_relaxed);
+
+        LfoParameters lfoParams;
+        lfoParams.prepareToPlay(sampleRate, blockSize);
+        lfoParams.setMode(0, LfoMode::Sync);
+        lfoParams.setRateMode(0, LfoRateMode::Tempo);
+        lfoParams.setTempoDivision(0, 8); // 1/4 at 120 BPM = 2 Hz
+        lfoParams.setPhaseOffset(0, 0.0f);
+        lfoParams.setSmoothAmount(0, 0.0f);
+        lfoParams.setDelayAmount(0, 0.0f);
+
+        LfoWaveform ramp;
+        ramp.smooth = false;
+        ramp.nodes = { { 0.0, 0.0, 0.0f }, { 1.0, 1.0, 0.0f } };
+        lfoParams.waveformChanged(0, ramp);
+
+        auto renderFirstSampleAt = [&](double syncStartSeconds) {
+            lfoParams.audioStates[0].phase = 0.73f;
+            lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0,
+                                          voiceActive, syncStartSeconds, true);
+            return lfoParams.blockBuffer[0][0];
+        };
+
+        expectWithinAbsoluteError(renderFirstSampleAt(0.25), 0.5f, 0.01f);
+        expectWithinAbsoluteError(renderFirstSampleAt(1.25), 0.5f, 0.01f);
+        expectWithinAbsoluteError(renderFirstSampleAt(0.125), 0.25f, 0.01f);
+
+        testutil::cleanupLfoParams(lfoParams);
+    }
+};
+
+static LfoSyncTimelineAnchorTest lfoSyncTimelineAnchorTest;

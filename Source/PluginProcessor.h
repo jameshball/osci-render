@@ -211,6 +211,7 @@ public:
 
     // DAW or standalone BPM – updated every processBlock
     std::atomic<double> currentBpm{120.0};
+    double lfoSyncTimeSeconds = 0.0;
 
     // Standalone-only BPM parameter (automatable)
     osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);

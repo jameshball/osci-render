@@ -13,7 +13,7 @@ struct Texture {
 };
 
 class VisualiserWindow;
-class VisualiserRenderer : public juce::Component, public osci::AudioBackgroundThread, public juce::OpenGLRenderer, public juce::AsyncUpdater {
+class VisualiserRenderer : public juce::Component, public osci::AudioBackgroundThread, public juce::OpenGLRenderer {
 public:
     enum class RenderMode : int {
         XY = 1,
@@ -33,7 +33,6 @@ public:
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void runTask(const juce::AudioBuffer<float>& buffer) override;
     void stopTask() override;
-    void handleAsyncUpdate() override;
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
     void openGLContextClosing() override;
@@ -120,6 +119,9 @@ private:
     std::vector<float> smoothedGSamples;
     std::vector<float> smoothedBSamples;
     std::atomic<int> sampleBufferCount = 0;
+    // -1 means no pending request; any value > 0 is a requested texture resolution
+    // to be applied on the next renderOpenGL invocation.
+    std::atomic<int> pendingResolution = -1;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
 
@@ -200,7 +202,10 @@ private:
     float fadeAmount;
     ScreenOverlay screenOverlay = ScreenOverlay::INVALID;
 
-    int resolution;
+    // Atomic because setResolution may be invoked from non-GL threads (e.g. the offline
+    // render worker) as well as the GL thread (via preRenderCallback). The actual texture
+    // rebuild is deferred to the GL thread via pendingResolution.
+    std::atomic<int> resolution;
     double frameRate;
 
     const double RESAMPLE_RATIO = 6.0;

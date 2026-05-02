@@ -468,13 +468,12 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             if (safeThis->audioProcessor.haltRecording != nullptr)
                 safeThis->audioProcessor.haltRecording();
 
-            const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
+            const bool wasVisualiserVisible = safeThis->visualiser.isVisible();
             const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
 
             // Make the plugin output silent and skip heavy processing during offline render.
             safeThis->audioProcessor.setOfflineRenderActive(true);
-
-            safeThis->visualiser.setPaused(true);
+            safeThis->visualiser.setVisible(false);
 
             auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
 
@@ -522,12 +521,12 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
             window->enterModalState(
                 true,
-                juce::ModalCallbackFunction::create([safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder](int) {
+                juce::ModalCallbackFunction::create([safeThis, wasVisualiserVisible, wasOfflineRenderActive, resultHolder](int) {
                     if (safeThis == nullptr)
                         return;
 
                     safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
-                    safeThis->visualiser.setPaused(wasVisualiserPaused);
+                    safeThis->visualiser.setVisible(wasVisualiserVisible);
                     safeThis->offlineRenderDialog = nullptr;
 
                     if (resultHolder != nullptr && resultHolder->has_value())

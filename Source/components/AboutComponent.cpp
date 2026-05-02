@@ -9,6 +9,21 @@ juce::Point<int> AboutComponent::preferredSize(const Info& info) {
     return { 520, (int)std::ceil(h) };
 }
 
+void AboutComponent::launchAsDialog(const Info& info, bool useNativeTitleBar) {
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned(new AboutComponent(info));
+    options.dialogTitle = "About";
+    options.dialogBackgroundColour = AboutComponent::dialogBackground();
+    options.escapeKeyTriggersCloseButton = true;
+   #if JUCE_WINDOWS || JUCE_MAC
+    options.useNativeTitleBar = useNativeTitleBar;
+   #else
+    juce::ignoreUnused (useNativeTitleBar);
+   #endif
+    options.resizable = false;
+    options.launchAsync();
+}
+
 AboutComponent::AboutComponent(const Info& info) : info(info) {
     logo = juce::ImageFileFormat::loadFrom(info.imageData, info.imageSize);
     logoComponent.setImage(logo);
