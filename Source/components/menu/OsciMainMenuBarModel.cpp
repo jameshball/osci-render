@@ -76,11 +76,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
         aboutInfo.productName = ProjectInfo::projectName;
         aboutInfo.companyName = ProjectInfo::companyName;
         aboutInfo.versionString = ProjectInfo::versionString;
-#if OSCI_PREMIUM
-        aboutInfo.isPremium = true;
-#else
-        aboutInfo.isPremium = false;
-#endif
+    aboutInfo.isPremium = audioProcessor.hasPremiumLicense();
         aboutInfo.websiteUrl = "https://osci-render.com";
         aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
         aboutInfo.credits = {
@@ -98,6 +94,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
         const bool useNativeTitleBar = true;
        #endif
         AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
+    });
+    addMenuItem(aboutMenu, "License and Updates...", [this] {
+        editor.openLicenseAndUpdates();
     });
     addDiagnosticsMenuItems(aboutMenu, audioProcessor);
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {

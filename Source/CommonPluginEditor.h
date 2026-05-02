@@ -30,6 +30,7 @@ public:
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
+    void openLicenseAndUpdates();
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
 

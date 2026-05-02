@@ -106,11 +106,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
         aboutInfo.productName = ProjectInfo::projectName;
         aboutInfo.companyName = ProjectInfo::companyName;
         aboutInfo.versionString = ProjectInfo::versionString;
-#if OSCI_PREMIUM
-        aboutInfo.isPremium = true;
-#else
-        aboutInfo.isPremium = false;
-#endif
+    aboutInfo.isPremium = processor.hasPremiumLicense();
         aboutInfo.websiteUrl = "https://osci-render.com";
         aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
         aboutInfo.credits = {
@@ -125,6 +121,9 @@ void SosciMainMenuBarModel::resetMenuItems() {
         const bool useNativeTitleBar = true;
        #endif
         AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
+    });
+    addMenuItem(aboutMenu, "License and Updates...", [&]() {
+        editor.openLicenseAndUpdates();
     });
     addDiagnosticsMenuItems(aboutMenu, processor);
 

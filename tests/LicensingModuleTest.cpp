@@ -112,6 +112,17 @@ public:
         beginTest ("Release signature verifier uses configured public key");
         expect (osci::licensing::LicenseToken::verifyReleaseSignature ("2.8.10.8", "mac-arm64", "abcdef", makeSignature()));
 
+        beginTest ("Production Ed25519 verifier accepts valid signatures");
+        resetTestVerifier();
+        osci::licensing::LicenseToken::setPublicKeysForTesting ({}, "iT+WRr9r0vLoIXcT6vStDDJiOYhkp4lLfhQI11p2OIk=");
+        expect (osci::licensing::LicenseToken::verifyReleaseSignature (
+            "2.0.0", "mac-arm64", "abcdef",
+            "2SKjjG3qSG3DTL0qgtBCwg2u2Tc34OB62jVK7CVArxFn9WzXyorb8jgIKoEV5d03kndkRBcZV+VnwoeyQsEKAA=="));
+        expect (! osci::licensing::LicenseToken::verifyReleaseSignature (
+            "2.0.1", "mac-arm64", "abcdef",
+            "2SKjjG3qSG3DTL0qgtBCwg2u2Tc34OB62jVK7CVArxFn9WzXyorb8jgIKoEV5d03kndkRBcZV+VnwoeyQsEKAA=="));
+        installTestVerifier();
+
         beginTest ("LicenseManager treats free cached tokens as non-premium");
         {
             const auto storageDirectory = juce::File::getSpecialLocation (juce::File::tempDirectory)

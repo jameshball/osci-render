@@ -34,6 +34,10 @@ public:
     void addAllParameters();
 
     juce::UndoManager& getUndoManager() { return undoManager; }
+    osci::licensing::LicenseManager& getLicenseManager();
+    const osci::licensing::LicenseManager& getLicenseManager() const;
+    juce::String getProductSlug() const;
+    bool hasPremiumLicense() const;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -179,6 +183,8 @@ public:
 #else
         "ffmpeg";
 #endif
+
+    std::unique_ptr<osci::licensing::LicenseManager> licenseManager;
     void setAcceptsKeys(bool shouldAcceptKeys) {
         setGlobalValue("acceptsAllKeys", shouldAcceptKeys);
     }

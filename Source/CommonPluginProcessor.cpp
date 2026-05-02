@@ -69,6 +69,13 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     
     globalSettings = std::make_unique<juce::PropertiesFile>(options);
 
+    osci::licensing::LicenseManager::Config licenseConfig;
+    licenseConfig.productSlug = getProductSlug();
+    licenseConfig.storageDirectory = osci::licensing::HardwareInfo::getDefaultStorageDirectory (licenseConfig.productSlug);
+    licenseManager = std::make_unique<osci::licensing::LicenseManager> (licenseConfig);
+    if (auto result = licenseManager->loadCachedToken(); result.failed())
+        juce::Logger::writeToLog ("License cache load failed: " + result.getErrorMessage());
+
     // Restore recently-opened project files (shared across instances).
     recentProjectFiles.setMaxNumberOfItems(10);
     {
@@ -109,6 +116,33 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
     wavParser.setLooping(false);
     startHeartbeat();
+}
+
+osci::licensing::LicenseManager& CommonAudioProcessor::getLicenseManager()
+{
+    jassert (licenseManager != nullptr);
+    return *licenseManager;
+}
+
+const osci::licensing::LicenseManager& CommonAudioProcessor::getLicenseManager() const
+{
+    jassert (licenseManager != nullptr);
+    return *licenseManager;
+}
+
+juce::String CommonAudioProcessor::getProductSlug() const
+{
+    const juce::String pluginName (JucePlugin_Name);
+    return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+}
+
+bool CommonAudioProcessor::hasPremiumLicense() const
+{
+#if OSCI_PREMIUM
+    return licenseManager != nullptr && licenseManager->hasPremium();
+#else
+    return false;
+#endif
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const

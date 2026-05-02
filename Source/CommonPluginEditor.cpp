@@ -1,5 +1,6 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "components/LicenseAndUpdatesComponent.h"
 #include "standalone/CustomStandaloneFilterWindow.h"
 
 #if OSCI_PREMIUM
@@ -392,15 +393,19 @@ void CommonPluginEditor::openAudioSettings() {
     standalone->showAudioSettingsDialog();
 }
 
+void CommonPluginEditor::openLicenseAndUpdates() {
+    if (findActiveOverlay<LicenseAndUpdatesComponent>() != nullptr)
+        return;
+
+    showOverlay(std::make_unique<LicenseAndUpdatesComponent>(audioProcessor));
+}
+
 void CommonPluginEditor::openRecordingSettings() {
     recordingSettingsWindow.setVisible(true);
 }
 
 void CommonPluginEditor::showPremiumSplashScreen() {
-    juce::AlertWindow::showMessageBoxAsync(
-        juce::AlertWindow::InfoIcon,
-        "Premium Feature",
-        "This feature is available in the premium version.");
+    openLicenseAndUpdates();
 }
 
 void CommonPluginEditor::renderAudioFileToVideo() {
