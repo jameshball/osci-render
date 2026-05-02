@@ -103,6 +103,8 @@
               file="Source/video/FFmpegEncoderManager.cpp"/>
         <FILE id="oKPzgR" name="FFmpegEncoderManager.h" compile="0" resource="0"
               file="Source/video/FFmpegEncoderManager.h"/>
+        <FILE id="sMPrb1" name="FFmpegMediaInfo.h" compile="0" resource="0"
+              file="Source/video/FFmpegMediaInfo.h"/>
       </GROUP>
       <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>

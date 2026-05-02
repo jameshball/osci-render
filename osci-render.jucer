@@ -764,6 +764,8 @@
               file="Source/video/FFmpegEncoderManager.cpp"/>
         <FILE id="t2oI5O" name="FFmpegEncoderManager.h" compile="0" resource="0"
               file="Source/video/FFmpegEncoderManager.h"/>
+        <FILE id="fMPrb1" name="FFmpegMediaInfo.h" compile="0" resource="0"
+              file="Source/video/FFmpegMediaInfo.h"/>
         <FILE id="xEIRCs" name="InvisibleOpenGLContextComponent.h" compile="0"
               resource="0" file="Source/video/InvisibleOpenGLContextComponent.h"/>
         <FILE id="OyC3qj" name="SyphonFrameGrabber.h" compile="0" resource="0"

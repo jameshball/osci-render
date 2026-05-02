@@ -1,0 +1,39 @@
+#include <JuceHeader.h>
+#include "../Source/video/FFmpegMediaInfo.h"
+
+class FFmpegMediaInfoTest : public juce::UnitTest
+{
+public:
+    FFmpegMediaInfoTest() : juce::UnitTest("FFmpeg Media Info", "Video") {}
+
+    void runTest() override
+    {
+        beginTest("ffprobe output parses dimensions and rational frame rate");
+        {
+            const auto info = osci::video::detail::parseFFprobeOutput(
+                "width=1920\n"
+                "height=1080\n"
+                "avg_frame_rate=30000/1001\n"
+                "r_frame_rate=30/1\n");
+
+            expectEquals(info.width, 1920);
+            expectEquals(info.height, 1080);
+            expectWithinAbsoluteError(info.frameRate, 30000.0 / 1001.0, 0.0001);
+        }
+
+        beginTest("ffmpeg fallback only parses video stream metadata");
+        {
+            const auto info = osci::video::detail::parseFFmpegInputOutput(
+                "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'clip.mp4':\n"
+                "  Duration: 00:00:01.00, start: 0.000000, bitrate: 1024 kb/s\n"
+                "  Stream #0:0: Video: h264, yuv420p(progressive), 640x360 [SAR 1:1 DAR 16:9], 29.97 fps, 29.97 tbr, 90k tbn\n"
+                "  Stream #0:1: Audio: aac, 48000 Hz, stereo, fltp\n");
+
+            expectEquals(info.width, 640);
+            expectEquals(info.height, 360);
+            expectWithinAbsoluteError(info.frameRate, 29.97, 0.0001);
+        }
+    }
+};
+
+static FFmpegMediaInfoTest ffmpegMediaInfoTest;

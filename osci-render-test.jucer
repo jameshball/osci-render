@@ -128,6 +128,8 @@
             file="tests/LfoStressTest.cpp"/>
       <FILE id="LuaCor" name="LuaCorrectnessTests.cpp" compile="1" resource="0"
             file="tests/LuaCorrectnessTests.cpp"/>
+      <FILE id="FfMedI" name="FFmpegMediaInfoTests.cpp" compile="1" resource="0"
+            file="tests/FFmpegMediaInfoTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"
             file="tests/LottieParserTests.cpp"/>
       <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"
