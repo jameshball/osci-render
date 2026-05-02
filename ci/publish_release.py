@@ -119,7 +119,8 @@ def main(argv: list[str]) -> int:
     p.add_argument('--semver', required=True, help='e.g. 2.6.0.0')
     p.add_argument('--platform', required=True,
                    choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64'])
-    p.add_argument('--channel', default='stable', choices=['stable', 'beta'])
+    p.add_argument('--release-track', default='alpha', choices=['alpha', 'beta', 'stable'],
+                   help='Release track to register with the API. CI should publish alpha.')
     p.add_argument('--variant', default='premium', choices=['free', 'premium'],
                    help='Licensing variant of the build (free or premium); separate Version row per variant.')
     p.add_argument('--artifact-kind', required=True, choices=['pkg', 'exe', 'zip', 'appimage', 'tar.gz'])
@@ -167,7 +168,7 @@ def main(argv: list[str]) -> int:
         'product': args.product,
         'semver': args.semver,
         'platform': args.platform,
-        'channel': args.channel,
+        'release_track': args.release_track,
         'variant': args.variant,
         'artifact_kind': args.artifact_kind,
         'filename': filename,

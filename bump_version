@@ -11,14 +11,13 @@ Versioning scheme here is 4-part: A.B.C.D
 By default, both products get a patch bump.
 
 Usage:
-    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--message MSG] [--skip-validation] [--release]
+    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--message MSG] [--skip-validation]
 
 Examples:
     ./bump_version
     ./bump_version --osci minor --sosci patch
     ./bump_version --sosci none
     ./bump_version --osci patch --sosci none --skip-validation   # low-cost CI run (build only)
-    ./bump_version --osci minor --sosci patch --release          # build + publish to api.osci-render.com
 
 Notes:
 - Requires a clean working tree.
@@ -41,7 +40,6 @@ from typing import Iterable, Sequence
 REPO_ROOT = Path(__file__).resolve().parent
 CI_TRIGGER_MARKER = "[trigger-ci:bump-version]"
 CI_SKIP_VALIDATION_MARKER = "[skip-validation]"
-CI_RELEASE_MARKER = "[release]"
 
 
 class FatalError(RuntimeError):
@@ -210,13 +208,6 @@ def add_skip_validation_marker(message: str) -> str:
     return f"{message}\n{CI_SKIP_VALIDATION_MARKER}"
 
 
-def add_release_marker(message: str) -> str:
-    message = message.rstrip()
-    if CI_RELEASE_MARKER in message:
-        return message
-    return f"{message}\n{CI_RELEASE_MARKER}"
-
-
 def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(prog="bump_version", add_help=True)
     parser.add_argument(
@@ -245,19 +236,6 @@ def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
             "Produce a lightweight CI run: skip unit tests (ci/test.sh) and "
             "pluginval validation. Adds the " + CI_SKIP_VALIDATION_MARKER +
             " marker to the commit message. CI still builds all artefacts."
-        ),
-    )
-
-    parser.add_argument(
-        "--release",
-        action="store_true",
-        help=(
-            "Trigger the release-publish pipeline. Adds the " + CI_RELEASE_MARKER +
-            " marker to the commit message. After a successful build, CI "
-            "signs each artifact with the release-signing key and POSTs it to "
-            "api.osci-render.com so the JUCE updater can pick it up. "
-            "Requires PUBLISH_API_TOKEN and RELEASE_SIGNING_PRIVATE_KEY "
-            "GitHub Actions secrets to be set on the repo."
         ),
     )
 
@@ -314,13 +292,6 @@ def main(argv: Sequence[str]) -> int:
     msg = add_ci_trigger_marker(msg)
     if ns.skip_validation:
         msg = add_skip_validation_marker(msg)
-    if ns.release:
-        msg = add_release_marker(msg)
-        if ns.skip_validation:
-            raise FatalError(
-                "--release cannot be combined with --skip-validation: "
-                "release builds must run unit tests and pluginval."
-            )
 
     commit(msg)
 

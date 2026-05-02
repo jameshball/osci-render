@@ -112,12 +112,6 @@ jobs:
           else
             echo "skip_validation=false" >> "$GITHUB_OUTPUT"
           fi
-          if [[ "$MSG" == *"[release]"* ]]; then
-            echo "release=true" >> "$GITHUB_OUTPUT"
-            echo "Commit requests release: signed artifacts will be published to api.osci-render.com."
-          else
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Run unit tests
         if: steps.ci_flags.outputs.skip_validation != 'true'
@@ -367,12 +361,9 @@ jobs:
           exit $FAILED
 
       # -- Release publish ----------------------------------------
-      # When the commit message contains [release] (added by `bump_version
-      # --release`), upload the signed installer artifact to api.osci-render.com
-      # so the JUCE in-plugin updater can fetch it. Runs for all matrix combos
-      # (osci-render free + premium, sosci premium, all OSes).
+      # Every successful build publishes a signed alpha artifact to
+      # api.osci-render.com so the updater can fetch it after admin promotion.
       - name: Publish release artifact
-        if: steps.ci_flags.outputs.release == 'true'
         shell: bash
         env:
           PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
@@ -424,7 +415,7 @@ jobs:
             --semver "${{ steps.version.outputs.version }}" \
             --platform "${PLATFORM}" \
             --variant "${{ matrix.version }}" \
-            --channel stable \
+            --release-track alpha \
             --artifact-kind "${KIND}" \
             --artifact "${ARTIFACT}" \
             --notes "Auto-published by CI from $(git log -1 --format=%H)"
