@@ -66,7 +66,7 @@ void ObjectServer::run() {
                                     std::vector<std::vector<osci::Line>> receivedFrames;
                                     int bytesRead = static_cast<int>(binStream.getDataSize());
                                     if (bytesRead < 8) return;
-                                    char* gplaData = (char*)binStream.getData();
+                                    const char* gplaData = static_cast<const char*>(binStream.getData());
                                     receivedFrames = LineArtParser::parseBinaryFrames(gplaData, bytesRead);
                                     if (receivedFrames.size() <= 0) continue;
                                     frameContainer = receivedFrames[0];

@@ -109,7 +109,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		juce::MemoryBlock buffer{};
 		auto bytesRead = stream->readIntoMemoryBlock(buffer);
 		if (bytesRead < 8) return;
-		char* gplaData = (char*)buffer.getData();
+		const char* gplaData = static_cast<const char*>(buffer.getData());
 		const char tag[] = "GPLA    ";
 		bool isBinary = true;
 		for (int i = 0; i < 8; i++) {
