@@ -35,9 +35,7 @@ private:
     // Retained JSON buffer (thorvg loads with copy=false so we must keep it alive).
     juce::MemoryBlock jsonBuffer;
 
-    // Custom deleter keeps thorvg types out of this header.
-    struct AnimationDeleter { void operator()(tvg::Animation* a) const noexcept; };
-    std::unique_ptr<tvg::Animation, AnimationDeleter> animation;
+    std::unique_ptr<tvg::Animation> animation;
 
     // Pre-rendered shape vectors, one per frame. Populated in the constructor
     // so setFrame/draw are O(1) and safe to call on the audio thread.

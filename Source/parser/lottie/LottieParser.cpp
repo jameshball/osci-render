@@ -3,8 +3,24 @@
 #include <unordered_set>
 #include <functional>
 #include <clipper2/clipper.h>
+#include "../../../modules/Mathter/include/Mathter/Matrix.hpp"
 
 namespace {
+    using Mat3 = mathter::Matrix<float, 3, 3, mathter::eMatrixOrder::PRECEDE_VECTOR, mathter::eMatrixLayout::ROW_MAJOR, false>;
+    using Vec3 = mathter::Vector<float, 3, false>;
+
+    inline Mat3 toMat3(const tvg::Matrix& m) {
+        Mat3 r;
+        r(0,0)=m.e11; r(0,1)=m.e12; r(0,2)=m.e13;
+        r(1,0)=m.e21; r(1,1)=m.e22; r(1,2)=m.e23;
+        r(2,0)=m.e31; r(2,1)=m.e32; r(2,2)=m.e33;
+        return r;
+    }
+
+    inline tvg::Matrix toTvgMatrix(const Mat3& m) {
+        return {m(0,0), m(0,1), m(0,2), m(1,0), m(1,1), m(1,2), m(2,0), m(2,1), m(2,2)};
+    }
+
     // Global refcount for thorvg Initializer across all LottieParser instances.
     juce::SpinLock& initializerLock() {
         static juce::SpinLock l;
@@ -31,32 +47,21 @@ namespace {
     // Walk from `leaf` up to (but not including) `root`, multiplying each
     // ancestor's local transform to produce the world-space transform.
     tvg::Matrix accumulatedTransform(const tvg::Paint* leaf, const tvg::Paint* root) {
-        tvg::Matrix m{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        Mat3 m = mathter::Identity();
         std::vector<const tvg::Paint*> chain;
         for (auto p = leaf; p != nullptr && p != root; p = p->parent()) {
             chain.push_back(p);
         }
         // Multiply root->leaf so we accumulate correctly.
         for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
-            tvg::Matrix t = const_cast<tvg::Paint*>(*it)->transform();
-            tvg::Matrix r;
-            r.e11 = m.e11 * t.e11 + m.e12 * t.e21 + m.e13 * t.e31;
-            r.e12 = m.e11 * t.e12 + m.e12 * t.e22 + m.e13 * t.e32;
-            r.e13 = m.e11 * t.e13 + m.e12 * t.e23 + m.e13 * t.e33;
-            r.e21 = m.e21 * t.e11 + m.e22 * t.e21 + m.e23 * t.e31;
-            r.e22 = m.e21 * t.e12 + m.e22 * t.e22 + m.e23 * t.e32;
-            r.e23 = m.e21 * t.e13 + m.e22 * t.e23 + m.e23 * t.e33;
-            r.e31 = m.e31 * t.e11 + m.e32 * t.e21 + m.e33 * t.e31;
-            r.e32 = m.e31 * t.e12 + m.e32 * t.e22 + m.e33 * t.e32;
-            r.e33 = m.e31 * t.e13 + m.e32 * t.e23 + m.e33 * t.e33;
-            m = r;
+            m = m * toMat3(const_cast<tvg::Paint*>(*it)->transform());
         }
-        return m;
+        return toTvgMatrix(m);
     }
 
     inline tvg::Point applyMatrix(const tvg::Matrix& m, tvg::Point p) {
-        return {m.e11 * p.x + m.e12 * p.y + m.e13,
-                m.e21 * p.x + m.e22 * p.y + m.e23};
+        const Vec3 result = toMat3(m) * Vec3{p.x, p.y, 1.0f};
+        return {result[0], result[1]};
     }
 
     float accumulatedOpacity(const tvg::Paint* leaf, const tvg::Paint* root) {
@@ -191,14 +196,14 @@ namespace {
             return 0.5f * (chord + control);
         }
         // subdivide at t=0.5
-        auto m01 = lerp(p0, p1, 0.5f);
-        auto m12 = lerp(p1, p2, 0.5f);
-        auto m23 = lerp(p2, p3, 0.5f);
-        auto m012 = lerp(m01, m12, 0.5f);
-        auto m123 = lerp(m12, m23, 0.5f);
-        auto m0123 = lerp(m012, m123, 0.5f);
-        return cubicLength(p0, m01, m012, m0123, depth - 1)
-             + cubicLength(m0123, m123, m23, p3, depth - 1);
+        auto mid01  = lerp(p0, p1, 0.5f);
+        auto mid12  = lerp(p1, p2, 0.5f);
+        auto mid23  = lerp(p2, p3, 0.5f);
+        auto mid012 = lerp(mid01, mid12, 0.5f);
+        auto mid123 = lerp(mid12, mid23, 0.5f);
+        auto splitPoint = lerp(mid012, mid123, 0.5f);
+        return cubicLength(p0, mid01, mid012, splitPoint, depth - 1)
+             + cubicLength(splitPoint, mid123, mid23, p3, depth - 1);
     }
 
     // Extract the cubic bezier segment between parameters t0..t1 using de Casteljau.
@@ -206,23 +211,23 @@ namespace {
                          float t0, float t1,
                          tvg::Point& q0, tvg::Point& q1, tvg::Point& q2, tvg::Point& q3) {
         // First split at t1 to get [0, t1]
-        auto a1 = lerp(p0, p1, t1);
-        auto b1 = lerp(p1, p2, t1);
-        auto c1 = lerp(p2, p3, t1);
-        auto a2 = lerp(a1, b1, t1);
-        auto b2 = lerp(b1, c1, t1);
-        auto a3 = lerp(a2, b2, t1);
-        // Segment [0, t1] is: p0, a1, a2, a3
+        auto s1a = lerp(p0, p1, t1);
+        auto s1b = lerp(p1, p2, t1);
+        auto s1c = lerp(p2, p3, t1);
+        auto s2a = lerp(s1a, s1b, t1);
+        auto s2b = lerp(s1b, s1c, t1);
+        auto splitAtT1 = lerp(s2a, s2b, t1);
+        // Segment [0, t1] is: p0, s1a, s2a, splitAtT1
         // Now split [0, t1] at t0/t1 to get [t0, t1]
-        float u = (t1 > 0.0f) ? (t0 / t1) : 0.0f;
-        auto d1 = lerp(p0, a1, u);
-        auto e1 = lerp(a1, a2, u);
-        auto f1 = lerp(a2, a3, u);
-        auto d2 = lerp(d1, e1, u);
-        auto e2 = lerp(e1, f1, u);
-        auto d3 = lerp(d2, e2, u);
-        // Segment [t0, t1] as cubic bezier: d3, e2, f1, a3
-        q0 = d3; q1 = e2; q2 = f1; q3 = a3;
+        float localT = (t1 > 0.0f) ? (t0 / t1) : 0.0f;
+        auto r1a = lerp(p0,  s1a,      localT);
+        auto r1b = lerp(s1a, s2a,      localT);
+        auto r1c = lerp(s2a, splitAtT1, localT);
+        auto r2a = lerp(r1a, r1b, localT);
+        auto r2b = lerp(r1b, r1c, localT);
+        auto subStart = lerp(r2a, r2b, localT);
+        // Segment [t0, t1] as cubic bezier: subStart, r2b, r1c, splitAtT1
+        q0 = subStart; q1 = r2b; q2 = r1c; q3 = splitAtT1;
     }
 
     void normaliseTrimRange(float& begin, float& end) {
@@ -289,38 +294,34 @@ namespace {
     // Adaptive cubic flattening. Appends points to `out` (including the
     // endpoint p3; the caller is responsible for first pushing p0).
     void flattenCubic(tvg::Point p0, tvg::Point p1, tvg::Point p2, tvg::Point p3,
-                      std::vector<tvg::Point>& out, float tolSq = 0.25f, int depth = 10) {
+                      std::vector<tvg::Point>& out, float toleranceSquared = 0.25f, int depth = 10) {
         // Distance from control points to the chord p0->p3.
         auto dx = p3.x - p0.x;
         auto dy = p3.y - p0.y;
-        auto len2 = dx * dx + dy * dy;
+        auto chordLengthSquared = dx * dx + dy * dy;
         auto perp = [&](tvg::Point c) -> float {
-            if (len2 <= 1.0e-12f) {
+            if (chordLengthSquared <= 1.0e-12f) {
                 auto ex = c.x - p0.x, ey = c.y - p0.y;
                 return ex * ex + ey * ey;
             }
-            float t = ((c.x - p0.x) * dx + (c.y - p0.y) * dy) / len2;
+            float t = ((c.x - p0.x) * dx + (c.y - p0.y) * dy) / chordLengthSquared;
             float px = p0.x + t * dx, py = p0.y + t * dy;
             float ex = c.x - px, ey = c.y - py;
             return ex * ex + ey * ey;
         };
-        if (depth <= 0 || (perp(p1) < tolSq && perp(p2) < tolSq)) {
+        if (depth <= 0 || (perp(p1) < toleranceSquared && perp(p2) < toleranceSquared)) {
             out.push_back(p3);
             return;
         }
-        auto m01 = lerp(p0, p1, 0.5f);
-        auto m12 = lerp(p1, p2, 0.5f);
-        auto m23 = lerp(p2, p3, 0.5f);
-        auto m012 = lerp(m01, m12, 0.5f);
-        auto m123 = lerp(m12, m23, 0.5f);
-        auto m0123 = lerp(m012, m123, 0.5f);
-        flattenCubic(p0, m01, m012, m0123, out, tolSq, depth - 1);
-        flattenCubic(m0123, m123, m23, p3, out, tolSq, depth - 1);
+        auto mid01  = lerp(p0, p1, 0.5f);
+        auto mid12  = lerp(p1, p2, 0.5f);
+        auto mid23  = lerp(p2, p3, 0.5f);
+        auto mid012 = lerp(mid01, mid12, 0.5f);
+        auto mid123 = lerp(mid12, mid23, 0.5f);
+        auto splitPoint = lerp(mid012, mid123, 0.5f);
+        flattenCubic(p0, mid01, mid012, splitPoint, out, toleranceSquared, depth - 1);
+        flattenCubic(splitPoint, mid123, mid23, p3, out, toleranceSquared, depth - 1);
     }
-}
-
-void OsciLottieParser::AnimationDeleter::operator()(tvg::Animation* a) const noexcept {
-    delete a;
 }
 
 OsciLottieParser::OsciLottieParser(juce::String jsonContent) {
@@ -403,7 +404,7 @@ OsciLottieParser::OsciLottieParser(juce::String jsonContent) {
 }
 
 OsciLottieParser::~OsciLottieParser() {
-    // unique_ptr destroys the animation via AnimationDeleter before releaseThorVG.
+    // unique_ptr destroys the animation before releaseThorVG.
     animation.reset();
     releaseThorVG();
 }
