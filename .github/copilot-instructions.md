@@ -1,25 +1,19 @@
 # osci-render Development Guide
 
-## Communication
-
-- **NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool for structured UI with selectable options.
-- After each completed task, **YOU MUST** ask the user if the changes are satisfactory or if further modifications are needed using the `vscode_askQuestions` tool. Do not assume completion until the user confirms.
-
-## Subagents
-
-**Multiple independent subagents MUST be invoked in the same `<function_calls>` block to execute in parallel.** Separate blocks run sequentially.
-
-## Code Reviews
-
-1. Review all unstaged changes (quality, duplication, structure, performance, bugs).
-2. List every issue numbered with file/line.
-3. For each issue, use `vscode_askQuestions` to ask: implement the fix or skip.
-4. Implement all accepted fixes, then build and verify.
-
 ## Guidelines
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
-- **Recommendations/proposals**: Always first write your findings, and then for each finding, present it as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
+- **README files**: Do not edit `README.md` files unless the user explicitly asks for README changes.
+- **Brace style**: Use same-line opening braces for functions and control flow, e.g. `void f() {` and `if (condition) {`, not Allman-style braces on the next line.
+- **Else style**: Put `else` on the same line as the preceding closing brace, e.g. `} else {`.
+- **Required braces**: Always use braces for control-flow bodies, even for single-line `if`, `else`, `for`, and `while` bodies.
+- **Control flow clarity**: Avoid initializer statements in `if`/`switch` conditions. Prefer a named local variable before the condition, especially for `juce::Result` values.
+
+## GitHub Actions Monitoring
+
+- **NEVER tight-poll GitHub Actions.** Prefer one watcher: `TERM=dumb gh run watch <run-id> --repo <owner>/<repo> --compact --interval 60 --exit-status`.
+- For a manual check, use exactly one timestamped query: `gh run view <run-id> --repo <owner>/<repo> --json status,conclusion,createdAt,startedAt,updatedAt,jobs`.
+- After a manual check, do not call `gh run view`, `list_workflow_runs`, or `list_workflow_jobs` again until at least the elapsed runtime has passed; use 60 seconds minimum when no duration is known.
 
 ## Project Overview
 

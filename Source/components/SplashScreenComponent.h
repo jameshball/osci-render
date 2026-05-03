@@ -18,7 +18,6 @@ protected:
 private:
     void buildBenefitTiles();
 
-    juce::Label titleLabel;
     juce::Label subtitleLabel;
     GridComponent benefitsGrid;
     juce::Label supportLabel;

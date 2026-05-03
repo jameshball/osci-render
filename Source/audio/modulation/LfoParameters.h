@@ -50,7 +50,7 @@ public:
             juce::String idx = juce::String(i + 1);
             juce::String pfx = "lfo" + idx;
 
-            rate[i] = new osci::FloatParameter("LFO " + idx + " Rate", pfx + "Rate", VERSION_HINT, 1.0f, 0.01f, 100.0f, 0.01f, "Hz");
+            rate[i] = new osci::FloatParameter("LFO " + idx + " Rate", pfx + "Rate", VERSION_HINT, 1.0f, 0.01f, 1000.0f, 0.01f, "Hz");
             phaseOffset[i] = new osci::FloatParameter("LFO " + idx + " Phase Offset", pfx + "PhaseOffset", VERSION_HINT, 0.0f, 0.0f, 1.0f, 0.0001f);
             smoothAmount[i] = new osci::FloatParameter("LFO " + idx + " Smooth", pfx + "SmoothAmount", VERSION_HINT, 0.0f, 0.0f, 16.0f, 0.0001f, "s");
             delayAmount[i] = new osci::FloatParameter("LFO " + idx + " Delay", pfx + "DelayAmount", VERSION_HINT, 0.0f, 0.0f, 4.0f, 0.0001f, "s");
@@ -234,7 +234,8 @@ public:
     // Processes MIDI note events for LFO triggering and computes per-sample LFO values.
     template<int MaxVoices>
     void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi,
-                          double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices]) {
+                          double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices],
+                          double syncStartSeconds = 0.0, bool useHostSync = false) {
         if (numSamples <= 0) return;
 
         // Process MIDI note events to drive LFO triggering for non-Free modes
@@ -333,8 +334,12 @@ public:
 
                 int advanceSamples = numSamples - delaySkipSamples;
                 if (advanceSamples > 0) {
+                    double segmentSyncStartSeconds = syncStartSeconds;
+                    if (useHostSync && sampleRate > 0.0)
+                        segmentSyncStartSeconds += (double)delaySkipSamples / sampleRate;
                     audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples,
-                                                r, sr, waveforms[l], md, phaseOff);
+                                                r, sr, waveforms[l], md, phaseOff,
+                                                segmentSyncStartSeconds, useHostSync);
                 }
                 if (md == LfoMode::Sync && !effectiveVoiceActive) {
                     for (int s = 0; s < numSamples; ++s)

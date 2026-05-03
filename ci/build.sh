@@ -3,7 +3,12 @@
 PLUGIN="$1"
 VERSION="$2"
 
-OUTPUT_NAME="$PLUGIN-$VERSION"
+# sosci has only one variant, so we omit the version suffix from its artifact names
+if [ "$PLUGIN" = "sosci" ]; then
+  OUTPUT_NAME="$PLUGIN"
+else
+  OUTPUT_NAME="$PLUGIN-$VERSION"
+fi
 
 # Platform-aware in-place sed
 sed_jucer() {
@@ -140,17 +145,17 @@ if [ "$PLUGIN" = "osci-render" ]; then
 fi
 
 # Package linux binaries (after both effect and instrument builds)
+# Produces a single zip containing the standalone executable + vst3(s) at the root.
 if [ "$OS" = "linux" ]; then
   cd "$ROOT/ci/bin"
 
   if [ "$PLUGIN" = "osci-render" ]; then
     INSTRUMENT_TARGET="$PLUGIN-instrument"
-    zip -r "${OUTPUT_NAME}-linux-vst3.zip" "$PLUGIN.vst3" "$INSTRUMENT_TARGET.vst3"
+    zip -r "${OUTPUT_NAME}-linux.zip" "$PLUGIN" "$PLUGIN.vst3" "$INSTRUMENT_TARGET.vst3"
   else
-    zip -r "${OUTPUT_NAME}-linux-vst3.zip" "$PLUGIN.vst3"
+    zip -r "${OUTPUT_NAME}-linux.zip" "$PLUGIN" "$PLUGIN.vst3"
   fi
-  zip -r "${OUTPUT_NAME}-linux.zip" "$PLUGIN"
-  cp ${OUTPUT_NAME}*.zip "$ROOT/bin"
+  cp "${OUTPUT_NAME}-linux.zip" "$ROOT/bin"
 fi
 
 cd "$ROOT"

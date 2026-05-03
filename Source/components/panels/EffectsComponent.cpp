@@ -33,9 +33,10 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	};
 
 	autoLinkButton.setTooltip("Auto-link LFOs to new effects based on their default animation settings.");
-	autoLinkButton.setToggleState(audioProcessor.getGlobalBoolValue("autoLinkLfos", true), juce::dontSendNotification);
+	autoLinkButton.setToggleState(audioProcessor.globalSettings.getBool("autoLinkLfos", true), juce::dontSendNotification);
 	autoLinkButton.onClick = [this] {
-		audioProcessor.setGlobalValue("autoLinkLfos", autoLinkButton.getToggleState());
+		audioProcessor.globalSettings.set("autoLinkLfos", autoLinkButton.getToggleState());
+		audioProcessor.globalSettings.save();
 	};
 	addAndMakeVisible(autoLinkButton);
 
@@ -102,7 +103,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         audioProcessor.promotePreviewLfoAssignments();
         // Auto-assign LFOs if the toggle is enabled
 #if OSCI_PREMIUM
-        if (chosen != nullptr && audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
+        if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
             audioProcessor.autoAssignLfosForEffect(*chosen);
             audioProcessor.broadcaster.sendChangeMessage();
         }

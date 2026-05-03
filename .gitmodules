@@ -47,3 +47,7 @@
 [submodule "modules/Clipper2"]
 	path = modules/Clipper2
 	url = https://github.com/AngusJohnson/Clipper2.git
+[submodule "modules/osci_licensing"]
+	path = modules/osci_licensing
+	url = https://github.com/jameshball/osci_licensing.git
+	branch = main

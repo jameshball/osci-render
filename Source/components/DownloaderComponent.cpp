@@ -1,16 +1,14 @@
 #include "DownloaderComponent.h"
 
 DownloaderComponent::DownloaderComponent() : juce::Thread("DownloaderComponent") {
-    addChildComponent(progressBar);
-    addChildComponent(successLabel);
+    addAndMakeVisible(progress_);
+    progress_.reset();
 }
 
 void DownloaderComponent::setup(juce::URL url, juce::File file) {
     this->url = url;
     this->file = file;
-    
-    successLabel.setText(file.getFileName() + " downloaded!", juce::dontSendNotification);
-    
+
     if (url.toString(false).endsWithIgnoreCase(".gz")) {
         uncompressOnFinish = true;
         this->file = file.getSiblingFile(file.getFileName() + ".gz");
@@ -49,29 +47,20 @@ void DownloaderComponent::threadComplete() {
         }
         file.deleteFile();
     }
-    
+
     if (error) {
         file.deleteFile();
-        progressValue = -2;
+        progress_.showError("Download failed");
     } else {
-        progressValue = 1;
         if (onSuccessfulDownload != nullptr) {
             onSuccessfulDownload();
         }
-        juce::MessageManager::callAsync([this]() {
-            progressBar.setVisible(false);
-            successLabel.setVisible(true);
-        });
-        
-        juce::Timer::callAfterDelay(3000, [this]() {
-            successLabel.setVisible(false);
-        });
+        progress_.showSuccess(file.getFileName() + " downloaded!");
     }
 }
 
 void DownloaderComponent::resized() {
-    progressBar.setBounds(getLocalBounds());
-    successLabel.setBounds(getLocalBounds());
+    progress_.setBounds(getLocalBounds());
 }
 
 void DownloaderComponent::finished(juce::URL::DownloadTask* task, bool success) {
@@ -79,16 +68,19 @@ void DownloaderComponent::finished(juce::URL::DownloadTask* task, bool success) 
 }
 
 void DownloaderComponent::progress(juce::URL::DownloadTask* task, juce::int64 bytesDownloaded, juce::int64 totalLength) {
-    if (uncompressOnFinish) {
-        progressValue = ((double) bytesDownloaded / (double) totalLength) * 0.9;
-    } else {
-        progressValue = (double) bytesDownloaded / (double) totalLength;
+    if (totalLength <= 0) {
+        progress_.setProgress(-1.0);
+        return;
     }
+    const double fraction = (double) bytesDownloaded / (double) totalLength;
+    // Reserve the last 10% for post-download decompression so the bar doesn't
+    // sit at 100% while we're still working.
+    progress_.setProgress(uncompressOnFinish ? fraction * 0.9 : fraction);
 }
 
 void DownloaderComponent::download() {
-    progressValue = -1;
-    successLabel.setVisible(false);
-    progressBar.setVisible(true);
+    progress_.reset();
+    progress_.setStatus("Downloading...");
+    progress_.setProgress(-1.0);
     startThread();
 }

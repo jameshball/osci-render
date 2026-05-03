@@ -1,5 +1,6 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "components/LicenseAndUpdatesComponent.h"
 #include "standalone/CustomStandaloneFilterWindow.h"
 
 #if OSCI_PREMIUM
@@ -22,6 +23,16 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     addAndMakeVisible(undoButton);
     addAndMakeVisible(redoButton);
     addAndMakeVisible(undoLabel);
+    addAndMakeVisible(betaUpdatesButton);
+    addAndMakeVisible(updatePrompt);
+    updatePrompt.setVisible(false);
+    betaUpdatesButton.setColour(juce::TextButton::buttonColourId, juce::Colour::fromRGB(0xf2, 0xc9, 0x4c));
+    betaUpdatesButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour::fromRGB(0xff, 0xd9, 0x68));
+    betaUpdatesButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    betaUpdatesButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark());
+    betaUpdatesButton.setTooltip("Beta updates are enabled. Click to manage.");
+    betaUpdatesButton.onClick = [this] { openLicenseAndUpdates(); };
+    refreshBetaUpdatesButton();
     undoLabel.setJustificationType(juce::Justification::centredRight);
     undoLabel.setFont(juce::Font(juce::FontOptions(12.0f)));
     undoLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.7f));
@@ -113,6 +124,17 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
+
+    updatePrompt.showPendingInstallStatusIfNeeded();
+    updatePrompt.scheduleInitialCheck();
+
+#if OSCI_PREMIUM
+    juce::MessageManager::callAsync([safeThis]
+    {
+        if (safeThis != nullptr && ! safeThis->audioProcessor.licenseManager.hasPremium())
+            safeThis->openLicenseAndUpdates();
+    });
+#endif
 }
 
 void CommonPluginEditor::parentHierarchyChanged()
@@ -169,13 +191,36 @@ void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
 void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
+    refreshBetaUpdatesButton();
+
+    const int promptWidth = juce::jmin(380, getWidth() - 28);
+    if (promptWidth > 260)
+        updatePrompt.setBounds(getWidth() - promptWidth - 14, 42, promptWidth, updatePrompt.getPreferredHeight());
+    else
+        updatePrompt.setBounds({});
 
     if (!activeOverlays.empty()) {
         for (auto& overlay : activeOverlays) {
             overlay->setBounds(getLocalBounds());
             overlay->toFront(false);
         }
+    } else {
+        updatePrompt.toFront(false);
     }
+}
+
+void CommonPluginEditor::refreshBetaUpdatesButton() {
+    betaUpdatesButton.setVisible(osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled());
+}
+
+void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
+    refreshBetaUpdatesButton();
+    if (! betaUpdatesButton.isVisible())
+        return;
+
+    const auto width = juce::jmin(118, topBar.getWidth());
+    betaUpdatesButton.setBounds(topBar.removeFromRight(width).reduced(2, 2));
+    betaUpdatesButton.toFront(false);
 }
 
 void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
@@ -392,15 +437,19 @@ void CommonPluginEditor::openAudioSettings() {
     standalone->showAudioSettingsDialog();
 }
 
+void CommonPluginEditor::openLicenseAndUpdates() {
+    if (findActiveOverlay<LicenseAndUpdatesComponent>() != nullptr)
+        return;
+
+    showOverlay(std::make_unique<LicenseAndUpdatesComponent>(audioProcessor));
+}
+
 void CommonPluginEditor::openRecordingSettings() {
     recordingSettingsWindow.setVisible(true);
 }
 
 void CommonPluginEditor::showPremiumSplashScreen() {
-    juce::AlertWindow::showMessageBoxAsync(
-        juce::AlertWindow::InfoIcon,
-        "Premium Feature",
-        "This feature is available in the premium version.");
+    openLicenseAndUpdates();
 }
 
 void CommonPluginEditor::renderAudioFileToVideo() {
@@ -468,13 +517,12 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             if (safeThis->audioProcessor.haltRecording != nullptr)
                 safeThis->audioProcessor.haltRecording();
 
-            const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
+            const bool wasVisualiserVisible = safeThis->visualiser.isVisible();
             const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
 
             // Make the plugin output silent and skip heavy processing during offline render.
             safeThis->audioProcessor.setOfflineRenderActive(true);
-
-            safeThis->visualiser.setPaused(true);
+            safeThis->visualiser.setVisible(false);
 
             auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
 
@@ -522,12 +570,12 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
             window->enterModalState(
                 true,
-                juce::ModalCallbackFunction::create([safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder](int) {
+                juce::ModalCallbackFunction::create([safeThis, wasVisualiserVisible, wasOfflineRenderActive, resultHolder](int) {
                     if (safeThis == nullptr)
                         return;
 
                     safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
-                    safeThis->visualiser.setPaused(wasVisualiserPaused);
+                    safeThis->visualiser.setVisible(wasVisualiserVisible);
                     safeThis->offlineRenderDialog = nullptr;
 
                     if (resultHolder != nullptr && resultHolder->has_value())

@@ -373,7 +373,7 @@ void SettingsComponent::layoutChildren() {
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
         const bool showKeyboard = midiOn
-                          && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
+                          && audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
 
         midi.setVisible(false);
 
@@ -435,7 +435,7 @@ void SettingsComponent::layoutChildren() {
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
         const bool showKeyboard = midiOn
-                          && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
+                          && audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
 
         // Reserve space for keyboard at the very bottom if MIDI is on
         if (showKeyboard) {

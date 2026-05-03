@@ -171,8 +171,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     // Apply global default LFO preset if set
     {
-        auto defaultFactory = getGlobalStringValue("defaultLfoPreset");
-        auto defaultFile = getGlobalStringValue("defaultLfoPresetFile");
+        auto defaultFactory = globalSettings.getString("defaultLfoPreset");
+        auto defaultFile = globalSettings.getString("defaultLfoPresetFile");
         if (defaultFile.isNotEmpty()) {
             juce::File file(defaultFile);
             if (file.existsAsFile()) {
@@ -837,6 +837,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // MIDI transport info variables (defaults to 60bpm, 4/4 time signature at zero seconds and not playing)
     double bpm = 60;
     double playTimeSeconds = 0;
+    double ppqPosition = 0;
+    bool hasPlayTimeSeconds = false;
+    bool hasPpqPosition = false;
     bool isPlaying = false;
     juce::AudioPlayHead::TimeSignature timeSig;
 
@@ -847,7 +850,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (pos.hasValue()) {
             juce::AudioPlayHead::PositionInfo pi = *pos;
             bpm = pi.getBpm().orFallback(bpm);
-            playTimeSeconds = pi.getTimeInSeconds().orFallback(playTimeSeconds);
+            auto timeSeconds = pi.getTimeInSeconds();
+            if (timeSeconds.hasValue()) {
+                playTimeSeconds = *timeSeconds;
+                hasPlayTimeSeconds = true;
+            }
+            auto ppq = pi.getPpqPosition();
+            if (ppq.hasValue()) {
+                ppqPosition = *ppq;
+                hasPpqPosition = true;
+            }
             isPlaying = pi.getIsPlaying();
             timeSig = pi.getTimeSignature().orFallback(timeSig);
         }
@@ -861,10 +873,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Publish BPM for UI components (LFO rate display, etc.)
     currentBpm.store(bpm, std::memory_order_relaxed);
 
-    // Calculated number of beats
-    // TODO: To make this more resilient to changing BPMs, we should change how this is calculated
-    // or use another property of the AudioPlayHead::PositionInfo
-    double playTimeBeats = bpm * playTimeSeconds / 60;
+    double playTimeBeats = hasPpqPosition ? ppqPosition : bpm * playTimeSeconds / 60;
+    double lfoSyncStartSeconds = lfoSyncTimeSeconds;
+    if (hasPpqPosition && bpm > 0.0)
+        lfoSyncStartSeconds = ppqPosition / (bpm / 60.0);
+    else if (hasPlayTimeSeconds)
+        lfoSyncStartSeconds = playTimeSeconds;
 
     // Calculated time per sample in seconds and beats
     double sTimeSec = 1.f / sampleRate;
@@ -972,7 +986,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 #if OSCI_PREMIUM
         // Fill modulation block buffers (type-specific generation)
         lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                       currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+                                       currentBpm.load(std::memory_order_relaxed),
+                                       uiVoiceActive, lfoSyncStartSeconds, true);
         envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
         randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
                                           currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
@@ -986,6 +1001,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         modulationEngine.applyAllModulation(numSamples);
     }
 
+    if (sampleRate > 0.0)
+        lfoSyncTimeSeconds = lfoSyncStartSeconds + (double)numSamples / sampleRate;
+
     outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
     outputBuffer3d.clear();
 
@@ -996,6 +1014,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(4), -1.0f, buffer.getNumSamples());
     juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(5), -1.0f, buffer.getNumSamples());
 
+    // Track whether we need to apply toggleable effects after filling the buffer.
+    // The synth path applies them per-voice internally, but Syphon and audio input
+    // need them applied globally here.
+    bool applyToggleableEffectsGlobally = false;
+    juce::AudioBuffer<float>* toggleableExternalInput = nullptr;
+
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
     if (syphonInputActive) {
         for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
@@ -1003,6 +1027,16 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             outputBuffer3d.setSample(0, sample, point.x);
             outputBuffer3d.setSample(1, sample, point.y);
         }
+
+        // Forward MIDI to the synth so MIDI-driven modulation/effects work
+        // the same way they do in the audio-input path.
+        auto midiIterator = midiMessages.cbegin();
+        std::for_each(midiIterator,
+            midiMessages.cend(),
+            [&] (const juce::MidiMessageMetadata& meta) { synth.handleMidiEvent(meta.getMessage()); }
+        );
+
+        applyToggleableEffectsGlobally = true;
     } else
 #endif
     if (usingInput && totalNumInputChannels >= 1) {
@@ -1023,8 +1057,20 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
             [&] (const juce::MidiMessageMetadata& meta) { synth.handleMidiEvent(meta.getMessage()); }
         );
 
-		// Apply toggleable effects directly in input mode (no synth voices involved)
-		{
+        applyToggleableEffectsGlobally = true;
+        toggleableExternalInput = &inputBuffer;
+    } else {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        // Apply file selection on the audio thread (among already-loaded files)
+        applyFileSelectLocked();
+
+        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+    }
+
+    // Apply toggleable effects for non-synth paths (Syphon/Spout and audio input)
+    if (applyToggleableEffectsGlobally) {
 			juce::SpinLock::ScopedLockType lock(effectsLock);
 
             inputFrequencyBuffer.setSize(1, numSamples, false, false, true);
@@ -1037,16 +1083,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
                 }
             }
 
-                        applyToggleableEffectsToBuffer(outputBuffer3d, &inputBuffer, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
-		}
-    } else {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
-        juce::SpinLock::ScopedLockType lock2(effectsLock);
-
-        // Apply file selection on the audio thread (among already-loaded files)
-        applyFileSelectLocked();
-
-        synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
+        applyToggleableEffectsToBuffer(outputBuffer3d, toggleableExternalInput, &currentVolumeBuffer, &inputFrequencyBuffer, nullptr, nullptr, previewEffect);
     }
 
     midiMessages.clear();
@@ -1684,13 +1721,25 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
         float endNorm = juce::jlimit(0.0f, 1.0f, conv.endPercent / 100.0f);
         float depth = endNorm - startNorm;
 
-        // Set the parameter base value to the LFO sweep start
+        // Only convert if the parameter belongs to an effect that is actually
+        // present (selected) in the project — skip effects that weren't added.
         osci::EffectParameter* effectParam = nullptr;
+        bool effectIsSelected = false;
         for (auto& effect : effects) {
             effectParam = effect->getParameter(conv.paramId);
-            if (effectParam != nullptr) break;
-        }
         if (effectParam != nullptr) {
+                // For toggleable effects, require the effect to be selected (present in the project).
+                // Permanent effects and lua effects are always considered present.
+                bool isToggleable = std::find(toggleableEffects.begin(), toggleableEffects.end(), effect) != toggleableEffects.end();
+                effectIsSelected = !isToggleable || (effect->selected != nullptr && effect->selected->getBoolValue());
+                break;
+            }
+        }
+        if (effectParam == nullptr || !effectIsSelected) {
+            juce::Logger::writeToLog("convertFreeProjectLfos: param " + conv.paramId + " not found or effect not selected, skipping");
+            continue;
+        }
+        {
             float paramMin = effectParam->min.load();
             float paramRange = effectParam->max.load() - paramMin;
             float baseValue = paramMin + startNorm * paramRange;
