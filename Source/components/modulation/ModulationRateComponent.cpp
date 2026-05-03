@@ -269,7 +269,7 @@ void ModulationRateComponent::showInlineEditor() {
     };
     inlineEditor = InlineEditorHelper::create(
         juce::String(hz, 2), valueArea, { commitFn, cancelFn },
-        Colours::veryDark(), juce::Colours::white,
+        osci::Colours::veryDark(), juce::Colours::white,
         juce::Colours::white.withAlpha(0.3f), 12.0f);
     inlineEditor->setJustification(juce::Justification::centredLeft);
     addAndMakeVisible(inlineEditor.get());

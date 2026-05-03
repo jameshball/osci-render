@@ -6,7 +6,7 @@
 #include "../../PluginProcessor.h"
 #include "../DraggableListBox.h"
 #include "../effects/EffectsListComponent.h"
-#include "../ScrollFadeViewport.h"
+#include <osci_gui/osci_gui.h>
 #include "../effects/EffectTypeGridComponent.h"
 #include "../ParameterSyncHelper.h"
 
@@ -23,8 +23,8 @@ private:
 	OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
 
-	SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), Colours::accentColor() };
-	SvgButton autoLinkButton{ "autoLink", juce::String(BinaryData::link_svg), juce::Colours::white.withAlpha(0.5f), Colours::accentColor() };
+	osci::SvgButton randomiseButton{ "randomise", juce::String(BinaryData::random_svg), osci::Colours::accentColor() };
+	osci::SvgButton autoLinkButton{ "autoLink", juce::String(BinaryData::link_svg), juce::Colours::white.withAlpha(0.5f), osci::Colours::accentColor() };
 
 	AudioEffectListBoxItemData itemData;
 	EffectsListBoxModel listBoxModel;

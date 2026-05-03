@@ -13,7 +13,7 @@ public:
         setRange(0.0, 1.0);
         setDoubleClickReturnValue(true, 0.0);
         setPopupDisplayEnabled(true, false, nullptr);
-        setColour(juce::Slider::trackColourId, Colours::accentColor());
+        setColour(juce::Slider::trackColourId, osci::Colours::accentColor());
         setLookAndFeel(&lnf);
     }
 
@@ -24,7 +24,7 @@ public:
     }
 
 private:
-    struct LookAndFeel : public OscirenderLookAndFeel {
+    struct LookAndFeel : public PluginLookAndFeel {
         void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
                               float sliderPos, float /*minSliderPos*/, float /*maxSliderPos*/,
                               const juce::Slider::SliderStyle, juce::Slider& slider) override {
@@ -35,7 +35,7 @@ private:
             bool hovering = slider.isMouseOverOrDragging();
 
             // Track background
-            g.setColour(Colours::veryDark());
+            g.setColour(osci::Colours::veryDark());
             g.fillRoundedRectangle(bounds, r);
 
             // Clip to track shape so fill and handle don't extend past rounded ends

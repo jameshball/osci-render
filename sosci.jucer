@@ -61,9 +61,13 @@
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="kTJy4S" name="distort.svg" compile="0" resource="1" file="Resources/svg/distort.svg"/>
+        <FILE id="copy01" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
+        <FILE id="eye002" name="eye.svg" compile="0" resource="1" file="Resources/svg/eye.svg"/>
+        <FILE id="eyeOf2" name="eye-off.svg" compile="0" resource="1" file="Resources/svg/eye-off.svg"/>
         <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
               file="Resources/svg/fixed_rotate.svg"/>
         <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="help02" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="Q2mSgZ" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="e19TQV" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
@@ -162,7 +166,6 @@
               file="Source/components/DownloaderComponent.h"/>
         <FILE id="Ft2WnP" name="StopwatchComponent.h" compile="0" resource="0"
               file="Source/components/StopwatchComponent.h"/>
-        <FILE id="f2kkHV" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="SlTbHs" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
         <FILE id="LbTbHs" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
@@ -330,6 +333,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -369,6 +373,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -417,6 +422,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -455,6 +461,7 @@
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>

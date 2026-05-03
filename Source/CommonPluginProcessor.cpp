@@ -82,7 +82,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         if (savedRecent.isNotEmpty())
             recentProjectFiles.restoreFromString(savedRecent);
     }
-    
+
     // locking isn't necessary here because we are in the constructor
 
     for (auto effect : visualiserParameters.effects) {
@@ -92,15 +92,15 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         // audio thread. They are shader-only effects (no audio processing).
         effects.push_back(effect);
     }
-    
+
     for (auto effect : visualiserParameters.audioEffects) {
         effects.push_back(effect);
     }
-        
+
     for (auto parameter : visualiserParameters.booleans) {
         booleanParameters.push_back(parameter);
     }
-    
+
     for (auto parameter : visualiserParameters.integers) {
         intParameters.push_back(parameter);
     }
@@ -202,7 +202,7 @@ void CommonAudioProcessor::addAllParameters() {
             }
         }
     }
-        
+
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
     }
@@ -364,11 +364,11 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         + " effects=" + juce::String(effects.size()));
 
 	currentSampleRate = sampleRate;
-    
+
     for (auto& effect : effects) {
         effect->prepareToPlay(currentSampleRate, samplesPerBlock);
     }
-    
+
     threadManager.prepare(sampleRate, samplesPerBlock);
 }
 
@@ -509,9 +509,9 @@ void CommonAudioProcessor::loadEffectsFromXml(const juce::XmlElement* effectsXml
 
 void CommonAudioProcessor::saveProperties(juce::XmlElement& xml) {
     juce::SpinLock::ScopedLockType lock(propertiesLock);
-    
+
     auto propertiesXml = xml.createNewChildElement("properties");
-    
+
     for (auto& property : properties) {
         auto element = propertiesXml->createNewChildElement("property");
         element->setAttribute("key", property.first);
@@ -538,14 +538,14 @@ void CommonAudioProcessor::saveProperties(juce::XmlElement& xml) {
 
 void CommonAudioProcessor::loadProperties(juce::XmlElement& xml) {
     juce::SpinLock::ScopedLockType lock(propertiesLock);
-    
+
     auto propertiesXml = xml.getChildByName("properties");
-    
+
     if (propertiesXml != nullptr) {
         for (auto property : propertiesXml->getChildIterator()) {
             auto key = property->getStringAttribute("key").toStdString();
             auto type = property->getStringAttribute("type");
-            
+
             if (type == "int") {
                 properties[key] = property->getIntAttribute("value");
             } else if (type == "float") {
@@ -573,11 +573,11 @@ juce::File CommonAudioProcessor::getLastOpenedDirectory()
     juce::String savedDir = globalSettings.getString("lastOpenedDirectory");
     if (savedDir.isEmpty())
         return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-    
+
     juce::File dir(savedDir);
     if (dir.exists() && dir.isDirectory())
         return dir;
-    
+
     return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
 }
 
@@ -605,7 +605,7 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
             if (((start > end || end == juce::Time()) && heartbeatStale) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
                 // Ensure the custom look and feel is set before showing the dialog,
                 // since the editor (which normally creates it) hasn't been opened yet.
-                OscirenderLookAndFeel::getSharedInstance();
+                PluginLookAndFeel::getSharedInstance();
 
                 juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
                 bool userPressedReset = juce::AlertWindow::showOkCancelBox(
@@ -660,7 +660,7 @@ juce::String CommonAudioProcessor::getFFmpegURL() {
     #endif
 #endif
     + ".gz";
-    
+
     return ffmpegURL;
 }
 
@@ -706,7 +706,7 @@ bool CommonAudioProcessor::validateFFmpegBinary() {
 
 bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std::function<void()> onSuccess) {
     juce::File ffmpegFile = getFFmpegFile();
-    
+
     if (ffmpegFile.existsAsFile()) {
         // Verify the binary actually works on this system
         if (!validateFFmpegBinary()) {
@@ -748,10 +748,10 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     if (editor == nullptr) {
         return false; // Editor not found
     }
-    
+
     juce::String url = getFFmpegURL();
     editor->ffmpegDownloader.setup(url, ffmpegFile);
-    
+
     editor->ffmpegDownloader.onSuccessfulDownload = [this, onSuccess]() {
         if (onSuccess != nullptr) {
             juce::MessageManager::callAsync(onSuccess);
@@ -777,7 +777,7 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
             editor->resized();
         }
     });
-    
+
     return false;
 }
 #endif

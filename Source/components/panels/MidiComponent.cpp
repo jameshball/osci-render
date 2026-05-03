@@ -205,18 +205,18 @@ void MidiComponent::paint(juce::Graphics& g) {
     juce::Path togglePath;
     togglePath.addRoundedRectangle(toggleSection.getX(), toggleSection.getY(),
                                    toggleSection.getWidth(), toggleSection.getHeight(),
-                                   Colours::kPillRadius, Colours::kPillRadius,
+                                   osci::Colours::kPillRadius, osci::Colours::kPillRadius,
                                    true, false, true, false);
-    g.setColour(Colours::veryDark());
+    g.setColour(osci::Colours::veryDark());
     g.fillPath(togglePath);
 
     // Settings section: rounded on right, flat on left
     juce::Path settingsPath;
     settingsPath.addRoundedRectangle(settingsSection.getX(), settingsSection.getY(),
                                      settingsSection.getWidth(), settingsSection.getHeight(),
-                                     Colours::kPillRadius, Colours::kPillRadius,
+                                     osci::Colours::kPillRadius, osci::Colours::kPillRadius,
                                      false, true, false, true);
-    g.setColour(Colours::darker());
+    g.setColour(osci::Colours::darker());
     g.fillPath(settingsPath);
 #endif
 }

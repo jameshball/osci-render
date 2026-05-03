@@ -26,15 +26,15 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
 #endif
 #if !OSCI_PREMIUM
     addAndMakeVisible(upgradeButton);
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
     upgradeButton.onClick = [this] {
         if (onUpgradeRequested) {
             onUpgradeRequested();
         }
     };
 #endif
-    
+
     for (int i = 1; i <= parameters.screenOverlay->max; i++) {
         screenOverlay.addItem(parameters.screenOverlay->getText(parameters.screenOverlay->getNormalisedValue(i)), i);
     }
@@ -42,12 +42,12 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     screenOverlay.onChange = [this] {
         parameters.screenOverlay->setUnnormalisedValueNotifyingHost(screenOverlay.getSelectedId());
     };
-    
+
     sweepMs.setEnabled(sweepToggle.getToggleState());
     triggerValue.setEnabled(sweepToggle.getToggleState());
-    
+
     sweepMs.slider.setSkewFactorFromMidPoint(100);
-    
+
     sweepToggle.onClick = [this] {
         sweepMs.setEnabled(sweepToggle.getToggleState());
         triggerValue.setEnabled(sweepToggle.getToggleState());
@@ -78,18 +78,18 @@ void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
 #endif
 
 void VisualiserSettings::paint(juce::Graphics& g) {
-    g.fillAll(Colours::darker());
+    g.fillAll(osci::Colours::darker());
 }
 
 void VisualiserSettings::resized() {
 	auto area = getLocalBounds().reduced(20, 0).withTrimmedBottom(20);
 	double rowHeight = 30;
-    
+
     auto screenOverlayArea = area.removeFromTop(2 * rowHeight);
     screenOverlayArea = screenOverlayArea.withSizeKeepingCentre(300, rowHeight);
     screenOverlayLabel.setBounds(screenOverlayArea.removeFromLeft(120));
     screenOverlay.setBounds(screenOverlayArea.removeFromRight(180));
-    
+
     lineColour.setBounds(area.removeFromTop(lineColour.getHeight()));
 #if OSCI_PREMIUM
     area.removeFromTop(10);
@@ -101,7 +101,7 @@ void VisualiserSettings::resized() {
     videoEffects.setBounds(area.removeFromTop(videoEffects.getHeight()));
     area.removeFromTop(10);
     lineEffects.setBounds(area.removeFromTop(lineEffects.getHeight()));
-    
+
 #if OSCI_PREMIUM
     area.removeFromTop(10);
     scale.setBounds(area.removeFromTop(scale.getHeight()));

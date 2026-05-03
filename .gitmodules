@@ -44,3 +44,7 @@
 	path = modules/osci_licensing
 	url = https://github.com/jameshball/osci_licensing.git
 	branch = main
+[submodule "modules/osci_gui"]
+	path = modules/osci_gui
+	url = git@github.com:jameshball/osci_gui.git
+	branch = main

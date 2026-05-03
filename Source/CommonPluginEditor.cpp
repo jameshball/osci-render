@@ -28,8 +28,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     updatePrompt.setVisible(false);
     betaUpdatesButton.setColour(juce::TextButton::buttonColourId, juce::Colour::fromRGB(0xf2, 0xc9, 0x4c));
     betaUpdatesButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour::fromRGB(0xff, 0xd9, 0x68));
-    betaUpdatesButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
-    betaUpdatesButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark());
+    betaUpdatesButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
+    betaUpdatesButton.setColour(juce::TextButton::textColourOnId, osci::Colours::veryDark());
     betaUpdatesButton.setTooltip("Beta updates are enabled. Click to manage.");
     betaUpdatesButton.onClick = [this] { openLicenseAndUpdates(); };
     refreshBetaUpdatesButton();
@@ -60,8 +60,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
             if (dw != nullptr) {
-                dw->setBackgroundColour(Colours::veryDark());
-                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark());
+                dw->setBackgroundColour(osci::Colours::veryDark());
+                dw->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark());
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
             }
@@ -77,15 +77,15 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             };
         }
     }
-    
+
     addAndMakeVisible(visualiser);
-    
+
     int width = std::any_cast<int>(audioProcessor.getProperty("appWidth", defaultWidth));
     int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
     visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
-    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark());
+    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
     recordingSettings.setSize(300, 330);
@@ -95,7 +95,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 #elif JUCE_MAC
     recordingSettingsWindow.setUsingNativeTitleBar(true);
 #endif
-    
+
     // Register as KeyListener on settings windows so undo/redo shortcuts
     // work when those separate top-level windows have focus.
     recordingSettingsWindow.addKeyListener(this);
@@ -107,7 +107,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipWindow->setMillisecondsBeforeTipAppears(100);
-    
+
     updateTitle();
 
     // On startup (especially standalone state restore), the editor may not yet be attached to a
@@ -168,13 +168,13 @@ void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
         // Split the command line into tokens, using space as delimiter
         // and handling quoted arguments as one token.
         juce::StringArray tokens = juce::StringArray::fromTokens(commandLine, " ", "\"");
-        
+
         if (tokens.size() > 0) {
             // Use the first token as the file path and trim any extra whitespace.
             juce::String filePath = tokens[0].trim();
             filePath = filePath.unquoted();
             juce::File file = juce::File::createFileWithoutCheckingPath(filePath);
-            
+
             if (file.existsAsFile()) {
                 if (file.getFileExtension().toLowerCase() == "." + projectFileType.toLowerCase()) {
                     openProject(file);
@@ -223,7 +223,7 @@ void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
     betaUpdatesButton.toFront(false);
 }
 
-void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
+void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
     bool anyHeavy = false;
     for (auto& o : activeOverlays)
         if (!o->lightweight) anyHeavy = true;
@@ -242,7 +242,7 @@ void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) 
     resized();
 }
 
-void CommonPluginEditor::dismissOverlay(OverlayComponent* overlay) {
+void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay) {
     for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
         if (it->get() == overlay) {
             removeChildComponent(overlay);
@@ -552,7 +552,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
             juce::DialogWindow::LaunchOptions options;
             options.dialogTitle = "Render Audio File to Video";
-            options.dialogBackgroundColour = Colours::dark();
+            options.dialogBackgroundColour = osci::Colours::dark();
             options.content.setOwned(content.release());
             options.componentToCentreAround = safeThis.getComponent();
             options.escapeKeyTriggersCloseButton = true;
@@ -611,15 +611,15 @@ void CommonPluginEditor::toggleFullScreen() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
         fullScreen = !fullScreen;
-        
+
         if (fullScreen) {
             // Store the current window bounds before going fullscreen
             windowedBounds = window->getBounds();
-            
+
             // Get the display that contains the window
             auto& displays = juce::Desktop::getInstance().getDisplays();
             auto* display = displays.getDisplayForRect(window->getBounds());
-            
+
             if (display != nullptr) {
                 // Set window to cover the entire screen
                 window->setFullScreen(true);

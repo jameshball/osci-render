@@ -32,7 +32,7 @@ public:
     void mouseUp(const juce::MouseEvent& event) override;
 
     // Recommended dialog background colour — matches the main application window.
-    static juce::Colour dialogBackground() { return Colours::veryDark().brighter(0.1f); }
+    static juce::Colour dialogBackground() { return osci::Colours::veryDark().brighter(0.1f); }
 
     // Preferred dialog size for the given content.
     static juce::Point<int> preferredSize(const Info& info);

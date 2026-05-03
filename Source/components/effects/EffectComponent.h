@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../ModulationState.h"
 
 #ifndef SOSCI
@@ -119,9 +119,9 @@ private:
     bool modDropHighlight = false;
     std::shared_ptr<juce::Component> component;
 
-    std::unique_ptr<SvgButton> sidechainButton;
+    std::unique_ptr<osci::SvgButton> sidechainButton;
 
-    SvgButton linkButton = SvgButton(effect.parameters[index]->name + " Link",
+    osci::SvgButton linkButton = osci::SvgButton(effect.parameters[index]->name + " Link",
         BinaryData::link_svg,
         juce::Colours::white,
         juce::Colours::red,

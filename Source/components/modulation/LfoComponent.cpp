@@ -16,8 +16,8 @@ LfoComponent::PresetSelector::PresetSelector() {
 void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
 
-    g.setColour(Colours::evenDarker());
-    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
+    g.setColour(osci::Colours::evenDarker());
+    g.fillRoundedRectangle(bounds, osci::Colours::kPillRadius);
 
     // Left chevron
     {
@@ -426,8 +426,8 @@ void LfoComponent::paint(juce::Graphics& g) {
 
     // Dark rounded background behind paint + preview controls
     if (!paintControlsBg.isEmpty()) {
-        g.setColour(Colours::darkerer());
-        g.fillRoundedRectangle(paintControlsBg.toFloat(), Colours::kPillRadius);
+        g.setColour(osci::Colours::darkerer());
+        g.fillRoundedRectangle(paintControlsBg.toFloat(), osci::Colours::kPillRadius);
     }
 }
 

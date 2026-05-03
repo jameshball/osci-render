@@ -51,6 +51,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <osci_render_core/osci_render_core.h>
 
 #if JUCE_MAC && OSCI_PREMIUM
  #include "../audio/platform/ProcessAudioPermissions.h"

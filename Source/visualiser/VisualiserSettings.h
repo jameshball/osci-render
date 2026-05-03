@@ -6,7 +6,7 @@
 #include "../audio/effects/SmoothEffect.h"
 #include "../audio/effects/StereoEffect.h"
 #include "../components/effects/EffectComponent.h"
-#include "../components/SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../components/SwitchButton.h"
 #include "VisualiserParameters.h"
 
@@ -21,7 +21,7 @@ public:
             addAndMakeVisible(effect.get());
         }
 
-        setColour(groupComponentBackgroundColourId, Colours::veryDark().withMultipliedBrightness(3.0));
+        setColour(osci::groupComponentBackgroundColourId, osci::Colours::veryDark().withMultipliedBrightness(3.0));
     }
 
 #ifndef SOSCI
@@ -133,7 +133,7 @@ private:
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 1),
         },
         "Image Scale"};
-    
+
     GroupedSettings position{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.offsetEffect, 0),
@@ -163,7 +163,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(Colours::darker());
+        g.fillAll(osci::Colours::darker());
     }
 
     void resized() override {
@@ -177,7 +177,7 @@ private:
 
 class SettingsWindow : public juce::DialogWindow {
 public:
-    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, Colours::darker(), true, true), component(component), componentHeight(componentHeight) {
+    SettingsWindow(juce::String name, juce::Component& component, int windowWidth, int windowHeight, int componentWidth, int componentHeight) : juce::DialogWindow(name, osci::Colours::darker(), true, true), component(component), componentHeight(componentHeight) {
         setContentComponent(&viewport);
         centreWithSize(windowWidth, windowHeight);
         setResizeLimits(windowWidth, windowHeight, componentWidth, componentHeight);

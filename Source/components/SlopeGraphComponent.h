@@ -56,7 +56,7 @@ public:
         }
 
         // Stroke curve
-        g.setColour(Colours::accentColor().withAlpha(0.9f));
+        g.setColour(osci::Colours::accentColor().withAlpha(0.9f));
         g.strokePath(path, juce::PathStrokeType(1.5f, juce::PathStrokeType::beveled, juce::PathStrokeType::rounded));
     }
 

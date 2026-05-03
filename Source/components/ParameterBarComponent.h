@@ -129,7 +129,7 @@ private:
         inlineEditor = InlineEditorHelper::create(
             initialText, getContentArea().reduced(2),
             { commitFn, cancelFn },
-            Colours::evenDarker(), juce::Colours::white,
+            osci::Colours::evenDarker(), juce::Colours::white,
             juce::Colours::transparentBlack, 13.0f);
         addAndMakeVisible(*inlineEditor);
         inlineEditor->grabKeyboardFocus();

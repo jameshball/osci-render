@@ -31,7 +31,7 @@ VisualiserComponent::VisualiserComponent(
         active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         audioProcessor.visualiserParameters.visualiserPaused->addListener(this);
     }
-    
+
     setShouldBeRunning(active);
 
 #if OSCI_PREMIUM
@@ -127,7 +127,7 @@ VisualiserComponent::VisualiserComponent(
 
     // Listen for audio file changes
     audioProcessor.addAudioPlayerListener(this);
-    
+
     // Initialize timeline for standalone premium builds
     // Controller will be set by parent component
     addChildComponent(timeline);
@@ -170,7 +170,7 @@ VisualiserComponent::VisualiserComponent(
                 audioRecorder.audioThreadCallback(audioOutputBuffer);
             }
         }
-        
+
         stopwatch.addTime(juce::RelativeTime::seconds(1.0 / this->recordingSettings.getFrameRate()));
     };
 }
@@ -212,7 +212,7 @@ void VisualiserComponent::enableFullScreen() {
     grabKeyboardFocus();
 }
 
-void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent &event) { 
+void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent &event) {
     if (event.originalComponent == this) {
         enableFullScreen();
     }
@@ -237,14 +237,14 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
     if (affectAudio) {
         audioProcessor.wavParser.setPaused(paused);
     }
-    
+
     if (isPrimaryVisualiser()) {
         bool currentParamValue = audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         if (currentParamValue != paused) {
             audioProcessor.visualiserParameters.visualiserPaused->setBoolValueNotifyingHost(paused);
         }
     }
-    
+
     repaint();
     if (child != nullptr) {
         child->repaint();
@@ -492,7 +492,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 if (!file.hasFileExtension(extension)) {
                     file = file.withFileExtension(extension);
                 }
-                
+
                 if (wasRecordingAudio && wasRecordingVideo) {
                     // delete the file if it exists
                     if (file.existsAsFile()) {
@@ -515,7 +515,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 if (!file.hasFileExtension(extension)) {
                     file = file.withFileExtension(extension);
                 }
-                
+
                 tempAudioFile->getFile().copyFileTo(file);
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             } });
@@ -721,13 +721,13 @@ void VisualiserComponent::parserChanged() {
 }
 
 void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineController> controller) {
-    bool shouldShow = controller != nullptr && 
+    bool shouldShow = controller != nullptr &&
                       juce::JUCEApplicationBase::isStandaloneApp();
-    
+
 #if !OSCI_PREMIUM
     shouldShow = false;
 #endif
-    
+
     if (shouldShow) {
         timeline.setController(controller);
         timeline.setVisible(true);
@@ -736,7 +736,7 @@ void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineControll
         timeline.setController(nullptr);
         timeline.setVisible(false);
     }
-    
+
     resized();
 }
 
@@ -754,7 +754,7 @@ void VisualiserComponent::paint(juce::Graphics &g) {
     }
 
     bool colourSpecified = isColourSpecified(buttonRowColourId);
-    auto buttonRowColour = Colours::veryDark();
+    auto buttonRowColour = osci::Colours::veryDark();
     if (colourSpecified) {
         buttonRowColour = findColour(buttonRowColourId, true);
     }

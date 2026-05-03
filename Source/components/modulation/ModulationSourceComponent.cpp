@@ -23,7 +23,7 @@ void ModulationSourceComponent::DepthIndicator::paint(juce::Graphics& g) {
 
     auto colour = owner.config.getSourceColour(sourceIndex);
 
-    g.setColour(Colours::veryDark());
+    g.setColour(osci::Colours::veryDark());
     g.fillEllipse(bounds);
 
     g.setColour(colour.withAlpha(0.2f));
@@ -78,7 +78,7 @@ void ModulationSourceComponent::DepthIndicator::mouseUp(const juce::MouseEvent&)
 }
 
 void ModulationSourceComponent::DepthIndicator::mouseEnter(const juce::MouseEvent& e) {
-    HoverAnimationMixin::mouseEnter(e);
+    osci::HoverAnimationMixin::mouseEnter(e);
     hovering = true;
     EffectComponent::highlightedParamId = paramId;
     EffectComponent::modRangeParamId = paramId;
@@ -91,7 +91,7 @@ void ModulationSourceComponent::DepthIndicator::mouseEnter(const juce::MouseEven
 }
 
 void ModulationSourceComponent::DepthIndicator::mouseExit(const juce::MouseEvent& e) {
-    HoverAnimationMixin::mouseExit(e);
+    osci::HoverAnimationMixin::mouseExit(e);
     hovering = false;
     EffectComponent::highlightedParamId = juce::String();
     EffectComponent::modRangeParamId = juce::String();
@@ -213,7 +213,7 @@ void ModulationSourceComponent::DepthIndicator::startTextEdit() {
         juce::String((int)(depth * 100.0f)),
         getLocalBounds().expanded(8, 2),
         { commitFn, cancelFn },
-        Dracula::background, Dracula::foreground,
+        osci::Dracula::background, osci::Dracula::foreground,
         owner.config.getSourceColour(sourceIndex), 11.0f);
     addAndMakeVisible(inlineEditor.get());
     inlineEditor->grabKeyboardFocus();
@@ -223,8 +223,8 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     if (!valuePopup) {
         valuePopup = std::make_unique<juce::Label>();
         valuePopup->setFont(juce::Font(11.0f, juce::Font::bold));
-        valuePopup->setColour(juce::Label::backgroundColourId, Dracula::background);
-        valuePopup->setColour(juce::Label::textColourId, Dracula::foreground);
+        valuePopup->setColour(juce::Label::backgroundColourId, osci::Dracula::background);
+        valuePopup->setColour(juce::Label::textColourId, osci::Dracula::foreground);
         valuePopup->setJustificationType(juce::Justification::centred);
         valuePopup->setInterceptsMouseClicks(false, false);
         valuePopup->addToDesktop(juce::ComponentPeer::windowIsTemporary | juce::ComponentPeer::windowIgnoresKeyPresses);
@@ -274,7 +274,7 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
                                       radius, radius,
                                       true, true, true, true);
         // All tabs look "active" when collapsed
-        g.setColour(Colours::darker());
+        g.setColour(osci::Colours::darker());
         g.fillPath(tabShape);
     } else {
         tabShape.addRoundedRectangle(bounds.getX(), bounds.getY(),
@@ -282,10 +282,10 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
                                       radius, radius,
                                       true, true, false, false);
         if (active) {
-            g.setColour(Colours::darker());
+            g.setColour(osci::Colours::darker());
             g.fillPath(tabShape);
         } else {
-            g.setColour(Colours::darker().darker(0.5f));
+            g.setColour(osci::Colours::darker().darker(0.5f));
             g.fillPath(tabShape);
 
             juce::ColourGradient shadow(juce::Colours::black.withAlpha(0.2f), bounds.getCentreX(), bounds.getBottom(),
@@ -561,7 +561,7 @@ ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfi
 
     tabViewport.setViewedComponent(&tabList, false);
     tabViewport.setScrollBarsShown(false, false, false, true);
-    tabViewport.setColour(scrollFadeOverlayBackgroundColourId,
+    tabViewport.setColour(osci::scrollFadeOverlayBackgroundColourId,
                           findColour(juce::ResizableWindow::backgroundColourId));
     tabViewport.setSidesEnabled(false, false, true, true);
     tabViewport.setFadeWidth(20);
@@ -644,13 +644,13 @@ void ModulationSourceComponent::paint(juce::Graphics& g) {
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
-    float r = OscirenderLookAndFeel::RECT_RADIUS;
+    float r = osci::LookAndFeel::RECT_RADIUS;
     juce::Path panelPath;
     // When there are no tabs, round all four corners; otherwise only the bottom ones
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
                                    r, r, !hasTabs, !hasTabs, true, true);
-    g.setColour(Colours::darker());
+    g.setColour(osci::Colours::darker());
     g.fillPath(panelPath);
 }
 
@@ -663,7 +663,7 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
     juce::Path panelPath;
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
-                                   OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS,
+                                   osci::LookAndFeel::RECT_RADIUS, osci::LookAndFeel::RECT_RADIUS,
                                    !hasTabs, !hasTabs, true, true);
 
     if (!hasTabs) {
