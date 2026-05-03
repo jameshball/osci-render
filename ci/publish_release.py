@@ -115,7 +115,7 @@ def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(prog='publish_release.py', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--product', required=True,
-                   help='Gumroad product id, Payhip product link, or numeric internal id')
+                   help='Gumroad product id, Payhip product link, product slug, or numeric internal id')
     p.add_argument('--semver', required=True, help='e.g. 2.6.0.0')
     p.add_argument('--platform', required=True,
                    choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64'])
