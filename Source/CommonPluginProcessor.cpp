@@ -136,15 +136,6 @@ juce::String CommonAudioProcessor::getProductSlug() const
     return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
 }
 
-bool CommonAudioProcessor::hasPremiumLicense() const
-{
-#if OSCI_PREMIUM
-    return licenseManager != nullptr && licenseManager->hasPremium();
-#else
-    return false;
-#endif
-}
-
 int CommonAudioProcessor::getNumRecentProjectFiles() const
 {
     return recentProjectFiles.getNumFiles();

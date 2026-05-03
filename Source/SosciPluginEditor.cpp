@@ -65,12 +65,14 @@ void SosciPluginEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
+        betaUpdatesButton.setVisible(false);
     } else {
         auto topBar = area.removeFromTop(25);
-        menuBar.setBounds(topBar);
+        layoutBetaUpdatesButton(topBar);
         redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
         undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
         undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+        menuBar.setBounds(topBar);
         undoLabel.toFront(false);
         undoButton.toFront(false);
         redoButton.toFront(false);

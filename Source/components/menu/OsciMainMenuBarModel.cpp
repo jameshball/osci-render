@@ -76,7 +76,20 @@ void OsciMainMenuBarModel::resetMenuItems() {
         aboutInfo.productName = ProjectInfo::projectName;
         aboutInfo.companyName = ProjectInfo::companyName;
         aboutInfo.versionString = ProjectInfo::versionString;
-    aboutInfo.isPremium = audioProcessor.hasPremiumLicense();
+#if OSCI_PREMIUM
+        aboutInfo.isPremium = true;
+#else
+        aboutInfo.isPremium = false;
+#endif
+        aboutInfo.betaUpdatesEnabled = audioProcessor.getGlobalBoolValue("betaUpdatesEnabled");
+        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled)
+        {
+            audioProcessor.setGlobalValue("betaUpdatesEnabled", enabled);
+            audioProcessor.setGlobalValue("releaseTrack", enabled ? "beta" : "stable");
+            audioProcessor.saveGlobalSettings();
+            editor.refreshBetaUpdatesButton();
+            editor.resized();
+        };
         aboutInfo.websiteUrl = "https://osci-render.com";
         aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
         aboutInfo.credits = {

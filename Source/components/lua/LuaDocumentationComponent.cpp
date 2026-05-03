@@ -1,13 +1,7 @@
 #include "LuaDocumentationComponent.h"
 
 LuaDocumentationComponent::LuaDocumentationComponent() {
-    configureLabel(titleLabel, juce::Font(22.0f, juce::Font::bold), juce::Justification::centred);
-    titleLabel.setText("Lua Scripting Reference", juce::NotificationType::dontSendNotification);
-    addAndMakeVisible(titleLabel);
-
-    closeButton = std::make_unique<SvgButton>("close", BinaryData::close_svg, juce::Colours::white);
-    closeButton->onClick = [this] { dismiss(); };
-    addAndMakeVisible(*closeButton);
+    setOverlayTitle("Lua Scripting Reference");
 
     viewport.setViewedComponent(&contentComponent, false);
     viewport.setScrollBarsShown(true, false);
@@ -19,11 +13,6 @@ LuaDocumentationComponent::LuaDocumentationComponent() {
 }
 
 void LuaDocumentationComponent::resizeContent(juce::Rectangle<int> contentArea) {
-    auto titleArea = contentArea.removeFromTop(32);
-    closeButton->setBounds(titleArea.removeFromRight(32).reduced(4));
-    titleLabel.setBounds(titleArea);
-    contentArea.removeFromTop(4);
-
     viewport.setBounds(contentArea);
     layoutContent(contentArea.getWidth() - viewport.getScrollBarThickness() - 4);
 }

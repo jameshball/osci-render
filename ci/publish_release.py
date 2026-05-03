@@ -174,6 +174,7 @@ def main(argv: list[str]) -> int:
         'filename': filename,
         'sha256': sha256,
         'ed25519_sig': sig,
+        'size_bytes': args.artifact.stat().st_size,
     }
     if notes:
         body['notes_md'] = notes

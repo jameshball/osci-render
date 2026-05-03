@@ -37,7 +37,6 @@ public:
     osci::licensing::LicenseManager& getLicenseManager();
     const osci::licensing::LicenseManager& getLicenseManager() const;
     juce::String getProductSlug() const;
-    bool hasPremiumLicense() const;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;

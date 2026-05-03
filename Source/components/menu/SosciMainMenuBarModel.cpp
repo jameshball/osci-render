@@ -106,7 +106,20 @@ void SosciMainMenuBarModel::resetMenuItems() {
         aboutInfo.productName = ProjectInfo::projectName;
         aboutInfo.companyName = ProjectInfo::companyName;
         aboutInfo.versionString = ProjectInfo::versionString;
-    aboutInfo.isPremium = processor.hasPremiumLicense();
+#if OSCI_PREMIUM
+        aboutInfo.isPremium = true;
+#else
+        aboutInfo.isPremium = false;
+#endif
+        aboutInfo.betaUpdatesEnabled = processor.getGlobalBoolValue("betaUpdatesEnabled");
+        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled)
+        {
+            processor.setGlobalValue("betaUpdatesEnabled", enabled);
+            processor.setGlobalValue("releaseTrack", enabled ? "beta" : "stable");
+            processor.saveGlobalSettings();
+            editor.refreshBetaUpdatesButton();
+            editor.resized();
+        };
         aboutInfo.websiteUrl = "https://osci-render.com";
         aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
         aboutInfo.credits = {

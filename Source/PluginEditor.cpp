@@ -261,6 +261,7 @@ void OscirenderAudioProcessorEditor::resized() {
         visualiser.setBounds(area);
         undoButton.setVisible(false);
         redoButton.setVisible(false);
+        betaUpdatesButton.setVisible(false);
         return;
     }
 
@@ -272,6 +273,7 @@ void OscirenderAudioProcessorEditor::resized() {
 #if !OSCI_PREMIUM
         upgradeButton.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
 #endif
+    layoutBetaUpdatesButton(topBar);
         // Menu bar gets priority — allocate from the left first
         menuBar.setBounds(topBar.removeFromLeft(juce::jmin(kMenuBarMaxWidth, topBar.getWidth())));
         // Right-side items share whatever remains, clamped to available width

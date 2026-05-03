@@ -3,10 +3,8 @@
 #include <array>
 
 SplashScreenComponent::SplashScreenComponent() {
-    const auto headingFont = juce::Font(26.0f, juce::Font::bold);
+    setOverlayTitle("Upgrade to osci-render Premium");
     const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
-    configureLabel(titleLabel, headingFont, juce::Justification::centred);
-    titleLabel.setText("Upgrade to osci-render Premium", juce::NotificationType::dontSendNotification);
 
     configureLabel(subtitleLabel, subtitleFont, juce::Justification::centred);
     subtitleLabel.setText("Unlock new features, and more creative firepower.", juce::NotificationType::dontSendNotification);
@@ -44,7 +42,6 @@ SplashScreenComponent::SplashScreenComponent() {
     continueButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     continueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
 
-    addAndMakeVisible(titleLabel);
     addAndMakeVisible(subtitleLabel);
     addAndMakeVisible(upgradeButton);
     addAndMakeVisible(continueButton);
@@ -52,10 +49,6 @@ SplashScreenComponent::SplashScreenComponent() {
 
 void SplashScreenComponent::resizeContent(juce::Rectangle<int> contentArea) {
 
-    auto titleArea = contentArea.removeFromTop(40);
-    titleLabel.setBounds(titleArea);
-
-    contentArea.removeFromTop(12);
     auto subtitleArea = contentArea.removeFromTop(32);
     subtitleLabel.setBounds(subtitleArea);
 
