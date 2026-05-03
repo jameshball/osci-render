@@ -111,12 +111,11 @@ void SosciMainMenuBarModel::resetMenuItems() {
 #else
         aboutInfo.isPremium = false;
 #endif
-        aboutInfo.betaUpdatesEnabled = processor.getGlobalBoolValue("betaUpdatesEnabled");
-        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled)
-        {
-            processor.setGlobalValue("betaUpdatesEnabled", enabled);
-            processor.setGlobalValue("releaseTrack", enabled ? "beta" : "stable");
-            processor.saveGlobalSettings();
+        aboutInfo.betaUpdatesEnabled = osci::UpdateSettings(processor.getProductSlug()).betaUpdatesEnabled();
+        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled) {
+            osci::UpdateSettings updateSettings(processor.getProductSlug());
+            updateSettings.setReleaseTrack(enabled ? osci::ReleaseTrack::Beta
+                                                   : osci::ReleaseTrack::Stable);
             editor.refreshBetaUpdatesButton();
             editor.resized();
         };

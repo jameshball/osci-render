@@ -81,12 +81,11 @@ void OsciMainMenuBarModel::resetMenuItems() {
 #else
         aboutInfo.isPremium = false;
 #endif
-        aboutInfo.betaUpdatesEnabled = audioProcessor.getGlobalBoolValue("betaUpdatesEnabled");
-        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled)
-        {
-            audioProcessor.setGlobalValue("betaUpdatesEnabled", enabled);
-            audioProcessor.setGlobalValue("releaseTrack", enabled ? "beta" : "stable");
-            audioProcessor.saveGlobalSettings();
+        aboutInfo.betaUpdatesEnabled = osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled();
+        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled) {
+            osci::UpdateSettings updateSettings(audioProcessor.getProductSlug());
+            updateSettings.setReleaseTrack(enabled ? osci::ReleaseTrack::Beta
+                                                   : osci::ReleaseTrack::Stable);
             editor.refreshBetaUpdatesButton();
             editor.resized();
         };
@@ -164,27 +163,27 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
     // Interface menu
     addToggleMenuItem(interfaceMenu, "Preview effect on hover", [this] {
-        bool current = audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+        bool current = audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
         bool newValue = ! current;
-        audioProcessor.setGlobalValue("previewEffectOnHover", newValue);
-        audioProcessor.saveGlobalSettings();
+        audioProcessor.globalSettings.set("previewEffectOnHover", newValue);
+        audioProcessor.globalSettings.save();
         if (! newValue) {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             audioProcessor.clearPreviewEffect();
         }
         resetMenuItems(); // update tick state
-        }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+        }, [this] { return audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
     });
 
     addListenForSpecialKeysMenuItem(interfaceMenu, audioProcessor);
 
     addToggleMenuItem(interfaceMenu, "Show MIDI Keyboard", [this] {
-        bool current = audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
-        audioProcessor.setGlobalValue("showMidiKeyboard", !current);
-        audioProcessor.saveGlobalSettings();
+        bool current = audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
+        audioProcessor.globalSettings.set("showMidiKeyboard", !current);
+        audioProcessor.globalSettings.save();
         editor.settings.resized();
         resetMenuItems();
-    }, [this] { return audioProcessor.getGlobalBoolValue("showMidiKeyboard", true); });
+    }, [this] { return audioProcessor.globalSettings.getBool("showMidiKeyboard", true); });
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

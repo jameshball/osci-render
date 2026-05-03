@@ -83,19 +83,19 @@ void EffectTypeGridComponent::setupEffectItems()
                     onEffectSelected(effectId);
             };
             item->onHoverStart = [this](const juce::String& effectId) {
-                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                if (audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.setPreviewEffectId(effectId);
                 }
 #if OSCI_PREMIUM
-                if (audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
+                if (audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
                     audioProcessor.autoAssignLfosForPreview(effectId);
                     audioProcessor.broadcaster.sendChangeMessage();
                 }
 #endif
             };
             item->onHoverEnd = [this]() {
-                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                if (audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.clearPreviewEffect();
                 }

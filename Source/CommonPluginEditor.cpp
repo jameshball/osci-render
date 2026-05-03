@@ -125,12 +125,13 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
 
+    updatePrompt.showPendingInstallStatusIfNeeded();
     updatePrompt.scheduleInitialCheck();
 
 #if OSCI_PREMIUM
     juce::MessageManager::callAsync([safeThis]
     {
-        if (safeThis != nullptr && ! safeThis->audioProcessor.getLicenseManager().hasPremium())
+        if (safeThis != nullptr && ! safeThis->audioProcessor.licenseManager.hasPremium())
             safeThis->openLicenseAndUpdates();
     });
 #endif
@@ -209,7 +210,7 @@ void CommonPluginEditor::resized() {
 }
 
 void CommonPluginEditor::refreshBetaUpdatesButton() {
-    betaUpdatesButton.setVisible(audioProcessor.getGlobalBoolValue("betaUpdatesEnabled"));
+    betaUpdatesButton.setVisible(osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled());
 }
 
 void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
