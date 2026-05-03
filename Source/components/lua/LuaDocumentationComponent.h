@@ -3,7 +3,6 @@
 #include <JuceHeader.h>
 #include "LuaCodeSnippet.h"
 #include "../OverlayComponent.h"
-#include "../SvgButton.h"
 
 // Full-screen overlay displaying Lua scripting documentation.
 // Uses a Viewport over a content component with headings, body
@@ -27,9 +26,6 @@ private:
 
     void buildDocumentation();
     void layoutContent(int width);
-
-    juce::Label titleLabel;
-    std::unique_ptr<SvgButton> closeButton;
 
     juce::Viewport viewport;
     juce::Component contentComponent;

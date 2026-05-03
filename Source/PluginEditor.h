@@ -126,11 +126,7 @@ public:
 #endif
 
 private:
-    // Overlay management overrides
     void showLuaDocumentation();
-    void dismissOverlay(OverlayComponent* overlay) override;
-
-    std::unique_ptr<LuaDocumentationComponent> cachedLuaDocs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

@@ -255,8 +255,8 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     bool defaultIsFile = false;
     juce::String defaultUserName;
 
-    juce::String defaultFileStr = audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
-    juce::String defaultFactoryStr = audioProcessor.getGlobalStringValue("defaultLfoPreset");
+    juce::String defaultFileStr = audioProcessor.globalSettings.getString("defaultLfoPresetFile");
+    juce::String defaultFactoryStr = audioProcessor.globalSettings.getString("defaultLfoPreset");
 
     if (defaultFileStr.isNotEmpty()) {
         juce::File file(defaultFileStr);
@@ -916,32 +916,32 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
 }
 
 void LfoComponent::presetBrowserSetDefaultFactory(LfoPreset preset) {
-    audioProcessor.setGlobalValue("defaultLfoPreset", lfoPresetToString(preset));
-    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.set("defaultLfoPreset", lfoPresetToString(preset));
+    audioProcessor.globalSettings.remove("defaultLfoPresetFile");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::presetBrowserSetDefaultFile(const juce::File& file) {
-    audioProcessor.setGlobalValue("defaultLfoPresetFile", file.getFullPathName());
-    audioProcessor.removeGlobalValue("defaultLfoPreset");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.set("defaultLfoPresetFile", file.getFullPathName());
+    audioProcessor.globalSettings.remove("defaultLfoPreset");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::presetBrowserClearDefault() {
-    audioProcessor.removeGlobalValue("defaultLfoPreset");
-    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.remove("defaultLfoPreset");
+    audioProcessor.globalSettings.remove("defaultLfoPresetFile");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 juce::String LfoComponent::getDefaultFactoryName() const {
-    return audioProcessor.getGlobalStringValue("defaultLfoPreset");
+    return audioProcessor.globalSettings.getString("defaultLfoPreset");
 }
 
 juce::String LfoComponent::getDefaultFilePath() const {
-    return audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
+    return audioProcessor.globalSettings.getString("defaultLfoPresetFile");
 }
 
 void LfoComponent::refreshPresetBrowserIfVisible() {

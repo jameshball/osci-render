@@ -73,18 +73,7 @@ class CustomStandaloneFilterApp final : public JUCEApplication
 public:
     CustomStandaloneFilterApp()
     {
-        PropertiesFile::Options options;
-
-        options.applicationName     = CharPointer_UTF8 (JucePlugin_Name);
-        options.filenameSuffix      = ".settings";
-        options.osxLibrarySubFolder = "Application Support";
-       #if JUCE_LINUX || JUCE_BSD
-        options.folderName          = "~/.config";
-       #else
-        options.folderName          = "";
-       #endif
-
-        appProperties.setStorageParameters (options);
+        appProperties.setStorageParameters (::osci::SettingsStore::optionsForStandaloneApp (String (CharPointer_UTF8 (JucePlugin_Name))));
     }
 
     const String getApplicationName() override              { return CharPointer_UTF8 (JucePlugin_Name); }

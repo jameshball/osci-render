@@ -789,6 +789,8 @@ void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineControll
         timeline.setController(controller);
         timeline.setVisible(true);
     } else {
+        // Clear the controller so resized() doesn't re-show the timeline based on a stale controller.
+        timeline.setController(nullptr);
         timeline.setVisible(false);
     }
     

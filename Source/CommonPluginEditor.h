@@ -9,6 +9,7 @@
 #include "components/SvgButton.h"
 #include "components/VolumeComponent.h"
 #include "components/DownloaderComponent.h"
+#include "components/UpdatePromptComponent.h"
 #include "components/CustomTooltipWindow.h"
 #include "components/OverlayComponent.h"
 
@@ -30,6 +31,8 @@ public:
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
+    void openLicenseAndUpdates();
+    void refreshBetaUpdatesButton();
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
 
@@ -91,6 +94,8 @@ public:
     };
 
     VolumeComponent volume{audioProcessor};
+    juce::TextButton betaUpdatesButton { "Beta updates" };
+    UpdatePromptComponent updatePrompt{audioProcessor};
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
@@ -130,6 +135,7 @@ public:
 
     void timerCallback() override { updateUndoRedoState(); }
     void updateUndoRedoState();
+    void layoutBetaUpdatesButton(juce::Rectangle<int>& topBar);
 
 protected:
     bool handleShortcut(const juce::KeyPress& key);

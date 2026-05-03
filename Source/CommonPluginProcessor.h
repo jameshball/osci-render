@@ -35,6 +35,7 @@ public:
     void addAllParameters();
 
     juce::UndoManager& getUndoManager() { return undoManager; }
+    juce::String getProductSlug() const;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -80,15 +81,10 @@ public:
     static juce::String getFFmpegURL();
 #endif
     
-    // Global settings methods
-    bool getGlobalBoolValue(const juce::String& keyName, bool defaultValue = false) const;
-    int getGlobalIntValue(const juce::String& keyName, int defaultValue = 0) const;
-    double getGlobalDoubleValue(const juce::String& keyName, double defaultValue = 0.0) const;
-    juce::String getGlobalStringValue(const juce::String& keyName, const juce::String& defaultValue = "") const;
-    void setGlobalValue(const juce::String& keyName, const juce::var& value);
-    void removeGlobalValue(const juce::String& keyName);
-    void saveGlobalSettings();
-    void reloadGlobalSettings();
+    // Path to the standalone app's settings file (written by CustomStandaloneFilterApp).
+    // The file only exists when running as a standalone; when hosted in a DAW
+    // this returns the would-be path (which will not exist on disk).
+    static juce::File getAppSettingsFile();
     
     bool hasSetSessionStartTime = false;
     bool programCrashedAndUserWantsToReset();
@@ -175,11 +171,16 @@ public:
 #else
         "ffmpeg";
 #endif
+
+    osci::LicenseManager licenseManager;
+    osci::SettingsStore globalSettings;
+
     void setAcceptsKeys(bool shouldAcceptKeys) {
-        setGlobalValue("acceptsAllKeys", shouldAcceptKeys);
+        globalSettings.set("acceptsAllKeys", shouldAcceptKeys);
+        globalSettings.save();
     }
     bool getAcceptsKeys() {
-        return getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp());
+        return globalSettings.getBool("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp());
     }
     
 protected:
@@ -250,9 +251,6 @@ protected:
     juce::SpinLock propertiesLock;
     std::unordered_map<std::string, std::any> properties;
     
-    // Global settings that persist across plugin instances
-    std::unique_ptr<juce::PropertiesFile> globalSettings;
-
     // File logger for writing diagnostics to the application data folder
     std::unique_ptr<juce::FileLogger> fileLogger;
 

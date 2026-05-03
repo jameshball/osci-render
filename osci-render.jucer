@@ -4,8 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.8.9.11" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1"
+              version="2.9.1.2" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -878,6 +878,7 @@
         <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
@@ -895,6 +896,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
@@ -922,6 +924,7 @@
         <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
@@ -939,6 +942,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
@@ -954,10 +958,11 @@
                hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                externalLibraries="luajit" userNotes="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,CC=$(SRCROOT)/../../../ci/ccache-clang,CXX=$(SRCROOT)/../../../ci/ccache-clang++"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
-                       libraryPath="../../../modules/LuaJIt/src" usePrecompiledHeaderFile="1"
-                       precompiledHeaderFile="Source/pch.h" userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
+                       libraryPath="../../../modules/LuaJIt/src"
+                       usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
+                       userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
                        libraryPath="../../../modules/LuaJIt/src" codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
@@ -976,6 +981,7 @@
         <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
@@ -993,6 +999,7 @@
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
@@ -1023,6 +1030,7 @@
             useGlobalPath="1"/>
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -1034,6 +1042,7 @@
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
