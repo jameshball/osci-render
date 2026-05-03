@@ -296,6 +296,8 @@
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
         </GROUP>
         <GROUP id="{AUD_PLATFORM}" name="platform">
+          <FILE id="IsrCtl" name="InternalSampleRateController.h" compile="0"
+                resource="0" file="Source/audio/platform/InternalSampleRateController.h"/>
           <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
                 file="Source/audio/platform/SampleRateManager.h"/>
           <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
@@ -523,6 +525,10 @@
                 file="Source/components/timeline/TimelineLookAndFeel.h"/>
         </GROUP>
         <GROUP id="{CMP_MENU}" name="menu">
+          <FILE id="IsrMnuC" name="InternalSampleRateMenu.cpp" compile="1" resource="0"
+                file="Source/components/menu/InternalSampleRateMenu.cpp"/>
+          <FILE id="IsrMnuH" name="InternalSampleRateMenu.h" compile="0" resource="0"
+                file="Source/components/menu/InternalSampleRateMenu.h"/>
           <FILE id="CfBFAE" name="MainMenuBarModel.cpp" compile="1" resource="0"
                 file="Source/components/menu/MainMenuBarModel.cpp"/>
           <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"

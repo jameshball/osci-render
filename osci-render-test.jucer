@@ -63,9 +63,21 @@
       <FILE id="TstClH" name="TestCleanup.h" compile="0" resource="0" file="tests/TestCleanup.h"/>
       <FILE id="SmpAcc" name="SampleAccuracyTest.cpp" compile="1" resource="0"
             file="tests/SampleAccuracyTest.cpp"/>
+      <FILE id="IrsAdp" name="IntegerRatioSampleRateAdapterTest.cpp" compile="1"
+            resource="0" file="tests/IntegerRatioSampleRateAdapterTest.cpp"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
+    <MODULE id="chowdsp_buffers" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -93,6 +105,14 @@
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
@@ -117,6 +137,14 @@
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
@@ -131,7 +159,8 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/Test/MacOSX" externalLibraries="luajit" extraCompilerFlags="-Wno-deprecated-declarations -Wno-reorder-ctor -Wno-inconsistent-missing-override -Wno-unused-function -Wno-unused-variable">
+    <XCODE_MAC targetFolder="Builds/Test/MacOSX" externalLibraries="luajit"
+               extraCompilerFlags="-Wno-deprecated-declarations -Wno-reorder-ctor -Wno-inconsistent-missing-override -Wno-unused-function -Wno-unused-variable">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
                        libraryPath="../../../modules/LuaJIT/src"/>
@@ -140,6 +169,14 @@
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>

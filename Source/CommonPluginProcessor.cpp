@@ -9,6 +9,8 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
 
+#include <cmath>
+
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesProperties)
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -68,6 +70,15 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     #endif
     
     globalSettings = std::make_unique<juce::PropertiesFile>(options);
+
+    // Restore internal sample-rate ratio (1.0 = follow device).
+    {
+#if OSCI_PREMIUM
+        internalSampleRate.restoreSavedRatio(getGlobalDoubleValue(InternalSampleRateController::settingKey, 1.0));
+#else
+        internalSampleRate.restoreSavedRatio(1.0);
+#endif
+    }
 
     // Restore recently-opened project files (shared across instances).
     recentProjectFiles.setMaxNumberOfItems(10);
@@ -351,13 +362,66 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         + " samplesPerBlock=" + juce::String(samplesPerBlock)
         + " effects=" + juce::String(effects.size()));
 
-	currentSampleRate = sampleRate;
-    
+    const int numChannels = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels(), 1);
+    const auto prepared = internalSampleRate.prepare(sampleRate, samplesPerBlock, numChannels, supportsInternalSampleRateOverride());
+    const double internalRate = prepared.sampleRate;
+    const int internalBlock = prepared.blockSize;
+    currentSampleRate.store(internalRate);
+    setLatencySamples(prepared.latencySamples);
+
     for (auto& effect : effects) {
-        effect->prepareToPlay(currentSampleRate, samplesPerBlock);
+        effect->prepareToPlay(internalRate, internalBlock);
     }
-    
-    threadManager.prepare(sampleRate, samplesPerBlock);
+
+    threadManager.prepare(internalRate, internalBlock);
+    prepareToPlayInternal(internalRate, internalBlock);
+}
+
+void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    const int deviceNumSamples = buffer.getNumSamples();
+    if (deviceNumSamples <= 0) {
+        return;
+    }
+
+    if (isSuspended()) {
+        buffer.clear();
+        midi.clear();
+        return;
+    }
+
+    internalSampleRate.process (buffer, midi, [this] (auto& b, auto& m) { processBlockInternal (b, m); });
+}
+
+bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
+#if OSCI_PREMIUM
+    return supportsInternalSampleRateOverride() && internalSampleRate.canSetRatio(ratio);
+#else
+    return std::abs(ratio - 1.0) < 0.000001;
+#endif
+}
+
+void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
+#if !OSCI_PREMIUM
+    juce::ignoreUnused(ratio);
+    return;
+#else
+    if (! supportsInternalSampleRateOverride()) {
+        return;
+    }
+
+    if (! internalSampleRate.setRatio(ratio)) {
+        return;
+    }
+
+    setGlobalValue(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
+    saveGlobalSettings();
+
+    if (internalSampleRate.hasPreparedDevice()) {
+        suspendProcessing(true);
+        prepareToPlay(internalSampleRate.getLastDeviceSampleRate(), internalSampleRate.getLastDeviceBlockSize());
+        suspendProcessing(false);
+    }
+#endif
 }
 
 void CommonAudioProcessor::releaseResources() {
@@ -406,13 +470,9 @@ osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
     return dynamic_cast<osci::IntParameter*>(it->second);
 }
 
-//==============================================================================
-bool CommonAudioProcessor::hasEditor() const {
-    return true; // (change this to false if you choose to not supply an editor)
-}
-
-double CommonAudioProcessor::getSampleRate() {
-    return currentSampleRate;
+double CommonAudioProcessor::getEffectiveSampleRate() {
+    const double sampleRate = currentSampleRate.load();
+    return sampleRate > 0.0 ? sampleRate : 192000.0;
 }
 
 void CommonAudioProcessor::loadAudioFile(const juce::File& file) {

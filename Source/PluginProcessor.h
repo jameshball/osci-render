@@ -110,9 +110,11 @@ public:
     // EffectComponents register/unregister via wireModulation / destructor.
     ModulationUpdateBroadcaster modulationUpdateBroadcaster;
 
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) override;
+    void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    bool supportsInternalSampleRateOverride() const override { return OSCI_PREMIUM; }
 
+    bool hasEditor() const override { return true; }
     juce::AudioProcessorEditor* createEditor() override;
 
     void setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback);

@@ -373,7 +373,7 @@ void ImageParser::findWhite(double thresholdPow, bool invert) {
 }
 
 int ImageParser::jumpFrequency() {
-    return audioProcessor.currentSampleRate * 0.005;
+    return audioProcessor.getEffectiveSampleRate() * 0.005;
 }
 
 void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert) {

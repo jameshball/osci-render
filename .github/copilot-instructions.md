@@ -21,6 +21,12 @@
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
 - **Recommendations/proposals**: Always first write your findings, and then for each finding, present it as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
 
+## Code Style
+
+- **Always use curly braces** for `if`/`else`/`for`/`while` bodies, even single-statement ones. Place the body on its own line(s); do not collapse `for (...) { stmt; }` onto one line.
+- **Prefer compact one-liners** for expressions and call sites — keep arguments on a single line where reasonable rather than column-aligning them vertically across multiple lines.
+- **Use descriptive variable names**; avoid overly shortened names like `M`, `N`, `opts`, or `r` unless they are established domain notation in nearby code.
+
 ## Project Overview
 
 JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audio for oscilloscope displays. Supports `.obj`, `.svg`, `.txt`, `.lua`, `.gpla`, `.gif`, and Blender scenes with real-time effects and DAW automation.
