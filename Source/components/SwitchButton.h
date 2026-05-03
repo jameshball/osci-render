@@ -113,7 +113,7 @@ public:
         g.setColour (juce::Colours::black.withAlpha (0.1f));
         g.drawRoundedRectangle (b, cornerSize, 2.0f);
         if (ccHelper.isLearning())
-            g.setColour(Colours::midiLearnBackground());
+            g.setColour(osci::Colours::midiLearnBackground());
         else
             g.setColour (findColour (getSwitchState() ? switchOnBackgroundColour : switchOffBackgroundColour));
         g.fillRoundedRectangle (b, cornerSize);

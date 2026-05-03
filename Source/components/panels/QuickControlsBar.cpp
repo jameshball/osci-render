@@ -111,6 +111,6 @@ void QuickControlsBar::resized() {
 
 void QuickControlsBar::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour(Colours::darker());
-    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
+    g.setColour(osci::Colours::darker());
+    g.fillRoundedRectangle(bounds, osci::Colours::kPillRadius);
 }

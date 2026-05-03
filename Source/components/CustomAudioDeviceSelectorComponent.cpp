@@ -170,7 +170,7 @@ public:
 
         if (items.isEmpty())
         {
-            g.setColour (Colours::grey);
+            g.setColour (osci::Colours::grey());
             g.setFont (0.5f * (float) getRowHeight());
             g.drawText (noItemsMessage,
                         0, 0, getWidth(), getHeight() / 2,
@@ -1112,7 +1112,7 @@ public:
 
             if (items.isEmpty())
             {
-                g.setColour (Colours::grey);
+                g.setColour (osci::Colours::grey());
                 g.setFont (0.5f * (float) getRowHeight());
                 g.drawText (noItemsMessage,
                             0, 0, getWidth(), getHeight() / 2,

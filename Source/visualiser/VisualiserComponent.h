@@ -9,7 +9,7 @@
 #include "../audio/AudioRecorder.h"
 #include "../components/DownloaderComponent.h"
 #include "../components/StopwatchComponent.h"
-#include "../components/SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../components/timeline/TimelineComponent.h"
 #include "../components/timeline/TimelineController.h"
 #include "../video/FFmpegEncoderManager.h"
@@ -86,16 +86,16 @@ private:
     RecordingSettings& recordingSettings;
 
     bool visualiserOnly;
-    
+
     // Timeline for controlling playback (audio, video, gif, gpla)
     // Controller is set by parent component based on file type
     TimelineComponent timeline;
 
-    SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
-    SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
-    SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
-    SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
-    SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+    osci::SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
+    osci::SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
 
 #if OSCI_PREMIUM
     SharedTextureManager& sharedTextureManager;
@@ -125,7 +125,7 @@ private:
 #endif
 
     StopwatchComponent stopwatch;
-    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
+    osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;

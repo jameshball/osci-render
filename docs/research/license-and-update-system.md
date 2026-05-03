@@ -73,8 +73,8 @@ A local clone of the existing API lives at `./osci-render-api/` (gitignored) for
 - [ ] Confirm the remaining private-key backup names and rotation runbook outside source control.
 - [x] Deploy the `size_bytes` migration/API change to production.
 - [ ] Continue polishing the account/update panel visual design; current pass is compact, generic-overlay based, and uses one `Download and install` action.
-- [ ] Finish installer completion/product install UX in the dedicated installer app; plugin-side handoff now uses pending markers rather than trying to observe installer completion.
-- [ ] Create `osci-installer.jucer` and the installer UX.
+- [x] Create `osci-installer.jucer` and the first installer UX.
+- [ ] Finish installer completion/product install UX polish; plugin-side handoff now uses pending markers rather than trying to observe installer completion.
 - [x] Decide promotion workflow: builds publish as `alpha`, then admin promotes to `beta`/`stable` in the admin UI.
 
 ### Next ordered TODOs
@@ -96,14 +96,15 @@ A local clone of the existing API lives at `./osci-render-api/` (gitignored) for
   - [x] Implement best-effort process scan.
   - [x] Warn only; do not close host processes.
   - [x] Integrate before launch in both update prompt and account/update panel.
-- [ ] 5. Create `osci-installer.jucer`.
-  - [ ] Reuse licensing/update primitives.
-  - [ ] Implement minimal welcome → key/free choice → install flow.
-  - [ ] Share `osci-licensing.settings` with osci-render and sosci.
+- [x] 5. Create `osci-installer.jucer`.
+  - [x] Reuse licensing/update primitives.
+  - [x] Implement minimal welcome → key/free choice → install flow.
+  - [x] Share `osci-licensing.settings` with osci-render and sosci.
 - [ ] 6. Harden installer/update edge cases before public release.
-  - [ ] Move DAW process scanning off the message thread or make `readProcessList()` non-blocking.
+  - [x] Move DAW process scanning off the message thread for install confirmation.
   - [ ] Smoke test pending-install success/failure/retry prompts with real installers on macOS and Windows.
   - [ ] Decide whether plugin-hosted update launches should only warn/retry, or also guide users to reopen their DAW after installation.
+  - [ ] Polish installer UI copy/layout and add product/version metadata once release artifacts are available.
 
 ---
 

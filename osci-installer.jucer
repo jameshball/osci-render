@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="oInst1" name="osci-installer" projectType="guiapp" useAppConfig="0"
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" cppLanguageStandard="20"
+              projectLineFeed="&#10;" headerPath="./include" version="1.0.0.0"
+              companyName="James H Ball" companyWebsite="https://osci-render.com"
+              companyEmail="james@ball.sh" bundleIdentifier="sh.ball.osci-installer"
+              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;">
+  <MAINGROUP id="iRoot1" name="osci-installer">
+    <GROUP id="{3E43E8D7-6C31-4F48-9B36-6E2D9F53E991}" name="Source">
+      <GROUP id="{F7307549-98C6-4E26-8FD8-BFFFC2E56622}" name="installer">
+        <FILE id="iMain1" name="Main.cpp" compile="1" resource="0" file="Source/installer/Main.cpp"/>
+      </GROUP>
+      <GROUP id="{39802B06-0587-444B-99C7-7122C60E85AF}" name="components">
+        <FILE id="iFlow1" name="InstallFlowHelpers.h" compile="0" resource="0"
+              file="Source/components/InstallFlowHelpers.h"/>
+      </GROUP>
+    </GROUP>
+    <GROUP id="{36C18144-0A18-4628-AD40-964D1E7D5C9A}" name="Resources">
+      <GROUP id="{16DC3C83-3F47-4DA0-9FAF-D918950470D6}" name="fonts">
+        <FILE id="iFiraR" name="FiraSans-Regular.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Regular.ttf"/>
+        <FILE id="iFiraB" name="FiraSans-Bold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Bold.ttf"/>
+        <FILE id="iFiraI" name="FiraSans-Italic.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Italic.ttf"/>
+        <FILE id="iFiraS" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-SemiBold.ttf"/>
+      </GROUP>
+      <GROUP id="{DA285F89-D5DB-4C00-9694-B5F37CE4C975}" name="images">
+        <FILE id="iOsciM" name="osci_mac.png" compile="0" resource="1" file="Resources/images/osci_mac.png"/>
+        <FILE id="iSosciM" name="sosci_mac.png" compile="0" resource="1" file="Resources/images/sosci_mac.png"/>
+      </GROUP>
+      <GROUP id="{E6EC7E61-00B9-4A79-8712-A456D25EAE4D}" name="svg">
+        <FILE id="iClose" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
+        <FILE id="iHelp1" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
+      </GROUP>
+    </GROUP>
+  </MAINGROUP>
+  <MODULES>
+    <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <EXPORTFORMATS>
+    <LINUX_MAKE targetFolder="Builds/osci-installer/LinuxMakefile">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-installer"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-installer"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+      </MODULEPATHS>
+    </LINUX_MAKE>
+    <VS2022 targetFolder="Builds/osci-installer/VisualStudio2022">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-installer"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-installer"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+      </MODULEPATHS>
+    </VS2022>
+    <XCODE_MAC targetFolder="Builds/osci-installer/MacOSX">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-installer"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-installer"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+</JUCERPROJECT>

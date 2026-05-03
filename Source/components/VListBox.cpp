@@ -24,7 +24,7 @@
 */
 
 #include "VListBox.h"
-#include "ScrollFadeViewport.h"
+#include <osci_gui/osci_gui.h>
 
 class VListBox::RowComponent : public juce::Component, public TooltipClient
 {
@@ -158,7 +158,7 @@ public:
 };
 
 //==============================================================================
-class VListBox::ListViewport : public ScrollFadeViewport
+class VListBox::ListViewport : public osci::ScrollFadeViewport
 {
 public:
     ListViewport (VListBox& lb) : owner (lb)
@@ -186,7 +186,7 @@ public:
 
     void updateAllRows() {
         // THIS IS A MODIFICATION OF THE ORIGINAL CLASS
-        // 
+        //
         // This function is called to update all rows, including
         // those offscreen, so that we never need to recalculate
         // the row components.
@@ -221,7 +221,7 @@ public:
     void visibleAreaChanged (const juce::Rectangle<int>& newVisibleArea) override
     {
         // Ensure scroll-fade overlay updates
-        ScrollFadeViewport::visibleAreaChanged(newVisibleArea);
+        osci::ScrollFadeViewport::visibleAreaChanged(newVisibleArea);
         updateVisibleArea (true);
 
         if (auto* m = owner.getModel())
@@ -778,7 +778,7 @@ bool VListBox::keyPressed (const juce::KeyPress& key)
         else
             selectRow (juce::jmin (totalItems - 1, juce::jmax (0, lastRowSelected + 1)));
     }
-    else if (key.isKeyCode (juce::KeyPress::pageUpKey)) 
+    else if (key.isKeyCode (juce::KeyPress::pageUpKey))
     {
         auto rowToSelect = juce::jmax(0, lastRowSelected);
         auto pageHeight = viewport->getMaximumVisibleHeight();

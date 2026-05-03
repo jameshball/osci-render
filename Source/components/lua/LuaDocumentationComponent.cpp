@@ -1,11 +1,12 @@
 #include "LuaDocumentationComponent.h"
 
-LuaDocumentationComponent::LuaDocumentationComponent() {
+LuaDocumentationComponent::LuaDocumentationComponent()
+    : osci::OverlayComponent (juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize)) {
     setOverlayTitle("Lua Scripting Reference");
 
     viewport.setViewedComponent(&contentComponent, false);
     viewport.setScrollBarsShown(true, false);
-    viewport.setColour(juce::ScrollBar::thumbColourId, Colours::grey());
+    viewport.setColour(juce::ScrollBar::thumbColourId, osci::Colours::grey());
     viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
     addAndMakeVisible(viewport);
 
@@ -63,7 +64,7 @@ void LuaDocumentationComponent::addCode(const juce::String& code) {
 void LuaDocumentationComponent::addLink(const juce::String& text, const juce::URL& url) {
     auto* link = new juce::HyperlinkButton(text, url);
     link->setFont(juce::Font(13.5f), false);
-    link->setColour(juce::HyperlinkButton::textColourId, Colours::accentColor());
+    link->setColour(juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
     link->setJustificationType(juce::Justification::centredLeft);
     elements.add(link);
     contentComponent.addAndMakeVisible(link);

@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "../effects/EffectComponent.h"
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 class PerspectiveComponent : public juce::GroupComponent {

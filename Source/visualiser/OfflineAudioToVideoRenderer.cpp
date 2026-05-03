@@ -157,7 +157,7 @@ OfflineAudioToVideoRendererComponent::~OfflineAudioToVideoRendererComponent()
 void OfflineAudioToVideoRendererComponent::paint(juce::Graphics& g)
 {
     // This component is marked opaque, so it must fully paint its bounds.
-    g.fillAll(Colours::dark());
+    g.fillAll(osci::Colours::dark());
 }
 
 void OfflineAudioToVideoRendererComponent::resized()

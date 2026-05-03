@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../components/effects/EffectComponent.h"
-#include "../components/SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
 
@@ -26,7 +26,7 @@ public:
         frameRate.disableLfo();
         frameRate.disableSidechain();
     }
-    
+
 private:
 
 #if OSCI_PREMIUM
@@ -34,7 +34,7 @@ private:
 #else
     const bool sosciFeatures = false;
 #endif
-    
+
 public:
 
     osci::EffectParameter qualityParameter = osci::EffectParameter(
@@ -49,7 +49,7 @@ public:
 
     osci::BooleanParameter recordAudio = osci::BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
     osci::BooleanParameter recordVideo = osci::BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
-    
+
     osci::EffectParameter resolution = osci::EffectParameter(
         "Resolution",
         "The resolution of the recorded video. This only changes when not recording.",
@@ -57,7 +57,7 @@ public:
         VERSION_HINT, 1024, 128, 2048, 1.0
     );
     std::shared_ptr<osci::Effect> resolutionEffect = std::make_shared<osci::SimpleEffect>(&resolution);
-    
+
     osci::EffectParameter frameRate = osci::EffectParameter(
         "Frame Rate",
         "The frame rate of the recorded video. This only changes when not recording.",
@@ -78,10 +78,10 @@ public:
         settingsXml->setAttribute("compressionPreset", compressionPreset);
         settingsXml->setAttribute("customSharedTextureServerName", customSharedTextureServerName);
         settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
-        
+
         auto qualityXml = settingsXml->createNewChildElement("quality");
         qualityEffect->save(qualityXml);
-        
+
         auto resolutionXml = settingsXml->createNewChildElement("resolution");
         resolutionEffect->save(resolutionXml);
 
@@ -125,7 +125,7 @@ public:
             }
         }
     }
-   
+
     juce::StringArray compressionPresets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
     juce::String customSharedTextureServerName = "";
 };
@@ -158,18 +158,18 @@ public:
     juce::String getCompressionPreset() {
         return parameters.compressionPreset;
     }
-    
+
     juce::String getCustomSharedTextureServerName() {
         if (parameters.customSharedTextureServerName.isEmpty()) {
             return "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
         }
         return parameters.customSharedTextureServerName;
     }
-    
+
     int getResolution() {
         return parameters.resolution.getValueUnnormalised();
     }
-    
+
     double getFrameRate() {
         return parameters.frameRate.getValueUnnormalised();
     }
@@ -211,20 +211,20 @@ private:
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
-    
+
 #if !OSCI_PREMIUM
-    juce::TextEditor recordVideoWarning{"recordVideoWarning"};
+    osci::TextEditor recordVideoWarning{"recordVideoWarning"};
     juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/#purchase")};
 #endif
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;
-    
+
     juce::Label videoCodecLabel{"Video Codec", "Video Codec"};
     juce::ComboBox videoCodecSelector;
-    
+
     juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
-    juce::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
+    osci::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
 
     void updateLosslessAudioEnabled();
 
