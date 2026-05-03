@@ -614,7 +614,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if (isAnimated || isImage) {
+    } else if ((isAnimated && !juce::JUCEApplicationBase::isStandaloneApp()) || isImage) {
         frameSettingsVisible = true;
         frame.setAnimated(isAnimated);
         frame.setImage(isImage);

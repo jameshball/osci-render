@@ -194,13 +194,8 @@ public:
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
 
-    // DAW transport state (updated in processBlock, read by voices for Lua)
-    std::atomic<double> luaBpm = 120.0;
-    std::atomic<double> luaPlayTime = 0.0;
-    std::atomic<double> luaPlayTimeBeats = 0.0;
-    std::atomic<bool> luaIsPlaying = false;
-    std::atomic<int> luaTimeSigNum = 4;
-    std::atomic<int> luaTimeSigDen = 4;
+    // Updated on the audio thread; read by audio-thread voices and message-thread UI.
+    osci::DawPosition dawPosition;
 
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -220,10 +215,6 @@ public:
 
     // Look up human-readable name for any parameter by ID (searches all effects).
     juce::String getParamDisplayName(const juce::String& paramId) const;
-
-    // DAW or standalone BPM – updated every processBlock
-    std::atomic<double> currentBpm{120.0};
-    double lfoSyncTimeSeconds = 0.0;
 
     // Standalone-only BPM parameter (automatable)
     osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);
@@ -476,8 +467,6 @@ private:
         parseVersion(parsedB, b);
         return std::lexicographical_compare(parsedA, parsedA + 3, parsedB, parsedB + 3);
     }
-
-    juce::AudioPlayHead* playHead;
 
     // Precomputed paramId → (effect*, paramIndex) lookup for O(1) modulation target resolution.
     // Built once after all effects are populated; the effect lists are stable after construction.

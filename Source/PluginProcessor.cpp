@@ -834,63 +834,15 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     double sampleRate = getSampleRate();
     int numSamples = buffer.getNumSamples();
 
-    // MIDI transport info variables (defaults to 60bpm, 4/4 time signature at zero seconds and not playing)
-    double bpm = 60;
-    double playTimeSeconds = 0;
-    double ppqPosition = 0;
-    bool hasPlayTimeSeconds = false;
-    bool hasPpqPosition = false;
-    bool isPlaying = false;
-    juce::AudioPlayHead::TimeSignature timeSig;
-
-    // Get MIDI transport info
-    playHead = this->getPlayHead();
-    if (playHead != nullptr) {
-        auto pos = playHead->getPosition();
-        if (pos.hasValue()) {
-            juce::AudioPlayHead::PositionInfo pi = *pos;
-            bpm = pi.getBpm().orFallback(bpm);
-            auto timeSeconds = pi.getTimeInSeconds();
-            if (timeSeconds.hasValue()) {
-                playTimeSeconds = *timeSeconds;
-                hasPlayTimeSeconds = true;
-            }
-            auto ppq = pi.getPpqPosition();
-            if (ppq.hasValue()) {
-                ppqPosition = *ppq;
-                hasPpqPosition = true;
-            }
-            isPlaying = pi.getIsPlaying();
-            timeSig = pi.getTimeSignature().orFallback(timeSig);
-        }
-    }
-
-    // In standalone mode, use the standaloneBpm parameter as the tempo source
+    osci::DawPosition::Options dawPositionOptions;
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        bpm = (double)standaloneBpm->getValueUnnormalised();
+        dawPositionOptions = osci::DawPosition::Options::withBpmOverride((double)standaloneBpm->getValueUnnormalised());
     }
+    const auto blockDawPosition = osci::DawPosition::fromPlayHead(this->getPlayHead(), sampleRate, dawPositionOptions);
+    dawPosition.storeFrom(blockDawPosition);
 
-    // Publish BPM for UI components (LFO rate display, etc.)
-    currentBpm.store(bpm, std::memory_order_relaxed);
-
-    double playTimeBeats = hasPpqPosition ? ppqPosition : bpm * playTimeSeconds / 60;
-    double lfoSyncStartSeconds = lfoSyncTimeSeconds;
-    if (hasPpqPosition && bpm > 0.0)
-        lfoSyncStartSeconds = ppqPosition / (bpm / 60.0);
-    else if (hasPlayTimeSeconds)
-        lfoSyncStartSeconds = playTimeSeconds;
-
-    // Calculated time per sample in seconds and beats
-    double sTimeSec = 1.f / sampleRate;
-    double sTimeBeats = bpm * sTimeSec / 60;
-
-    // Store DAW transport for Lua access from voices
-    luaBpm.store(bpm, std::memory_order_relaxed);
-    luaPlayTime.store(playTimeSeconds, std::memory_order_relaxed);
-    luaPlayTimeBeats.store(playTimeBeats, std::memory_order_relaxed);
-    luaIsPlaying.store(isPlaying, std::memory_order_relaxed);
-    luaTimeSigNum.store(timeSig.numerator, std::memory_order_relaxed);
-    luaTimeSigDen.store(timeSig.denominator, std::memory_order_relaxed);
+    // Calculated time per sample in seconds
+    double sTimeSec = blockDawPosition.secondsPerSample.load(std::memory_order_relaxed);
 
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
@@ -986,11 +938,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 #if OSCI_PREMIUM
         // Fill modulation block buffers (type-specific generation)
         lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                       currentBpm.load(std::memory_order_relaxed),
-                                       uiVoiceActive, lfoSyncStartSeconds, true);
+                                       blockDawPosition, uiVoiceActive);
         envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
         randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                          currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+                                          blockDawPosition.bpm.load(std::memory_order_relaxed), uiVoiceActive);
 #endif
 
         // Always run the sidechain envelope follower so the UI display
@@ -1000,9 +951,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         // Apply all modulation buffers to animated parameter values (generic)
         modulationEngine.applyAllModulation(numSamples);
     }
-
-    if (sampleRate > 0.0)
-        lfoSyncTimeSeconds = lfoSyncStartSeconds + (double)numSamples / sampleRate;
 
     outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
     outputBuffer3d.clear();
@@ -1107,10 +1055,10 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         if (juce::JUCEApplicationBase::isStandaloneApp()) {
             frameIncrement = sTimeSec * rate * numSamples;
         } else if (animationSyncBPM->getValue()) {
-            animationFrame = playTimeBeats * rate + animationOffset->getValueUnnormalised();
+            animationFrame = blockDawPosition.beats.load(std::memory_order_relaxed) * rate + animationOffset->getValueUnnormalised();
             frameIncrement = 0.0; // Already calculated absolute position
         } else {
-            animationFrame = playTimeSeconds * rate + animationOffset->getValueUnnormalised();
+            animationFrame = blockDawPosition.seconds.load(std::memory_order_relaxed) * rate + animationOffset->getValueUnnormalised();
             frameIncrement = 0.0; // Already calculated absolute position
         }
 
@@ -1188,12 +1136,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
     }
     
-    // Update playback time
-    if (isPlaying) {
-        playTimeSeconds += sTimeSec * numSamples;
-        playTimeBeats += sTimeBeats * numSamples;
-    }
-
     // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)
     juce::SpinLock::ScopedLockType lock(audioThreadCallbackLock);
     if (audioThreadCallback != nullptr) {
