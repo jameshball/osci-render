@@ -32,7 +32,7 @@ void MainMenuBarModel::addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudi
         });
     }
     addMenuItem(topLevelMenuIndex, "Open Global Settings File", [&processor] {
-        processor.getGlobalSettingsFile().revealToUser();
+        processor.globalSettings.getFile().revealToUser();
     });
 }
 

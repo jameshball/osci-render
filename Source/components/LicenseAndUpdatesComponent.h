@@ -4,14 +4,13 @@
 #include "../CommonPluginEditor.h"
 #include "../CommonPluginProcessor.h"
 #include "DownloadProgressComponent.h"
+#include "InstallFlowHelpers.h"
 #include "OverlayComponent.h"
 
-class LicenseAndUpdatesComponent : public OverlayComponent
-{
+class LicenseAndUpdatesComponent : public OverlayComponent {
 public:
     explicit LicenseAndUpdatesComponent (CommonAudioProcessor& processorToUse)
-        : processor (processorToUse)
-    {
+        : processor (processorToUse) {
         setOverlayTitle (requiresPremiumLicense() ? juce::String() : "Account");
         // Premium-required builds must keep the user blocked until they
         // activate; free builds never reach this branch (see
@@ -54,8 +53,9 @@ public:
         juce::Component* components[] = { &statusLabel, &accountLabel, &updatesLabel, &messageLabel,
                   &licenseKeyEditor, &activateButton, &deactivateButton, &stableUpdatesButton, &checkButton,
                   &updateButton, &freeVersionButton };
-        for (auto* component : components)
+        for (auto* component : components) {
             addAndMakeVisible (component);
+        }
 
         addChildComponent (downloadProgress);
 
@@ -77,20 +77,17 @@ private:
     juce::TextButton updateButton { "Download and install" };
     juce::TextButton freeVersionButton { "or install free version" };
 
-    std::optional<osci::licensing::VersionInfo> availableVersion;
+    std::optional<osci::VersionInfo> availableVersion;
     juce::File downloadedFile;
     bool busy = false;
     DownloadProgressComponent downloadProgress;
 
-    juce::Point<int> getPreferredPanelSize() const override
-    {
+    juce::Point<int> getPreferredPanelSize() const override {
         return requiresPremiumLicense() ? juce::Point<int> { 520, 230 } : juce::Point<int> { 560, 360 };
     }
 
-    void resizeContent (juce::Rectangle<int> area) override
-    {
-        if (requiresPremiumLicense())
-        {
+    void resizeContent (juce::Rectangle<int> area) override {
+        if (requiresPremiumLicense()) {
             statusLabel.setJustificationType (juce::Justification::centred);
             statusLabel.setBounds (area.removeFromTop (30));
             accountLabel.setBounds ({ });
@@ -107,20 +104,18 @@ private:
             licenseKeyEditor.setBounds (licenseRow);
             area.removeFromTop (8);
 
-            if (downloadProgress.isVisible())
-            {
+            if (downloadProgress.isVisible()) {
                 downloadProgress.setBounds (area.removeFromTop (48));
                 area.removeFromTop (4);
                 freeVersionButton.setBounds ({ });
-            }
-            else
-            {
+            } else {
                 downloadProgress.setBounds ({ });
                 auto actionRow = area.removeFromTop (32);
-                if (freeVersionButton.isVisible())
+                if (freeVersionButton.isVisible()) {
                     freeVersionButton.setBounds (actionRow.withSizeKeepingCentre (176, actionRow.getHeight()));
-                else
+                } else {
                     freeVersionButton.setBounds ({ });
+                }
             }
 
             deactivateButton.setBounds ({ });
@@ -139,36 +134,27 @@ private:
         area.removeFromTop (8);
 
         auto licenseRow = area.removeFromTop (38);
-        if (activateButton.isVisible())
-        {
+        if (activateButton.isVisible()) {
             activateButton.setBounds (licenseRow.removeFromRight (112));
             licenseRow.removeFromRight (8);
-        }
-        else
-        {
+        } else {
             activateButton.setBounds ({ });
         }
         licenseKeyEditor.setBounds (licenseRow);
         area.removeFromTop (10);
 
-        if (downloadProgress.isVisible())
-        {
+        if (downloadProgress.isVisible()) {
             downloadProgress.setBounds (area.removeFromTop (48));
             checkButton.setBounds ({ });
             updateButton.setBounds ({ });
             freeVersionButton.setBounds ({ });
             stableUpdatesButton.setBounds ({ });
-        }
-        else
-        {
+        } else {
             downloadProgress.setBounds ({ });
             auto actionRow = area.removeFromTop (32);
-            if (freeVersionButton.isVisible() && ! checkButton.isVisible() && ! updateButton.isVisible() && ! stableUpdatesButton.isVisible())
-            {
+            if (freeVersionButton.isVisible() && ! checkButton.isVisible() && ! updateButton.isVisible() && ! stableUpdatesButton.isVisible()) {
                 freeVersionButton.setBounds (actionRow.withSizeKeepingCentre (176, actionRow.getHeight()));
-            }
-            else
-            {
+            } else {
                 layoutButton (actionRow, checkButton, 136);
                 layoutButton (actionRow, updateButton, 156);
                 layoutButton (actionRow, freeVersionButton, 176);
@@ -180,13 +166,11 @@ private:
         layoutButton (bottomRow, deactivateButton, 132);
     }
 
-    void refreshState()
-    {
-        const auto state = processor.getLicenseManager().getStateForUi();
+    void refreshState() {
+        const auto state = processor.licenseManager.getStateForUi();
         const auto premium = static_cast<bool> (state.getProperty ("premium"));
         const auto premiumRequired = requiresPremiumLicense();
-        const auto betaEnabled = processor.getGlobalBoolValue ("betaUpdatesEnabled")
-                              && processor.getGlobalStringValue ("releaseTrack", "stable") == "beta";
+        const auto betaEnabled = osci::UpdateSettings(processor.getProductSlug()).betaUpdatesEnabled();
         auto status = premiumRequired ? juce::String ("Enter your premium license")
                                       : (premium ? juce::String ("Premium active") : juce::String ("Free version"));
 
@@ -194,8 +178,9 @@ private:
         const auto expiresAt = state.getProperty ("expires_at").toString();
         auto accountText = premiumRequired ? juce::String ("This premium build needs activation")
                                            : (email.isNotEmpty() ? email : juce::String ("No license key activated"));
-        if (expiresAt.isNotEmpty())
+        if (expiresAt.isNotEmpty()) {
             accountText << " - expires " << expiresAt;
+        }
 
         statusLabel.setText (status, juce::dontSendNotification);
         statusLabel.setJustificationType (premiumRequired ? juce::Justification::centred : juce::Justification::centredLeft);
@@ -224,10 +209,8 @@ private:
         resized();
     }
 
-    static void layoutButton (juce::Rectangle<int>& row, juce::TextButton& button, int width)
-    {
-        if (! button.isVisible())
-        {
+    static void layoutButton (juce::Rectangle<int>& row, juce::TextButton& button, int width) {
+        if (! button.isVisible()) {
             button.setBounds ({ });
             return;
         }
@@ -236,63 +219,58 @@ private:
         row.removeFromLeft (10);
     }
 
-    bool requiresPremiumLicense() const
-    {
+    bool requiresPremiumLicense() const {
 #if OSCI_PREMIUM
-        return ! processor.getLicenseManager().hasPremium();
+        return ! processor.licenseManager.hasPremium();
 #else
         return false;
 #endif
     }
 
-    bool hasFreeFallback() const
-    {
+    bool hasFreeFallback() const {
         return processor.getProductSlug() == "osci-render";
     }
 
-    static void stylePrimaryButton (juce::TextButton& button)
-    {
+    static void stylePrimaryButton (juce::TextButton& button) {
         button.setColour (juce::TextButton::buttonColourId, Colours::accentColor());
         button.setColour (juce::TextButton::buttonOnColourId, Colours::accentColor().brighter (0.12f));
         button.setColour (juce::TextButton::textColourOffId, Colours::veryDark());
         button.setColour (juce::TextButton::textColourOnId, Colours::veryDark());
     }
 
-    static void styleSecondaryButton (juce::TextButton& button)
-    {
+    static void styleSecondaryButton (juce::TextButton& button) {
         button.setColour (juce::TextButton::buttonColourId, Colours::darker());
         button.setColour (juce::TextButton::buttonOnColourId, Colours::dark().brighter (0.08f));
         button.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.88f));
         button.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
     }
 
-    void setBusy (bool shouldBeBusy, juce::StringRef text = {})
-    {
+    void setBusy (bool shouldBeBusy, juce::StringRef text = {}) {
         busy = shouldBeBusy;
-        if (text.isNotEmpty())
+        if (text.isNotEmpty()) {
             messageLabel.setText (text, juce::dontSendNotification);
+        }
         refreshState();
     }
 
     void runAsync (juce::String busyText,
                    std::function<juce::Result()> work,
-                   std::function<void()> onSuccess = {})
-    {
-        if (busy)
+                   std::function<void()> onSuccess = {}) {
+        if (busy) {
             return;
+        }
 
         setBusy (true, busyText);
         auto result = std::make_shared<juce::Result> (juce::Result::ok());
         auto safeThis = juce::Component::SafePointer<LicenseAndUpdatesComponent> (this);
 
-        juce::Thread::launch ([safeThis, result, work = std::move (work), onSuccess = std::move (onSuccess)] () mutable
-        {
+        juce::Thread::launch ([safeThis, result, work = std::move (work), onSuccess = std::move (onSuccess)] () mutable {
             *result = work();
 
-            juce::MessageManager::callAsync ([safeThis, result, onSuccess = std::move (onSuccess)] () mutable
-            {
-                if (safeThis == nullptr)
+            juce::MessageManager::callAsync ([safeThis, result, onSuccess = std::move (onSuccess)] () mutable {
+                if (safeThis == nullptr) {
                     return;
+                }
 
                 // If the download progress bar was shown, always hide it when
                 // the async operation completes (success path hides explicitly;
@@ -301,21 +279,20 @@ private:
                 safeThis->resized();
 
                 safeThis->setBusy (false);
-                if (result->failed())
+                if (result->failed()) {
                     safeThis->messageLabel.setText (result->getErrorMessage(), juce::dontSendNotification);
-                else if (onSuccess)
+                } else if (onSuccess) {
                     onSuccess();
+                }
 
                 safeThis->refreshState();
             });
         });
     }
 
-    void activateLicense()
-    {
+    void activateLicense() {
         const auto key = licenseKeyEditor.getText().trim();
-        if (key.isEmpty())
-        {
+        if (key.isEmpty()) {
             messageLabel.setText ("Enter a license key.", juce::dontSendNotification);
             return;
         }
@@ -323,7 +300,7 @@ private:
         // The processor (and thus its LicenseManager) outlives any editor
         // instance, so capturing by reference is safe even if the editor is
         // destroyed mid-activation.
-        auto& manager = processor.getLicenseManager();
+        auto& manager = processor.licenseManager;
         runAsync ("Activating license...",
                   [&manager, key] { return manager.activate (key); },
                   [this]
@@ -333,26 +310,21 @@ private:
                   });
     }
 
-    void deactivateLicense()
-    {
-        processor.getLicenseManager().deactivate();
+    void deactivateLicense() {
+        processor.licenseManager.deactivate();
         availableVersion.reset();
         downloadedFile = juce::File();
         messageLabel.setText ("License deactivated.", juce::dontSendNotification);
         refreshState();
     }
 
-    void disableBetaUpdates()
-    {
-        processor.setGlobalValue ("betaUpdatesEnabled", false);
-        processor.setGlobalValue ("releaseTrack", "stable");
-        processor.saveGlobalSettings();
+    void disableBetaUpdates() {
+        osci::UpdateSettings(processor.getProductSlug()).useStableTrack();
         availableVersion.reset();
         downloadedFile = juce::File();
         messageLabel.setText ("Stable updates enabled.", juce::dontSendNotification);
 
-        if (auto* editor = findParentComponentOfClass<CommonPluginEditor>())
-        {
+        if (auto* editor = findParentComponentOfClass<CommonPluginEditor>()) {
             editor->refreshBetaUpdatesButton();
             editor->resized();
         }
@@ -361,60 +333,50 @@ private:
         resized();
     }
 
-    void checkForUpdates()
-    {
-        auto foundVersion = std::make_shared<std::optional<osci::licensing::VersionInfo>>();
+    void checkForUpdates() {
+        auto foundVersion = std::make_shared<std::optional<osci::VersionInfo>>();
         const auto product = processor.getProductSlug();
         const auto currentVersion = juce::String (JucePlugin_VersionString);
         const auto track = selectedReleaseTrack();
         const auto variant = desiredUpdateVariant();
 
         runAsync ("Checking for updates...",
-                  [foundVersion, product, currentVersion, track, variant]
-                  {
-                      osci::licensing::UpdateChecker checker;
+                  [foundVersion, product, currentVersion, track, variant] {
+                      osci::UpdateChecker checker;
                       *foundVersion = checker.checkForUpdate (product, currentVersion, track, variant);
                       return checker.getLastResult();
                   },
-                  [this, foundVersion]
-                  {
+                  [this, foundVersion] {
                       availableVersion = *foundVersion;
                       downloadedFile = juce::File();
-                      if (availableVersion.has_value())
-                      {
+                      if (availableVersion.has_value()) {
                           messageLabel.setText ("Version " + availableVersion->semver + " is available.", juce::dontSendNotification);
-                      }
-                      else
-                      {
+                      } else {
                           messageLabel.setText ("No update available.", juce::dontSendNotification);
                       }
                   });
     }
 
-    void downloadAndInstallUpdate()
-    {
-        if (! availableVersion.has_value())
+    void downloadAndInstallUpdate() {
+        if (! availableVersion.has_value()) {
             return;
+        }
 
-        downloadAndInstallVersion (*availableVersion, processor.getLicenseManager().getCachedToken());
+        downloadAndInstallVersion (*availableVersion, processor.licenseManager.getCachedToken());
     }
 
-    void installLatestFreeVersion()
-    {
-        auto foundVersion = std::make_shared<std::optional<osci::licensing::VersionInfo>>();
+    void installLatestFreeVersion() {
+        auto foundVersion = std::make_shared<std::optional<osci::VersionInfo>>();
         const auto product = processor.getProductSlug();
 
         runAsync ("Finding free version...",
-                  [foundVersion, product]
-                  {
-                      osci::licensing::UpdateChecker checker;
-                      *foundVersion = checker.checkForUpdate (product, "0.0.0.0", osci::licensing::ReleaseTrack::Stable, "free");
+                  [foundVersion, product] {
+                      osci::UpdateChecker checker;
+                      *foundVersion = checker.checkForUpdate (product, "0.0.0.0", osci::ReleaseTrack::Stable, "free");
                       return checker.getLastResult();
                   },
-                  [this, foundVersion]
-                  {
-                      if (! foundVersion->has_value())
-                      {
+                  [this, foundVersion] {
+                      if (! foundVersion->has_value()) {
                           messageLabel.setText ("No free download is available.", juce::dontSendNotification);
                           return;
                       }
@@ -423,11 +385,11 @@ private:
                   });
     }
 
-    void downloadAndInstallVersion (const osci::licensing::VersionInfo& versionToInstall,
-                                    juce::StringRef licenseToken)
-    {
-        if (busy)
+    void downloadAndInstallVersion (const osci::VersionInfo& versionToInstall,
+                                    juce::StringRef licenseToken) {
+        if (busy) {
             return;
+        }
 
         auto downloaded = std::make_shared<juce::File>();
         const auto version = versionToInstall;
@@ -444,70 +406,61 @@ private:
         auto safeThis = juce::Component::SafePointer<LicenseAndUpdatesComponent> (this);
 
         runAsync ("Downloading update...",
-                  [downloaded, version, token, product, safeThis]
-                  {
-                      osci::licensing::Downloader::Config config;
-                      config.downloadDirectory = osci::licensing::HardwareInfo::getDefaultStorageDirectory (product).getChildFile ("downloads");
-                      osci::licensing::Downloader downloader (config);
+                  [downloaded, version, token, product, safeThis] {
+                      osci::Downloader::Config config;
+                      config.downloadDirectory = osci::HardwareInfo::getDefaultStorageDirectory (product).getChildFile ("downloads");
+                      osci::Downloader downloader (config);
                       auto result = downloader.downloadAndVerify (
                           version, token,
-                          [safeThis] (double fraction, juce::int64)
-                          {
-                              if (safeThis != nullptr)
+                          [safeThis] (double fraction, juce::int64) {
+                              if (safeThis != nullptr) {
                                   safeThis->downloadProgress.setProgress (fraction);
+                              }
                           });
-                      if (result.wasOk())
+                      if (result.wasOk()) {
                           *downloaded = downloader.getDownloadedFile();
+                      }
                       return result;
                   },
-                  [this, downloaded]
-                  {
+                  [this, downloaded, version] {
                       downloadProgress.setVisible (false);
                       resized();
+                      availableVersion = version;
                       downloadedFile = *downloaded;
                       messageLabel.setText ("Update downloaded and verified.", juce::dontSendNotification);
                       installUpdate();
                   });
     }
 
-    void installUpdate()
-    {
-        if (! downloadedFile.existsAsFile())
+    void installUpdate() {
+        if (! downloadedFile.existsAsFile()) {
             return;
+        }
 
         const auto file = downloadedFile;
-        juce::AlertWindow::showOkCancelBox (
-            juce::AlertWindow::WarningIcon,
-            "Install Update",
-            "Save your work before continuing. The installer may need to close the host application.",
-            "Install",
-            "Cancel",
+        const auto version = availableVersion;
+        const auto product = processor.getProductSlug();
+        const auto currentVersion = juce::String (JucePlugin_VersionString);
+        auto safeThis = juce::Component::SafePointer<LicenseAndUpdatesComponent> (this);
+
+        osci::showInstallConfirmation (
             this,
-            juce::ModalCallbackFunction::create ([file] (int result)
-            {
-                if (result == 0)
+            [safeThis, file, version, product, currentVersion] {
+                if (! osci::launchInstallerWithPendingMarker (file, version, product, currentVersion)) {
                     return;
-
-                if (! osci::licensing::InstallerLauncher::launchAndExitHost (file))
-                {
-                    juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                            "Install Update",
-                                                            "Could not launch the downloaded installer.");
                 }
-            }));
+
+                if (safeThis != nullptr) {
+                    safeThis->messageLabel.setText ("Installer launched. Reopen the app after installation finishes.", juce::dontSendNotification);
+                }
+            });
     }
 
-    osci::licensing::ReleaseTrack selectedReleaseTrack() const
-    {
-        if (processor.getGlobalBoolValue ("betaUpdatesEnabled")
-            && processor.getGlobalStringValue ("releaseTrack", "stable") == "beta")
-            return osci::licensing::ReleaseTrack::Beta;
-
-        return osci::licensing::ReleaseTrack::Stable;
+    osci::ReleaseTrack selectedReleaseTrack() const {
+        return osci::UpdateSettings(processor.getProductSlug()).releaseTrack();
     }
 
-    static juce::String compiledVariant()
-    {
+    static juce::String compiledVariant() {
 #if OSCI_PREMIUM
         return "premium";
 #else
@@ -515,10 +468,10 @@ private:
 #endif
     }
 
-    juce::String desiredUpdateVariant() const
-    {
-        if (processor.getLicenseManager().hasPremium())
+    juce::String desiredUpdateVariant() const {
+        if (processor.licenseManager.hasPremium()) {
             return "premium";
+        }
 
         return compiledVariant();
     }

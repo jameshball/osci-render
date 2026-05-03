@@ -9,10 +9,23 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
 
+namespace
+{
+    osci::LicenseManager::Config makeLicenseManagerConfig() {
+        osci::LicenseManager::Config config;
+        const juce::String pluginName (JucePlugin_Name);
+        config.productSlug = pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+        return config;
+    }
+}
+
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesProperties)
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor(busesProperties)
+     : AudioProcessor(busesProperties),
+       licenseManager (makeLicenseManagerConfig())
+#else
+     : licenseManager (makeLicenseManagerConfig())
 #endif
 {
 
@@ -55,31 +68,17 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
                                  + juce::SystemStats::getUserRegion() + ")");
     }
 
-    // Initialize the global settings with the plugin name
-    juce::PropertiesFile::Options options;
-    options.applicationName = JucePlugin_Name + juce::String("_globals");
-    options.filenameSuffix = ".settings";
-    options.osxLibrarySubFolder = "Application Support";
-    
-    #if JUCE_LINUX || JUCE_BSD
-    options.folderName = "~/.config";
-    #else
-    options.folderName = "";
-    #endif
-    
-    globalSettings = std::make_unique<juce::PropertiesFile>(options);
+    globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
 
-    osci::licensing::LicenseManager::Config licenseConfig;
-    licenseConfig.productSlug = getProductSlug();
-    licenseConfig.storageDirectory = osci::licensing::HardwareInfo::getDefaultStorageDirectory (licenseConfig.productSlug);
-    licenseManager = std::make_unique<osci::licensing::LicenseManager> (licenseConfig);
-    if (auto result = licenseManager->loadCachedToken(); result.failed())
-        juce::Logger::writeToLog ("License cache load failed: " + result.getErrorMessage());
+    const auto licenseCacheResult = licenseManager.loadCachedToken();
+    if (licenseCacheResult.failed()) {
+        juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());
+    }
 
     // Restore recently-opened project files (shared across instances).
     recentProjectFiles.setMaxNumberOfItems(10);
     {
-        const auto savedRecent = getGlobalStringValue("recentProjectFiles");
+        const auto savedRecent = globalSettings.getString("recentProjectFiles");
         if (savedRecent.isNotEmpty())
             recentProjectFiles.restoreFromString(savedRecent);
     }
@@ -118,18 +117,6 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     startHeartbeat();
 }
 
-osci::licensing::LicenseManager& CommonAudioProcessor::getLicenseManager()
-{
-    jassert (licenseManager != nullptr);
-    return *licenseManager;
-}
-
-const osci::licensing::LicenseManager& CommonAudioProcessor::getLicenseManager() const
-{
-    jassert (licenseManager != nullptr);
-    return *licenseManager;
-}
-
 juce::String CommonAudioProcessor::getProductSlug() const
 {
     const juce::String pluginName (JucePlugin_Name);
@@ -154,8 +141,8 @@ void CommonAudioProcessor::addRecentProjectFile(const juce::File& file)
     recentProjectFiles.addFile(file);
 
     // Persist to global settings.
-    setGlobalValue("recentProjectFiles", recentProjectFiles.toString());
-    saveGlobalSettings();
+    globalSettings.set("recentProjectFiles", recentProjectFiles.toString());
+    globalSettings.save();
 
     // Best-effort: register with OS for native "recent documents" integration (jump lists / dock).
     // This is optional and should be safe across platforms.
@@ -172,8 +159,8 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
         recentProjectFiles.removeNonExistentFiles();
         const auto after = recentProjectFiles.toString();
         if (after != before) {
-            setGlobalValue("recentProjectFiles", after);
-            saveGlobalSettings();
+            globalSettings.set("recentProjectFiles", after);
+            globalSettings.save();
         }
     }
 
@@ -309,14 +296,14 @@ void CommonAudioProcessor::stopHeartbeat() {
 }
 
 void CommonAudioProcessor::timerCallback() {
-    setGlobalValue("lastHeartbeatTime", juce::Time::getCurrentTime().toISO8601(true));
-    saveGlobalSettings();
+    globalSettings.set("lastHeartbeatTime", juce::Time::getCurrentTime().toISO8601(true));
+    globalSettings.save();
 }
 
-CommonAudioProcessor::~CommonAudioProcessor() 
+CommonAudioProcessor::~CommonAudioProcessor()
 {
-    setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
-    saveGlobalSettings();
+    globalSettings.set("endTime", juce::Time::getCurrentTime().toISO8601(true));
+    globalSettings.save();
     stopHeartbeat();
     juce::Logger::setCurrentLogger(nullptr);
 }
@@ -576,69 +563,14 @@ void CommonAudioProcessor::loadProperties(juce::XmlElement& xml) {
     }
 }
 
-bool CommonAudioProcessor::getGlobalBoolValue(const juce::String& keyName, bool defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getBoolValue(keyName, defaultValue) : defaultValue;
-}
-
-int CommonAudioProcessor::getGlobalIntValue(const juce::String& keyName, int defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getIntValue(keyName, defaultValue) : defaultValue;
-}
-
-double CommonAudioProcessor::getGlobalDoubleValue(const juce::String& keyName, double defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getDoubleValue(keyName, defaultValue) : defaultValue;
-}
-
-juce::String CommonAudioProcessor::getGlobalStringValue(const juce::String& keyName, const juce::String& defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getValue(keyName, defaultValue) : defaultValue;
-}
-
-void CommonAudioProcessor::setGlobalValue(const juce::String& keyName, const juce::var& value)
-{
-    if (globalSettings != nullptr)
-        globalSettings->setValue(keyName, value);
-}
-
-void CommonAudioProcessor::removeGlobalValue(const juce::String& keyName)
-{
-    if (globalSettings != nullptr)
-        globalSettings->removeValue(keyName);
-}
-
-void CommonAudioProcessor::saveGlobalSettings()
-{
-    if (globalSettings != nullptr)
-        globalSettings->saveIfNeeded();
-}
-
-void CommonAudioProcessor::reloadGlobalSettings()
-{
-    if (globalSettings != nullptr)
-        globalSettings->reload();
-}
-
 juce::File CommonAudioProcessor::getAppSettingsFile()
 {
-    // Mirror the PropertiesFile::Options used by CustomStandaloneFilterApp so this
-    // always resolves to the same path the standalone app writes to.
-    juce::PropertiesFile::Options options;
-    options.applicationName     = juce::CharPointer_UTF8 (JucePlugin_Name);
-    options.filenameSuffix      = ".settings";
-    options.osxLibrarySubFolder = "Application Support";
-   #if JUCE_LINUX || JUCE_BSD
-    options.folderName          = "~/.config";
-   #else
-    options.folderName          = "";
-   #endif
-    return options.getDefaultFile();
+    return osci::SettingsStore::optionsForStandaloneApp (JucePlugin_Name).getDefaultFile();
 }
 
 juce::File CommonAudioProcessor::getLastOpenedDirectory()
 {
-    juce::String savedDir = getGlobalStringValue("lastOpenedDirectory");
+    juce::String savedDir = globalSettings.getString("lastOpenedDirectory");
     if (savedDir.isEmpty())
         return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
     
@@ -653,17 +585,17 @@ void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)
 {
     if (directory.exists() && directory.isDirectory())
     {
-        setGlobalValue("lastOpenedDirectory", directory.getFullPathName());
-        saveGlobalSettings();
+        globalSettings.set("lastOpenedDirectory", directory.getFullPathName());
+        globalSettings.save();
     }
 }
 
 bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     bool userWantsToReset = false;
     if (!hasSetSessionStartTime) {
-        juce::String startTime = getGlobalStringValue("startTime");
-        juce::String endTime = getGlobalStringValue("endTime");
-        juce::String lastHeartbeat = getGlobalStringValue("lastHeartbeatTime");
+        juce::String startTime = globalSettings.getString("startTime");
+        juce::String endTime = globalSettings.getString("endTime");
+        juce::String lastHeartbeat = globalSettings.getString("lastHeartbeatTime");
         juce::Time start = juce::Time::fromISO8601(startTime);
         juce::Time end = juce::Time::fromISO8601(endTime);
         juce::Time heartbeat = juce::Time::fromISO8601(lastHeartbeat);
@@ -690,8 +622,8 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
                 }
             }
         }
-        setGlobalValue("startTime", juce::Time::getCurrentTime().toISO8601(true));
-        saveGlobalSettings();
+        globalSettings.set("startTime", juce::Time::getCurrentTime().toISO8601(true));
+        globalSettings.save();
         hasSetSessionStartTime = true;
     }
     return userWantsToReset;

@@ -2,14 +2,13 @@
 
 #include <JuceHeader.h>
 #include "../CommonPluginProcessor.h"
+#include "InstallFlowHelpers.h"
 #include "../LookAndFeel.h"
 
-class UpdatePromptComponent : public juce::Component
-{
+class UpdatePromptComponent : public juce::Component {
 public:
     explicit UpdatePromptComponent (CommonAudioProcessor& processorToUse)
-        : processor (processorToUse), progressBar (progressValue)
-    {
+        : processor (processorToUse), progressBar (progressValue) {
         setVisible (false);
         setAlwaysOnTop (true);
 
@@ -25,12 +24,16 @@ public:
         primaryButton.setColour (juce::TextButton::textColourOffId, Colours::veryDark());
         secondaryButton.setColour (juce::TextButton::buttonColourId, Colours::veryDark().brighter (0.12f));
 
-        primaryButton.onClick = [this]
-        {
-            if (mode == Mode::Ready)
+        primaryButton.onClick = [this] {
+            if (mode == Mode::Ready) {
                 installUpdate();
-            else if (mode == Mode::Available || mode == Mode::Failed)
+            } else if (mode == Mode::PendingInstallFailed) {
+                retryPendingInstall();
+            } else if (mode == Mode::InstallSucceeded) {
+                hidePrompt();
+            } else if (mode == Mode::Available || mode == Mode::Failed) {
                 downloadUpdate();
+            }
         };
 
         secondaryButton.onClick = [this] { dismissFor48Hours(); };
@@ -42,20 +45,36 @@ public:
         addChildComponent (progressBar);
     }
 
-    void scheduleInitialCheck()
-    {
+    void scheduleInitialCheck() {
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
-        juce::Timer::callAfterDelay (1800, [safeThis]
-        {
-            if (safeThis != nullptr)
+        juce::Timer::callAfterDelay (1800, [safeThis] {
+            if (safeThis != nullptr) {
                 safeThis->checkForUpdate (false);
+            }
         });
+    }
+
+    bool showPendingInstallStatusIfNeeded() {
+        osci::PendingInstall pending (processor.getProductSlug());
+        auto marker = pending.load();
+        if (! marker.has_value()) {
+            return false;
+        }
+
+        if (osci::PendingInstall::isResolvedByRunningVersion (*marker, JucePlugin_VersionString)) {
+            pending.clear();
+            showInstallSucceeded (*marker);
+            return true;
+        }
+
+        pending.clear();
+        showPendingInstallFailed (*marker);
+        return true;
     }
 
     int getPreferredHeight() const noexcept { return 118; }
 
-    void paint (juce::Graphics& g) override
-    {
+    void paint (juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat().reduced (0.5f);
         g.setColour (Colours::veryDark().withAlpha (0.96f));
         g.fillRoundedRectangle (bounds, 8.0f);
@@ -63,33 +82,36 @@ public:
         g.drawRoundedRectangle (bounds, 8.0f, 1.2f);
     }
 
-    void resized() override
-    {
+    void resized() override {
         auto area = getLocalBounds().reduced (14, 12);
         titleLabel.setBounds (area.removeFromTop (20));
         detailLabel.setBounds (area.removeFromTop (34));
         area.removeFromTop (8);
 
-        if (progressBar.isVisible())
-        {
+        if (progressBar.isVisible()) {
             progressBar.setBounds (area.removeFromTop (8));
             area.removeFromTop (10);
         }
 
         auto buttonRow = area.removeFromBottom (28);
-        secondaryButton.setBounds (buttonRow.removeFromRight (82));
-        buttonRow.removeFromRight (8);
+        if (secondaryButton.isVisible()) {
+            secondaryButton.setBounds (buttonRow.removeFromRight (82));
+            buttonRow.removeFromRight (8);
+        } else {
+            secondaryButton.setBounds ({});
+        }
         primaryButton.setBounds (buttonRow.removeFromRight (98));
     }
 
 private:
-    enum class Mode
-    {
+    enum class Mode {
         Hidden,
         Available,
         Downloading,
         Ready,
         Failed,
+        InstallSucceeded,
+        PendingInstallFailed,
     };
 
     CommonAudioProcessor& processor;
@@ -99,57 +121,58 @@ private:
     juce::TextButton secondaryButton { "Later" };
     double progressValue = 0.0;
     juce::ProgressBar progressBar;
-    std::optional<osci::licensing::VersionInfo> availableVersion;
+    std::optional<osci::VersionInfo> availableVersion;
+    std::optional<osci::PendingInstallMarker> pendingInstallRetryMarker;
     juce::File downloadedFile;
     Mode mode = Mode::Hidden;
     bool busy = false;
 
-    void checkForUpdate (bool showErrors)
-    {
-        if (busy)
+    void checkForUpdate (bool showErrors) {
+        if (busy || mode == Mode::InstallSucceeded || mode == Mode::PendingInstallFailed) {
             return;
+        }
 
         busy = true;
         const auto product = processor.getProductSlug();
         const auto currentVersion = juce::String (JucePlugin_VersionString);
         const auto track = selectedReleaseTrack();
         const auto variant = desiredUpdateVariant();
-        auto foundVersion = std::make_shared<std::optional<osci::licensing::VersionInfo>>();
+        auto foundVersion = std::make_shared<std::optional<osci::VersionInfo>>();
         auto result = std::make_shared<juce::Result> (juce::Result::ok());
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
 
-        juce::Thread::launch ([safeThis, foundVersion, result, product, currentVersion, track, variant, showErrors]
-        {
-            osci::licensing::UpdateChecker checker;
+        juce::Thread::launch ([safeThis, foundVersion, result, product, currentVersion, track, variant, showErrors] {
+            osci::UpdateChecker checker;
             *foundVersion = checker.checkForUpdate (product, currentVersion, track, variant);
             *result = checker.getLastResult();
 
-            juce::MessageManager::callAsync ([safeThis, foundVersion, result, showErrors]
-            {
-                if (safeThis == nullptr)
-                    return;
-
-                safeThis->busy = false;
-                if (result->failed())
-                {
-                    if (showErrors)
-                        safeThis->showFailure (result->getErrorMessage());
+            juce::MessageManager::callAsync ([safeThis, foundVersion, result, showErrors] {
+                if (safeThis == nullptr) {
                     return;
                 }
 
-                if (! foundVersion->has_value())
+                safeThis->busy = false;
+                if (result->failed()) {
+                    if (showErrors) {
+                        safeThis->showFailure (result->getErrorMessage());
+                    }
                     return;
+                }
 
-                if (safeThis->isDismissed ((*foundVersion)->semver))
+                if (! foundVersion->has_value()) {
                     return;
+                }
+
+                if (safeThis->isDismissed ((*foundVersion)->semver)) {
+                    return;
+                }
 
                 safeThis->showAvailable (**foundVersion);
             });
         });
     }
 
-    void showAvailable (const osci::licensing::VersionInfo& version)
-    {
+    void showAvailable (const osci::VersionInfo& version) {
         availableVersion = version;
         downloadedFile = juce::File();
         mode = Mode::Available;
@@ -158,6 +181,7 @@ private:
         detailLabel.setText ("Version " + version.semver + " is ready for " + version.releaseTrack + ".", juce::dontSendNotification);
         primaryButton.setButtonText ("Update");
         secondaryButton.setButtonText ("Later");
+        secondaryButton.setVisible (true);
         primaryButton.setEnabled (true);
         secondaryButton.setEnabled (true);
         setVisible (true);
@@ -165,14 +189,14 @@ private:
         repaint();
     }
 
-    void showFailure (juce::StringRef message)
-    {
+    void showFailure (juce::StringRef message) {
         mode = Mode::Failed;
         progressBar.setVisible (false);
         titleLabel.setText ("Update failed", juce::dontSendNotification);
         detailLabel.setText (message, juce::dontSendNotification);
         primaryButton.setButtonText ("Retry");
         secondaryButton.setButtonText ("Later");
+        secondaryButton.setVisible (true);
         primaryButton.setEnabled (true);
         secondaryButton.setEnabled (true);
         setVisible (true);
@@ -180,10 +204,10 @@ private:
         repaint();
     }
 
-    void downloadUpdate()
-    {
-        if (! availableVersion.has_value() || busy)
+    void downloadUpdate() {
+        if (! availableVersion.has_value() || busy) {
             return;
+        }
 
         busy = true;
         mode = Mode::Downloading;
@@ -198,38 +222,34 @@ private:
         auto downloaded = std::make_shared<juce::File>();
         auto result = std::make_shared<juce::Result> (juce::Result::ok());
         const auto version = *availableVersion;
-        const auto token = processor.getLicenseManager().getCachedToken();
+        const auto token = processor.licenseManager.getCachedToken();
         const auto product = processor.getProductSlug();
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
 
-        juce::Thread::launch ([safeThis, downloaded, result, version, token, product]
-        {
-            osci::licensing::Downloader::Config config;
-            config.downloadDirectory = osci::licensing::HardwareInfo::getDefaultStorageDirectory (product).getChildFile ("downloads");
-            osci::licensing::Downloader downloader (config);
-            *result = downloader.downloadAndVerify (version, token, [safeThis] (double fraction, juce::int64)
-            {
-                juce::MessageManager::callAsync ([safeThis, fraction]
-                {
-                    if (safeThis != nullptr && fraction >= 0.0)
-                    {
+        juce::Thread::launch ([safeThis, downloaded, result, version, token, product] {
+            osci::Downloader::Config config;
+            config.downloadDirectory = osci::HardwareInfo::getDefaultStorageDirectory (product).getChildFile ("downloads");
+            osci::Downloader downloader (config);
+            *result = downloader.downloadAndVerify (version, token, [safeThis] (double fraction, juce::int64) {
+                juce::MessageManager::callAsync ([safeThis, fraction] {
+                    if (safeThis != nullptr && fraction >= 0.0) {
                         safeThis->progressValue = juce::jlimit (0.0, 1.0, fraction);
                         safeThis->repaint();
                     }
                 });
             });
 
-            if (result->wasOk())
+            if (result->wasOk()) {
                 *downloaded = downloader.getDownloadedFile();
+            }
 
-            juce::MessageManager::callAsync ([safeThis, downloaded, result]
-            {
-                if (safeThis == nullptr)
+            juce::MessageManager::callAsync ([safeThis, downloaded, result] {
+                if (safeThis == nullptr) {
                     return;
+                }
 
                 safeThis->busy = false;
-                if (result->failed())
-                {
+                if (result->failed()) {
                     safeThis->showFailure (result->getErrorMessage());
                     return;
                 }
@@ -242,6 +262,7 @@ private:
                 safeThis->detailLabel.setText ("The update was downloaded and verified.", juce::dontSendNotification);
                 safeThis->primaryButton.setButtonText ("Install");
                 safeThis->secondaryButton.setButtonText ("Later");
+                safeThis->secondaryButton.setVisible (true);
                 safeThis->primaryButton.setEnabled (true);
                 safeThis->secondaryButton.setEnabled (true);
                 safeThis->resized();
@@ -250,74 +271,55 @@ private:
         });
     }
 
-    void installUpdate()
-    {
-        if (! downloadedFile.existsAsFile())
+    void installUpdate() {
+        if (! downloadedFile.existsAsFile()) {
             return;
-
-        const auto file = downloadedFile;
-        juce::AlertWindow::showOkCancelBox (
-            juce::AlertWindow::WarningIcon,
-            "Install Update",
-            "Save your work before continuing. If this is running inside a DAW, close the host before completing the installer.",
-            "Install",
-            "Cancel",
-            this,
-            juce::ModalCallbackFunction::create ([file] (int result)
-            {
-                if (result == 0)
-                    return;
-
-                if (! osci::licensing::InstallerLauncher::launchAndExitHost (file))
-                {
-                    juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                            "Install Update",
-                                                            "Could not launch the downloaded installer.");
-                }
-            }));
-    }
-
-    void dismissFor48Hours()
-    {
-        if (availableVersion.has_value())
-        {
-            processor.setGlobalValue ("dismissedUpdateSemver", availableVersion->semver);
-            processor.setGlobalValue ("dismissedUpdateAt", currentTimeSeconds());
-            processor.saveGlobalSettings();
         }
 
-        mode = Mode::Hidden;
-        setVisible (false);
+        const auto file = downloadedFile;
+        const auto version = availableVersion;
+        const auto product = processor.getProductSlug();
+        const auto currentVersion = juce::String (JucePlugin_VersionString);
+        auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
+
+        osci::showInstallConfirmation (
+            this,
+            [safeThis, file, version, product, currentVersion] {
+                if (! osci::launchInstallerWithPendingMarker (file, version, product, currentVersion)) {
+                    return;
+                }
+
+                if (safeThis != nullptr) {
+                    safeThis->hidePrompt();
+                }
+            });
     }
 
-    bool isDismissed (const juce::String& semver) const
-    {
-        if (processor.getGlobalStringValue ("dismissedUpdateSemver") != semver)
-            return false;
+    void dismissFor48Hours() {
+        if (availableVersion.has_value()) {
+            osci::UpdateSettings(processor.getProductSlug()).dismiss (availableVersion->semver, currentTimeSeconds());
+        }
 
-        const auto dismissedAt = processor.getGlobalDoubleValue ("dismissedUpdateAt", 0.0);
-        return dismissedAt > 0.0 && (currentTimeSeconds() - dismissedAt) < (48.0 * 60.0 * 60.0);
+        hidePrompt();
     }
 
-    osci::licensing::ReleaseTrack selectedReleaseTrack() const
-    {
-        if (processor.getGlobalBoolValue ("betaUpdatesEnabled")
-            && processor.getGlobalStringValue ("releaseTrack", "stable") == "beta")
-            return osci::licensing::ReleaseTrack::Beta;
-
-        return osci::licensing::ReleaseTrack::Stable;
+    bool isDismissed (const juce::String& semver) const {
+        return osci::UpdateSettings(processor.getProductSlug()).isDismissed (semver, currentTimeSeconds());
     }
 
-    juce::String desiredUpdateVariant() const
-    {
-        if (processor.getLicenseManager().hasPremium())
+    osci::ReleaseTrack selectedReleaseTrack() const {
+        return osci::UpdateSettings(processor.getProductSlug()).releaseTrack();
+    }
+
+    juce::String desiredUpdateVariant() const {
+        if (processor.licenseManager.hasPremium()) {
             return "premium";
+        }
 
         return compiledVariant();
     }
 
-    static juce::String compiledVariant()
-    {
+    static juce::String compiledVariant() {
 #if OSCI_PREMIUM
         return "premium";
 #else
@@ -325,17 +327,74 @@ private:
 #endif
     }
 
-    static double currentTimeSeconds()
-    {
+    static double currentTimeSeconds() {
         return static_cast<double> (juce::Time::currentTimeMillis()) / 1000.0;
     }
 
-    void refreshParentLayout()
-    {
-        if (auto* parent = getParentComponent())
+    void showInstallSucceeded (const osci::PendingInstallMarker& marker) {
+        availableVersion.reset();
+        pendingInstallRetryMarker.reset();
+        downloadedFile = juce::File();
+        mode = Mode::InstallSucceeded;
+        progressBar.setVisible (false);
+        titleLabel.setText ("Update installed", juce::dontSendNotification);
+        detailLabel.setText ("Version " + marker.targetVersion + " is now running.", juce::dontSendNotification);
+        primaryButton.setButtonText ("OK");
+        secondaryButton.setVisible (false);
+        primaryButton.setEnabled (true);
+        setVisible (true);
+        refreshParentLayout();
+        repaint();
+    }
+
+    void showPendingInstallFailed (const osci::PendingInstallMarker& marker) {
+        pendingInstallRetryMarker = marker;
+        availableVersion = marker.toVersionInfo();
+        downloadedFile = marker.artifactPath.isNotEmpty() ? juce::File (marker.artifactPath) : juce::File();
+        mode = Mode::PendingInstallFailed;
+        progressBar.setVisible (false);
+        titleLabel.setText ("Install did not complete", juce::dontSendNotification);
+        detailLabel.setText ("Version " + marker.targetVersion + " was not installed.", juce::dontSendNotification);
+        primaryButton.setButtonText ("Retry");
+        secondaryButton.setButtonText ("Later");
+        secondaryButton.setVisible (true);
+        primaryButton.setEnabled (true);
+        secondaryButton.setEnabled (true);
+        setVisible (true);
+        refreshParentLayout();
+        repaint();
+    }
+
+    void retryPendingInstall() {
+        if (! pendingInstallRetryMarker.has_value()) {
+            return;
+        }
+
+        availableVersion = pendingInstallRetryMarker->toVersionInfo();
+
+        if (osci::PendingInstall::validateArtifact (*pendingInstallRetryMarker).wasOk()) {
+            downloadedFile = juce::File (pendingInstallRetryMarker->artifactPath);
+            installUpdate();
+            return;
+        }
+
+        downloadedFile = juce::File();
+        downloadUpdate();
+    }
+
+    void hidePrompt() {
+        mode = Mode::Hidden;
+        setVisible (false);
+        refreshParentLayout();
+    }
+
+    void refreshParentLayout() {
+        auto* parent = getParentComponent();
+        if (parent != nullptr) {
             parent->resized();
-        else
+        } else {
             resized();
+        }
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UpdatePromptComponent)

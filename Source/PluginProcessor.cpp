@@ -171,8 +171,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     // Apply global default LFO preset if set
     {
-        auto defaultFactory = getGlobalStringValue("defaultLfoPreset");
-        auto defaultFile = getGlobalStringValue("defaultLfoPresetFile");
+        auto defaultFactory = globalSettings.getString("defaultLfoPreset");
+        auto defaultFile = globalSettings.getString("defaultLfoPresetFile");
         if (defaultFile.isNotEmpty()) {
             juce::File file(defaultFile);
             if (file.existsAsFile()) {

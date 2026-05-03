@@ -4,6 +4,10 @@
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
 - **README files**: Do not edit `README.md` files unless the user explicitly asks for README changes.
+- **Brace style**: Use same-line opening braces for functions and control flow, e.g. `void f() {` and `if (condition) {`, not Allman-style braces on the next line.
+- **Else style**: Put `else` on the same line as the preceding closing brace, e.g. `} else {`.
+- **Required braces**: Always use braces for control-flow bodies, even for single-line `if`, `else`, `for`, and `while` bodies.
+- **Control flow clarity**: Avoid initializer statements in `if`/`switch` conditions. Prefer a named local variable before the condition, especially for `juce::Result` values.
 
 ## GitHub Actions Monitoring
 
