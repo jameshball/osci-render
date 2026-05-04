@@ -123,7 +123,7 @@ def main(argv: list[str]) -> int:
                    help='Release track to register with the API. CI should publish alpha.')
     p.add_argument('--variant', default='premium', choices=['free', 'premium'],
                    help='Licensing variant of the build (free or premium); separate Version row per variant.')
-    p.add_argument('--artifact-kind', required=True, choices=['pkg', 'exe', 'zip', 'appimage', 'tar.gz'])
+    p.add_argument('--artifact-kind', required=True, choices=['pkg', 'dmg', 'exe', 'binary', 'zip', 'appimage', 'tar.gz'])
     p.add_argument('--artifact', required=True, type=Path,
                    help='Path to the artifact file on disk; uploaded as-is to R2')
     p.add_argument('--filename', default=None,
