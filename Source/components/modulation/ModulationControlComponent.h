@@ -44,7 +44,7 @@ public:
                                iconBounds.getBottom() - 3.0f);
 
             bool iconHover = iconHovered;
-            g.setColour(iconHover ? juce::Colours::white.withAlpha(0.7f) : Colours::grey());
+            g.setColour(iconHover ? juce::Colours::white.withAlpha(0.7f) : osci::Colours::grey());
             drawIcon(g, iconBounds.reduced(2.0f, 2.0f));
         }
     }

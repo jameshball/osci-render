@@ -17,11 +17,11 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(videoCodecLabel);
     addAndMakeVisible(customSharedTextureOutputLabel);
     addAndMakeVisible(customSharedTextureOutputEditor);
-    
+
     quality.setRangeEnabled(false);
     resolution.setRangeEnabled(false);
     frameRate.setRangeEnabled(false);
-    
+
     updateLosslessAudioEnabled();
     recordAudio.onClick = [this] {
         if (!recordAudio.getToggleState() && !recordVideo.getToggleState()) {
@@ -44,7 +44,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     compressionPreset.addItemList(parameters.compressionPresets, 1);
     compressionPreset.setSelectedId(parameters.compressionPresets.indexOf(parameters.compressionPreset) + 1);
     compressionPresetLabel.setTooltip("The compression preset to use when recording video. Slower presets will produce smaller files at the expense of encoding time.");
-    
+
     // Setup the codec selector
     videoCodecSelector.addItem("H.264", static_cast<int>(VideoCodec::H264) + 1);
     videoCodecSelector.addItem("H.265/HEVC", static_cast<int>(VideoCodec::H265) + 1);
@@ -61,7 +61,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
         updateLosslessAudioEnabled();
     };
     videoCodecLabel.setTooltip("The video codec to use when recording. Different codecs offer different trade-offs between quality, file size, and compatibility.");
-    
+
     customSharedTextureOutputLabel.setTooltip("Custom name for when creating a new Syphon/Spout server. WARNING: You should not use the same name when running multiple servers at once!.");
     customSharedTextureOutputEditor.setText(parameters.customSharedTextureServerName);
     customSharedTextureOutputEditor.onTextChange = [this] {
@@ -70,15 +70,15 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 #else
     addAndMakeVisible(recordVideoWarning);
     addAndMakeVisible(sosciLink);
-    
+
     recordVideoWarning.setText("Recording video is only available in osci-render premium or sosci.");
     recordVideoWarning.setJustification(juce::Justification::centred);
-    recordVideoWarning.setColour(juce::TextEditor::textColourId, Colours::accentColor());
+    recordVideoWarning.setColour(juce::TextEditor::textColourId, osci::Colours::accentColor());
     recordVideoWarning.setMultiLine(true);
     recordVideoWarning.setReadOnly(true);
     recordVideoWarning.setInterceptsMouseClicks(false, false);
-    
-    sosciLink.setColour(juce::HyperlinkButton::textColourId, Colours::accentColor());
+
+    sosciLink.setColour(juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
 #endif
 }
 
@@ -92,7 +92,7 @@ void RecordingSettings::updateLosslessAudioEnabled() {
 void RecordingSettings::resized() {
 	auto area = getLocalBounds().reduced(20);
     double rowHeight = 30;
-    
+
 #if OSCI_PREMIUM
     losslessAudio.setBounds(area.removeFromTop(rowHeight));
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
@@ -101,16 +101,16 @@ void RecordingSettings::resized() {
     frameRate.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     recordAudio.setBounds(area.removeFromTop(rowHeight));
     recordVideo.setBounds(area.removeFromTop(rowHeight));
-    
+
     auto row = area.removeFromTop(rowHeight);
     compressionPresetLabel.setBounds(row.removeFromLeft(170));
     compressionPreset.setBounds(row.removeFromRight(100));
-    
+
     area.removeFromTop(5);
     row = area.removeFromTop(rowHeight);
     videoCodecLabel.setBounds(row.removeFromLeft(170));
     videoCodecSelector.setBounds(row.removeFromRight(100));
-    
+
     area.removeFromTop(5);
     row = area.removeFromTop(rowHeight);
     customSharedTextureOutputLabel.setBounds(row.removeFromLeft(170));

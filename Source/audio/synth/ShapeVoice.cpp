@@ -288,12 +288,13 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     const double dt = 1.0 / sampleRate;
 
     // Snapshot DAW transport once per block (constant within a processBlock call)
-    const double blockBpm = audioProcessor.luaBpm.load(std::memory_order_relaxed);
-    const double blockPlayTime = audioProcessor.luaPlayTime.load(std::memory_order_relaxed);
-    const double blockPlayTimeBeats = audioProcessor.luaPlayTimeBeats.load(std::memory_order_relaxed);
-    const bool blockIsPlaying = audioProcessor.luaIsPlaying.load(std::memory_order_relaxed);
-    const int blockTimeSigNum = audioProcessor.luaTimeSigNum.load(std::memory_order_relaxed);
-    const int blockTimeSigDen = audioProcessor.luaTimeSigDen.load(std::memory_order_relaxed);
+    const auto& dawPosition = audioProcessor.dawPosition;
+    const double blockBpm = dawPosition.bpm.load(std::memory_order_relaxed);
+    const double blockPlayTime = dawPosition.seconds.load(std::memory_order_relaxed);
+    const double blockPlayTimeBeats = dawPosition.beats.load(std::memory_order_relaxed);
+    const bool blockIsPlaying = dawPosition.isPlaying.load(std::memory_order_relaxed);
+    const int blockTimeSigNum = dawPosition.timeSigNumerator.load(std::memory_order_relaxed);
+    const int blockTimeSigDen = dawPosition.timeSigDenominator.load(std::memory_order_relaxed);
 
     // Snapshot the sound pointer once per block.  The underlying ShapeSound
     // is ref-counted so it stays alive even if another thread swaps it out.

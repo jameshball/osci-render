@@ -7,8 +7,8 @@
 // ---- RulesPanel paint: darker rounded background ----
 
 void FractalComponent::RulesPanel::paint(juce::Graphics& g) {
-    g.setColour(Colours::darker().darker(0.3f));
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+    g.setColour(osci::Colours::darker().darker(0.3f));
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), osci::LookAndFeel::RECT_RADIUS);
 }
 
 // ---- FractalComponent ----

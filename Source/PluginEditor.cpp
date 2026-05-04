@@ -28,7 +28,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     // Create timeline controllers for osci-render
     animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
     audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
-    
+
     // Register the file removal callback
     registerFileRemovedCallback();
 
@@ -37,8 +37,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     upgradeButton.onClick = [this] {
         showPremiumSplashScreen();
     };
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
 #else
     addChildComponent(mtsEspLabel);
     mtsEspLabel.setFont(juce::Font(juce::FontOptions(11.0f)));
@@ -222,6 +222,9 @@ bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
         || name.endsWith(".obj")
 #if OSCI_PREMIUM
         || name.endsWith(".lsystem")
+    || name.endsWith(".json")
+    || name.endsWith(".lottie")
+    || name.endsWith(".lot")
 #endif
         ;
 }
@@ -261,6 +264,7 @@ void OscirenderAudioProcessorEditor::resized() {
         visualiser.setBounds(area);
         undoButton.setVisible(false);
         redoButton.setVisible(false);
+        betaUpdatesButton.setVisible(false);
         return;
     }
 
@@ -272,6 +276,7 @@ void OscirenderAudioProcessorEditor::resized() {
 #if !OSCI_PREMIUM
         upgradeButton.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
 #endif
+    layoutBetaUpdatesButton(topBar);
         // Menu bar gets priority — allocate from the left first
         menuBar.setBounds(topBar.removeFromLeft(juce::jmin(kMenuBarMaxWidth, topBar.getWidth())));
         // Right-side items share whatever remains, clamped to available width
@@ -361,7 +366,7 @@ void OscirenderAudioProcessorEditor::resized() {
         console.setVisible(luaFileOpen);
         luaResizerBar.setVisible(luaFileOpen);
         lua.setVisible(luaFileOpen);
-        
+
         // Hide txtFont if code editor is not visible
         if (!fileOpen) {
             txtFont.setVisible(false);
@@ -695,35 +700,16 @@ void OscirenderAudioProcessorEditor::showLuaDocumentation() {
     if (findActiveOverlay<LuaDocumentationComponent>() != nullptr)
         return;
 
-    if (!cachedLuaDocs) {
-        cachedLuaDocs = std::make_unique<LuaDocumentationComponent>();
-    }
-
-    std::unique_ptr<OverlayComponent> overlay(cachedLuaDocs.release());
-    showOverlay(std::move(overlay));
-}
-
-void OscirenderAudioProcessorEditor::dismissOverlay(OverlayComponent* overlay) {
-    // Reclaim LuaDocumentationComponent for reuse before the base class destroys it
-    if (dynamic_cast<LuaDocumentationComponent*>(overlay)) {
-        for (auto& o : activeOverlays) {
-            if (o.get() == overlay) {
-                cachedLuaDocs.reset(static_cast<LuaDocumentationComponent*>(o.release()));
-                cachedLuaDocs->onDismissRequested = nullptr;
-                break;
-            }
-        }
-    }
-    CommonPluginEditor::dismissOverlay(overlay);
+    showOverlay(std::make_unique<LuaDocumentationComponent>());
 }
 
 void OscirenderAudioProcessorEditor::updateTimelineController() {
     std::shared_ptr<TimelineController> controller = nullptr;
-    
+
     int currentFileIndex = audioProcessor.getCurrentFileIndex();
     if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
         auto parser = audioProcessor.parsers[currentFileIndex];
-        
+
         // Check if it's an animatable file (gpla, gif, video)
         if (parser->isAnimatable) {
             controller = animationTimelineController;
@@ -733,7 +719,7 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
             controller = audioTimelineController;
         }
     }
-    
+
     visualiser.setTimelineController(controller);
 }
 

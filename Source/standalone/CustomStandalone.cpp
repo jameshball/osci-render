@@ -49,8 +49,10 @@
 #include <juce_audio_plugin_client/detail/juce_PluginUtilities.h>
 
 #include <juce_audio_devices/juce_audio_devices.h>
+#include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <osci_render_core/settings/osci_SettingsStore.h>
 
 #if JUCE_MAC && OSCI_PREMIUM
  #include "../audio/platform/ProcessAudioPermissions.h"
@@ -73,18 +75,7 @@ class CustomStandaloneFilterApp final : public JUCEApplication
 public:
     CustomStandaloneFilterApp()
     {
-        PropertiesFile::Options options;
-
-        options.applicationName     = CharPointer_UTF8 (JucePlugin_Name);
-        options.filenameSuffix      = ".settings";
-        options.osxLibrarySubFolder = "Application Support";
-       #if JUCE_LINUX || JUCE_BSD
-        options.folderName          = "~/.config";
-       #else
-        options.folderName          = "";
-       #endif
-
-        appProperties.setStorageParameters (options);
+        appProperties.setStorageParameters (::osci::SettingsStore::optionsForStandaloneApp (String (CharPointer_UTF8 (JucePlugin_Name))));
     }
 
     const String getApplicationName() override              { return CharPointer_UTF8 (JucePlugin_Name); }

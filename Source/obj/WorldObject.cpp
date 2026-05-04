@@ -128,6 +128,25 @@ WorldObject::WorldObject(const std::string& obj_string) {
             edge_set.insert(std::make_pair(first, last));
             face++;
         }
+
+        // process line elements ('l' directives in OBJ)
+        int li = 0;
+        int line = 0;
+        while (li < shape.lines.indices.size()) {
+            int prevVertex = -1;
+            int num_line_vertices = shape.lines.num_line_vertices[line];
+            for (int j = 0; j < num_line_vertices; j++) {
+                int vertex = shape.lines.indices[li].vertex_index;
+                if (prevVertex != -1) {
+                    int first = std::min(prevVertex, vertex);
+                    int last = std::max(prevVertex, vertex);
+                    edge_set.insert(std::make_pair(first, last));
+                }
+                prevVertex = vertex;
+                li++;
+            }
+            line++;
+        }
 	}
 
     std::list<std::pair<int, int>> edge_list;

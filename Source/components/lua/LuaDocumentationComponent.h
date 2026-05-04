@@ -2,13 +2,12 @@
 
 #include <JuceHeader.h>
 #include "LuaCodeSnippet.h"
-#include "../OverlayComponent.h"
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 
 // Full-screen overlay displaying Lua scripting documentation.
 // Uses a Viewport over a content component with headings, body
 // text, and syntax-highlighted read-only code snippets.
-class LuaDocumentationComponent : public OverlayComponent {
+class LuaDocumentationComponent : public osci::OverlayComponent {
 public:
     LuaDocumentationComponent();
     ~LuaDocumentationComponent() override = default;
@@ -27,9 +26,6 @@ private:
 
     void buildDocumentation();
     void layoutContent(int width);
-
-    juce::Label titleLabel;
-    std::unique_ptr<SvgButton> closeButton;
 
     juce::Viewport viewport;
     juce::Component contentComponent;

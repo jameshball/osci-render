@@ -1,8 +1,8 @@
 #include "EffectTypeGridComponent.h"
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
-#include "../GridComponent.h"
-#include "../GridItemComponent.h"
+#include <osci_gui/osci_gui.h>
+#include <osci_gui/osci_gui.h>
 #include "../../PluginEditor.h"
 #include <unordered_set>
 #include <algorithm>
@@ -58,7 +58,7 @@ void EffectTypeGridComponent::setupEffectItems()
         juce::String effectName = effect->getName();
 
         // Create new generic item component
-        auto* item = new GridItemComponent(effectName, effect->getIcon(), effect->getId());
+        auto* item = new osci::GridItemComponent(effectName, effect->getIcon(), effect->getId());
 
         const bool isLockedPremium =
 #if !OSCI_PREMIUM
@@ -83,19 +83,19 @@ void EffectTypeGridComponent::setupEffectItems()
                     onEffectSelected(effectId);
             };
             item->onHoverStart = [this](const juce::String& effectId) {
-                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                if (audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.setPreviewEffectId(effectId);
                 }
 #if OSCI_PREMIUM
-                if (audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
+                if (audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
                     audioProcessor.autoAssignLfosForPreview(effectId);
                     audioProcessor.broadcaster.sendChangeMessage();
                 }
 #endif
             };
             item->onHoverEnd = [this]() {
-                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                if (audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.clearPreviewEffect();
                 }

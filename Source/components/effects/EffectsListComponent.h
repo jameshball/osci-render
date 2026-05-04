@@ -6,7 +6,7 @@
 #include "../ComponentList.h"
 #include "../SwitchButton.h"
 #include "EffectTypeGridComponent.h"
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include <random>
 #include <unordered_map>
 
@@ -230,7 +230,7 @@ protected:
     ComponentListModel listModel { ROW_HEIGHT };
     VListBox list;
     jux::SwitchButton enabled = { effect.enabled };
-    SvgButton closeButton = SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
+    osci::SvgButton closeButton = osci::SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

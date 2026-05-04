@@ -40,3 +40,18 @@
 [submodule "modules/juce_mts_esp"]
 	path = modules/juce_mts_esp
 	url = https://github.com/jameshball/juce_mts_esp.git
+[submodule "modules/thorvg"]
+	path = modules/thorvg
+        url = https://github.com/jameshball/thorvg.git
+        branch = osci-render-trim-getter
+[submodule "modules/Clipper2"]
+	path = modules/Clipper2
+	url = https://github.com/AngusJohnson/Clipper2.git
+[submodule "modules/osci_licensing"]
+	path = modules/osci_licensing
+	url = https://github.com/jameshball/osci_licensing.git
+	branch = main
+[submodule "modules/osci_gui"]
+	path = modules/osci_gui
+	url = git@github.com:jameshball/osci_gui.git
+	branch = main

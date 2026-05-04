@@ -2,7 +2,7 @@
 #include <JuceHeader.h>
 #include "../lua/LuaParser.h"
 #include "../PluginProcessor.h"
-#include "SvgButton.h"
+#include <osci_gui/osci_gui.h>
 
 class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener, public juce::AsyncUpdater {
  public:
@@ -109,7 +109,7 @@ public:
     OscirenderCodeEditorComponent(juce::CodeDocument& document, juce::CodeTokeniser* codeTokeniser, OscirenderAudioProcessor& p, juce::String id, juce::String fileName) : editor(document, codeTokeniser, id), audioProcessor(p) {
         setText(fileName);
         setTextLabelPosition(juce::Justification::centred);
-        setColour(groupComponentBackgroundColourId, Colours::veryDark());
+        setColour(osci::groupComponentBackgroundColourId, osci::Colours::veryDark());
         
         editor.setScrollbarThickness(8);
         addAndMakeVisible(editor);
@@ -140,17 +140,17 @@ public:
         return editor;
     }
 
-    void setHelpButton(SvgButton* button) {
+    void setHelpButton(osci::SvgButton* button) {
         setButton(helpButton, button);
     }
 
-    void setResetButton(SvgButton* button) {
+    void setResetButton(osci::SvgButton* button) {
         setButton(resetButton, button);
     }
 
 private:
 
-    void setButton(SvgButton*& member, SvgButton* button) {
+    void setButton(osci::SvgButton*& member, osci::SvgButton* button) {
         if (member == button) return;
         if (member != nullptr) {
             removeChildComponent(member);
@@ -163,6 +163,6 @@ private:
 
     ErrorCodeEditorComponent editor;
     OscirenderAudioProcessor& audioProcessor;
-    SvgButton* helpButton = nullptr;
-    SvgButton* resetButton = nullptr;
+    osci::SvgButton* helpButton = nullptr;
+    osci::SvgButton* resetButton = nullptr;
 };

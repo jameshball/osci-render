@@ -27,8 +27,8 @@ public:
         float ry = bounds.getHeight();
 
         juce::ColourGradient gradient(
-            Colours::darker(), centre.x, centre.y,
-            Colours::darker().withAlpha(0.0f), centre.x + rx, centre.y, true);
+            osci::Colours::darker(), centre.x, centre.y,
+            osci::Colours::darker().withAlpha(0.0f), centre.x + rx, centre.y, true);
         g.setGradientFill(gradient);
         g.fillEllipse(centre.x - rx, centre.y - ry, rx * 2.0f, ry * 2.0f);
 

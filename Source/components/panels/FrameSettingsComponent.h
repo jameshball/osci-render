@@ -7,36 +7,36 @@
 #include "../SwitchButton.h"
 
 class OscirenderAudioProcessorEditor;
-class FrameSettingsComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {
+
+class FrameSettingsComponent : public juce::GroupComponent,
+                               public juce::AudioProcessorParameter::Listener,
+                               private juce::AsyncUpdater
+{
 public:
     FrameSettingsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
-	~FrameSettingsComponent();
+    ~FrameSettingsComponent() override;
 
     void resized() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
+
     void update();
     void setAnimated(bool animated);
     void setImage(bool image);
     int getPreferredHeight() const;
-    
+
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
-    
+
     bool animated = true;
     bool image = true;
-    
-    // Cached preferred height calculated during resized()
     mutable int cachedPreferredHeight = 0;
 
-    jux::SwitchButton animate{audioProcessor.animateFrames};
     jux::SwitchButton sync{audioProcessor.animationSyncBPM};
-    juce::Label rateLabel{ "Framerate","Framerate"};
-    juce::Label offsetLabel{ "Offset","Offset" };
-    DoubleTextBox rateBox{ audioProcessor.animationRate->min, audioProcessor.animationRate->max };
-    DoubleTextBox offsetBox{ audioProcessor.animationOffset->min, audioProcessor.animationRate->max };
+    juce::Label offsetLabel{"Offset", "Offset"};
+    DoubleTextBox offsetBox{audioProcessor.animationOffset->min, audioProcessor.animationOffset->max};
 
     jux::SwitchButton invertImage{audioProcessor.invertImage};
     EffectComponent threshold{*audioProcessor.imageThreshold};

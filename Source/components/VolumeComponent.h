@@ -3,9 +3,9 @@
 #include <JuceHeader.h>
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
-#include "SvgButton.h"
+#include <osci_gui/osci_gui.h>
 
-class ThumbRadiusLookAndFeel : public OscirenderLookAndFeel {
+class ThumbRadiusLookAndFeel : public PluginLookAndFeel {
 public:
     ThumbRadiusLookAndFeel(int thumbRadius) : thumbRadius(thumbRadius) {}
 
@@ -36,7 +36,7 @@ public:
         juce::Path p;
         float arrowWidth = diameter;
         float arrowHeight = diameter;
-        
+
         // Start at the point of the arrow
         p.startNewSubPath(x, y + arrowHeight * 0.5f);
         // Draw line to top-right corner
@@ -69,21 +69,21 @@ public:
 
 private:
     CommonAudioProcessor& audioProcessor;
-    
+
     const int DEFAULT_SAMPLE_RATE = 192000;
     const double BUFFER_DURATION_SECS = 1.0/60.0;
-    
+
     int sampleRate = DEFAULT_SAMPLE_RATE;
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;
-	
+
     ThumbRadiusLookAndFeel thumbRadiusLookAndFeel{12};
     juce::Slider volumeSlider;
     ThresholdLookAndFeel thresholdLookAndFeel{7};
 	juce::Slider thresholdSlider;
 
-    SvgButton volumeButton = SvgButton("VolumeButton", BinaryData::volume_svg, juce::Colours::white, juce::Colours::red, audioProcessor.muteParameter, BinaryData::mute_svg);
+    osci::SvgButton volumeButton = osci::SvgButton("VolumeButton", BinaryData::volume_svg, juce::Colours::white, juce::Colours::red, audioProcessor.muteParameter, BinaryData::mute_svg);
 
     // Animation smoothing
     juce::SmoothedValue<float> leftVolumeSmoothed;

@@ -6,7 +6,7 @@
 // Shared paint routine for Vital-inspired dark rounded-bar controls.
 namespace DarkBarPainter {
 
-static constexpr int kLabelHeight = Colours::kLabelHeight;
+static constexpr int kLabelHeight = osci::Colours::kLabelHeight;
 
 // Paint the common elements: content background and label strip.
 inline void paintBackground(juce::Graphics& g,
@@ -17,7 +17,7 @@ inline void paintBackground(juce::Graphics& g,
                             float /*cornerRadius*/ = 4.0f) {
     juce::ignoreUnused(hovering);
 
-    float radius = Colours::kPillRadius;
+    float radius = osci::Colours::kPillRadius;
 
     if (!labelArea.isEmpty()) {
         // Content area (rounded top corners, flat bottom)
@@ -26,7 +26,7 @@ inline void paintBackground(juce::Graphics& g,
         contentPath.addRoundedRectangle(contentBounds.getX(), contentBounds.getY(),
                                         contentBounds.getWidth(), contentBounds.getHeight(),
                                         radius, radius, true, true, false, false);
-        g.setColour(Colours::evenDarker());
+        g.setColour(osci::Colours::evenDarker());
         g.fillPath(contentPath);
 
         // Label strip (flat top, rounded bottom corners) — same width as content
@@ -35,14 +35,14 @@ inline void paintBackground(juce::Graphics& g,
         labelPath.addRoundedRectangle(labelBounds.getX(), labelBounds.getY(),
                                        labelBounds.getWidth(), labelBounds.getHeight(),
                                        radius, radius, false, false, true, true);
-        g.setColour(Colours::darkerer());
+        g.setColour(osci::Colours::darkerer());
         g.fillPath(labelPath);
 
         g.setColour(juce::Colours::white);
         g.setFont(juce::Font(juce::FontOptions(10.0f)));
         g.drawText(labelText, labelBounds, juce::Justification::centred);
     } else {
-        g.setColour(Colours::evenDarker());
+        g.setColour(osci::Colours::evenDarker());
         g.fillRoundedRectangle(bounds, radius);
     }
 }

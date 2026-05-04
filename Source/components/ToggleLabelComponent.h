@@ -34,15 +34,15 @@ public:
         // Background pill
         juce::Colour bgColour;
         if (ccHelper.isLearning()) {
-            bgColour = Colours::midiLearnBackground();
+            bgColour = osci::Colours::midiLearnBackground();
         } else {
-            bgColour = on ? Colours::accentColor().withAlpha(0.25f)
-                          : Colours::darkerer();
+            bgColour = on ? osci::Colours::accentColor().withAlpha(0.25f)
+                          : osci::Colours::darkerer();
         }
         if (hovering)
             bgColour = bgColour.brighter(0.3f);
         g.setColour(bgColour);
-        g.fillRoundedRectangle(bounds, Colours::kPillRadius);
+        g.fillRoundedRectangle(bounds, osci::Colours::kPillRadius);
 
         // Text
         auto textColour = on ? juce::Colours::white

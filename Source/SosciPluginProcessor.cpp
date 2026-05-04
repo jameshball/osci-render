@@ -24,6 +24,14 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
         return;
     }
 
+#if OSCI_PREMIUM
+    if (! licenseManager.hasPremium()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
+#endif
+
     juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
     juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
     const float EPSILON = 0.0001f;
@@ -36,17 +44,24 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
 
     // Get source buffer (either from WAV parser or input)
     juce::AudioBuffer<float> sourceBuffer;
-    
-    juce::SpinLock::ScopedLockType lock2(wavParserLock);
-    bool readingFromWav = wavParser.isInitialised();
 
-    if (readingFromWav) {
-        wavBuffer.setSize(6, numSamples, false, true, true);
-        wavBuffer.clear();
-        wavParser.processBlock(wavBuffer);
-        sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
-    } else {
-        sourceBuffer = juce::AudioBuffer<float>(input.getArrayOfWritePointers(), input.getNumChannels(), numSamples);
+    {
+        // Scope the wavParserLock to only the section that accesses wavParser.
+        // This lock must NOT be held during threadManager.write() calls below,
+        // because those can block (wait_enqueue) when the consumer buffer is full,
+        // and the consumer chain depends on the message thread being responsive,
+        // which in turn may need this same lock (via AudioTimelineController::getCurrentPosition).
+        juce::SpinLock::ScopedLockType lock2(wavParserLock);
+        bool readingFromWav = wavParser.isInitialised();
+
+        if (readingFromWav) {
+            wavBuffer.setSize(6, numSamples, false, true, true);
+            wavBuffer.clear();
+            wavParser.processBlock(wavBuffer);
+            sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
+        } else {
+            sourceBuffer = juce::AudioBuffer<float>(input.getArrayOfWritePointers(), input.getNumChannels(), numSamples);
+        }
     }
 
     // Resize working buffer with 6 channels: x, y, z/brightness, r, g, b

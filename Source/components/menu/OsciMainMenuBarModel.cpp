@@ -73,11 +73,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
         addMenuItem(fileMenu, "Create New Project", [this] { editor.resetToDefault(); });
     }
 
-    addMenuItem(editMenu, "Undo", [this] { audioProcessor.getUndoManager().undo(); }, juce::String::fromUTF8("\xe2\x8c\x98Z"));
-    addMenuItem(editMenu, "Redo", [this] { audioProcessor.getUndoManager().redo(); }, juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"));
+    addEditMenuItems(editMenu, audioProcessor);
 
     addMenuItem(aboutMenu, "About osci-render", [this] {
-        juce::DialogWindow::LaunchOptions options;
         AboutComponent::Info aboutInfo;
         aboutInfo.imageData = BinaryData::logo_png;
         aboutInfo.imageSize = BinaryData::logo_pngSize;
@@ -89,6 +87,14 @@ void OsciMainMenuBarModel::resetMenuItems() {
 #else
         aboutInfo.isPremium = false;
 #endif
+        aboutInfo.betaUpdatesEnabled = osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled();
+        aboutInfo.onBetaUpdatesChanged = [this] (bool enabled) {
+            osci::UpdateSettings updateSettings(audioProcessor.getProductSlug());
+            updateSettings.setReleaseTrack(enabled ? osci::ReleaseTrack::Beta
+                                                   : osci::ReleaseTrack::Stable);
+            editor.refreshBetaUpdatesButton();
+            editor.resized();
+        };
         aboutInfo.websiteUrl = "https://osci-render.com";
         aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
         aboutInfo.credits = {
@@ -97,27 +103,21 @@ void OsciMainMenuBarModel::resetMenuItems() {
             { "BUS ERROR Collective", "Provided source code for the Hilligoss encoder" },
             { "Ener-G",             "Provided his L-system fractal script that formed the basis for the L-system implementation" },
             { "TheDumbDude",         "Contributed several example Lua files" },
+            { "LottieFiles",         "Free Lottie animations used as examples (lottiefiles.com)" },
         };
         aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));
 
-        AboutComponent* about = new AboutComponent(aboutInfo);
-        options.content.setOwned(about);
-        options.dialogTitle = "About";
-        options.dialogBackgroundColour = AboutComponent::dialogBackground();
-        options.escapeKeyTriggersCloseButton = true;
-#if JUCE_WINDOWS
-        // if not standalone, use native title bar for compatibility with DAWs
-        options.useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
-#elif JUCE_MAC
-        options.useNativeTitleBar = true;
-#endif
-        options.resizable = false;
-
-        options.launchAsync();
+       #if JUCE_WINDOWS
+        const bool useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
+       #else
+        const bool useNativeTitleBar = true;
+       #endif
+        AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
     });
-    addMenuItem(aboutMenu, "Open Log File", [this] {
-        audioProcessor.applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log").revealToUser();
+    addMenuItem(aboutMenu, "License and Updates...", [this] {
+        editor.openLicenseAndUpdates();
     });
+    addDiagnosticsMenuItems(aboutMenu, audioProcessor);
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
     });
@@ -170,30 +170,27 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
     // Interface menu
     addToggleMenuItem(interfaceMenu, "Preview effect on hover", [this] {
-        bool current = audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+        bool current = audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
         bool newValue = ! current;
-        audioProcessor.setGlobalValue("previewEffectOnHover", newValue);
-        audioProcessor.saveGlobalSettings();
+        audioProcessor.globalSettings.set("previewEffectOnHover", newValue);
+        audioProcessor.globalSettings.save();
         if (! newValue) {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             audioProcessor.clearPreviewEffect();
         }
         resetMenuItems(); // update tick state
-        }, [this] { return audioProcessor.getGlobalBoolValue("previewEffectOnHover", true);
+        }, [this] { return audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
     });
 
-    addToggleMenuItem(interfaceMenu, "Listen for Special Keys", [this] {
-        audioProcessor.setAcceptsKeys(! audioProcessor.getAcceptsKeys());
-        resetMenuItems();
-    }, [this] { return audioProcessor.getAcceptsKeys(); });
+    addListenForSpecialKeysMenuItem(interfaceMenu, audioProcessor);
 
     addToggleMenuItem(interfaceMenu, "Show MIDI Keyboard", [this] {
-        bool current = audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
-        audioProcessor.setGlobalValue("showMidiKeyboard", !current);
-        audioProcessor.saveGlobalSettings();
+        bool current = audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
+        audioProcessor.globalSettings.set("showMidiKeyboard", !current);
+        audioProcessor.globalSettings.save();
         editor.settings.resized();
         resetMenuItems();
-    }, [this] { return audioProcessor.getGlobalBoolValue("showMidiKeyboard", true); });
+    }, [this] { return audioProcessor.globalSettings.getBool("showMidiKeyboard", true); });
 }
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM

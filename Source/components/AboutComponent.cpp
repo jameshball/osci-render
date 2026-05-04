@@ -9,6 +9,21 @@ juce::Point<int> AboutComponent::preferredSize(const Info& info) {
     return { 520, (int)std::ceil(h) };
 }
 
+void AboutComponent::launchAsDialog(const Info& info, bool useNativeTitleBar) {
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned(new AboutComponent(info));
+    options.dialogTitle = "About";
+    options.dialogBackgroundColour = AboutComponent::dialogBackground();
+    options.escapeKeyTriggersCloseButton = true;
+   #if JUCE_WINDOWS || JUCE_MAC
+    options.useNativeTitleBar = useNativeTitleBar;
+   #else
+    juce::ignoreUnused (useNativeTitleBar);
+   #endif
+    options.resizable = false;
+    options.launchAsync();
+}
+
 AboutComponent::AboutComponent(const Info& info) : info(info) {
     logo = juce::ImageFileFormat::loadFrom(info.imageData, info.imageSize);
     logoComponent.setImage(logo);
@@ -26,16 +41,16 @@ AboutComponent::AboutComponent(const Info& info) : info(info) {
 
     // Brighten Discord brand colour so its hover/contrast feels similar to the accent buttons.
     const juce::Colour discordColour = juce::Colour::fromRGB(0x58, 0x65, 0xF2).brighter(0.4f);
-    setupBtn(websiteBtn, "Website", info.websiteUrl, Colours::accentColor());
+    setupBtn(websiteBtn, "Website", info.websiteUrl, osci::Colours::accentColor());
     setupBtn(discordBtn, "Join Discord", "https://discord.gg/ekjpQvT68C", discordColour);
-    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues", Colours::accentColor());
+    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues", osci::Colours::accentColor());
 
     auto sz = preferredSize(info);
     setSize(sz.x, sz.y);
 }
 
 void AboutComponent::paintCard(juce::Graphics& g, juce::Rectangle<float> area) const {
-    g.setColour(Colours::darkerer());
+    g.setColour(osci::Colours::darkerer());
     g.fillRoundedRectangle(area, kCardRadius);
 }
 
@@ -48,21 +63,27 @@ void AboutComponent::paint(juce::Graphics& g) {
     area.removeFromTop(6.0f);
 
     // Product name
-    g.setFont(juce::Font(juce::FontOptions(22.0f)).boldened());
+    g.setFont(juce::FontOptions(22.0f, juce::Font::bold));
     g.setColour(juce::Colours::white);
     g.drawText(info.productName, area.removeFromTop(24.0f), juce::Justification::centred);
 
     // "by Company"
-    g.setFont(juce::Font(juce::FontOptions(13.0f)));
+    g.setFont(juce::FontOptions(13.0f));
     g.setColour(juce::Colours::white.withAlpha(0.75f));
     g.drawText("by " + info.companyName, area.removeFromTop(18.0f), juce::Justification::centred);
 
-    // Version · Premium/Free
+    // Version / build status
     juce::String status = "Version " + info.versionString + "  \xc2\xb7  ";
     status += info.isPremium ? "Premium" : "Free";
-    g.setFont(juce::Font(juce::FontOptions(12.0f)));
-    g.setColour(juce::Colours::white.withAlpha(0.65f));
-    g.drawText(status, area.removeFromTop(16.0f), juce::Justification::centred);
+    if (info.betaUpdatesEnabled)
+        status += "  \xc2\xb7  Beta updates enabled";
+    if (betaUnlockMessage.isNotEmpty())
+        status = betaUnlockMessage;
+    g.setFont(juce::FontOptions(12.0f));
+    g.setColour(betaUnlockMessage.isNotEmpty() ? osci::Colours::accentColor().brighter(0.15f)
+                                                : juce::Colours::white.withAlpha(0.65f));
+    versionStatusBounds = area.removeFromTop(16.0f);
+    g.drawText(status, versionStatusBounds, juce::Justification::centred);
 
     area.removeFromTop(kGap);
 
@@ -74,24 +95,24 @@ void AboutComponent::paint(juce::Graphics& g) {
         auto inner = card.reduced(kCardPad + 4.0f, kCardPad);
 
         // Title
-        g.setFont(juce::Font(juce::FontOptions(11.0f)).boldened());
+        g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
         g.setColour(juce::Colours::white.withAlpha(0.75f));
         g.drawText("CONTRIBUTORS", inner.removeFromTop(20.0f), juce::Justification::centredLeft);
 
         // Entries
         for (auto& c : info.credits) {
             auto nameRow = inner.removeFromTop(18.0f);
-            g.setFont(juce::Font(juce::FontOptions(13.0f)).boldened());
+            g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
             g.setColour(juce::Colours::white);
             g.drawText(c.name, nameRow, juce::Justification::centredLeft);
 
             auto descRow = inner.removeFromTop(16.0f);
-            g.setFont(juce::Font(juce::FontOptions(12.0f)));
+            g.setFont(juce::FontOptions(12.0f));
             g.setColour(juce::Colours::white.withAlpha(0.7f));
             g.drawText(c.contribution, descRow, juce::Justification::centredLeft);
         }
 
-        g.setFont(juce::Font(juce::FontOptions(11.0f)).withStyle(juce::Font::italic));
+        g.setFont(juce::FontOptions(11.0f, juce::Font::italic));
         g.setColour(juce::Colours::white.withAlpha(0.6f));
         g.drawText("...and all the community!", inner.removeFromTop(18.0f), juce::Justification::centredLeft);
     }
@@ -105,7 +126,7 @@ void AboutComponent::paint(juce::Graphics& g) {
         paintCard(g, card);
         auto inner = card.reduced(kCardPad + 4.0f, kCardPad);
 
-        g.setFont(juce::Font(juce::FontOptions(12.0f)));
+        g.setFont(juce::FontOptions(12.0f));
         g.setColour(juce::Colours::white.withAlpha(0.65f));
 
         juce::String buildInfo = juce::String("Built ") + __DATE__ + "  \xc2\xb7  " + juce::SystemStats::getJUCEVersion();
@@ -130,4 +151,37 @@ void AboutComponent::resized() {
     discordBtn.setBounds(btnRow.removeFromLeft(btnW));
     btnRow.removeFromLeft((int)kBtnGap);
     issuesBtn.setBounds(btnRow);
+}
+
+void AboutComponent::mouseUp(const juce::MouseEvent& event) {
+    if (!versionStatusBounds.contains(event.position))
+        return;
+
+    betaUnlockClicks++;
+    const int remaining = 5 - betaUnlockClicks;
+    if (remaining > 0) {
+        const auto action = info.betaUpdatesEnabled ? "return to stable updates" : "enable beta updates";
+        showTemporaryBetaMessage(juce::String(remaining) + (remaining == 1 ? " more click" : " more clicks") + " to " + action);
+    } else {
+        info.betaUpdatesEnabled = ! info.betaUpdatesEnabled;
+        betaUnlockClicks = 0;
+        showTemporaryBetaMessage(info.betaUpdatesEnabled ? "Beta updates enabled" : "Stable updates enabled");
+        if (info.onBetaUpdatesChanged)
+            info.onBetaUpdatesChanged(info.betaUpdatesEnabled);
+    }
+}
+
+void AboutComponent::showTemporaryBetaMessage(const juce::String& message) {
+    betaUnlockMessage = message;
+    repaint();
+
+    juce::Component::SafePointer<AboutComponent> safeThis(this);
+    juce::Timer::callAfterDelay(2000, [safeThis]
+    {
+        if (safeThis == nullptr)
+            return;
+
+        safeThis->betaUnlockMessage.clear();
+        safeThis->repaint();
+    });
 }

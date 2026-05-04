@@ -2,9 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
-#include "GridComponent.h"
-#include "SvgButton.h"
-#include "ScrollFadeViewport.h"
+#include <osci_gui/osci_gui.h>
 
 // A grid-based browser for opening files: includes examples by category and a generic file chooser
 class OpenFileComponent : public juce::Component
@@ -30,26 +28,27 @@ private:
 
     // Outer chrome and scrolling (examples mode)
     juce::GroupComponent group { {}, "Open Files" };
-    ScrollFadeViewport viewport;        // Outer scroll container for entire examples panel
+    osci::ScrollFadeViewport viewport;        // Outer scroll container for entire examples panel
     juce::Component content;        // Holds all headings + category grids
 
     // Close icon overlayed in the group header
-    SvgButton closeButton { "closeExamples", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white };
+    osci::SvgButton closeButton { "closeExamples", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white };
 
     std::unique_ptr<juce::FileChooser> chooser;
 
     // Categories
     struct CategoryViews {
         juce::GroupComponent group;
-        GridComponent grid;
+        osci::GridComponent grid;
     };
 
-    CategoryViews textCat { juce::GroupComponent({}, "Text"), GridComponent{} };
-    CategoryViews luaCat { juce::GroupComponent({}, "Lua"), GridComponent{} };
-    CategoryViews modelsCat { juce::GroupComponent({}, "3D models"), GridComponent{} };
-    CategoryViews svgsCat { juce::GroupComponent({}, "SVGs"), GridComponent{} };
+    CategoryViews textCat { juce::GroupComponent({}, "Text"), osci::GridComponent{} };
+    CategoryViews luaCat { juce::GroupComponent({}, "Lua"), osci::GridComponent{} };
+    CategoryViews modelsCat { juce::GroupComponent({}, "3D models"), osci::GridComponent{} };
+    CategoryViews svgsCat { juce::GroupComponent({}, "SVGs"), osci::GridComponent{} };
 #if OSCI_PREMIUM
-    CategoryViews fractalCat { juce::GroupComponent({}, "Fractals"), GridComponent{} };
+    CategoryViews fractalCat { juce::GroupComponent({}, "Fractals"), osci::GridComponent{} };
+    CategoryViews lottieCat { juce::GroupComponent({}, "Lottie"), osci::GridComponent{} };
 #endif
 
     // Helpers
