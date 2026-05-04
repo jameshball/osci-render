@@ -15,6 +15,12 @@
 - For a manual check, use exactly one timestamped query: `gh run view <run-id> --repo <owner>/<repo> --json status,conclusion,createdAt,startedAt,updatedAt,jobs`.
 - After a manual check, do not call `gh run view`, `list_workflow_runs`, or `list_workflow_jobs` again until at least the elapsed runtime has passed; use 60 seconds minimum when no duration is known.
 
+## Code Style
+
+- **Always use curly braces** for `if`/`else`/`for`/`while` bodies, even single-statement ones. Place the body on its own line(s); do not collapse `for (...) { stmt; }` onto one line.
+- **Prefer compact one-liners** for expressions and call sites — keep arguments on a single line where reasonable rather than column-aligning them vertically across multiple lines.
+- **Use descriptive variable names**; avoid overly shortened names like `M`, `N`, `opts`, or `r` unless they are established domain notation in nearby code.
+
 ## Project Overview
 
 JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audio for oscilloscope displays. Supports `.obj`, `.svg`, `.txt`, `.lua`, `.gpla`, `.gif`, and Blender scenes with real-time effects and DAW automation.

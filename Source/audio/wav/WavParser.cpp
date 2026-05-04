@@ -39,7 +39,7 @@ bool WavParser::parse(std::unique_ptr<juce::InputStream> stream) {
     // If the processor sample rate isn't known yet, fall back to the file sample rate.
     // For offline rendering, callers can disable following before parse() and optionally
     // set a fixed target sample rate.
-    const double processorRate = (double) audioProcessor.currentSampleRate.load();
+    const double processorRate = audioProcessor.getEffectiveSampleRate();
     const double defaultTarget = processorRate > 0.0 ? processorRate : fileSampleRate;
 
     const bool shouldFollow = followProcessorSampleRate.load();
@@ -104,7 +104,7 @@ void WavParser::processBlock(juce::AudioBuffer<float> &buffer) {
     }
 
     if (followProcessorSampleRate.load()) {
-        const int desired = (int) audioProcessor.currentSampleRate.load();
+        const int desired = (int) audioProcessor.getEffectiveSampleRate();
         if (desired > 0 && currentSampleRate != desired) {
             setSampleRate(desired);
         }

@@ -23,11 +23,12 @@ public:
     SosciAudioProcessor();
     ~SosciAudioProcessor() override;
 
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void processBlockInternal (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    bool hasEditor() const override { return true; }
     juce::AudioProcessorEditor* createEditor() override;
 
 private:

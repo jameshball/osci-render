@@ -1,7 +1,10 @@
 #include <JuceHeader.h>
 #include "TestCleanup.h"
 
-using namespace osci;
+using osci::Effect;
+using osci::EffectApplication;
+using osci::EffectParameter;
+using osci::SimpleEffect;
 
 // ---------------------------------------------------------------------------
 // Synthetic EffectApplications that mirror the real patterns
@@ -10,7 +13,7 @@ using namespace osci;
 // Stateless effect (like BitCrush, Bulge, Rotate, Translate, ...)
 class BenchStatelessEffect : public EffectApplication {
 public:
-    Point apply(int index, Point input, Point externalInput,
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput,
                 const std::vector<std::atomic<float>>& values,
                 float sampleRate, float frequency) override {
         return input;
@@ -29,7 +32,7 @@ public:
 // Small-state effect (like AutoGainControl, KaleidoscopeEffect, etc.)
 class BenchSmallStateEffect : public EffectApplication {
 public:
-    Point apply(int index, Point input, Point externalInput,
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput,
                 const std::vector<std::atomic<float>>& values,
                 float sampleRate, float frequency) override {
         smoothedLevel += (input.x - smoothedLevel) * 0.01;
@@ -51,7 +54,7 @@ private:
 // Large-buffer effect (mirrors DelayEffect: 1,920,000 Points = ~46 MB)
 class BenchDelayLikeEffect : public EffectApplication {
 public:
-    Point apply(int index, Point input, Point externalInput,
+    osci::Point apply(int index, osci::Point input, osci::Point externalInput,
                 const std::vector<std::atomic<float>>& values,
                 float sampleRate, float frequency) override {
         delayBuffer[head] = input;
@@ -69,7 +72,7 @@ public:
     }
 private:
     static const int MAX_DELAY = 192000 * 10; // 1,920,000 Points
-    std::vector<Point> delayBuffer = std::vector<Point>(MAX_DELAY);
+    std::vector<osci::Point> delayBuffer = std::vector<osci::Point>(MAX_DELAY);
     int head = 0;
 };
 
