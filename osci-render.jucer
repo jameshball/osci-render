@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.9.1.2" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.9.1.9" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -96,6 +96,8 @@
         <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
         <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
         <FILE id="J9H3kV" name="desktop.svg" compile="0" resource="1" file="Resources/svg/desktop.svg"/>
+        <FILE id="eye001" name="eye.svg" compile="0" resource="1" file="Resources/svg/eye.svg"/>
+        <FILE id="eyeOff" name="eye-off.svg" compile="0" resource="1" file="Resources/svg/eye-off.svg"/>
         <FILE id="Fr2002" name="dragon_curve.svg" compile="0" resource="1"
               file="Resources/svg/dragon_curve.svg"/>
         <FILE id="KTXUuA" name="diamond.svg" compile="0" resource="1" file="Resources/svg/diamond.svg"/>
@@ -387,17 +389,6 @@
               file="Source/components/FileControlsComponent.cpp"/>
         <FILE id="uo7flZ" name="FileControlsComponent.h" compile="0" resource="0"
               file="Source/components/FileControlsComponent.h"/>
-        <FILE id="sqD2Zy" name="GridComponent.cpp" compile="1" resource="0"
-              file="Source/components/GridComponent.cpp"/>
-        <FILE id="QRwdXD" name="GridComponent.h" compile="0" resource="0" file="Source/components/GridComponent.h"/>
-        <FILE id="Dfsnmg" name="GridItemComponent.cpp" compile="1" resource="0"
-              file="Source/components/GridItemComponent.cpp"/>
-        <FILE id="MwZoTt" name="GridItemComponent.h" compile="0" resource="0"
-              file="Source/components/GridItemComponent.h"/>
-        <FILE id="SYA32K" name="HoverAnimationMixin.cpp" compile="1" resource="0"
-              file="Source/components/HoverAnimationMixin.cpp"/>
-        <FILE id="JyPgec" name="HoverAnimationMixin.h" compile="0" resource="0"
-              file="Source/components/HoverAnimationMixin.h"/>
         <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
               file="Source/components/LabelledTextBox.h"/>
         <FILE id="yhsLOr" name="OpenFileComponent.cpp" compile="1" resource="0"
@@ -405,14 +396,11 @@
         <FILE id="LBoxwR" name="OpenFileComponent.h" compile="0" resource="0"
               file="Source/components/OpenFileComponent.h"/>
         <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
-        <FILE id="QrDKRZ" name="SvgButton.h" compile="0" resource="0" file="Source/components/SvgButton.h"/>
         <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
         <FILE id="MwKZ5Q" name="SplashScreenComponent.cpp" compile="1" resource="0"
               file="Source/components/SplashScreenComponent.cpp"/>
         <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
               file="Source/components/SplashScreenComponent.h"/>
-        <FILE id="oVrlYc" name="OverlayComponent.h" compile="0" resource="0"
-              file="Source/components/OverlayComponent.h"/>
         <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
@@ -897,6 +885,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
@@ -943,6 +932,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
@@ -1000,6 +990,7 @@
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
@@ -1042,6 +1033,7 @@
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>

@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
-#include "SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
 
 class OscirenderAudioProcessorEditor;
@@ -23,11 +23,11 @@ private:
     OscirenderAudioProcessorEditor& pluginEditor;
 
     // Controls
-    SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), juce::Colours::white, juce::Colours::red, audioProcessor.inputEnabled};
-    SvgButton leftArrow      { "leftArrow",  juce::String(BinaryData::left_arrow_svg),  juce::Colours::white };
-    SvgButton rightArrow     { "rightArrow", juce::String(BinaryData::right_arrow_svg), juce::Colours::white };
-    SvgButton closeFileButton{ "closeFile",  juce::String(BinaryData::delete_svg),       juce::Colours::red };
-    SvgButton openFileButton { "openFiles", juce::String(BinaryData::plus_svg), juce::Colours::white, juce::Colours::white };
+    osci::SvgButton inputEnabled{"inputEnabled", juce::String(BinaryData::microphone_svg), juce::Colours::white, juce::Colours::red, audioProcessor.inputEnabled};
+    osci::SvgButton leftArrow      { "leftArrow",  juce::String(BinaryData::left_arrow_svg),  juce::Colours::white };
+    osci::SvgButton rightArrow     { "rightArrow", juce::String(BinaryData::right_arrow_svg), juce::Colours::white };
+    osci::SvgButton closeFileButton{ "closeFile",  juce::String(BinaryData::delete_svg),       juce::Colours::red };
+    osci::SvgButton openFileButton { "openFiles", juce::String(BinaryData::plus_svg), juce::Colours::white, juce::Colours::white };
     juce::Label fileLabel;
     juce::Label fileNumberLabel;
 

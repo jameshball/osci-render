@@ -31,16 +31,16 @@ TxtComponent::~TxtComponent() {
 }
 
 TxtComponent::FontPreviewLookAndFeel::FontPreviewLookAndFeel() {
-	OscirenderLookAndFeel::applyOscirenderColours(*this);
+	osci::LookAndFeel::applyColours(*this);
 }
 
 void TxtComponent::FontPreviewLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int,
 														juce::ComboBox& box) {
-	OscirenderLookAndFeel::drawOscirenderComboBox(g, width, height, box);
+	osci::LookAndFeel::drawComboBoxStyle(g, width, height, box);
 }
 
 void TxtComponent::FontPreviewLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label) {
-	OscirenderLookAndFeel::positionOscirenderComboBoxText(*this, box, label);
+	osci::LookAndFeel::positionComboBoxTextStyle(*this, box, label);
 }
 
 void TxtComponent::FontPreviewLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectangle<int>& area, bool isSeparator,

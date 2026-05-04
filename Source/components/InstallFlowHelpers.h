@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../CommonPluginProcessor.h"
 
 namespace osci {
     inline juce::String makeInstallWarningMessage (const juce::Array<DetectedDawProcess>& detectedDaws) {
@@ -16,10 +15,10 @@ namespace osci {
         return message;
     }
 
-    inline bool launchInstallerWithPendingMarker (const juce::File& installerFile,
-                                                  const std::optional<VersionInfo>& version,
-                                                  juce::StringRef product,
-                                                  juce::StringRef currentVersion) {
+    inline juce::Result launchInstallerWithPendingMarkerResult (const juce::File& installerFile,
+                                                                const std::optional<VersionInfo>& version,
+                                                                juce::StringRef product,
+                                                                juce::StringRef currentVersion) {
         bool markerWritten = false;
         if (version.has_value()) {
             PendingInstall pending (product);
@@ -33,36 +32,67 @@ namespace osci {
         }
 
         if (InstallerLauncher::launchAndExitHost (installerFile)) {
-            return true;
+            return juce::Result::ok();
         }
 
         if (markerWritten) {
             PendingInstall (product).clear();
         }
 
+        return juce::Result::fail ("Could not launch downloaded installer at " + installerFile.getFullPathName() + ".");
+    }
+
+    inline bool launchInstallerWithPendingMarker (const juce::File& installerFile,
+                                                  const std::optional<VersionInfo>& version,
+                                                  juce::StringRef product,
+                                                  juce::StringRef currentVersion) {
+        const auto result = launchInstallerWithPendingMarkerResult (installerFile, version, product, currentVersion);
+        if (result.wasOk()) {
+            return true;
+        }
+
         juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
                                                 "Install Update",
-                                                "Could not launch the downloaded installer.");
+                                                result.getErrorMessage());
         return false;
     }
 
-    inline void showInstallConfirmation (juce::Component* parent, std::function<void()> onConfirmed) {
-        const auto detectedDaws = DawProcessDetector::scan();
-        const auto message = makeInstallWarningMessage (detectedDaws);
+    inline void showInstallConfirmation (juce::Component* parent,
+                                         std::function<void()> onConfirmed,
+                                         std::function<void()> onCancelled = {}) {
+        const auto hasParent = parent != nullptr;
+        auto safeParent = juce::Component::SafePointer<juce::Component> (parent);
 
-        juce::AlertWindow::showOkCancelBox (
-            juce::AlertWindow::WarningIcon,
-            "Install Update",
-            message,
-            "Install",
-            "Cancel",
-            parent,
-            juce::ModalCallbackFunction::create ([onConfirmed = std::move (onConfirmed)] (int result) mutable {
-                if (result == 0) {
+        DawProcessDetector::scanAsync (
+            [hasParent,
+             safeParent,
+             onConfirmed = std::move (onConfirmed),
+             onCancelled = std::move (onCancelled)] (juce::Array<DetectedDawProcess> detectedDaws) mutable {
+                if (hasParent && safeParent == nullptr) {
                     return;
                 }
 
-                onConfirmed();
-            }));
+                const auto message = makeInstallWarningMessage (detectedDaws);
+
+                juce::AlertWindow::showOkCancelBox (
+                    juce::AlertWindow::WarningIcon,
+                    "Install Update",
+                    message,
+                    "Install",
+                    "Cancel",
+                    hasParent ? safeParent.getComponent() : nullptr,
+                    juce::ModalCallbackFunction::create ([onConfirmed = std::move (onConfirmed),
+                                                          onCancelled = std::move (onCancelled)] (int result) mutable {
+                        if (result == 0) {
+                            if (onCancelled != nullptr) {
+                                onCancelled();
+                            }
+
+                            return;
+                        }
+
+                        onConfirmed();
+                    }));
+            });
     }
 }

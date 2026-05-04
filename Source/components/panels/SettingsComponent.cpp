@@ -20,7 +20,7 @@ SettingsComponent::VerticalDragBar::VerticalDragBar() {
 
 void SettingsComponent::VerticalDragBar::paint(juce::Graphics& g) {
     if (isMouseOver() || isDragging) {
-        g.setColour(Colours::accentColor().withAlpha(0.5f));
+        g.setColour(osci::Colours::accentColor().withAlpha(0.5f));
         g.fillRoundedRectangle(getLocalBounds().toFloat(), 4.0f);
     }
 }
@@ -166,7 +166,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(keyboardViewport);
     keyboardViewport.setViewedComponent(&keyboard, false);
     keyboardViewport.setScrollBarsShown(false, false, false, true);
-    keyboardViewport.setColour(scrollFadeOverlayBackgroundColourId,
+    keyboardViewport.setColour(osci::scrollFadeOverlayBackgroundColourId,
                                findColour(juce::ResizableWindow::backgroundColourId));
     keyboardViewport.setSidesEnabled(false, false, true, true);
     keyboardViewport.setFadeWidth(20);
@@ -559,11 +559,11 @@ void SettingsComponent::ChildLayoutUpdater::handleAsyncUpdate() {
 
 void SettingsComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
-    g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+    g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), osci::LookAndFeel::RECT_RADIUS);
 
     if (! keyboardPanelBounds.isEmpty()) {
         g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
-        g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) OscirenderLookAndFeel::RECT_RADIUS);
+        g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) osci::LookAndFeel::RECT_RADIUS);
 
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <osci_gui/osci_gui.h>
 
 // Shows a temporary inline TextEditor over a Slider to let the user type a value.
 // The editor is added as a child of |parent| at the given |bounds|.
@@ -13,7 +14,7 @@
 namespace InlineValueEditor {
 
 // TextEditor subclass that detects click-away via JUCE's modal component system.
-class Editor : public juce::TextEditor {
+class Editor : public osci::TextEditor {
 public:
     std::function<void()> onClickAway;
 

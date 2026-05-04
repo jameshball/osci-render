@@ -18,7 +18,7 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
 
     saveEditor.setFont(juce::Font(juce::FontOptions(13.0f)));
     saveEditor.setTextToShowWhenEmpty("Preset name...", juce::Colours::white.withAlpha(0.3f));
-    saveEditor.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark());
+    saveEditor.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
     saveEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::textColourId, juce::Colours::white);
@@ -79,7 +79,7 @@ void LfoPresetBrowserOverlay::BrowserPanel::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
     constexpr float radius = 6.0f;
 
-    g.setColour(Colours::veryDark().brighter(0.08f));
+    g.setColour(osci::Colours::veryDark().brighter(0.08f));
     g.fillRoundedRectangle(bounds, radius);
 }
 

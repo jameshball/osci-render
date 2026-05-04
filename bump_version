@@ -8,15 +8,16 @@ Versioning scheme here is 4-part: A.B.C.D
 - --minor increments C and resets D to 0.
 - --patch increments D.
 
-By default, both products get a patch bump.
+By default, the installer gets a patch bump whenever the script is run.
 
 Usage:
-    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--message MSG] [--skip-validation]
+    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--installer {major,minor,patch,none}] [--message MSG] [--skip-validation]
 
 Examples:
-    ./bump_version
+    ./bump_version --osci patch --sosci patch
     ./bump_version --osci minor --sosci patch
     ./bump_version --sosci none
+    ./bump_version --osci patch --sosci patch --installer none
     ./bump_version --osci patch --sosci none --skip-validation   # low-cost CI run (build only)
 
 Notes:
@@ -222,6 +223,12 @@ def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
         required=True,
         help="Bump kind for sosci",
     )
+    parser.add_argument(
+        "--installer",
+        choices=["major", "minor", "patch", "none"],
+        default="patch",
+        help="Bump kind for osci-installer (default: patch)",
+    )
 
     parser.add_argument(
         "--message",
@@ -247,11 +254,13 @@ def main(argv: Sequence[str]) -> int:
     ns, _ = parse_args(list(argv))
     osci_kind = ns.osci
     sosci_kind = ns.sosci
+    installer_kind = ns.installer
 
     ensure_clean_working_tree()
 
     osci_jucer = REPO_ROOT / "osci-render.jucer"
     sosci_jucer = REPO_ROOT / "sosci.jucer"
+    installer_jucer = REPO_ROOT / "osci-installer.jucer"
     osci_iss = REPO_ROOT / "packaging" / "osci-render.iss"
     sosci_iss = REPO_ROOT / "packaging" / "sosci.iss"
     osci_pkgproj = REPO_ROOT / "packaging" / "osci-render.pkgproj"
@@ -259,9 +268,11 @@ def main(argv: Sequence[str]) -> int:
 
     osci_old = get_jucer_version(osci_jucer)
     sosci_old = get_jucer_version(sosci_jucer)
+    installer_old = get_jucer_version(installer_jucer)
 
     osci_new = osci_old.bump(osci_kind)
     sosci_new = sosci_old.bump(sosci_kind)
+    installer_new = installer_old.bump(installer_kind)
 
     changed: list[Path] = []
 
@@ -269,6 +280,8 @@ def main(argv: Sequence[str]) -> int:
         changed.append(osci_jucer)
     if set_jucer_version(sosci_jucer, sosci_new):
         changed.append(sosci_jucer)
+    if set_jucer_version(installer_jucer, installer_new):
+        changed.append(installer_jucer)
 
     if set_iss_version(osci_iss, osci_new):
         changed.append(osci_iss)
@@ -280,14 +293,18 @@ def main(argv: Sequence[str]) -> int:
     if set_pkgproj_versions(sosci_pkgproj, sosci_new):
         changed.append(sosci_pkgproj)
 
-    if osci_new == osci_old and sosci_new == sosci_old:
-        raise FatalError("No version bump requested (both products unchanged).")
+    if osci_new == osci_old and sosci_new == sosci_old and installer_new == installer_old:
+        raise FatalError("No version bump requested (all products unchanged).")
 
     stage_files(changed)
 
     msg = ns.message
     if not msg:
-        msg = f"chore: bump versions (osci-render {osci_old}->{osci_new}, sosci {sosci_old}->{sosci_new})"
+        msg = (
+            f"chore: bump versions (osci-render {osci_old}->{osci_new}, "
+            f"sosci {sosci_old}->{sosci_new}, "
+            f"osci-installer {installer_old}->{installer_new})"
+        )
 
     msg = add_ci_trigger_marker(msg)
     if ns.skip_validation:

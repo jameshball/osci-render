@@ -1,8 +1,8 @@
 #include "EffectTypeGridComponent.h"
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
-#include "../GridComponent.h"
-#include "../GridItemComponent.h"
+#include <osci_gui/osci_gui.h>
+#include <osci_gui/osci_gui.h>
 #include "../../PluginEditor.h"
 #include <unordered_set>
 #include <algorithm>
@@ -58,7 +58,7 @@ void EffectTypeGridComponent::setupEffectItems()
         juce::String effectName = effect->getName();
 
         // Create new generic item component
-        auto* item = new GridItemComponent(effectName, effect->getIcon(), effect->getId());
+        auto* item = new osci::GridItemComponent(effectName, effect->getIcon(), effect->getId());
 
         const bool isLockedPremium =
 #if !OSCI_PREMIUM

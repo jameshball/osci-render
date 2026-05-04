@@ -1,5 +1,5 @@
 #include "OpenFileComponent.h"
-#include "GridItemComponent.h"
+#include <osci_gui/osci_gui.h>
 #include "../../JuceLibraryCode/BinaryData.h"
 
 OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
@@ -10,7 +10,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
 
     addAndMakeVisible(startImportButton);
     startImportButton.onClick = [this]() { openFileChooser(); };
-    startImportButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    startImportButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
     startImportButton.setColour(juce::TextButton::textColourOffId, juce::Colours::black);
 
     addAndMakeVisible(chooseExampleLabel);
@@ -25,7 +25,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     closeButton.onClick = [this]() { if (onClosed) onClosed(); };
 
     auto addCat = [this](CategoryViews& cat) {
-        cat.group.setColour(groupComponentBackgroundColourId, Colours::darker().darker(0.2));
+        cat.group.setColour(osci::groupComponentBackgroundColourId, osci::Colours::darker().darker(0.2));
         content.addAndMakeVisible(cat.group);
         content.addAndMakeVisible(cat.grid);
         cat.grid.setUseViewport(false);
@@ -119,7 +119,7 @@ void OpenFileComponent::addExample(CategoryViews& cat, const juce::String& fileN
         iconData = BinaryData::random_svg;
         iconSize = BinaryData::random_svgSize;
     }
-    auto* item = new GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
+    auto* item = new osci::GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
     item->onItemSelected = [this, fileName, data, size](const juce::String&) {
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         audioProcessor.addFile(fileName, data, size);

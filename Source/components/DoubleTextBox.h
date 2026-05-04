@@ -1,7 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
+#include <osci_gui/osci_gui.h>
 
-class DoubleTextBox : public juce::TextEditor {
+class DoubleTextBox : public osci::TextEditor {
 public:
 	DoubleTextBox(double minValue, double maxValue) : minValue(minValue), maxValue(maxValue) {
 		setText(juce::String(minValue, 2), false);

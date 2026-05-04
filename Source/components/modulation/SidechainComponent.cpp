@@ -177,9 +177,9 @@ void SidechainComponent::paint(juce::Graphics& g) {
 
     // Draw a background panel behind the knob area (below the graph)
     if (!knobAreaBounds.isEmpty()) {
-        float r = OscirenderLookAndFeel::RECT_RADIUS;
+        float r = osci::LookAndFeel::RECT_RADIUS;
         auto bf = knobAreaBounds.toFloat();
-        g.setColour(Colours::darker());
+        g.setColour(osci::Colours::darker());
         g.fillRoundedRectangle(bf, r);
     }
 }

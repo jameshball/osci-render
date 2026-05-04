@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
-#include "../GridComponent.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 
@@ -22,7 +22,7 @@ public:
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;
-    GridComponent grid;
+    osci::GridComponent grid;
     juce::TextButton cancelButton { "Cancel" };
 
     void setupEffectItems();

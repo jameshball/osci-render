@@ -344,7 +344,7 @@ public:
             version.variant = "premium";
             version.platform = "mac-arm64";
             version.artifactKind = "pkg";
-            version.sha256 = juce::SHA256 (artifact).toHexString();
+            version.sha256 = osci::fileSha256Hex (artifact);
             version.ed25519Signature = makeSignature();
             version.sizeBytes = artifact.getSize();
 

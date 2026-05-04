@@ -67,9 +67,9 @@ void FileControlsComponent::paint(juce::Graphics& g)
 {
     // Rounded veryDark background
     auto b = getLocalBounds().toFloat();
-    auto bg = Colours::veryDark();
+    auto bg = osci::Colours::veryDark();
     g.setColour(bg);
-    g.fillRoundedRectangle(b, OscirenderLookAndFeel::RECT_RADIUS);
+    g.fillRoundedRectangle(b, osci::LookAndFeel::RECT_RADIUS);
 }
 
 void FileControlsComponent::resized()
