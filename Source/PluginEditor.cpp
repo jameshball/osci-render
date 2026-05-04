@@ -28,7 +28,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     // Create timeline controllers for osci-render
     animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
     audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
-    
+
     // Register the file removal callback
     registerFileRemovedCallback();
 
@@ -37,8 +37,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     upgradeButton.onClick = [this] {
         showPremiumSplashScreen();
     };
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
 #else
     addChildComponent(mtsEspLabel);
     mtsEspLabel.setFont(juce::Font(juce::FontOptions(11.0f)));
@@ -366,7 +366,7 @@ void OscirenderAudioProcessorEditor::resized() {
         console.setVisible(luaFileOpen);
         luaResizerBar.setVisible(luaFileOpen);
         lua.setVisible(luaFileOpen);
-        
+
         // Hide txtFont if code editor is not visible
         if (!fileOpen) {
             txtFont.setVisible(false);
@@ -705,11 +705,11 @@ void OscirenderAudioProcessorEditor::showLuaDocumentation() {
 
 void OscirenderAudioProcessorEditor::updateTimelineController() {
     std::shared_ptr<TimelineController> controller = nullptr;
-    
+
     int currentFileIndex = audioProcessor.getCurrentFileIndex();
     if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
         auto parser = audioProcessor.parsers[currentFileIndex];
-        
+
         // Check if it's an animatable file (gpla, gif, video)
         if (parser->isAnimatable) {
             controller = animationTimelineController;
@@ -719,7 +719,7 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
             controller = audioTimelineController;
         }
     }
-    
+
     visualiser.setTimelineController(controller);
 }
 

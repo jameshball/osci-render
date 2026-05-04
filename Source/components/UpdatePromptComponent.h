@@ -20,9 +20,9 @@ public:
         detailLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.72f));
         detailLabel.setJustificationType (juce::Justification::centredLeft);
 
-        primaryButton.setColour (juce::TextButton::buttonColourId, Colours::accentColor());
-        primaryButton.setColour (juce::TextButton::textColourOffId, Colours::veryDark());
-        secondaryButton.setColour (juce::TextButton::buttonColourId, Colours::veryDark().brighter (0.12f));
+        primaryButton.setColour (juce::TextButton::buttonColourId, osci::Colours::accentColor());
+        primaryButton.setColour (juce::TextButton::textColourOffId, osci::Colours::veryDark());
+        secondaryButton.setColour (juce::TextButton::buttonColourId, osci::Colours::veryDark().brighter (0.12f));
 
         primaryButton.onClick = [this] {
             if (mode == Mode::Ready) {
@@ -76,9 +76,9 @@ public:
 
     void paint (juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat().reduced (0.5f);
-        g.setColour (Colours::veryDark().withAlpha (0.96f));
+        g.setColour (osci::Colours::veryDark().withAlpha (0.96f));
         g.fillRoundedRectangle (bounds, 8.0f);
-        g.setColour (Colours::accentColor().withAlpha (0.55f));
+        g.setColour (osci::Colours::accentColor().withAlpha (0.55f));
         g.drawRoundedRectangle (bounds, 8.0f, 1.2f);
     }
 
@@ -145,6 +145,9 @@ private:
             osci::UpdateChecker checker;
             *foundVersion = checker.checkForUpdate (product, currentVersion, track, variant);
             *result = checker.getLastResult();
+            if (result->failed()) {
+                *result = failWithContext ("Could not check for updates", *result);
+            }
 
             juce::MessageManager::callAsync ([safeThis, foundVersion, result, showErrors] {
                 if (safeThis == nullptr) {
@@ -241,6 +244,8 @@ private:
 
             if (result->wasOk()) {
                 *downloaded = downloader.getDownloadedFile();
+            } else {
+                *result = failWithContext ("Could not download update", *result);
             }
 
             juce::MessageManager::callAsync ([safeThis, downloaded, result] {
@@ -329,6 +334,10 @@ private:
 
     static double currentTimeSeconds() {
         return static_cast<double> (juce::Time::currentTimeMillis()) / 1000.0;
+    }
+
+    static juce::Result failWithContext (juce::StringRef context, const juce::Result& result) {
+        return juce::Result::fail (juce::String (context) + ": " + result.getErrorMessage());
     }
 
     void showInstallSucceeded (const osci::PendingInstallMarker& marker) {

@@ -24,6 +24,14 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         return;
     }
 
+#if OSCI_PREMIUM
+    if (! licenseManager.hasPremium()) {
+        midiMessages.clear();
+        buffer.clear();
+        return;
+    }
+#endif
+
     juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
     juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
     const float EPSILON = 0.0001f;

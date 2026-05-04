@@ -1,5 +1,5 @@
 #include "EffectsListComponent.h"
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../../PluginEditor.h"
 #include "../../LookAndFeel.h"
 #include "../../audio/modulation/LfoState.h"
@@ -38,7 +38,7 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         listModel.addComponent(effectComponent);
     }
 
-    list.setColour(effectComponentBackgroundColourId, juce::Colours::transparentBlack.withAlpha(0.2f));
+    list.setColour(osci::effectComponentBackgroundColourId, juce::Colours::transparentBlack.withAlpha(0.2f));
     list.setModel(&listModel);
     list.updateContent();
     addAndMakeVisible(list);
@@ -104,10 +104,10 @@ EffectsListComponent::~EffectsListComponent() {
 
 void EffectsListComponent::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().removeFromLeft(LEFT_BAR_WIDTH);
-    g.setColour(findColour(effectComponentHandleColourId));
+    g.setColour(findColour(osci::effectComponentHandleColourId));
     bounds.removeFromBottom(PADDING);
     juce::Path path;
-    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, true, false, true, false);
+    path.addRoundedRectangle(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), osci::LookAndFeel::RECT_RADIUS, osci::LookAndFeel::RECT_RADIUS, true, false, true, false);
     g.fillPath(path);
     g.setColour(juce::Colours::white);
     // draw drag and drop handle using circles
@@ -125,9 +125,9 @@ void EffectsListComponent::paint(juce::Graphics& g) {
 
     auto rightBar = getLocalBounds().removeFromRight(RIGHT_BAR_WIDTH);
     rightBar.removeFromBottom(PADDING);
-    g.setColour(findColour(effectComponentHandleColourId));
+    g.setColour(findColour(osci::effectComponentHandleColourId));
     juce::Path rightPath;
-    rightPath.addRoundedRectangle(rightBar.getX(), rightBar.getY(), rightBar.getWidth(), rightBar.getHeight(), OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS, false, true, false, true);
+    rightPath.addRoundedRectangle(rightBar.getX(), rightBar.getY(), rightBar.getWidth(), rightBar.getHeight(), osci::LookAndFeel::RECT_RADIUS, osci::LookAndFeel::RECT_RADIUS, false, true, false, true);
     g.fillPath(rightPath);
 
     DraggableListBoxItem::paint(g);
@@ -157,8 +157,8 @@ void EffectsListComponent::resized() {
 
 std::shared_ptr<juce::Component> EffectsListComponent::createComponent(osci::EffectParameter* parameter) {
     if (parameter->paramID == "customEffectStrength") {
-        std::shared_ptr<SvgButton> button = std::make_shared<SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::red);
-        std::weak_ptr<SvgButton> weakButton = button;
+        std::shared_ptr<osci::SvgButton> button = std::make_shared<osci::SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::red);
+        std::weak_ptr<osci::SvgButton> weakButton = button;
         button->setEdgeIndent(5);
         button->setToggleState(editor.editingCustomFunction, juce::dontSendNotification);
         button->setTooltip("Toggles whether the text editor is editing the currently open file, or the custom Lua effect.");

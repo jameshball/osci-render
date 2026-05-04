@@ -5,7 +5,7 @@
 // A generic tab list component that lays out tabs vertically or horizontally.
 // Manages N tabs with equal size and optional gaps.
 // Tracks active tab index and notifies via callback.
-// Use inside a ScrollFadeViewport when tabs may exceed available space.
+// Use inside a osci::ScrollFadeViewport when tabs may exceed available space.
 class VerticalTabListComponent : public juce::Component {
 public:
     enum Orientation { Vertical, Horizontal };

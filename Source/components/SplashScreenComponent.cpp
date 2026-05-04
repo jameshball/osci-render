@@ -2,9 +2,10 @@
 
 #include <array>
 
-SplashScreenComponent::SplashScreenComponent() {
-    const auto subtitleFont = juce::Font(juce::FontOptions(17.0f, juce::Font::plain));
+SplashScreenComponent::SplashScreenComponent()
+    : osci::OverlayComponent (juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize)) {
     setOverlayTitle("Upgrade to osci-render Premium");
+    const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
 
     configureLabel(subtitleLabel, subtitleFont, juce::Justification::centred);
     subtitleLabel.setText("Unlock new features, and more creative firepower.", juce::NotificationType::dontSendNotification);
@@ -13,11 +14,11 @@ SplashScreenComponent::SplashScreenComponent() {
     benefitsGrid.setUseCenteringPlaceholders(true);
     benefitsGrid.setItemsInteractive(false);
     benefitsGrid.setItemHeight(120);
-    benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark());
+    benefitsGrid.setColour(osci::scrollFadeOverlayBackgroundColourId, osci::Colours::veryDark());
     addAndMakeVisible(benefitsGrid);
 
-    configureLabel(supportLabel, juce::Font(juce::FontOptions(14.5f, juce::Font::italic)), juce::Justification::centred);
-    supportLabel.setColour(juce::Label::textColourId, Colours::accentColor().brighter(0.2f));
+    configureLabel(supportLabel, juce::Font(14.5f, juce::Font::italic), juce::Justification::centred);
+    supportLabel.setColour(juce::Label::textColourId, osci::Colours::accentColor().brighter(0.2f));
     supportLabel.setText("Purchasing premium directly supports ongoing development. Thank you!", juce::NotificationType::dontSendNotification);
     addAndMakeVisible(supportLabel);
 
@@ -34,11 +35,11 @@ SplashScreenComponent::SplashScreenComponent() {
         dismiss();
     };
 
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
-    upgradeButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::textColourOnId, osci::Colours::veryDark());
 
-    continueButton.setColour(juce::TextButton::buttonColourId, Colours::darker().withAlpha(0.8f));
+    continueButton.setColour(juce::TextButton::buttonColourId, osci::Colours::darker().withAlpha(0.8f));
     continueButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     continueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
 
@@ -115,7 +116,7 @@ void SplashScreenComponent::buildBenefitTiles()
     for (const auto& benefit : benefits)
     {
         auto iconSvg = juce::String::createStringFromData(benefit.iconData, benefit.iconSize);
-        auto* tile = new GridItemComponent(benefit.title, iconSvg, benefit.title, Colours::accentColor());
+        auto* tile = new osci::GridItemComponent(benefit.title, iconSvg, benefit.title, osci::Colours::accentColor());
         tile->setDescription(benefit.description);
         tile->setInteractive(false);
         benefitsGrid.addItem(tile);

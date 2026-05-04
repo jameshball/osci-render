@@ -375,9 +375,8 @@ void CustomMidiKeyboardComponent::drawBlackNote (int midiNoteNumber, Graphics& g
     g.fillPath (keyPath);
 
     // Faint lighter bevel/highlight on top edge
-    if (! isDown)
-    {
-        g.setColour (Colours::white.withAlpha (0.07f));
+    if (! isDown) {
+        g.setColour (juce::Colours::white.withAlpha (0.07f));
         g.fillRect (area.withHeight (1.0f));
     }
 }

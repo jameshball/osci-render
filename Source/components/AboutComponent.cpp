@@ -41,16 +41,16 @@ AboutComponent::AboutComponent(const Info& info) : info(info) {
 
     // Brighten Discord brand colour so its hover/contrast feels similar to the accent buttons.
     const juce::Colour discordColour = juce::Colour::fromRGB(0x58, 0x65, 0xF2).brighter(0.4f);
-    setupBtn(websiteBtn, "Website", info.websiteUrl, Colours::accentColor());
+    setupBtn(websiteBtn, "Website", info.websiteUrl, osci::Colours::accentColor());
     setupBtn(discordBtn, "Join Discord", "https://discord.gg/ekjpQvT68C", discordColour);
-    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues", Colours::accentColor());
+    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues", osci::Colours::accentColor());
 
     auto sz = preferredSize(info);
     setSize(sz.x, sz.y);
 }
 
 void AboutComponent::paintCard(juce::Graphics& g, juce::Rectangle<float> area) const {
-    g.setColour(Colours::darkerer());
+    g.setColour(osci::Colours::darkerer());
     g.fillRoundedRectangle(area, kCardRadius);
 }
 
@@ -80,7 +80,7 @@ void AboutComponent::paint(juce::Graphics& g) {
     if (betaUnlockMessage.isNotEmpty())
         status = betaUnlockMessage;
     g.setFont(juce::FontOptions(12.0f));
-    g.setColour(betaUnlockMessage.isNotEmpty() ? Colours::accentColor().brighter(0.15f)
+    g.setColour(betaUnlockMessage.isNotEmpty() ? osci::Colours::accentColor().brighter(0.15f)
                                                 : juce::Colours::white.withAlpha(0.65f));
     versionStatusBounds = area.removeFromTop(16.0f);
     g.drawText(status, versionStatusBounds, juce::Justification::centred);

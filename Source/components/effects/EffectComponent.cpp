@@ -24,7 +24,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
 
     sidechainEnabled = effect.parameters[index]->sidechain != nullptr;
     if (sidechainEnabled) {
-        sidechainButton = std::make_unique<SvgButton>(effect.parameters[index]->name, BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red, effect.parameters[index]->sidechain);
+        sidechainButton = std::make_unique<osci::SvgButton>(effect.parameters[index]->name, BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red, effect.parameters[index]->sidechain);
         sidechainButton->setTooltip("When enabled, the volume of the input audio controls the value of the slider, acting like a sidechain effect.");
         addAndMakeVisible(*sidechainButton);
     }
@@ -60,7 +60,7 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     lfoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     lfoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, TEXT_BOX_WIDTH, lfoSlider.getTextBoxHeight());
     lfoSlider.setTextValueSuffix("Hz");
-    lfoSlider.setColour(sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
+    lfoSlider.setColour(osci::sliderThumbOutlineColourId, juce::Colour(0xff00ff00));
     lfoSlider.setNumDecimalPlacesToDisplay(3);
     lfoSlider.setScrollWheelEnabled(false);
 
@@ -189,11 +189,11 @@ void EffectComponent::setupComponent() {
 
     if (sidechainEnabled && effect.parameters[index]->sidechain->getBoolValue()) {
         slider.setEnabled(false);
-        slider.setColour(sliderThumbOutlineColourId, juce::Colour(0xffff0000));
+        slider.setColour(osci::sliderThumbOutlineColourId, juce::Colour(0xffff0000));
         slider.setTooltip("Sidechain effect applied - click the microphone icon to disable this.");
     } else {
         slider.setEnabled(true);
-        slider.setColour(sliderThumbOutlineColourId, findColour(sliderThumbOutlineColourId));
+        slider.setColour(osci::sliderThumbOutlineColourId, findColour(osci::sliderThumbOutlineColourId));
         slider.setTooltip("");
     }
 }
@@ -243,7 +243,7 @@ void EffectComponent::resized() {
 }
 
 void EffectComponent::paint(juce::Graphics& g) {
-    g.setColour(findColour(effectComponentBackgroundColourId, true));
+    g.setColour(findColour(osci::effectComponentBackgroundColourId, true));
     g.fillRect(getLocalBounds());
 }
 
@@ -304,10 +304,10 @@ void EffectComponent::changeListenerCallback(juce::ChangeBroadcaster*) {
 void EffectComponent::updateLabelAppearance() {
     bool learning = midiCCManager != nullptr && midiCCManager->isLearning(effect.parameters[index]);
     if (learning) {
-        label.setColour(juce::Label::textColourId, Colours::midiLearnText());
-        label.setText(Colours::midiLearnLabel(), juce::dontSendNotification);
+        label.setColour(juce::Label::textColourId, osci::Colours::midiLearnText());
+        label.setText(osci::Colours::midiLearnLabel(), juce::dontSendNotification);
     } else {
-        label.setColour(juce::Label::textColourId, labelHovered ? Colours::accentColor() : juce::Colours::white);
+        label.setColour(juce::Label::textColourId, labelHovered ? osci::Colours::accentColor() : juce::Colours::white);
         label.setText(effect.parameters[index]->name, juce::dontSendNotification);
     }
 }

@@ -77,8 +77,8 @@ public:
 
     LuaConsole console;
 
-    SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
-    SvgButton luaResetButton { "luaReset", juce::String(BinaryData::refresh_svg), juce::Colours::white };
+    osci::SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
+    osci::SvgButton luaResetButton { "luaReset", juce::String(BinaryData::refresh_svg), juce::Colours::white };
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;

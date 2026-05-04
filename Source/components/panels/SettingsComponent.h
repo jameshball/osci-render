@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 
 #include "../CustomMidiKeyboardComponent.h"
-#include "../ScrollFadeViewport.h"
+#include <osci_gui/osci_gui.h>
 
 #include "../../LookAndFeel.h"
 #include "EffectsComponent.h"
@@ -59,7 +59,7 @@ private:
     std::unique_ptr<LfoComponent> lfo;
     std::unique_ptr<RandomComponent> random;
     std::unique_ptr<SidechainComponent> sidechain;
-    ScrollFadeViewport keyboardViewport;
+    osci::ScrollFadeViewport keyboardViewport;
     juce::CustomMidiKeyboardComponent keyboard;
 
     bool examplesVisible = false;
