@@ -19,8 +19,8 @@ if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/$APP/LinuxMakefile"
   make -j"$(nproc)" CONFIG=Release
 
-  cd "$ROOT/Builds/$APP/LinuxMakefile/build"
-  zip -r "$ROOT/bin/$OUTPUT_NAME.zip" "$APP"
+  cp "$ROOT/Builds/$APP/LinuxMakefile/build/$APP" "$ROOT/bin/$OUTPUT_NAME"
+  chmod +x "$ROOT/bin/$OUTPUT_NAME"
 fi
 
 if [ "$OS" = "win" ]; then
