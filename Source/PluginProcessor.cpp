@@ -445,9 +445,7 @@ void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const j
     audioThreadCallback = callback;
 }
 
-void OscirenderAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock) {
-    CommonAudioProcessor::prepareToPlay(sampleRate, samplesPerBlock);
-
+void OscirenderAudioProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
     defaultEnvelopeState.smoothedLevel = 0.0f;
     synth.handleMidiEvent(juce::MidiMessage::allSoundOff(1));
     synth.setCurrentPlaybackSampleRate(sampleRate);
@@ -818,7 +816,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
     }
 }
 
-void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
+void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
@@ -839,7 +837,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     // Audio info variables
     int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();
-    double sampleRate = getSampleRate();
+    double sampleRate = getEffectiveSampleRate();
     int numSamples = buffer.getNumSamples();
 
     osci::DawPosition::Options dawPositionOptions;

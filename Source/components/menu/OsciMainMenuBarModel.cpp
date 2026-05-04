@@ -2,6 +2,7 @@
 
 #include "../../PluginEditor.h"
 #include "../../PluginProcessor.h"
+#include "InternalSampleRateMenu.h"
 
 OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& e) : audioProcessor(p), editor(e) {
     resetMenuItems();
@@ -11,54 +12,59 @@ void OsciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
     constexpr int RECENT_BASE_ID = 1000;
+    constexpr int SAMPLE_RATE_BASE_ID = 2000;
+    constexpr int audioMenuIndex = 4;
 
     customMenuLogic = [this](juce::PopupMenu& menu, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
-            return;
+        if (topLevelMenuIndex == 0) {
+            juce::PopupMenu recentMenu;
+            const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
+                                                                                RECENT_BASE_ID,
+                                                                                true,
+                                                                                true);
+            if (added == 0) {
+                recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+            }
 
-        juce::PopupMenu recentMenu;
-        const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
-                                                                            RECENT_BASE_ID,
-                                                                            true,
-                                                                            true);
-        if (added == 0)
-            recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
-
-        menu.addSubMenu("Open Recent", recentMenu);
-        menu.addSeparator();
+            menu.addSubMenu("Open Recent", recentMenu);
+            menu.addSeparator();
+        } else if (topLevelMenuIndex == audioMenuIndex) {
+            InternalSampleRateMenu::addSubmenu(menu, audioProcessor, SAMPLE_RATE_BASE_ID);
+        }
     };
 
     customMenuSelectedLogic = [this](int menuItemID, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
-            return false;
-
-        if (menuItemID < RECENT_BASE_ID)
-            return false;
-
-        const int index = menuItemID - RECENT_BASE_ID;
-        const auto file = audioProcessor.getRecentProjectFile(index);
-        if (file != juce::File() && file.existsAsFile())
-            editor.openProject(file);
-
-        return true;
+        if (topLevelMenuIndex == 0 && menuItemID >= RECENT_BASE_ID) {
+            const auto file = audioProcessor.getRecentProjectFile(menuItemID - RECENT_BASE_ID);
+            if (file != juce::File() && file.existsAsFile()) {
+                editor.openProject(file);
+            }
+            return true;
+        }
+        if (topLevelMenuIndex == audioMenuIndex
+            && InternalSampleRateMenu::handleMenuId(menuItemID,
+                                                    SAMPLE_RATE_BASE_ID,
+                                                    audioProcessor,
+                                                    [this] { editor.showPremiumSplashScreen(); })) {
+            resetMenuItems();
+            return true;
+        }
+        return false;
     };
 
     addTopLevelMenu("File");
     addTopLevelMenu("Edit");
     addTopLevelMenu("About");
     addTopLevelMenu("Video");
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addTopLevelMenu("Audio");
-    }
+    addTopLevelMenu("Audio");
     addTopLevelMenu("Interface");
 
     const int fileMenu      = 0;
     const int editMenu      = 1;
     const int aboutMenu     = 2;
     const int videoMenu     = 3;
-    int nextMenu = 4;
-    const int audioMenu     = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? nextMenu++ : -1;
-    const int interfaceMenu = nextMenu;
+    const int audioMenu     = audioMenuIndex;
+    const int interfaceMenu = 5;
 
     addMenuItem(fileMenu, "Open Project", [this] { editor.openProject(); });
     addMenuItem(fileMenu, "Save Project", [this] { editor.saveProject(); });

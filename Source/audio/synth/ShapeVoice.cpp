@@ -16,8 +16,9 @@ void ShapeVoice::initializeEffectsFromGlobal() {
         if (simpleEffect) {
             auto cloned = simpleEffect->cloneWithSharedParameters();
             // Initialize the effect with current sample rate
-            if (audioProcessor.currentSampleRate > 0) {
-                cloned->prepareToPlay(audioProcessor.currentSampleRate, 512);
+            const double sampleRate = audioProcessor.getEffectiveSampleRate();
+            if (sampleRate > 0) {
+                cloned->prepareToPlay(sampleRate, 512);
             }
             voiceEffectsMap[globalEffect->getId()] = cloned;
         }
@@ -28,8 +29,9 @@ void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
     if (effect) {
         voicePreviewEffect = effect->cloneWithSharedParameters();
         // Initialize the effect with current sample rate
-        if (audioProcessor.currentSampleRate > 0) {
-            voicePreviewEffect->prepareToPlay(audioProcessor.currentSampleRate, 512);
+        const double sampleRate = audioProcessor.getEffectiveSampleRate();
+        if (sampleRate > 0) {
+            voicePreviewEffect->prepareToPlay(sampleRate, 512);
         }
     } else {
         voicePreviewEffect = nullptr;
@@ -282,7 +284,8 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     frameSyncBuffer.clear();
 
     const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
-    const double dt = 1.0 / audioProcessor.currentSampleRate;
+    const double sampleRate = audioProcessor.getEffectiveSampleRate();
+    const double dt = 1.0 / sampleRate;
 
     // Snapshot DAW transport once per block (constant within a processBlock call)
     const auto& dawPosition = audioProcessor.dawPosition;
@@ -340,7 +343,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         int sample = startSample + i;
-        lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+        lengthIncrement = juce::jmax(frameLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         osci::Point channels;
 
@@ -348,7 +351,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             auto parser = currentSound->parser;
 
             if (renderingSample) {
-                vars.sampleRate = audioProcessor.currentSampleRate;
+                vars.sampleRate = sampleRate;
                 vars.frequency = actualFrequency;
                 vars.ext_x = 0;
                 vars.ext_y = 0;
@@ -483,7 +486,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     // Kill-fade: per-sample linear ramp from 1→0 over kKillFadeTimeSec.
     const float killFadeDecPerSample = killFading
-        ? static_cast<float>(1.0 / (kKillFadeTimeSec * audioProcessor.currentSampleRate))
+        ? static_cast<float>(1.0 / (kKillFadeTimeSec * sampleRate))
         : 0.0f;
 
     for (int i = 0; i < numSamples; ++i) {
