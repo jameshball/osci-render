@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
+#include <osci_gui/osci_gui.h>
 
 class AboutComponent : public juce::Component {
 public:
@@ -31,18 +32,9 @@ public:
     void resized() override;
     void mouseUp(const juce::MouseEvent& event) override;
 
-    // Recommended dialog background colour — matches the main application window.
-    static juce::Colour dialogBackground() { return osci::Colours::veryDark().brighter(0.1f); }
-
-    // Preferred dialog size for the given content.
     static juce::Point<int> preferredSize(const Info& info);
 
-    // Convenience: launches the About content in a standard dialog window
-    // (matches the boilerplate used by every app's "About" menu item).
-    // `useNativeTitleBar` should typically be true when running as a standalone
-    // app and false when embedded in a DAW on Windows. The flag has no effect
-    // on Linux (JUCE always uses its own title bar there).
-    static void launchAsDialog(const Info& info, bool useNativeTitleBar);
+    static std::unique_ptr<osci::OverlayComponent> createOverlay(const Info& info, juce::String closeButtonSvg);
 
 private:
     Info info;

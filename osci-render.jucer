@@ -331,6 +331,12 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
+        <FILE id="AudOvR" name="AudioSettingsOverlay.h" compile="0" resource="0"
+              file="Source/components/AudioSettingsOverlay.h"/>
+        <FILE id="OffOvR" name="OfflineRenderOverlay.h" compile="0" resource="0"
+              file="Source/components/OfflineRenderOverlay.h"/>
+        <FILE id="RecOvR" name="RecordingSettingsOverlay.h" compile="0" resource="0"
+              file="Source/components/RecordingSettingsOverlay.h"/>
         <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
@@ -363,6 +369,8 @@
               file="Source/components/SplashScreenComponent.h"/>
         <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
+        <FILE id="SypOvR" name="SyphonInputOverlay.h" compile="0" resource="0"
+              file="Source/components/SyphonInputOverlay.h"/>
         <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
         <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"

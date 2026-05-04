@@ -9,19 +9,13 @@ juce::Point<int> AboutComponent::preferredSize(const Info& info) {
     return { 520, (int)std::ceil(h) };
 }
 
-void AboutComponent::launchAsDialog(const Info& info, bool useNativeTitleBar) {
-    juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(new AboutComponent(info));
-    options.dialogTitle = "About";
-    options.dialogBackgroundColour = AboutComponent::dialogBackground();
-    options.escapeKeyTriggersCloseButton = true;
-   #if JUCE_WINDOWS || JUCE_MAC
-    options.useNativeTitleBar = useNativeTitleBar;
-   #else
-    juce::ignoreUnused (useNativeTitleBar);
-   #endif
-    options.resizable = false;
-    options.launchAsync();
+std::unique_ptr<osci::OverlayComponent> AboutComponent::createOverlay(const Info& info, juce::String closeButtonSvg) {
+    auto content = std::make_unique<AboutComponent>(info);
+    return std::make_unique<osci::ComponentOverlay>(std::move(content),
+                                                    std::move(closeButtonSvg),
+                                                    juce::String(),
+                                                    preferredSize(info),
+                                                    false);
 }
 
 AboutComponent::AboutComponent(const Info& info) : info(info) {
@@ -163,7 +157,7 @@ void AboutComponent::mouseUp(const juce::MouseEvent& event) {
         const auto action = info.betaUpdatesEnabled ? "return to stable updates" : "enable beta updates";
         showTemporaryBetaMessage(juce::String(remaining) + (remaining == 1 ? " more click" : " more clicks") + " to " + action);
     } else {
-        info.betaUpdatesEnabled = ! info.betaUpdatesEnabled;
+        info.betaUpdatesEnabled = !info.betaUpdatesEnabled;
         betaUnlockClicks = 0;
         showTemporaryBetaMessage(info.betaUpdatesEnabled ? "Beta updates enabled" : "Stable updates enabled");
         if (info.onBetaUpdatesChanged)

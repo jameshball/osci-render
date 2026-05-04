@@ -6,8 +6,10 @@
 
 class SyphonInputSelectorComponent : public juce::Component, private juce::Button::Listener {
 public:
-    SyphonInputSelectorComponent(SharedTextureManager& manager, std::function<void(const juce::String&, const juce::String&)> onConnect, std::function<void()> onDisconnect, juce::String currentSource = "")
-        : sharedTextureManager(manager), onConnectCallback(onConnect), onDisconnectCallback(onDisconnect), currentSourceName(currentSource) {
+    SyphonInputSelectorComponent(SharedTextureManager& manager,
+                                 std::function<void(const juce::String&, const juce::String&)> onConnect,
+                                 juce::String currentSource = "")
+        : sharedTextureManager(manager), onConnectCallback(onConnect), currentSourceName(currentSource) {
         addAndMakeVisible(sourceLabel);
         sourceLabel.setText("Syphon/Spout Source:", juce::dontSendNotification);
 
@@ -25,6 +27,10 @@ public:
         } else if (sourceDropdown.getNumItems() > 0) {
             sourceDropdown.setSelectedItemIndex(0, juce::sendNotificationSync);
         }
+    }
+
+    void setOnFinished(std::function<void()> callback) {
+        onFinished = std::move(callback);
     }
 
     void refreshSources() {
@@ -51,19 +57,22 @@ public:
     }
 
     void buttonClicked(juce::Button* b) override {
+        juce::ignoreUnused(b);
+
         int selectedIndex = sourceDropdown.getSelectedItemIndex();
         if (selectedIndex >= 0 && selectedIndex < serverNames.size()) {
             onConnectCallback(serverNames[selectedIndex], appNames[selectedIndex]);
 
-            if (auto* window = findParentComponentOfClass<juce::DialogWindow>())
-                window->exitModalState(0);
+            if (onFinished != nullptr) {
+                onFinished();
+            }
         }
     }
 
 private:
     SharedTextureManager& sharedTextureManager;
     std::function<void(const juce::String&, const juce::String&)> onConnectCallback;
-    std::function<void()> onDisconnectCallback;
+    std::function<void()> onFinished;
     juce::String currentSourceName;
 
     juce::StringArray serverNames;

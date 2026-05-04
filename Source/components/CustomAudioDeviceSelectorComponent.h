@@ -14,6 +14,7 @@
 #pragma once
 
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <osci_gui/osci_gui.h>
 
 namespace juce
 {
@@ -63,6 +64,7 @@ private:
     void changeListenerCallback (ChangeBroadcaster*) override;
     void updateAllControls();
 
+    osci::OverlayLookAndFeel overlayLookAndFeel;
     std::unique_ptr<ComboBox> deviceTypeDropDown;
     std::unique_ptr<Label> deviceTypeDropDownLabel;
     std::unique_ptr<Component> audioDeviceSettingsComp;

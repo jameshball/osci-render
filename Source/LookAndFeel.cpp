@@ -66,17 +66,17 @@ void PluginLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w
         const auto& modTypes = getModulationTypes();
 
         for (const auto& modType : modTypes) {
-            if (! static_cast<bool> (props.getWithDefault (modType.propPrefix + "_active", false))) {
+            if (!static_cast<bool>(props.getWithDefault (modType.propPrefix + "_active", false))) {
                 continue;
             }
 
-            const auto modPos = static_cast<float> (static_cast<double> (props.getWithDefault (modType.propPrefix + "_mod_pos", 0.0)));
-            const auto colourArgb = static_cast<juce::uint32> (static_cast<juce::int64> (
-                props.getWithDefault (modType.propPrefix + "_colour", static_cast<juce::int64> (modType.defaultColour))));
+            const auto modPos = static_cast<float>(static_cast<double>(props.getWithDefault (modType.propPrefix + "_mod_pos", 0.0)));
+            const auto colourArgb = static_cast<juce::uint32>(static_cast<juce::int64>(
+                props.getWithDefault (modType.propPrefix + "_colour", static_cast<juce::int64>(modType.defaultColour))));
             const auto modColour = juce::Colour (colourArgb);
 
             const auto trackHeight = 6.0f;
-            const auto trackY = static_cast<float> (y) + static_cast<float> (height) * 0.5f - trackHeight * 0.5f;
+            const auto trackY = static_cast<float>(y) + static_cast<float>(height) * 0.5f - trackHeight * 0.5f;
             const auto barLeft = juce::jmin (sliderPos, modPos);
             const auto barRight = juce::jmax (sliderPos, modPos);
             const auto barWidth = barRight - barLeft;
@@ -109,14 +109,14 @@ void PluginLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w
     const auto angleRange = rotaryEndAngle - rotaryStartAngle;
 
     for (const auto& modType : modTypes) {
-        if (! static_cast<bool> (props.getWithDefault (modType.propPrefix + "_active", false))) {
+        if (!static_cast<bool>(props.getWithDefault (modType.propPrefix + "_active", false))) {
             continue;
         }
 
-        const auto modNorm = static_cast<float> (static_cast<double> (props.getWithDefault (modType.propPrefix + "_mod_pos_norm", static_cast<double> (sliderPos))));
+        const auto modNorm = static_cast<float>(static_cast<double>(props.getWithDefault (modType.propPrefix + "_mod_pos_norm", static_cast<double>(sliderPos))));
         const auto modAngle = rotaryStartAngle + modNorm * angleRange;
-        const auto colourArgb = static_cast<juce::uint32> (static_cast<juce::int64> (
-            props.getWithDefault (modType.propPrefix + "_colour", static_cast<juce::int64> (modType.defaultColour))));
+        const auto colourArgb = static_cast<juce::uint32>(static_cast<juce::int64>(
+            props.getWithDefault (modType.propPrefix + "_colour", static_cast<juce::int64>(modType.defaultColour))));
         const auto modColour = juce::Colour (colourArgb);
         const auto arcStart = juce::jmin (valueAngle, modAngle);
         const auto arcEnd = juce::jmax (valueAngle, modAngle);

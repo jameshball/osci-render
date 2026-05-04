@@ -152,6 +152,12 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
+        <FILE id="AudOvS" name="AudioSettingsOverlay.h" compile="0" resource="0"
+              file="Source/components/AudioSettingsOverlay.h"/>
+        <FILE id="OffOvS" name="OfflineRenderOverlay.h" compile="0" resource="0"
+              file="Source/components/OfflineRenderOverlay.h"/>
+        <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
+              file="Source/components/RecordingSettingsOverlay.h"/>
         <FILE id="CuMkC2" name="CustomMidiKeyboardComponent.cpp" compile="1"
               resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
         <FILE id="CuMkH2" name="CustomMidiKeyboardComponent.h" compile="0"
@@ -335,6 +341,7 @@
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
@@ -375,6 +382,7 @@
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
@@ -424,6 +432,7 @@
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
@@ -460,6 +469,7 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>

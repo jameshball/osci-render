@@ -100,12 +100,8 @@ void OsciMainMenuBarModel::resetMenuItems() {
         };
         aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));
 
-       #if JUCE_WINDOWS
-        const bool useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
-       #else
-        const bool useNativeTitleBar = true;
-       #endif
-        AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
+        auto closeButtonSvg = juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
+        editor.showOverlay(AboutComponent::createOverlay(aboutInfo, std::move(closeButtonSvg)));
     });
     addMenuItem(aboutMenu, "License and Updates...", [this] {
         editor.openLicenseAndUpdates();
@@ -164,10 +160,10 @@ void OsciMainMenuBarModel::resetMenuItems() {
     // Interface menu
     addToggleMenuItem(interfaceMenu, "Preview effect on hover", [this] {
         bool current = audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
-        bool newValue = ! current;
+        bool newValue = !current;
         audioProcessor.globalSettings.set("previewEffectOnHover", newValue);
         audioProcessor.globalSettings.save();
-        if (! newValue) {
+        if (!newValue) {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             audioProcessor.clearPreviewEffect();
         }

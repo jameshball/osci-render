@@ -7,6 +7,7 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "components/effects/EffectComponent.h"
+#include "components/SyphonInputOverlay.h"
 #include "components/SyphonInputSelectorComponent.h"
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
@@ -648,9 +649,6 @@ void OscirenderAudioProcessorEditor::openRecordingSettings() {
 #if OSCI_PREMIUM
     CommonPluginEditor::openRecordingSettings();
 #else
-    if (recordingSettingsWindow.isVisible()) {
-        recordingSettingsWindow.setVisible(false);
-    }
     showPremiumSplashScreen();
 #endif
 }
@@ -722,23 +720,28 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
-    SyphonInputSelectorComponent* selector = nullptr;
-    {
-        selector = new SyphonInputSelectorComponent(
-            sharedTextureManager,
-            [this](const juce::String& server, const juce::String& app) { connectSyphonInput(server, app); },
-            [this]() { disconnectSyphonInput(); },
-            getSyphonSourceName());
+    if (findActiveOverlay<SyphonInputOverlay>() != nullptr) {
+        return;
     }
-    juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(selector);
-    options.content->setSize(350, 120);
-    options.dialogTitle = "Select Syphon/Spout Input";
-    options.dialogBackgroundColour = juce::Colours::darkgrey;
-    options.escapeKeyTriggersCloseButton = true;
-    options.useNativeTitleBar = true;
-    options.resizable = false;
-    options.launchAsync();
+
+    auto selector = std::make_unique<SyphonInputSelectorComponent>(
+        sharedTextureManager,
+        [this](const juce::String& server, const juce::String& app) { connectSyphonInput(server, app); },
+        getSyphonSourceName());
+
+    selector->setSize(350, 120);
+
+    auto overlayHolder = std::make_shared<juce::Component::SafePointer<SyphonInputOverlay>>();
+    selector->setOnFinished([overlayHolder] {
+        if (auto* overlay = overlayHolder->getComponent()) {
+            overlay->requestDismiss();
+        }
+    });
+
+    const juce::Point<int> preferredContentSize { selector->getWidth(), selector->getHeight() };
+    auto overlay = std::make_unique<SyphonInputOverlay>(std::move(selector), preferredContentSize);
+    *overlayHolder = overlay.get();
+    showOverlay(std::move(overlay));
 }
 
 void OscirenderAudioProcessorEditor::connectSyphonInput(const juce::String& server, const juce::String& app) {

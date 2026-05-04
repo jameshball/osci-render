@@ -58,6 +58,9 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
+    void prepareOverlayFadeIn();
+    void fadeInAfterOverlay();
+    void cancelOverlayFadeIn();
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
@@ -74,8 +77,17 @@ public:
     };
 
 private:
+    class FadeCoverComponent : public juce::Component {
+    public:
+        FadeCoverComponent();
+        void paint(juce::Graphics& g) override;
+    };
+
+    static constexpr int overlayFadeDurationMs = 225;
+
     void updatePausedState();
     bool isPrimaryVisualiser() const;
+    void setOverlayFadeProgress(float progress);
 
     std::atomic<bool> active = true;
 
@@ -109,6 +121,8 @@ private:
     bool hideButtonRow = false;
     bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;
+    osci::ToggleAnimationController overlayFadeController { this };
+    FadeCoverComponent overlayFadeCover;
 
     juce::File ffmpegFile;
     bool recordingAudio = true;

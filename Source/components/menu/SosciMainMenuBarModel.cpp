@@ -127,12 +127,8 @@ void SosciMainMenuBarModel::resetMenuItems() {
             { "DJ_Level_3",     "Testing throughout and helping add features" },
         };
 
-       #if JUCE_WINDOWS
-        const bool useNativeTitleBar = editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
-       #else
-        const bool useNativeTitleBar = true;
-       #endif
-        AboutComponent::launchAsDialog(aboutInfo, useNativeTitleBar);
+        auto closeButtonSvg = juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
+        editor.showOverlay(AboutComponent::createOverlay(aboutInfo, std::move(closeButtonSvg)));
     });
     addMenuItem(aboutMenu, "License and Updates...", [&]() {
         editor.openLicenseAndUpdates();
