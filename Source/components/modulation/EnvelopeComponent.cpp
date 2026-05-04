@@ -203,8 +203,7 @@ void EnvelopeComponent::initEnvelopeData(int envIndex) {
     envData[envIndex].nodes = buildDahdsrNodes(audioProcessor.getCurrentDahdsrParams(envIndex));
 }
 
-void EnvelopeComponent::onActiveSourceChanged(int index) {
-    envData[activeSourceIndex].nodes = graph.getNodes();
+void EnvelopeComponent::onActiveSourceChanged(int) {
     syncGraphToActiveEnv();
     syncKnobsToActiveEnv();
     graph.resetFlowTrail();
