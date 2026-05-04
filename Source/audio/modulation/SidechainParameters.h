@@ -32,8 +32,8 @@ public:
     mutable juce::SpinLock curveLock;
 
     SidechainParameters() {
-        attack = new osci::FloatParameter("SC Attack", "sidechainAttack", VERSION_HINT, 0.3f, 0.001f, 2.0f, 0.001f, "s");
-        release = new osci::FloatParameter("SC Release", "sidechainRelease", VERSION_HINT, 0.3f, 0.001f, 2.0f, 0.001f, "s");
+        attack = new osci::FloatParameter("SC Attack", "sidechainAttack", VERSION_HINT, 0.2f, 0.001f, 2.0f, 0.001f, "s");
+        release = new osci::FloatParameter("SC Release", "sidechainRelease", VERSION_HINT, 0.2f, 0.001f, 2.0f, 0.001f, "s");
 
         floatParameters.push_back(attack);
         floatParameters.push_back(release);
@@ -60,11 +60,11 @@ public:
     // === Parameter getters ===
 
     float getAttack(int /*scIndex*/) const {
-        return attack ? attack->getValueUnnormalised() : 0.3f;
+        return attack ? attack->getValueUnnormalised() : 0.2f;
     }
 
     float getRelease(int /*scIndex*/) const {
-        return release ? release->getValueUnnormalised() : 0.3f;
+        return release ? release->getValueUnnormalised() : 0.2f;
     }
 
     // === Parameter setters ===
@@ -110,8 +110,8 @@ public:
     void fillBlockBuffers(int numSamples, double sampleRate, const float* rectifiedIn) {
         if (numSamples <= 0) return;
 
-        float attackVal = attack ? attack->getValueUnnormalised() : 0.3f;
-        float releaseVal = release ? release->getValueUnnormalised() : 0.3f;
+        float attackVal = attack ? attack->getValueUnnormalised() : 0.2f;
+        float releaseVal = release ? release->getValueUnnormalised() : 0.2f;
 
         {
             juce::SpinLock::ScopedLockType lock(curveLock);

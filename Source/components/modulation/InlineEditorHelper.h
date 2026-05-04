@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <osci_gui/osci_gui.h>
 #include <memory>
 #include <functional>
 
@@ -23,7 +24,7 @@ inline std::unique_ptr<juce::TextEditor> create(
         juce::Colour textColour = juce::Colours::white,
         juce::Colour outlineColour = juce::Colours::white.withAlpha(0.3f),
         float fontSize = 12.0f) {
-    auto editor = std::make_unique<juce::TextEditor>();
+    auto editor = std::make_unique<osci::TextEditor>();
     editor->setJustification(juce::Justification::centred);
     editor->setFont(juce::Font(juce::FontOptions(fontSize, juce::Font::bold)));
     editor->setColour(juce::TextEditor::backgroundColourId, backgroundColour);

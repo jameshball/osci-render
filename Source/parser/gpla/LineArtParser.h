@@ -5,20 +5,23 @@
 class LineArtParser {
 public:
 	LineArtParser(juce::String json);
-	LineArtParser(char* data, int dataLength);
+	LineArtParser(const char* data, int dataLength);
 	~LineArtParser();
 
 	void setFrame(int fNum);
 	std::vector<std::unique_ptr<osci::Shape>> draw();
+	double getFrameRate() const { return frameRate; }
 
 	static std::vector<std::vector<osci::Line>> parseJsonFrames(juce::String jsonStr);
-	static std::vector<std::vector<osci::Line>> parseBinaryFrames(char* data, int dataLength);
+	static std::vector<std::vector<osci::Line>> parseBinaryFrames(const char* data, int dataLength);
+	static std::vector<std::vector<osci::Line>> parseBinaryFrames(const char* data, int dataLength, int& outFrameRate);
 
 	static std::vector<osci::Line> generateFrame(juce::Array < juce::var> objects, double focalLength);
 
 	int numFrames = 0;
 	int frameNumber = 0;
 private:
+	double frameRate = 30.0;
 	static std::vector<std::vector<osci::Line>> epicFail();
 	static double makeDouble(int64_t data);
 	static void makeChars(int64_t data, char* chars);

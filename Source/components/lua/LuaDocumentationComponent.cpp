@@ -1,17 +1,12 @@
 #include "LuaDocumentationComponent.h"
 
-LuaDocumentationComponent::LuaDocumentationComponent() {
-    configureLabel(titleLabel, juce::Font(juce::FontOptions(22.0f, juce::Font::bold)), juce::Justification::centred);
-    titleLabel.setText("Lua Scripting Reference", juce::NotificationType::dontSendNotification);
-    addAndMakeVisible(titleLabel);
-
-    closeButton = std::make_unique<SvgButton>("close", BinaryData::close_svg, juce::Colours::white);
-    closeButton->onClick = [this] { dismiss(); };
-    addAndMakeVisible(*closeButton);
+LuaDocumentationComponent::LuaDocumentationComponent()
+    : osci::OverlayComponent (juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize)) {
+    setOverlayTitle("Lua Scripting Reference");
 
     viewport.setViewedComponent(&contentComponent, false);
     viewport.setScrollBarsShown(true, false);
-    viewport.setColour(juce::ScrollBar::thumbColourId, Colours::grey());
+    viewport.setColour(juce::ScrollBar::thumbColourId, osci::Colours::grey());
     viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
     addAndMakeVisible(viewport);
 
@@ -19,11 +14,6 @@ LuaDocumentationComponent::LuaDocumentationComponent() {
 }
 
 void LuaDocumentationComponent::resizeContent(juce::Rectangle<int> contentArea) {
-    auto titleArea = contentArea.removeFromTop(32);
-    closeButton->setBounds(titleArea.removeFromRight(32).reduced(4));
-    titleLabel.setBounds(titleArea);
-    contentArea.removeFromTop(4);
-
     viewport.setBounds(contentArea);
     layoutContent(contentArea.getWidth() - viewport.getScrollBarThickness() - 4);
 }
@@ -33,7 +23,7 @@ void LuaDocumentationComponent::resizeContent(juce::Rectangle<int> contentArea) 
 void LuaDocumentationComponent::addHeading(const juce::String& text) {
     auto* label = new juce::Label();
     label->setText(text, juce::dontSendNotification);
-    label->setFont(juce::Font(juce::FontOptions(18.0f, juce::Font::bold)));
+    label->setFont(juce::Font(18.0f, juce::Font::bold));
     label->setColour(juce::Label::textColourId, juce::Colours::white);
     label->setJustificationType(juce::Justification::centredLeft);
     label->setInterceptsMouseClicks(false, false);
@@ -44,7 +34,7 @@ void LuaDocumentationComponent::addHeading(const juce::String& text) {
 void LuaDocumentationComponent::addSubHeading(const juce::String& text) {
     auto* label = new juce::Label();
     label->setText(text, juce::dontSendNotification);
-    label->setFont(juce::Font(juce::FontOptions(14.0f, juce::Font::bold)));
+    label->setFont(juce::Font(14.0f, juce::Font::bold));
     label->setColour(juce::Label::textColourId, juce::Colours::white);
     label->setJustificationType(juce::Justification::centredLeft);
     label->setInterceptsMouseClicks(false, false);
@@ -55,7 +45,7 @@ void LuaDocumentationComponent::addSubHeading(const juce::String& text) {
 void LuaDocumentationComponent::addBody(const juce::String& text) {
     auto* label = new juce::Label();
     label->setText(text, juce::dontSendNotification);
-    label->setFont(juce::Font(juce::FontOptions(13.5f)));
+    label->setFont(juce::Font(13.5f));
     label->setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.85f));
     label->setJustificationType(juce::Justification::topLeft);
     label->setInterceptsMouseClicks(false, false);
@@ -73,8 +63,8 @@ void LuaDocumentationComponent::addCode(const juce::String& code) {
 
 void LuaDocumentationComponent::addLink(const juce::String& text, const juce::URL& url) {
     auto* link = new juce::HyperlinkButton(text, url);
-    link->setFont(juce::Font(juce::FontOptions(13.5f)), false);
-    link->setColour(juce::HyperlinkButton::textColourId, Colours::accentColor());
+    link->setFont(juce::Font(13.5f), false);
+    link->setColour(juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
     link->setJustificationType(juce::Justification::centredLeft);
     elements.add(link);
     contentComponent.addAndMakeVisible(link);

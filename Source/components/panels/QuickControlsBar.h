@@ -22,6 +22,10 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
 
+    // Show/hide the animation speed knob based on whether the current file is
+    // animatable (Lottie, GPLA, GIF, video, ...).
+    void setAnimated(bool animated);
+
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
@@ -33,6 +37,7 @@ private:
     KnobContainerComponent frequencyKnob{"FREQUENCY"};
     KnobContainerComponent perspectiveKnob{"PERSPECTIVE"};
     KnobContainerComponent fovKnob{"FOV"};
+    KnobContainerComponent animationSpeedKnob{"SPEED"};
 
 #if !OSCI_PREMIUM
     jux::SwitchButton midiToggle{audioProcessor.midiEnabled};

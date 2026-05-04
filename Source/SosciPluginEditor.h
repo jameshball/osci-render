@@ -8,7 +8,7 @@
 #include "visualiser/VisualiserSettings.h"
 #include "components/timeline/AudioTimelineController.h"
 #include "components/menu/SosciMainMenuBarModel.h"
-#include "components/SvgButton.h"
+#include <osci_gui/osci_gui.h>
 
 class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener, public AudioPlayerListener {
 public:
@@ -33,12 +33,12 @@ private:
     juce::String currentInputDevice;
 
     ScrollableComponent visualiserSettingsWrapper = ScrollableComponent(visualiserSettings);
-    
+
     SosciMainMenuBarModel model{*this, audioProcessor};
-    
+
     // Timeline controller for sosci (audio playback, shared pointer to allow passing to timeline component)
     std::shared_ptr<AudioTimelineController> audioTimelineController;
-    
+
     void updateTimelineController();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SosciPluginEditor)

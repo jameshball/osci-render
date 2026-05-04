@@ -189,9 +189,12 @@ void ModulationRateComponent::mouseDrag(const juce::MouseEvent& e) {
     if (!isDragging) return;
 
     if (rateMode == LfoRateMode::Seconds) {
+        auto* param = config.getRateParam(sourceIndex);
+        float minRate = (param != nullptr) ? param->min.load() : 0.01f;
+        float maxRate = (param != nullptr) ? param->max.load() : 1000.0f;
         float dy = (float)(dragStartY - e.getPosition().y);
         float logNewVal = std::log(dragStartValue) + dy * 0.02f;
-        float newVal = juce::jlimit(0.01f, 100.0f, std::exp(logNewVal));
+        float newVal = juce::jlimit(minRate, maxRate, std::exp(logNewVal));
         pushRateToProcessor(newVal);
         repaint();
     } else {
@@ -252,7 +255,10 @@ void ModulationRateComponent::showInlineEditor() {
 
     auto commitFn = [this](const juce::String& text) {
         float val = text.getFloatValue();
-        val = juce::jlimit(0.01f, 100.0f, val);
+        auto* param = config.getRateParam(sourceIndex);
+        float minRate = (param != nullptr) ? param->min.load() : 0.01f;
+        float maxRate = (param != nullptr) ? param->max.load() : 1000.0f;
+        val = juce::jlimit(minRate, maxRate, val);
         inlineEditor.reset();
         pushRateToProcessor(val);
         repaint();
@@ -263,7 +269,7 @@ void ModulationRateComponent::showInlineEditor() {
     };
     inlineEditor = InlineEditorHelper::create(
         juce::String(hz, 2), valueArea, { commitFn, cancelFn },
-        Colours::veryDark(), juce::Colours::white,
+        osci::Colours::veryDark(), juce::Colours::white,
         juce::Colours::white.withAlpha(0.3f), 12.0f);
     inlineEditor->setJustification(juce::Justification::centredLeft);
     addAndMakeVisible(inlineEditor.get());
@@ -274,7 +280,10 @@ void ModulationRateComponent::commitInlineEditor() {
     auto editor = std::move(inlineEditor);
     if (!editor) return;
     float val = editor->getText().getFloatValue();
-    val = juce::jlimit(0.01f, 100.0f, val);
+    auto* param = config.getRateParam(sourceIndex);
+    float minRate = (param != nullptr) ? param->min.load() : 0.01f;
+    float maxRate = (param != nullptr) ? param->max.load() : 1000.0f;
+    val = juce::jlimit(minRate, maxRate, val);
     pushRateToProcessor(val);
     repaint();
 }

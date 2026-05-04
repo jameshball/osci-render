@@ -120,15 +120,15 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
 
     addAndMakeVisible(graph);
 
-    // Attack knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    attackKnob.bindToParam(audioProcessor.sidechainParameters.attack, 0.3, 3);
+    // Attack knob (0-2 seconds, default 0.2s, skew centre 0.2)
+    attackKnob.bindToParam(audioProcessor.sidechainParameters.attack, 0.2, 3);
     attackKnob.getKnob().setTextValueSuffix(" s");
     attackKnob.setAccentColour(getSidechainColour(0));
     attackKnob.wireModulation(audioProcessor);
     addAndMakeVisible(attackKnob);
 
-    // Release knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    releaseKnob.bindToParam(audioProcessor.sidechainParameters.release, 0.3, 3);
+    // Release knob (0-2 seconds, default 0.2s, skew centre 0.2)
+    releaseKnob.bindToParam(audioProcessor.sidechainParameters.release, 0.2, 3);
     releaseKnob.getKnob().setTextValueSuffix(" s");
     releaseKnob.setAccentColour(getSidechainColour(0));
     releaseKnob.wireModulation(audioProcessor);
@@ -177,9 +177,9 @@ void SidechainComponent::paint(juce::Graphics& g) {
 
     // Draw a background panel behind the knob area (below the graph)
     if (!knobAreaBounds.isEmpty()) {
-        float r = OscirenderLookAndFeel::RECT_RADIUS;
+        float r = osci::LookAndFeel::RECT_RADIUS;
         auto bf = knobAreaBounds.toFloat();
-        g.setColour(Colours::darker());
+        g.setColour(osci::Colours::darker());
         g.fillRoundedRectangle(bf, r);
     }
 }

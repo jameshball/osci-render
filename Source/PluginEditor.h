@@ -77,8 +77,8 @@ public:
 
     LuaConsole console;
 
-    SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
-    SvgButton luaResetButton { "luaReset", juce::String(BinaryData::refresh_svg), juce::Colours::white };
+    osci::SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
+    osci::SvgButton luaResetButton { "luaReset", juce::String(BinaryData::refresh_svg), juce::Colours::white };
 
     std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
     std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;
@@ -126,11 +126,7 @@ public:
 #endif
 
 private:
-    // Overlay management overrides
     void showLuaDocumentation();
-    void dismissOverlay(OverlayComponent* overlay) override;
-
-    std::unique_ptr<LuaDocumentationComponent> cachedLuaDocs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

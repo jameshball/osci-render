@@ -2,6 +2,7 @@
 #include "../../../modules/gifdec/gifdec.h"
 #include "../../PluginProcessor.h"
 #include "../../CommonPluginEditor.h"
+#include "../../video/FFmpegMediaInfo.h"
 
 ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
     juce::File file = temp.getFile();
@@ -80,6 +81,10 @@ void ImageParser::processGifFile(juce::File& file) {
 
         int i = 0;
         while (gd_get_frame(gif) > 0) {
+            if (i == 0 && gif->gce.delay > 0) {
+                // GIF delay is in hundredths of a second.
+                frameRate = 100.0 / static_cast<double>(gif->gce.delay);
+            }
             gd_render_frame(gif, tempBuffer.data());
 
             frames.emplace_back(std::vector<uint8_t>(frameSize));
@@ -168,32 +173,12 @@ void ImageParser::processVideoFile(juce::File& file) {
 }
 
 bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile) {
-    // Use StringArray for arguments to handle quoting reliably
-    juce::StringArray metadataCommand;
-    metadataCommand.add(ffmpegFile.getFullPathName());
-    metadataCommand.add("-i");
-    metadataCommand.add(file.getFullPathName());
-    metadataCommand.add("-hide_banner");
-
-    if (!ffmpegProcess.start(metadataCommand))
-    {
-        handleError("Failed to start ffmpeg process for metadata.");
-        return false;
+    const auto mediaInfo = osci::video::probeFFmpegMediaInfo(ffmpegFile, file);
+    if (mediaInfo.width > 0 && mediaInfo.height > 0) {
+        width = mediaInfo.width;
+        height = mediaInfo.height;
     }
-    juce::String output = ffmpegProcess.readAllProcessOutput();
-    
-    if (output.isNotEmpty()) {
-        // Look for resolution in format "1920x1080"
-        std::regex resolutionRegex(R"((\d{2,5})x(\d{2,5}))");
-        std::smatch match;
-        std::string stdOut = output.toStdString();
-
-        if (std::regex_search(stdOut, match, resolutionRegex) && match.size() == 3)
-        {
-            width = std::stoi(match[1].str());
-            height = std::stoi(match[2].str());
-        }
-    }
+    if (mediaInfo.frameRate > 0.0) frameRate = mediaInfo.frameRate;
     
     // If still no dimensions or dimensions are too large, use reasonable defaults
     if (width <= 0 || height <= 0) {

@@ -16,8 +16,8 @@ LfoComponent::PresetSelector::PresetSelector() {
 void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
 
-    g.setColour(Colours::evenDarker());
-    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
+    g.setColour(osci::Colours::evenDarker());
+    g.fillRoundedRectangle(bounds, osci::Colours::kPillRadius);
 
     // Left chevron
     {
@@ -221,7 +221,7 @@ static ModulationRateConfig buildLfoRateConfig(OscirenderAudioProcessor& proc) {
     cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.lfoParameters.setRateMode(i, m); };
     cfg.getTempoDivision = [&proc](int i) { return proc.lfoParameters.getTempoDivision(i); };
     cfg.setTempoDivision = [&proc](int i, int d) { proc.lfoParameters.setTempoDivision(i, d); };
-    cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
+    cfg.getCurrentBpm = [&proc]() { return proc.dawPosition.bpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_LFOS;
     return cfg;
 }
@@ -255,8 +255,8 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     bool defaultIsFile = false;
     juce::String defaultUserName;
 
-    juce::String defaultFileStr = audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
-    juce::String defaultFactoryStr = audioProcessor.getGlobalStringValue("defaultLfoPreset");
+    juce::String defaultFileStr = audioProcessor.globalSettings.getString("defaultLfoPresetFile");
+    juce::String defaultFactoryStr = audioProcessor.globalSettings.getString("defaultLfoPreset");
 
     if (defaultFileStr.isNotEmpty()) {
         juce::File file(defaultFileStr);
@@ -426,8 +426,8 @@ void LfoComponent::paint(juce::Graphics& g) {
 
     // Dark rounded background behind paint + preview controls
     if (!paintControlsBg.isEmpty()) {
-        g.setColour(Colours::darkerer());
-        g.fillRoundedRectangle(paintControlsBg.toFloat(), Colours::kPillRadius);
+        g.setColour(osci::Colours::darkerer());
+        g.fillRoundedRectangle(paintControlsBg.toFloat(), osci::Colours::kPillRadius);
     }
 }
 
@@ -916,32 +916,32 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
 }
 
 void LfoComponent::presetBrowserSetDefaultFactory(LfoPreset preset) {
-    audioProcessor.setGlobalValue("defaultLfoPreset", lfoPresetToString(preset));
-    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.set("defaultLfoPreset", lfoPresetToString(preset));
+    audioProcessor.globalSettings.remove("defaultLfoPresetFile");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::presetBrowserSetDefaultFile(const juce::File& file) {
-    audioProcessor.setGlobalValue("defaultLfoPresetFile", file.getFullPathName());
-    audioProcessor.removeGlobalValue("defaultLfoPreset");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.set("defaultLfoPresetFile", file.getFullPathName());
+    audioProcessor.globalSettings.remove("defaultLfoPreset");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::presetBrowserClearDefault() {
-    audioProcessor.removeGlobalValue("defaultLfoPreset");
-    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.remove("defaultLfoPreset");
+    audioProcessor.globalSettings.remove("defaultLfoPresetFile");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 juce::String LfoComponent::getDefaultFactoryName() const {
-    return audioProcessor.getGlobalStringValue("defaultLfoPreset");
+    return audioProcessor.globalSettings.getString("defaultLfoPreset");
 }
 
 juce::String LfoComponent::getDefaultFilePath() const {
-    return audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
+    return audioProcessor.globalSettings.getString("defaultLfoPresetFile");
 }
 
 void LfoComponent::refreshPresetBrowserIfVisible() {

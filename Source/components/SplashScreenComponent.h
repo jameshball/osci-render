@@ -2,10 +2,9 @@
 
 #include <JuceHeader.h>
 
-#include "OverlayComponent.h"
-#include "GridComponent.h"
+#include <osci_gui/osci_gui.h>
 
-class SplashScreenComponent : public OverlayComponent {
+class SplashScreenComponent : public osci::OverlayComponent {
 public:
     SplashScreenComponent();
     ~SplashScreenComponent() override = default;
@@ -18,9 +17,8 @@ protected:
 private:
     void buildBenefitTiles();
 
-    juce::Label titleLabel;
     juce::Label subtitleLabel;
-    GridComponent benefitsGrid;
+    osci::GridComponent benefitsGrid;
     juce::Label supportLabel;
 
     juce::TextButton upgradeButton{"Upgrade to Premium"};

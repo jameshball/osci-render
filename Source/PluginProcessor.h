@@ -79,6 +79,18 @@ private:
     std::vector<Entry> entries;
 };
 
+// Extensions recognised as Lottie animation files (with or without the leading dot).
+inline bool isLottieExtension(const juce::String& extension) {
+#if OSCI_PREMIUM
+    auto e = extension.toLowerCase();
+    return e == "json" || e == "lottie" || e == "lot"
+        || e == ".json" || e == ".lottie" || e == ".lot";
+#else
+    (void) extension;
+    return false;
+#endif
+}
+
 /**
  */
 class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient
@@ -184,13 +196,8 @@ public:
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
 
-    // DAW transport state (updated in processBlock, read by voices for Lua)
-    std::atomic<double> luaBpm = 120.0;
-    std::atomic<double> luaPlayTime = 0.0;
-    std::atomic<double> luaPlayTimeBeats = 0.0;
-    std::atomic<bool> luaIsPlaying = false;
-    std::atomic<int> luaTimeSigNum = 4;
-    std::atomic<int> luaTimeSigDen = 4;
+    // Updated on the audio thread; read by audio-thread voices and message-thread UI.
+    osci::DawPosition dawPosition;
 
     juce::SpinLock parsersLock;
     std::vector<std::shared_ptr<FileParser>> parsers;
@@ -210,9 +217,6 @@ public:
 
     // Look up human-readable name for any parameter by ID (searches all effects).
     juce::String getParamDisplayName(const juce::String& paramId) const;
-
-    // DAW or standalone BPM – updated every processBlock
-    std::atomic<double> currentBpm{120.0};
 
     // Standalone-only BPM parameter (automatable)
     osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);
@@ -273,7 +277,12 @@ public:
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
     osci::BooleanParameter* animationSyncBPM = new osci::BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
-    osci::FloatParameter* animationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000);
+    std::shared_ptr<osci::Effect> animationSpeed = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Animation Speed",
+            "Scalar multiplier of the file's intrinsic frame rate. Negative values play the animation in reverse. Right-click to edit the range.",
+            "animationSpeed",
+            VERSION_HINT, 1.0f, -4.0f, 4.0f, 0.01f));
     osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
@@ -383,6 +392,9 @@ public:
         "lsystem",
         "mp4",
         "mov",
+        "json",
+        "lottie",
+        "lot",
 #endif
     };
 
@@ -457,8 +469,6 @@ private:
         parseVersion(parsedB, b);
         return std::lexicographical_compare(parsedA, parsedA + 3, parsedB, parsedB + 3);
     }
-
-    juce::AudioPlayHead* playHead;
 
     // Precomputed paramId → (effect*, paramIndex) lookup for O(1) modulation target resolution.
     // Built once after all effects are populated; the effect lists are stable after construction.

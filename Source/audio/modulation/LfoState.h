@@ -221,6 +221,10 @@ struct LfoAudioState {
 
         switch (mode) {
             case LfoMode::Free:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceFreeOrSync(phaseInc, waveform);
+                return;
+
             case LfoMode::Sync:
                 for (int s = 0; s < numSamples; ++s)
                     output[s] = advanceFreeOrSync(phaseInc, waveform);

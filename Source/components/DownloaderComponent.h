@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "DownloadProgressComponent.h"
 
 class DownloaderThread : public juce::Thread {
 public:
@@ -38,9 +39,7 @@ private:
     
     juce::URL url;
     juce::File file;
-    double progressValue = -1;
-    juce::ProgressBar progressBar = juce::ProgressBar(progressValue);
-    juce::Label successLabel;
+    DownloadProgressComponent progress_;
     juce::CriticalSection taskLock;
     std::unique_ptr<juce::URL::DownloadTask> task;
     std::unique_ptr<DownloaderThread> downloader;

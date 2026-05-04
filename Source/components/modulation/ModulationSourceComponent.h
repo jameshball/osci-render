@@ -4,8 +4,8 @@
 #include <melatonin_blur/melatonin_blur.h>
 #include "../../audio/modulation/ModAssignment.h"
 #include "../VerticalTabListComponent.h"
-#include "../ScrollFadeViewport.h"
-#include "../HoverAnimationMixin.h"
+#include <osci_gui/osci_gui.h>
+#include <osci_gui/osci_gui.h>
 
 namespace osci { class MidiCCManager; }
 
@@ -115,7 +115,7 @@ protected:
 
     // The tab list and viewport (accessible for subclass layout if needed).
     VerticalTabListComponent tabList;
-    ScrollFadeViewport tabViewport;
+    osci::ScrollFadeViewport tabViewport;
 
     // Called when active source changes. Override for subclass-specific logic
     // (e.g. updating graph, preset selector). Base implementation is empty.
@@ -141,7 +141,7 @@ private:
     melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {0, -2}, 0 };
 
     // DepthIndicator – small arc knob for a single source→param connection.
-    class DepthIndicator : public HoverAnimationMixin {
+    class DepthIndicator : public osci::HoverAnimationMixin {
     public:
         DepthIndicator(ModulationSourceComponent& owner, int sourceIndex,
                        juce::String paramId, float depth, bool bipolar);

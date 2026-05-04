@@ -4,8 +4,11 @@ on:
     branches:
       - develop
     paths:
+      - .github/workflows/build.yaml
+      - ci/**
       - osci-render.jucer
       - sosci.jucer
+      - osci-installer.jucer
       - packaging/osci-render.iss
       - packaging/sosci.iss
       - packaging/osci-render.pkgproj
@@ -22,11 +25,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-latest, windows-2022]
-        project: [osci-render, sosci]
+        project: [osci-render, sosci, osci-installer]
         version: [free, premium]
         exclude:
           - project: sosci
             version: free
+          - project: osci-installer
+            version: premium
     steps:
       - name: Fix up git URLs
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
@@ -49,6 +54,13 @@ jobs:
           else
             echo "OS=win" >> $GITHUB_ENV
             echo "OS_ARTIFACT=windows" >> $GITHUB_ENV
+          fi
+
+          # sosci and osci-installer have only one release artifact name.
+          if [[ "${{ matrix.project }}" == "sosci" || "${{ matrix.project }}" == "osci-installer" ]]; then
+            echo "OUTPUT_NAME=${{ matrix.project }}" >> $GITHUB_ENV
+          else
+            echo "OUTPUT_NAME=${{ matrix.project }}-${{ matrix.version }}" >> $GITHUB_ENV
           fi
 
       - name: Extract project version
@@ -76,7 +88,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
 
       - name: Import installer certificates
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         uses: apple-actions/import-codesign-certs@v3
         with:
           keychain: oscirender
@@ -121,11 +133,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           source ./ci/setup-env.sh
-          source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
+          if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
+            source ./ci/build_installer.sh
+          else
+            source ./ci/build.sh "${{ matrix.project }}" "${{ matrix.version }}"
+          fi
 
-      # Install MEGAcmd early so both pluginval-log and binary uploads can use it
+      # Install MEGAcmd for pluginval-log uploads.
       - name: Install MEGAcmd (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: matrix.project != 'osci-installer' && runner.os != 'Windows'
         shell: bash
         run: |
           if [[ "${{ runner.os }}" == "Linux" ]]; then
@@ -138,7 +154,7 @@ jobs:
           fi
 
       - name: Install MEGAcmd (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.project != 'osci-installer' && runner.os == 'Windows'
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
@@ -156,7 +172,7 @@ jobs:
           echo $megaDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install procdump (Windows)
-        if: matrix.os == 'windows-2022'
+        if: matrix.project != 'osci-installer' && matrix.os == 'windows-2022'
         shell: bash
         run: |
           choco install procdump -y --no-progress
@@ -164,7 +180,7 @@ jobs:
 
       - name: Validate plugin with pluginval
         id: pluginval_effect
-        if: steps.ci_flags.outputs.skip_validation != 'true'
+        if: matrix.project != 'osci-installer' && steps.ci_flags.outputs.skip_validation != 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -188,7 +204,7 @@ jobs:
 
       # Upload pluginval logs and crash dumps to MEGA (runs even if pluginval failed)
       - name: Upload pluginval logs to MEGA (Unix)
-        if: always() && runner.os != 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
+        if: always() && matrix.project != 'osci-installer' && runner.os != 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
         shell: bash
         run: |
           set -euo pipefail
@@ -201,7 +217,7 @@ jobs:
           mega-logout || true
 
       - name: Upload pluginval logs to MEGA (Windows)
-        if: always() && runner.os == 'Windows'
+        if: always() && matrix.project != 'osci-installer' && runner.os == 'Windows'
         shell: powershell
         run: |
           $ErrorActionPreference = 'Continue'
@@ -223,32 +239,32 @@ jobs:
 
       # macOS packaging & notarization
       - name: Download Packages installer build tool
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         run: wget http://s.sudre.free.fr/files/Packages_1211_dev.dmg
 
       - name: Mount Packages image
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         run: hdiutil attach Packages_1211_dev.dmg
 
       - name: Install Packages
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         run: sudo installer -pkg /Volumes/Packages\ 1.2.11/Install\ Packages.pkg -target /
 
       - name: Build installer (macOS pkg)
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         run: packagesbuild --project "packaging/${{ matrix.project }}.pkgproj"
 
       - name: Sign installer (macOS pkg)
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         run: |
-          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
-          pkgutil --check-signature "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
+          pkgutil --check-signature "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
 
       - name: Notarize installer (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         uses: lando/notarize-action@v2
         with:
-          product-path: "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+          product-path: "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
           appstore-connect-username: ${{ secrets.APPLE_ID }}
           appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
           appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
@@ -257,70 +273,80 @@ jobs:
           verbose: true
 
       - name: Staple installer (macOS)
-        if: matrix.os == 'macos-latest'
-        run: xcrun stapler staple "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
+        run: xcrun stapler staple "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
 
       - name: Check installer (macOS)
-        if: matrix.os == 'macos-latest'
-        run: spctl -a -vvv -t install "bin/${{ matrix.project }}-${{ matrix.version }}.pkg"
+        if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
+        run: spctl -a -vvv -t install "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
 
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
-        if: matrix.os == 'windows-2022'
+        if: matrix.project != 'osci-installer' && matrix.os == 'windows-2022'
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: "packaging/${{ matrix.project }}.iss"
 
-      - name: Move installer to bin (Windows)
-        if: matrix.os == 'windows-2022'
+      - name: Package Windows installer as zip
+        if: matrix.project != 'osci-installer' && matrix.os == 'windows-2022'
         shell: bash
-        run: mv "packaging/build/${{ matrix.project }}.exe" "bin/${{ matrix.project }}-${{ matrix.version }}.exe"
+        run: |
+          # Move the installer .exe into bin/ under the canonical OUTPUT_NAME,
+          # then zip it as ${OUTPUT_NAME}-windows.zip so users get a single, clearly
+          # named download matching the other platforms.
+          mv "packaging/build/${{ matrix.project }}.exe" "bin/${OUTPUT_NAME}.exe"
+          cd bin
+          7z a "${OUTPUT_NAME}-windows.zip" "${OUTPUT_NAME}.exe"
+          rm -f "${OUTPUT_NAME}.exe"
 
-      # Combined MEGA upload (Unix)
-      - name: Upload binaries to MEGA (Linux/macOS)
-        if: runner.os != 'Windows'
+      # osci-installer macOS app signing/notarization. The plugin jobs publish
+      # signed .pkg files above; the installer app ships as a notarized .app zip.
+      - name: Sign osci-installer app (macOS)
+        if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
         shell: bash
         run: |
           set -euo pipefail
-          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          DEST="/${{ matrix.project }}/${{ steps.version.outputs.version }}/${{ matrix.version }}"
-          ls -1 bin || true
-          # Upload all produced artifacts (files only) into variant subdirectory
-          shopt -s nullglob
-          for f in bin/*; do
-            if [[ -f "$f" ]]; then
-              echo "Uploading $f -> $DEST"
-              mega-put -c "$f" "$DEST/"
-            fi
-          done
-          mega-logout
+          APP_PATH="Builds/osci-installer/MacOSX/build/Release/osci-installer.app"
+          if [[ ! -d "${APP_PATH}" ]]; then
+            echo "::error::expected app ${APP_PATH} not found"
+            find Builds/osci-installer/MacOSX/build -maxdepth 3 -print || true
+            exit 1
+          fi
+          APP_IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -n 1)"
+          if [[ -z "${APP_IDENTITY}" ]]; then
+            echo "::error::Developer ID Application signing identity not found"
+            security find-identity -v -p codesigning || true
+            exit 1
+          fi
+          codesign --force --deep --options runtime --timestamp --sign "${APP_IDENTITY}" "${APP_PATH}"
+          codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
+          ditto -c -k --keepParent "${APP_PATH}" "bin/osci-installer-mac-notary.zip"
 
-      # Combined MEGA upload (Windows)
-      - name: Upload binaries to MEGA (Windows)
-        if: runner.os == 'Windows'
-        shell: powershell
+      - name: Notarize osci-installer app (macOS)
+        if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
+        uses: lando/notarize-action@v2
+        with:
+          product-path: "bin/osci-installer-mac-notary.zip"
+          appstore-connect-username: ${{ secrets.APPLE_ID }}
+          appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
+          primary-bundle-id: sh.ball.osci-installer
+          tool: notarytool
+          verbose: true
+
+      - name: Package notarized osci-installer app (macOS)
+        if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          # Ensure MEGAcmd is on PATH
-          if (-not (Get-Command mega-login -ErrorAction SilentlyContinue)) {
-            $p = "$env:LOCALAPPDATA\MEGAcmd"
-            if (Test-Path $p) { $env:PATH = "$p;$env:PATH" }
-          }
-          mega-login "${{ secrets.MEGA_USERNAME }}" "${{ secrets.MEGA_PASSWORD }}"
-          $root = "/${{ matrix.project }}/${{ steps.version.outputs.version }}"
-          $variant = "$root/${{ matrix.version }}"
-          Get-ChildItem bin -File | ForEach-Object {
-            if ($_.Extension -eq '.pdb') {
-              Write-Host "Uploading $($_.FullName) -> $root (debug info)"
-              mega-put -c $_.FullName $root/
-            } else {
-              Write-Host "Uploading $($_.FullName) -> $variant"
-              mega-put -c $_.FullName $variant/
-            }
-          }
-          mega-logout
+          set -euo pipefail
+          APP_PATH="Builds/osci-installer/MacOSX/build/Release/osci-installer.app"
+          xcrun stapler staple "${APP_PATH}"
+          spctl -a -vvv -t exec "${APP_PATH}"
+          rm -f "bin/osci-installer-mac.zip"
+          ditto -c -k --keepParent "${APP_PATH}" "bin/osci-installer-mac.zip"
+          rm -f "bin/osci-installer-mac-notary.zip"
 
-      # Fail the job if pluginval failed (after all logs and binaries have been uploaded)
+      # Fail the job if pluginval failed after logs have been uploaded.
       - name: Check pluginval results
         if: always()
         shell: bash
@@ -335,3 +361,74 @@ jobs:
             FAILED=1
           fi
           exit $FAILED
+
+      # -- Release publish ----------------------------------------
+      # Every successful build publishes a signed alpha artifact to
+      # api.osci-render.com so the updater can fetch it after admin promotion.
+      - name: Publish release artifact
+        shell: bash
+        env:
+          PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
+          RELEASE_SIGNING_PRIVATE_KEY: ${{ secrets.RELEASE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PUBLISH_API_TOKEN:-}" ]] || [[ -z "${RELEASE_SIGNING_PRIVATE_KEY:-}" ]]; then
+            echo "::error::PUBLISH_API_TOKEN or RELEASE_SIGNING_PRIVATE_KEY GitHub secrets are not set"
+            exit 1
+          fi
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            python3 -m pip install --quiet --user --break-system-packages pynacl
+          else
+            python3 -m pip install --quiet pynacl
+          fi
+
+          # Map matrix -> (product id/slug, platform, artifact path, kind)
+          case "${{ matrix.project }}" in
+            osci-render) PRODUCT='wHBxF-jb7oyeVNPRzKDorA==' ;;
+            sosci)       PRODUCT='Hsr9C58_YhTxYP0MNvsIow==' ;;
+            osci-installer) PRODUCT='osci-installer' ;;
+            *) echo "::error::unknown project ${{ matrix.project }}"; exit 1 ;;
+          esac
+          if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
+            PUBLISH_VARIANT='free'
+          else
+            PUBLISH_VARIANT='${{ matrix.version }}'
+          fi
+
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            PLATFORM='mac-universal'
+            if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
+              ARTIFACT="bin/${OUTPUT_NAME}-mac.zip"
+              KIND='zip'
+            else
+              ARTIFACT="bin/${OUTPUT_NAME}-mac.pkg"
+              KIND='pkg'
+            fi
+          elif [[ "${{ matrix.os }}" == windows* ]]; then
+            PLATFORM='win-x86_64'
+            ARTIFACT="bin/${OUTPUT_NAME}-windows.zip"
+            KIND='zip'
+          elif [[ "${{ matrix.os }}" == ubuntu* ]]; then
+            PLATFORM='linux-x86_64'
+            ARTIFACT="bin/${OUTPUT_NAME}-linux.zip"
+            KIND='zip'
+          else
+            echo "::warning::skipping publish for unsupported OS ${{ matrix.os }}"
+            exit 0
+          fi
+
+          if [[ ! -f "${ARTIFACT}" ]]; then
+            echo "::error::expected artifact ${ARTIFACT} not found"
+            ls -la bin/ || true
+            exit 1
+          fi
+
+          python3 ci/publish_release.py \
+            --product "${PRODUCT}" \
+            --semver "${{ steps.version.outputs.version }}" \
+            --platform "${PLATFORM}" \
+            --variant "${PUBLISH_VARIANT}" \
+            --release-track alpha \
+            --artifact-kind "${KIND}" \
+            --artifact "${ARTIFACT}" \
+            --notes "Auto-published by CI from $(git log -1 --format=%H)"

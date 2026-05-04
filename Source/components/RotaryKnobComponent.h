@@ -13,7 +13,7 @@ public:
         setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
         setPopupDisplayEnabled(true, false, nullptr);
-        setColour(juce::Slider::rotarySliderFillColourId, Colours::accentColor());
+        setColour(juce::Slider::rotarySliderFillColourId, osci::Colours::accentColor());
 
         constexpr float kArcGap = juce::MathConstants<float>::pi / 3.0f;
         float startAngle = juce::MathConstants<float>::pi + kArcGap * 0.5f;
