@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="oInst1" name="osci-installer" projectType="guiapp" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" cppLanguageStandard="20"
-              projectLineFeed="&#10;" headerPath="./include" version="1.0.0.0"
+              projectLineFeed="&#10;" headerPath="./include" version="1.0.0.1"
               companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" bundleIdentifier="sh.ball.osci-installer"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;">
