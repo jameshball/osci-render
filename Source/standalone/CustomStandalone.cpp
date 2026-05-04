@@ -48,6 +48,14 @@
 #include <juce_gui_basics/native/juce_WindowsHooks_windows.h>
 #include <juce_audio_plugin_client/detail/juce_PluginUtilities.h>
 
+#ifdef Component
+ #undef Component
+#endif
+
+#ifdef Point
+ #undef Point
+#endif
+
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
