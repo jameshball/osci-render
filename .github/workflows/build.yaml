@@ -257,14 +257,14 @@ jobs:
       - name: Sign installer (macOS pkg)
         if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         run: |
-          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
-          pkgutil --check-signature "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
+          productsign -s "${{ secrets.APPLE_DEVELOPER_ID_INSTALLER }}" "packaging/build/${{ matrix.project }}.pkg" "bin/${{ env.OUTPUT_NAME }}.pkg"
+          pkgutil --check-signature "bin/${{ env.OUTPUT_NAME }}.pkg"
 
       - name: Notarize installer (macOS)
         if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
         uses: lando/notarize-action@v2
         with:
-          product-path: "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
+          product-path: "bin/${{ env.OUTPUT_NAME }}.pkg"
           appstore-connect-username: ${{ secrets.APPLE_ID }}
           appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
           appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
@@ -274,11 +274,11 @@ jobs:
 
       - name: Staple installer (macOS)
         if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
-        run: xcrun stapler staple "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
+        run: xcrun stapler staple "bin/${{ env.OUTPUT_NAME }}.pkg"
 
       - name: Check installer (macOS)
         if: matrix.project != 'osci-installer' && matrix.os == 'macos-latest'
-        run: spctl -a -vvv -t install "bin/${{ env.OUTPUT_NAME }}-mac.pkg"
+        run: spctl -a -vvv -t install "bin/${{ env.OUTPUT_NAME }}.pkg"
 
       # Windows packaging (Inno Setup)
       - name: Compile .ISS to .EXE Installer
@@ -287,20 +287,14 @@ jobs:
         with:
           path: "packaging/${{ matrix.project }}.iss"
 
-      - name: Package Windows installer as zip
+      - name: Stage Windows installer executable
         if: matrix.project != 'osci-installer' && matrix.os == 'windows-2022'
         shell: bash
         run: |
-          # Move the installer .exe into bin/ under the canonical OUTPUT_NAME,
-          # then zip it as ${OUTPUT_NAME}-windows.zip so users get a single, clearly
-          # named download matching the other platforms.
           mv "packaging/build/${{ matrix.project }}.exe" "bin/${OUTPUT_NAME}.exe"
-          cd bin
-          7z a "${OUTPUT_NAME}-windows.zip" "${OUTPUT_NAME}.exe"
-          rm -f "${OUTPUT_NAME}.exe"
 
       # osci-installer macOS app signing/notarization. The plugin jobs publish
-      # signed .pkg files above; the installer app ships as a notarized .app zip.
+      # signed .pkg files above; the installer app ships as a plain notarized DMG.
       - name: Sign osci-installer app (macOS)
         if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
         shell: bash
@@ -322,7 +316,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
           ditto -c -k --keepParent "${APP_PATH}" "bin/osci-installer-mac-notary.zip"
 
-      - name: Notarize osci-installer app (macOS)
+      - name: Notarize osci-installer app zip (macOS)
         if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
         uses: lando/notarize-action@v2
         with:
@@ -334,17 +328,48 @@ jobs:
           tool: notarytool
           verbose: true
 
-      - name: Package notarized osci-installer app (macOS)
+      - name: Package notarized osci-installer app as DMG (macOS)
         if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
         shell: bash
         run: |
           set -euo pipefail
           APP_PATH="Builds/osci-installer/MacOSX/build/Release/osci-installer.app"
+          APP_IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -n 1)"
+          if [[ -z "${APP_IDENTITY}" ]]; then
+            echo "::error::Developer ID Application signing identity not found"
+            security find-identity -v -p codesigning || true
+            exit 1
+          fi
           xcrun stapler staple "${APP_PATH}"
           spctl -a -vvv -t exec "${APP_PATH}"
-          rm -f "bin/osci-installer-mac.zip"
-          ditto -c -k --keepParent "${APP_PATH}" "bin/osci-installer-mac.zip"
+          DMG_STAGING="$(mktemp -d)"
+          trap 'rm -rf "${DMG_STAGING}"' EXIT
+          ditto "${APP_PATH}" "${DMG_STAGING}/osci-installer.app"
+          rm -f "bin/osci-installer.dmg"
+          hdiutil create -volname "osci-installer" -srcfolder "${DMG_STAGING}" -ov -format UDZO "bin/osci-installer.dmg"
+          codesign --force --timestamp --sign "${APP_IDENTITY}" "bin/osci-installer.dmg"
+          codesign --verify --verbose=2 "bin/osci-installer.dmg"
           rm -f "bin/osci-installer-mac-notary.zip"
+
+      - name: Notarize osci-installer DMG (macOS)
+        if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
+        uses: lando/notarize-action@v2
+        with:
+          product-path: "bin/osci-installer.dmg"
+          appstore-connect-username: ${{ secrets.APPLE_ID }}
+          appstore-connect-password: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
+          appstore-connect-team-id: ${{ secrets.APPLE_TEAM_ID }}
+          primary-bundle-id: sh.ball.osci-installer.dmg
+          tool: notarytool
+          verbose: true
+
+      - name: Staple osci-installer DMG (macOS)
+        if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun stapler staple "bin/osci-installer.dmg"
+          spctl -a -vvv -t open --context context:primary-signature "bin/osci-installer.dmg"
 
       # Fail the job if pluginval failed after logs have been uploaded.
       - name: Check pluginval results
@@ -398,20 +423,25 @@ jobs:
           if [[ "${{ matrix.os }}" == macos* ]]; then
             PLATFORM='mac-universal'
             if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
-              ARTIFACT="bin/${OUTPUT_NAME}-mac.zip"
-              KIND='zip'
+              ARTIFACT="bin/${OUTPUT_NAME}.dmg"
+              KIND='dmg'
             else
-              ARTIFACT="bin/${OUTPUT_NAME}-mac.pkg"
+              ARTIFACT="bin/${OUTPUT_NAME}.pkg"
               KIND='pkg'
             fi
           elif [[ "${{ matrix.os }}" == windows* ]]; then
             PLATFORM='win-x86_64'
-            ARTIFACT="bin/${OUTPUT_NAME}-windows.zip"
-            KIND='zip'
+            ARTIFACT="bin/${OUTPUT_NAME}.exe"
+            KIND='exe'
           elif [[ "${{ matrix.os }}" == ubuntu* ]]; then
             PLATFORM='linux-x86_64'
-            ARTIFACT="bin/${OUTPUT_NAME}-linux.zip"
-            KIND='zip'
+            if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
+              ARTIFACT="bin/${OUTPUT_NAME}"
+              KIND='binary'
+            else
+              ARTIFACT="bin/${OUTPUT_NAME}.zip"
+              KIND='zip'
+            fi
           else
             echo "::warning::skipping publish for unsupported OS ${{ matrix.os }}"
             exit 0
