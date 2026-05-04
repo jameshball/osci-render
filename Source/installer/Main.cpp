@@ -30,7 +30,7 @@ namespace {
     }
 
     juce::Image loadImage (const void* data, int size) {
-        return juce::ImageFileFormat::loadFrom (data, static_cast<size_t> (size));
+        return juce::ImageFileFormat::loadFrom (data, static_cast<size_t>(size));
     }
 
     osci::LookAndFeel::TypefaceData makeTypefaceData() {
@@ -208,6 +208,7 @@ private:
             supportOverlay = nullptr;
         };
 
+        supportOverlay->captureBackdropFrom (*this);
         addAndMakeVisible (*supportOverlay);
         supportOverlay->setBounds (getLocalBounds());
         supportOverlay->toFront (false);
@@ -239,7 +240,7 @@ private:
         }
 
         if (isPremiumPath (currentPath)) {
-            const auto showKeyEntry = ! hasCachedPremiumToken || licenseKeyEditor.isVisible();
+            const auto showKeyEntry = !hasCachedPremiumToken || licenseKeyEditor.isVisible();
             if (showKeyEntry) {
                 licenseKeyEditor.setBounds (area.removeFromTop (34).withSizeKeepingCentre (380, 34));
                 area.removeFromTop (12);
@@ -323,28 +324,28 @@ private:
         const auto premiumPath = isPremiumPath (currentPath);
         const auto showOsciChoice = selectedOsciRender && currentPath == InstallPath::None;
         const auto showPanel = selectedProduct != ProductChoice::None;
-        const auto showKeyEntry = premiumPath && ! hasCachedPremiumToken;
-        const auto showChoiceLabel = showKeyEntry && ! busy;
+        const auto showKeyEntry = premiumPath && !hasCachedPremiumToken;
+        const auto showChoiceLabel = showKeyEntry && !busy;
 
         osciRenderTile.setSelected (selectedOsciRender);
         sosciTile.setSelected (selectedSosci);
-        osciRenderTile.setInteractive (! busy);
-        sosciTile.setInteractive (! busy);
+        osciRenderTile.setInteractive(!busy);
+        sosciTile.setInteractive(!busy);
 
         panel.setVisible (showPanel);
         choiceLabel.setVisible (showChoiceLabel);
         freeChoiceButton.setVisible (showOsciChoice);
         premiumChoiceButton.setVisible (showOsciChoice);
-        statusLabel.setVisible (showPanel && ! showOsciChoice);
+        statusLabel.setVisible (showPanel && !showOsciChoice);
         licenseKeyEditor.setVisible (showKeyEntry);
         needLicenseLink.setVisible (showKeyEntry);
         premiumInstallButton.setVisible (premiumPath);
         progressBar.setVisible (busy || progressValue > 0.0);
 
-        freeChoiceButton.setEnabled (! busy);
-        premiumChoiceButton.setEnabled (! busy);
-        licenseKeyEditor.setEnabled (! busy);
-        premiumInstallButton.setEnabled (! busy);
+        freeChoiceButton.setEnabled(!busy);
+        premiumChoiceButton.setEnabled(!busy);
+        licenseKeyEditor.setEnabled(!busy);
+        premiumInstallButton.setEnabled(!busy);
 
         if (showKeyEntry) {
             choiceLabel.setText ("Enter your license key", juce::dontSendNotification);
@@ -352,7 +353,7 @@ private:
             choiceLabel.setText ("Choose an edition", juce::dontSendNotification);
         }
 
-        if (! busy) {
+        if (!busy) {
             statusLabel.setText (statusTextForCurrentState(), juce::dontSendNotification);
         }
 
@@ -421,7 +422,7 @@ private:
         currentPath = path;
         const auto request = makeRequest (path);
 
-        if (request.premium && request.licenseKey.isEmpty() && ! hasCachedPremiumToken) {
+        if (request.premium && request.licenseKey.isEmpty() && !hasCachedPremiumToken) {
             statusLabel.setText ("Enter your license key to install premium.", juce::dontSendNotification);
             refreshUi();
             return;
@@ -475,7 +476,7 @@ private:
                                               osci::ReleaseTrack::Stable,
                                               request.variant);
 
-            if (! version.has_value()) {
+            if (!version.has_value()) {
                 const auto checkResult = checker.getLastResult();
                 result = checkResult.failed()
                     ? failWithContext ("Could not check for the latest stable " + request.productName + " " + request.variant + " installer",
@@ -536,11 +537,11 @@ private:
             }
         } else if (licenseManager.status() == osci::LicenseManager::Status::ExpiredOffline) {
             return juce::Result::fail ("Cached premium license has expired. Paste your license key and try again.");
-        } else if (! licenseManager.hasPremium()) {
+        } else if (!licenseManager.hasPremium()) {
             return juce::Result::fail ("Enter a license key or activate this product from the plugin first.");
         }
 
-        if (! licenseManager.hasPremium()) {
+        if (!licenseManager.hasPremium()) {
             return juce::Result::fail ("This license is not valid for premium downloads.");
         }
 
@@ -566,7 +567,7 @@ private:
             return;
         }
 
-        if (! version.has_value() || ! installerFile.existsAsFile()) {
+        if (!version.has_value() || !installerFile.existsAsFile()) {
             progressValue = 0.0;
             const auto message = "The installer downloaded, but the installer file was not found on disk.";
             setBusy (false, message);

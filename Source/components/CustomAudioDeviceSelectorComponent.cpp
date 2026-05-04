@@ -28,46 +28,6 @@ namespace juce
 namespace
 {
 
-struct CustomSimpleDeviceManagerInputLevelMeter final : public Component,
-                                                        public Timer
-{
-    CustomSimpleDeviceManagerInputLevelMeter (AudioDeviceManager& m) : manager (m)
-    {
-        startTimerHz (20);
-        inputLevelGetter = manager.getInputLevelGetter();
-    }
-
-    void timerCallback() override
-    {
-        if (isShowing())
-        {
-            auto newLevel = (float) inputLevelGetter->getCurrentLevel();
-
-            if (std::abs (level - newLevel) > 0.005f)
-            {
-                level = newLevel;
-                repaint();
-            }
-        }
-        else
-        {
-            level = 0;
-        }
-    }
-
-    void paint (Graphics& g) override
-    {
-        getLookAndFeel().drawLevelMeter (g, getWidth(), getHeight(),
-                                         (float) std::exp (std::log (level) / 3.0));
-    }
-
-    AudioDeviceManager& manager;
-    AudioDeviceManager::LevelMeter::Ptr inputLevelGetter;
-    float level = 0;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomSimpleDeviceManagerInputLevelMeter)
-};
-
 void customDrawTextLayout (Graphics& g, Component& owner, StringRef text, const Rectangle<int>& textBounds, bool enabled)
 {
     const auto textColour = owner.findColour (ListBox::textColourId, true).withMultipliedAlpha (enabled ? 1.0f : 0.6f);
@@ -87,6 +47,38 @@ void customDrawTextLayout (Graphics& g, Component& owner, StringRef text, const 
 
 String customGetNoDeviceString() { return "<< " + TRANS ("none") + " >>"; }
 
+struct OverlayInputLevelMeter final : public Component,
+                                      public Timer {
+    OverlayInputLevelMeter (AudioDeviceManager& m) : manager (m) {
+        startTimerHz (20);
+        inputLevelGetter = manager.getInputLevelGetter();
+    }
+
+    void timerCallback() override {
+        if (isShowing()) {
+            auto newLevel = (float) inputLevelGetter->getCurrentLevel();
+
+            if (std::abs (level - newLevel) > 0.005f) {
+                level = newLevel;
+                repaint();
+            }
+        } else {
+            level = 0;
+        }
+    }
+
+    void paint (Graphics& g) override {
+        const auto levelToDraw = level <= 0.0f ? 0.0f : std::pow (level, 1.0f / 3.0f);
+        getLookAndFeel().drawLevelMeter (g, getWidth(), getHeight(), levelToDraw);
+    }
+
+    AudioDeviceManager& manager;
+    AudioDeviceManager::LevelMeter::Ptr inputLevelGetter;
+    float level = 0;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OverlayInputLevelMeter)
+};
+
 } // anonymous namespace
 
 
@@ -101,18 +93,16 @@ struct CustomAudioDeviceSetupDetails
 
 
 //==============================================================================
-class CustomAudioDeviceSelectorComponent::CustomMidiInputSelectorComponentListBox final : public ListBox,
+class CustomAudioDeviceSelectorComponent::CustomMidiInputSelectorComponentListBox final : public osci::OverlayListBox,
                                                                                           private ListBoxModel
 {
 public:
     CustomMidiInputSelectorComponentListBox (AudioDeviceManager& dm, const String& noItems)
-        : ListBox ({}, nullptr),
-          deviceManager (dm),
-          noItemsMessage (noItems)
+        : osci::OverlayListBox (noItems),
+          deviceManager (dm)
     {
         updateDevices();
         setModel (this);
-        setOutlineThickness (1);
     }
 
     void updateDevices()
@@ -130,8 +120,9 @@ public:
         if (isPositiveAndBelow (row, items.size()))
         {
             if (rowIsSelected)
-                g.fillAll (findColour (TextEditor::highlightColourId)
-                               .withMultipliedAlpha (0.3f));
+            {
+                osci::OverlayLookAndFeel::paintRowHighlight (*this, g, width, height);
+            }
 
             auto item = items[row];
             bool enabled = deviceManager.isMidiInputDeviceEnabled (item.identifier);
@@ -164,20 +155,6 @@ public:
         flipEnablement (row);
     }
 
-    void paint (Graphics& g) override
-    {
-        ListBox::paint (g);
-
-        if (items.isEmpty())
-        {
-            g.setColour (Colours::grey);
-            g.setFont (0.5f * (float) getRowHeight());
-            g.drawText (noItemsMessage,
-                        0, 0, getWidth(), getHeight() / 2,
-                        Justification::centred, true);
-        }
-    }
-
     int getBestHeight (int preferredHeight)
     {
         auto extra = getOutlineThickness() * 2;
@@ -189,15 +166,18 @@ public:
 
 private:
     AudioDeviceManager& deviceManager;
-    const String noItemsMessage;
     Array<MidiDeviceInfo> items;
+
+    bool hasListItems() const override {
+        return !items.isEmpty();
+    }
 
     void flipEnablement (const int row)
     {
         if (isPositiveAndBelow (row, items.size()))
         {
             auto identifier = items[row].identifier;
-            deviceManager.setMidiInputDeviceEnabled (identifier, ! deviceManager.isMidiInputDeviceEnabled (identifier));
+            deviceManager.setMidiInputDeviceEnabled (identifier, !deviceManager.isMidiInputDeviceEnabled (identifier));
         }
     }
 
@@ -440,7 +420,7 @@ public:
                     config.inputDeviceName = inputDeviceDropDown->getSelectedId() < 0 ? String()
                                                                                       : inputDeviceDropDown->getText();
 
-                if (! type.hasSeparateInputsAndOutputs())
+                if (!type.hasSeparateInputsAndOutputs())
                     config.inputDeviceName = config.outputDeviceName;
             }
 
@@ -579,7 +559,6 @@ public:
         else
         {
             jassert (setup.manager->getCurrentAudioDevice() == nullptr); // not the correct device type!
-
             inputChanLabel.reset();
             outputChanLabel.reset();
             sampleRateLabel.reset();
@@ -605,8 +584,8 @@ public:
             // to open on first attempt during type switch/startup. Apply a
             // concrete combined selection once.
             if (isCombinedSelectionType()
-                && ! attemptingCombinedTypeRecovery
-                && ! hasAttemptedCombinedTypeRecovery)
+                && !attemptingCombinedTypeRecovery
+                && !hasAttemptedCombinedTypeRecovery)
             {
                 hasAttemptedCombinedTypeRecovery = true;
                 const ScopedValueSetter<bool> recoveryScope (attemptingCombinedTypeRecovery, true);
@@ -872,7 +851,7 @@ private:
 
     void updateOutputsComboBox()
     {
-        if (setup.maxNumOutputChannels > 0 || ! type.hasSeparateInputsAndOutputs())
+        if (setup.maxNumOutputChannels > 0 || !type.hasSeparateInputsAndOutputs())
         {
             if (outputDeviceDropDown == nullptr)
             {
@@ -918,7 +897,7 @@ private:
                 inputDeviceLabel = std::make_unique<Label> (String{}, TRANS ("Input:"));
                 inputDeviceLabel->attachToComponent (inputDeviceDropDown.get(), true);
 
-                inputLevelMeter = std::make_unique<CustomSimpleDeviceManagerInputLevelMeter> (*setup.manager);
+                inputLevelMeter = std::make_unique<OverlayInputLevelMeter> (*setup.manager);
                 addAndMakeVisible (inputLevelMeter.get());
             }
 
@@ -997,7 +976,7 @@ private:
 
 public:
     //==============================================================================
-    class CustomChannelSelectorListBox final : public ListBox,
+    class CustomChannelSelectorListBox final : public osci::OverlayListBox,
                                                 private ListBoxModel
     {
     public:
@@ -1008,11 +987,10 @@ public:
         };
 
         CustomChannelSelectorListBox (const CustomAudioDeviceSetupDetails& setupDetails, BoxType boxType, const String& noItemsText)
-           : ListBox ({}, nullptr), setup (setupDetails), type (boxType), noItemsMessage (noItemsText)
+           : osci::OverlayListBox (noItemsText), setup (setupDetails), type (boxType)
         {
             refresh();
             setModel (this);
-            setOutlineThickness (1);
         }
 
         void refresh()
@@ -1053,11 +1031,14 @@ public:
             return items.size();
         }
 
-        void paintListBoxItem (int row, Graphics& g, int width, int height, bool) override
+        void paintListBoxItem (int row, Graphics& g, int width, int height, bool rowIsSelected) override
         {
             if (isPositiveAndBelow (row, items.size()))
             {
-                g.fillAll (findColour (ListBox::backgroundColourId));
+                if (rowIsSelected)
+                {
+                    osci::OverlayLookAndFeel::paintRowHighlight (*this, g, width, height);
+                }
 
                 auto item = items[row];
                 bool enabled = false;
@@ -1106,20 +1087,6 @@ public:
             flipEnablement (row);
         }
 
-        void paint (Graphics& g) override
-        {
-            ListBox::paint (g);
-
-            if (items.isEmpty())
-            {
-                g.setColour (Colours::grey);
-                g.setFont (0.5f * (float) getRowHeight());
-                g.drawText (noItemsMessage,
-                            0, 0, getWidth(), getHeight() / 2,
-                            Justification::centred, true);
-            }
-        }
-
         int getBestHeight (int maxHeight)
         {
             return getRowHeight() * jlimit (2, jmax (2, maxHeight / getRowHeight()),
@@ -1130,8 +1097,11 @@ public:
     private:
         const CustomAudioDeviceSetupDetails setup;
         const BoxType type;
-        const String noItemsMessage;
         StringArray items;
+
+        bool hasListItems() const override {
+            return !items.isEmpty();
+        }
 
         static String getNameForChannelPair (const String& name1, const String& name2)
         {
@@ -1141,7 +1111,7 @@ public:
                 if (name1.substring (0, j).equalsIgnoreCase (name2.substring (0, j)))
                     commonBit = name1.substring (0, j);
 
-            while (commonBit.isNotEmpty() && ! CharacterFunctions::isWhitespace (commonBit.getLastCharacter()))
+            while (commonBit.isNotEmpty() && !CharacterFunctions::isWhitespace (commonBit.getLastCharacter()))
                 commonBit = commonBit.dropLastCharacters (1);
 
             return name1.trim() + " + " + name2.substring (commonBit.length()).trim();
@@ -1252,6 +1222,8 @@ CustomAudioDeviceSelectorComponent::CustomAudioDeviceSelectorComponent (AudioDev
       showChannelsAsStereoPairs (showChannelsAsStereoPairsToUse),
       hideAdvancedOptionsWithButton (hideAdvancedOptionsWithButtonToUse)
 {
+    setLookAndFeel (&overlayLookAndFeel);
+
     jassert (minOutputChannels >= 0 && minOutputChannels <= maxOutputChannels);
     jassert (minInputChannels >= 0 && minInputChannels <= maxInputChannels);
 
@@ -1316,6 +1288,7 @@ CustomAudioDeviceSelectorComponent::CustomAudioDeviceSelectorComponent (AudioDev
 
 CustomAudioDeviceSelectorComponent::~CustomAudioDeviceSelectorComponent()
 {
+    setLookAndFeel (nullptr);
     deviceManager.removeChangeListener (this);
 }
 

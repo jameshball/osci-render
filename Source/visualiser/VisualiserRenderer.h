@@ -38,6 +38,7 @@ public:
     void openGLContextClosing() override;
     void setResolution(int width);
     void setFrameRate(double frameRate);
+    void setPresentationFadeAlpha(float alpha);
     // Render mode can be changed from the message thread at any time
     void setRenderMode(RenderMode mode) { renderMode.store(mode); }
     RenderMode getRenderMode() const { return renderMode.load(); }
@@ -122,6 +123,7 @@ private:
     // -1 means no pending request; any value > 0 is a requested texture resolution
     // to be applied on the next renderOpenGL invocation.
     std::atomic<int> pendingResolution = -1;
+    std::atomic<float> presentationFadeAlpha = 0.0f;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
 
@@ -238,6 +240,7 @@ private:
                   RenderMode mode);
     void fade();
     void drawCRT();
+    void drawPresentationFadeOverlay();
     void checkGLErrors(juce::String file, int line);
     void viewportChanged(juce::Rectangle<int> area);
 

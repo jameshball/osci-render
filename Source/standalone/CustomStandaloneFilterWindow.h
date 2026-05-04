@@ -96,7 +96,7 @@ namespace SystemAudioCapture
     inline bool isAvailable (AudioDeviceManager& deviceManager)
     {
        #if OSCI_PREMIUM && JUCE_MAC
-        if (! ProcessAudioPermissions::isProcessTapAvailable())
+        if (!ProcessAudioPermissions::isProcessTapAvailable())
             return false;
        #endif
 
@@ -183,7 +183,7 @@ public:
         currentInstance = this;
 
         shouldMuteInput.addListener (this);
-        shouldMuteInput = ! isInterAppAudioConnected();
+        shouldMuteInput = !isInterAppAudioConnected();
 
         handleCreatePlugin();
 
@@ -196,7 +196,7 @@ public:
         auto audioInputRequired = (inChannels > 0);
 
         if (audioInputRequired && RuntimePermissions::isRequired (RuntimePermissions::recordAudio)
-            && ! RuntimePermissions::isGranted (RuntimePermissions::recordAudio))
+            && !RuntimePermissions::isGranted (RuntimePermissions::recordAudio))
             RuntimePermissions::request (RuntimePermissions::recordAudio,
                                          [this, preferredDefaultDeviceName] (bool granted) { init (granted, preferredDefaultDeviceName); });
         else
@@ -305,7 +305,7 @@ public:
             MemoryBlock data;
             processor->getStateInformation (data);
 
-            if (! fc.getResult().replaceWithData (data.getData(), data.getSize()))
+            if (!fc.getResult().replaceWithData (data.getData(), data.getSize()))
             {
                 Logger::writeToLog ("Standalone save failed: could not write to '" + fc.getResult().getFullPathName() + "'");
                 auto opts = MessageBoxOptions::makeOptionsOk (AlertWindow::WarningIcon,
@@ -377,29 +377,12 @@ public:
     /** Shows an audio properties dialog box modally. */
     void showAudioSettingsDialog()
     {
-        DialogWindow::LaunchOptions o;
-
-        int maxNumInputs = 0, maxNumOutputs = 0;
-
-        if (channelConfiguration.size() > 0)
-        {
-            auto& defaultConfig = channelConfiguration.getReference (0);
-
-            maxNumInputs  = jmax (0, (int) defaultConfig.numIns);
-            maxNumOutputs = jmax (0, (int) defaultConfig.numOuts);
+        if (showAudioSettingsOverlay != nullptr && showAudioSettingsOverlay()) {
+            return;
         }
 
-        if (auto* bus = processor->getBus (true, 0))
-            maxNumInputs = jmax (0, bus->getDefaultLayout().size());
-
-        if (auto* bus = processor->getBus (false, 0))
-            maxNumOutputs = jmax (0, bus->getDefaultLayout().size());
-
-        auto content = std::make_unique<SettingsComponent> (*this, deviceManager, maxNumInputs, maxNumOutputs);
-        content->setSize (500, 550);
-        content->setToRecommendedSize();
-
-        o.content.setOwned (content.release());
+        DialogWindow::LaunchOptions o;
+        o.content.setOwned (createAudioSettingsComponent().release());
 
         o.dialogTitle                   = TRANS ("Audio/MIDI Settings");
         o.dialogBackgroundColour        = o.content->getLookAndFeel().findColour (ResizableWindow::backgroundColourId);
@@ -410,6 +393,8 @@ public:
         o.launchAsync();
     }
 
+    std::unique_ptr<Component> createAudioSettingsComponent();
+
     void saveAudioDeviceState()
     {
         if (settings != nullptr)
@@ -418,7 +403,7 @@ public:
 
             settings->setValue ("audioSetup", xml.get());
 
-           #if ! (JUCE_IOS || JUCE_ANDROID)
+           #if !(JUCE_IOS || JUCE_ANDROID)
             settings->setValue ("shouldMuteInput", (bool) shouldMuteInput.getValue());
            #endif
         }
@@ -434,7 +419,7 @@ public:
         {
             savedState = settings->getXmlValue ("audioSetup");
 
-           #if ! (JUCE_IOS || JUCE_ANDROID)
+           #if !(JUCE_IOS || JUCE_ANDROID)
                      shouldMuteInput.setValue (settings->getBoolValue ("shouldMuteInput", true));
            #endif
         }
@@ -444,7 +429,7 @@ public:
             Array<const XmlElement*> toVisit;
             toVisit.add (&root);
 
-            while (! toVisit.isEmpty())
+            while (!toVisit.isEmpty())
             {
                 auto* e = toVisit.getLast();
                 toVisit.removeLast();
@@ -475,7 +460,7 @@ public:
         // If a newer macOS saved "Process Audio" as the active device type,
         // discard that state on older macOS versions where process taps are unavailable.
         if (savedState != nullptr
-            && ! ProcessAudioPermissions::isProcessTapAvailable()
+            && !ProcessAudioPermissions::isProcessTapAvailable()
             && xmlContainsDeviceTypeName (*savedState, "Process Audio"))
             savedState.reset();
        #endif
@@ -485,7 +470,7 @@ public:
         // doesn't expose the type, discard stale state to avoid failed opens.
         if (savedState != nullptr
             && xmlContainsDeviceTypeName (*savedState, "Windows Loopback")
-            && ! hasAudioDeviceType ("Windows Loopback"))
+            && !hasAudioDeviceType ("Windows Loopback"))
             savedState.reset();
        #endif
 
@@ -581,6 +566,7 @@ public:
     
     const String commandLine;
     std::function<void(const juce::String&)> commandLineCallback;
+    std::function<bool()> showAudioSettingsOverlay;
 
     // avoid feedback loop by default
     bool processorHasPotentialFeedbackLoop = true;
@@ -721,21 +707,17 @@ private:
                               0, maxAudioOutputChannels,
                               true,
                               (pluginHolder.processor.get() != nullptr && pluginHolder.processor->producesMidi()),
-                              false, false),
-              shouldMuteLabel  ("Feedback Loop:", "Feedback Loop:"),
-              shouldMuteButton ("Mute audio input")
+                              false, false)
         {
             setOpaque (true);
 
             owner.deviceManager.addChangeListener (this);
 
-            shouldMuteButton.setClickingTogglesState (true);
-            shouldMuteButton.getToggleStateValue().referTo (owner.shouldMuteInput);
-
             addAndMakeVisible (deviceSelector);
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
             enableSystemAudioCaptureButton.setButtonText ("Enable System Audio Capture");
+            enableSystemAudioCaptureButton.setLookAndFeel (&deviceSelector.getLookAndFeel());
             enableSystemAudioCaptureButton.onClick = [this]
             {
                 const auto typeName = SystemAudioCapture::getTypeName();
@@ -776,23 +758,19 @@ private:
             // Audio Capture permission is requested at app start (see CustomStandalone.cpp).
 #endif
 
-            if (owner.getProcessorHasPotentialFeedbackLoop())
-            {
-                addAndMakeVisible (shouldMuteButton);
-                addAndMakeVisible (shouldMuteLabel);
-
-                shouldMuteLabel.attachToComponent (&shouldMuteButton, true);
-            }
         }
 
         ~SettingsComponent() override
         {
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+            enableSystemAudioCaptureButton.setLookAndFeel (nullptr);
+#endif
             owner.deviceManager.removeChangeListener (this);
         }
 
         void paint (Graphics& g) override
         {
-            g.fillAll (getLookAndFeel().findColour (ResizableWindow::backgroundColourId));
+            g.fillAll (findColour (ResizableWindow::backgroundColourId));
         }
 
         void resized() override
@@ -806,49 +784,50 @@ private:
             layoutSystemAudioCaptureButtonRow (r, itemHeight);
 #endif
 
-            if (owner.getProcessorHasPotentialFeedbackLoop())
-            {
-                const auto separatorHeight = (itemHeight >> 1);
-                auto row = r.removeFromTop (itemHeight + separatorHeight);
-
-                auto buttonRow = row.removeFromBottom (itemHeight);
-                shouldMuteButton.setBounds (Rectangle<int> (buttonRow.getX() + buttonRow.proportionOfWidth (0.35f),
-                                                           buttonRow.getY(),
-                                                           buttonRow.proportionOfWidth (0.60f),
-                                                           itemHeight));
-            }
-
             deviceSelector.setBounds (r);
+            requestRecommendedSizeUpdate();
         }
 
         void childBoundsChanged (Component* childComp) override
         {
-            if (! isResizing && childComp == &deviceSelector)
-                setToRecommendedSize();
+            if (!isResizing && childComp == &deviceSelector) {
+                requestRecommendedSizeUpdate();
+            }
         }
 
         void setToRecommendedSize()
         {
-            const auto extraHeight = [&]
-            {
-                if (! owner.getProcessorHasPotentialFeedbackLoop())
-                    return 0;
-
-                const auto itemHeight = deviceSelector.getItemHeight();
-                const auto separatorHeight = (itemHeight >> 1);
-                return itemHeight + separatorHeight;
-            }();
-
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
             const auto processAudioButtonExtra = getSystemAudioCaptureButtonExtraHeight (deviceSelector.getItemHeight());
 #else
             const auto processAudioButtonExtra = 0;
 #endif
 
-            setSize (getWidth(), deviceSelector.getHeight() + extraHeight + processAudioButtonExtra);
+            const auto recommendedHeight = deviceSelector.getHeight() + processAudioButtonExtra;
+            if (getHeight() != recommendedHeight) {
+                setSize (getWidth(), recommendedHeight);
+            }
         }
 
     private:
+        void requestRecommendedSizeUpdate()
+        {
+            if (recommendedSizeUpdatePending) {
+                return;
+            }
+
+            recommendedSizeUpdatePending = true;
+            const Component::SafePointer<SettingsComponent> safeThis { this };
+            MessageManager::callAsync ([safeThis] {
+                if (safeThis == nullptr) {
+                    return;
+                }
+
+                safeThis->recommendedSizeUpdatePending = false;
+                safeThis->setToRecommendedSize();
+            });
+        }
+
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
         int getSystemAudioCaptureButtonExtraHeight (int itemHeight) const
         {
@@ -857,7 +836,7 @@ private:
 
         void layoutSystemAudioCaptureButtonRow (Rectangle<int>& bounds, int itemHeight)
         {
-            if (! shouldShowSystemAudioCaptureButton)
+            if (!shouldShowSystemAudioCaptureButton)
                 return;
 
             auto row = bounds.removeFromTop (itemHeight);
@@ -869,7 +848,7 @@ private:
 
         bool shouldShowSystemAudioCaptureEnableButton() const
         {
-            if (! SystemAudioCapture::isAvailable (owner.deviceManager))
+            if (!SystemAudioCapture::isAvailable (owner.deviceManager))
                 return false;
 
             return owner.deviceManager.getCurrentAudioDeviceType() != SystemAudioCapture::getTypeName();
@@ -899,9 +878,8 @@ private:
         //==============================================================================
         StandalonePluginHolder& owner;
         CustomAudioDeviceSelectorComponent deviceSelector;
-        Label shouldMuteLabel;
-        ToggleButton shouldMuteButton;
         bool isResizing = false;
+        bool recommendedSizeUpdatePending = false;
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
         TextButton enableSystemAudioCaptureButton;
@@ -1028,11 +1006,11 @@ private:
         if (newMidiDevices != lastMidiDevices)
         {
             for (auto& oldDevice : lastMidiDevices)
-                if (! newMidiDevices.contains (oldDevice))
+                if (!newMidiDevices.contains (oldDevice))
                     deviceManager.setMidiInputDeviceEnabled (oldDevice.identifier, false);
 
             for (auto& newDevice : newMidiDevices)
-                if (! lastMidiDevices.contains (newDevice))
+                if (!lastMidiDevices.contains (newDevice))
                     deviceManager.setMidiInputDeviceEnabled (newDevice.identifier, true);
 
             lastMidiDevices = newMidiDevices;
@@ -1041,6 +1019,33 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StandalonePluginHolder)
 };
+
+inline std::unique_ptr<Component> StandalonePluginHolder::createAudioSettingsComponent() {
+    int maxNumInputs = 0;
+    int maxNumOutputs = 0;
+
+    if (channelConfiguration.size() > 0) {
+        auto& defaultConfig = channelConfiguration.getReference (0);
+
+        maxNumInputs  = jmax (0, (int) defaultConfig.numIns);
+        maxNumOutputs = jmax (0, (int) defaultConfig.numOuts);
+    }
+
+    auto* inputBus = processor->getBus (true, 0);
+    if (inputBus != nullptr) {
+        maxNumInputs = jmax (0, inputBus->getDefaultLayout().size());
+    }
+
+    auto* outputBus = processor->getBus (false, 0);
+    if (outputBus != nullptr) {
+        maxNumOutputs = jmax (0, outputBus->getDefaultLayout().size());
+    }
+
+    auto content = std::make_unique<SettingsComponent> (*this, deviceManager, maxNumInputs, maxNumOutputs);
+    content->setSize (500, 550);
+    content->setToRecommendedSize();
+    return content;
+}
 
 //==============================================================================
 /**
@@ -1171,7 +1176,7 @@ public:
 
     ~StandaloneFilterWindow() override
     {
-       #if (! JUCE_IOS) && (! JUCE_ANDROID)
+       #if (!JUCE_IOS) && (!JUCE_ANDROID)
         if (auto* props = pluginHolder->settings.get())
         {
             props->setValue ("windowX", getX());

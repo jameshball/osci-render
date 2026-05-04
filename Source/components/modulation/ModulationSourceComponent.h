@@ -5,7 +5,6 @@
 #include "../../audio/modulation/ModAssignment.h"
 #include "../VerticalTabListComponent.h"
 #include <osci_gui/osci_gui.h>
-#include <osci_gui/osci_gui.h>
 
 namespace osci { class MidiCCManager; }
 
@@ -215,8 +214,7 @@ private:
         juce::OwnedArray<DepthIndicator> depthIndicators;
 
         float hoverProgress = 0.0f;
-        juce::VBlankAnimatorUpdater hoverAnimUpdater { this };
-        std::optional<juce::Animator> hoverAnim;
+        osci::ToggleAnimationController hoverAnimationController { this };
     };
 
     // Non-owning typed pointers into tab handles (tab list owns them).

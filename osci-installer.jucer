@@ -52,6 +52,7 @@
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
@@ -69,6 +70,7 @@
         <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
@@ -93,6 +95,7 @@
         <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
@@ -117,6 +120,7 @@
         <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>

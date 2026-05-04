@@ -257,6 +257,10 @@ ModulationSourceComponent::ModTabHandle::ModTabHandle(
         const juce::String& l, int idx, ModulationSourceComponent& o)
     : label(l), sourceIndex(idx), owner(o) {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    hoverAnimationController.setValueChangedCallback ([this] (auto value) {
+        hoverProgress = static_cast<float>(value);
+        repaint();
+    });
 }
 
 void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
@@ -409,34 +413,12 @@ void ModulationSourceComponent::ModTabHandle::mouseUp(const juce::MouseEvent& e)
 
 void ModulationSourceComponent::ModTabHandle::mouseEnter(const juce::MouseEvent&) {
     isHovering = true;
-    float startP = hoverProgress;
-    hoverAnim = juce::ValueAnimatorBuilder{}
-        .withOnStartReturningValueChangedCallback([this, startP] {
-            return [this, startP](float p) {
-                hoverProgress = startP + p * (1.0f - startP);
-                repaint();
-            };
-        })
-        .withDurationMs(150.0)
-        .build();
-    hoverAnim->start();
-    hoverAnimUpdater.addAnimator(*hoverAnim);
+    hoverAnimationController.animateTo (true, 150, juce::Easings::createEaseOut());
 }
 
 void ModulationSourceComponent::ModTabHandle::mouseExit(const juce::MouseEvent&) {
     isHovering = false;
-    float startP = hoverProgress;
-    hoverAnim = juce::ValueAnimatorBuilder{}
-        .withOnStartReturningValueChangedCallback([this, startP] {
-            return [this, startP](float p) {
-                hoverProgress = startP * (1.0f - p);
-                repaint();
-            };
-        })
-        .withDurationMs(150.0)
-        .build();
-    hoverAnim->start();
-    hoverAnimUpdater.addAnimator(*hoverAnim);
+    hoverAnimationController.animateTo (false, 150, juce::Easings::createEaseOut());
 }
 
 void ModulationSourceComponent::ModTabHandle::resized() {

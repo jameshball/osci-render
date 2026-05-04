@@ -37,7 +37,8 @@ public:
 
     // Overlay management — any component can show/dismiss full-editor overlays
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay);
-    virtual void dismissOverlay(osci::OverlayComponent* overlay);
+    virtual void dismissOverlay(osci::OverlayComponent* overlay,
+                                std::function<void()> beforeVisualiserRestore = nullptr);
 
     template<typename T>
     T* findActiveOverlay() {
@@ -78,7 +79,6 @@ public:
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
-    SettingsWindow recordingSettingsWindow = SettingsWindow("Recording Settings", recordingSettings, 330, 360, 330, 360);
     VisualiserComponent visualiser{
         audioProcessor,
         *this,
@@ -115,10 +115,6 @@ public:
     juce::Label undoLabel;
 
     bool usingNativeMenuBar = false;
-
-#if OSCI_PREMIUM
-    juce::Component::SafePointer<juce::DialogWindow> offlineRenderDialog;
-#endif
 
 #if JUCE_LINUX
     juce::OpenGLContext openGlContext;

@@ -4,12 +4,6 @@
 
 #include "../LookAndFeel.h"
 
-juce::String OfflineAudioToVideoRendererComponent::toPercentString(double progress)
-{
-    const int pct = (int) juce::jlimit(0.0, 100.0, std::round(progress * 100.0));
-    return juce::String(pct) + "%";
-}
-
 bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpegExe,
                                                        const juce::File& videoInput,
                                                        const juce::File& audioInput,
@@ -124,7 +118,7 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
             preview(visualiserParameters, threadManager, glReadyEvent),
             initialRenderMode(initialRenderMode)
 {
-    setOpaque(true);
+    setOpaque(false);
 
     addAndMakeVisible(preview);
     addAndMakeVisible(progressBar);
@@ -156,8 +150,7 @@ OfflineAudioToVideoRendererComponent::~OfflineAudioToVideoRendererComponent()
 
 void OfflineAudioToVideoRendererComponent::paint(juce::Graphics& g)
 {
-    // This component is marked opaque, so it must fully paint its bounds.
-    g.fillAll(osci::Colours::dark());
+    juce::ignoreUnused(g);
 }
 
 void OfflineAudioToVideoRendererComponent::resized()
@@ -210,9 +203,6 @@ void OfflineAudioToVideoRendererComponent::setProgressAsync(double newProgress)
             return;
 
         safeThis->progressValue = juce::jlimit(0.0, 1.0, newProgress);
-
-        if (auto* window = safeThis->findParentComponentOfClass<juce::DialogWindow>())
-            window->setName("Render Audio File to Video (" + toPercentString(safeThis->progressValue) + ")");
     });
 }
 

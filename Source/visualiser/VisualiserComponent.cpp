@@ -4,6 +4,16 @@
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 
+VisualiserComponent::FadeCoverComponent::FadeCoverComponent() {
+    setOpaque(false);
+    setInterceptsMouseClicks(false, false);
+    setVisible(false);
+}
+
+void VisualiserComponent::FadeCoverComponent::paint(juce::Graphics& g) {
+    g.fillAll(juce::Colours::black);
+}
+
 VisualiserComponent::VisualiserComponent(
     CommonAudioProcessor &processor,
     CommonPluginEditor &pluginEditor,
@@ -57,6 +67,11 @@ VisualiserComponent::VisualiserComponent(
 
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
     setWantsKeyboardFocus(true);
+    overlayFadeController.setValueChangedCallback([this](float progress) {
+        setOverlayFadeProgress(progress);
+    });
+    overlayFadeController.snapTo(true);
+    addChildComponent(overlayFadeCover);
 
     if (parent == nullptr || juce::JUCEApplicationBase::isStandaloneApp()) {
         addAndMakeVisible(fullScreenButton);
@@ -543,6 +558,8 @@ void VisualiserComponent::resized() {
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
+        overlayFadeCover.setBounds(getLocalBounds());
+        overlayFadeCover.toFront(false);
         setViewportArea(area);
         return;
     } else {
@@ -597,6 +614,9 @@ void VisualiserComponent::resized() {
         timeline.setVisible(true);
         timeline.setBounds(buttons);
     }
+
+    overlayFadeCover.setBounds(getLocalBounds());
+    overlayFadeCover.toFront(false);
 
     setViewportArea(area);
 }
@@ -663,6 +683,28 @@ void VisualiserComponent::childUpdated() {
             setRecording(false);
         };
     }
+}
+
+void VisualiserComponent::prepareOverlayFadeIn() {
+    overlayFadeCover.toFront(false);
+    overlayFadeController.snapTo(false);
+}
+
+void VisualiserComponent::fadeInAfterOverlay() {
+    overlayFadeController.animateTo(true,
+                                    overlayFadeDurationMs,
+                                    juce::Easings::createCubicBezier(0.42f, 0.0f, 0.58f, 1.0f));
+}
+
+void VisualiserComponent::cancelOverlayFadeIn() {
+    overlayFadeController.snapTo(true);
+}
+
+void VisualiserComponent::setOverlayFadeProgress(float progress) {
+    const auto fadeAlpha = 1.0f - juce::jlimit(0.0f, 1.0f, progress);
+    setPresentationFadeAlpha(fadeAlpha);
+    overlayFadeCover.setAlpha(fadeAlpha);
+    overlayFadeCover.setVisible(fadeAlpha > 0.001f);
 }
 
 void VisualiserComponent::updateRenderModeFromProcessor() {

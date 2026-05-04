@@ -44,8 +44,6 @@ public:
     void setOnFinished(FinishedCallback cb) { onFinished = std::move(cb); }
 
 private:
-    static juce::String toPercentString(double progress);
-
     static bool runFfmpegMux(const juce::File& ffmpegExe,
                              const juce::File& videoInput,
                              const juce::File& audioInput,

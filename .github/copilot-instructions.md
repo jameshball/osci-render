@@ -8,6 +8,8 @@
 - **Else style**: Put `else` on the same line as the preceding closing brace, e.g. `} else {`.
 - **Required braces**: Always use braces for control-flow bodies, even for single-line `if`, `else`, `for`, and `while` bodies.
 - **Control flow clarity**: Avoid initializer statements in `if`/`switch` conditions. Prefer a named local variable before the condition, especially for `juce::Result` values.
+- **Unary operator spacing**: Do not put a space between a unary operator and its operand, e.g. use `!anyHeavy`.
+- **Expression spacing**: Avoid unnecessary spaces inside expressions. For example, use `freeChoiceButton.setEnabled(!busy);`, not `freeChoiceButton.setEnabled (!busy);`, and `static_cast<float>(value)`, not `static_cast<float> (value)`.
 
 ## GitHub Actions Monitoring
 

@@ -19,7 +19,7 @@ public:
                       juce::String::createStringFromData (BinaryData::help_svg, BinaryData::help_svgSize),
                       juce::Colours::white) {
         setOverlayTitle (requiresPremiumLicense() ? juce::String() : "Account");
-        setDismissible (! requiresPremiumLicense());
+        setDismissible(!requiresPremiumLicense());
 
         licenseCard.onActivate = [this] {
             activateLicense();
@@ -28,13 +28,13 @@ public:
             copyLicenseKey();
         };
         licenseCard.onToggleReveal = [this] {
-            licenseKeyRevealed = ! licenseKeyRevealed;
+            licenseKeyRevealed = !licenseKeyRevealed;
             refreshState();
         };
         licenseCard.onInstallFreeVersion = [this] {
             installLatestFreeVersion();
         };
-        addAndMakeVisible (licenseCard);
+        addPanelContentAndMakeVisible (licenseCard);
 
         updateCard.onCheckForUpdates = [this] {
             checkForUpdates();
@@ -45,21 +45,21 @@ public:
         updateCard.onUseStableUpdates = [this] {
             disableBetaUpdates();
         };
-        addAndMakeVisible (updateCard);
+        addPanelContentAndMakeVisible (updateCard);
 
         removeLicenseButton.setButtonText ("Remove license");
         removeLicenseButton.onClick = [this] {
             confirmDeactivateLicense();
         };
         styleDangerButton (removeLicenseButton);
-        addAndMakeVisible (removeLicenseButton);
+        addPanelContentAndMakeVisible (removeLicenseButton);
 
         helpButton.setTooltip ("Help");
         helpButton.setMouseCursor (juce::MouseCursor::PointingHandCursor);
         helpButton.onClick = [this] {
             showLicenseHelpOverlay();
         };
-        addAndMakeVisible (helpButton);
+        addPanelControlAndMakeVisible (helpButton);
 
         refreshState();
     }
@@ -266,11 +266,11 @@ private:
             activateButton.setVisible (state.showActivation);
             freeVersionButton.setVisible (state.showFreeFallback);
 
-            licenseKeyEditor.setEnabled (! state.busy && state.showActivation);
-            activateButton.setEnabled (! state.busy && state.showActivation);
-            freeVersionButton.setEnabled (! state.busy && state.showFreeFallback);
-            copyButton.setEnabled (! state.busy && hasLicenseKey);
-            revealButton.setEnabled (! state.busy && hasLicenseKey);
+            licenseKeyEditor.setEnabled(!state.busy && state.showActivation);
+            activateButton.setEnabled(!state.busy && state.showActivation);
+            freeVersionButton.setEnabled(!state.busy && state.showFreeFallback);
+            copyButton.setEnabled(!state.busy && hasLicenseKey);
+            revealButton.setEnabled(!state.busy && hasLicenseKey);
 
             noticeKind = state.noticeKind;
             noticeLabel.setText (state.notice, juce::dontSendNotification);
@@ -509,12 +509,12 @@ private:
             updateButton.setVisible (state.showUpdateButton);
             stableUpdatesButton.setVisible (state.showStableButton);
 
-            checkButton.setEnabled (! state.busy && state.showCheckButton);
-            updateButton.setEnabled (! state.busy && state.showUpdateButton);
-            stableUpdatesButton.setEnabled (! state.busy && state.showStableButton);
+            checkButton.setEnabled(!state.busy && state.showCheckButton);
+            updateButton.setEnabled(!state.busy && state.showUpdateButton);
+            stableUpdatesButton.setEnabled(!state.busy && state.showStableButton);
 
             downloadProgress.setVisible (state.downloading);
-            if (! state.downloading) {
+            if (!state.downloading) {
                 downloadProgress.reset();
             }
 
@@ -591,7 +591,7 @@ private:
         DownloadProgressComponent downloadProgress;
 
         static void layoutButtonFromRight (juce::Rectangle<int>& row, juce::TextButton& button, int width) {
-            if (! button.isVisible()) {
+            if (!button.isVisible()) {
                 button.setBounds ({ });
                 return;
             }
@@ -624,7 +624,7 @@ private:
             return { 560, licenseNotice.text.isNotEmpty() ? 264 : 238 };
         }
 
-        if (! updatesCardVisible) {
+        if (!updatesCardVisible) {
             return { 600, 390 };
         }
 
@@ -635,8 +635,8 @@ private:
 
     void resizeContent (juce::Rectangle<int> area) override {
         const auto premiumRequired = requiresPremiumLicense();
-        auto topBar = panelBounds.reduced (24).removeFromTop (28);
-        if (! premiumRequired) {
+        auto topBar = getPanelBoundsInPanelLayer().reduced (24).removeFromTop (28);
+        if (!premiumRequired) {
             topBar.removeFromRight (28);
             topBar.removeFromRight (12);
         }
@@ -683,7 +683,7 @@ private:
         updatesCardVisible = premium && currentLicenseKey.isNotEmpty();
 
         setOverlayTitle (premiumRequired ? juce::String() : "Account");
-        setDismissible (! premiumRequired);
+        setDismissible(!premiumRequired);
 
         LicenseProfileCard::State licenseState;
         licenseState.productName = premium ? juce::String() : productName;
@@ -693,9 +693,9 @@ private:
         licenseState.badge = badgeTextForState (status, premium, premiumRequired);
         licenseState.licenseKey = currentLicenseKey;
         licenseState.revealLicenseKey = licenseKeyRevealed;
-        licenseState.showActivation = premiumRequired || ! premium;
+        licenseState.showActivation = premiumRequired || !premium;
         licenseState.showFreeFallback = premiumRequired && hasFreeFallback();
-        licenseState.drawChrome = ! premiumRequired;
+        licenseState.drawChrome = !premiumRequired;
         licenseState.topRightReserve = premiumRequired ? 48 : 0;
         licenseState.busy = busy;
         applyEffectiveLicenseNotice (licenseState, status);
@@ -707,16 +707,16 @@ private:
         updateState.availableVersion = availableVersion.has_value()
             ? juce::String ("Update available: ") + availableVersion->semver
             : juce::String();
-        updateState.showCheckButton = ! premiumRequired;
-        updateState.showUpdateButton = ! premiumRequired && availableVersion.has_value();
-        updateState.showStableButton = ! premiumRequired && betaEnabled;
+        updateState.showCheckButton = !premiumRequired;
+        updateState.showUpdateButton = !premiumRequired && availableVersion.has_value();
+        updateState.showStableButton = !premiumRequired && betaEnabled;
         updateState.busy = busy;
         updateState.downloading = busy && updateCard.isVisible() && updateNotice.text.startsWithIgnoreCase ("Downloading");
         updateCard.setState (updateState);
         updateCard.setVisible (updatesCardVisible);
 
-        removeLicenseButton.setVisible (! premiumRequired && status != "free");
-        removeLicenseButton.setEnabled (! busy && removeLicenseButton.isVisible());
+        removeLicenseButton.setVisible(!premiumRequired && status != "free");
+        removeLicenseButton.setEnabled(!busy && removeLicenseButton.isVisible());
 
         relayoutAfterStateChange();
     }
@@ -789,7 +789,7 @@ private:
 
     bool requiresPremiumLicense() const {
 #if OSCI_PREMIUM
-        return ! processor.licenseManager.hasPremium();
+        return !processor.licenseManager.hasPremium();
 #else
         return false;
 #endif
@@ -986,7 +986,7 @@ private:
     }
 
     void downloadAndInstallUpdate() {
-        if (! availableVersion.has_value()) {
+        if (!availableVersion.has_value()) {
             return;
         }
 
@@ -1009,7 +1009,7 @@ private:
                                              : result;
                   },
                   [this, foundVersion, noticeTarget] {
-                      if (! foundVersion->has_value()) {
+                      if (!foundVersion->has_value()) {
                           setNotice (noticeTarget, "No free download is available.", NoticeKind::Error);
                           return;
                       }
@@ -1069,7 +1069,7 @@ private:
     }
 
     void installUpdate (NoticeTarget noticeTarget) {
-        if (! downloadedFile.existsAsFile()) {
+        if (!downloadedFile.existsAsFile()) {
             setNotice (noticeTarget, "Downloaded installer could not be found.", NoticeKind::Error);
             refreshState();
             return;
@@ -1115,6 +1115,7 @@ private:
             resized();
         };
 
+        helpOverlay->captureBackdropFrom (*this);
         addAndMakeVisible (*helpOverlay);
         helpOverlay->setBounds (getLocalBounds());
         helpOverlay->toFront (false);

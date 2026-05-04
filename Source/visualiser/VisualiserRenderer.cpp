@@ -546,6 +546,7 @@ void VisualiserRenderer::renderOpenGL() {
             Texture mirrorTex { mirrorTexture, w, h };
             targetTexture = std::nullopt;
             drawTexture({ mirrorTex });
+            drawPresentationFadeOverlay();
             return;
         }
 
@@ -576,6 +577,7 @@ void VisualiserRenderer::renderOpenGL() {
         activateTargetTexture(std::nullopt);
         setShader(texturedShader.get());
         drawTexture({renderTexture});
+        drawPresentationFadeOverlay();
 
         // Capture frame for mirror consumer (child window)
         if (hasMirrorConsumer.load()) {
@@ -747,6 +749,11 @@ void VisualiserRenderer::setFrameRate(double frameRate) {
             setupArrays(RESAMPLE_RATIO * sampleRate / frameRate);
         }
     }
+}
+
+void VisualiserRenderer::setPresentationFadeAlpha(float alpha) {
+    presentationFadeAlpha.store(juce::jlimit(0.0f, 1.0f, alpha));
+    openGLContext.triggerRepaint();
 }
 
 void VisualiserRenderer::drawLineTexture(const std::vector<float> &xPoints, const std::vector<float> &yPoints,
@@ -1037,6 +1044,29 @@ void VisualiserRenderer::fade() {
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glDisableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
 #endif
+}
+
+void VisualiserRenderer::drawPresentationFadeOverlay() {
+    using namespace juce::gl;
+
+    const auto alpha = presentationFadeAlpha.load();
+    if (alpha <= 0.001f || simpleShader == nullptr) {
+        return;
+    }
+
+    setNormalBlending();
+    simpleShader->use();
+
+    const auto vertexPosition = glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition");
+    glEnableVertexAttribArray(vertexPosition);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * fullScreenQuad.size(), fullScreenQuad.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(vertexPosition, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    simpleShader->setUniform("colour", 0.0f, 0.0f, 0.0f, alpha);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDisableVertexAttribArray(vertexPosition);
 }
 
 void VisualiserRenderer::drawCRT() {

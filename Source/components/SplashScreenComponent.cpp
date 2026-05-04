@@ -15,12 +15,12 @@ SplashScreenComponent::SplashScreenComponent()
     benefitsGrid.setItemsInteractive(false);
     benefitsGrid.setItemHeight(120);
     benefitsGrid.setColour(osci::scrollFadeOverlayBackgroundColourId, osci::Colours::veryDark());
-    addAndMakeVisible(benefitsGrid);
+    addPanelContentAndMakeVisible(benefitsGrid);
 
     configureLabel(supportLabel, juce::Font(14.5f, juce::Font::italic), juce::Justification::centred);
     supportLabel.setColour(juce::Label::textColourId, osci::Colours::accentColor().brighter(0.2f));
     supportLabel.setText("Purchasing premium directly supports ongoing development. Thank you!", juce::NotificationType::dontSendNotification);
-    addAndMakeVisible(supportLabel);
+    addPanelContentAndMakeVisible(supportLabel);
 
     buildBenefitTiles();
 
@@ -43,9 +43,13 @@ SplashScreenComponent::SplashScreenComponent()
     continueButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     continueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
 
-    addAndMakeVisible(subtitleLabel);
-    addAndMakeVisible(upgradeButton);
-    addAndMakeVisible(continueButton);
+    addPanelContentAndMakeVisible(subtitleLabel);
+    addPanelContentAndMakeVisible(upgradeButton);
+    addPanelContentAndMakeVisible(continueButton);
+}
+
+juce::Point<int> SplashScreenComponent::getPreferredPanelSize() const {
+    return getPanelSizeForContentSize({ 680, 540 });
 }
 
 void SplashScreenComponent::resizeContent(juce::Rectangle<int> contentArea) {
