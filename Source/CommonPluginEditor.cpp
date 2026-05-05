@@ -195,11 +195,12 @@ void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appHeight", getHeight());
     refreshBetaUpdatesButton();
 
-    const int promptWidth = juce::jmin(380, getWidth() - 28);
-    if (promptWidth > 260)
+    const int promptWidth = juce::jmin(updatePrompt.getPreferredWidth(), getWidth() - 28);
+    if (promptWidth > 340) {
         updatePrompt.setBounds(getWidth() - promptWidth - 14, 42, promptWidth, updatePrompt.getPreferredHeight());
-    else
+    } else {
         updatePrompt.setBounds({});
+    }
 
     if (!activeOverlays.empty()) {
         for (auto& overlay : activeOverlays) {
