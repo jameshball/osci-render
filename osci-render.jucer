@@ -30,6 +30,7 @@
       <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
         <FILE id="jI9VSZ" name="logo.png" compile="0" resource="1" file="Resources/images/logo.png"/>
         <FILE id="aZXbCi" name="osci_mac.png" compile="0" resource="1" file="Resources/images/osci_mac.png"/>
+        <FILE id="Jk6VkC" name="osci_win.png" compile="0" resource="1" file="Resources/images/osci_win.png"/>
       </GROUP>
       <GROUP id="{C2609827-4F4A-1ADA-8BA1-A40C1D92649C}" name="lua">
         <FILE id="IWx6sW" name="donut.lua" compile="0" resource="1" file="Resources/lua/donut.lua"/>
@@ -727,8 +728,8 @@
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
                JUCE_WEB_BROWSER="0" JUCE_ASIO="1" JUCE_ENABLE_LIVE_CONSTANT_EDITOR="1"/>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="pSc1mq"
-                bigIcon="pSc1mq" externalLibraries="luajit" extraCompilerFlags="-mavx">
+    <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="Jk6VkC"
+                bigIcon="Jk6VkC" externalLibraries="luajit" extraCompilerFlags="-mavx">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
                        libraryPath="../../../modules/LuaJIT/src"/>
@@ -770,8 +771,8 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="pSc1mq"
-            bigIcon="pSc1mq" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
+    <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="Jk6VkC"
+            bigIcon="Jk6VkC" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
