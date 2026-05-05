@@ -382,7 +382,7 @@ private:
         osci::showInstallConfirmation (
             this,
             [safeThis, file, version, product, currentVersion] {
-                if (! osci::launchInstallerWithPendingMarker (file, version, product, currentVersion)) {
+                if (!osci::launchInstallerWithPendingMarker(file, version, product, currentVersion, safeThis.getComponent())) {
                     return;
                 }
 

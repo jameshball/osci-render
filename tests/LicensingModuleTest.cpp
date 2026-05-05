@@ -372,16 +372,22 @@ public:
         beginTest ("DAW matcher recognises known hosts without broad false positives");
         {
             juce::String display;
-            expect (osci::DawProcessDetector::isKnownDawProcessName (
+            expect(osci::DawProcessDetector::isKnownDawProcessName(
                 "/Applications/Ableton Live 12 Suite.app/Contents/MacOS/Ableton Live 12 Suite", &display));
-            expectEquals (display, juce::String ("Ableton Live"));
-            expect (osci::DawProcessDetector::isKnownDawProcessName ("pluginval", &display));
-            expectEquals (display, juce::String ("pluginval"));
-            expect (osci::DawProcessDetector::isKnownDawProcessName ("VST3PluginTestHost.exe", &display));
-            expectEquals (display, juce::String ("VST3 plugin test host"));
-            expect (osci::DawProcessDetector::isKnownDawProcessName ("auval", &display));
-            expectEquals (display, juce::String ("AU validation tool"));
-            expect (! osci::DawProcessDetector::isKnownDawProcessName ("Final Cut Pro"));
+            expectEquals(display, juce::String("Ableton Live"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName(
+                "/Applications/Logic Pro X.app/Contents/MacOS/Logic Pro X", &display));
+            expectEquals(display, juce::String("Logic Pro"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName("pluginval", &display));
+            expectEquals(display, juce::String("pluginval"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName("VST3PluginTestHost.exe", &display));
+            expectEquals(display, juce::String("VST3 plugin test host"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName("auval", &display));
+            expectEquals(display, juce::String("AU validation tool"));
+            expect(!osci::DawProcessDetector::isKnownDawProcessName(
+                "/Applications/Logic Pro X.app/Contents/PlugIns/LogicProThumbnailExtension.appex/Contents/MacOS/LogicProThumbnailExtension"));
+            expect(!osci::DawProcessDetector::isKnownDawProcessName("LogicProThumbnailExtension"));
+            expect(!osci::DawProcessDetector::isKnownDawProcessName("Final Cut Pro"));
         }
 
         beginTest ("Hardware helpers return stable local values");

@@ -613,6 +613,7 @@ private:
     std::optional<osci::VersionInfo> availableVersion;
     juce::File downloadedFile;
     bool busy = false;
+    bool updateDownloadInProgress = false;
     bool licenseKeyRevealed = false;
     bool updatesCardVisible = false;
     juce::String currentLicenseKey;
@@ -629,7 +630,7 @@ private:
         }
 
         const auto licenseCardHeight = licenseNotice.text.isNotEmpty() ? 240 : 210;
-        const auto updateCardHeight = availableVersion.has_value() ? 122 : 94;
+        const auto updateCardHeight = getUpdateCardHeight();
         return { 620, 86 + licenseCardHeight + 12 + updateCardHeight + 12 + 36 };
     }
 
@@ -655,7 +656,7 @@ private:
         if (updatesCardVisible) {
             area.removeFromTop (12);
             updateCard.setVisible (true);
-            const auto updateCardHeight = availableVersion.has_value() ? 122 : 94;
+            const auto updateCardHeight = getUpdateCardHeight();
             updateCard.setBounds (area.removeFromTop (updateCardHeight));
         } else {
             updateCard.setVisible (false);
@@ -711,7 +712,7 @@ private:
         updateState.showUpdateButton = !premiumRequired && availableVersion.has_value();
         updateState.showStableButton = !premiumRequired && betaEnabled;
         updateState.busy = busy;
-        updateState.downloading = busy && updateCard.isVisible() && updateNotice.text.startsWithIgnoreCase ("Downloading");
+        updateState.downloading = updateDownloadInProgress;
         updateCard.setState (updateState);
         updateCard.setVisible (updatesCardVisible);
 
@@ -799,6 +800,14 @@ private:
         return processor.getProductSlug() == "osci-render";
     }
 
+    int getUpdateCardHeight() const {
+        if (!availableVersion.has_value()) {
+            return 94;
+        }
+
+        return updateDownloadInProgress ? 176 : 122;
+    }
+
     static void styleDangerButton (juce::TextButton& button) {
         const auto danger = juce::Colour::fromRGB (0xD8, 0x56, 0x56);
         button.setColour (juce::TextButton::buttonColourId, danger.withAlpha (0.14f));
@@ -866,6 +875,7 @@ private:
                     return;
                 }
 
+                safeThis->updateDownloadInProgress = false;
                 safeThis->updateCard.hideDownload();
                 safeThis->setBusy (false);
                 if (result->failed()) {
@@ -1030,6 +1040,7 @@ private:
         const auto token = juce::String (licenseToken);
         const auto product = processor.getProductSlug();
 
+        updateDownloadInProgress = true;
         updateCard.resetDownload();
         updateCard.setDownloadStatus (juce::String ("Downloading ") + version.semver + "...");
         updateCard.setDownloadProgress (-1.0);
