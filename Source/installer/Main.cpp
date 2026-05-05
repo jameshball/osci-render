@@ -611,9 +611,7 @@ private:
     }
 
     void showErrorDialog (juce::StringRef title, juce::StringRef message) {
-        juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                title,
-                                                juce::String (message));
+        osci::showInstallError(this, title, message);
     }
 };
 

@@ -16,7 +16,10 @@
     #include "melatonin_inspector/melatonin_inspector.h"
 #endif
 
-class CommonPluginEditor : public juce::AudioProcessorEditor, public juce::KeyListener, private juce::Timer {
+class CommonPluginEditor : public juce::AudioProcessorEditor,
+                           public juce::KeyListener,
+                           public osci::OverlayHost,
+                           private juce::Timer {
 public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
     ~CommonPluginEditor() override;
@@ -36,7 +39,7 @@ public:
     virtual void showPremiumSplashScreen();
 
     // Overlay management — any component can show/dismiss full-editor overlays
-    void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay);
+    void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     virtual void dismissOverlay(osci::OverlayComponent* overlay,
                                 std::function<void()> beforeVisualiserRestore = nullptr);
 

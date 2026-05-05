@@ -259,9 +259,12 @@ void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> ove
 
 void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
                                         std::function<void()> beforeVisualiserRestore) {
+    const juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    std::unique_ptr<osci::OverlayComponent> removedOverlay;
     for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
         if (it->get() == overlay) {
             removeChildComponent(overlay);
+            removedOverlay = std::move(*it);
             activeOverlays.erase(it);
             break;
         }
@@ -277,6 +280,12 @@ void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
 
     if (beforeVisualiserRestore != nullptr) {
         beforeVisualiserRestore();
+    }
+
+    removedOverlay.reset();
+
+    if (safeThis == nullptr) {
+        return;
     }
 
     if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
