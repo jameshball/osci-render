@@ -28,6 +28,10 @@
               file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
       <GROUP id="{DA285F89-D5DB-4C00-9694-B5F37CE4C975}" name="images">
+        <FILE id="Z3g78i" name="osci_installer_mac.png" compile="0" resource="1"
+              file="Resources/images/osci_installer_mac.png"/>
+        <FILE id="PqoazG" name="osci_installer_win.png" compile="0" resource="1"
+              file="Resources/images/osci_installer_win.png"/>
         <FILE id="iOsciM" name="osci_mac.png" compile="0" resource="1" file="Resources/images/osci_mac.png"/>
         <FILE id="iSosciM" name="sosci_mac.png" compile="0" resource="1" file="Resources/images/sosci_mac.png"/>
       </GROUP>
@@ -84,7 +88,8 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/osci-installer/VisualStudio2022">
+    <VS2022 targetFolder="Builds/osci-installer/VisualStudio2022" smallIcon="PqoazG"
+            bigIcon="PqoazG">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-installer"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-installer"/>
@@ -109,7 +114,8 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/osci-installer/MacOSX">
+    <XCODE_MAC targetFolder="Builds/osci-installer/MacOSX" smallIcon="Z3g78i"
+               bigIcon="Z3g78i">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-installer"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-installer"/>
