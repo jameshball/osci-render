@@ -328,25 +328,38 @@ jobs:
           tool: notarytool
           verbose: true
 
+      - name: Install dmgbuild
+        if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
+        shell: bash
+        run: python3 -m pip install --quiet --user --break-system-packages dmgbuild
+
       - name: Package notarized osci-installer app as DMG (macOS)
         if: matrix.project == 'osci-installer' && matrix.os == 'macos-latest'
         shell: bash
         run: |
           set -euo pipefail
           APP_PATH="Builds/osci-installer/MacOSX/build/Release/osci-installer.app"
+          ICON_PATH="Builds/osci-installer/MacOSX/Icon.icns"
           APP_IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -n 1)"
           if [[ -z "${APP_IDENTITY}" ]]; then
             echo "::error::Developer ID Application signing identity not found"
             security find-identity -v -p codesigning || true
             exit 1
           fi
+          if [[ ! -f "${ICON_PATH}" ]]; then
+            echo "::error::expected icon ${ICON_PATH} not found"
+            exit 1
+          fi
           xcrun stapler staple "${APP_PATH}"
           spctl -a -vvv -t exec "${APP_PATH}"
-          DMG_STAGING="$(mktemp -d)"
-          trap 'rm -rf "${DMG_STAGING}"' EXIT
-          ditto "${APP_PATH}" "${DMG_STAGING}/osci-installer.app"
           rm -f "bin/osci-installer.dmg"
-          hdiutil create -volname "osci-installer" -srcfolder "${DMG_STAGING}" -ov -format UDZO "bin/osci-installer.dmg"
+          python3 -m dmgbuild \
+            --settings "ci/osci_installer_dmg_settings.py" \
+            --detach-retries 12 \
+            -D "app=${APP_PATH}" \
+            -D "icon=${ICON_PATH}" \
+            "osci-installer" \
+            "bin/osci-installer.dmg"
           codesign --force --timestamp --sign "${APP_IDENTITY}" "bin/osci-installer.dmg"
           codesign --verify --verbose=2 "bin/osci-installer.dmg"
           rm -f "bin/osci-installer-mac-notary.zip"
