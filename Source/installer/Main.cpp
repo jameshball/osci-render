@@ -67,7 +67,7 @@ class InstallerComponent final : public juce::Component {
 public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
-          sosciTile ("sosci", loadImage (BinaryData::sosci_mac_png, BinaryData::sosci_mac_pngSize), "sosci"),
+          sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
           needLicenseLink ("Need a license key?", juce::URL ("https://osci-render.com/#purchase")),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
