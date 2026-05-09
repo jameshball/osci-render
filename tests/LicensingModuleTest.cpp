@@ -378,6 +378,9 @@ public:
             expect(osci::DawProcessDetector::isKnownDawProcessName(
                 "/Applications/Logic Pro X.app/Contents/MacOS/Logic Pro X", &display));
             expectEquals(display, juce::String("Logic Pro"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName(
+                "C:\\Program Files\\Steinberg\\Cubase 13\\Cubase13.exe", &display));
+            expectEquals(display, juce::String("Cubase"));
             expect(osci::DawProcessDetector::isKnownDawProcessName("pluginval", &display));
             expectEquals(display, juce::String("pluginval"));
             expect(osci::DawProcessDetector::isKnownDawProcessName("VST3PluginTestHost.exe", &display));
