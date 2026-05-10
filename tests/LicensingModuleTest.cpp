@@ -31,15 +31,15 @@ namespace
     {
         auto payload = juce::var (new juce::DynamicObject());
         auto* object = payload.getDynamicObject();
-        object->setProperty ("v", 1);
-        object->setProperty ("kid", 1);
-        object->setProperty ("lk", "LICENSE-KEY");
-        object->setProperty ("pid", "osci-render");
-        object->setProperty ("prv", "gumroad");
-        object->setProperty ("em", "buyer@example.com");
-        object->setProperty ("tr", std::move (tier));
-        object->setProperty ("iat", issuedAtSeconds);
-        object->setProperty ("exp", expiresAtSeconds);
+        object->setProperty ("token_format_version", 3);
+        object->setProperty ("key_id", 1);
+        object->setProperty ("license_key", "LICENSE-KEY");
+        object->setProperty ("provider_product_id", "osci-render");
+        object->setProperty ("provider", "gumroad");
+        object->setProperty ("email", "buyer@example.com");
+        object->setProperty ("tier", std::move (tier));
+        object->setProperty ("issued_at", issuedAtSeconds);
+        object->setProperty ("expires_at", expiresAtSeconds);
 
         const auto payloadJson = juce::JSON::toString (payload, true);
         const juce::MemoryBlock payloadBytes (payloadJson.toRawUTF8(), std::strlen (payloadJson.toRawUTF8()));

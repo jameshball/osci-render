@@ -329,6 +329,46 @@ public:
         expectWithinAbsoluteError(renderFirstSampleAt(1.25), 0.5f, 0.01f);
         expectWithinAbsoluteError(renderFirstSampleAt(0.125), 0.25f, 0.01f);
 
+        beginTest("Sync mode holds the host timeline value when transport is paused");
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0, voiceActive, 0.125, true, false);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+
+        beginTest("Paused Sync mode outputs a constant value with smoothing enabled");
+        lfoParams.setSmoothAmount(0, 1.0f);
+        lfoParams.smoothedOutput[0] = 0.75f;
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0, voiceActive, 0.125, true, false);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+        lfoParams.setSmoothAmount(0, 0.0f);
+
+        beginTest("Sync mode is active on a MIDI-disabled note-on block");
+        voiceActive[0].store(false, std::memory_order_relaxed);
+        juce::MidiBuffer midiDisabledTrigger;
+        midiDisabledTrigger.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 0);
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, midiDisabledTrigger, 120.0, voiceActive, 0.125, true, false);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+
+        beginTest("Untouched Free LFOs can default to Sync");
+        LfoParameters defaultParams;
+        defaultParams.setIsCustom(1, true);
+        ModAssignment assignment;
+        assignment.sourceIndex = 2;
+        assignment.paramId = "target";
+        defaultParams.addAssignment(assignment);
+        defaultParams.switchUnmodifiedFreeToSync();
+        expect(defaultParams.getMode(0) == LfoMode::Sync);
+        expect(defaultParams.getMode(1) == LfoMode::Free);
+        expect(defaultParams.getMode(2) == LfoMode::Free);
+        testutil::cleanupLfoParams(defaultParams);
+
         testutil::cleanupLfoParams(lfoParams);
     }
 };

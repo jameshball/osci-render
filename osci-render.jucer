@@ -133,6 +133,7 @@
         <FILE id="WnBZf0" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
         <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
+        <FILE id="midi01" name="midi.svg" compile="0" resource="1" file="Resources/svg/midi.svg"/>
         <FILE id="YuYfcJ" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
         <FILE id="lKNfVm" name="mushroom.svg" compile="0" resource="1" file="Resources/svg/mushroom.svg"/>
         <FILE id="eGMxwy" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
@@ -408,6 +409,8 @@
               file="Source/components/LabelledBarComponent.h"/>
         <FILE id="PrBrCm" name="ParameterBarComponent.h" compile="0" resource="0"
               file="Source/components/ParameterBarComponent.h"/>
+        <FILE id="SvSwBt" name="SvgSwitchButton.h" compile="0" resource="0"
+              file="Source/components/SvgSwitchButton.h"/>
         <FILE id="TgLbCm" name="ToggleLabelComponent.h" compile="0" resource="0"
               file="Source/components/ToggleLabelComponent.h"/>
         <FILE id="BlPCCH" name="BooleanParamCCHelper.h" compile="0" resource="0"

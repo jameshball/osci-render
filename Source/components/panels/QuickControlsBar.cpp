@@ -26,11 +26,7 @@ QuickControlsBar::QuickControlsBar(OscirenderAudioProcessor& p, OscirenderAudioP
     fovKnob.wireModulation(audioProcessor);
 
 #if !OSCI_PREMIUM
-    addAndMakeVisible(midiToggle);
-    addAndMakeVisible(midiLabel);
-    midiLabel.setFont(juce::Font(13.0f));
-    midiLabel.setJustificationType(juce::Justification::centredLeft);
-    midiLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    addAndMakeVisible(midiSwitch);
 
     addAndMakeVisible(voicesBar);
     voicesBar.setVisible(audioProcessor.midiEnabled->getBoolValue());
@@ -66,15 +62,12 @@ void QuickControlsBar::resized() {
     constexpr int gap = 3;
 
 #if !OSCI_PREMIUM
-    // Layout: [toggle][label][voices] | [freq][persp][fov]
-    constexpr int toggleW = 30;
-    constexpr int labelW = 75;
+    // Layout: [MIDI icon+toggle][voices] | [freq][persp][fov]
+    constexpr int toggleW = 36;
     constexpr int voicesW = 80;
 
     auto midiArea = area.removeFromLeft(toggleW);
-    midiToggle.setBounds(midiArea.withSizeKeepingCentre(toggleW, 22));
-
-    midiLabel.setBounds(area.removeFromLeft(labelW));
+    midiSwitch.setBounds(midiArea);
     area.removeFromLeft(gap);
 
     bool midiOn = audioProcessor.midiEnabled->getBoolValue();

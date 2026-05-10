@@ -211,9 +211,7 @@ struct LfoAudioState {
 
     // Fill an output buffer for an entire block, dispatching mode once.
     // This avoids a per-sample switch in the hot path.
-    void advanceBlock(float* output, int numSamples, float rateHz, float sampleRate,
-                      const LfoWaveform& waveform, LfoMode mode, float phaseOffset,
-                      double syncStartSeconds = 0.0, bool useHostSync = false) {
+    void advanceBlock(float* output, int numSamples, float rateHz, float sampleRate, const LfoWaveform& waveform, LfoMode mode, float phaseOffset, double syncStartSeconds = 0.0, bool useHostSync = false, bool hostSyncShouldAdvance = true) {
         if (sampleRate <= 0.0f) {
             std::fill(output, output + numSamples, 0.0f);
             return;
@@ -228,13 +226,19 @@ struct LfoAudioState {
 
             case LfoMode::Sync:
                 if (useHostSync) {
-                    double sampleDuration = 1.0 / (double)sampleRate;
-                    for (int s = 0; s < numSamples; ++s)
-                        output[s] = advanceSync(syncStartSeconds + (double)s * sampleDuration,
-                                                rateHz, waveform, phaseOffset);
+                    if (hostSyncShouldAdvance) {
+                        double sampleDuration = 1.0 / (double)sampleRate;
+                        for (int s = 0; s < numSamples; ++s) {
+                            output[s] = advanceSync(syncStartSeconds + (double)s * sampleDuration, rateHz, waveform, phaseOffset);
+                        }
+                    } else {
+                        float heldValue = advanceSync(syncStartSeconds, rateHz, waveform, phaseOffset);
+                        std::fill(output, output + numSamples, heldValue);
+                    }
                 } else {
-                    for (int s = 0; s < numSamples; ++s)
+                    for (int s = 0; s < numSamples; ++s) {
                         output[s] = advanceFreeOrSync(phaseInc, waveform);
+                    }
                 }
                 return;
 

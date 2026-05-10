@@ -139,23 +139,31 @@ public:
         return customState[i].load(std::memory_order_relaxed);
     }
 
-    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
-    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
-    void switchUnmodifiedFreeToTrigger() {
+    void switchUnmodifiedFreeTo(LfoMode targetMode) {
         auto allAssignments = getAssignments();
         int assignCount[NUM_LFOS] = {};
-        for (const auto& a : allAssignments)
-            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS)
+        for (const auto& a : allAssignments) {
+            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS) {
                 assignCount[a.sourceIndex]++;
+            }
+        }
 
         for (int i = 0; i < NUM_LFOS; ++i) {
             bool isFree = getMode(i) == LfoMode::Free;
             bool unassigned = assignCount[i] == 0;
             bool unmodified = !getIsCustom(i);
-            if (isFree && unassigned && unmodified)
-                setMode(i, LfoMode::Trigger);
+            if (isFree && unassigned && unmodified) {
+                setMode(i, targetMode);
+            }
         }
     }
+
+    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
+    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
+    void switchUnmodifiedFreeToTrigger() { switchUnmodifiedFreeTo(LfoMode::Trigger); }
+
+    // Switch untouched Free-mode LFOs to DAW Sync when MIDI is disabled in a plugin host.
+    void switchUnmodifiedFreeToSync() { switchUnmodifiedFreeTo(LfoMode::Sync); }
 
     void setIsCustom(int i, bool custom) {
         if (i < 0 || i >= NUM_LFOS) return;
@@ -233,9 +241,7 @@ public:
     // === Block buffer generation (called from audio thread each processBlock) ===
     // Processes MIDI note events for LFO triggering and computes per-sample LFO values.
     template<int MaxVoices>
-    void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi,
-                          double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices],
-                          double syncStartSeconds = 0.0, bool useHostSync = false) {
+    void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi, double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices], double syncStartSeconds = 0.0, bool useHostSync = false, bool hostSyncShouldAdvance = true) {
         if (numSamples <= 0) return;
 
         // Process MIDI note events to drive LFO triggering for non-Free modes
@@ -337,17 +343,18 @@ public:
                     double segmentSyncStartSeconds = syncStartSeconds;
                     if (useHostSync && sampleRate > 0.0)
                         segmentSyncStartSeconds += (double)delaySkipSamples / sampleRate;
-                    audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples,
-                                                r, sr, waveforms[l], md, phaseOff,
-                                                segmentSyncStartSeconds, useHostSync);
+                    audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples, r, sr, waveforms[l], md, phaseOff, segmentSyncStartSeconds, useHostSync, hostSyncShouldAdvance);
                 }
                 if (md == LfoMode::Sync && !effectiveVoiceActive) {
                     for (int s = 0; s < numSamples; ++s)
                         blockBuffer[l][s] = 0.0f;
                 }
 
+                const bool syncHeldByTransport = md == LfoMode::Sync && useHostSync && !hostSyncShouldAdvance;
                 float smoothSecs = smoothAmount[l] ? smoothAmount[l]->getValueUnnormalised() : 0.005f;
-                if (smoothSecs > 1e-6f) {
+                if (syncHeldByTransport) {
+                    smoothedOutput[l] = blockBuffer[l][numSamples - 1];
+                } else if (smoothSecs > 1e-6f) {
                     float alpha = 1.0f - std::exp(-1.0f / (smoothSecs * sr));
                     float prev = smoothedOutput[l];
                     for (int s = 0; s < numSamples; ++s) {
