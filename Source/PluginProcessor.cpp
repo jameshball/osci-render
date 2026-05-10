@@ -883,10 +883,13 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     double playTimeBeats = hasPpqPosition ? ppqPosition : bpm * playTimeSeconds / 60;
     double lfoSyncStartSeconds = lfoSyncTimeSeconds;
-    if (hasPpqPosition && bpm > 0.0)
+    if (hasPpqPosition && bpm > 0.0) {
         lfoSyncStartSeconds = ppqPosition / (bpm / 60.0);
-    else if (hasPlayTimeSeconds)
+    } else if (hasPlayTimeSeconds) {
         lfoSyncStartSeconds = playTimeSeconds;
+    }
+    const bool hasHostSyncPosition = hasPpqPosition || hasPlayTimeSeconds;
+    const bool hostSyncShouldAdvance = juce::JUCEApplicationBase::isStandaloneApp() || !hasHostSyncPosition || isPlaying;
 
     // Calculated time per sample in seconds and beats
     double sTimeSec = 1.f / sampleRate;
@@ -995,12 +998,9 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
 #if OSCI_PREMIUM
         // Fill modulation block buffers (type-specific generation)
-        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                       currentBpm.load(std::memory_order_relaxed),
-                                       uiVoiceActive, lfoSyncStartSeconds, true);
+        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, currentBpm.load(std::memory_order_relaxed), uiVoiceActive, lfoSyncStartSeconds, true, hostSyncShouldAdvance);
         envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
-        randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                          currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
+        randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, currentBpm.load(std::memory_order_relaxed), uiVoiceActive);
 #endif
 
         // Always run the sidechain envelope follower so the UI display
@@ -1011,8 +1011,12 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         modulationEngine.applyAllModulation(numSamples);
     }
 
-    if (sampleRate > 0.0)
-        lfoSyncTimeSeconds = lfoSyncStartSeconds + (double)numSamples / sampleRate;
+    if (sampleRate > 0.0) {
+        lfoSyncTimeSeconds = lfoSyncStartSeconds;
+        if (hostSyncShouldAdvance) {
+            lfoSyncTimeSeconds += (double)numSamples / sampleRate;
+        }
+    }
 
     outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
     outputBuffer3d.clear();

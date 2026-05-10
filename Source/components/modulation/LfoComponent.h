@@ -37,7 +37,7 @@ public:
 
     static juce::Colour getLfoColour(int lfoIndex);
 
-    // Restrict LFO features when MIDI is disabled (only Free mode available)
+    // Restrict LFO features when MIDI is disabled.
     void setMidiEnabled(bool enabled);
 
     void syncFromProcessorState() override;

@@ -10,6 +10,7 @@
 - **Control flow clarity**: Avoid initializer statements in `if`/`switch` conditions. Prefer a named local variable before the condition, especially for `juce::Result` values.
 - **Unary operator spacing**: Do not put a space between a unary operator and its operand, e.g. use `!anyHeavy`.
 - **Expression spacing**: Avoid unnecessary spaces inside expressions. For example, use `freeChoiceButton.setEnabled(!busy);`, not `freeChoiceButton.setEnabled (!busy);`, and `static_cast<float>(value)`, not `static_cast<float> (value)`.
+- **Compact signatures and calls**: Do not split function signatures or call arguments across extra lines just because a parameter was added. Keep arguments on the same line when reasonable, and prefer compact wrapping over one-argument-per-line formatting.
 
 ## GitHub Actions Monitoring
 
