@@ -173,10 +173,15 @@ jobs:
 
       - name: Install procdump (Windows)
         if: matrix.project != 'osci-installer' && matrix.os == 'windows-2022'
+        continue-on-error: true
         shell: bash
         run: |
-          choco install procdump -y --no-progress
-          procdump -accepteula || true
+          choco install procdump -y --no-progress || echo "WARNING: failed to install procdump; pluginval will run without crash dumps"
+          if command -v procdump >/dev/null 2>&1; then
+            procdump -accepteula || true
+          else
+            echo "WARNING: procdump unavailable"
+          fi
 
       - name: Validate plugin with pluginval
         id: pluginval_effect
@@ -205,6 +210,8 @@ jobs:
       # Upload pluginval logs and crash dumps to MEGA (runs even if pluginval failed)
       - name: Upload pluginval logs to MEGA (Unix)
         if: always() && matrix.project != 'osci-installer' && runner.os != 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
+        continue-on-error: true
+        timeout-minutes: 5
         shell: bash
         run: |
           set -euo pipefail
@@ -218,6 +225,8 @@ jobs:
 
       - name: Upload pluginval logs to MEGA (Windows)
         if: always() && matrix.project != 'osci-installer' && runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 5
         shell: powershell
         run: |
           $ErrorActionPreference = 'Continue'

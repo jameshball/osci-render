@@ -80,7 +80,7 @@ def sha256_file(path: Path, *, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 60.0) -> dict:
+def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 300.0) -> dict:
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode('utf-8'),
@@ -92,6 +92,10 @@ def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 60.0
             return json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         raise SystemExit(f'POST {url} -> HTTP {e.code}: {e.read().decode("utf-8", errors="replace")}')
+    except TimeoutError:
+        raise SystemExit(f'POST {url} timed out after {timeout:g}s waiting for the API response')
+    except urllib.error.URLError as e:
+        raise SystemExit(f'POST {url} failed: {e.reason}')
 
 
 def http_put_file(url: str, path: Path, *, content_type: str = 'application/octet-stream', timeout: float = 600.0) -> int:
