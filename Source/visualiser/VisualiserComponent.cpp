@@ -135,7 +135,7 @@ VisualiserComponent::VisualiserComponent(
     preRenderCallback = [this] {
         if (!record.getToggleState()) {
             updateRenderModeFromProcessor();
-            setResolution(this->recordingSettings.getResolution());
+            setRenderSize(this->recordingSettings.getCanvasSize());
             setFrameRate(this->recordingSettings.getFrameRate());
         }
     };
@@ -146,6 +146,12 @@ VisualiserComponent::VisualiserComponent(
             if (recordingVideo) {
                 // draw frame to ffmpeg
                 Texture renderTexture = getRenderTexture();
+                if (renderTexture.width != recordingRenderSize.width || renderTexture.height != recordingRenderSize.height) {
+                    return;
+                }
+                if (framePixels.size() != static_cast<size_t>(renderTexture.width * renderTexture.height * 4)) {
+                    framePixels.resize(renderTexture.width * renderTexture.height * 4);
+                }
                 getFrame(framePixels);
                 if (ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height, 3000) == 0) {
                     record.setToggleState(false, juce::NotificationType::dontSendNotification);
@@ -412,6 +418,10 @@ void VisualiserComponent::setRecording(bool recording) {
                 return;
             }
 
+            const auto canvasSize = recordingSettings.getCanvasSize();
+            recordingRenderSize = canvasSize;
+            setRenderSize(canvasSize);
+
             // Get the appropriate file extension based on codec
             juce::String fileExtension = recordingSettings.getFileExtensionForCodec();
             tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
@@ -420,8 +430,8 @@ void VisualiserComponent::setRecording(bool recording) {
             juce::String cmd = ffmpegEncoderManager.buildVideoEncodingCommand(
                 codec,
                 recordingSettings.getCRF(),
-                getRenderWidth(),
-                getRenderHeight(),
+                canvasSize.width,
+                canvasSize.height,
                 recordingSettings.getFrameRate(),
                 recordingSettings.getCompressionPreset(),
                 tempVideoFile->getFile());
@@ -441,7 +451,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 });
                 return;
             }
-            framePixels.resize(getRenderWidth() * getRenderHeight() * 4);
+            framePixels.resize(canvasSize.width * canvasSize.height * 4);
         }
 
         if (recordingAudio) {

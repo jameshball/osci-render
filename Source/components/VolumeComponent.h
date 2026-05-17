@@ -78,6 +78,8 @@ private:
 
 	std::atomic<float> leftVolume = 0;
 	std::atomic<float> rightVolume = 0;
+    std::atomic<float> leftPeak = 0;
+    std::atomic<float> rightPeak = 0;
 
     ThumbRadiusLookAndFeel thumbRadiusLookAndFeel{12};
     juce::Slider volumeSlider;

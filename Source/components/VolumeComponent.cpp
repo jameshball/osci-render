@@ -1,4 +1,5 @@
 #include "VolumeComponent.h"
+#include "../audio/OutputClip.h"
 
 VolumeComponent::VolumeComponent(CommonAudioProcessor& p) 
     : osci::AudioBackgroundThread("VolumeComponent", p.threadManager), 
@@ -68,8 +69,12 @@ void VolumeComponent::paint(juce::Graphics& g) {
     r.removeFromBottom(volumeSlider.getLookAndFeel().getSliderThumbRadius(volumeSlider));
 
     auto channelHeight = r.getHeight();
-    auto leftVolumeHeight = channelHeight * leftVolume;
-    auto rightVolumeHeight = channelHeight * rightVolume;
+    auto leftVolumeValue = juce::jlimit(0.0f, 1.0f, leftVolume.load());
+    auto rightVolumeValue = juce::jlimit(0.0f, 1.0f, rightVolume.load());
+    auto leftPeakValue = leftPeak.load();
+    auto rightPeakValue = rightPeak.load();
+    auto thresholdValue = static_cast<float>(thresholdSlider.getValue());
+    auto clipActive = osci::isOutputClipActive(thresholdValue);
 
     auto overallRect = r;
 
@@ -84,8 +89,9 @@ void VolumeComponent::paint(juce::Graphics& g) {
     // Enable anti-aliasing for smoother rendering
     g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
 
-    auto drawVolumeMeter = [&](juce::Rectangle<float>& rect, float volume) {
-        auto meterRect = rect.removeFromBottom(volume * channelHeight);
+    auto drawVolumeMeter = [&](juce::Rectangle<float> rect, float volume) {
+        auto displayVolume = juce::jlimit(0.0f, 1.0f, volume);
+        auto meterRect = rect.removeFromBottom(displayVolume * channelHeight);
         auto gradient = juce::ColourGradient(
             juce::Colour(0xff00ff00),  // Green
             0, overallRect.getBottom(),
@@ -101,13 +107,15 @@ void VolumeComponent::paint(juce::Graphics& g) {
         g.restoreState();
     };
 
-    drawVolumeMeter(leftRect, leftVolume);
-    drawVolumeMeter(rightRect, rightVolume);
+    drawVolumeMeter(leftRect, leftVolumeValue);
+    drawVolumeMeter(rightRect, rightVolumeValue);
 
     // Draw smooth volume indicators
     auto drawSmoothIndicator = [&](const juce::Rectangle<float>& region, float value) {
-        if (value > 0.0f) {  // Only draw indicator if volume is greater than 0
-            auto y = region.getBottom() - (value * channelHeight);
+        auto displayValue = juce::jlimit(0.0f, 1.0f, value);
+
+        if (displayValue > 0.0f) {  // Only draw indicator if volume is greater than 0
+            auto y = region.getBottom() - (displayValue * channelHeight);
             auto indicatorHeight = 3.0f;
             auto indicatorRect = juce::Rectangle<float>(
                 region.getX(), y - indicatorHeight / 2,
@@ -121,17 +129,41 @@ void VolumeComponent::paint(juce::Graphics& g) {
     drawSmoothIndicator(leftRegion, leftVolumeSmoothed.getNextValue());
     drawSmoothIndicator(rightRegion, rightVolumeSmoothed.getNextValue());
 
-    // Draw threshold line with modern style
-    auto thresholdY = rightRegion.getBottom() - (thresholdSlider.getValue() * channelHeight);
+    // Draw the clipping threshold, or a dim unity reference when clipping is bypassed.
+    auto thresholdReference = clipActive ? juce::jlimit(0.0f, 1.0f, thresholdValue) : 1.0f;
+    auto thresholdLineHeight = clipActive ? 3.0f : 2.0f;
+    auto thresholdY = rightRegion.getBottom() - (thresholdReference * channelHeight);
+    thresholdY = juce::jlimit(rightRegion.getY() + thresholdLineHeight * 0.5f, rightRegion.getBottom() - thresholdLineHeight * 0.5f, thresholdY);
     auto thresholdRect = juce::Rectangle<float>(
         leftRegion.getX(),
-        thresholdY - 1.5f,
+        thresholdY - thresholdLineHeight * 0.5f,
         leftRegion.getWidth() + rightRegion.getWidth(),
-        3.0f
+        thresholdLineHeight
     );
-    
-    g.setColour(juce::Colours::white.withAlpha(0.7f));
-    g.fillRoundedRectangle(thresholdRect, 1.5f);
+
+    g.setColour(juce::Colours::white.withAlpha(clipActive ? 0.7f : 0.22f));
+    g.fillRoundedRectangle(thresholdRect, thresholdLineHeight * 0.5f);
+
+    auto drawPeakCap = [&](const juce::Rectangle<float>& region, float peak) {
+        auto crossedClipThreshold = clipActive && peak > 0.0f && peak >= thresholdValue - osci::kOutputClipPeakEpsilon;
+        auto crossedUnity = !clipActive && peak > 1.0f + osci::kOutputClipPeakEpsilon;
+
+        if (!crossedClipThreshold && !crossedUnity) {
+            return;
+        }
+
+        auto capRect = juce::Rectangle<float>(
+            region.getX() + 1.0f,
+            region.getY() + 1.0f,
+            region.getWidth() - 2.0f,
+            3.0f);
+
+        g.setColour(crossedClipThreshold ? juce::Colours::red.withAlpha(0.78f) : juce::Colours::orange.withAlpha(0.65f));
+        g.fillRoundedRectangle(capRect, 1.5f);
+    };
+
+    drawPeakCap(leftRegion, leftPeakValue);
+    drawPeakCap(rightRegion, rightPeakValue);
 }
 
 void VolumeComponent::handleAsyncUpdate() {
@@ -144,24 +176,45 @@ void VolumeComponent::handleAsyncUpdate() {
 }
 
 void VolumeComponent::runTask(const juce::AudioBuffer<float>& buffer) {
-    float leftVolume = 0;
-    float rightVolume = 0;
+    const int numSamples = buffer.getNumSamples();
 
-    for (int i = 0; i < buffer.getNumSamples(); i++) {
-        leftVolume += buffer.getSample(0, i) * buffer.getSample(0, i);
-        rightVolume += buffer.getSample(1, i) * buffer.getSample(1, i);
-    }
-    // RMS
-    leftVolume = std::sqrt(leftVolume / buffer.getNumSamples());
-    rightVolume = std::sqrt(rightVolume / buffer.getNumSamples());
-
-    if (std::isnan(leftVolume) || std::isnan(rightVolume)) {
+    if (numSamples <= 0 || buffer.getNumChannels() < 2) {
         leftVolume = 0;
         rightVolume = 0;
+        leftPeak = 0;
+        rightPeak = 0;
+        triggerAsyncUpdate();
+        return;
     }
-    
-    this->leftVolume = leftVolume;
-    this->rightVolume = rightVolume;
+
+    float leftRms = 0;
+    float rightRms = 0;
+    float leftPeakValue = 0;
+    float rightPeakValue = 0;
+    const float* leftChannel = buffer.getReadPointer(0);
+    const float* rightChannel = buffer.getReadPointer(1);
+
+    for (int i = 0; i < numSamples; i++) {
+        auto leftSample = leftChannel[i];
+        auto rightSample = rightChannel[i];
+        leftRms += leftSample * leftSample;
+        rightRms += rightSample * rightSample;
+        leftPeakValue = juce::jmax(leftPeakValue, std::abs(leftSample));
+        rightPeakValue = juce::jmax(rightPeakValue, std::abs(rightSample));
+    }
+    // RMS
+    leftRms = std::sqrt(leftRms / numSamples);
+    rightRms = std::sqrt(rightRms / numSamples);
+
+    if (std::isnan(leftRms) || std::isnan(rightRms)) {
+        leftRms = 0;
+        rightRms = 0;
+    }
+
+    this->leftVolume = leftRms;
+    this->rightVolume = rightRms;
+    this->leftPeak = leftPeakValue;
+    this->rightPeak = rightPeakValue;
 
     triggerAsyncUpdate();
 }
