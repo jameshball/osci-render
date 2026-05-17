@@ -5,7 +5,10 @@
 RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 #if OSCI_PREMIUM
     addAndMakeVisible(quality);
-    addAndMakeVisible(resolution);
+    addAndMakeVisible(canvasPresetSelector);
+    addAndMakeVisible(canvasPresetLabel);
+    addAndMakeVisible(canvasWidth);
+    addAndMakeVisible(canvasHeight);
     addAndMakeVisible(frameRate);
     addAndMakeVisible(losslessAudio);
     addAndMakeVisible(losslessVideo);
@@ -19,8 +22,28 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(customSharedTextureOutputEditor);
 
     quality.setRangeEnabled(false);
-    resolution.setRangeEnabled(false);
+    canvasWidth.setRangeEnabled(false);
+    canvasHeight.setRangeEnabled(false);
     frameRate.setRangeEnabled(false);
+
+    canvasPresetSelector.addItem(VisualiserGeometry::getPresetName(VisualiserCanvasPreset::Square), static_cast<int>(VisualiserCanvasPreset::Square));
+    canvasPresetSelector.addItem(VisualiserGeometry::getPresetName(VisualiserCanvasPreset::HDLandscape), static_cast<int>(VisualiserCanvasPreset::HDLandscape));
+    canvasPresetSelector.addItem(VisualiserGeometry::getPresetName(VisualiserCanvasPreset::HDPortrait), static_cast<int>(VisualiserCanvasPreset::HDPortrait));
+    canvasPresetSelector.addItem(VisualiserGeometry::getPresetName(VisualiserCanvasPreset::Custom), static_cast<int>(VisualiserCanvasPreset::Custom));
+    canvasPresetSelector.onChange = [this] {
+        auto selectedPreset = VisualiserGeometry::sanitiseCanvasPreset(canvasPresetSelector.getSelectedId());
+        parameters.canvasPreset = selectedPreset;
+        if (selectedPreset != VisualiserCanvasPreset::Custom) {
+            parameters.setCanvasSize(VisualiserGeometry::getRenderSizeForPreset(selectedPreset));
+        }
+        updateCanvasControlsVisibility();
+    };
+    updateCanvasPresetSelector();
+    updateCanvasControlsVisibility();
+    canvasPresetLabel.setTooltip("The visualiser canvas size used for preview, recording, offline video rendering, and Syphon/Spout output.");
+
+    parameters.canvasWidth.addListener(this);
+    parameters.canvasHeight.addListener(this);
 
     updateLosslessAudioEnabled();
     recordAudio.onClick = [this] {
@@ -82,11 +105,52 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 #endif
 }
 
-RecordingSettings::~RecordingSettings() {}
+RecordingSettings::~RecordingSettings() {
+    parameters.canvasWidth.removeListener(this);
+    parameters.canvasHeight.removeListener(this);
+}
 
 void RecordingSettings::updateLosslessAudioEnabled() {
     losslessAudio.setEnabled(recordAudio.getToggleState()
                              && parameters.videoCodec != VideoCodec::VP9);
+}
+
+void RecordingSettings::updateCanvasPresetSelector() {
+    const auto size = parameters.getCanvasSize();
+    auto preset = VisualiserGeometry::getPresetForRenderSize(size);
+    if (parameters.canvasPreset == VisualiserCanvasPreset::Custom) {
+        preset = VisualiserCanvasPreset::Custom;
+    } else {
+        parameters.canvasPreset = preset;
+    }
+    canvasPresetSelector.setSelectedId(static_cast<int>(preset), juce::dontSendNotification);
+}
+
+void RecordingSettings::updateCanvasControlsVisibility() {
+    const bool custom = parameters.canvasPreset == VisualiserCanvasPreset::Custom;
+    canvasWidth.setVisible(custom);
+    canvasHeight.setVisible(custom);
+    canvasWidth.setEnabled(custom);
+    canvasHeight.setEnabled(custom);
+    resized();
+    repaint();
+}
+
+void RecordingSettings::parameterValueChanged(int parameterIndex, float newValue) {
+    juce::ignoreUnused(parameterIndex, newValue);
+    juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<RecordingSettings>(this)] {
+        if (safeThis == nullptr) {
+            return;
+        }
+        safeThis->parameters.sanitiseCanvasParameters();
+        safeThis->parameters.canvasPreset = VisualiserGeometry::getPresetForRenderSize(safeThis->parameters.getCanvasSize());
+        safeThis->updateCanvasPresetSelector();
+        safeThis->updateCanvasControlsVisibility();
+    });
+}
+
+void RecordingSettings::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {
+    juce::ignoreUnused(parameterIndex, gestureIsStarting);
 }
 
 void RecordingSettings::resized() {
@@ -97,12 +161,18 @@ void RecordingSettings::resized() {
     losslessAudio.setBounds(area.removeFromTop(rowHeight));
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
-    resolution.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
+    auto row = area.removeFromTop(rowHeight);
+    canvasPresetLabel.setBounds(row.removeFromLeft(170));
+    canvasPresetSelector.setBounds(row.removeFromRight(100));
+    if (canvasWidth.isVisible()) {
+        canvasWidth.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
+        canvasHeight.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
+    }
     frameRate.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     recordAudio.setBounds(area.removeFromTop(rowHeight));
     recordVideo.setBounds(area.removeFromTop(rowHeight));
 
-    auto row = area.removeFromTop(rowHeight);
+    row = area.removeFromTop(rowHeight);
     compressionPresetLabel.setBounds(row.removeFromLeft(170));
     compressionPreset.setBounds(row.removeFromRight(100));
 

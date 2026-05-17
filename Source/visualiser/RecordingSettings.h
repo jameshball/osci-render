@@ -5,6 +5,7 @@
 #include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
 #include "../components/SwitchButton.h"
+#include "VisualiserGeometry.h"
 
 // Define codec options
 enum class VideoCodec {
@@ -21,8 +22,10 @@ public:
     RecordingParameters() {
         qualityParameter.disableLfo();
         qualityParameter.disableSidechain();
-        resolution.disableLfo();
-        resolution.disableSidechain();
+        canvasWidth.disableLfo();
+        canvasWidth.disableSidechain();
+        canvasHeight.disableLfo();
+        canvasHeight.disableSidechain();
         frameRate.disableLfo();
         frameRate.disableSidechain();
     }
@@ -50,13 +53,23 @@ public:
     osci::BooleanParameter recordAudio = osci::BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
     osci::BooleanParameter recordVideo = osci::BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
 
-    osci::EffectParameter resolution = osci::EffectParameter(
-        "Resolution",
-        "The resolution of the recorded video. This only changes when not recording.",
-        "resolution",
-        VERSION_HINT, 1024, 128, 2048, 1.0
+    VisualiserCanvasPreset canvasPreset = VisualiserCanvasPreset::Square;
+
+    osci::EffectParameter canvasWidth = osci::EffectParameter(
+        "Canvas Width",
+        "The width of the visualiser canvas and recorded video. This only changes when not recording.",
+        "canvasWidth",
+        VERSION_HINT, 1024, VisualiserGeometry::minCanvasDimension, VisualiserGeometry::maxCanvasDimension, 2.0
     );
-    std::shared_ptr<osci::Effect> resolutionEffect = std::make_shared<osci::SimpleEffect>(&resolution);
+    std::shared_ptr<osci::Effect> canvasWidthEffect = std::make_shared<osci::SimpleEffect>(&canvasWidth);
+
+    osci::EffectParameter canvasHeight = osci::EffectParameter(
+        "Canvas Height",
+        "The height of the visualiser canvas and recorded video. This only changes when not recording.",
+        "canvasHeight",
+        VERSION_HINT, 1024, VisualiserGeometry::minCanvasDimension, VisualiserGeometry::maxCanvasDimension, 2.0
+    );
+    std::shared_ptr<osci::Effect> canvasHeightEffect = std::make_shared<osci::SimpleEffect>(&canvasHeight);
 
     osci::EffectParameter frameRate = osci::EffectParameter(
         "Frame Rate",
@@ -82,8 +95,13 @@ public:
         auto qualityXml = settingsXml->createNewChildElement("quality");
         qualityEffect->save(qualityXml);
 
-        auto resolutionXml = settingsXml->createNewChildElement("resolution");
-        resolutionEffect->save(resolutionXml);
+        settingsXml->setAttribute("canvasPreset", static_cast<int>(canvasPreset));
+
+        auto canvasWidthXml = settingsXml->createNewChildElement("canvasWidth");
+        canvasWidthEffect->save(canvasWidthXml);
+
+        auto canvasHeightXml = settingsXml->createNewChildElement("canvasHeight");
+        canvasHeightEffect->save(canvasHeightXml);
 
         auto frameRateXml = settingsXml->createNewChildElement("frameRate");
         frameRateEffect->save(frameRateXml);
@@ -117,8 +135,29 @@ public:
             if (auto* qualityXml = settingsXml->getChildByName("quality")) {
                 qualityEffect->load(qualityXml);
             }
-            if (auto* resolutionXml = settingsXml->getChildByName("resolution")) {
-                resolutionEffect->load(resolutionXml);
+            bool loadedCanvasSize = false;
+            if (auto* canvasWidthXml = settingsXml->getChildByName("canvasWidth")) {
+                canvasWidthEffect->load(canvasWidthXml);
+                loadedCanvasSize = true;
+            }
+            if (auto* canvasHeightXml = settingsXml->getChildByName("canvasHeight")) {
+                canvasHeightEffect->load(canvasHeightXml);
+                loadedCanvasSize = true;
+            }
+            if (!loadedCanvasSize) {
+                if (auto* resolutionXml = settingsXml->getChildByName("resolution")) {
+                    const int legacyResolution = VisualiserGeometry::getLegacyResolutionFromXml(resolutionXml);
+                    if (legacyResolution > 0) {
+                        setCanvasSize({legacyResolution, legacyResolution});
+                    }
+                }
+            }
+            sanitiseCanvasParameters();
+            if (settingsXml->hasAttribute("canvasPreset")) {
+                const auto fallbackPreset = VisualiserGeometry::getPresetForRenderSize(getCanvasSize());
+                canvasPreset = VisualiserGeometry::sanitiseCanvasPreset(settingsXml->getIntAttribute("canvasPreset", static_cast<int>(fallbackPreset)), fallbackPreset);
+            } else {
+                canvasPreset = VisualiserGeometry::getPresetForRenderSize(getCanvasSize());
             }
             if (auto* frameRateXml = settingsXml->getChildByName("frameRate")) {
                 frameRateEffect->load(frameRateXml);
@@ -128,9 +167,32 @@ public:
 
     juce::StringArray compressionPresets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
     juce::String customSharedTextureServerName = "";
+
+    VisualiserRenderSize getCanvasSize() {
+        return VisualiserGeometry::sanitiseRenderSize(juce::roundToInt(canvasWidth.getValueUnnormalised()),
+                                                      juce::roundToInt(canvasHeight.getValueUnnormalised()));
+    }
+
+    void setCanvasSize(VisualiserRenderSize size) {
+        size = VisualiserGeometry::sanitiseRenderSize(size.width, size.height);
+        canvasWidth.setUnnormalisedValueNotifyingHost(static_cast<float>(size.width));
+        canvasHeight.setUnnormalisedValueNotifyingHost(static_cast<float>(size.height));
+        canvasPreset = VisualiserGeometry::getPresetForRenderSize(size);
+    }
+
+    void sanitiseCanvasParameters() {
+        const auto size = getCanvasSize();
+        if (canvasWidth.getValueUnnormalised() != size.width) {
+            canvasWidth.setUnnormalisedValueNotifyingHost(static_cast<float>(size.width));
+        }
+        if (canvasHeight.getValueUnnormalised() != size.height) {
+            canvasHeight.setUnnormalisedValueNotifyingHost(static_cast<float>(size.height));
+        }
+    }
+
 };
 
-class RecordingSettings : public juce::Component {
+class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
     RecordingSettings(RecordingParameters&);
     ~RecordingSettings();
@@ -166,8 +228,16 @@ public:
         return parameters.customSharedTextureServerName;
     }
 
-    int getResolution() {
-        return parameters.resolution.getValueUnnormalised();
+    VisualiserRenderSize getCanvasSize() {
+        return parameters.getCanvasSize();
+    }
+
+    int getCanvasWidth() {
+        return getCanvasSize().width;
+    }
+
+    int getCanvasHeight() {
+        return getCanvasSize().height;
     }
 
     double getFrameRate() {
@@ -204,7 +274,8 @@ public:
 
 private:
     EffectComponent quality{*parameters.qualityEffect};
-    EffectComponent resolution{*parameters.resolutionEffect};
+    EffectComponent canvasWidth{*parameters.canvasWidthEffect};
+    EffectComponent canvasHeight{*parameters.canvasHeightEffect};
     EffectComponent frameRate{*parameters.frameRateEffect};
 
     jux::SwitchButton losslessAudio{&parameters.losslessAudio};
@@ -220,6 +291,9 @@ private:
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;
 
+    juce::Label canvasPresetLabel{"Resolution", "Resolution"};
+    juce::ComboBox canvasPresetSelector;
+
     juce::Label videoCodecLabel{"Video Codec", "Video Codec"};
     juce::ComboBox videoCodecSelector;
 
@@ -227,6 +301,10 @@ private:
     osci::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
 
     void updateLosslessAudioEnabled();
+    void updateCanvasPresetSelector();
+    void updateCanvasControlsVisibility();
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
 };

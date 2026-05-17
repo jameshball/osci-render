@@ -132,6 +132,7 @@ private:
     bool downloading = false;
 
     long numFrames = 0;
+    VisualiserRenderSize recordingRenderSize;
     std::vector<unsigned char> framePixels;
     osci::WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;

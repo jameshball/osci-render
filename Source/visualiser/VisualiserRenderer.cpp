@@ -17,15 +17,63 @@
 #include "WideBlurFragmentShader.glsl"
 #include "WideBlurVertexShader.glsl"
 
+namespace {
+    void drawImageCropToFill(juce::Graphics& g, const juce::Image& source, juce::Rectangle<int> dest) {
+        if (source.isNull() || dest.isEmpty()) {
+            return;
+        }
+
+        const double sourceAspect = static_cast<double>(source.getWidth()) / static_cast<double>(source.getHeight());
+        const double destAspect = static_cast<double>(dest.getWidth()) / static_cast<double>(dest.getHeight());
+        int sourceX = 0;
+        int sourceY = 0;
+        int sourceWidth = source.getWidth();
+        int sourceHeight = source.getHeight();
+
+        if (destAspect > sourceAspect) {
+            sourceHeight = juce::roundToInt(static_cast<double>(sourceWidth) / destAspect);
+            sourceY = (source.getHeight() - sourceHeight) / 2;
+        } else {
+            sourceWidth = juce::roundToInt(static_cast<double>(sourceHeight) * destAspect);
+            sourceX = (source.getWidth() - sourceWidth) / 2;
+        }
+
+        g.drawImage(source, dest.getX(), dest.getY(), dest.getWidth(), dest.getHeight(),
+                    sourceX, sourceY, sourceWidth, sourceHeight, false);
+    }
+
+    void drawImageAspectFit(juce::Graphics& g, const juce::Image& source, juce::Rectangle<int> dest) {
+        if (source.isNull() || dest.isEmpty()) {
+            return;
+        }
+
+        const double sourceAspect = static_cast<double>(source.getWidth()) / static_cast<double>(source.getHeight());
+        const double destAspect = static_cast<double>(dest.getWidth()) / static_cast<double>(dest.getHeight());
+        int targetWidth = dest.getWidth();
+        int targetHeight = dest.getHeight();
+
+        if (destAspect > sourceAspect) {
+            targetWidth = juce::roundToInt(static_cast<double>(targetHeight) * sourceAspect);
+        } else {
+            targetHeight = juce::roundToInt(static_cast<double>(targetWidth) / sourceAspect);
+        }
+
+        const int targetX = dest.getX() + (dest.getWidth() - targetWidth) / 2;
+        const int targetY = dest.getY() + (dest.getHeight() - targetHeight) / 2;
+        g.drawImage(source, targetX, targetY, targetWidth, targetHeight,
+                    0, 0, source.getWidth(), source.getHeight(), false);
+    }
+}
+
 VisualiserRenderer::VisualiserRenderer(
     VisualiserParameters &parameters,
     osci::AudioBackgroundThreadManager &threadManager,
-    int resolution,
+    VisualiserRenderSize renderSize,
     double frameRate,
     juce::String threadName
 ) : parameters(parameters),
     osci::AudioBackgroundThread("VisualiserRenderer" + threadName, threadManager),
-    resolution(resolution),
+    packedRenderSize(VisualiserGeometry::packRenderSize(renderSize)),
     frameRate(frameRate)
 {
     openGLContext.setRenderer(this);
@@ -111,10 +159,12 @@ void VisualiserRenderer::runTask(const juce::AudioBuffer<float>& buffer) {
             double sweepIncrement = getSweepIncrement();
             double triggerValue = parameters.getTriggerValue();
             bool belowTrigger = false;
+            const auto currentRenderSize = VisualiserGeometry::unpackRenderSize(packedRenderSize.load());
+            const auto worldToClipScale = VisualiserGeometry::getWorldToClipScale(currentRenderSize);
+            const double startPoint = 1.135 / worldToClipScale.x;
 
             for (int i = 0; i < numSamples; ++i) {
                 long samplePosition = sampleCount - lastTriggerPosition;
-                double startPoint = 1.135;
                 float sweep = samplePosition * sweepIncrement * 2 * startPoint - startPoint;
 
                 float value = channelData[0][i];
@@ -383,11 +433,11 @@ void VisualiserRenderer::newOpenGLContextCreated() {
     glGenBuffers(1, &quadIndexBuffer);
     glGenBuffers(1, &vertexIndexBuffer);
 
-    setupTextures(resolution.load());
+    setupTextures(VisualiserGeometry::unpackRenderSize(packedRenderSize.load()));
 
-    // Textures are now sized for the current resolution, so any pending request that
+    // Textures are now sized for the current canvas, so any pending request that
     // arrived before the context was ready can be discarded.
-    pendingResolution.store(-1);
+    pendingRenderSize.store(0);
 }
 
 void VisualiserRenderer::openGLContextClosing() {
@@ -433,11 +483,9 @@ void VisualiserRenderer::renderOpenGL() {
     using namespace juce::gl;
 
     if (openGLContext.isActive()) {
-        if (const int requestedResolution = pendingResolution.exchange(-1); requestedResolution > 0) {
-            glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-            lineTexture = makeTexture(requestedResolution, requestedResolution, lineTexture.id);
-            renderTexture = makeTexture(requestedResolution, requestedResolution, renderTexture.id);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        const auto requestedPackedSize = pendingRenderSize.exchange(0);
+        if (requestedPackedSize != 0) {
+            resizeRenderTextures(VisualiserGeometry::unpackRenderSize(requestedPackedSize));
         }
 
         // One-time DPI diagnostics: log before anything modifies the viewport.
@@ -532,12 +580,11 @@ void VisualiserRenderer::renderOpenGL() {
                 }
             }
 
-            // Centered square viewport using full component size (not viewportArea)
-            float minDim = juce::jmin(totalW, totalH);
-            float x = (totalW - minDim) / 2.0f;
-            float y = (totalH - minDim) / 2.0f;
-            glViewport(juce::roundToInt(x), juce::roundToInt(y),
-                       juce::roundToInt(minDim), juce::roundToInt(minDim));
+            // Centered aspect-fit viewport using full component size (not viewportArea)
+            const auto fitted = VisualiserGeometry::getAspectFitBounds(
+                juce::Rectangle<int>(0, 0, juce::roundToInt(totalW), juce::roundToInt(totalH)),
+                VisualiserGeometry::sanitiseRenderSize(w, h));
+            glViewport(fitted.getX(), fitted.getY(), fitted.getWidth(), fitted.getHeight());
 
             setShader(texturedShader.get());
             texturedShader->setUniform("uResizeForCanvas", 1.0f);
@@ -620,17 +667,16 @@ void VisualiserRenderer::viewportChanged(juce::Rectangle<int> area) {
             // The crop rectangle will be applied in drawTexture() via texture coordinates
             float x = area.getX() * renderScale + xOffset;
             float y = area.getY() * renderScale + yOffset;
-            
-            glViewport(juce::roundToInt(x), juce::roundToInt(y), 
-                       juce::roundToInt(realWidth), juce::roundToInt(realHeight));
-        } else {
-            // Original square viewport calculation
-            float minDim = juce::jmin(realWidth, realHeight);
-            float x = (realWidth - minDim) / 2 + area.getX() * renderScale + xOffset;
-            float y = (realHeight - minDim) / 2 - area.getY() * renderScale + yOffset;
 
-            glViewport(juce::roundToInt(x), juce::roundToInt(y), 
-                       juce::roundToInt(minDim), juce::roundToInt(minDim));
+            glViewport(juce::roundToInt(x), juce::roundToInt(y), juce::roundToInt(realWidth), juce::roundToInt(realHeight));
+        } else {
+            const auto fitted = VisualiserGeometry::getAspectFitBounds(
+                juce::Rectangle<int>(0, 0, juce::roundToInt(realWidth), juce::roundToInt(realHeight)),
+                VisualiserGeometry::unpackRenderSize(packedRenderSize.load()));
+            float x = fitted.getX() + area.getX() * renderScale + xOffset;
+            float y = fitted.getY() - area.getY() * renderScale + yOffset;
+
+            glViewport(juce::roundToInt(x), juce::roundToInt(y), fitted.getWidth(), fitted.getHeight());
         }
     }
 }
@@ -674,29 +720,56 @@ void VisualiserRenderer::setupArrays(int nPoints) {
     scratchVertices.resize(12 * nPoints);
 }
 
-void VisualiserRenderer::setupTextures(int resolution) {
+void VisualiserRenderer::setupTextures(VisualiserRenderSize size) {
     using namespace juce::gl;
+
+    size = VisualiserGeometry::sanitiseRenderSize(size.width, size.height);
+    const auto tightBlurSize = VisualiserGeometry::getAspectScaledRenderSize(size, 512);
+    const auto wideBlurSize = VisualiserGeometry::getAspectScaledRenderSize(size, 128);
 
     // Create the framebuffer
     glGenFramebuffers(1, &frameBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
 
     // Create textures
-    lineTexture = makeTexture(resolution, resolution);
-    blur1Texture = makeTexture(512, 512);
-    blur2Texture = makeTexture(512, 512);
-    blur3Texture = makeTexture(128, 128);
-    blur4Texture = makeTexture(128, 128);
-    renderTexture = makeTexture(resolution, resolution);
+    lineTexture = makeTexture(size.width, size.height);
+    blur1Texture = makeTexture(tightBlurSize.width, tightBlurSize.height);
+    blur2Texture = makeTexture(tightBlurSize.width, tightBlurSize.height);
+    blur3Texture = makeTexture(wideBlurSize.width, wideBlurSize.height);
+    blur4Texture = makeTexture(wideBlurSize.width, wideBlurSize.height);
+    renderTexture = makeTexture(size.width, size.height);
 
     screenTexture = createScreenTexture();
-    
+
 #if OSCI_PREMIUM
-    glowTexture = makeTexture(512, 512);
+    glowTexture = makeTexture(tightBlurSize.width, tightBlurSize.height);
     reflectionTexture = createReflectionTexture();
 #endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind
+}
+
+void VisualiserRenderer::resizeRenderTextures(VisualiserRenderSize size) {
+    using namespace juce::gl;
+
+    size = VisualiserGeometry::sanitiseRenderSize(size.width, size.height);
+    const auto tightBlurSize = VisualiserGeometry::getAspectScaledRenderSize(size, 512);
+    const auto wideBlurSize = VisualiserGeometry::getAspectScaledRenderSize(size, 128);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+    lineTexture = makeTexture(size.width, size.height, lineTexture.id);
+    blur1Texture = makeTexture(tightBlurSize.width, tightBlurSize.height, blur1Texture.id);
+    blur2Texture = makeTexture(tightBlurSize.width, tightBlurSize.height, blur2Texture.id);
+    blur3Texture = makeTexture(wideBlurSize.width, wideBlurSize.height, blur3Texture.id);
+    blur4Texture = makeTexture(wideBlurSize.width, wideBlurSize.height, blur4Texture.id);
+    renderTexture = makeTexture(size.width, size.height, renderTexture.id);
+#if OSCI_PREMIUM
+    glowTexture = makeTexture(tightBlurSize.width, tightBlurSize.height, glowTexture.id);
+    reflectionTexture = createReflectionTexture();
+#endif
+    screenTexture = createScreenTexture();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    viewportChanged(viewportArea);
 }
 
 Texture VisualiserRenderer::makeTexture(int width, int height, GLuint textureID) {
@@ -729,13 +802,12 @@ Texture VisualiserRenderer::makeTexture(int width, int height, GLuint textureID)
     return {textureID, width, height};
 }
 
-void VisualiserRenderer::setResolution(int resolution) {
-    if (resolution <= 0) {
-        return;
-    }
-    if (this->resolution.load() != resolution) {
-        this->resolution.store(resolution);
-        pendingResolution.store(resolution);
+void VisualiserRenderer::setRenderSize(VisualiserRenderSize size) {
+    size = VisualiserGeometry::sanitiseRenderSize(size.width, size.height);
+    const auto packedSize = VisualiserGeometry::packRenderSize(size);
+    if (packedRenderSize.load() != packedSize) {
+        packedRenderSize.store(packedSize);
+        pendingRenderSize.store(packedSize);
         openGLContext.triggerRepaint();
     }
 }
@@ -998,6 +1070,8 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 
     lineShader->setUniform("uFadeAmount", fadeAmount);
     lineShader->setUniform("uNEdges", (GLfloat)nEdges);
+    const auto worldToClipScale = VisualiserGeometry::getWorldToClipScale(VisualiserGeometry::unpackRenderSize(packedRenderSize.load()));
+    lineShader->setUniform("uWorldToClipScale", worldToClipScale.x, worldToClipScale.y);
     setOffsetAndScale(lineShader.get());
 
 #if OSCI_PREMIUM
@@ -1080,16 +1154,16 @@ void VisualiserRenderer::drawCRT() {
     drawTexture({lineTexture});
     checkGLErrors(__FILE__, __LINE__);
 
-    // horizontal blur 512x512
+    // horizontal tight blur
     activateTargetTexture(blur2Texture);
     setShader(blurShader.get());
-    blurShader->setUniform("uOffset", 1.0f / 512.0f, 0.0f);
+    blurShader->setUniform("uOffset", 1.0f / (float)blur1Texture.width, 0.0f);
     drawTexture({blur1Texture});
     checkGLErrors(__FILE__, __LINE__);
 
-    // vertical blur 512x512
+    // vertical tight blur
     activateTargetTexture(blur1Texture);
-    blurShader->setUniform("uOffset", 0.0f, 1.0f / 512.0f);
+    blurShader->setUniform("uOffset", 0.0f, 1.0f / (float)blur2Texture.height);
     drawTexture({blur2Texture});
     checkGLErrors(__FILE__, __LINE__);
 
@@ -1100,16 +1174,16 @@ void VisualiserRenderer::drawCRT() {
     drawTexture({blur1Texture});
     checkGLErrors(__FILE__, __LINE__);
 
-    // horizontal blur 128x128
+    // horizontal wide blur
     activateTargetTexture(blur4Texture);
     setShader(wideBlurShader.get());
-    wideBlurShader->setUniform("uOffset", 1.0f / 128.0f, 0.0f);
+    wideBlurShader->setUniform("uOffset", 1.0f / (float)blur3Texture.width, 0.0f);
     drawTexture({blur3Texture});
     checkGLErrors(__FILE__, __LINE__);
 
-    // vertical blur 128x128
+    // vertical wide blur
     activateTargetTexture(blur3Texture);
-    wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / 128.0f);
+    wideBlurShader->setUniform("uOffset", 0.0f, 1.0f / (float)blur4Texture.height);
     drawTexture({blur4Texture});
     checkGLErrors(__FILE__, __LINE__);
 
@@ -1189,20 +1263,26 @@ void VisualiserRenderer::setOffsetAndScale(juce::OpenGLShaderProgram *shader) {
 Texture VisualiserRenderer::createReflectionTexture() {
     using namespace juce::gl;
 
+    const auto size = VisualiserGeometry::unpackRenderSize(packedRenderSize.load());
+    juce::Image canvas(juce::Image::ARGB, size.width, size.height, true);
+    juce::Graphics g(canvas);
+    g.fillAll(juce::Colours::black);
+
     if (parameters.getScreenOverlay() == ScreenOverlay::VectorDisplay) {
         if (vectorDisplayReflectionImage.isNull())
             vectorDisplayReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_reflection_png, BinaryData::vector_display_reflection_pngSize);
-        reflectionOpenGLTexture.loadImage(vectorDisplayReflectionImage);
+        drawImageAspectFit(g, vectorDisplayReflectionImage, canvas.getBounds());
     } else if (parameters.getScreenOverlay() == ScreenOverlay::Real) {
         if (oscilloscopeReflectionImage.isNull())
             oscilloscopeReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::real_reflection_png, BinaryData::real_reflection_pngSize);
-        reflectionOpenGLTexture.loadImage(oscilloscopeReflectionImage);
+        drawImageAspectFit(g, oscilloscopeReflectionImage, canvas.getBounds());
     } else {
         if (emptyReflectionImage.isNull())
             emptyReflectionImage = juce::ImageFileFormat::loadFrom(BinaryData::no_reflection_jpg, BinaryData::no_reflection_jpgSize);
-        reflectionOpenGLTexture.loadImage(emptyReflectionImage);
+        drawImageCropToFill(g, emptyReflectionImage, canvas.getBounds());
     }
 
+    reflectionOpenGLTexture.loadImage(canvas);
     Texture texture = {reflectionOpenGLTexture.getTextureID(), reflectionOpenGLTexture.getWidth(), reflectionOpenGLTexture.getHeight()};
 
     return texture;
@@ -1212,25 +1292,32 @@ Texture VisualiserRenderer::createReflectionTexture() {
 Texture VisualiserRenderer::createScreenTexture() {
     using namespace juce::gl;
 
+    const auto size = VisualiserGeometry::unpackRenderSize(packedRenderSize.load());
+    juce::Image canvas(juce::Image::ARGB, size.width, size.height, true);
+    juce::Graphics g(canvas);
+    g.fillAll(juce::Colours::black);
+
     if (screenOverlay == ScreenOverlay::Smudged || screenOverlay == ScreenOverlay::SmudgedGraticule) {
         if (screenTextureImage.isNull())
             screenTextureImage = juce::ImageFileFormat::loadFrom(BinaryData::noise_jpg, BinaryData::noise_jpgSize);
-        screenOpenGLTexture.loadImage(screenTextureImage);
+        drawImageCropToFill(g, screenTextureImage, canvas.getBounds());
 #if OSCI_PREMIUM
     } else if (screenOverlay == ScreenOverlay::Real) {
         if (oscilloscopeImage.isNull())
             oscilloscopeImage = juce::ImageFileFormat::loadFrom(BinaryData::real_png, BinaryData::real_pngSize);
-        screenOpenGLTexture.loadImage(oscilloscopeImage);
+        drawImageAspectFit(g, oscilloscopeImage, canvas.getBounds());
     } else if (screenOverlay == ScreenOverlay::VectorDisplay) {
         if (vectorDisplayImage.isNull())
             vectorDisplayImage = juce::ImageFileFormat::loadFrom(BinaryData::vector_display_png, BinaryData::vector_display_pngSize);
-        screenOpenGLTexture.loadImage(vectorDisplayImage);
+        drawImageAspectFit(g, vectorDisplayImage, canvas.getBounds());
 #endif
     } else {
         if (emptyScreenImage.isNull())
             emptyScreenImage = juce::ImageFileFormat::loadFrom(BinaryData::empty_jpg, BinaryData::empty_jpgSize);
-        screenOpenGLTexture.loadImage(emptyScreenImage);
+        drawImageCropToFill(g, emptyScreenImage, canvas.getBounds());
     }
+
+    screenOpenGLTexture.loadImage(canvas);
     checkGLErrors(__FILE__, __LINE__);
     Texture texture = {screenOpenGLTexture.getTextureID(), screenOpenGLTexture.getWidth(), screenOpenGLTexture.getHeight()};
 
@@ -1243,43 +1330,77 @@ Texture VisualiserRenderer::createScreenTexture() {
         checkGLErrors(__FILE__, __LINE__);
         glColorMask(true, false, false, true);
 
+        const auto graticule = VisualiserGeometry::getGraticuleLayout(size);
+        const int minorDivisions = 5;
+        const float tickScale = graticule.cellSizePixels / 45.0f;
+        const float shortTickNegative = 2.0f * tickScale;
+        const float shortTickPositive = 1.0f * tickScale;
+        const float centreTickNegative = 5.0f * tickScale;
+        const float centreTickPositive = 4.0f * tickScale;
+        const float quarterTickLength = 2.0f * tickScale;
+        const float xMax = graticule.xOriginPixels + graticule.cellSizePixels * static_cast<float>(graticule.xDivisions);
+        const float yMax = graticule.yOriginPixels + graticule.cellSizePixels * static_cast<float>(graticule.yDivisions);
+
+        const int majorLineCount = graticule.yDivisions + graticule.xDivisions + 2;
+        const int horizontalTickLineCount = (graticule.yDivisions - 1) * (graticule.xDivisions * minorDivisions + 1);
+        const int verticalTickLineCount = (graticule.xDivisions - 1) * (graticule.yDivisions * minorDivisions + 1);
+        const int quarterTickLineCount = 2 * graticule.xDivisions * (minorDivisions - 1);
+        const int lineCount = majorLineCount + horizontalTickLineCount + verticalTickLineCount + quarterTickLineCount;
         std::vector<float> data;
+        data.reserve(static_cast<size_t>(lineCount) * 4u);
 
-        int step = 45;
+        auto addLine = [&](float x1, float y1, float x2, float y2) {
+            data.push_back(VisualiserGeometry::graticulePixelToClip(x1, size.width));
+            data.push_back(VisualiserGeometry::graticulePixelToClip(y1, size.height));
+            data.push_back(VisualiserGeometry::graticulePixelToClip(x2, size.width));
+            data.push_back(VisualiserGeometry::graticulePixelToClip(y2, size.height));
+        };
 
-        for (int i = 0; i < 11; i++) {
-            float s = i * step;
+        for (int i = 0; i <= graticule.yDivisions; i++) {
+            const float y = graticule.yOriginPixels + graticule.cellSizePixels * static_cast<float>(i);
+            addLine(graticule.xOriginPixels, y, xMax, y);
+        }
 
-            // Inserting at the beginning of the vector (equivalent to splice(0,0,...))
-            data.insert(data.begin(), {0, s, 10.0f * step, s});
-            data.insert(data.begin(), {s, 0, s, 10.0f * step});
+        for (int i = 0; i <= graticule.xDivisions; i++) {
+            const float x = graticule.xOriginPixels + graticule.cellSizePixels * static_cast<float>(i);
+            addLine(x, graticule.yOriginPixels, x, yMax);
+        }
 
-            if (i != 0 && i != 10) {
-                for (int j = 0; j < 51; j++) {
-                    float t = j * step / 5;
-                    if (i != 5) {
-                        data.insert(data.begin(), {t, s - 2, t, s + 1});
-                        data.insert(data.begin(), {s - 2, t, s + 1, t});
-                    } else {
-                        data.insert(data.begin(), {t, s - 5, t, s + 4});
-                        data.insert(data.begin(), {s - 5, t, s + 4, t});
-                    }
-                }
+        for (int i = 1; i < graticule.yDivisions; i++) {
+            const float y = graticule.yOriginPixels + graticule.cellSizePixels * static_cast<float>(i);
+            const bool centreLine = i == graticule.yDivisions / 2;
+            const float tickNegative = centreLine ? centreTickNegative : shortTickNegative;
+            const float tickPositive = centreLine ? centreTickPositive : shortTickPositive;
+
+            for (int j = 0; j <= graticule.xDivisions * minorDivisions; j++) {
+                const float tx = graticule.xOriginPixels
+                    + graticule.cellSizePixels * static_cast<float>(j) / static_cast<float>(minorDivisions);
+                addLine(tx, y - tickNegative, tx, y + tickPositive);
             }
         }
 
-        for (int j = 0; j < 51; j++) {
-            float t = j * step / 5;
-            if (static_cast<int>(t) % 5 == 0)
-                continue;
+        for (int i = 1; i < graticule.xDivisions; i++) {
+            const float x = graticule.xOriginPixels + graticule.cellSizePixels * static_cast<float>(i);
+            const bool centreLine = i == graticule.xDivisions / 2;
+            const float tickNegative = centreLine ? centreTickNegative : shortTickNegative;
+            const float tickPositive = centreLine ? centreTickPositive : shortTickPositive;
 
-            data.insert(data.begin(), {t - 2, 2.5f * step, t + 2, 2.5f * step});
-            data.insert(data.begin(), {t - 2, 7.5f * step, t + 2, 7.5f * step});
+            for (int j = 0; j <= graticule.yDivisions * minorDivisions; j++) {
+                const float ty = graticule.yOriginPixels
+                    + graticule.cellSizePixels * static_cast<float>(j) / static_cast<float>(minorDivisions);
+                addLine(x - tickNegative, ty, x + tickPositive, ty);
+            }
         }
 
-        // Normalize the data
-        for (size_t i = 0; i < data.size(); i++) {
-            data[i] = (data[i] + 31.0f) / 256.0f - 1;
+        const float quarterY1 = graticule.yOriginPixels + graticule.cellSizePixels * static_cast<float>(graticule.yDivisions) * 0.25f;
+        const float quarterY2 = graticule.yOriginPixels + graticule.cellSizePixels * static_cast<float>(graticule.yDivisions) * 0.75f;
+        for (int j = 0; j <= graticule.xDivisions * minorDivisions; j++) {
+            if (j % minorDivisions != 0) {
+                const float x = graticule.xOriginPixels
+                    + graticule.cellSizePixels * static_cast<float>(j) / static_cast<float>(minorDivisions);
+                addLine(x - quarterTickLength, quarterY1, x + quarterTickLength, quarterY1);
+                addLine(x - quarterTickLength, quarterY2, x + quarterTickLength, quarterY2);
+            }
         }
 
         glEnableVertexAttribArray(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"));
@@ -1288,7 +1409,7 @@ Texture VisualiserRenderer::createScreenTexture() {
         glVertexAttribPointer(glGetAttribLocation(simpleShader->getProgramID(), "vertexPosition"), 2, GL_FLOAT, GL_FALSE, 0, nullptr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         simpleShader->setUniform("colour", 0.01f, 0.05f, 0.01f, 1.0f);
-        glLineWidth(4.0f);
+        glLineWidth(graticule.lineWidthPixels);
         glDrawArrays(GL_LINES, 0, data.size() / 2);
 
         // Also write a clean graticule mask into alpha so the compositor can
@@ -1319,10 +1440,11 @@ Texture VisualiserRenderer::createScreenTexture() {
             glClearColor(prevClearColour[0], prevClearColour[1], prevClearColour[2], prevClearColour[3]);
             glColorMask(prevColourMask[0], prevColourMask[1], prevColourMask[2], prevColourMask[3]);
             glBlendFunc(prevBlendSrc, prevBlendDst);
-            if (prevBlendEnabled)
+            if (prevBlendEnabled) {
                 glEnable(GL_BLEND);
-            else
+            } else {
                 glDisable(GL_BLEND);
+            }
         }
 
         glBindTexture(GL_TEXTURE_2D, targetTexture.value().id);

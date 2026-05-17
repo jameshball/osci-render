@@ -100,7 +100,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 330);
+    recordingSettings.setSize(330, 430);
 
     menuBar.toFront(true);
 
@@ -498,7 +498,7 @@ void CommonPluginEditor::openRecordingSettings() {
         return;
     }
 
-    const juce::Point<int> preferredContentSize { 330, 360 };
+    const juce::Point<int> preferredContentSize { 330, 430 };
     recordingSettings.setSize(preferredContentSize.x, preferredContentSize.y);
     showOverlay(std::make_unique<RecordingSettingsOverlay>(recordingSettings, preferredContentSize));
 }
