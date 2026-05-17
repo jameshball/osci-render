@@ -3,13 +3,15 @@
 #include <JuceHeader.h>
 
 #include <algorithm>
+#include <cstdint>
 
 #include "VisualiserParameters.h"
+#include "VisualiserGeometry.h"
 
 struct Texture {
-    GLuint id;
-    int width;
-    int height;
+    GLuint id = 0;
+    int width = 0;
+    int height = 0;
 };
 
 class VisualiserWindow;
@@ -23,7 +25,7 @@ public:
     VisualiserRenderer(
         VisualiserParameters &parameters,
         osci::AudioBackgroundThreadManager &threadManager,
-        int resolution = 1024,
+        VisualiserRenderSize renderSize = {1024, 1024},
         double frameRate = 60.0f,
         juce::String threadName = ""
     );
@@ -36,7 +38,7 @@ public:
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
     void openGLContextClosing() override;
-    void setResolution(int width);
+    void setRenderSize(VisualiserRenderSize size);
     void setFrameRate(double frameRate);
     void setPresentationFadeAlpha(float alpha);
     // Render mode can be changed from the message thread at any time
@@ -45,6 +47,7 @@ public:
 
     int getRenderWidth() const { return renderTexture.width; }
     int getRenderHeight() const { return renderTexture.height; }
+    VisualiserRenderSize getRenderSize() const { return {renderTexture.width, renderTexture.height}; }
     Texture getRenderTexture() const { return renderTexture; }
 
     // Mirror mode: child displays parent's rendered frame instead of its own pipeline
@@ -120,9 +123,9 @@ private:
     std::vector<float> smoothedGSamples;
     std::vector<float> smoothedBSamples;
     std::atomic<int> sampleBufferCount = 0;
-    // -1 means no pending request; any value > 0 is a requested texture resolution
+    // 0 means no pending request; any non-zero value is a packed render size
     // to be applied on the next renderOpenGL invocation.
-    std::atomic<int> pendingResolution = -1;
+    std::atomic<std::uint64_t> pendingRenderSize = 0;
     std::atomic<float> presentationFadeAlpha = 0.0f;
     int prevSampleBufferCount = 0;
     long lastTriggerPosition = 0;
@@ -204,10 +207,10 @@ private:
     float fadeAmount;
     ScreenOverlay screenOverlay = ScreenOverlay::INVALID;
 
-    // Atomic because setResolution may be invoked from non-GL threads (e.g. the offline
+    // Atomic because setRenderSize may be invoked from non-GL threads (e.g. the offline
     // render worker) as well as the GL thread (via preRenderCallback). The actual texture
-    // rebuild is deferred to the GL thread via pendingResolution.
-    std::atomic<int> resolution;
+    // rebuild is deferred to the GL thread via pendingRenderSize.
+    std::atomic<std::uint64_t> packedRenderSize;
     double frameRate;
 
     const double RESAMPLE_RATIO = 6.0;
@@ -225,7 +228,8 @@ private:
     void setOffsetAndScale(juce::OpenGLShaderProgram* shader);
     Texture makeTexture(int width, int height, GLuint textureID = 0);
     void setupArrays(int num_points);
-    void setupTextures(int resolution);
+    void setupTextures(VisualiserRenderSize size);
+    void resizeRenderTextures(VisualiserRenderSize size);
     void drawLineTexture(const std::vector<float>& xPoints, const std::vector<float>& yPoints,
                          const std::vector<float>& rPoints, const std::vector<float>& gPoints, const std::vector<float>& bPoints);
     void saveTextureToPNG(Texture texture, const juce::File& file);

@@ -9,6 +9,7 @@ uniform float uFadeAmount;
 uniform float uIntensity;
 uniform bool uShutterSync;
 uniform float uGain;
+uniform vec2 uWorldToClipScale;
 attribute vec3 aStart, aEnd;
 attribute vec3 aStartColor, aEndColor;
 attribute float aIdx;
@@ -30,10 +31,13 @@ void main () {
     vec2 aEndPos = aEnd.xy;
     float aStartBrightness = clamp(aStart.z, 0.0, 1.0);
     float aEndBrightness = clamp(aEnd.z, 0.0, 1.0);
-    
+
+    vec2 startClipPos = aStartPos * uGain * uWorldToClipScale;
+    vec2 endClipPos = aEndPos * uGain * uWorldToClipScale;
+
     // `dir` vector is storing the normalized difference
     // between end and start
-    vec2 dir = (aEndPos-aStartPos)*uGain;
+    vec2 dir = endClipPos - startClipPos;
     uvl.z = length(dir);
     
     if (uvl.z > EPS) {
@@ -48,13 +52,13 @@ void main () {
     vec2 norm = vec2(-dir.y, dir.x);
     
     if (idx >= 2.0) {
-        current = aEndPos*uGain;
+        current = endClipPos;
         tang = 1.0;
         uvl.x = -vSize;
         uvl.w = aEndBrightness;
         vColor = aEndColor;
     } else {
-        current = aStartPos*uGain;
+        current = startClipPos;
         tang = -1.0;
         uvl.x = uvl.z + vSize;
         uvl.w = aStartBrightness;

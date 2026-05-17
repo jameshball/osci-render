@@ -82,7 +82,7 @@ OfflineAudioToVideoRendererComponent::OfflinePreviewRenderer::OfflinePreviewRend
     VisualiserParameters& parameters,
     osci::AudioBackgroundThreadManager& manager,
     juce::WaitableEvent& glReadyEventToSignal)
-    : VisualiserRenderer(parameters, manager, 1024, 60.0, "Offline"),
+    : VisualiserRenderer(parameters, manager, {1024, 1024}, 60.0, "Offline"),
       glReadyEvent(glReadyEventToSignal)
 {
 }
@@ -272,7 +272,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         return result;
     }
 
-    const int resolution = juce::jmax(16, recordingSettings.getResolution());
+    const auto renderSize = recordingSettings.getCanvasSize();
 
     // Decode via WavParser (AudioFormatManager-backed), but lock it to the file sample rate.
     WavParser wav { processor };
@@ -317,7 +317,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     const int samplesPerFrame = juce::jmax(1, (int) std::llround(fileSampleRate / fps));
 
     // Configure preview renderer to match Recording Settings.
-    preview.setResolution(resolution);
+    preview.setRenderSize(renderSize);
     preview.setFrameRate(fps);
     preview.prepareTask(fileSampleRate, samplesPerFrame);
 
@@ -346,8 +346,8 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     const juce::String encodeCmd = ffmpegEncoderManager.buildVideoEncodingCommand(
         codec,
         crf,
-        resolution,
-        resolution,
+        renderSize.width,
+        renderSize.height,
         fps,
         preset,
         tempVideoFile);

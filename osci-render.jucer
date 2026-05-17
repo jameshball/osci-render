@@ -210,6 +210,7 @@
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="GrNdH1" name="GraphNode.h" compile="0" resource="0" file="Source/audio/GraphNode.h"/>
         <FILE id="HE3dFE" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
+        <FILE id="OutCl1" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <FILE id="ATGrd1" name="AudioThreadGuard.h" compile="0" resource="0"
               file="Source/audio/AudioThreadGuard.h"/>
         <FILE id="ATGrd2" name="AudioThreadGuard.cpp" compile="1" resource="0"
@@ -669,6 +670,8 @@
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="EOcvBc" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
+        <FILE id="VisGeo" name="VisualiserGeometry.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserGeometry.h"/>
         <FILE id="oAVr1a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr1b" name="OfflineAudioToVideoRenderer.h" compile="0"

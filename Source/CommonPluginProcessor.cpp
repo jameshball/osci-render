@@ -8,6 +8,7 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "audio/OutputClip.h"
 
 namespace
 {
@@ -790,8 +791,7 @@ void CommonAudioProcessor::applyVolumeAndThreshold(float* const* channels, int n
     for (int i = 0; i < numSamples; ++i) {
         float vol = volBuf ? volBuf[i] : volFallback;
         float thr = thrBuf ? thrBuf[i] : thrFallback;
-        channels[0][i] = juce::jlimit(-thr, thr, channels[0][i] * vol);
-        channels[1][i] = juce::jlimit(-thr, thr, channels[1][i] * vol);
+        channels[0][i] = osci::applyVolumeAndOptionalClip(channels[0][i], vol, thr);
+        channels[1][i] = osci::applyVolumeAndOptionalClip(channels[1][i], vol, thr);
     }
 }
-
