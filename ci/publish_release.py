@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a single release artifact to api.osci-render.com.
+"""Publish a single release artifact to release-plane.
 
 Used by the CI release pipeline (and runnable manually) to:
 
@@ -11,7 +11,7 @@ Used by the CI release pipeline (and runnable manually) to:
 
 Environment variables (all required):
 
-    PUBLISH_API_BASE              e.g. https://api.osci-render.com
+    PUBLISH_API_BASE              e.g. https://jameshball.releaseplane.org
     PUBLISH_API_TOKEN             bearer token (server PUBLISH_API_TOKEN secret)
     RELEASE_SIGNING_PRIVATE_KEY   base64-encoded 32-byte Ed25519 seed
                                   (or pass --release-key path/to/seed.b64)
@@ -136,7 +136,7 @@ def main(argv: list[str]) -> int:
     p.add_argument('--notes-file', default=None, type=Path, help='Read release notes from file')
     p.add_argument('--min-supported-from', default=None,
                    help='Optional: oldest semver that should auto-upgrade to this build')
-    p.add_argument('--api-base', default=os.environ.get('PUBLISH_API_BASE', 'https://api.osci-render.com'))
+    p.add_argument('--api-base', default=os.environ.get('PUBLISH_API_BASE', 'https://jameshball.releaseplane.org'))
     p.add_argument('--api-token', default=os.environ.get('PUBLISH_API_TOKEN'),
                    help='Bearer token; defaults to $PUBLISH_API_TOKEN')
     p.add_argument('--release-key', default=None,
