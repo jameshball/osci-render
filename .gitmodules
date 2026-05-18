@@ -9,7 +9,7 @@
 	url = ../../jameshball/osci_render_core.git
 [submodule "modules/melatonin_inspector"]
 	path = modules/melatonin_inspector
-	url = https://github.com/sudara/melatonin_inspector.git
+	url = https://github.com/jameshball/melatonin_inspector.git
 	branch = main
 [submodule "LuaJIT"]
 	path = modules/LuaJIT
