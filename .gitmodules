@@ -7,10 +7,6 @@
 [submodule "modules/osci_render_core"]
 	path = modules/osci_render_core
 	url = ../../jameshball/osci_render_core.git
-[submodule "modules/melatonin_inspector"]
-	path = modules/melatonin_inspector
-	url = https://github.com/jameshball/melatonin_inspector.git
-	branch = main
 [submodule "LuaJIT"]
 	path = modules/LuaJIT
 	url = https://luajit.org/git/luajit.git
@@ -48,3 +44,6 @@
 	path = modules/osci_gui
 	url = git@github.com:jameshball/osci_gui.git
 	branch = main
+[submodule "modules/jucewright"]
+	path = modules/jucewright
+	url = https://github.com/jameshball/jucewright.git
