@@ -13,7 +13,7 @@
 #include "components/CustomTooltipWindow.h"
 
 #if DEBUG
-    #include "melatonin_inspector/melatonin_inspector.h"
+    #include <jucewright/jucewright.h>
 #endif
 
 class CommonPluginEditor : public juce::AudioProcessorEditor,
@@ -124,7 +124,7 @@ public:
 #endif
 
 #if DEBUG
-    melatonin::Inspector inspector { *this, false };
+    jucewright::Automation automation;
 #endif
 
     bool keyPressed(const juce::KeyPress& key) override;

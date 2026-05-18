@@ -3,7 +3,7 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SESSION="${SESSION:-osci-render}"
-AUTOMATION_ARTIFACT_ROOT="${AUTOMATION_ARTIFACT_ROOT:-$HOME/Library/Caches/osci-render/osci-render-melatonin-automation}"
+AUTOMATION_ARTIFACT_ROOT="${AUTOMATION_ARTIFACT_ROOT:-$HOME/Library/Caches/osci-render/osci-render-jucewright-automation}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$AUTOMATION_ARTIFACT_ROOT/browse/$(date +%Y%m%d-%H%M%S)}"
 RECORDING_DIR_PROVIDED="${RECORDING_DIR+x}"
 RECORDING_DIR="${RECORDING_DIR:-$ARTIFACT_DIR/recordings}"
@@ -12,8 +12,8 @@ AUTOMATION_HOME_ROOT="${AUTOMATION_HOME_ROOT:-$ARTIFACT_DIR/home}"
 SOURCE_HOME="${SOURCE_HOME:-$HOME}"
 APP_BUNDLE="${APP_BUNDLE:-$ROOT_DIR/Builds/osci-render/MacOSX/build/Debug/osci-render.app}"
 APP_EXECUTABLE="${APP_EXECUTABLE:-$APP_BUNDLE/Contents/MacOS/osci-render}"
-MELATONIN_UI="${MELATONIN_UI:-}"
-MELATONIN_UI_BUILD_DIR="${MELATONIN_UI_BUILD_DIR:-/tmp/melatonin-inspector-osci-render-cli}"
+JUCEWRIGHT="${JUCEWRIGHT:-}"
+JUCEWRIGHT_BUILD_DIR="${JUCEWRIGHT_BUILD_DIR:-/tmp/jucewright-osci-render-cli}"
 SESSION_TIMEOUT_SECONDS="${SESSION_TIMEOUT_SECONDS:-120}"
 
 BUILD_APP=0
@@ -36,11 +36,11 @@ Options:
   --keep-app        Leave the launched osci-render process running.
   --native-dialogs  Include actions that may open native file dialogs.
   --artifact-dir D  Write logs, JSON snapshots, screenshots, and traces to D.
-  --melatonin-ui P  Use a specific melatonin-ui executable.
+  --jucewright P    Use a specific jucewright executable.
   --help            Show this help.
 
 Environment:
-  SESSION, SESSION_TIMEOUT_SECONDS, ARTIFACT_DIR, RECORDING_DIR, AUTOMATION_ARTIFACT_ROOT, AUTOMATION_HOME_ROOT, APP_BUNDLE, APP_EXECUTABLE, MELATONIN_UI, MELATONIN_UI_BUILD_DIR
+  SESSION, SESSION_TIMEOUT_SECONDS, ARTIFACT_DIR, RECORDING_DIR, AUTOMATION_ARTIFACT_ROOT, AUTOMATION_HOME_ROOT, APP_BUNDLE, APP_EXECUTABLE, JUCEWRIGHT, JUCEWRIGHT_BUILD_DIR
 USAGE
 }
 
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
         --keep-app) KEEP_APP=1; shift ;;
         --native-dialogs) INCLUDE_NATIVE=1; shift ;;
         --artifact-dir) ARTIFACT_DIR="$2"; shift 2 ;;
-        --melatonin-ui) MELATONIN_UI="$2"; shift 2 ;;
+        --jucewright) JUCEWRIGHT="$2"; shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -269,43 +269,45 @@ cleanup() {
 }
 trap cleanup EXIT
 
-find_melatonin_ui() {
-    if [[ -n "$MELATONIN_UI" && -x "$MELATONIN_UI" ]]; then
+find_jucewright() {
+    if [[ -n "$JUCEWRIGHT" && -x "$JUCEWRIGHT" ]]; then
         return 0
     fi
 
     local candidate
     for candidate in \
-        "$MELATONIN_UI_BUILD_DIR/melatonin-ui_artefacts/Debug/melatonin-ui" \
-        "$MELATONIN_UI_BUILD_DIR/melatonin-ui_artefacts/Release/melatonin-ui" \
-        "$ROOT_DIR/modules/melatonin_inspector/build/melatonin-ui_artefacts/Debug/melatonin-ui" \
-        "$ROOT_DIR/modules/melatonin_inspector/build/melatonin-ui_artefacts/Release/melatonin-ui"; do
+        "$JUCEWRIGHT_BUILD_DIR/jucewright_cli_artefacts/jucewright" \
+        "$JUCEWRIGHT_BUILD_DIR/jucewright_cli_artefacts/Debug/jucewright" \
+        "$JUCEWRIGHT_BUILD_DIR/jucewright_cli_artefacts/Release/jucewright" \
+        "$ROOT_DIR/modules/jucewright/build/jucewright_cli_artefacts/jucewright" \
+        "$ROOT_DIR/modules/jucewright/build/jucewright_cli_artefacts/Debug/jucewright" \
+        "$ROOT_DIR/modules/jucewright/build/jucewright_cli_artefacts/Release/jucewright"; do
         if [[ -x "$candidate" ]]; then
-            MELATONIN_UI="$candidate"
+            JUCEWRIGHT="$candidate"
             return 0
         fi
     done
 
-    candidate="$(find "$MELATONIN_UI_BUILD_DIR" "$ROOT_DIR/modules/melatonin_inspector" -type f -name melatonin-ui -perm -111 2>/dev/null | head -n 1 || true)"
+    candidate="$(find "$JUCEWRIGHT_BUILD_DIR" "$ROOT_DIR/modules/jucewright" -type f -name jucewright -perm -111 2>/dev/null | head -n 1 || true)"
     if [[ -n "$candidate" && -x "$candidate" ]]; then
-        MELATONIN_UI="$candidate"
+        JUCEWRIGHT="$candidate"
         return 0
     fi
 
     return 1
 }
 
-build_melatonin_ui() {
+build_jucewright() {
     local jobs
     jobs="$(sysctl -n hw.ncpu 2>/dev/null || printf '4')"
 
-    log "Building melatonin-ui in $MELATONIN_UI_BUILD_DIR"
-    cmake -S "$ROOT_DIR/modules/melatonin_inspector" \
-          -B "$MELATONIN_UI_BUILD_DIR" \
+    log "Building jucewright in $JUCEWRIGHT_BUILD_DIR"
+    cmake -S "$ROOT_DIR/modules/jucewright" \
+          -B "$JUCEWRIGHT_BUILD_DIR" \
           -DCMAKE_BUILD_TYPE=Debug \
-          -DMELATONIN_INSPECTOR_ENABLE_AUTOMATION=ON \
-          -DMELATONIN_INSPECTOR_BUILD_CLI=ON
-    cmake --build "$MELATONIN_UI_BUILD_DIR" --target melatonin-ui --parallel "$jobs"
+          -DJUCEWRIGHT_BUILD_CLI=ON \
+          -DJUCEWRIGHT_BUILD_TESTS=OFF
+    cmake --build "$JUCEWRIGHT_BUILD_DIR" --target jucewright_cli --parallel "$jobs"
 }
 
 build_app() {
@@ -321,7 +323,7 @@ build_app() {
 }
 
 cli() {
-    "$MELATONIN_UI" -s "$SESSION" "$@"
+    "$JUCEWRIGHT" -s "$SESSION" "$@"
 }
 
 launch_app() {
@@ -344,7 +346,7 @@ launch_app() {
     launch_log="$ARTIFACT_DIR/launch.$suffix.json"
 
     log "Launching osci-render ($label)"
-    "$MELATONIN_UI" launch \
+    "$JUCEWRIGHT" launch \
         --app "$APP_BUNDLE" \
         --app-name "osci-render" \
         --session "$SESSION" \
@@ -355,7 +357,7 @@ launch_app() {
         --stdout "$stdout_log" \
         --stderr "$stderr_log" \
         --timeout-ms "$((SESSION_TIMEOUT_SECONDS * 1000))" \
-        >"$launch_log" || die "Timed out waiting for melatonin_inspector session '$SESSION' (see $launch_log, $stderr_log)"
+        >"$launch_log" || die "Timed out waiting for jucewright session '$SESSION' (see $launch_log, $stderr_log)"
 
     if [[ -z "$APP_PID" ]]; then
         APP_PID="$(pgrep -x "osci-render" | tail -n 1 || true)"
@@ -370,7 +372,7 @@ mcp_call() {
     local file="$ARTIFACT_DIR/$(printf '%03d' "$STEP")_mcp_$(slug "$label").json"
 
     log "MCP $label"
-    if printf '%s\n' "$request" | "$MELATONIN_UI" mcp >"$file" 2>&1; then
+    if printf '%s\n' "$request" | "$JUCEWRIGHT" mcp >"$file" 2>&1; then
         log "OK  MCP $label -> $file"
         return 0
     else
@@ -937,7 +939,7 @@ exercise_modulation_source_assignment() {
 }
 
 exercise_hello_world_editor() {
-    local edited_text=$'hello\nmelatonin automation\nworld'
+    local edited_text=$'hello\njucewright automation\nworld'
 
     run_step "edit Hello World source text" cli fill --class "ErrorCodeEditorComponent" --nth 0 --timeout-ms 5000 "$edited_text"
     run_step "wait after editing Hello World source text" cli wait --ms 500
@@ -1111,9 +1113,9 @@ exercise_external_file_type_passes() {
     done
 }
 
-if ! find_melatonin_ui; then
-    build_melatonin_ui || die "Failed to build melatonin-ui"
-    find_melatonin_ui || die "Could not find melatonin-ui after build"
+if ! find_jucewright; then
+    build_jucewright || die "Failed to build jucewright"
+    find_jucewright || die "Could not find jucewright after build"
 fi
 
 if [[ "$BUILD_APP" -eq 1 || ! -x "$APP_EXECUTABLE" ]]; then
@@ -1121,15 +1123,15 @@ if [[ "$BUILD_APP" -eq 1 || ! -x "$APP_EXECUTABLE" ]]; then
 fi
 
 [[ -x "$APP_EXECUTABLE" ]] || die "App executable not found: $APP_EXECUTABLE"
-[[ -x "$MELATONIN_UI" ]] || die "melatonin-ui not executable: $MELATONIN_UI"
+[[ -x "$JUCEWRIGHT" ]] || die "jucewright not executable: $JUCEWRIGHT"
 
 log "Artifacts: $ARTIFACT_DIR"
-log "melatonin-ui: $MELATONIN_UI"
+log "jucewright: $JUCEWRIGHT"
 log "App: $APP_EXECUTABLE"
 
 launch_app "clean startup"
 
-run_step "list sessions" "$MELATONIN_UI" list
+run_step "list sessions" "$JUCEWRIGHT" list
 run_step "capabilities" cli capabilities
 run_step "windows" cli windows
 run_step "start trace" cli trace-start --file "$ARTIFACT_DIR/trace.json"
