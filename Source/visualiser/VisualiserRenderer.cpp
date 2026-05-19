@@ -904,6 +904,12 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
     setAdditiveBlending();
 
     int nPoints = (int) xPoints.size();
+    if (nPoints < 2 || (int)yPoints.size() < nPoints) {
+        return;
+    }
+    if (mode == RenderMode::XYRGB && ((int)rPoints.size() < nPoints || (int)gPoints.size() < nPoints || (int)bPoints.size() < nPoints)) {
+        return;
+    }
 
     // Without this, there's an access violation that seems to occur only on some systems
     std::vector<float> positionData(nPoints * 12);
@@ -1009,7 +1015,7 @@ void VisualiserRenderer::drawLine(const std::vector<float> &xPoints, const std::
 #endif
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertexIndexBuffer);
-    int nEdgesThisTime = xPoints.size() - 1;
+    int nEdgesThisTime = nPoints - 1;
     glDrawElements(GL_TRIANGLES, nEdgesThisTime * 6, GL_UNSIGNED_INT, 0);
 
     glDisableVertexAttribArray(aStartLoc);
