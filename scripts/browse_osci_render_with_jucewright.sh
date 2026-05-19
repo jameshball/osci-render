@@ -489,9 +489,9 @@ root = data.get("tree", {})
 skip_names = re.compile(
     r"(closeOverlay|Record output|Open Project|Save Project|Save Project As|"
     r"Open visualiser window|Toggle fullscreen visualiser|Shared texture output|"
-    r"Open files and examples|Audio input|Website|Report Issue|Beta updates|"
+    r"Open files and examples|Audio input|inputEnabled|midi|Website|Report Issue|Beta updates|"
     r"Download|Purchase|License|Reset|Add |Add$|Remove|Delete|Clear|Pause|"
-    r"Play|Stop|Repeat|Randomise|Auto-link|Render Audio|Syphon|Spout)",
+    r"Play|Stop|Repeat|Record|Randomise|Auto-link|Render Audio|sharedTexture|Syphon|Spout)",
     re.IGNORECASE,
 )
 
@@ -698,7 +698,10 @@ PY
 }
 
 open_examples_panel() {
-    try_step "open files and examples panel" cli click --name "openFiles" --exact --timeout-ms 5000
+    try_step "disable external audio before opening examples" cli set-checked --component-name inputEnabled --exact --timeout-ms 3000 false
+    try_step "wait after disabling external audio before examples" cli wait --ms 250
+    run_step "open files and examples panel" cli click --name "openFiles" --exact --timeout-ms 5000
+    run_step "examples panel is open" cli locator --class "OpenFileComponent" --timeout-ms 5000
     try_step "examples panel snapshot" cli snapshot --json --interesting --depth 10
 }
 
@@ -871,6 +874,56 @@ ensure_midi_keyboard_visible() {
     run_step "wait after showing midi keyboard preference" cli wait --ms 500
 }
 
+checked_switch_ref_for_component() {
+    local component_name="$1"
+    local snapshot_file="$ARTIFACT_DIR/switch_$(slug "$component_name").json"
+
+    cli snapshot --json --interesting --depth 6 --component-name "$component_name" --timeout-ms 3000 >"$snapshot_file" 2>"$snapshot_file.stderr" || return 1
+    python3 - "$snapshot_file" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], "r", encoding="utf-8"))
+root = data.get("tree", {})
+
+def walk(node):
+    yield node
+    for child in node.get("children", []) or []:
+        if isinstance(child, dict):
+            yield from walk(child)
+
+for node in walk(root):
+    actions = node.get("actions", []) or []
+    if "set_checked" in actions:
+        print(node.get("ref", ""), "true" if node.get("checked") else "false")
+        raise SystemExit(0)
+
+raise SystemExit("no checked switch descendant")
+PY
+}
+
+ensure_checked_switch() {
+    local component_name="$1"
+    local label="$2"
+    local desired="${3:-true}"
+    local state
+    local ref
+    local checked
+
+    state="$(checked_switch_ref_for_component "$component_name")" || {
+        run_step "$label switch lookup" false
+        return 1
+    }
+    read -r ref checked <<<"$state"
+
+    if [[ "$checked" == "$desired" ]]; then
+        try_step "$label already $desired" cli wait --ms 1
+        return 0
+    fi
+
+    run_step "$label" cli set-checked "$ref" --timeout-ms 3000 "$desired"
+}
+
 exercise_modulation_graph_handles_for_tab() {
     local tab="$1"
 
@@ -944,7 +997,7 @@ exercise_hello_world_editor() {
     run_step "edit Hello World source text" cli fill --class "ErrorCodeEditorComponent" --nth 0 --timeout-ms 5000 "$edited_text"
     run_step "wait after editing Hello World source text" cli wait --ms 500
     run_step "snapshot after editing Hello World source text" cli snapshot --json --interesting --depth 8 --class "ErrorCodeEditorComponent" --nth 0
-    run_step "collapse Hello World source editor" cli click --name "Collapse" --exact --timeout-ms 3000
+    run_step "collapse Hello World source editor" cli click --role button --name "Collapse" --exact --timeout-ms 3000
     run_step "snapshot after collapsing Hello World source editor" cli snapshot --json --interesting --depth 12
 }
 
@@ -1210,20 +1263,23 @@ exercise_file_switching
 try_step "hidden timeline describe without animatable file" cli describe --json --interesting --depth 8 --class "TimelineComponent" --hidden
 
 run_step "midi controls describe" cli describe --json --interesting --depth 8 --class "MidiComponent"
-run_step "enable midi mode" cli set-checked --role button --name "MIDI" --exact --timeout-ms 3000 true
+ensure_checked_switch "midi" "enable midi mode" true
 run_step "wait after enabling midi mode" cli wait --ms 500
 run_step "midi controls after toggle" cli snapshot --json --interesting --depth 10 --class "MidiComponent"
 ensure_midi_keyboard_visible
 exercise_midi_keyboard_clicks
 
-run_step "modulation tabs snapshot" cli snapshot --json --interesting --depth 10 --class "ModTabHandle"
+run_step "modulation tabs snapshot" cli locator --format json --class "ModTabHandle"
 MOD_TABS=("LFO 1" "LFO 2" "LFO 3" "LFO 4" "LFO 5" "LFO 6" "LFO 7" "LFO 8" "RAND 1" "RAND 2" "RAND 3" "INPUT" "ENV 1" "ENV 2" "ENV 3" "ENV 4" "ENV 5")
 if [[ "$QUICK" -eq 1 ]]; then
     MOD_TABS=("LFO 1" "RAND 1" "INPUT" "ENV 1")
 fi
 
 for tab in "${MOD_TABS[@]}"; do
-    handle_nth="$(mod_handle_nth "$tab")" || die "No modulation handle index mapping for '$tab'"
+    handle_nth="$(mod_handle_nth "$tab")" || {
+        try_step "skip unavailable modulation tab $tab" cli wait --ms 1
+        continue
+    }
     try_step "select modulation tab $tab" cli click --class "ModTabHandle" --nth "$handle_nth" --force --timeout-ms 2500
     try_step "describe modulation tab $tab" cli describe --json --interesting --depth 8 --class "ModTabHandle" --nth "$handle_nth"
     exercise_modulation_graph_handles_for_tab "$tab"

@@ -5,6 +5,7 @@
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
 - **README files**: Do not edit `README.md` files unless the user explicitly asks for README changes.
 - **Formatting scope**: Apply the formatting rules below to new code and to lines you are already changing for the task. Do not reformat unrelated code just to satisfy style rules.
+- **Long-running commands**: For builds, tests, deployments, and exhaustive automation runs, prefer one blocking command with a long timeout and wait for completion. Avoid frequent short polling or progress checks unless the user asks for live updates or the command is genuinely interactive.
 - **Visualiser render semaphore logic**: Do not change the `VisualiserRenderer` render semaphore / `triggerRepaint()` / `renderingSemaphore.acquire()` logic unless the user explicitly asks for that specific work. This synchronization is subtle and easy to break.
 - **Brace style**: Use same-line opening braces for functions and control flow, e.g. `void f() {` and `if (condition) {`, not Allman-style braces on the next line.
 - **Else style**: Put `else` on the same line as the preceding closing brace, e.g. `} else {`.
