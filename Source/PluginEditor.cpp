@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 
+#include <cmath>
 #include <memory>
 
 #include "../modules/juce_sharedtexture/SharedTexture.h"
@@ -9,6 +10,19 @@
 #include "components/effects/EffectComponent.h"
 #include "components/SyphonInputOverlay.h"
 #include "components/SyphonInputSelectorComponent.h"
+
+namespace {
+    constexpr double kDefaultCodeEditorMainPanelSize = -0.7;
+    constexpr double kMinimumCodeEditorMainPanelFraction = 0.3;
+
+    double sanitiseCodeEditorMainPanelSize(double preferredSize) {
+        if (!std::isfinite(preferredSize) || preferredSize > -kMinimumCodeEditorMainPanelFraction) {
+            return kDefaultCodeEditorMainPanelSize;
+        }
+
+        return preferredSize;
+    }
+}
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
     juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
@@ -103,7 +117,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         audioProcessor.broadcaster.addChangeListener(this);
     }
 
-    double codeEditorLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("codeEditorLayoutPreferredSize", -0.7));
+    double codeEditorLayoutPreferredSize = sanitiseCodeEditorMainPanelSize(std::any_cast<double>(audioProcessor.getProperty("codeEditorLayoutPreferredSize", kDefaultCodeEditorMainPanelSize)));
     double luaLayoutPreferredSize = std::any_cast<double>(audioProcessor.getProperty("luaLayoutPreferredSize", -0.7));
 
     layout.setItemLayout(0, -0.3, -1.0, codeEditorLayoutPreferredSize);
@@ -383,7 +397,9 @@ void OscirenderAudioProcessorEditor::resized() {
 
     settings.setBounds(area);
 
-    audioProcessor.setProperty("codeEditorLayoutPreferredSize", layout.getItemCurrentRelativeSize(0));
+    if (editorVisible) {
+        audioProcessor.setProperty("codeEditorLayoutPreferredSize", sanitiseCodeEditorMainPanelSize(layout.getItemCurrentRelativeSize(0)));
+    }
     audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
 
     repaint();
@@ -413,7 +429,7 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     codeDocuments.insert(codeDocuments.begin() + index, codeDocument);
     codeEditors.insert(codeEditors.begin() + index, editor);
     addChildComponent(*editor);
-    // I need to disable accessibility otherwise it doesn't work! Appears to be a JUCE issue, very annoying!
+    // Keep the wrapper out of the accessibility tree; the nested editor carries the useful identity.
     editor->setAccessible(false);
     // listen for changes to the code editor
     codeDocument->addListener(this);
