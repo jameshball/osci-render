@@ -127,6 +127,16 @@ See `.github/docs/build-details.md`.
 
 Tests live in `tests/`, configured by `osci-render-test.jucer`.
 
+### UI Automation
+
+Use the cross-platform Jucewright browser runner for standalone UI coverage:
+```bash
+python3 scripts/browse_osci_render_with_jucewright.py --quick
+python3 scripts/browse_osci_render_with_jucewright.py
+```
+
+The runner discovers platform-specific build outputs and app profile paths automatically. Use `--build-app` to rebuild first, `--jucewright` to point at a specific CLI executable, and `--app` to override the standalone app path.
+
 ### Validation
 
 **pluginval** — run locally only after major changes (effects, parameters, audio processing). Runs in CI automatically.
