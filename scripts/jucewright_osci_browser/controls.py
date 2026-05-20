@@ -11,8 +11,11 @@ from .utils import numeric, slug, walk_tree
 
 
 class ControlDiscoveryMixin:
-    def check_png_not_blank(self, file):
-        return check_png_not_blank(file)
+    def check_png_not_blank(self, file, **kwargs):
+        return check_png_not_blank(file, **kwargs)
+
+    def check_visualiser_png_not_blank(self, file):
+        return check_png_not_blank(file, crop_bottom_fraction=0.12)
 
     def node_label(self, node: dict) -> str:
         for key in ["name", "title", "componentName", "componentId", "class"]:
