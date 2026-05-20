@@ -35,6 +35,7 @@ The proprietary-compatible surface must exclude, replace, or compile out:
 Set `OSCI_PROPRIETARY_BUILD=1` when compiling a proprietary consumer or when verifying that reusable modules avoid incompatible dependencies.
 
 In this mode, code should compile without GPL-only or unresolved-provenance dependencies. It may still use permissively licensed code and separately licensed framework/platform dependencies.
+Project-owned assets may remain available in this mode; only assets with unclear or incompatible rights should be excluded, replaced, or separately licensed.
 
 When `OSCI_PROPRIETARY_BUILD` is unset or `0`, GPL osci-render builds may continue to use GPL-compatible dependencies and GPL-distributed application assets.
 
