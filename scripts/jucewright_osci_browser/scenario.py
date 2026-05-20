@@ -330,7 +330,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step(f"snapshot external {kind}", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
         screenshot = self.artifact_dir / f"visualiser_external_{slug(kind)}.png"
         self.run_step(f"visualiser screenshot external {kind}", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", screenshot))
-        self.try_step(f"visualiser nonblank external {kind}", lambda: self.check_png_not_blank(screenshot))
+        self.try_step(f"visualiser nonblank external {kind}", lambda: self.check_visualiser_png_not_blank(screenshot))
         self.exercise_current_file_common(f"external {kind}")
         self.exercise_frame_and_timeline_controls(f"external {kind}", kind)
 
@@ -401,7 +401,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.run_step("visualiser count", self.cli("count", "--class", "VisualiserComponent", "--nth", "0"))
             self.run_step("visualiser describe", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "VisualiserComponent", "--nth", "0"))
             self.run_step("visualiser screenshot", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", self.artifact_dir / "visualiser.png"))
-            self.run_step("visualiser screenshot nonblank check", lambda: self.check_png_not_blank(self.artifact_dir / "visualiser.png"))
+            self.run_step("visualiser screenshot nonblank check", lambda: self.check_visualiser_png_not_blank(self.artifact_dir / "visualiser.png"))
 
             for menu in ["File", "Edit", "About", "Video", "Audio", "Interface"]:
                 self.exercise_menu(menu)
