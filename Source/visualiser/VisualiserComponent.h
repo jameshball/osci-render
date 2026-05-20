@@ -16,7 +16,7 @@
 #include "../audio/wav/WavParser.h"
 #include "RecordingSettings.h"
 #include "VisualiserSettings.h"
-#include "VisualiserRenderer.h"
+#include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 
 enum class FullScreenMode {
     TOGGLE,
