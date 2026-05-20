@@ -5,7 +5,7 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.9.1.25" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -245,8 +245,6 @@
           <FILE id="L01ZLi" name="RippleEffect.h" compile="0" resource="0" file="Source/audio/effects/RippleEffect.h"/>
           <FILE id="bXcQHc" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/effects/RotateEffect.h"/>
           <FILE id="Cffx3f" name="ScaleEffect.h" compile="0" resource="0" file="Source/audio/effects/ScaleEffect.h"/>
-          <FILE id="Vwjht7" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/effects/SmoothEffect.h"/>
-          <FILE id="WACNMe" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/effects/StereoEffect.h"/>
           <FILE id="yiIupB" name="SwirlEffect.h" compile="0" resource="0" file="Source/audio/effects/SwirlEffect.h"/>
           <FILE id="qZkeZC" name="TranslateEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/TranslateEffect.h"/>
@@ -645,26 +643,6 @@
               file="Source/video/SyphonFrameGrabber.h"/>
       </GROUP>
       <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
-        <FILE id="DkDKBX" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/AfterglowFragmentShader.glsl"/>
-        <FILE id="eM1kV3" name="AfterglowVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/AfterglowVertexShader.glsl"/>
-        <FILE id="kfMvdQ" name="BlurFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/BlurFragmentShader.glsl" xcodeResource="0"/>
-        <FILE id="c59gvD" name="BlurVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/BlurVertexShader.glsl" xcodeResource="0"/>
-        <FILE id="dma1IP" name="GlowFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/GlowFragmentShader.glsl"/>
-        <FILE id="ytSpvX" name="GlowVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/GlowVertexShader.glsl"/>
-        <FILE id="WZFPXF" name="LineFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/LineFragmentShader.glsl" xcodeResource="0"/>
-        <FILE id="iS2Ipw" name="LineVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/LineVertexShader.glsl" xcodeResource="0"/>
-        <FILE id="hrzO1G" name="OutputFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/OutputFragmentShader.glsl" xcodeResource="0"/>
-        <FILE id="A0CrLF" name="OutputVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/OutputVertexShader.glsl" xcodeResource="0"/>
         <FILE id="XpwLUN" name="RecordingSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="EOcvBc" name="RecordingSettings.h" compile="0" resource="0"
@@ -673,32 +651,14 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr1b" name="OfflineAudioToVideoRenderer.h" compile="0"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
-        <FILE id="Gwupwc" name="SimpleFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/SimpleFragmentShader.glsl"/>
-        <FILE id="RX1oPv" name="SimpleVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/SimpleVertexShader.glsl"/>
-        <FILE id="zR2PyI" name="TexturedFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/TexturedFragmentShader.glsl"/>
-        <FILE id="TSORlO" name="TexturedVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/TexturedVertexShader.glsl"/>
         <FILE id="Ju0mVn" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="frfxSR" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
-        <FILE id="MwblOp" name="VisualiserParameters.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserParameters.h"/>
-        <FILE id="zN66Ve" name="VisualiserRenderer.cpp" compile="1" resource="0"
-              file="Source/visualiser/VisualiserRenderer.cpp"/>
-        <FILE id="fPgwyr" name="VisualiserRenderer.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserRenderer.h"/>
         <FILE id="iZM7s0" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserSettings.cpp"/>
         <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserSettings.h"/>
-        <FILE id="Qa4JGo" name="WideBlurFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/WideBlurFragmentShader.glsl"/>
-        <FILE id="mSCsyS" name="WideBlurVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/WideBlurVertexShader.glsl"/>
       </GROUP>
       <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>

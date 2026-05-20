@@ -22,7 +22,6 @@
 #include "audio/effects/DistortEffect.h"
 #include "audio/effects/UnfoldEffect.h"
 #include "audio/effects/MultiplexEffect.h"
-#include "audio/effects/SmoothEffect.h"
 #include "audio/effects/WobbleEffect.h"
 #include "audio/effects/DuplicatorEffect.h"
 #include "audio/effects/DashedLineEffect.h"
@@ -40,6 +39,7 @@
 #include "parser/FileParser.h"
 #include "parser/FrameProducer.h"
 #include "audio/modulation/LfoPresetManager.h"
+#include <osci_render_core/effects/osci_SmoothEffect.h>
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 #include "parser/img/ImageParser.h"
@@ -58,7 +58,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(RotateEffectApp().build());
     toggleableEffects.push_back(TranslateEffectApp().build());
     toggleableEffects.push_back(SwirlEffectApp().build());
-    toggleableEffects.push_back(SmoothEffect().build());
+    toggleableEffects.push_back(osci::SmoothEffect().withIcon(BinaryData::smoothing_svg).build());
     toggleableEffects.push_back(DelayEffect().build());
     toggleableEffects.push_back(DashedLineEffect().build());
     toggleableEffects.push_back(TraceEffect().build());
