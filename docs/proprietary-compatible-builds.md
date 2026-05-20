@@ -47,9 +47,10 @@ For proprietary distribution, JUCE and any other framework or platform dependenc
 
 Optional dependencies should be controlled by explicit feature flags rather than by implicit module assumptions.
 
-- `OSCI_RENDER_CORE_ENABLE_CHOWDSP_RESAMPLING=1` enables core sample-rate conversion backed by ChowDSP. Projects enabling it must include the required ChowDSP modules.
 - `OSCI_GUI_ENABLE_VISUALISER=1` enables the visualiser renderer in `osci_gui`. Projects enabling it must include the renderer's required modules, including `osci_render_core` and JUCE OpenGL support.
 - `OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1` enables visualiser upsampling backed by ChowDSP. Projects enabling it must include the required ChowDSP modules.
+
+The core integer-ratio sample-rate adapter uses JUCE-only bypass and upsampling modes. It supports `1.0`, `2.0`, `4.0`, and `8.0`, and has no optional ChowDSP-backed path.
 
 These feature flags must remain off in `OSCI_PROPRIETARY_BUILD` builds unless the dependency has been separately cleared for proprietary use and the guard is intentionally updated.
 
