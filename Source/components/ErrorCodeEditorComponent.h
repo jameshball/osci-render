@@ -1,8 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../lua/LuaParser.h"
 #include "../PluginProcessor.h"
 #include <osci_gui/osci_gui.h>
+#include <osci_scripting/osci_scripting.h>
 
 class ErrorCodeEditorComponent : public juce::CodeEditorComponent, public ErrorListener, public juce::AsyncUpdater {
  public:

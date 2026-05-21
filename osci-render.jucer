@@ -219,10 +219,8 @@
                 file="Source/audio/effects/PolygonizerEffect.h"/>
           <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/KaleidoscopeEffect.h"/>
-          <FILE id="mREEpc" name="UnfoldEffect.h" compile="0" resource="0" file="Source/audio/effects/UnfoldEffect.h"/>
           <FILE id="jfRtxu" name="VortexEffect.h" compile="0" resource="0" file="Source/audio/effects/VortexEffect.h"/>
           <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/effects/GodRayEffect.h"/>
-          <FILE id="tU2pQl" name="SkewEffect.h" compile="0" resource="0" file="Source/audio/effects/SkewEffect.h"/>
           <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/DuplicatorEffect.h"/>
           <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
@@ -230,27 +228,13 @@
           <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/BitCrushEffect.h"/>
           <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/effects/BulgeEffect.h"/>
-          <FILE id="uvMCNC" name="CustomEffect.cpp" compile="1" resource="0"
-                file="Source/audio/effects/CustomEffect.cpp"/>
-          <FILE id="qFZDUh" name="CustomEffect.h" compile="0" resource="0" file="Source/audio/effects/CustomEffect.h"/>
           <FILE id="I7B78q" name="DashedLineEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/DashedLineEffect.h"/>
-          <FILE id="kpI9pv" name="DelayEffect.h" compile="0" resource="0" file="Source/audio/effects/DelayEffect.h"/>
-          <FILE id="ux2dO2" name="DistortEffect.h" compile="0" resource="0" file="Source/audio/effects/DistortEffect.h"/>
           <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/MultiplexEffect.h"/>
-          <FILE id="bNcEfx" name="BounceEffect.h" compile="0" resource="0" file="Source/audio/effects/BounceEffect.h"/>
           <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
                 file="Source/audio/effects/PerspectiveEffect.h"/>
-          <FILE id="L01ZLi" name="RippleEffect.h" compile="0" resource="0" file="Source/audio/effects/RippleEffect.h"/>
-          <FILE id="bXcQHc" name="RotateEffect.h" compile="0" resource="0" file="Source/audio/effects/RotateEffect.h"/>
-          <FILE id="Cffx3f" name="ScaleEffect.h" compile="0" resource="0" file="Source/audio/effects/ScaleEffect.h"/>
-          <FILE id="yiIupB" name="SwirlEffect.h" compile="0" resource="0" file="Source/audio/effects/SwirlEffect.h"/>
-          <FILE id="qZkeZC" name="TranslateEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/TranslateEffect.h"/>
           <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/effects/TwistEffect.h"/>
-          <FILE id="Be21D0" name="VectorCancellingEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/VectorCancellingEffect.h"/>
           <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/effects/WobbleEffect.h"/>
         </GROUP>
         <GROUP id="{AUD_MODULATION}" name="modulation">
@@ -319,10 +303,6 @@
         </GROUP>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
-        <FILE id="kzXVmm" name="CustomTooltipWindow.cpp" compile="1" resource="0"
-              file="Source/components/CustomTooltipWindow.cpp"/>
-        <FILE id="A4ukex" name="CustomTooltipWindow.h" compile="0" resource="0"
-              file="Source/components/CustomTooltipWindow.h"/>
         <FILE id="CuMkC1" name="CustomMidiKeyboardComponent.cpp" compile="1"
               resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
         <FILE id="CuMkH1" name="CustomMidiKeyboardComponent.h" compile="0"
@@ -341,10 +321,6 @@
               file="Source/components/ComponentList.cpp"/>
         <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
         <FILE id="IvySRY" name="DoubleTextBox.h" compile="0" resource="0" file="Source/components/DoubleTextBox.h"/>
-        <FILE id="Jh9JQ3" name="DownloaderComponent.cpp" compile="1" resource="0"
-              file="Source/components/DownloaderComponent.cpp"/>
-        <FILE id="rCLnwK" name="DownloaderComponent.h" compile="0" resource="0"
-              file="Source/components/DownloaderComponent.h"/>
         <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
               file="Source/components/DraggableListBox.cpp"/>
         <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
@@ -355,14 +331,10 @@
               file="Source/components/FileControlsComponent.cpp"/>
         <FILE id="uo7flZ" name="FileControlsComponent.h" compile="0" resource="0"
               file="Source/components/FileControlsComponent.h"/>
-        <FILE id="L9DIT2" name="LabelledTextBox.h" compile="0" resource="0"
-              file="Source/components/LabelledTextBox.h"/>
         <FILE id="yhsLOr" name="OpenFileComponent.cpp" compile="1" resource="0"
               file="Source/components/OpenFileComponent.cpp"/>
         <FILE id="LBoxwR" name="OpenFileComponent.h" compile="0" resource="0"
               file="Source/components/OpenFileComponent.h"/>
-        <FILE id="QQzSwh" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
-        <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
         <FILE id="MwKZ5Q" name="SplashScreenComponent.cpp" compile="1" resource="0"
               file="Source/components/SplashScreenComponent.cpp"/>
         <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
@@ -377,22 +349,14 @@
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
-        <FILE id="VTbLH1" name="VerticalTabListComponent.h" compile="0" resource="0"
-              file="Source/components/VerticalTabListComponent.h"/>
-        <FILE id="VPpHlp" name="ValuePopupHelper.h" compile="0" resource="0"
-              file="Source/components/ValuePopupHelper.h"/>
         <FILE id="PhSldr" name="PhaseSliderComponent.h" compile="0" resource="0"
               file="Source/components/PhaseSliderComponent.h"/>
         <FILE id="RtKnbC" name="RotaryKnobComponent.h" compile="0" resource="0"
               file="Source/components/RotaryKnobComponent.h"/>
         <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
               file="Source/components/KnobContainerComponent.h"/>
-        <FILE id="PrmSHl" name="ParameterSyncHelper.h" compile="0" resource="0"
-              file="Source/components/ParameterSyncHelper.h"/>
         <FILE id="KnbCnC" name="KnobContainerComponent.cpp" compile="1" resource="0"
               file="Source/components/KnobContainerComponent.cpp"/>
-        <FILE id="PrCtxM" name="ParameterContextMenu.h" compile="0" resource="0"
-              file="Source/components/ParameterContextMenu.h"/>
         <FILE id="PrStCm" name="ParameterSettingsComponent.h" compile="0" resource="0"
               file="Source/components/ParameterSettingsComponent.h"/>
         <FILE id="InVlEd" name="InlineValueEditor.h" compile="0" resource="0"
@@ -407,12 +371,8 @@
               file="Source/components/LabelledBarComponent.h"/>
         <FILE id="PrBrCm" name="ParameterBarComponent.h" compile="0" resource="0"
               file="Source/components/ParameterBarComponent.h"/>
-        <FILE id="SvSwBt" name="SvgSwitchButton.h" compile="0" resource="0"
-              file="Source/components/SvgSwitchButton.h"/>
         <FILE id="TgLbCm" name="ToggleLabelComponent.h" compile="0" resource="0"
               file="Source/components/ToggleLabelComponent.h"/>
-        <FILE id="BlPCCH" name="BooleanParamCCHelper.h" compile="0" resource="0"
-              file="Source/components/BooleanParamCCHelper.h"/>
         <FILE id="SlGrCm" name="SlopeGraphComponent.h" compile="0" resource="0"
               file="Source/components/SlopeGraphComponent.h"/>
         <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"
@@ -562,12 +522,7 @@
         <FILE id="tCwz6G" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
               resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.cpp"/>
       </GROUP>
-      <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua">
-        <FILE id="aLb1Rc" name="LuaLibrary.cpp" compile="1" resource="0" file="Source/lua/LuaLibrary.cpp"/>
-        <FILE id="aLb1Rh" name="LuaLibrary.h" compile="0" resource="0" file="Source/lua/LuaLibrary.h"/>
-        <FILE id="WKSBg8" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
-        <FILE id="E4ORpe" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
-      </GROUP>
+      <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua"/>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
         <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="modules/chinese_postman/BinaryHeap.cpp"/>
         <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="modules/chinese_postman/BinaryHeap.h"/>
@@ -604,16 +559,7 @@
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
         <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
         <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
-        <FILE id="Yevl42" name="FrameConsumer.h" compile="0" resource="0" file="Source/parser/FrameConsumer.h"/>
-        <FILE id="Z3mAYx" name="FrameProducer.cpp" compile="1" resource="0"
-              file="Source/parser/FrameProducer.cpp"/>
-        <FILE id="JEcNPP" name="FrameProducer.h" compile="0" resource="0" file="Source/parser/FrameProducer.h"/>
-        <FILE id="hCrVUD" name="FrameSource.h" compile="0" resource="0" file="Source/parser/FrameSource.h"/>
-        <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla">
-          <FILE id="KvDV8j" name="LineArtParser.cpp" compile="1" resource="0"
-                file="Source/parser/gpla/LineArtParser.cpp"/>
-          <FILE id="t008RG" name="LineArtParser.h" compile="0" resource="0" file="Source/parser/gpla/LineArtParser.h"/>
-        </GROUP>
+        <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla"/>
         <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
           <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
           <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
@@ -623,14 +569,8 @@
                 file="Source/parser/fractal/FractalParser.cpp"/>
           <FILE id="Fr2002" name="FractalParser.h" compile="0" resource="0" file="Source/parser/fractal/FractalParser.h"/>
         </GROUP>
-        <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg">
-          <FILE id="cTec1H" name="SvgParser.cpp" compile="1" resource="0" file="Source/parser/svg/SvgParser.cpp"/>
-          <FILE id="gvkrDH" name="SvgParser.h" compile="0" resource="0" file="Source/parser/svg/SvgParser.h"/>
-        </GROUP>
-        <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt">
-          <FILE id="vIYWRG" name="TextParser.cpp" compile="1" resource="0" file="Source/parser/txt/TextParser.cpp"/>
-          <FILE id="LlefOK" name="TextParser.h" compile="0" resource="0" file="Source/parser/txt/TextParser.h"/>
-        </GROUP>
+        <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg"/>
+        <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt"/>
       </GROUP>
       <GROUP id="{0F62E77C-5385-0C56-69A1-3C8866A6E6E3}" name="video">
         <FILE id="DniMew" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
@@ -655,6 +595,8 @@
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="frfxSR" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="VTA001" name="VisualiserTextureAssets.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserTextureAssets.h"/>
         <FILE id="iZM7s0" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserSettings.cpp"/>
         <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
@@ -727,6 +669,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
@@ -774,6 +718,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
@@ -831,6 +777,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
@@ -873,8 +821,10 @@
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

@@ -347,6 +347,70 @@ class BrowserSession:
         tree.write(settings_file, encoding="UTF-8", xml_declaration=True)
         return audio_output
 
+    def start_audio_permission_prompt_watcher(self) -> subprocess.Popen | None:
+        if not is_macos():
+            return None
+
+        script = r'''
+set endDate to (current date) + 120
+repeat while (current date) < endDate
+    tell application "System Events"
+        try
+            repeat with processName in {"UserNotificationCenter", "CoreServicesUIAgent", "osci-render"}
+                if exists process (processName as text) then
+                    tell process (processName as text)
+                        repeat with appWindow in windows
+                            set combinedText to ""
+                            try
+                                set combinedText to (value of static texts of appWindow) as text
+                            end try
+                            try
+                                set combinedText to combinedText & " " & (name of appWindow)
+                            end try
+
+                            if my isAudioPermissionPrompt(combinedText) then
+                                if my clickDenyButton(appWindow) then
+                                    return
+                                end if
+                            end if
+                        end repeat
+                    end tell
+                end if
+            end repeat
+        end try
+    end tell
+
+    delay 0.2
+end repeat
+
+on isAudioPermissionPrompt(promptText)
+    return promptText contains "Microphone" or promptText contains "microphone" or promptText contains "record your system audio" or promptText contains "capture audio from other applications"
+end isAudioPermissionPrompt
+
+on clickDenyButton(appWindow)
+    tell application "System Events"
+        try
+            click button "Don’t Allow" of appWindow
+            return true
+        end try
+
+        try
+            click button "Don't Allow" of appWindow
+            return true
+        end try
+
+        try
+            click button 2 of appWindow
+            return true
+        end try
+    end tell
+
+    return false
+end clickDenyButton
+'''
+
+        return subprocess.Popen(["osascript", "-e", script], cwd=self.root_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     def session_pids(self) -> list[int]:
         if self.jucewright is None or not is_executable(self.jucewright):
             return []
@@ -435,7 +499,13 @@ class BrowserSession:
             self.session_timeout_seconds * 1000,
         )
 
-        completed = subprocess.run([str(part) for part in command], cwd=self.root_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        prompt_watcher = self.start_audio_permission_prompt_watcher()
+        try:
+            completed = subprocess.run([str(part) for part in command], cwd=self.root_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        finally:
+            if prompt_watcher is not None and prompt_watcher.poll() is None:
+                prompt_watcher.terminate()
+
         if completed.returncode != 0:
             launch_log.write_text(completed.stdout, encoding="utf-8")
             self.die(f"Timed out waiting for jucewright session '{self.session}' (see {launch_log}, {stderr_log})")

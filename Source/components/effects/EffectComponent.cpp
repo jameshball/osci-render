@@ -2,7 +2,7 @@
 
 #include "../../LookAndFeel.h"
 #include "../InlineValueEditor.h"
-#include "../ParameterContextMenu.h"
+#include <osci_gui/osci_gui.h>
 #include "../ParameterSettingsComponent.h"
 #ifndef SOSCI
 #include "../../PluginProcessor.h"

@@ -4,7 +4,7 @@
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"
-#include "../ParameterSyncHelper.h"
+#include <osci_gui/osci_gui.h>
 #include "../DisabledOverlay.h"
 #include "../../audio/modulation/SidechainState.h"
 
