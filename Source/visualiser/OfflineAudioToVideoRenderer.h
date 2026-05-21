@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 
-#include "VisualiserRenderer.h"
+#include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 #include "RecordingSettings.h"
 
 #if OSCI_PREMIUM

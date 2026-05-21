@@ -8,11 +8,9 @@
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
 #include "components/VolumeComponent.h"
-#include "components/DownloaderComponent.h"
 #include "components/UpdatePromptComponent.h"
-#include "components/CustomTooltipWindow.h"
 
-#if DEBUG
+#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
 #endif
 
@@ -123,8 +121,8 @@ public:
     juce::OpenGLContext openGlContext;
 #endif
 
-#if DEBUG
-    jucewright::Automation automation;
+#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+    jucewright::EnvironmentAutomation automation { *this };
 #endif
 
     bool keyPressed(const juce::KeyPress& key) override;

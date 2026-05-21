@@ -4,7 +4,6 @@
 #include "../components/effects/EffectComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
-#include "../components/SwitchButton.h"
 
 // Define codec options
 enum class VideoCodec {

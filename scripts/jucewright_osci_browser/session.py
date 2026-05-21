@@ -11,6 +11,7 @@ import shutil
 import signal
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from .errors import StepError
@@ -273,6 +274,143 @@ class BrowserSession:
         else:
             self.die(f"Unsupported platform for --build-app: {platform.system()}")
 
+    def prepare_profile(self, launch_home: Path) -> dict:
+        command = self.jw(
+            "prepare-juce-profile",
+            "--home",
+            launch_home,
+            "--app-name",
+            "osci-render",
+            "--source-home",
+            self.source_home,
+            "--copy-setting",
+            "osci-licensing.settings",
+            "--keep-audio-state",
+        )
+
+        completed = subprocess.run([str(part) for part in command], cwd=self.root_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if completed.returncode != 0:
+            self.die(f"Could not prepare jucewright profile:\n{completed.stdout}")
+
+        try:
+            profile = json.loads(completed.stdout)
+        except json.JSONDecodeError:
+            self.die(f"Could not parse jucewright profile output:\n{completed.stdout}")
+
+        settings_file = profile.get("settingsFile")
+        if settings_file:
+            audio_output = self.disable_profile_audio_input(Path(settings_file))
+            profile["disabledAudioInput"] = True
+            profile["audioOutputDeviceName"] = audio_output
+            if not audio_output:
+                self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
+
+        return profile
+
+    @staticmethod
+    def disable_profile_audio_input(settings_file: Path) -> str | None:
+        if settings_file.exists():
+            tree = ET.parse(settings_file)
+            root = tree.getroot()
+        else:
+            root = ET.Element("PROPERTIES")
+            tree = ET.ElementTree(root)
+
+        audio_value = None
+        for child in root.findall("VALUE"):
+            if child.get("name") == "audioSetup":
+                audio_value = child
+                break
+
+        if audio_value is None:
+            audio_value = ET.SubElement(root, "VALUE", {"name": "audioSetup"})
+
+        setup = audio_value.find("DEVICESETUP")
+        if setup is None:
+            setup = ET.SubElement(audio_value, "DEVICESETUP")
+
+        setup.set("audioInputDeviceName", "")
+        setup.set("audioDeviceInChans", "0")
+        setup.attrib.pop("audioDeviceOutChans", None)
+        audio_output = setup.get("audioOutputDeviceName")
+
+        for midi_input in list(setup.findall("MIDIINPUT")):
+            setup.remove(midi_input)
+
+        for child in root.findall("VALUE"):
+            if child.get("name") == "shouldMuteInput":
+                child.set("val", "1")
+                break
+        else:
+            ET.SubElement(root, "VALUE", {"name": "shouldMuteInput", "val": "1"})
+
+        tree.write(settings_file, encoding="UTF-8", xml_declaration=True)
+        return audio_output
+
+    def start_audio_permission_prompt_watcher(self) -> subprocess.Popen | None:
+        if not is_macos():
+            return None
+
+        script = r'''
+set endDate to (current date) + 120
+repeat while (current date) < endDate
+    tell application "System Events"
+        try
+            repeat with processName in {"UserNotificationCenter", "CoreServicesUIAgent", "osci-render"}
+                if exists process (processName as text) then
+                    tell process (processName as text)
+                        repeat with appWindow in windows
+                            set combinedText to ""
+                            try
+                                set combinedText to (value of static texts of appWindow) as text
+                            end try
+                            try
+                                set combinedText to combinedText & " " & (name of appWindow)
+                            end try
+
+                            if my isAudioPermissionPrompt(combinedText) then
+                                if my clickDenyButton(appWindow) then
+                                    return
+                                end if
+                            end if
+                        end repeat
+                    end tell
+                end if
+            end repeat
+        end try
+    end tell
+
+    delay 0.2
+end repeat
+
+on isAudioPermissionPrompt(promptText)
+    return promptText contains "Microphone" or promptText contains "microphone" or promptText contains "record your system audio" or promptText contains "capture audio from other applications"
+end isAudioPermissionPrompt
+
+on clickDenyButton(appWindow)
+    tell application "System Events"
+        try
+            click button "Don’t Allow" of appWindow
+            return true
+        end try
+
+        try
+            click button "Don't Allow" of appWindow
+            return true
+        end try
+
+        try
+            click button 2 of appWindow
+            return true
+        end try
+    end tell
+
+    return false
+end clickDenyButton
+'''
+
+        return subprocess.Popen(["osascript", "-e", script], cwd=self.root_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     def session_pids(self) -> list[int]:
         if self.jucewright is None or not is_executable(self.jucewright):
             return []
@@ -337,6 +475,7 @@ class BrowserSession:
         stdout_log = self.artifact_dir / f"osci-render.{suffix}.stdout.log"
         stderr_log = self.artifact_dir / f"osci-render.{suffix}.stderr.log"
         launch_log = self.artifact_dir / f"launch.{suffix}.json"
+        profile = self.prepare_profile(launch_home)
 
         self.log(f"Launching osci-render ({label})")
         command = self.jw(
@@ -351,10 +490,7 @@ class BrowserSession:
             self.artifact_dir,
             "--home",
             launch_home,
-            "--source-home",
-            self.source_home,
-            "--copy-setting",
-            "osci-licensing.settings",
+            "--no-profile",
             "--stdout",
             stdout_log,
             "--stderr",
@@ -363,17 +499,26 @@ class BrowserSession:
             self.session_timeout_seconds * 1000,
         )
 
-        completed = subprocess.run([str(part) for part in command], cwd=self.root_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        launch_log.write_text(completed.stdout, encoding="utf-8")
+        prompt_watcher = self.start_audio_permission_prompt_watcher()
+        try:
+            completed = subprocess.run([str(part) for part in command], cwd=self.root_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        finally:
+            if prompt_watcher is not None and prompt_watcher.poll() is None:
+                prompt_watcher.terminate()
+
         if completed.returncode != 0:
+            launch_log.write_text(completed.stdout, encoding="utf-8")
             self.die(f"Timed out waiting for jucewright session '{self.session}' (see {launch_log}, {stderr_log})")
 
         try:
             payload = json.loads(completed.stdout)
+            payload["profile"] = profile
+            launch_log.write_text(json.dumps(payload), encoding="utf-8")
             matched = payload.get("matchedSession", {})
             pid = matched.get("pid")
             self.app_pid = int(pid) if pid is not None else None
         except Exception:
+            launch_log.write_text(completed.stdout, encoding="utf-8")
             self.app_pid = None
 
         time.sleep(0.9)
