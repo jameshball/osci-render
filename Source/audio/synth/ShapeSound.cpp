@@ -1,6 +1,5 @@
 #include "ShapeSound.h"
 #include "../../parser/FileParser.h"
-#include "../../parser/FrameProducer.h"
 
 ShapeSound::ShapeSound(OscirenderAudioProcessor &p, std::shared_ptr<FileParser> parser) : parser(parser) {
     if (parser->isSample()) {

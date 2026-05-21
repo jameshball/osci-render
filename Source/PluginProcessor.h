@@ -18,9 +18,6 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "audio/effects/CustomEffect.h"
-#include "audio/effects/DelayEffect.h"
-#include "audio/modulation/LuaEffectState.h"
 #include "audio/effects/PerspectiveEffect.h"
 #include "audio/synth/VoiceManager.h"
 #include "audio/platform/SampleRateManager.h"
@@ -39,6 +36,7 @@
 #include "audio/modulation/ModulationEngine.h"
 #include "audio/modulation/ModulationTypes.h"
 #include "obj/ObjectServer.h"
+#include <osci_scripting/osci_scripting.h>
 
 class FileParser;
 

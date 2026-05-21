@@ -11,7 +11,9 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     addAndMakeVisible(lineEffects);
     addAndMakeVisible(sweepMs);
     addAndMakeVisible(triggerValue);
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
     addAndMakeVisible(upsamplingToggle);
+#endif
     addAndMakeVisible(sweepToggle);
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
@@ -116,7 +118,9 @@ void VisualiserSettings::resized() {
 
 #if !OSCI_PREMIUM
 #endif
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
+#endif
     sweepToggle.setBounds(area.removeFromTop(rowHeight));
     sweepMs.setBounds(area.removeFromTop(rowHeight));
     triggerValue.setBounds(area.removeFromTop(rowHeight));

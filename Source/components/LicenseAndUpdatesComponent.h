@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "../CommonPluginEditor.h"
 #include "../CommonPluginProcessor.h"
-#include "DownloadProgressComponent.h"
+#include <osci_gui/osci_gui.h>
 #include "InstallFlowHelpers.h"
 
 class LicenseAndUpdatesComponent : public osci::OverlayComponent {

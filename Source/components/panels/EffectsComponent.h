@@ -8,7 +8,6 @@
 #include "../effects/EffectsListComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "../effects/EffectTypeGridComponent.h"
-#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessorEditor;
 class EffectsComponent : public juce::GroupComponent, public juce::ChangeListener {

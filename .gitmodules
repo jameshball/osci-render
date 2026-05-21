@@ -47,3 +47,11 @@
 [submodule "modules/jucewright"]
 	path = modules/jucewright
 	url = https://github.com/jameshball/jucewright.git
+[submodule "modules/osci_file_import"]
+	path = modules/osci_file_import
+	url = git@github.com:jameshball/osci_file_import.git
+	branch = main
+[submodule "modules/osci_scripting"]
+	path = modules/osci_scripting
+	url = git@github.com:jameshball/osci_scripting.git
+	branch = main

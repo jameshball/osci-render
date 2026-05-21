@@ -3,12 +3,9 @@
 #include <JuceHeader.h>
 
 #include "../LookAndFeel.h"
-#include "../audio/effects/SmoothEffect.h"
-#include "../audio/effects/StereoEffect.h"
 #include "../components/effects/EffectComponent.h"
 #include <osci_gui/osci_gui.h>
-#include "../components/SwitchButton.h"
-#include "VisualiserParameters.h"
+#include <osci_gui/visualiser/osci_VisualiserParameters.h>
 
 #ifndef SOSCI
 class OscirenderAudioProcessor;
@@ -123,7 +120,9 @@ private:
     juce::Label screenOverlayLabel{"Screen Overlay", "Screen Overlay"};
     juce::ComboBox screenOverlay;
 
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
+#endif
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
 #if OSCI_PREMIUM

@@ -2,7 +2,7 @@
 
 #include "audio/modulation/ModulationTypes.h"
 #include "components/CustomMidiKeyboardComponent.h"
-#include "components/SwitchButton.h"
+#include <osci_gui/osci_gui.h>
 #include "components/modulation/EnvelopeComponent.h"
 #include "components/modulation/NodeGraphComponent.h"
 

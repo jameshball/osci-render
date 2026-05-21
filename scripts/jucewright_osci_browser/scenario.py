@@ -26,6 +26,7 @@ from .utils import bool_text, slug, walk_tree
 
 class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
     def open_examples_panel(self) -> None:
+        self.ensure_midi_mode(False, "before opening examples")
         self.try_step("disable external audio before opening examples", self.cli("set-checked", "--component-name", "inputEnabled", "--exact", "--timeout-ms", "3000", "false"))
         self.try_step("wait after disabling external audio before examples", self.cli("wait", "--ms", "250"))
         self.run_step("open files and examples panel", self.cli("click", "--name", "openFiles", "--exact", "--timeout-ms", "5000"))
@@ -147,6 +148,11 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
         self.run_step(label, self.cli("set-checked", ref, "--timeout-ms", "3000", bool_text(desired)))
 
+    def ensure_midi_mode(self, desired: bool, context: str) -> None:
+        label = f"{'enable' if desired else 'disable'} midi mode {context}"
+        self.ensure_checked_switch("midi", label, desired)
+        self.run_step(f"wait after {label}", self.cli("wait", "--ms", "500" if desired else "250"))
+
     def exercise_modulation_graph_handles_for_tab(self, tab: str) -> None:
         if tab.startswith("RAND"):
             self.run_step(f"random graph drag for {tab}", self.cli("drag", "--class", "RandomGraphComponent", "--nth", "0", "--position", "80,24", "--dx", "50", "--dy", "0", "--steps", "8", "--timeout-ms", "5000"))
@@ -173,8 +179,23 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             return "MOD:SC:0"
         raise StepError(f"unknown modulation tab {tab}")
 
-    def exercise_modulation_source_assignment(self, tab: str) -> None:
-        handle_nth = MOD_HANDLE_INDEX.get(tab)
+    def visible_modulation_handle_index(self, tab: str, env_visible: bool) -> int | None:
+        if env_visible:
+            return MOD_HANDLE_INDEX.get(tab)
+
+        if tab.startswith("ENV "):
+            return None
+        if tab.startswith("LFO "):
+            return int(tab.split()[1]) - 1
+        if tab.startswith("RAND "):
+            return 8 + int(tab.split()[1]) - 1
+        if tab == "INPUT":
+            return 11
+        return None
+
+    def exercise_modulation_source_assignment(self, tab: str, handle_nth: int | None = None, env_visible: bool = True) -> None:
+        if handle_nth is None:
+            handle_nth = self.visible_modulation_handle_index(tab, env_visible)
         if handle_nth is None:
             self.die(f"No modulation handle index mapping for '{tab}'")
 
@@ -187,6 +208,17 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step(f"drag modulation strength {tab}", self.cli("drag", "--class", "DepthIndicator", "--nth", "0", "--dx", "0", "--dy", "-18", "--steps", "8", "--force", "--timeout-ms", "5000"))
         self.run_step(f"right click modulation strength {tab} and set bipolar", self.cli("right-click", "--class", "DepthIndicator", "--nth", "0", "--force", "--menu-item", "Make Bipolar", "--timeout-ms", "5000"))
         self.try_step(f"dismiss modulation context menu {tab}", self.cli("press", "Escape"))
+
+    def exercise_modulation_tabs(self, tabs: list[str], env_visible: bool) -> None:
+        for tab in tabs:
+            handle_nth = self.visible_modulation_handle_index(tab, env_visible)
+            if handle_nth is None:
+                self.try_step(f"skip unavailable modulation tab {tab}", self.cli("wait", "--ms", "1"))
+                continue
+            self.try_step(f"select modulation tab {tab}", self.cli("click", "--class", "ModTabHandle", "--nth", handle_nth, "--force", "--timeout-ms", "2500"))
+            self.try_step(f"describe modulation tab {tab}", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "ModTabHandle", "--nth", handle_nth))
+            self.exercise_modulation_graph_handles_for_tab(tab)
+            self.exercise_modulation_source_assignment(tab, handle_nth, env_visible)
 
     def exercise_hello_world_editor(self) -> None:
         edited_text = "hello\njucewright automation\nworld"
@@ -325,12 +357,13 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
     def exercise_external_file(self, kind: str, path: Path) -> None:
         self.launch_app(f"external {kind}")
+        self.ensure_midi_mode(False, f"for external {kind}")
         self.run_step(f"drop external {kind} file", self.cli("drop-files", "--file", path, "--timeout-ms", "5000"))
         self.run_step(f"wait after dropping external {kind}", self.cli("wait", "--ms", "750"))
         self.run_step(f"snapshot external {kind}", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
         screenshot = self.artifact_dir / f"visualiser_external_{slug(kind)}.png"
         self.run_step(f"visualiser screenshot external {kind}", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", screenshot))
-        self.try_step(f"visualiser nonblank external {kind}", lambda: self.check_png_not_blank(screenshot))
+        self.try_step(f"visualiser nonblank external {kind}", lambda: self.check_visualiser_png_not_blank(screenshot))
         self.exercise_current_file_common(f"external {kind}")
         self.exercise_frame_and_timeline_controls(f"external {kind}", kind)
 
@@ -393,6 +426,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.run_step("list sessions", self.jw("list"))
             self.run_step("capabilities", self.cli("capabilities"))
             self.run_step("windows", self.cli("windows"))
+            self.ensure_midi_mode(False, "after clean startup")
             self.run_step("start trace", self.cli("trace-start", "--file", self.artifact_dir / "trace.json"))
 
             self.run_step("root full snapshot", self.cli("snapshot", "--json", "--full", "--depth", "14"))
@@ -401,7 +435,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.run_step("visualiser count", self.cli("count", "--class", "VisualiserComponent", "--nth", "0"))
             self.run_step("visualiser describe", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "VisualiserComponent", "--nth", "0"))
             self.run_step("visualiser screenshot", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", self.artifact_dir / "visualiser.png"))
-            self.run_step("visualiser screenshot nonblank check", lambda: self.check_png_not_blank(self.artifact_dir / "visualiser.png"))
+            self.run_step("visualiser screenshot nonblank check", lambda: self.check_visualiser_png_not_blank(self.artifact_dir / "visualiser.png"))
 
             for menu in ["File", "Edit", "About", "Video", "Audio", "Interface"]:
                 self.exercise_menu(menu)
@@ -414,6 +448,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.exercise_visible_controls("quick controls root", 0, "--class", "QuickControlsBar")
             self.exercise_visible_controls("volume controls root", 0, "--class", "VolumeComponent")
             self.exercise_visible_controls("main workspace controls", 25 if self.quick else 120)
+            self.ensure_midi_mode(False, "after generic workspace controls")
 
             text_examples = ["Hello World"] if self.quick else TEXT_EXAMPLES
             lua_examples = ["Spiral", "Shape Generator"] if self.quick else LUA_EXAMPLES
@@ -450,30 +485,29 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
             self.try_step("hidden timeline describe without animatable file", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "TimelineComponent", "--hidden"))
 
-            self.run_step("midi controls describe", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "MidiComponent"))
-            self.ensure_checked_switch("midi", "enable midi mode", True)
-            self.run_step("wait after enabling midi mode", self.cli("wait", "--ms", "500"))
-            self.run_step("midi controls after toggle", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "MidiComponent"))
-            self.ensure_midi_keyboard_visible()
-            self.exercise_midi_keyboard_clicks()
+            self.ensure_midi_mode(False, "before non-env modulation")
+            self.run_step("midi controls describe with midi disabled", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "MidiComponent"))
 
-            self.run_step("modulation tabs snapshot", self.cli("locator", "--format", "json", "--class", "ModTabHandle"))
+            self.run_step("modulation tabs snapshot with midi disabled", self.cli("locator", "--format", "json", "--class", "ModTabHandle"))
             mod_tabs = ["LFO 1", "RAND 1", "INPUT", "ENV 1"] if self.quick else MOD_TABS
-            for tab in mod_tabs:
-                handle_nth = MOD_HANDLE_INDEX.get(tab)
-                if handle_nth is None:
-                    self.try_step(f"skip unavailable modulation tab {tab}", self.cli("wait", "--ms", "1"))
-                    continue
-                self.try_step(f"select modulation tab {tab}", self.cli("click", "--class", "ModTabHandle", "--nth", handle_nth, "--force", "--timeout-ms", "2500"))
-                self.try_step(f"describe modulation tab {tab}", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "ModTabHandle", "--nth", handle_nth))
-                self.exercise_modulation_graph_handles_for_tab(tab)
-                self.exercise_modulation_source_assignment(tab)
+            non_env_tabs = [tab for tab in mod_tabs if not tab.startswith("ENV ")]
+            env_tabs = [tab for tab in mod_tabs if tab.startswith("ENV ")]
+            self.exercise_modulation_tabs(non_env_tabs, False)
 
             self.try_step("lfo graph drag", self.cli("drag", "--class", "NodeGraphComponent", "--nth", "0", "--dx", "20", "--dy", "-20", "--steps", "8", "--timeout-ms", "3000"))
             self.try_step("modulation graph snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "NodeGraphComponent", "--nth", "0"))
 
+            self.ensure_midi_mode(True, "for keyboard and env modulation")
+            self.run_step("midi controls after enabling for keyboard and env", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "MidiComponent"))
+            self.ensure_midi_keyboard_visible()
+            self.exercise_midi_keyboard_clicks()
+            self.run_step("modulation tabs snapshot with midi enabled", self.cli("locator", "--format", "json", "--class", "ModTabHandle"))
+            self.exercise_modulation_tabs(env_tabs, True)
+            self.ensure_midi_mode(False, "after keyboard and env modulation")
+
             self.run_step("stop startup trace before clean effects sweep", self.cli("trace-stop"))
             self.launch_app("clean effects sweep")
+            self.ensure_midi_mode(False, "for clean effects sweep")
             self.run_step("start effects trace", self.cli("trace-start", "--file", self.artifact_dir / "effects-trace.json"))
             self.run_step("audio effects describe", self.cli("describe", "--json", "--interesting", "--depth", "10", "--class", "EffectsComponent"))
             self.try_open_effect_browser("initial effects sweep")

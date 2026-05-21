@@ -3,8 +3,6 @@
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
 #include <osci_gui/osci_gui.h>
-#include <osci_gui/osci_gui.h>
-#include <osci_gui/osci_gui.h>
 
 // A grid-based browser for opening files: includes examples by category and a generic file chooser
 class OpenFileComponent : public juce::Component

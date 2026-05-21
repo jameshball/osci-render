@@ -7,7 +7,7 @@ from pathlib import Path
 from .errors import StepError
 
 
-def check_png_not_blank(file: Path) -> None:
+def check_png_not_blank(file: Path, *, crop_bottom_fraction: float = 0.0) -> None:
     data = file.read_bytes()
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
         raise StepError("not a png")
@@ -35,11 +35,15 @@ def check_png_not_blank(file: Path) -> None:
 
     raw = zlib.decompress(payload)
     stride = width * channels
+    checked_height = height
+    if crop_bottom_fraction > 0.0:
+        checked_height = max(1, min(height, int(height * (1.0 - crop_bottom_fraction))))
+
     prior = bytearray(stride)
     values: list[int] = []
     offset = 0
 
-    for _ in range(height):
+    for y in range(height):
         filter_type = raw[offset]
         offset += 1
         row = bytearray(raw[offset:offset + stride])
@@ -69,6 +73,9 @@ def check_png_not_blank(file: Path) -> None:
                 raise StepError("unsupported png filter")
 
         prior = recon
+        if y >= checked_height:
+            continue
+
         if color_type in (2, 6):
             values.extend(recon[i] for i in range(0, len(recon), channels))
             values.extend(recon[i] for i in range(1, len(recon), channels))
@@ -82,6 +89,6 @@ def check_png_not_blank(file: Path) -> None:
     minimum = min(values)
     maximum = max(values)
     mean = sum(values) / len(values)
-    print(f"min={minimum} max={maximum} mean={mean:.2f}")
+    print(f"min={minimum} max={maximum} mean={mean:.2f} checkedHeight={checked_height}")
     if maximum < 10 or maximum - minimum < 4:
         raise StepError("image appears blank or nearly flat")

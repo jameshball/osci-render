@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../parser/gpla/LineArtParser.h"
+#include <osci_file_import/osci_file_import.h>
 
 class OscirenderAudioProcessor;
 class ObjectServer : public juce::Thread {
