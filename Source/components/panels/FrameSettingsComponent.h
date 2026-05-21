@@ -4,7 +4,7 @@
 #include "../../PluginProcessor.h"
 #include "../DoubleTextBox.h"
 #include "../effects/EffectComponent.h"
-#include "../SwitchButton.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 class FrameSettingsComponent : public juce::GroupComponent, public juce::AudioProcessorParameter::Listener, juce::AsyncUpdater {

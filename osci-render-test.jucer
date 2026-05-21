@@ -24,12 +24,7 @@
           <FILE id="VmC3" name="VoiceManager.cpp" compile="1" resource="0" file="Source/audio/synth/VoiceManager.cpp"/>
         </GROUP>
       </GROUP>
-      <GROUP id="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}" name="lua">
-        <FILE id="LuaPCp" name="LuaParser.cpp" compile="1" resource="0" file="Source/lua/LuaParser.cpp"/>
-        <FILE id="LuaPHd" name="LuaParser.h" compile="0" resource="0" file="Source/lua/LuaParser.h"/>
-        <FILE id="LuaLCp" name="LuaLibrary.cpp" compile="1" resource="0" file="Source/lua/LuaLibrary.cpp"/>
-        <FILE id="LuaLHd" name="LuaLibrary.h" compile="0" resource="0" file="Source/lua/LuaLibrary.h"/>
-      </GROUP>
+      <GROUP id="{B2C3D4E5-F6A7-8901-BCDE-F12345678901}" name="lua"/>
     </GROUP>
     <GROUP id="{C3D4E5F6-A7B8-9012-CDEF-123456789012}" name="Tests">
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="tests/TestMain.cpp"/>
@@ -84,6 +79,7 @@
     <MODULE id="juce_mts_esp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
   <EXPORTFORMATS>
@@ -101,6 +97,7 @@
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
@@ -127,6 +124,7 @@
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
@@ -152,6 +150,7 @@
         <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>

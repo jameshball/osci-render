@@ -1,6 +1,5 @@
 #include <JuceHeader.h>
-#include "../Source/lua/LuaParser.h"
-#include "../Source/lua/LuaLibrary.h"
+#include <osci_scripting/osci_scripting.h>
 #include <lua.hpp>
 
 // ============================================================================

@@ -7,7 +7,7 @@
 #include "../ToggleLabelComponent.h"
 #include "../SlopeGraphComponent.h"
 #include "../DisabledOverlay.h"
-#include "../SvgSwitchButton.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {

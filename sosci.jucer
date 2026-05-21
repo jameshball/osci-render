@@ -159,22 +159,6 @@
               resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
         <FILE id="CuMkH2" name="CustomMidiKeyboardComponent.h" compile="0"
               resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
-        <FILE id="SKySvH" name="CustomTooltipWindow.cpp" compile="1" resource="0"
-              file="Source/components/CustomTooltipWindow.cpp"/>
-        <FILE id="kgwbHY" name="CustomTooltipWindow.h" compile="0" resource="0"
-              file="Source/components/CustomTooltipWindow.h"/>
-        <FILE id="aihIvJ" name="DownloaderComponent.cpp" compile="1" resource="0"
-              file="Source/components/DownloaderComponent.cpp"/>
-        <FILE id="wBQEfb" name="DownloaderComponent.h" compile="0" resource="0"
-              file="Source/components/DownloaderComponent.h"/>
-        <FILE id="Ft2WnP" name="StopwatchComponent.h" compile="0" resource="0"
-              file="Source/components/StopwatchComponent.h"/>
-        <FILE id="SlTbHs" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
-        <FILE id="LbTbHs" name="LabelledTextBox.h" compile="0" resource="0"
-              file="Source/components/LabelledTextBox.h"/>
-        <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
-        <FILE id="BlPCCH" name="BooleanParamCCHelper.h" compile="0" resource="0"
-              file="Source/components/BooleanParamCCHelper.h"/>
         <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
@@ -211,8 +195,6 @@
         </GROUP>
         <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
               file="Source/components/ModulationState.h"/>
-        <FILE id="PrCtxS" name="ParameterContextMenu.h" compile="0" resource="0"
-              file="Source/components/ParameterContextMenu.h"/>
         <FILE id="PrStSc" name="ParameterSettingsComponent.h" compile="0" resource="0"
               file="Source/components/ParameterSettingsComponent.h"/>
         <FILE id="InVlEs" name="InlineValueEditor.h" compile="0" resource="0"
@@ -243,6 +225,8 @@
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="VTA002" name="VisualiserTextureAssets.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserTextureAssets.h"/>
         <FILE id="wdZb9U" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserSettings.cpp"/>
         <FILE id="v3pCdC" name="VisualiserSettings.h" compile="0" resource="0"

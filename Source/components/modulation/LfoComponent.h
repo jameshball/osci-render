@@ -12,7 +12,6 @@
 #include <osci_gui/osci_gui.h>
 #include "../KnobContainerComponent.h"
 
-#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessor;
 

@@ -108,10 +108,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 
-#if DEBUG
-    automation.enableFromEnvironment(*this, appName);
-#endif
-
     tooltipWindow->setMillisecondsBeforeTipAppears(100);
 
     updateTitle();

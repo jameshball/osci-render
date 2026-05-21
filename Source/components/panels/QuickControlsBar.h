@@ -4,7 +4,7 @@
 #include "../../PluginProcessor.h"
 #include "../KnobContainerComponent.h"
 #include "../ParameterBarComponent.h"
-#include "../SvgSwitchButton.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 

@@ -7,8 +7,6 @@
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../audio/AudioRecorder.h"
-#include "../components/DownloaderComponent.h"
-#include "../components/StopwatchComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "../components/timeline/TimelineComponent.h"
 #include "../components/timeline/TimelineController.h"

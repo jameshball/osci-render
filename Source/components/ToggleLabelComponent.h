@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
-#include "BooleanParamCCHelper.h"
+#include <osci_gui/osci_gui.h>
 #include <osci_render_core/effect/osci_EffectParameter.h>
 
 // A toggleable rounded-label pill that wraps a BooleanParameter.

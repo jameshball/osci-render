@@ -6,7 +6,6 @@
 #include "../components/effects/EffectComponent.h"
 #include <osci_gui/osci_gui.h>
 #include <osci_gui/visualiser/osci_VisualiserParameters.h>
-#include "../components/SwitchButton.h"
 
 #ifndef SOSCI
 class OscirenderAudioProcessor;

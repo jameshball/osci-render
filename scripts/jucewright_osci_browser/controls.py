@@ -11,6 +11,28 @@ from .utils import numeric, slug, walk_tree
 
 
 class ControlDiscoveryMixin:
+    PROTECTED_GENERIC_CONTROL_CLASSES = {
+        "MidiComponent",
+        "juce::CustomMidiKeyboardComponent",
+        "CustomMidiKeyboardComponent",
+    }
+
+    PROTECTED_GENERIC_COMPONENT_NAMES = {
+        "midi",
+        "inputenabled",
+    }
+
+    CONSERVATIVE_VISUALISER_SLIDERS = {
+        "line intensity",
+        "persistence",
+        "focus",
+        "glow",
+        "afterglow",
+        "overexposure",
+        "noise",
+        "ambient light",
+    }
+
     def check_png_not_blank(self, file, **kwargs):
         return check_png_not_blank(file, **kwargs)
 
@@ -34,6 +56,33 @@ class ControlDiscoveryMixin:
         bounds = node.get("bounds", {})
         return bounds.get("w", 1) > 0 and bounds.get("h", 1) > 0
 
+    def should_skip_control_path(self, path: tuple[dict, ...]) -> bool:
+        for node in path:
+            if str(node.get("class", "")) in self.PROTECTED_GENERIC_CONTROL_CLASSES:
+                return True
+
+            for key in ["name", "componentName", "componentId"]:
+                value = str(node.get(key, "")).strip().lower()
+                if value in self.PROTECTED_GENERIC_COMPONENT_NAMES:
+                    return True
+
+        return False
+
+    def conservative_visualiser_slider_value(self, node: dict, label: str, minimum: float, maximum: float) -> float | None:
+        if label.strip().lower() not in self.CONSERVATIVE_VISUALISER_SLIDERS:
+            return None
+
+        current = numeric(node.get("value"))
+        span = maximum - minimum
+
+        if current is None:
+            return minimum + span * 0.25
+
+        if label.strip().lower() in {"line intensity", "focus"}:
+            return max(minimum, current - span * 0.05)
+
+        return min(maximum, current + span * 0.05)
+
     def slider_value(self, node: dict, index: int) -> float | None:
         minimum = numeric(node.get("minimum"))
         maximum = numeric(node.get("maximum"))
@@ -43,12 +92,18 @@ class ControlDiscoveryMixin:
                 return None
             return current + (0.1 if index % 2 == 0 else -0.1)
 
-        fraction = 0.35 if index % 2 == 0 else 0.65
-        value = minimum + (maximum - minimum) * fraction
+        label = self.node_label(node)
+        conservative_value = self.conservative_visualiser_slider_value(node, label, minimum, maximum)
+        if conservative_value is not None:
+            value = conservative_value
+        else:
+            fraction = 0.35 if index % 2 == 0 else 0.65
+            value = minimum + (maximum - minimum) * fraction
+
         interval = numeric(node.get("interval"))
         if interval is not None and interval > 0:
             value = round(value / interval) * interval
-        return value
+        return max(minimum, min(maximum, value))
 
     def first_enabled_option_index(self, node: dict):
         options = node.get("options", [])
@@ -73,14 +128,23 @@ class ControlDiscoveryMixin:
                 return index
         return fallback
 
+    def walk_tree_with_path(self, node: dict, path: tuple[dict, ...] = ()):
+        current_path = (*path, node)
+        yield node, current_path
+        for child in node.get("children", []) or []:
+            if isinstance(child, dict):
+                yield from self.walk_tree_with_path(child, current_path)
+
     def discover_visible_controls(self, snapshot_file: Path, max_controls: int) -> list[tuple[str, str, str, str, str]]:
         data = json.loads(snapshot_file.read_text(encoding="utf-8"))
         root = data.get("tree", {})
         rows: list[tuple[str, str, str, str, str]] = []
 
-        for node in walk_tree(root):
+        for node, path in self.walk_tree_with_path(root):
             if max_controls and len(rows) >= max_controls:
                 break
+            if self.should_skip_control_path(path):
+                continue
             if not self.is_visible_control(node):
                 continue
 
