@@ -238,7 +238,7 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     int pct = (int)(depth * 100.0f);
     valuePopup->setText(paramName + " " + juce::String(pct) + "%", juce::dontSendNotification);
 
-    int popupW = valuePopup->getFont().getStringWidth(valuePopup->getText()) + 14;
+    int popupW = juce::GlyphArrangement::getStringWidthInt(valuePopup->getFont(), valuePopup->getText()) + 14;
     int popupH = 20;
     auto screenPos = localPointToGlobal(juce::Point<int>(getWidth() / 2, 0));
     valuePopup->setBounds(screenPos.x - popupW / 2, screenPos.y - popupH - 4, popupW, popupH);
