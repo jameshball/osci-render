@@ -1,6 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/audio/OutputClip.h"
-#include "../Source/visualiser/VisualiserGeometry.h"
+#include "../modules/osci_gui/visualiser/osci_VisualiserGeometry.h"
 
 class ProducerThread : public juce::Thread {
 public:

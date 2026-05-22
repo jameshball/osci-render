@@ -3,9 +3,9 @@
 <JUCERPROJECT id="HH2E72" name="sosci" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginManufacturer="jameshball"
               aaxIdentifier="sh.ball.sosci" cppLanguageStandard="20" projectLineFeed="&#10;"
-              headerPath="./include" version="1.4.1.24" companyName="James H Ball"
+              headerPath="./include" version="1.4.1.26" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
-              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;&#10;SOSCI=1"
+              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;&#10;SOSCI=1"
               pluginManufacturerCode="Jhba" pluginCode="Sosc" pluginAUMainType="'aufx'">
   <MAINGROUP id="j5Ge2T" name="sosci">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -123,10 +123,7 @@
               file="Source/audio/AudioThreadGuard.h"/>
         <FILE id="ATGrd4" name="AudioThreadGuard.cpp" compile="1" resource="0"
               file="Source/audio/AudioThreadGuard.cpp"/>
-        <GROUP id="{AUD_EFFECTS}" name="effects">
-          <FILE id="GSnwBW" name="SmoothEffect.h" compile="0" resource="0" file="Source/audio/effects/SmoothEffect.h"/>
-          <FILE id="jq3EXV" name="StereoEffect.h" compile="0" resource="0" file="Source/audio/effects/StereoEffect.h"/>
-        </GROUP>
+        <GROUP id="{AUD_EFFECTS}" name="effects"/>
         <GROUP id="{AUD_PLATFORM}" name="platform">
           <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
                 file="Source/audio/platform/SampleRateManager.h"/>
@@ -163,22 +160,6 @@
               resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
         <FILE id="CuMkH2" name="CustomMidiKeyboardComponent.h" compile="0"
               resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
-        <FILE id="SKySvH" name="CustomTooltipWindow.cpp" compile="1" resource="0"
-              file="Source/components/CustomTooltipWindow.cpp"/>
-        <FILE id="kgwbHY" name="CustomTooltipWindow.h" compile="0" resource="0"
-              file="Source/components/CustomTooltipWindow.h"/>
-        <FILE id="aihIvJ" name="DownloaderComponent.cpp" compile="1" resource="0"
-              file="Source/components/DownloaderComponent.cpp"/>
-        <FILE id="wBQEfb" name="DownloaderComponent.h" compile="0" resource="0"
-              file="Source/components/DownloaderComponent.h"/>
-        <FILE id="Ft2WnP" name="StopwatchComponent.h" compile="0" resource="0"
-              file="Source/components/StopwatchComponent.h"/>
-        <FILE id="SlTbHs" name="SliderTextBox.h" compile="0" resource="0" file="Source/components/SliderTextBox.h"/>
-        <FILE id="LbTbHs" name="LabelledTextBox.h" compile="0" resource="0"
-              file="Source/components/LabelledTextBox.h"/>
-        <FILE id="qzfstC" name="SwitchButton.h" compile="0" resource="0" file="Source/components/SwitchButton.h"/>
-        <FILE id="BlPCCH" name="BooleanParamCCHelper.h" compile="0" resource="0"
-              file="Source/components/BooleanParamCCHelper.h"/>
         <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
@@ -215,8 +196,6 @@
         </GROUP>
         <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
               file="Source/components/ModulationState.h"/>
-        <FILE id="PrCtxS" name="ParameterContextMenu.h" compile="0" resource="0"
-              file="Source/components/ParameterContextMenu.h"/>
         <FILE id="PrStSc" name="ParameterSettingsComponent.h" compile="0" resource="0"
               file="Source/components/ParameterSettingsComponent.h"/>
         <FILE id="InVlEs" name="InlineValueEditor.h" compile="0" resource="0"
@@ -235,54 +214,20 @@
               resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.cpp"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
-        <FILE id="O444rE" name="AfterglowFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/AfterglowFragmentShader.glsl"/>
-        <FILE id="kG6Zku" name="AfterglowVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/AfterglowVertexShader.glsl"/>
-        <FILE id="Y4j91J" name="BlurFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/BlurFragmentShader.glsl"/>
-        <FILE id="Fimn0E" name="BlurVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/BlurVertexShader.glsl"/>
-        <FILE id="ahlSbF" name="GlowFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/GlowFragmentShader.glsl"/>
-        <FILE id="yKcFST" name="GlowVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/GlowVertexShader.glsl"/>
-        <FILE id="R6Yr8V" name="LineFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/LineFragmentShader.glsl"/>
-        <FILE id="aK7kZN" name="LineVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/LineVertexShader.glsl"/>
-        <FILE id="BnnCmE" name="OutputFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/OutputFragmentShader.glsl"/>
-        <FILE id="df9jjf" name="OutputVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/OutputVertexShader.glsl"/>
         <FILE id="Hw3RUp" name="RecordingSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
-        <FILE id="SoVGeo" name="VisualiserGeometry.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserGeometry.h"/>
         <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
-        <FILE id="ePJ1g0" name="SimpleFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/SimpleFragmentShader.glsl"/>
-        <FILE id="GFGIEu" name="SimpleVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/SimpleVertexShader.glsl"/>
-        <FILE id="bie77n" name="TexturedFragmentShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/TexturedFragmentShader.glsl"/>
-        <FILE id="EW75fo" name="TexturedVertexShader.glsl" compile="0" resource="0"
-              file="Source/visualiser/TexturedVertexShader.glsl"/>
         <FILE id="pxVOD9" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
-        <FILE id="IzKiqO" name="VisualiserParameters.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserParameters.h"/>
-        <FILE id="A9Zk5z" name="VisualiserRenderer.cpp" compile="1" resource="0"
-              file="Source/visualiser/VisualiserRenderer.cpp"/>
-        <FILE id="XquFmM" name="VisualiserRenderer.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserRenderer.h"/>
+        <FILE id="VTA002" name="VisualiserTextureAssets.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserTextureAssets.h"/>
         <FILE id="wdZb9U" name="VisualiserSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserSettings.cpp"/>
         <FILE id="v3pCdC" name="VisualiserSettings.h" compile="0" resource="0"
@@ -344,8 +289,8 @@
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
-        <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
@@ -385,8 +330,8 @@
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
-        <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
@@ -435,8 +380,8 @@
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
-        <MODULEPATH id="melatonin_inspector" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
@@ -452,6 +397,7 @@
     <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="jucewright" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -473,7 +419,6 @@
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="melatonin_inspector" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>

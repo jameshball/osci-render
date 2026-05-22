@@ -3,6 +3,7 @@
 #include "../CommonPluginEditor.h"
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
+#include "VisualiserTextureAssets.h"
 
 VisualiserComponent::FadeCoverComponent::FadeCoverComponent() {
     setOpaque(false);
@@ -36,6 +37,8 @@ VisualiserComponent::VisualiserComponent(
                            visualiserOnly(visualiserOnly),
                            parent(parent),
                            editor(pluginEditor) {
+    setAssets(createVisualiserTextureAssets());
+
     // Sync active state with the parameter for the primary visualiser
     if (isPrimaryVisualiser()) {
         active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();

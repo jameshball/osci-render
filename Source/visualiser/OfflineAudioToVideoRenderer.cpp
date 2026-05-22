@@ -3,6 +3,7 @@
 #if OSCI_PREMIUM
 
 #include "../LookAndFeel.h"
+#include "VisualiserTextureAssets.h"
 
 bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpegExe,
                                                        const juce::File& videoInput,
@@ -85,6 +86,7 @@ OfflineAudioToVideoRendererComponent::OfflinePreviewRenderer::OfflinePreviewRend
     : VisualiserRenderer(parameters, manager, {1024, 1024}, 60.0, "Offline"),
       glReadyEvent(glReadyEventToSignal)
 {
+    setAssets(createVisualiserTextureAssets());
 }
 
 void OfflineAudioToVideoRendererComponent::OfflinePreviewRenderer::newOpenGLContextCreated()

@@ -19,27 +19,16 @@
 #include "audio/effects/TwistEffect.h"
 #include "audio/effects/PolygonizerEffect.h"
 #include "audio/effects/SpiralBitCrushEffect.h"
-#include "audio/effects/DistortEffect.h"
-#include "audio/effects/UnfoldEffect.h"
 #include "audio/effects/MultiplexEffect.h"
-#include "audio/effects/SmoothEffect.h"
 #include "audio/effects/WobbleEffect.h"
 #include "audio/effects/DuplicatorEffect.h"
 #include "audio/effects/DashedLineEffect.h"
-#include "audio/effects/VectorCancellingEffect.h"
-#include "audio/effects/ScaleEffect.h"
-#include "audio/effects/RotateEffect.h"
-#include "audio/effects/TranslateEffect.h"
-#include "audio/effects/RippleEffect.h"
-#include "audio/effects/SwirlEffect.h"
-#include "audio/effects/BounceEffect.h"
-#include "audio/effects/SkewEffect.h"
 #include "audio/effects/KaleidoscopeEffect.h"
 #include "audio/effects/VortexEffect.h"
 #include "audio/effects/GodRayEffect.h"
 #include "parser/FileParser.h"
-#include "parser/FrameProducer.h"
 #include "audio/modulation/LfoPresetManager.h"
+#include <osci_render_core/osci_render_core.h>
 
 #if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
 #include "parser/img/ImageParser.h"
@@ -53,13 +42,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     toggleableEffects.push_back(BitCrushEffect().build());
     toggleableEffects.push_back(BulgeEffect().build());
-    toggleableEffects.push_back(VectorCancellingEffect().build());
-    toggleableEffects.push_back(RippleEffectApp().build());
-    toggleableEffects.push_back(RotateEffectApp().build());
-    toggleableEffects.push_back(TranslateEffectApp().build());
-    toggleableEffects.push_back(SwirlEffectApp().build());
-    toggleableEffects.push_back(SmoothEffect().build());
-    toggleableEffects.push_back(DelayEffect().build());
+    toggleableEffects.push_back(VectorCancellingEffect().withIcon(BinaryData::vectorcancelling_svg).build());
+    toggleableEffects.push_back(RippleEffectApp().withIcon(BinaryData::ripple_svg).build());
+    toggleableEffects.push_back(RotateEffectApp().withIcon(BinaryData::rotate_svg).build());
+    toggleableEffects.push_back(TranslateEffectApp().withIcon(BinaryData::translate_svg).build());
+    toggleableEffects.push_back(SwirlEffectApp().withIcon(BinaryData::swirl_svg).build());
+    toggleableEffects.push_back(osci::SmoothEffect().withIcon(BinaryData::smoothing_svg).build());
+    toggleableEffects.push_back(DelayEffect().withIcon(BinaryData::delay_svg).build());
     toggleableEffects.push_back(DashedLineEffect().build());
     toggleableEffects.push_back(TraceEffect().build());
     toggleableEffects.push_back(WobbleEffect().build());
@@ -68,10 +57,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     std::vector<std::shared_ptr<osci::Effect>> premiumEffects;
 
     premiumEffects.push_back(MultiplexEffect().build());
-    premiumEffects.push_back(UnfoldEffect().build());
-    premiumEffects.push_back(BounceEffect().build());
+    premiumEffects.push_back(UnfoldEffect().withIcon(BinaryData::unfold_svg).build());
+    premiumEffects.push_back(BounceEffect().withIcon(BinaryData::bounce_svg).build());
     premiumEffects.push_back(TwistEffect().build());
-    premiumEffects.push_back(SkewEffect().build());
+    premiumEffects.push_back(SkewEffect().withIcon(BinaryData::skew_svg).build());
     premiumEffects.push_back(PolygonizerEffect().build());
     premiumEffects.push_back(KaleidoscopeEffect().build());
     premiumEffects.push_back(VortexEffect().build());
@@ -83,11 +72,11 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         toggleableEffects.push_back(premiumEffect);
     }
 
-    auto scaleEffect = ScaleEffectApp().build();
+    auto scaleEffect = ScaleEffectApp().withIcon(BinaryData::scale_svg).build();
     booleanParameters.push_back(scaleEffect->linked);
     toggleableEffects.push_back(scaleEffect);
 
-    auto distortEffect = DistortEffect().build();
+    auto distortEffect = DistortEffect().withIcon(BinaryData::distort_svg).build();
     booleanParameters.push_back(distortEffect->linked);
     toggleableEffects.push_back(distortEffect);
 

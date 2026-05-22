@@ -3,9 +3,8 @@
 #include <JuceHeader.h>
 #include "../components/effects/EffectComponent.h"
 #include <osci_gui/osci_gui.h>
+#include <osci_gui/visualiser/osci_VisualiserGeometry.h>
 #include "../LookAndFeel.h"
-#include "../components/SwitchButton.h"
-#include "VisualiserGeometry.h"
 
 // Define codec options
 enum class VideoCodec {

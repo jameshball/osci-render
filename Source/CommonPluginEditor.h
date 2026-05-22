@@ -8,12 +8,10 @@
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
 #include "components/VolumeComponent.h"
-#include "components/DownloaderComponent.h"
 #include "components/UpdatePromptComponent.h"
-#include "components/CustomTooltipWindow.h"
 
-#if DEBUG
-    #include "melatonin_inspector/melatonin_inspector.h"
+#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+    #include <jucewright/jucewright.h>
 #endif
 
 class CommonPluginEditor : public juce::AudioProcessorEditor,
@@ -123,8 +121,8 @@ public:
     juce::OpenGLContext openGlContext;
 #endif
 
-#if DEBUG
-    melatonin::Inspector inspector { *this, false };
+#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+    jucewright::EnvironmentAutomation automation { *this };
 #endif
 
     bool keyPressed(const juce::KeyPress& key) override;
