@@ -349,8 +349,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             "automation.png": self.root_dir / "Resources" / "oscilloscope" / "real.png",
             "automation.jpg": self.root_dir / "Resources" / "oscilloscope" / "empty.jpg",
             "automation.flac": self.root_dir / "Resources" / "audio" / "sosci.flac",
-            "automation.mp4": self.root_dir / "osci-render-website" / "assets" / "images" / "cubes.mp4",
-            "automation.mov": self.root_dir / "osci-render-website" / "assets" / "images" / "cubes.mp4",
+            "automation.mp4": self.root_dir / "tests" / "fixtures" / "jucewright" / "cubes.mp4",
+            "automation.mov": self.root_dir / "tests" / "fixtures" / "jucewright" / "cubes.mp4",
         }
         for name, source in fixtures.items():
             shutil.copyfile(source, self.fixture_dir / name)
