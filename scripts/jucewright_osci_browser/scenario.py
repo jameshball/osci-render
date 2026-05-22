@@ -40,11 +40,13 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
         self.open_examples_panel()
         self.run_step(f"load example {name}", self.cli("click", "--class", "osci::GridItemComponent", "--nth", nth, "--force", "--timeout-ms", "6000"))
-        self.run_step(f"wait after loading {name}", self.cli("wait", "--ms", "400"))
+        self.run_step(f"wait after loading {name}", self.cli("wait", "--ms", "750"))
         self.run_step(f"snapshot after loading {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
         if expect_source:
             self.try_step(f"source editor for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", "ErrorCodeEditorComponent", "--nth", "0"))
-        self.try_step(f"visualiser screenshot after {name}", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", self.artifact_dir / f"visualiser_{slug(name)}.png"))
+        visualiser_file = self.artifact_dir / f"visualiser_{slug(name)}.png"
+        self.run_step(f"visualiser screenshot after {name}", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", visualiser_file))
+        self.run_step(f"visualiser nonblank after {name}", lambda: self.check_visualiser_png_not_blank(visualiser_file))
         self.try_step(f"dismiss transient overlays after {name}", self.cli("press", "Escape"))
 
     def exercise_current_file_common(self, label: str) -> None:
@@ -351,8 +353,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             "png": self.root_dir / "Resources" / "oscilloscope" / "real.png",
             "jpg": self.root_dir / "Resources" / "oscilloscope" / "empty.jpg",
             "flac": self.root_dir / "Resources" / "audio" / "sosci.flac",
-            "mp4": self.root_dir / "osci-render-website" / "assets" / "images" / "cubes.mp4",
-            "mov": self.root_dir / "osci-render-website" / "assets" / "images" / "cubes.mp4",
+            "mp4": self.root_dir / "tests" / "fixtures" / "jucewright" / "cubes.mp4",
+            "mov": self.root_dir / "tests" / "fixtures" / "jucewright" / "cubes.mp4",
         }
         for kind in external_types:
             source = fixtures.get(kind)

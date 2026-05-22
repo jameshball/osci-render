@@ -286,7 +286,8 @@ class BrowserSession:
             "--copy-setting",
             "osci-licensing.settings",
         )
-        if os.environ.get("KEEP_AUDIO_STATE", "").lower() in ["1", "true", "yes"]:
+        keep_audio_state = os.environ.get("KEEP_AUDIO_STATE", "").lower() in ["1", "true", "yes"]
+        if keep_audio_state:
             command.append("--keep-audio-state")
 
         completed = subprocess.run([str(part) for part in command], cwd=self.root_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -300,11 +301,38 @@ class BrowserSession:
 
         settings_file = profile.get("settingsFile")
         if settings_file:
-            audio_output = self.disable_profile_audio_input(Path(settings_file))
-            profile["disabledAudioInput"] = True
-            profile["audioOutputDeviceName"] = audio_output
+            if keep_audio_state:
+                audio_output = self.disable_profile_audio_input(Path(settings_file))
+                profile["disabledAudioInput"] = True
+                profile["audioOutputDeviceName"] = audio_output
+            else:
+                self.reset_profile_audio_to_default_output(Path(settings_file))
+                profile["resetAudioSetupToDefaultOutput"] = True
+                profile["mutedAudioInput"] = True
 
         return profile
+
+    @staticmethod
+    def reset_profile_audio_to_default_output(settings_file: Path) -> None:
+        if settings_file.exists():
+            tree = ET.parse(settings_file)
+            root = tree.getroot()
+        else:
+            root = ET.Element("PROPERTIES")
+            tree = ET.ElementTree(root)
+
+        for child in list(root.findall("VALUE")):
+            if child.get("name") == "audioSetup":
+                root.remove(child)
+
+        for child in root.findall("VALUE"):
+            if child.get("name") == "shouldMuteInput":
+                child.set("val", "1")
+                break
+        else:
+            ET.SubElement(root, "VALUE", {"name": "shouldMuteInput", "val": "1"})
+
+        tree.write(settings_file, encoding="UTF-8", xml_declaration=True)
 
     @staticmethod
     def disable_profile_audio_input(settings_file: Path) -> str | None:
