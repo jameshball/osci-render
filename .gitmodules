@@ -1,9 +1,6 @@
 [submodule "modules/chowdsp_utils"]
 	path = modules/chowdsp_utils
 	url = ../../Chowdhury-DSP/chowdsp_utils.git
-[submodule "modules/juce_sharedtexture"]
-	path = modules/juce_sharedtexture
-	url = ../../jameshball/juce_sharedtexture.git
 [submodule "modules/osci_render_core"]
 	path = modules/osci_render_core
 	url = ../../jameshball/osci_render_core.git

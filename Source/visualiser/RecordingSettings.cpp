@@ -15,8 +15,8 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     addAndMakeVisible(compressionPresetLabel);
     addAndMakeVisible(videoCodecSelector);
     addAndMakeVisible(videoCodecLabel);
-    addAndMakeVisible(customSharedTextureOutputLabel);
-    addAndMakeVisible(customSharedTextureOutputEditor);
+    addAndMakeVisible(customTextureOutputLabel);
+    addAndMakeVisible(customTextureOutputEditor);
 
     quality.setRangeEnabled(false);
     resolution.setRangeEnabled(false);
@@ -62,10 +62,10 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     };
     videoCodecLabel.setTooltip("The video codec to use when recording. Different codecs offer different trade-offs between quality, file size, and compatibility.");
 
-    customSharedTextureOutputLabel.setTooltip("Custom name for when creating a new Syphon/Spout server. WARNING: You should not use the same name when running multiple servers at once!.");
-    customSharedTextureOutputEditor.setText(parameters.customSharedTextureServerName);
-    customSharedTextureOutputEditor.onTextChange = [this] {
-        parameters.customSharedTextureServerName = customSharedTextureOutputEditor.getText();
+    customTextureOutputLabel.setTooltip("Custom source name for texture output. Avoid using the same name for multiple running outputs.");
+    customTextureOutputEditor.setText(parameters.customTextureOutputName);
+    customTextureOutputEditor.onTextChange = [this] {
+        parameters.customTextureOutputName = customTextureOutputEditor.getText();
     };
 #else
     addAndMakeVisible(recordVideoWarning);
@@ -113,8 +113,8 @@ void RecordingSettings::resized() {
 
     area.removeFromTop(5);
     row = area.removeFromTop(rowHeight);
-    customSharedTextureOutputLabel.setBounds(row.removeFromLeft(170));
-    customSharedTextureOutputEditor.setBounds(row.removeFromRight(100));
+    customTextureOutputLabel.setBounds(row.removeFromLeft(170));
+    customTextureOutputEditor.setBounds(row.removeFromRight(100));
 #else
     recordVideoWarning.setBounds(area.removeFromTop(2 * rowHeight));
     area.removeFromTop(rowHeight / 2);

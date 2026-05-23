@@ -309,10 +309,6 @@
               file="Source/components/SplashScreenComponent.cpp"/>
         <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
               file="Source/components/SplashScreenComponent.h"/>
-        <FILE id="rA7fII" name="SyphonInputSelectorComponent.h" compile="0"
-              resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
-        <FILE id="SypOvR" name="SyphonInputOverlay.h" compile="0" resource="0"
-              file="Source/components/SyphonInputOverlay.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
@@ -527,8 +523,6 @@
               file="Source/video/FFmpegEncoderManager.h"/>
         <FILE id="xEIRCs" name="InvisibleOpenGLContextComponent.h" compile="0"
               resource="0" file="Source/video/InvisibleOpenGLContextComponent.h"/>
-        <FILE id="OyC3qj" name="SyphonFrameGrabber.h" compile="0" resource="0"
-              file="Source/video/SyphonFrameGrabber.h"/>
       </GROUP>
       <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
         <FILE id="XpwLUN" name="RecordingSettings.cpp" compile="1" resource="0"
@@ -616,7 +610,6 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -666,7 +659,6 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -682,22 +674,20 @@
     <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="aZXbCi"
                bigIcon="aZXbCi" applicationCategory="public.app-category.music"
-               microphonePermissionNeeded="1" frameworkSearchPaths="/Library/Frameworks"
-               extraCustomFrameworks="/Library/Frameworks/Syphon.framework"
-               hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
+               microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                externalLibraries="luajit" userNotes="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+        <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+        <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
-        <CONFIGURATION name="Profiling" targetName="osci-render" customXcodeFlags="LD_RUNPATH_SEARCH_PATHS = '/Library/Frameworks',OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,GCC_GENERATE_DEBUGGING_SYMBOLS=YES,GCC_DEBUGGING_SYMBOLS=full,DEBUG_INFORMATION_FORMAT=dwarf-with-dsym,STRIP_INSTALLED_PRODUCT = NO,COPY_PHASE_STRIP=NO,DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES"
+        <CONFIGURATION name="Profiling" targetName="osci-render" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,GCC_GENERATE_DEBUGGING_SYMBOLS=YES,GCC_DEBUGGING_SYMBOLS=full,DEBUG_INFORMATION_FORMAT=dwarf-with-dsym,STRIP_INSTALLED_PRODUCT = NO,COPY_PHASE_STRIP=NO,DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES"
                        headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
@@ -726,7 +716,6 @@
         <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
         <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
         <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -772,7 +761,6 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_mts_esp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
-    <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
