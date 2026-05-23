@@ -146,9 +146,8 @@ void VolumeComponent::paint(juce::Graphics& g) {
 
     auto drawPeakCap = [&](const juce::Rectangle<float>& region, float peak) {
         auto crossedClipThreshold = clipActive && peak > 0.0f && peak >= thresholdValue - osci::kOutputClipPeakEpsilon;
-        auto crossedUnity = !clipActive && peak > 1.0f + osci::kOutputClipPeakEpsilon;
 
-        if (!crossedClipThreshold && !crossedUnity) {
+        if (!crossedClipThreshold) {
             return;
         }
 
@@ -158,7 +157,7 @@ void VolumeComponent::paint(juce::Graphics& g) {
             region.getWidth() - 2.0f,
             3.0f);
 
-        g.setColour(crossedClipThreshold ? juce::Colours::red.withAlpha(0.78f) : juce::Colours::orange.withAlpha(0.65f));
+        g.setColour(juce::Colours::red.withAlpha(0.78f));
         g.fillRoundedRectangle(capRect, 1.5f);
     };
 
