@@ -322,27 +322,36 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
 void VoiceBuilder::run() {
     while (!threadShouldExit()) {
-        const int target = targetCount.load(std::memory_order_acquire);
-        const int current = processor.synth.getNumVoices();
-
-        if (current == target) {
-            wait(-1);
-            continue;
+        wait(-1);
+        if (threadShouldExit()) {
+            break;
         }
 
-        if (current < target) {
-            // Build one voice at a time so the target can be re-checked between allocations.
-            auto* voice = new ShapeVoice(processor, processor.inputBuffer, current);
+        // Build or remove voices one at a time, re-checking the target
+        // between each operation to handle rapid slider changes.
+        while (!threadShouldExit()) {
+            const int target = targetCount.load(std::memory_order_acquire);
+            const int current = processor.synth.getNumVoices();
 
-            if (targetCount.load(std::memory_order_acquire) > current) {
-                processor.synth.addVoice(voice); // internally locked
-                readyVoiceCount.store(current + 1, std::memory_order_release);
-            } else {
-                delete voice;
+            if (current == target) {
+                break;
             }
-        } else {
-            processor.synth.removeVoice(current - 1); // internally locked
-            readyVoiceCount.store(current - 1, std::memory_order_release);
+
+            if (current < target) {
+                // Build one voice (the expensive part — runs off the
+                // message and audio threads).
+                auto* voice = new ShapeVoice(processor, processor.inputBuffer, current);
+
+                // Re-check: is this voice still needed?
+                if (targetCount.load(std::memory_order_acquire) > current) {
+                    processor.synth.addVoice(voice); // internally locked
+                } else {
+                    delete voice;
+                }
+            } else {
+                // Removal is cheap — just do it directly.
+                processor.synth.removeVoice(current - 1); // internally locked
+            }
         }
     }
 }
@@ -914,12 +923,8 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
     // if midi has just been disabled or we need to retrigger
     if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
-        if (voiceBuilder != nullptr && voiceBuilder->hasAnyVoiceReady()) {
-            midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
-            retriggerMidi = false;
-        } else {
-            retriggerMidi = true;
-        }
+        midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
+        retriggerMidi = false;
     }
 
     prevMidiEnabled = usingMidi;
