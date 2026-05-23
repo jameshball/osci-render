@@ -116,6 +116,8 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="r2FzhS" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
+      <FILE id="JwAu02" name="JucewrightAutomation.h" compile="0" resource="0"
+            file="Source/JucewrightAutomation.h"/>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="ATGrd3" name="AudioThreadGuard.h" compile="0" resource="0"
@@ -123,26 +125,8 @@
         <FILE id="ATGrd4" name="AudioThreadGuard.cpp" compile="1" resource="0"
               file="Source/audio/AudioThreadGuard.cpp"/>
         <GROUP id="{AUD_EFFECTS}" name="effects"/>
-        <GROUP id="{AUD_PLATFORM}" name="platform">
-          <FILE id="aziWU2" name="SampleRateManager.h" compile="0" resource="0"
-                file="Source/audio/platform/SampleRateManager.h"/>
-          <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
-                file="Source/audio/platform/ProcessAudioDeviceType.h"/>
-          <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
-                file="Source/audio/platform/ProcessAudioDeviceType.mm"/>
-          <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
-                file="Source/audio/platform/ProcessAudioPermissions.h"/>
-          <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
-                file="Source/audio/platform/ProcessAudioPermissions.mm"/>
-          <FILE id="WlLpH2" name="WindowsLoopbackAudioDeviceType.h" compile="0"
-                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.h"/>
-          <FILE id="WlLpC2" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
-                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.cpp"/>
-        </GROUP>
-        <GROUP id="{AUD_WAV_S}" name="wav">
-          <FILE id="WvPrC2" name="WavParser.cpp" compile="1" resource="0" file="Source/audio/wav/WavParser.cpp"/>
-          <FILE id="WvPrH2" name="WavParser.h" compile="0" resource="0" file="Source/audio/wav/WavParser.h"/>
-        </GROUP>
+        <GROUP id="{AUD_PLATFORM}" name="platform"/>
+        <GROUP id="{AUD_WAV_S}" name="wav"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
@@ -155,10 +139,6 @@
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
               file="Source/components/RecordingSettingsOverlay.h"/>
-        <FILE id="CuMkC2" name="CustomMidiKeyboardComponent.cpp" compile="1"
-              resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
-        <FILE id="CuMkH2" name="CustomMidiKeyboardComponent.h" compile="0"
-              resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
         <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
@@ -197,20 +177,12 @@
               file="Source/components/ModulationState.h"/>
         <FILE id="PrStSc" name="ParameterSettingsComponent.h" compile="0" resource="0"
               file="Source/components/ParameterSettingsComponent.h"/>
-        <FILE id="InVlEs" name="InlineValueEditor.h" compile="0" resource="0"
-              file="Source/components/InlineValueEditor.h"/>
-        <FILE id="RtKnbS" name="RotaryKnobComponent.h" compile="0" resource="0"
-              file="Source/components/RotaryKnobComponent.h"/>
         <FILE id="KnCnHs" name="KnobContainerComponent.h" compile="0" resource="0"
               file="Source/components/KnobContainerComponent.h"/>
         <FILE id="KnCnCs" name="KnobContainerComponent.cpp" compile="1" resource="0"
               file="Source/components/KnobContainerComponent.cpp"/>
         <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
               file="Source/components/ModulationState.cpp"/>
-        <FILE id="C5aY6T" name="CustomAudioDeviceSelectorComponent.h" compile="0"
-              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.h"/>
-        <FILE id="Yp4s2V" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
-              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.cpp"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
         <FILE id="Hw3RUp" name="RecordingSettings.cpp" compile="1" resource="0"
@@ -287,6 +259,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -328,6 +302,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -378,6 +354,8 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -418,6 +396,8 @@
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>

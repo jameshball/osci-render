@@ -58,9 +58,11 @@ Optional dependencies should be controlled by explicit feature flags rather than
 
 - `OSCI_GUI_ENABLE_VISUALISER=1` enables the visualiser renderer in `osci_gui`. Projects enabling it must include the renderer's required modules, including `osci_render_core` and JUCE OpenGL support.
 - `OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1` enables visualiser upsampling backed by ChowDSP. Projects enabling it must include the required ChowDSP modules.
+- `OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO=1` enables platform-native system-audio capture support in `osci_audio_devices`. It defaults to `OSCI_PREMIUM` for existing osci-render products.
 - `OSCI_GUI_ENABLE_ADVANCED_VISUALISER_FEATURES`, `OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN`, and `OSCI_FILE_IMPORT_ENABLE_FORMATTED_TEXT` are module-owned feature switches. They currently default to `OSCI_PREMIUM` for the existing products, but reusable consumers can set them directly. `OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN` also controls shared GUI context-menu CC learn actions.
 
 The core integer-ratio sample-rate adapter uses JUCE-only bypass and upsampling modes. It supports `1.0`, `2.0`, `4.0`, and `8.0`, and has no optional ChowDSP-backed path.
+Windows system-audio capture in `osci_audio_devices` uses a nested miniaudio submodule when enabled; consuming products should initialise recursive submodules or provide `miniaudio/miniaudio.h` separately.
 
 Feature flags that enable incompatible dependencies, currently `OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING`, must remain off in `OSCI_PROPRIETARY_BUILD` builds unless the dependency has been separately cleared for proprietary use and the guard is intentionally updated.
 
@@ -70,7 +72,8 @@ The proprietary-compatible surface is expected to grow over time. Current reusab
 
 - `osci_render_core`: core data types, effect framework, concurrency helpers, and reusable effect implementations that do not depend on app-only assets.
 - `osci_gui`: reusable JUCE controls and optional visualiser renderer code. App-specific visualiser assets should be supplied by the consuming app rather than assumed by the module.
-- `osci_file_import`: leaf importers and parser contracts for formats that are currently separable from app orchestration.
+- `osci_file_import`: leaf importers, parser contracts, and JUCE-backed audio file parsing helpers for formats that are currently separable from app orchestration.
+- `osci_audio_devices`: JUCE-backed audio device UI and optional platform-native system-audio capture support.
 - `osci_scripting`: optional Lua/LuaJIT scripting integration and script-backed effect support.
 - `osci_licensing`: licensing, update, hardware identity, and backend-client infrastructure for products that want the osci-render licensing/update stack. This should be added directly by consuming products that need it, not pulled in transitively by renderer/core/gui/import modules.
 

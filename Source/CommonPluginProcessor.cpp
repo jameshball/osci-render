@@ -8,6 +8,7 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "JucewrightAutomation.h"
 
 namespace
 {
@@ -15,6 +16,7 @@ namespace
         osci::LicenseManager::Config config;
         const juce::String pluginName (JucePlugin_Name);
         config.productSlug = pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+        config.allowAutomationLicenseBypass = osci::isJucewrightAutomationLaunch();
         return config;
     }
 }
@@ -794,4 +796,3 @@ void CommonAudioProcessor::applyVolumeAndThreshold(float* const* channels, int n
         channels[1][i] = juce::jlimit(-thr, thr, channels[1][i] * vol);
     }
 }
-

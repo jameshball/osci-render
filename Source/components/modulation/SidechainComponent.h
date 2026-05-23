@@ -5,7 +5,6 @@
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"
 #include <osci_gui/osci_gui.h>
-#include "../DisabledOverlay.h"
 #include "../../audio/modulation/SidechainState.h"
 
 class OscirenderAudioProcessor;
