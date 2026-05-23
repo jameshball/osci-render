@@ -1,6 +1,5 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "components/AudioSettingsOverlay.h"
 #include "components/LicenseAndUpdatesComponent.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/RecordingSettingsOverlay.h"
@@ -463,23 +462,9 @@ void CommonPluginEditor::fileUpdated(juce::String fileName) {
 }
 
 void CommonPluginEditor::openAudioSettings() {
-    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-    if (standalone == nullptr) {
-        return;
-    }
-
-    if (findActiveOverlay<AudioSettingsOverlay>() != nullptr) {
-        return;
-    }
-
-    auto content = standalone->createAudioSettingsComponent();
-    if (content == nullptr) {
-        return;
-    }
-
-    const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
-    content->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark().brighter(0.015f));
-    showOverlay(std::make_unique<AudioSettingsOverlay>(std::move(content), preferredContentSize));
+    osci::showStandaloneAudioSettingsOverlay(
+        *this,
+        juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize));
 }
 
 void CommonPluginEditor::openLicenseAndUpdates() {

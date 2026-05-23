@@ -134,8 +134,6 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="AudOvS" name="AudioSettingsOverlay.h" compile="0" resource="0"
-              file="Source/components/AudioSettingsOverlay.h"/>
         <FILE id="OffOvS" name="OfflineRenderOverlay.h" compile="0" resource="0"
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
