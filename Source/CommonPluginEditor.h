@@ -77,7 +77,7 @@ public:
     int VISUALISER_SETTINGS_HEIGHT = 770;
 #endif
 
-    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3);
+    VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3, &audioProcessor.recordingParameters);
     RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
     VisualiserComponent visualiser{
         audioProcessor,

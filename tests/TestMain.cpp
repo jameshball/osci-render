@@ -149,6 +149,10 @@ public:
         expectWithinAbsoluteError(scale.x, 1.0f, 0.0001f);
         expectWithinAbsoluteError(scale.y, 0.5625f, 0.0001f);
 
+        beginTest("Square canvas detection");
+        expect(VisualiserGeometry::isSquare({1024, 1024}));
+        expect(!VisualiserGeometry::isSquare({1920, 1080}));
+
         beginTest("Graticule layout keeps square cells");
         auto graticule = VisualiserGeometry::getGraticuleLayout({1024, 1024});
         expect(graticule.xDivisions == 10);
