@@ -185,13 +185,17 @@ public:
             options.reset (new AudioDeviceManager::AudioDeviceSetup (*preferredSetupOptions));
 
         auto audioInputRequired = (inChannels > 0);
+        const bool recordAudioPermissionRequired = RuntimePermissions::isRequired(RuntimePermissions::recordAudio);
+        const bool recordAudioPermissionGranted = RuntimePermissions::isGranted(RuntimePermissions::recordAudio);
+        const bool shouldRequestAudioInputPermission = audioInputRequired && recordAudioPermissionRequired && !recordAudioPermissionGranted;
 
-        if (audioInputRequired && RuntimePermissions::isRequired (RuntimePermissions::recordAudio)
-            && !RuntimePermissions::isGranted (RuntimePermissions::recordAudio))
-            RuntimePermissions::request (RuntimePermissions::recordAudio,
-                                         [this, preferredDefaultDeviceName] (bool granted) { init (granted, preferredDefaultDeviceName); });
-        else
-            init (audioInputRequired, preferredDefaultDeviceName);
+        if (shouldRequestAudioInputPermission) {
+            RuntimePermissions::request(RuntimePermissions::recordAudio, [this, preferredDefaultDeviceName](bool granted) {
+                init(granted, preferredDefaultDeviceName);
+            });
+        } else {
+            init(audioInputRequired, preferredDefaultDeviceName);
+        }
     }
 
     void init (bool enableAudioInput, const String& preferredDefaultDeviceName)
