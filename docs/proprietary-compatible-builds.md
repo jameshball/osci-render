@@ -62,6 +62,7 @@ Optional dependencies should be controlled by explicit feature flags rather than
 - `OSCI_GUI_ENABLE_ADVANCED_VISUALISER_FEATURES`, `OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN`, and `OSCI_FILE_IMPORT_ENABLE_FORMATTED_TEXT` are module-owned feature switches. They currently default to `OSCI_PREMIUM` for the existing products, but reusable consumers can set them directly. `OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN` also controls shared GUI context-menu CC learn actions.
 
 The core integer-ratio sample-rate adapter uses JUCE-only bypass and upsampling modes. It supports `1.0`, `2.0`, `4.0`, and `8.0`, and has no optional ChowDSP-backed path.
+Windows system-audio capture in `osci_audio_devices` uses a nested miniaudio submodule when enabled; consuming products should initialise recursive submodules or provide `miniaudio/miniaudio.h` separately.
 
 Feature flags that enable incompatible dependencies, currently `OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING`, must remain off in `OSCI_PROPRIETARY_BUILD` builds unless the dependency has been separately cleared for proprietary use and the guard is intentionally updated.
 

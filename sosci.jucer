@@ -116,6 +116,8 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="r2FzhS" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
+      <FILE id="JwAu02" name="JucewrightAutomation.h" compile="0" resource="0"
+            file="Source/JucewrightAutomation.h"/>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
         <FILE id="ATGrd3" name="AudioThreadGuard.h" compile="0" resource="0"
