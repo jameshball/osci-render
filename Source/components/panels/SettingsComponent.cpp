@@ -5,7 +5,6 @@
 #include "../../audio/modulation/EnvState.h"
 #include "../../audio/modulation/LfoState.h"
 #include "../../parser/FileParser.h"
-#include "../CustomMidiKeyboardComponent.h"
 #if OSCI_PREMIUM
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 #endif

@@ -20,7 +20,6 @@
 #include "CommonPluginProcessor.h"
 #include "audio/effects/PerspectiveEffect.h"
 #include "audio/synth/VoiceManager.h"
-#include "audio/platform/SampleRateManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
 #include "audio/synth/VoiceBuilder.h"

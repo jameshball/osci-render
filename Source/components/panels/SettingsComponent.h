@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 
-#include "../CustomMidiKeyboardComponent.h"
 #include <osci_gui/osci_gui.h>
 
 #include "../../LookAndFeel.h"

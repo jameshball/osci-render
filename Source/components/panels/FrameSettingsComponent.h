@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
-#include "../DoubleTextBox.h"
 #include "../effects/EffectComponent.h"
 #include <osci_gui/osci_gui.h>
 

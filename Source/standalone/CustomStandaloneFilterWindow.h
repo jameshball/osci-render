@@ -38,16 +38,7 @@
  #include <juce_audio_plugin_client/detail/juce_CreatePluginFilter.h>
 #endif
 
-#if JUCE_MAC && OSCI_PREMIUM
- #include "../audio/platform/ProcessAudioDeviceType.h"
- #include "../audio/platform/ProcessAudioPermissions.h"
-#endif
-
-#if JUCE_WINDOWS && OSCI_PREMIUM
- #include "../audio/platform/WindowsLoopbackAudioDeviceType.h"
-#endif
-
-#include "../components/CustomAudioDeviceSelectorComponent.h"
+#include <osci_audio_devices/osci_audio_devices.h>
 
 namespace juce
 {
@@ -60,9 +51,9 @@ namespace SystemAudioCapture
         platform has no such device type. */
     inline String getTypeName()
     {
-       #if OSCI_PREMIUM && JUCE_MAC
+       #if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && JUCE_MAC
         return "Process Audio";
-       #elif OSCI_PREMIUM && JUCE_WINDOWS
+       #elif OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && JUCE_WINDOWS
         return "Windows Loopback";
        #else
         return {};
@@ -81,9 +72,9 @@ namespace SystemAudioCapture
         (format: "System Audio -> <outputName>"). */
     inline String makeDeviceName (const String& outputName = "Default Output")
     {
-       #if OSCI_PREMIUM && JUCE_MAC
+       #if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && JUCE_MAC
         return ProcessAudioDeviceType::makeCombinedDeviceName ("System Audio", outputName);
-       #elif OSCI_PREMIUM && JUCE_WINDOWS
+       #elif OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && JUCE_WINDOWS
         return WindowsLoopbackAudioDeviceType::makeCombinedDeviceName ("System Audio", outputName);
        #else
         ignoreUnused (outputName);
@@ -95,7 +86,7 @@ namespace SystemAudioCapture
         usable on this platform at runtime (permissions granted, type registered). */
     inline bool isAvailable (AudioDeviceManager& deviceManager)
     {
-       #if OSCI_PREMIUM && JUCE_MAC
+       #if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && JUCE_MAC
         if (!ProcessAudioPermissions::isProcessTapAvailable())
             return false;
        #endif
@@ -456,7 +447,7 @@ public:
             return false;
         };
 
-       #if JUCE_MAC && OSCI_PREMIUM
+       #if JUCE_MAC && OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO
         // If a newer macOS saved "Process Audio" as the active device type,
         // discard that state on older macOS versions where process taps are unavailable.
         if (savedState != nullptr
@@ -575,7 +566,7 @@ public:
     AudioBuffer<float> emptyBuffer;
     bool autoOpenMidiDevices;
 
-   #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+   #if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
     // -1 = never seen a device start; 0 = last was not capture; 1 = last was capture.
     std::atomic<int> lastDeviceWasCapturePath { -1 };
    #endif
@@ -715,7 +706,7 @@ private:
 
             addAndMakeVisible (deviceSelector);
 
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
             enableSystemAudioCaptureButton.setButtonText ("Enable System Audio Capture");
             enableSystemAudioCaptureButton.setLookAndFeel (&deviceSelector.getLookAndFeel());
             enableSystemAudioCaptureButton.onClick = [this]
@@ -754,7 +745,7 @@ private:
             updateSystemAudioCaptureButtonVisibility();
 #endif
 
-#if JUCE_MAC && OSCI_PREMIUM
+#if JUCE_MAC && OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO
             // Audio Capture permission is requested at app start (see CustomStandalone.cpp).
 #endif
 
@@ -762,7 +753,7 @@ private:
 
         ~SettingsComponent() override
         {
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
             enableSystemAudioCaptureButton.setLookAndFeel (nullptr);
 #endif
             owner.deviceManager.removeChangeListener (this);
@@ -780,7 +771,7 @@ private:
             auto r = getLocalBounds();
             const int itemHeight = deviceSelector.getItemHeight();
 
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
             layoutSystemAudioCaptureButtonRow (r, itemHeight);
 #endif
 
@@ -797,7 +788,7 @@ private:
 
         void setToRecommendedSize()
         {
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
             const auto processAudioButtonExtra = getSystemAudioCaptureButtonExtraHeight (deviceSelector.getItemHeight());
 #else
             const auto processAudioButtonExtra = 0;
@@ -828,7 +819,7 @@ private:
             });
         }
 
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
         int getSystemAudioCaptureButtonExtraHeight (int itemHeight) const
         {
             return shouldShowSystemAudioCaptureButton ? (itemHeight + (itemHeight >> 2)) : 0;
@@ -870,7 +861,7 @@ private:
 
         void changeListenerCallback (ChangeBroadcaster*) override
         {
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
             updateSystemAudioCaptureButtonVisibility();
 #endif
         }
@@ -881,7 +872,7 @@ private:
         bool isResizing = false;
         bool recommendedSizeUpdatePending = false;
 
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
         TextButton enableSystemAudioCaptureButton;
         bool shouldShowSystemAudioCaptureButton = false;
 #endif
@@ -914,7 +905,7 @@ private:
 
     void audioDeviceAboutToStart (AudioIODevice* device) override
     {
-       #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+       #if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
         const auto typeName = device != nullptr ? device->getTypeName() : String();
         const bool isCapturePathType = SystemAudioCapture::isCaptureType (typeName);
 
@@ -974,17 +965,17 @@ private:
         deviceManager.addAudioCallback (&maxSizeEnforcer);
         deviceManager.addMidiInputDeviceCallback ({}, &player);
 
-       #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+       #if OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO && (JUCE_MAC || JUCE_WINDOWS)
         // Ensure default device types (CoreAudio/WASAPI/ASIO/etc.) are created first.
         deviceManager.getAvailableDeviceTypes();
        #endif
 
-       #if JUCE_MAC && OSCI_PREMIUM
+       #if JUCE_MAC && OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO
         if (ProcessAudioPermissions::isProcessTapAvailable())
             deviceManager.addAudioDeviceType (std::make_unique<ProcessAudioDeviceType>());
        #endif
 
-       #if JUCE_WINDOWS && OSCI_PREMIUM
+       #if JUCE_WINDOWS && OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO
         deviceManager.addAudioDeviceType (std::make_unique<WindowsLoopbackAudioDeviceType>());
        #endif
 

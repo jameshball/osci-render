@@ -55,3 +55,7 @@
 	path = modules/osci_scripting
 	url = git@github.com:jameshball/osci_scripting.git
 	branch = main
+[submodule "modules/osci_audio_devices"]
+	path = modules/osci_audio_devices
+	url = git@github.com:jameshball/osci_audio_devices.git
+	branch = main
