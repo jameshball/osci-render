@@ -18,16 +18,7 @@ enum class VideoCodec {
 
 class RecordingParameters {
 public:
-    RecordingParameters() {
-        qualityParameter.disableLfo();
-        qualityParameter.disableSidechain();
-        canvasWidth.disableLfo();
-        canvasWidth.disableSidechain();
-        canvasHeight.disableLfo();
-        canvasHeight.disableSidechain();
-        frameRate.disableLfo();
-        frameRate.disableSidechain();
-    }
+    RecordingParameters();
 
 private:
 
@@ -81,113 +72,17 @@ public:
     juce::String compressionPreset = "fast";
     VideoCodec videoCodec = VideoCodec::H264;
 
-    void save(juce::XmlElement* xml) {
-        auto settingsXml = xml->createNewChildElement("recordingSettings");
-        losslessAudio.save(settingsXml->createNewChildElement("losslessAudio"));
-        losslessVideo.save(settingsXml->createNewChildElement("losslessVideo"));
-        recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
-        recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
-        settingsXml->setAttribute("compressionPreset", compressionPreset);
-        settingsXml->setAttribute("customTextureOutputName", customTextureOutputName);
-        settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
-
-        auto qualityXml = settingsXml->createNewChildElement("quality");
-        qualityEffect->save(qualityXml);
-
-        settingsXml->setAttribute("canvasPreset", static_cast<int>(canvasPreset));
-
-        auto canvasWidthXml = settingsXml->createNewChildElement("canvasWidth");
-        canvasWidthEffect->save(canvasWidthXml);
-
-        auto canvasHeightXml = settingsXml->createNewChildElement("canvasHeight");
-        canvasHeightEffect->save(canvasHeightXml);
-
-        auto frameRateXml = settingsXml->createNewChildElement("frameRate");
-        frameRateEffect->save(frameRateXml);
-    }
+    void save(juce::XmlElement* xml);
 
     // opt to not change any values if not found
-    void load(juce::XmlElement* xml) {
-        if (auto* settingsXml = xml->getChildByName("recordingSettings")) {
-            if (auto* losslessAudioXml = settingsXml->getChildByName("losslessAudio")) {
-                losslessAudio.load(losslessAudioXml);
-            }
-            if (auto* losslessVideoXml = settingsXml->getChildByName("losslessVideo")) {
-                losslessVideo.load(losslessVideoXml);
-            }
-            if (auto* recordAudioXml = settingsXml->getChildByName("recordAudio")) {
-                recordAudio.load(recordAudioXml);
-            }
-            if (auto* recordVideoXml = settingsXml->getChildByName("recordVideo")) {
-                recordVideo.load(recordVideoXml);
-            }
-            if (settingsXml->hasAttribute("compressionPreset")) {
-                compressionPreset = settingsXml->getStringAttribute("compressionPreset");
-            }
-            if (settingsXml->hasAttribute("customTextureOutputName")) {
-                customTextureOutputName = settingsXml->getStringAttribute("customTextureOutputName");
-            }
-            if (settingsXml->hasAttribute("videoCodec")) {
-                int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
-                videoCodec = static_cast<VideoCodec>(codecValue);
-            }
-            if (auto* qualityXml = settingsXml->getChildByName("quality")) {
-                qualityEffect->load(qualityXml);
-            }
-            bool loadedCanvasSize = false;
-            if (auto* canvasWidthXml = settingsXml->getChildByName("canvasWidth")) {
-                canvasWidthEffect->load(canvasWidthXml);
-                loadedCanvasSize = true;
-            }
-            if (auto* canvasHeightXml = settingsXml->getChildByName("canvasHeight")) {
-                canvasHeightEffect->load(canvasHeightXml);
-                loadedCanvasSize = true;
-            }
-            if (!loadedCanvasSize) {
-                if (auto* resolutionXml = settingsXml->getChildByName("resolution")) {
-                    const int legacyResolution = VisualiserGeometry::getLegacyResolutionFromXml(resolutionXml);
-                    if (legacyResolution > 0) {
-                        setCanvasSize({legacyResolution, legacyResolution});
-                    }
-                }
-            }
-            sanitiseCanvasParameters();
-            if (settingsXml->hasAttribute("canvasPreset")) {
-                const auto fallbackPreset = VisualiserGeometry::getPresetForRenderSize(getCanvasSize());
-                canvasPreset = VisualiserGeometry::sanitiseCanvasPreset(settingsXml->getIntAttribute("canvasPreset", static_cast<int>(fallbackPreset)), fallbackPreset);
-            } else {
-                canvasPreset = VisualiserGeometry::getPresetForRenderSize(getCanvasSize());
-            }
-            if (auto* frameRateXml = settingsXml->getChildByName("frameRate")) {
-                frameRateEffect->load(frameRateXml);
-            }
-        }
-    }
+    void load(juce::XmlElement* xml);
 
     juce::StringArray compressionPresets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
     juce::String customTextureOutputName = "";
 
-    VisualiserRenderSize getCanvasSize() {
-        return VisualiserGeometry::sanitiseRenderSize(juce::roundToInt(canvasWidth.getValueUnnormalised()),
-                                                      juce::roundToInt(canvasHeight.getValueUnnormalised()));
-    }
-
-    void setCanvasSize(VisualiserRenderSize size) {
-        size = VisualiserGeometry::sanitiseRenderSize(size.width, size.height);
-        canvasWidth.setUnnormalisedValueNotifyingHost(static_cast<float>(size.width));
-        canvasHeight.setUnnormalisedValueNotifyingHost(static_cast<float>(size.height));
-        canvasPreset = VisualiserGeometry::getPresetForRenderSize(size);
-    }
-
-    void sanitiseCanvasParameters() {
-        const auto size = getCanvasSize();
-        if (canvasWidth.getValueUnnormalised() != size.width) {
-            canvasWidth.setUnnormalisedValueNotifyingHost(static_cast<float>(size.width));
-        }
-        if (canvasHeight.getValueUnnormalised() != size.height) {
-            canvasHeight.setUnnormalisedValueNotifyingHost(static_cast<float>(size.height));
-        }
-    }
+    VisualiserRenderSize getCanvasSize();
+    void setCanvasSize(VisualiserRenderSize size);
+    void sanitiseCanvasParameters();
 };
 
 class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {

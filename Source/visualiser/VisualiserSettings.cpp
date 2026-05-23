@@ -95,17 +95,15 @@ void VisualiserSettings::paint(juce::Graphics& g) {
 }
 
 void VisualiserSettings::updateScreenOverlayItemsEnabled() {
+    auto selectedOverlay = static_cast<ScreenOverlay>((int)parameters.screenOverlay->getValueUnnormalised());
 #if OSCI_GUI_ENABLE_ADVANCED_VISUALISER_FEATURES
     const auto canvasSize = recordingParameters != nullptr ? recordingParameters->getCanvasSize() : VisualiserRenderSize{};
     const bool realisticOverlaysEnabled = VisualiserGeometry::isSquare(canvasSize);
     screenOverlay.setItemEnabled(static_cast<int>(ScreenOverlay::Real), realisticOverlaysEnabled);
     screenOverlay.setItemEnabled(static_cast<int>(ScreenOverlay::VectorDisplay), realisticOverlaysEnabled);
-
-    if (!realisticOverlaysEnabled && parameters.screenOverlay->isRealisticDisplay()) {
-        parameters.screenOverlay->setUnnormalisedValueNotifyingHost(static_cast<int>(ScreenOverlay::SmudgedGraticule));
-    }
+    selectedOverlay = getScreenOverlayForRenderSize(selectedOverlay, canvasSize);
 #endif
-    screenOverlay.setSelectedId(parameters.screenOverlay->getValueUnnormalised(), juce::dontSendNotification);
+    screenOverlay.setSelectedId(static_cast<int>(selectedOverlay), juce::dontSendNotification);
 }
 
 void VisualiserSettings::resized() {

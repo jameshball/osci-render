@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/audio/OutputClip.h"
-#include "../Source/visualiser/VisualiserGeometry.h"
+#include "../Source/visualiser/RecordingStateMigration.h"
+#include "../modules/osci_gui/visualiser/osci_VisualiserGeometry.h"
 
 class ProducerThread : public juce::Thread {
 public:
@@ -134,7 +135,7 @@ public:
         auto* parameterXml = resolutionXml->createNewChildElement("parameter");
         parameterXml->setAttribute("id", "resolution");
         parameterXml->setAttribute("value", 1920);
-        expect(VisualiserGeometry::getLegacyRenderSizeFromRecordingSettingsXml(settingsXml) == VisualiserRenderSize{1920, 1920}, "Legacy resolution should become width and height");
+        expect(RecordingStateMigration::getLegacyCanvasSize(settingsXml) == VisualiserRenderSize{1920, 1920}, "Legacy resolution should become width and height");
 
         beginTest("World extents preserve XY geometry");
         auto scale = VisualiserGeometry::getWorldToClipScale({1024, 1024});
@@ -192,6 +193,15 @@ public:
         expect(fitted.getWidth() == 562 || fitted.getWidth() == 563);
         expect(fitted.getHeight() == 1000);
         expect(fitted.getX() == 218 || fitted.getX() == 219);
+
+        fitted = VisualiserGeometry::getAspectFitBounds({0, 0, 1, 1000}, {4096, 128});
+        expect(fitted.getWidth() == 1);
+        expect(fitted.getHeight() >= 1);
+
+        beginTest("Graticule line generation is pure geometry");
+        const auto graticuleLines = VisualiserGeometry::getGraticuleLineVertices({1920, 1080});
+        expect(!graticuleLines.empty());
+        expect(graticuleLines.size() % 4 == 0);
     }
 };
 
