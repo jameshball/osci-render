@@ -290,8 +290,6 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="AudOvR" name="AudioSettingsOverlay.h" compile="0" resource="0"
-              file="Source/components/AudioSettingsOverlay.h"/>
         <FILE id="OffOvR" name="OfflineRenderOverlay.h" compile="0" resource="0"
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvR" name="RecordingSettingsOverlay.h" compile="0" resource="0"
