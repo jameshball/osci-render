@@ -9,7 +9,7 @@
 
 #include "../CommonPluginProcessor.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../audio/wav/WavParser.h"
+#include <osci_file_import/osci_file_import.h>
 
 class OfflineAudioToVideoRendererComponent;
 

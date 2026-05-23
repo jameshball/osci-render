@@ -2,11 +2,8 @@
 
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
-#include "../ParameterBarComponent.h"
 #include "../KnobContainerComponent.h"
-#include "../ToggleLabelComponent.h"
 #include "../SlopeGraphComponent.h"
-#include "../DisabledOverlay.h"
 #include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;

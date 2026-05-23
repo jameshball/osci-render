@@ -86,6 +86,11 @@ cd /Users/james/osci-render \
              -configuration Debug -arch arm64 build
 ```
 
+### Projucer Resave Order
+`JuceLibraryCode/` is generated, ignored, and shared by both `osci-render.jucer` and `sosci.jucer`. Always resave the exact `.jucer` you are about to build immediately before running `xcodebuild`.
+
+When switching products, do not reuse the previous generated `JuceLibraryCode/JuceHeader.h`. For example, resaving `osci-render.jucer` can leave `sosci` builds compiling osci-render-only modules such as `osci_scripting`, which then fails in the PCH step because sosci does not provide LuaJIT include paths. To validate both products, resave and build one product, then resave and build the other product.
+
 ### Post-build Relaunch
 After a successful macOS standalone build that changes runtime behavior or UI, automatically relaunch:
 ```bash
@@ -136,6 +141,8 @@ python3 scripts/browse_osci_render_with_jucewright.py
 ```
 
 The runner discovers platform-specific build outputs and app profile paths automatically. Use `--build-app` to rebuild first, `--jucewright` to point at a specific CLI executable, and `--app` to override the standalone app path.
+
+Do not launch osci-render for Jucewright by calling `jucewright prepare-juce-profile` or `jucewright launch` directly unless the prepared profile has first gone through the runner's `disable_profile_audio_input()` path. On macOS, launching with a preserved input device can leave the microphone permission prompt open indefinitely and block automation.
 
 ### Validation
 

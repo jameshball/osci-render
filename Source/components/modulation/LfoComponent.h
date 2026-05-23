@@ -8,7 +8,6 @@
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/LfoPresetManager.h"
 #include "ModulationSourceComponent.h"
-#include "../PhaseSliderComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "../KnobContainerComponent.h"
 

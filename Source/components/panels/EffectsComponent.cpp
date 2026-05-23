@@ -1,5 +1,6 @@
 #include "EffectsComponent.h"
 #include "../../audio/effects/BitCrushEffect.h"
+#include "../../audio/modulation/ModulationTypes.h"
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/EnvState.h"
 #include "../../PluginEditor.h"
@@ -40,12 +41,16 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	};
 	addAndMakeVisible(autoLinkButton);
 
-    {
-        juce::MessageManagerLock lock;
-        audioProcessor.broadcaster.addChangeListener(this);
-    }
+	{
+	    juce::MessageManagerLock lock;
+	    audioProcessor.broadcaster.addChangeListener(this);
+	}
 
-    // Listen to each effect's selected/enabled parameters so undo/redo refreshes the list
+    listBox.setDragSourceFilter([](const juce::DragAndDropTarget::SourceDetails& details) {
+        return !ModDrag::isModDrag(details.description.toString());
+    });
+
+	// Listen to each effect's selected/enabled parameters so undo/redo refreshes the list
     for (auto& effect : audioProcessor.toggleableEffects) {
         paramSync.track(effect->selected);
         paramSync.track(effect->enabled);

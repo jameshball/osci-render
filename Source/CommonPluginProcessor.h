@@ -11,17 +11,17 @@
 
 #include <JuceHeader.h>
 #include <any>
-#include "audio/platform/SampleRateManager.h"
+#include <osci_file_import/osci_file_import.h>
+
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
-#include "audio/wav/WavParser.h"
 
 class AudioPlayerListener {
 public:
     virtual void parserChanged() = 0;
 };
 
-class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager, public juce::Timer,
+class CommonAudioProcessor  : public juce::AudioProcessor, public juce::Timer,
                               public juce::ValueTree::Listener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
@@ -59,7 +59,7 @@ public:
     void setCurrentProgram(int index) override;
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
-    double getSampleRate() override;
+    double getSampleRate();
     void loadAudioFile(const juce::File& file);
     void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
     void stopAudioFile();
@@ -113,14 +113,14 @@ public:
         )
     );
 
+    std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock wavParserLock;
-    WavParser wavParser{ *this };
+    WavParser wavParser{ [this] { return currentSampleRate.load(); } };
 
     // Apply per-sample volume scaling and threshold clipping to a stereo buffer.
     // Uses SIMD (FloatVectorOperations) when the animated buffer is not populated.
     void applyVolumeAndThreshold(float* const* channels, int numSamples);
 
-    std::atomic<double> currentSampleRate = 0.0;
     juce::SpinLock effectsLock;
     VisualiserParameters visualiserParameters;
     RecordingParameters recordingParameters;

@@ -281,32 +281,10 @@
           <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
         </GROUP>
-        <GROUP id="{AUD_PLATFORM}" name="platform">
-          <FILE id="Q5kjpU" name="SampleRateManager.h" compile="0" resource="0"
-                file="Source/audio/platform/SampleRateManager.h"/>
-          <FILE id="PrAuD1" name="ProcessAudioDeviceType.h" compile="0" resource="0"
-                file="Source/audio/platform/ProcessAudioDeviceType.h"/>
-          <FILE id="PrAuD2" name="ProcessAudioDeviceType.mm" compile="1" resource="0"
-                file="Source/audio/platform/ProcessAudioDeviceType.mm"/>
-          <FILE id="PrAuD3" name="ProcessAudioPermissions.h" compile="0" resource="0"
-                file="Source/audio/platform/ProcessAudioPermissions.h"/>
-          <FILE id="PrAuD4" name="ProcessAudioPermissions.mm" compile="1" resource="0"
-                file="Source/audio/platform/ProcessAudioPermissions.mm"/>
-          <FILE id="WlLpH1" name="WindowsLoopbackAudioDeviceType.h" compile="0"
-                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.h"/>
-          <FILE id="WlLpC1" name="WindowsLoopbackAudioDeviceType.cpp" compile="1"
-                resource="0" file="Source/audio/platform/WindowsLoopbackAudioDeviceType.cpp"/>
-        </GROUP>
-        <GROUP id="{AUD_WAV}" name="wav">
-          <FILE id="WvPrC1" name="WavParser.cpp" compile="1" resource="0" file="Source/audio/wav/WavParser.cpp"/>
-          <FILE id="WvPrH1" name="WavParser.h" compile="0" resource="0" file="Source/audio/wav/WavParser.h"/>
-        </GROUP>
+        <GROUP id="{AUD_PLATFORM}" name="platform"/>
+        <GROUP id="{AUD_WAV}" name="wav"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
-        <FILE id="CuMkC1" name="CustomMidiKeyboardComponent.cpp" compile="1"
-              resource="0" file="Source/components/CustomMidiKeyboardComponent.cpp"/>
-        <FILE id="CuMkH1" name="CustomMidiKeyboardComponent.h" compile="0"
-              resource="0" file="Source/components/CustomMidiKeyboardComponent.h"/>
         <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"
@@ -317,14 +295,6 @@
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvR" name="RecordingSettingsOverlay.h" compile="0" resource="0"
               file="Source/components/RecordingSettingsOverlay.h"/>
-        <FILE id="kUinTt" name="ComponentList.cpp" compile="1" resource="0"
-              file="Source/components/ComponentList.cpp"/>
-        <FILE id="HGTPEW" name="ComponentList.h" compile="0" resource="0" file="Source/components/ComponentList.h"/>
-        <FILE id="IvySRY" name="DoubleTextBox.h" compile="0" resource="0" file="Source/components/DoubleTextBox.h"/>
-        <FILE id="poPVxL" name="DraggableListBox.cpp" compile="1" resource="0"
-              file="Source/components/DraggableListBox.cpp"/>
-        <FILE id="Y9NEGn" name="DraggableListBox.h" compile="0" resource="0"
-              file="Source/components/DraggableListBox.h"/>
         <FILE id="aEprcE" name="ErrorCodeEditorComponent.h" compile="0" resource="0"
               file="Source/components/ErrorCodeEditorComponent.h"/>
         <FILE id="oGIcdI" name="FileControlsComponent.cpp" compile="1" resource="0"
@@ -343,36 +313,20 @@
               resource="0" file="Source/components/SyphonInputSelectorComponent.h"/>
         <FILE id="SypOvR" name="SyphonInputOverlay.h" compile="0" resource="0"
               file="Source/components/SyphonInputOverlay.h"/>
-        <FILE id="icFMpl" name="VListBox.cpp" compile="1" resource="0" file="Source/components/VListBox.cpp"/>
-        <FILE id="mvp8je" name="VListBox.h" compile="0" resource="0" file="Source/components/VListBox.h"/>
         <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
               file="Source/components/VolumeComponent.cpp"/>
         <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
               file="Source/components/VolumeComponent.h"/>
-        <FILE id="PhSldr" name="PhaseSliderComponent.h" compile="0" resource="0"
-              file="Source/components/PhaseSliderComponent.h"/>
-        <FILE id="RtKnbC" name="RotaryKnobComponent.h" compile="0" resource="0"
-              file="Source/components/RotaryKnobComponent.h"/>
         <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
               file="Source/components/KnobContainerComponent.h"/>
         <FILE id="KnbCnC" name="KnobContainerComponent.cpp" compile="1" resource="0"
               file="Source/components/KnobContainerComponent.cpp"/>
         <FILE id="PrStCm" name="ParameterSettingsComponent.h" compile="0" resource="0"
               file="Source/components/ParameterSettingsComponent.h"/>
-        <FILE id="InVlEd" name="InlineValueEditor.h" compile="0" resource="0"
-              file="Source/components/InlineValueEditor.h"/>
         <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
               file="Source/components/ModulationState.h"/>
         <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
               file="Source/components/ModulationState.cpp"/>
-        <FILE id="DkBrPt" name="DarkBarPainter.h" compile="0" resource="0"
-              file="Source/components/DarkBarPainter.h"/>
-        <FILE id="LbBrCm" name="LabelledBarComponent.h" compile="0" resource="0"
-              file="Source/components/LabelledBarComponent.h"/>
-        <FILE id="PrBrCm" name="ParameterBarComponent.h" compile="0" resource="0"
-              file="Source/components/ParameterBarComponent.h"/>
-        <FILE id="TgLbCm" name="ToggleLabelComponent.h" compile="0" resource="0"
-              file="Source/components/ToggleLabelComponent.h"/>
         <FILE id="SlGrCm" name="SlopeGraphComponent.h" compile="0" resource="0"
               file="Source/components/SlopeGraphComponent.h"/>
         <FILE id="Fr3001" name="FractalComponent.cpp" compile="1" resource="0"
@@ -427,8 +381,6 @@
                 file="Source/components/modulation/SidechainComponent.h"/>
           <FILE id="ScCmC2" name="SidechainComponent.cpp" compile="1" resource="0"
                 file="Source/components/modulation/SidechainComponent.cpp"/>
-          <FILE id="InEdH1" name="InlineEditorHelper.h" compile="0" resource="0"
-                file="Source/components/modulation/InlineEditorHelper.h"/>
         </GROUP>
         <GROUP id="{CMP_EFFECTS}" name="effects">
           <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
@@ -517,10 +469,6 @@
                 file="Source/components/panels/TxtComponent.cpp"/>
           <FILE id="kxPbsL" name="TxtComponent.h" compile="0" resource="0" file="Source/components/panels/TxtComponent.h"/>
         </GROUP>
-        <FILE id="m7xE3R" name="CustomAudioDeviceSelectorComponent.h" compile="0"
-              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.h"/>
-        <FILE id="tCwz6G" name="CustomAudioDeviceSelectorComponent.cpp" compile="1"
-              resource="0" file="Source/components/CustomAudioDeviceSelectorComponent.cpp"/>
       </GROUP>
       <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua"/>
       <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
@@ -610,6 +558,8 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
+      <FILE id="JwAu01" name="JucewrightAutomation.h" compile="0" resource="0"
+            file="Source/JucewrightAutomation.h"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
       <FILE id="GF4uFx" name="PluginEditor.cpp" compile="1" resource="0"
@@ -669,6 +619,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
@@ -718,6 +669,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
@@ -777,6 +729,7 @@
         <MODULEPATH id="juce_sharedtexture" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
@@ -821,6 +774,7 @@
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_sharedtexture" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>

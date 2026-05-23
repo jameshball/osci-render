@@ -108,7 +108,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
 #endif
 	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
-		wav = std::make_shared<WavParser>(audioProcessor);
+		wav = std::make_shared<WavParser>([this] { return audioProcessor.currentSampleRate.load(); });
 		if (!wav->parse(std::move(stream))) {
 			juce::MessageManager::callAsync([this, fileName] {
 				juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon,

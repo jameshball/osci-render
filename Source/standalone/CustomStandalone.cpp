@@ -62,9 +62,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <osci_render_core/settings/osci_SettingsStore.h>
 
-#if JUCE_MAC && OSCI_PREMIUM
- #include "../audio/platform/ProcessAudioPermissions.h"
-#endif
+#include <osci_audio_devices/osci_audio_devices.h>
 
 // You can set this flag in your build if you need to specify a different
 // standalone JUCEApplication class for your app to use. If you don't
@@ -144,7 +142,7 @@ public:
     //==============================================================================
     void initialise (const String& commandLine) override
     {
-#if JUCE_MAC && OSCI_PREMIUM
+#if JUCE_MAC && OSCI_AUDIO_DEVICES_ENABLE_SYSTEM_AUDIO
         if (ProcessAudioPermissions::isProcessTapAvailable())
         {
             const auto status = ProcessAudioPermissions::getAudioCapturePermissionStatus();
