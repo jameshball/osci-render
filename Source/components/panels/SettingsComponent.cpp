@@ -566,7 +566,6 @@ void SettingsComponent::paint(juce::Graphics& g) {
     }
 }
 
-// syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     frame.setVisible(false);
@@ -574,22 +573,14 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     fractalEditor.setVisible(false);
 #endif
 
-    // Check if the file is an image based on extension or Syphon/Spout input
-    bool isSyphonActive = false;
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    isSyphonActive = audioProcessor.syphonInputActive;
-#endif
-
-    bool isImage = isSyphonActive ||
-                   (extension == ".gif" ||
+    bool isImage = extension == ".gif" ||
                     extension == ".png" ||
                     extension == ".jpg" ||
                     extension == ".jpeg" ||
                     extension == ".mov" ||
-                    extension == ".mp4");
+                    extension == ".mp4";
 
-    // Skip processing if object server is rendering or if no file is selected and no Syphon input
-    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !isSyphonActive);
+    bool skipProcessing = audioProcessor.objectServerRendering || fileName.isEmpty();
 
     if (skipProcessing) {
         // do nothing

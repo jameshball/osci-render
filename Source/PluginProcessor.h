@@ -39,12 +39,6 @@
 
 class FileParser;
 
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-#include "parser/img/ImageParser.h"
-#include "../modules/juce_sharedtexture/SharedTexture.h"
-#include "video/SyphonFrameGrabber.h"
-#endif
-
 //==============================================================================
 
 // Central 60 Hz timer that drives modulation display updates (LFO overlays,
@@ -464,14 +458,6 @@ private:
     // Modulation engine: operates on all sources via common ModulationSource interface.
     // Must be declared after paramLocationMap (it holds a reference to it).
     ModulationEngine modulationEngine{paramLocationMap};
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-public:
-    std::atomic<bool> syphonInputActive = false;
-
-    ImageParser syphonImageParser = ImageParser(*this);
-#endif
-
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessor)

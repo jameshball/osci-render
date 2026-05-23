@@ -114,17 +114,6 @@ public:
     std::shared_ptr<OscirenderAudioTimelineController> audioTimelineController;
     void updateTimelineController();
 
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    // Syphon/Spout input dialog
-    void openSyphonInputDialog();
-    void connectSyphonInput(const juce::String& server, const juce::String& app);
-    void disconnectSyphonInput();
-    juce::String getSyphonSourceName() const;
-
-    juce::SpinLock syphonLock;
-    std::unique_ptr<SyphonFrameGrabber> syphonFrameGrabber;
-#endif
-
 private:
     void showLuaDocumentation();
 

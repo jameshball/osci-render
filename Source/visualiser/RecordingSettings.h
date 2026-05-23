@@ -75,7 +75,7 @@ public:
         recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
         recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
         settingsXml->setAttribute("compressionPreset", compressionPreset);
-        settingsXml->setAttribute("customSharedTextureServerName", customSharedTextureServerName);
+        settingsXml->setAttribute("customTextureOutputName", customTextureOutputName);
         settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
 
         auto qualityXml = settingsXml->createNewChildElement("quality");
@@ -106,8 +106,8 @@ public:
             if (settingsXml->hasAttribute("compressionPreset")) {
                 compressionPreset = settingsXml->getStringAttribute("compressionPreset");
             }
-            if (settingsXml->hasAttribute("customSharedTextureServerName")) {
-                customSharedTextureServerName = settingsXml->getStringAttribute("customSharedTextureServerName");
+            if (settingsXml->hasAttribute("customTextureOutputName")) {
+                customTextureOutputName = settingsXml->getStringAttribute("customTextureOutputName");
             }
             if (settingsXml->hasAttribute("videoCodec")) {
                 int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
@@ -126,7 +126,7 @@ public:
     }
 
     juce::StringArray compressionPresets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
-    juce::String customSharedTextureServerName = "";
+    juce::String customTextureOutputName = "";
 };
 
 class RecordingSettings : public juce::Component {
@@ -158,11 +158,11 @@ public:
         return parameters.compressionPreset;
     }
 
-    juce::String getCustomSharedTextureServerName() {
-        if (parameters.customSharedTextureServerName.isEmpty()) {
+    juce::String getCustomTextureOutputName() {
+        if (parameters.customTextureOutputName.isEmpty()) {
             return "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
         }
-        return parameters.customSharedTextureServerName;
+        return parameters.customTextureOutputName;
     }
 
     int getResolution() {
@@ -222,8 +222,8 @@ private:
     juce::Label videoCodecLabel{"Video Codec", "Video Codec"};
     juce::ComboBox videoCodecSelector;
 
-    juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
-    osci::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
+    juce::Label customTextureOutputLabel{"Texture Output Name", "Texture Output Name"};
+    osci::TextEditor customTextureOutputEditor{"customTextureOutputEditor"};
 
     void updateLosslessAudioEnabled();
 

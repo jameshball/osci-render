@@ -103,13 +103,12 @@ void SplashScreenComponent::buildBenefitTiles()
         int iconSize;
     };
 
-    static const std::array<BenefitEntry, 11> benefits{{
+    static const std::array<BenefitEntry, 10> benefits{{
         { "New Effects", "Twist, Kaleidoscope, Vortex, Multiplex, and more.", BinaryData::distort_svg, BinaryData::distort_svgSize },
         { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
         { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
         { "System Audio Capture", "Capture system audio on macOS and Windows.", BinaryData::microphone_svg, BinaryData::microphone_svgSize },
         { "Fractals", "Koch Snowflake, Sierpinski Triangle, and custom fractals.", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize },
-        { "Live Video Input", "Perform live via Syphon or Spout feeds.", BinaryData::spout_svg, BinaryData::spout_svgSize },
         { "Synth Engine", "Rewritten synth with polyphony, glide, legato, and microtonal tuning.", BinaryData::waves_svg, BinaryData::waves_svgSize },
         { "Modulation", "8 LFOs, 4 envelopes, random sources, and sidechain modulation.", BinaryData::graph_svg, BinaryData::graph_svgSize },
         { "MIDI CC Learning", "Map hardware MIDI controllers to any parameter.", BinaryData::link_svg, BinaryData::link_svgSize },

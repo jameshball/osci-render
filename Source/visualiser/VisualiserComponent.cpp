@@ -18,9 +18,6 @@ void VisualiserComponent::FadeCoverComponent::paint(juce::Graphics& g) {
 VisualiserComponent::VisualiserComponent(
     CommonAudioProcessor &processor,
     CommonPluginEditor &pluginEditor,
-#if OSCI_PREMIUM
-    SharedTextureManager &sharedTextureManager,
-#endif
     juce::File ffmpegFile,
     VisualiserSettings &settings,
     RecordingSettings &recordingSettings,
@@ -30,7 +27,6 @@ VisualiserComponent::VisualiserComponent(
                            audioProcessor(processor),
                            ffmpegFile(ffmpegFile),
 #if OSCI_PREMIUM
-                           sharedTextureManager(sharedTextureManager),
                            ffmpegEncoderManager(ffmpegFile),
 #endif
                            recordingSettings(recordingSettings),
@@ -89,26 +85,11 @@ VisualiserComponent::VisualiserComponent(
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
-    addAndMakeVisible(sharedTextureButton);
-#if OSCI_PREMIUM
-    sharedTextureButton.setTooltip("Toggles sending the oscilloscope's visuals to a Syphon/Spout receiver.");
-    sharedTextureButton.onClick = [this] {
-        if (sharedTextureSender != nullptr) {
-            openGLContext.executeOnGLThread([this](juce::OpenGLContext &context) { closeSharedTexture(); },
-                                            false);
-        } else {
-            openGLContext.executeOnGLThread([this](juce::OpenGLContext &context) { initialiseSharedTexture(); },
-                                            false);
-        }
-    };
-#else
-    sharedTextureButton.setTooltip("Live video input via Syphon/Spout is a Premium feature. Click to learn more.");
-    sharedTextureButton.setClickingTogglesState(false);
-    sharedTextureButton.setToggleState(false, juce::NotificationType::dontSendNotification);
-    sharedTextureButton.onClick = [this]() {
-        editor.showPremiumSplashScreen();
-    };
-#endif
+    addAndMakeVisible(textureOutputButton);
+    textureOutputButton.setTooltip("Texture output is not available in this build.");
+    textureOutputButton.setClickingTogglesState(false);
+    textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
+    textureOutputButton.setEnabled(false);
 
     fullScreenButton.onClick = [this]() {
         if (this->parent != nullptr) {
@@ -160,12 +141,6 @@ VisualiserComponent::VisualiserComponent(
     };
 
     postRenderCallback = [this] {
-#if OSCI_PREMIUM
-        if (sharedTextureSender != nullptr) {
-            sharedTextureSender->renderGL();
-        }
-#endif
-
         if (record.getToggleState()) {
 #if OSCI_PREMIUM
             if (recordingVideo) {
@@ -557,7 +532,7 @@ void VisualiserComponent::resized() {
         popOutButton.setVisible(false);
         settingsButton.setVisible(false);
         audioInputButton.setVisible(false);
-        sharedTextureButton.setVisible(false);
+        textureOutputButton.setVisible(false);
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
@@ -591,8 +566,8 @@ void VisualiserComponent::resized() {
         audioInputButton.setBounds(buttons.removeFromRight(30));
     }
 
-    sharedTextureButton.setVisible(true);
-    sharedTextureButton.setBounds(buttons.removeFromRight(30));
+    textureOutputButton.setVisible(true);
+    textureOutputButton.setBounds(buttons.removeFromRight(30));
 
     record.setVisible(true);
     record.setBounds(buttons.removeFromRight(25));
@@ -626,9 +601,6 @@ void VisualiserComponent::resized() {
 
 void VisualiserComponent::popoutWindow() {
 #if OSCI_PREMIUM
-    if (sharedTextureButton.getToggleState()) {
-        sharedTextureButton.triggerClick();
-    }
     setRecording(false);
 
     // Release renderingSemaphore to prevent deadlock when creating a child visualizer
@@ -637,7 +609,6 @@ void VisualiserComponent::popoutWindow() {
     auto visualiser = new VisualiserComponent(
         audioProcessor,
         editor,
-        sharedTextureManager,
         ffmpegFile,
         settings,
         recordingSettings,
@@ -730,28 +701,7 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
     }
 }
 
-#if OSCI_PREMIUM
-void VisualiserComponent::initialiseSharedTexture() {
-    Texture renderTexture = getRenderTexture();
-    sharedTextureSender = sharedTextureManager.addSender(recordingSettings.getCustomSharedTextureServerName(), renderTexture.width, renderTexture.height);
-    sharedTextureSender->initGL();
-    sharedTextureSender->setSharedTextureId(renderTexture.id);
-    sharedTextureSender->setDrawFunction([this] { drawFrame(); });
-}
-
-void VisualiserComponent::closeSharedTexture() {
-    if (sharedTextureSender != nullptr) {
-        sharedTextureManager.removeSender(sharedTextureSender);
-        sharedTextureSender = nullptr;
-    }
-}
-#endif
-
 void VisualiserComponent::openGLContextClosing() {
-#if OSCI_PREMIUM
-    closeSharedTexture();
-#endif
-
     VisualiserRenderer::openGLContextClosing();
 }
 
