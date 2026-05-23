@@ -298,12 +298,14 @@ class BrowserSession:
             self.die(f"Could not parse jucewright profile output:\n{completed.stdout}")
 
         settings_file = profile.get("settingsFile")
-        if settings_file:
-            audio_output = self.disable_profile_audio_input(Path(settings_file))
-            profile["disabledAudioInput"] = True
-            profile["audioOutputDeviceName"] = audio_output
-            if not audio_output:
-                self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
+        if not settings_file:
+            self.die("Jucewright profile output did not include a settingsFile; refusing to launch without disabling audio input.")
+
+        audio_output = self.disable_profile_audio_input(Path(settings_file))
+        profile["disabledAudioInput"] = True
+        profile["audioOutputDeviceName"] = audio_output
+        if not audio_output:
+            self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
 
         return profile
 
@@ -476,6 +478,8 @@ end clickDenyButton
         stderr_log = self.artifact_dir / f"osci-render.{suffix}.stderr.log"
         launch_log = self.artifact_dir / f"launch.{suffix}.json"
         profile = self.prepare_profile(launch_home)
+        if not profile.get("disabledAudioInput"):
+            self.die("Internal error: refusing to launch before disabling profile audio input.")
 
         self.log(f"Launching osci-render ({label})")
         command = self.jw(

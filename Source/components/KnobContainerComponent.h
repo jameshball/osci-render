@@ -1,7 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "RotaryKnobComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "ModulationState.h"
 #include "../LookAndFeel.h"

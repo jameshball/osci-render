@@ -3,7 +3,6 @@
 #include <JuceHeader.h>
 #include "../obj/WorldObject.h"
 #include "img/ImageParser.h"
-#include "../audio/wav/WavParser.h"
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
 #if OSCI_PREMIUM

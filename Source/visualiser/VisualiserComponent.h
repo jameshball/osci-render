@@ -11,7 +11,7 @@
 #include "../components/timeline/TimelineComponent.h"
 #include "../components/timeline/TimelineController.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../audio/wav/WavParser.h"
+#include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
 #include "VisualiserSettings.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>

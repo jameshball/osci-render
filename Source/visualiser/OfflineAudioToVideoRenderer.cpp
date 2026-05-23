@@ -277,7 +277,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     const int resolution = juce::jmax(16, recordingSettings.getResolution());
 
     // Decode via WavParser (AudioFormatManager-backed), but lock it to the file sample rate.
-    WavParser wav { processor };
+    WavParser wav;
     wav.setLooping(false);
     wav.setPaused(false);
     wav.setFollowProcessorSampleRate(false);

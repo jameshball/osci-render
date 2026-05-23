@@ -2,7 +2,7 @@
 #include "../effects/EffectComponent.h"
 #include "../../LookAndFeel.h"
 #include "../../audio/modulation/ModulationTypes.h"
-#include "InlineEditorHelper.h"
+#include <osci_gui/osci_gui.h>
 #include <osci_render_core/midi/osci_MidiCCManager.h>
 
 // ============================================================================

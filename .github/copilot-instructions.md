@@ -137,6 +137,8 @@ python3 scripts/browse_osci_render_with_jucewright.py
 
 The runner discovers platform-specific build outputs and app profile paths automatically. Use `--build-app` to rebuild first, `--jucewright` to point at a specific CLI executable, and `--app` to override the standalone app path.
 
+Do not launch osci-render for Jucewright by calling `jucewright prepare-juce-profile` or `jucewright launch` directly unless the prepared profile has first gone through the runner's `disable_profile_audio_input()` path. On macOS, launching with a preserved input device can leave the microphone permission prompt open indefinitely and block automation.
+
 ### Validation
 
 **pluginval** — run locally only after major changes (effects, parameters, audio processing). Runs in CI automatically.
