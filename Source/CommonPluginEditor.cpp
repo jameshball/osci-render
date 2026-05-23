@@ -4,7 +4,7 @@
 #include "components/LicenseAndUpdatesComponent.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/RecordingSettingsOverlay.h"
-#include "standalone/CustomStandaloneFilterWindow.h"
+#include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
 #include "visualiser/OfflineAudioToVideoRenderer.h"

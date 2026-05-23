@@ -566,12 +566,6 @@
             file="Source/PluginProcessor.cpp"/>
       <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
             file="Source/PluginProcessor.h"/>
-      <GROUP id="{STANDALONE}" name="standalone">
-        <FILE id="TPGMru" name="CustomStandalone.cpp" compile="1" resource="0"
-              file="Source/standalone/CustomStandalone.cpp"/>
-        <FILE id="J0sbNw" name="CustomStandaloneFilterWindow.h" compile="0"
-              resource="0" file="Source/standalone/CustomStandaloneFilterWindow.h"/>
-      </GROUP>
       <GROUP id="{UTIL}" name="util">
         <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/util/MathUtil.h"/>
       </GROUP>
@@ -619,6 +613,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -668,6 +663,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -725,6 +721,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -771,5 +768,6 @@
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
