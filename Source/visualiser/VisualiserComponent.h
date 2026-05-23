@@ -29,9 +29,6 @@ public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
         CommonPluginEditor& editor,
-#if OSCI_PREMIUM
-        SharedTextureManager& sharedTextureManager,
-#endif
         juce::File ffmpegFile,
         VisualiserSettings& settings,
         RecordingSettings& recordingSettings,
@@ -105,12 +102,7 @@ private:
     osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
-    osci::SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
-
-#if OSCI_PREMIUM
-    SharedTextureManager& sharedTextureManager;
-    SharedTextureSender* sharedTextureSender = nullptr;
-#endif
+    osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
 
     int lastMouseX = 0;
     int lastMouseY = 0;
@@ -149,11 +141,6 @@ private:
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void stopTask() override;
-
-#if OSCI_PREMIUM
-    void initialiseSharedTexture();
-    void closeSharedTexture();
-#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
     JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)

@@ -69,7 +69,6 @@ public:
 
 #if OSCI_PREMIUM
     DownloaderComponent ffmpegDownloader;
-    SharedTextureManager sharedTextureManager;
 #endif
 
 #if OSCI_PREMIUM
@@ -83,9 +82,6 @@ public:
     VisualiserComponent visualiser{
         audioProcessor,
         *this,
-#if OSCI_PREMIUM
-        sharedTextureManager,
-#endif
         audioProcessor.applicationFolder.getChildFile(audioProcessor.ffmpegFileName),
         visualiserSettings,
         recordingSettings,

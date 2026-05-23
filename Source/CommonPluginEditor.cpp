@@ -120,10 +120,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             safeThis->updateTitle();
     });
 
-#if OSCI_PREMIUM
-    sharedTextureManager.initGL();
-#endif
-
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
 

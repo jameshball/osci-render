@@ -1018,30 +1018,11 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     juce::FloatVectorOperations::fill(outputBuffer3d.getWritePointer(5), -1.0f, buffer.getNumSamples());
 
     // Track whether we need to apply toggleable effects after filling the buffer.
-    // The synth path applies them per-voice internally, but Syphon and audio input
-    // need them applied globally here.
+    // The synth path applies them per-voice internally, but audio input needs
+    // them applied globally here.
     bool applyToggleableEffectsGlobally = false;
     juce::AudioBuffer<float>* toggleableExternalInput = nullptr;
 
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    if (syphonInputActive) {
-        for (int sample = 0; sample < outputBuffer3d.getNumSamples(); sample++) {
-            osci::Point point = syphonImageParser.getSample(sample);
-            outputBuffer3d.setSample(0, sample, point.x);
-            outputBuffer3d.setSample(1, sample, point.y);
-        }
-
-        // Forward MIDI to the synth so MIDI-driven modulation/effects work
-        // the same way they do in the audio-input path.
-        auto midiIterator = midiMessages.cbegin();
-        std::for_each(midiIterator,
-            midiMessages.cend(),
-            [&] (const juce::MidiMessageMetadata& meta) { synth.handleMidiEvent(meta.getMessage()); }
-        );
-
-        applyToggleableEffectsGlobally = true;
-    } else
-#endif
     if (usingInput && totalNumInputChannels >= 1) {
         if (totalNumInputChannels >= 2) {
             for (auto channel = 0; channel < juce::jmin(2, totalNumInputChannels); channel++) {
@@ -1072,7 +1053,7 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
     }
 
-    // Apply toggleable effects for non-synth paths (Syphon/Spout and audio input)
+    // Apply toggleable effects for non-synth paths.
     if (applyToggleableEffectsGlobally) {
         juce::SpinLock::ScopedLockType lock(effectsLock);
 

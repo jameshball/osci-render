@@ -128,11 +128,6 @@ void FileControlsComponent::updateFileLabel()
     rightArrow.setVisible(showRightArrow);
     fileNumberLabel.setVisible(showLeftArrow || showRightArrow);
 
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    if (audioProcessor.syphonInputActive) {
-        fileLabel.setText(pluginEditor.getSyphonSourceName(), juce::dontSendNotification);
-    } else
-#endif
     if (audioProcessor.objectServerRendering) {
         fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
     } else if (audioProcessor.inputEnabled->getBoolValue()) {

@@ -41,12 +41,12 @@ JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audi
 - `Source/lua/` — LuaJIT scripting integration
 - `Source/obj/` — OBJ/Blender 3D object loading
 - `Source/components/` — UI components
-- `Source/video/` — FFmpeg encoding, Syphon/Spout
+- `Source/video/` — FFmpeg encoding and video/OpenGL support
 
 ### Key Modules (`modules/`)
 
 - **osci_render_core** — `osci::Point`, `osci::Shape`, `osci::Effect`, `osci::EffectParameter`, `osci::FloatParameter`, `osci::BooleanParameter`, `osci::IntParameter`
-- **LuaJIT**, **chowdsp_utils**, **juce_sharedtexture**, **pluginval**, **Mathter**, **melatonin_blur**, **tinyobjloader**
+- **LuaJIT**, **chowdsp_utils**, **pluginval**, **Mathter**, **melatonin_blur**, **tinyobjloader**
 
 ### Data Flow
 
@@ -89,7 +89,7 @@ cd /Users/james/osci-render \
 ### Projucer Resave Order
 `JuceLibraryCode/` is generated, ignored, and shared by both `osci-render.jucer` and `sosci.jucer`. Always resave the exact `.jucer` you are about to build immediately before running `xcodebuild`.
 
-When switching products, do not reuse the previous generated `JuceLibraryCode/JuceHeader.h`. For example, resaving `osci-render.jucer` can leave `sosci` builds compiling osci-render-only modules such as `osci_scripting`, which then fails in the PCH step because sosci does not provide LuaJIT include paths. To validate both products, resave and build one product, then resave and build the other product.
+When switching products, do not reuse the previous generated `JuceLibraryCode/JuceHeader.h` or module include files. For example, resaving `osci-render.jucer` can leave `sosci` builds compiling osci-render-only modules such as `osci_scripting`, while resaving `sosci.jucer` can remove generated include files that `osci-render` needs. To validate both products, resave and build one product, then resave and build the other product.
 
 ### Post-build Relaunch
 After a successful macOS standalone build that changes runtime behavior or UI, automatically relaunch:

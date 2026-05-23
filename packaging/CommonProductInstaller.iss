@@ -72,8 +72,6 @@ Name: "deletefiles"; Description: "Remove any existing settings (Clean installat
 [Files]
 Source: "{#MyAppStandaloneSource}"; DestDir: "{code:GetExeInstallDir}"; Flags: ignoreversion
 Source: "{#MyAppVstSource}"; DestDir: "{code:GetVstInstallDir}"; Flags: ignoreversion
-Source: "{#SourcePath}..\\External\\spout\\SpoutLibrary.dll"; DestDir: "{code:GetExeInstallDir}"; Flags: ignoreversion
-Source: "{#SourcePath}..\\External\\spout\\SpoutLibrary.dll"; DestDir: "{sys}"; Flags: ignoreversion
 
 [InstallDelete]
 Type: files; Name: {userappdata}\{#MyAppName}\{#MyAppName}.settings; Tasks: deletefiles
