@@ -45,9 +45,9 @@ MOD_HANDLE_INDEX = {
 
 SKIP_CONTROL_NAMES = re.compile(
     r"(closeOverlay|Record output|Open Project|Save Project|Save Project As|"
-    r"Open visualiser window|Toggle fullscreen visualiser|Shared texture output|"
+    r"Open visualiser window|Toggle fullscreen visualiser|"
     r"Open files and examples|Audio input|inputEnabled|midi|Website|Report Issue|Beta updates|"
     r"Download|Purchase|License|Reset|Add |Add$|Remove|Delete|Clear|Pause|"
-    r"Play|Stop|Repeat|Record|Randomise|Auto-link|Render Audio|sharedTexture|Syphon|Spout)",
+    r"Play|Stop|Repeat|Record|Randomise|Auto-link|Render Audio|textureOutput)",
     re.IGNORECASE,
 )

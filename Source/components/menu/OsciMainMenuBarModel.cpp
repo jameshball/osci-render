@@ -130,24 +130,10 @@ void OsciMainMenuBarModel::resetMenuItems() {
     });
 
 #if JUCE_MAC || JUCE_WINDOWS
-    // Add Syphon/Spout input menu item under Recording
-    juce::String syphonMenuLabel =
-#if OSCI_PREMIUM
-        audioProcessor.syphonInputActive ? "Disconnect Syphon/Spout Input" : "Select Syphon/Spout Input...";
-#else
-        "Select Syphon/Spout Input...";
-#endif
-
-    addMenuItem(videoMenu, syphonMenuLabel, [this] {
-#if OSCI_PREMIUM
-        if (audioProcessor.syphonInputActive) {
-            editor.disconnectSyphonInput();
-        } else {
-            openSyphonInputDialog();
-        }
-#else
-        editor.showPremiumSplashScreen();
-#endif
+    addMenuItem(videoMenu, "Select Texture Input...", [this] {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+                                               "Texture Input",
+                                               "Texture input is not available in this build.");
     });
 #endif
 
@@ -181,9 +167,3 @@ void OsciMainMenuBarModel::resetMenuItems() {
         resetMenuItems();
     }, [this] { return audioProcessor.globalSettings.getBool("showMidiKeyboard", true); });
 }
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-void OsciMainMenuBarModel::openSyphonInputDialog() {
-    editor.openSyphonInputDialog();
-}
-#endif

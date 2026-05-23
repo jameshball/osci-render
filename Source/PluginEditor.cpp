@@ -3,13 +3,10 @@
 #include <cmath>
 #include <memory>
 
-#include "../modules/juce_sharedtexture/SharedTexture.h"
 #include "standalone/CustomStandaloneFilterWindow.h"
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "components/effects/EffectComponent.h"
-#include "components/SyphonInputOverlay.h"
-#include "components/SyphonInputSelectorComponent.h"
 
 namespace {
     constexpr double kDefaultCodeEditorMainPanelSize = -0.7;
@@ -166,9 +163,6 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     visualiserSettingsWindow.removeKeyListener(this);
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    audioProcessor.syphonInputActive = false;
-#endif
 
     // Clear the file removal callback
     audioProcessor.setFileRemovedCallback(nullptr);
@@ -241,7 +235,7 @@ bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
         ;
 }
 
-// parsersLock and syphonLock must be held
+// parsersLock must be held
 void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
     codeEditors.clear();
     codeDocuments.clear();
@@ -492,7 +486,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
     triggerAsyncUpdate();
 }
 
-// parsersLock and syphonLock MUST be locked before calling this function
+// parsersLock MUST be locked before calling this function
 void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool shouldOpenEditor) {
     CommonPluginEditor::fileUpdated(fileName);
     settings.fileUpdated(fileName);
@@ -733,70 +727,3 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
 
     visualiser.setTimelineController(controller);
 }
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-void OscirenderAudioProcessorEditor::openSyphonInputDialog() {
-    if (findActiveOverlay<SyphonInputOverlay>() != nullptr) {
-        return;
-    }
-
-    auto selector = std::make_unique<SyphonInputSelectorComponent>(
-        sharedTextureManager,
-        [this](const juce::String& server, const juce::String& app) { connectSyphonInput(server, app); },
-        getSyphonSourceName());
-
-    selector->setSize(350, 120);
-
-    auto overlayHolder = std::make_shared<juce::Component::SafePointer<SyphonInputOverlay>>();
-    selector->setOnFinished([overlayHolder] {
-        if (auto* overlay = overlayHolder->getComponent()) {
-            overlay->requestDismiss();
-        }
-    });
-
-    const juce::Point<int> preferredContentSize { selector->getWidth(), selector->getHeight() };
-    auto overlay = std::make_unique<SyphonInputOverlay>(std::move(selector), preferredContentSize);
-    *overlayHolder = overlay.get();
-    showOverlay(std::move(overlay));
-}
-
-void OscirenderAudioProcessorEditor::connectSyphonInput(const juce::String& server, const juce::String& app) {
-    juce::SpinLock::ScopedLockType lock(syphonLock);
-    if (!syphonFrameGrabber) {
-        juce::Logger::writeToLog("Syphon: connecting to server='" + server + "' app='" + app + "'");
-        syphonFrameGrabber = std::make_unique<SyphonFrameGrabber>(sharedTextureManager, server, app, audioProcessor.syphonImageParser);
-        audioProcessor.syphonInputActive = true;
-        model.resetMenuItems();
-        model.menuItemsChanged();
-        {
-            juce::MessageManagerLock lock;
-            audioProcessor.fileChangeBroadcaster.sendChangeMessage();
-        }
-        juce::Logger::writeToLog("Syphon: connected successfully");
-    }
-}
-
-void OscirenderAudioProcessorEditor::disconnectSyphonInput() {
-    juce::SpinLock::ScopedLockType lock(syphonLock);
-    if (!syphonFrameGrabber) {
-        return;
-    }
-    juce::Logger::writeToLog("Syphon: disconnecting from '" + syphonFrameGrabber->getSourceName() + "'");
-    audioProcessor.syphonInputActive = false;
-    syphonFrameGrabber.reset();
-    model.resetMenuItems();
-    model.menuItemsChanged();
-    {
-        juce::MessageManagerLock lock;
-        audioProcessor.fileChangeBroadcaster.sendChangeMessage();
-    }
-}
-
-juce::String OscirenderAudioProcessorEditor::getSyphonSourceName() const {
-    juce::SpinLock::ScopedLockType lock(syphonLock);
-    if (syphonFrameGrabber) {
-        return syphonFrameGrabber->getSourceName();
-    }
-    return "";
-}
-#endif

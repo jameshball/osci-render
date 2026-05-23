@@ -279,7 +279,6 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.try_step("toggle lossless video", self.cli("click", "--role", "button", "--name", "Lossless Video", "--exact", "--timeout-ms", "3000"))
         self.try_step("select compression speed medium", self.cli("select-option", "--role", "comboBox", "--name", "Compression speed", "--exact", "--text", "medium", "--timeout-ms", "3000"))
         self.try_step("select video codec h265", self.cli("select-option", "--role", "comboBox", "--name", "Video codec", "--exact", "--text", "H.265/HEVC", "--timeout-ms", "3000"))
-        self.try_step("set custom shared texture output name", self.cli("fill", "--role", "editableText", "--name", "Custom Syphon/Spout name", "--exact", "--timeout-ms", "3000", "osci-render-automation"))
         self.exercise_visible_controls("recording settings dialog", 0, "--class", "RecordingSettingsOverlay")
         self.run_step("close recording settings dialog", self.close_overlay)
 
@@ -303,10 +302,6 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.exercise_recording_dialog()
         self.exercise_audio_dialog()
         self.exercise_visualiser_settings_dialog()
-        self.try_step("syphon spout input dialog", self.select_menu_item("Select Syphon/Spout Input..."))
-        self.try_step("syphon spout input snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
-        self.exercise_visible_controls("syphon spout input dialog", 0, "--role", "dialogWindow", "--name", "Select Syphon/Spout Input", "--exact")
-        self.try_step("close syphon spout input dialog", self.close_overlay)
 
     def configure_visualiser_recording_for_automation(self) -> None:
         self.run_step("open recording settings for visualiser recording", self.select_menu_item("Recording Settings..."))
@@ -521,7 +516,6 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.try_step("visualiser settings snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
             self.try_step("close visualiser settings", self.cli("press", "Escape"))
             self.exercise_visualiser_recording()
-            self.try_step("shared texture output describe", self.cli("describe", "--json", "--interesting", "--depth", "6", "--name", "Syphon/Spout"))
             self.try_step("open visualiser window trial", self.cli("click", "--name", "new window", "--trial", "--timeout-ms", "3000"))
             self.try_step("fullscreen trial", self.cli("click", "--name", "fullscreen", "--trial", "--timeout-ms", "3000"))
 

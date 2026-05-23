@@ -48,25 +48,6 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     setFrame(0);
 }
 
-// Constructor for live Syphon/Spout input
-ImageParser::ImageParser(OscirenderAudioProcessor& p) : audioProcessor(p), usingLiveImage(true) {
-    width = 1;
-    height = 1;
-}
-
-void ImageParser::updateLiveFrame(const juce::Image& newImage)
-{
-    if (newImage.isValid()) {
-        juce::SpinLock::ScopedLockType lock(liveImageLock);
-        liveImage = newImage;
-        liveImage.duplicateIfShared();
-        width = liveImage.getWidth();
-        height = liveImage.getHeight();
-        visited.resize(width * height);
-        visited.assign(width * height, false);
-    }
-}
-
 void ImageParser::processGifFile(juce::File& file) {
     juce::String fileName = file.getFullPathName();
     gd_GIF *gif = gd_open_gif(fileName.toRawUTF8());
@@ -335,22 +316,6 @@ void ImageParser::resetPosition() {
 }
 
 float ImageParser::getPixelValue(int x, int y, bool invert) {
-    if (usingLiveImage) {
-        if (liveImage.isValid()) {
-            if (x < 0 || x >= width || y < 0 || y >= height) return 0;
-#if JUCE_MAC
-            juce::Colour pixel = liveImage.getPixelAt(x, y);
-#else
-            juce::Colour pixel = liveImage.getPixelAt(x, height - y - 1);
-#endif
-            
-            float value = pixel.getBrightness();
-            if (invert && value > 0) value = 1.0f - value;
-            return value;
-        }
-        return 0;
-    }
-    
     int index = (height - y - 1) * width + x;
     if (index < 0 || frames.size() <= 0 || index >= frames[frameIndex].size()) {
         return 0;
@@ -409,8 +374,6 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 }
 
 osci::Point ImageParser::getSample(int blockSampleIndex) {
-    juce::SpinLock::ScopedLockType lock(liveImageLock);
-    
     if (ALGORITHM == "HILLIGOSS") {
         if (count % jumpFrequency() == 0) {
             resetPosition();
