@@ -323,9 +323,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 void VoiceBuilder::run() {
     while (!threadShouldExit()) {
         wait(-1);
-        if (threadShouldExit()) {
-            break;
-        }
+        if (threadShouldExit()) break;
 
         // Build or remove voices one at a time, re-checking the target
         // between each operation to handle rapid slider changes.
@@ -333,9 +331,8 @@ void VoiceBuilder::run() {
             const int target = targetCount.load(std::memory_order_acquire);
             const int current = processor.synth.getNumVoices();
 
-            if (current == target) {
+            if (current == target)
                 break;
-            }
 
             if (current < target) {
                 // Build one voice (the expensive part — runs off the
