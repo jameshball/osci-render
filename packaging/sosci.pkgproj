@@ -216,7 +216,7 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>PATH</key>
-											<string>../External/syphon/Syphon.framework</string>
+											<string>../modules/osci_texture_interop/third_party/syphon/5/macos/Syphon.framework</string>
 											<key>PATH_TYPE</key>
 											<integer>1</integer>
 											<key>PERMISSIONS</key>
@@ -813,7 +813,7 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>PATH</key>
-											<string>../External/syphon/Syphon.framework</string>
+											<string>../modules/osci_texture_interop/third_party/syphon/5/macos/Syphon.framework</string>
 											<key>PATH_TYPE</key>
 											<integer>1</integer>
 											<key>PERMISSIONS</key>
@@ -1345,7 +1345,7 @@
 											<key>GID</key>
 											<integer>0</integer>
 											<key>PATH</key>
-											<string>../External/syphon/Syphon.framework</string>
+											<string>../modules/osci_texture_interop/third_party/syphon/5/macos/Syphon.framework</string>
 											<key>PATH_TYPE</key>
 											<integer>1</integer>
 											<key>PERMISSIONS</key>
