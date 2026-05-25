@@ -5,7 +5,7 @@
 #include "../PluginProcessor.h"
 #endif
 
-VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels, RecordingParameters* recordingParameters)
+VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels, RecordingParameters& recordingParameters)
     : parameters(p), recordingParameters(recordingParameters), numChannels(numChannels) {
     addAndMakeVisible(lineColour);
     addAndMakeVisible(lightEffects);
@@ -59,19 +59,15 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels,
     };
 
     parameters.screenOverlay->addListener(this);
-    if (recordingParameters != nullptr) {
-        recordingParameters->canvasWidth.addListener(this);
-        recordingParameters->canvasHeight.addListener(this);
-    }
+    recordingParameters.canvasWidth.addListener(this);
+    recordingParameters.canvasHeight.addListener(this);
     updateScreenOverlayItemsEnabled();
 }
 
 VisualiserSettings::~VisualiserSettings() {
     parameters.screenOverlay->removeListener(this);
-    if (recordingParameters != nullptr) {
-        recordingParameters->canvasWidth.removeListener(this);
-        recordingParameters->canvasHeight.removeListener(this);
-    }
+    recordingParameters.canvasWidth.removeListener(this);
+    recordingParameters.canvasHeight.removeListener(this);
 }
 
 #ifndef SOSCI
@@ -97,7 +93,7 @@ void VisualiserSettings::paint(juce::Graphics& g) {
 void VisualiserSettings::updateScreenOverlayItemsEnabled() {
     auto selectedOverlay = static_cast<ScreenOverlay>((int)parameters.screenOverlay->getValueUnnormalised());
 #if OSCI_GUI_ENABLE_ADVANCED_VISUALISER_FEATURES
-    const auto canvasSize = recordingParameters != nullptr ? recordingParameters->getCanvasSize() : VisualiserRenderSize{};
+    const auto canvasSize = recordingParameters.getCanvasSize();
     const bool realisticOverlaysEnabled = VisualiserGeometry::isSquare(canvasSize);
     screenOverlay.setItemEnabled(static_cast<int>(ScreenOverlay::Real), realisticOverlaysEnabled);
     screenOverlay.setItemEnabled(static_cast<int>(ScreenOverlay::VectorDisplay), realisticOverlaysEnabled);
@@ -160,9 +156,8 @@ void VisualiserSettings::parameterValueChanged(int parameterIndex, float newValu
     juce::ignoreUnused(newValue);
 
     const bool screenOverlayChanged = parameterIndex == parameters.screenOverlay->getParameterIndex();
-    const bool canvasSizeChanged = recordingParameters != nullptr
-        && (parameterIndex == recordingParameters->canvasWidth.getParameterIndex()
-            || parameterIndex == recordingParameters->canvasHeight.getParameterIndex());
+    const bool canvasSizeChanged = parameterIndex == recordingParameters.canvasWidth.getParameterIndex()
+                                || parameterIndex == recordingParameters.canvasHeight.getParameterIndex();
 
     if (screenOverlayChanged || canvasSizeChanged) {
         juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<VisualiserSettings>(this)] {
