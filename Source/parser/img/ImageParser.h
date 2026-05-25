@@ -43,7 +43,7 @@ private:
     const juce::String ALGORITHM = "HILLIGOSS";
 
     OscirenderAudioProcessor& audioProcessor;
-    mutable juce::SpinLock frameLock;
+    juce::SpinLock frameLock;
     juce::Random rng;
     int frameIndex = 0;
     std::vector<std::vector<uint8_t>> frames;

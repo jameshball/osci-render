@@ -40,9 +40,8 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(closeFileButton);
     closeFileButton.setTooltip("Close the currently open file.");
     closeFileButton.onClick = [this] {
-        if (pluginEditor.visualiser.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
-            pluginEditor.visualiser.stopTextureInput();
-            audioProcessor.stopTextureInput();
+        if (pluginEditor.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
+            pluginEditor.stopTextureInput();
             updateFileLabel();
             return;
         }
@@ -124,7 +123,7 @@ void FileControlsComponent::resized()
 
 void FileControlsComponent::updateFileLabel()
 {
-    const bool textureInputActive = audioProcessor.isTextureInputActive();
+    const bool textureInputActive = pluginEditor.isTextureInputActive() || audioProcessor.isTextureInputActive();
     bool ableToOpenFiles = !audioProcessor.objectServerRendering && !audioProcessor.inputEnabled->getBoolValue() && !textureInputActive;
     bool fileOpen = audioProcessor.getCurrentFileIndex() != -1 && ableToOpenFiles;
     bool showLeftArrow  = audioProcessor.getCurrentFileIndex() > 0 && fileOpen;
@@ -141,7 +140,7 @@ void FileControlsComponent::updateFileLabel()
     } else if (audioProcessor.inputEnabled->getBoolValue()) {
         fileLabel.setText("Using external audio", juce::dontSendNotification);
     } else if (textureInputActive) {
-        fileLabel.setText("Using texture input: " + audioProcessor.getTextureInputName(), juce::dontSendNotification);
+        fileLabel.setText("Using texture input: " + pluginEditor.getTextureInputName(), juce::dontSendNotification);
     } else if (audioProcessor.getCurrentFileIndex() == -1) {
         fileLabel.setText("No file open", juce::dontSendNotification);
     } else {

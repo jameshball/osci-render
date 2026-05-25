@@ -53,7 +53,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             const juce::String message = status.message.isNotEmpty() ? status.message : "Texture input is not available in this build.";
             sourceMenu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID, message, false);
         } else {
-            if (editor.visualiser.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
+            if (editor.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
                 sourceMenu.addItem(TEXTURE_INPUT_DISCONNECT_ID, "Disconnect Texture Input");
                 sourceMenu.addSeparator();
             }
@@ -101,8 +101,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
         }
 #else
         if (topLevelMenuIndex == videoMenu && menuItemID == TEXTURE_INPUT_DISCONNECT_ID) {
-            editor.visualiser.stopTextureInput();
-            audioProcessor.stopTextureInput();
+            editor.stopTextureInput();
             return true;
         }
 
@@ -112,7 +111,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
                 return true;
             }
 
-            editor.visualiser.setTextureInputSource(textureInputMenuSources[static_cast<size_t>(sourceIndex)]);
+            editor.setTextureInputSource(textureInputMenuSources[static_cast<size_t>(sourceIndex)]);
             return true;
         }
 #endif
