@@ -392,8 +392,6 @@
                 file="Source/components/effects/EffectTypeGridComponent.h"/>
         </GROUP>
         <GROUP id="{CMP_LUA}" name="lua">
-          <FILE id="tpNWJ3" name="LuaConsole.cpp" compile="1" resource="0" file="Source/components/lua/LuaConsole.cpp"/>
-          <FILE id="e3ZteP" name="LuaConsole.h" compile="0" resource="0" file="Source/components/lua/LuaConsole.h"/>
           <FILE id="qIxm1z" name="LuaListComponent.cpp" compile="1" resource="0"
                 file="Source/components/lua/LuaListComponent.cpp"/>
           <FILE id="x0Syav" name="LuaListComponent.h" compile="0" resource="0"

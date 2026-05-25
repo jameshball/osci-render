@@ -58,6 +58,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     mtsEspLabel.setJustificationType(juce::Justification::centredRight);
 #endif
 
+    console.setButtonSvgSources(juce::String(BinaryData::delete_svg), juce::String(BinaryData::pause_svg));
+    console.setButtonColours(juce::Colours::red, juce::Colours::white, osci::Colours::accentColor());
     addAndMakeVisible(console);
     console.setConsoleOpen(false);
 
