@@ -138,10 +138,6 @@
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
               file="Source/components/RecordingSettingsOverlay.h"/>
-        <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
-              file="Source/components/VolumeComponent.cpp"/>
-        <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
-              file="Source/components/VolumeComponent.h"/>
         <GROUP id="{CMP_EFFECTS}" name="effects">
           <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
                 file="Source/components/effects/EffectComponent.cpp"/>

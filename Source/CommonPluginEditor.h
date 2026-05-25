@@ -4,10 +4,10 @@
 #include "CommonPluginProcessor.h"
 #include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
+#include "audio/OutputClip.h"
 #include "visualiser/VisualiserSettings.h"
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
-#include "components/VolumeComponent.h"
 #include "components/UpdatePromptComponent.h"
 
 #if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
@@ -89,7 +89,16 @@ public:
         appName == "sosci"
     };
 
-    VolumeComponent volume{audioProcessor};
+    osci::VolumeComponent volume{
+        audioProcessor.threadManager,
+        *audioProcessor.volumeEffect->parameters[0],
+        *audioProcessor.thresholdEffect->parameters[0],
+        *audioProcessor.muteParameter,
+        juce::String::createStringFromData(BinaryData::volume_svg, BinaryData::volume_svgSize),
+        juce::String::createStringFromData(BinaryData::mute_svg, BinaryData::mute_svgSize),
+        osci::kOutputClipBypassThreshold,
+        osci::kOutputClipPeakEpsilon
+    };
     juce::TextButton betaUpdatesButton { "Beta updates" };
     UpdatePromptComponent updatePrompt{audioProcessor};
 

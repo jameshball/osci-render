@@ -308,10 +308,6 @@
               file="Source/components/SplashScreenComponent.cpp"/>
         <FILE id="M38ypx" name="SplashScreenComponent.h" compile="0" resource="0"
               file="Source/components/SplashScreenComponent.h"/>
-        <FILE id="s8EVcE" name="VolumeComponent.cpp" compile="1" resource="0"
-              file="Source/components/VolumeComponent.cpp"/>
-        <FILE id="MWkfTv" name="VolumeComponent.h" compile="0" resource="0"
-              file="Source/components/VolumeComponent.h"/>
         <FILE id="KnbCnt" name="KnobContainerComponent.h" compile="0" resource="0"
               file="Source/components/KnobContainerComponent.h"/>
         <FILE id="KnbCnC" name="KnobContainerComponent.cpp" compile="1" resource="0"
