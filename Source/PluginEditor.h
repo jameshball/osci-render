@@ -15,6 +15,7 @@
 #include "components/timeline/OscirenderAudioTimelineController.h"
 #include "components/menu/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
+#include "video/TextureInputFrameGrabber.h"
 #include "visualiser/VisualiserSettings.h"
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
@@ -38,6 +39,10 @@ public:
     void openVisualiserSettings();
     void openRecordingSettings() override;
     void showPremiumSplashScreen() override;
+    void setTextureInputSource(osci::texture::SourceInfo source);
+    void stopTextureInput();
+    bool isTextureInputActive() const;
+    juce::String getTextureInputName() const;
     void timerCallback() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
@@ -116,6 +121,8 @@ public:
 
 private:
     void showLuaDocumentation();
+
+    std::unique_ptr<TextureInputFrameGrabber> textureInputFrameGrabber;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

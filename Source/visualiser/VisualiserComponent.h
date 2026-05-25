@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <limits>
 
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
@@ -41,9 +40,6 @@ public:
 
     std::function<void()> openSettings;
     std::function<void()> closeSettings;
-    std::function<void(juce::String, int, int)> textureInputStarted;
-    std::function<void(const std::vector<std::uint8_t>&, int, int, bool)> textureInputFrameReady;
-    std::function<void()> textureInputStopped;
 
     void enableFullScreen();
     void setFullScreen(bool fullScreen);
@@ -58,10 +54,6 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
-    void setTextureInputSource(osci::texture::SourceInfo source);
-    void stopTextureInput();
-    bool isTextureInputActive() const;
-    juce::String getTextureInputName() const;
     void childUpdated();
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
@@ -98,12 +90,6 @@ private:
     osci::texture::ErrorCode startTextureOutputOnRenderThread();
     void publishTextureOutputFrame();
     void serviceTextureOutputFrame();
-    void serviceTextureInputFrame();
-    void disconnectTextureInputOnRenderThread(bool notifyProcessor);
-    bool readTextureInputFrame(const osci::texture::ReceivedOpenGLTexture& received);
-    void failTextureInput(osci::texture::ErrorCode error, juce::String message = {});
-    void notifyTextureInputStartedAsync(osci::texture::SourceInfo source, std::vector<std::uint8_t> initialFrame, int width, int height, bool verticallyFlipped);
-    void notifyTextureInputStoppedAsync();
 
     std::atomic<bool> active = true;
 
@@ -132,18 +118,6 @@ private:
     std::uint64_t textureOutputFrameIndex = 0;
     int textureOutputSenderWidth = 0;
     int textureOutputSenderHeight = 0;
-    osci::texture::OpenGLReceiver textureInputReceiver;
-    mutable juce::SpinLock textureInputLock;
-    osci::texture::SourceInfo textureInputSource;
-    std::atomic<bool> textureInputWanted = false;
-    std::atomic<bool> textureInputConnected = false;
-    std::atomic<bool> textureInputStartNotified = false;
-    std::atomic<bool> textureInputProcessorStarted = false;
-    std::atomic<bool> textureInputNeedsReconnect = false;
-    std::atomic<osci::texture::ErrorCode> textureInputLastConnectError = osci::texture::ErrorCode::none;
-    GLuint textureInputReadbackFbo = 0;
-    std::vector<std::uint8_t> textureInputReadbackPixels;
-    std::uint64_t textureInputLastFrameIndex = std::numeric_limits<std::uint64_t>::max();
 
     int lastMouseX = 0;
     int lastMouseY = 0;

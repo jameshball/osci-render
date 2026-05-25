@@ -2,8 +2,21 @@
 #include <numbers>
 #include "../PluginProcessor.h"
 
-FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
+FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback)
     : errorCallback(errorCallback), audioProcessor(p) {}
+
+void FileParser::clearLoadedSource() {
+	object = nullptr;
+	svg = nullptr;
+	text = nullptr;
+	gpla = nullptr;
+	lua = nullptr;
+	img = nullptr;
+	wav = nullptr;
+#if OSCI_PREMIUM
+	fractal = nullptr;
+#endif
+}
 
 // Helper function to show file size warning
 void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
@@ -51,17 +64,8 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		fallbackLuaScript = lua->getScript();
 	}
 
-	object = nullptr;
-	svg = nullptr;
-	text = nullptr;
-	gpla = nullptr;
-	lua = nullptr;
-	img = nullptr;
-	wav = nullptr;
-#if OSCI_PREMIUM
-	fractal = nullptr;
-#endif
-	
+	clearLoadedSource();
+
 	if (extension == ".obj") {
 		const int64_t fileSize = stream->getTotalLength();
 		juce::String objContent = stream->readEntireStreamAsString();
@@ -127,16 +131,7 @@ void FileParser::prepareLiveImageInput(int width, int height) {
 
 	juce::SpinLock::ScopedLockType scope(lock);
 
-	object = nullptr;
-	svg = nullptr;
-	text = nullptr;
-	gpla = nullptr;
-	lua = nullptr;
-	wav = nullptr;
-#if OSCI_PREMIUM
-	fractal = nullptr;
-#endif
-
+	clearLoadedSource();
 	img = std::move(imageParser);
 	isAnimatable = false;
 	sampleSource = true;
