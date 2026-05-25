@@ -51,7 +51,7 @@ private:
 
 class VisualiserSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
-    VisualiserSettings(VisualiserParameters&, int numChannels = 2, RecordingParameters* recordingParameters = nullptr);
+    VisualiserSettings(VisualiserParameters&, int numChannels, RecordingParameters& recordingParameters);
     ~VisualiserSettings();
 
 #ifndef SOSCI
@@ -64,7 +64,7 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     VisualiserParameters& parameters;
-    RecordingParameters* recordingParameters = nullptr;
+    RecordingParameters& recordingParameters;
     int numChannels;
     std::function<void()> onUpgradeRequested;
 
