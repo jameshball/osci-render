@@ -9,7 +9,6 @@
 #include "components/panels/SettingsComponent.h"
 #include "components/panels/TxtComponent.h"
 #include "components/timeline/AnimationTimelineController.h"
-#include "components/lua/LuaConsole.h"
 #include "components/lua/LuaDocumentationComponent.h"
 #include "components/timeline/OscirenderAudioTimelineController.h"
 #include "components/menu/OsciMainMenuBarModel.h"
@@ -75,7 +74,7 @@ public:
 
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 
-    LuaConsole console;
+    osci::LuaConsoleComponent console;
 
     std::vector<std::shared_ptr<osci::LuaScriptEditorModel>> codeModels;
     std::vector<std::shared_ptr<osci::LuaScriptEditorComponent>> codeEditors;
