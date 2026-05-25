@@ -42,6 +42,10 @@ void OsciMainMenuBarModel::resetMenuItems() {
         }
 
 #if JUCE_MAC || JUCE_WINDOWS
+#if !OSCI_PREMIUM
+        menu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID, "Select Texture Input...");
+        menu.addSeparator();
+#else
         juce::PopupMenu sourceMenu;
         textureInputMenuSources.clear();
         const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
@@ -75,6 +79,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
         menu.addSubMenu("Select Texture Input...", sourceMenu);
         menu.addSeparator();
 #endif
+#endif
     };
 
     customMenuSelectedLogic = [this, fileMenu, videoMenu](int menuItemID, int topLevelMenuIndex) {
@@ -89,6 +94,12 @@ void OsciMainMenuBarModel::resetMenuItems() {
         }
 
 #if JUCE_MAC || JUCE_WINDOWS
+#if !OSCI_PREMIUM
+        if (topLevelMenuIndex == videoMenu && menuItemID == TEXTURE_INPUT_SOURCE_BASE_ID) {
+            editor.showPremiumSplashScreen();
+            return true;
+        }
+#else
         if (topLevelMenuIndex == videoMenu && menuItemID == TEXTURE_INPUT_DISCONNECT_ID) {
             editor.visualiser.stopTextureInput();
             audioProcessor.stopTextureInput();
@@ -104,6 +115,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             editor.visualiser.setTextureInputSource(textureInputMenuSources[static_cast<size_t>(sourceIndex)]);
             return true;
         }
+#endif
 #endif
 
         if (topLevelMenuIndex != fileMenu) {

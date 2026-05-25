@@ -104,7 +104,11 @@ VisualiserComponent::VisualiserComponent(
     textureOutputButton.setClickingTogglesState(false);
     textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
     textureOutputButton.onClick = [this] {
+#if OSCI_PREMIUM
         setTextureOutputEnabled(!textureOutputWanted.load());
+#else
+        editor.showPremiumSplashScreen();
+#endif
     };
     refreshTextureOutputButton();
 
@@ -716,6 +720,13 @@ void VisualiserComponent::refreshTextureOutputButton() {
     const bool wanted = textureOutputWanted.load();
     const bool enabled = textureOutputEnabled.load();
 
+#if !OSCI_PREMIUM
+    textureOutputButton.setEnabled(true);
+    textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
+    textureOutputButton.setTooltip("Texture sharing via Syphon/Spout is a Premium feature. Click to learn more.");
+    return;
+#endif
+
     textureOutputButton.setEnabled(isPrimaryVisualiser());
     textureOutputButton.setToggleState(wanted || enabled, juce::NotificationType::dontSendNotification);
 
@@ -733,6 +744,13 @@ void VisualiserComponent::refreshTextureOutputButton() {
 }
 
 void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
+#if !OSCI_PREMIUM
+    juce::ignoreUnused(enabled);
+    editor.showPremiumSplashScreen();
+    refreshTextureOutputButton();
+    return;
+#endif
+
     if (enabled == textureOutputWanted.load()) {
         refreshTextureOutputButton();
         return;
@@ -923,6 +941,12 @@ void VisualiserComponent::serviceTextureOutputFrame() {
 }
 
 void VisualiserComponent::setTextureInputSource(osci::texture::SourceInfo source) {
+#if !OSCI_PREMIUM
+    juce::ignoreUnused(source);
+    editor.showPremiumSplashScreen();
+    return;
+#endif
+
     const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
     if (!status.isAvailable() || !isPrimaryVisualiser()) {
         const juce::String message = status.message.isNotEmpty()
