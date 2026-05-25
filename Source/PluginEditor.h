@@ -9,15 +9,14 @@
 #include "components/panels/SettingsComponent.h"
 #include "components/panels/TxtComponent.h"
 #include "components/timeline/AnimationTimelineController.h"
-#include "components/ErrorCodeEditorComponent.h"
-#include "components/lua/LuaConsole.h"
 #include "components/lua/LuaDocumentationComponent.h"
 #include "components/timeline/OscirenderAudioTimelineController.h"
 #include "components/menu/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
+#include <osci_scripting/osci_scripting.h>
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
+class OscirenderAudioProcessorEditor : public CommonPluginEditor, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
@@ -75,19 +74,9 @@ public:
 
     SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
 
-    LuaConsole console;
-
-    osci::SvgButton luaHelpButton { "luaHelp", juce::String(BinaryData::help_svg), juce::Colours::white };
-    osci::SvgButton luaResetButton { "luaReset", juce::String(BinaryData::refresh_svg), juce::Colours::white };
-
-    std::vector<std::shared_ptr<juce::CodeDocument>> codeDocuments;
-    std::vector<std::shared_ptr<OscirenderCodeEditorComponent>> codeEditors;
-    juce::CodeEditorComponent::ColourScheme colourScheme;
-    juce::LuaTokeniser luaTokeniser;
-    juce::XmlTokeniser xmlTokeniser;
+    std::vector<std::shared_ptr<osci::LuaScriptEditorModel>> codeModels;
+    std::vector<std::shared_ptr<osci::LuaScriptEditorComponent>> codeEditors;
     juce::ShapeButton collapseButton;
-    std::shared_ptr<juce::CodeDocument> customFunctionCodeDocument = std::make_shared<juce::CodeDocument>();
-    std::shared_ptr<OscirenderCodeEditorComponent> customFunctionCodeEditor = std::make_shared<OscirenderCodeEditorComponent>(*customFunctionCodeDocument, &luaTokeniser, audioProcessor, LuaEffectState::UNIQUE_ID, LuaEffectState::FILE_NAME);
 
     OsciMainMenuBarModel model{audioProcessor, *this};
 
@@ -97,13 +86,10 @@ public:
     juce::StretchableLayoutManager luaLayout;
     juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
-    std::atomic<bool> updatingDocumentsWithParserLock = false;
-
-    void codeDocumentTextInserted(const juce::String& newText, int insertIndex) override;
-    void codeDocumentTextDeleted(int startIndex, int endIndex) override;
-    void updateCodeDocument();
     void updateCodeEditor(bool binaryFile, bool shouldOpenEditor = false);
     void setCodeEditorVisible(std::optional<bool> visible);
+    void commitCodeModel(osci::LuaScriptEditorModel& model);
+    std::shared_ptr<osci::LuaScriptEditorModel> getVisibleLuaEditorModel() const;
 
     bool keyPressed(const juce::KeyPress& key) override;
     void mouseDown(const juce::MouseEvent& event) override;
