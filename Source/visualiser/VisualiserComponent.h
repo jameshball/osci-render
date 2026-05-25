@@ -3,6 +3,8 @@
 #include <JuceHeader.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
@@ -15,6 +17,7 @@
 #include "RecordingSettings.h"
 #include "VisualiserSettings.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
+#include <osci_texture_interop/osci_texture_interop.h>
 
 enum class FullScreenMode {
     TOGGLE,
@@ -38,6 +41,9 @@ public:
 
     std::function<void()> openSettings;
     std::function<void()> closeSettings;
+    std::function<void(juce::String, int, int)> textureInputStarted;
+    std::function<void(const std::vector<std::uint8_t>&, int, int, bool)> textureInputFrameReady;
+    std::function<void()> textureInputStopped;
 
     void enableFullScreen();
     void setFullScreen(bool fullScreen);
@@ -52,6 +58,10 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
+    void setTextureInputSource(osci::texture::SourceInfo source);
+    void stopTextureInput();
+    bool isTextureInputActive() const;
+    juce::String getTextureInputName() const;
     void childUpdated();
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
@@ -83,6 +93,17 @@ private:
     void updatePausedState();
     bool isPrimaryVisualiser() const;
     void setOverlayFadeProgress(float progress);
+    void refreshTextureOutputButton();
+    void setTextureOutputEnabled(bool enabled);
+    osci::texture::ErrorCode startTextureOutputOnRenderThread();
+    void publishTextureOutputFrame();
+    void serviceTextureOutputFrame();
+    void serviceTextureInputFrame();
+    void disconnectTextureInputOnRenderThread(bool notifyProcessor);
+    bool readTextureInputFrame(const osci::texture::ReceivedOpenGLTexture& received);
+    void failTextureInput(osci::texture::ErrorCode error, juce::String message = {});
+    void notifyTextureInputStartedAsync(osci::texture::SourceInfo source, std::vector<std::uint8_t> initialFrame, int width, int height, bool verticallyFlipped);
+    void notifyTextureInputStoppedAsync();
 
     std::atomic<bool> active = true;
 
@@ -103,6 +124,26 @@ private:
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+    osci::texture::OpenGLSender textureOutputSender;
+    mutable juce::SpinLock textureOutputLock;
+    juce::String textureOutputSourceName;
+    std::atomic<bool> textureOutputWanted = false;
+    std::atomic<bool> textureOutputEnabled = false;
+    std::uint64_t textureOutputFrameIndex = 0;
+    int textureOutputSenderWidth = 0;
+    int textureOutputSenderHeight = 0;
+    osci::texture::OpenGLReceiver textureInputReceiver;
+    mutable juce::SpinLock textureInputLock;
+    osci::texture::SourceInfo textureInputSource;
+    std::atomic<bool> textureInputWanted = false;
+    std::atomic<bool> textureInputConnected = false;
+    std::atomic<bool> textureInputStartNotified = false;
+    std::atomic<bool> textureInputProcessorStarted = false;
+    std::atomic<bool> textureInputNeedsReconnect = false;
+    std::atomic<osci::texture::ErrorCode> textureInputLastConnectError = osci::texture::ErrorCode::none;
+    GLuint textureInputReadbackFbo = 0;
+    std::vector<std::uint8_t> textureInputReadbackPixels;
+    std::uint64_t textureInputLastFrameIndex = std::numeric_limits<std::uint64_t>::max();
 
     int lastMouseX = 0;
     int lastMouseY = 0;

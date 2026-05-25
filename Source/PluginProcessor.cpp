@@ -384,7 +384,11 @@ void OscirenderAudioProcessor::applyFileSelectLocked() {
 
     ShapeSound* selectedSound = nullptr;
 
-    if (objectServerRendering.load()) {
+    if (textureInputActive.load(std::memory_order_acquire) && liveTextureSound != nullptr) {
+        selectedSound = liveTextureSound.get();
+        activeShapeSound.store(selectedSound, std::memory_order_release);
+        currentFile.store(-1);
+    } else if (objectServerRendering.load()) {
         selectedSound = objectServerSound.get();
         activeShapeSound.store(selectedSound, std::memory_order_release);
         currentFile.store(-1);
@@ -629,6 +633,11 @@ void OscirenderAudioProcessor::openFile(int index) {
 // much faster than openFile(int index) because it doesn't reparse any files.
 // parsersLock AND effectsLock must be locked before calling this function
 void OscirenderAudioProcessor::changeCurrentFile(int index) {
+    if (textureInputActive.load(std::memory_order_acquire)) {
+        textureInputActive.store(false, std::memory_order_release);
+        liveTextureInputName.clear();
+    }
+
     if (index == -1) {
         currentFile = -1;
         changeSound(defaultSound);
@@ -672,6 +681,10 @@ int OscirenderAudioProcessor::getCurrentFileIndex() {
 }
 
 std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
+    if (textureInputActive.load(std::memory_order_acquire)) {
+        return liveTextureParser;
+    }
+
     if (currentFile < 0 || currentFile >= parsers.size()) {
         return nullptr;
     }
@@ -679,11 +692,94 @@ std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
 }
 
 juce::String OscirenderAudioProcessor::getCurrentFileName() {
+    if (textureInputActive.load(std::memory_order_acquire)) {
+        return liveTextureInputName;
+    }
+
     if (objectServerRendering || currentFile == -1) {
         return "";
     } else {
         return fileNames[currentFile];
     }
+}
+
+void OscirenderAudioProcessor::startTextureInput(juce::String sourceName, int width, int height) {
+    if (inputEnabled->getBoolValue()) {
+        inputEnabled->setBoolValueNotifyingHost(false);
+    }
+
+    {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        if (!textureInputActive.load(std::memory_order_acquire)) {
+            liveTexturePreviousFile = currentFile.load();
+        }
+
+        if (liveTextureParser == nullptr) {
+            liveTextureParser = std::make_shared<FileParser>(*this, errorCallback);
+        }
+
+        liveTextureParser->prepareLiveImageInput(width, height);
+
+        if (liveTextureSound == nullptr) {
+            liveTextureSound = new ShapeSound(*this, liveTextureParser);
+        }
+
+        liveTextureInputName = sourceName.trim().isNotEmpty() ? sourceName : "Texture Input";
+        objectServerRendering.store(false);
+        textureInputActive.store(true, std::memory_order_release);
+        currentFile.store(-1);
+        changeSound(liveTextureSound);
+    }
+
+    if (fileSelectionNotifier != nullptr) {
+        fileSelectionNotifier->triggerAsyncUpdate();
+    }
+}
+
+void OscirenderAudioProcessor::updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
+    std::shared_ptr<FileParser> parser;
+    {
+        juce::SpinLock::ScopedLockType lock(parsersLock);
+        if (!textureInputActive.load(std::memory_order_acquire) || liveTextureParser == nullptr) {
+            return;
+        }
+        parser = liveTextureParser;
+    }
+
+    parser->updateLiveImageFrame(rgba, width, height, verticallyFlipped);
+}
+
+void OscirenderAudioProcessor::stopTextureInput() {
+    bool wasActive = false;
+    {
+        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock2(effectsLock);
+
+        wasActive = textureInputActive.exchange(false, std::memory_order_acq_rel);
+        liveTextureInputName.clear();
+
+        if (wasActive && activeShapeSound.load(std::memory_order_acquire) == liveTextureSound.get()) {
+            const int restoreIndex = liveTexturePreviousFile;
+            liveTexturePreviousFile = -1;
+            if (restoreIndex >= 0 && restoreIndex < fileBlocks.size()) {
+                currentFile.store(restoreIndex);
+                changeSound(sounds[(size_t)restoreIndex]);
+            } else {
+                currentFile.store(-1);
+                changeSound(defaultSound);
+            }
+        }
+    }
+
+    if (wasActive && fileSelectionNotifier != nullptr) {
+        fileSelectionNotifier->triggerAsyncUpdate();
+    }
+}
+
+juce::String OscirenderAudioProcessor::getTextureInputName() {
+    return liveTextureInputName;
 }
 
 juce::String OscirenderAudioProcessor::getFileName(int index) {
@@ -1240,7 +1336,8 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         auto base64 = fileBlocks[i]->toBase64Encoding();
         fileXml->addTextElement(base64);
     }
-    xml->setAttribute("currentFile", currentFile);
+    const int savedCurrentFile = textureInputActive.load(std::memory_order_acquire) ? liveTexturePreviousFile : currentFile.load();
+    xml->setAttribute("currentFile", savedCurrentFile);
 
     recordingParameters.save(xml.get());
 

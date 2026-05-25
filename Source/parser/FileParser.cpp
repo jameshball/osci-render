@@ -122,6 +122,39 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
 }
 
+void FileParser::prepareLiveImageInput(int width, int height) {
+	auto imageParser = std::make_shared<ImageParser>(audioProcessor, width, height);
+
+	juce::SpinLock::ScopedLockType scope(lock);
+
+	object = nullptr;
+	svg = nullptr;
+	text = nullptr;
+	gpla = nullptr;
+	lua = nullptr;
+	wav = nullptr;
+#if OSCI_PREMIUM
+	fractal = nullptr;
+#endif
+
+	img = std::move(imageParser);
+	isAnimatable = false;
+	sampleSource = true;
+	active = true;
+}
+
+void FileParser::updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
+	std::shared_ptr<ImageParser> imageParser;
+	{
+		juce::SpinLock::ScopedLockType scope(lock);
+		imageParser = img;
+	}
+
+	if (imageParser != nullptr) {
+		imageParser->setSingleFrameFromRgba(rgba, width, height, verticallyFlipped);
+	}
+}
+
 std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
     juce::SpinLock::ScopedLockType scope(lock);
 

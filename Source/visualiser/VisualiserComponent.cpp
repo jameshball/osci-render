@@ -5,6 +5,21 @@
 #include "../LookAndFeel.h"
 #include "VisualiserTextureAssets.h"
 
+#include <cstdint>
+
+#ifndef GL_READ_FRAMEBUFFER
+#define GL_READ_FRAMEBUFFER 0x8CA8
+#endif
+#ifndef GL_DRAW_FRAMEBUFFER
+#define GL_DRAW_FRAMEBUFFER 0x8CA9
+#endif
+#ifndef GL_READ_FRAMEBUFFER_BINDING
+#define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
+#endif
+#ifndef GL_DRAW_FRAMEBUFFER_BINDING
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#endif
+
 VisualiserComponent::FadeCoverComponent::FadeCoverComponent() {
     setOpaque(false);
     setInterceptsMouseClicks(false, false);
@@ -86,10 +101,12 @@ VisualiserComponent::VisualiserComponent(
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
     addAndMakeVisible(textureOutputButton);
-    textureOutputButton.setTooltip("Texture output is not available in this build.");
     textureOutputButton.setClickingTogglesState(false);
     textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
-    textureOutputButton.setEnabled(false);
+    textureOutputButton.onClick = [this] {
+        setTextureOutputEnabled(!textureOutputWanted.load());
+    };
+    refreshTextureOutputButton();
 
     fullScreenButton.onClick = [this]() {
         if (this->parent != nullptr) {
@@ -164,6 +181,9 @@ VisualiserComponent::VisualiserComponent(
             }
         }
 
+        serviceTextureOutputFrame();
+        serviceTextureInputFrame();
+
         stopwatch.addTime(juce::RelativeTime::seconds(1.0 / this->recordingSettings.getFrameRate()));
     };
 }
@@ -173,6 +193,17 @@ VisualiserComponent::~VisualiserComponent() {
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
+    textureOutputWanted.store(false);
+    {
+        juce::SpinLock::ScopedLockType lock(textureOutputLock);
+        textureOutputSourceName.clear();
+    }
+    textureOutputSender.stop();
+    textureOutputEnabled.store(false);
+    textureInputWanted.store(false);
+    textureInputReceiver.disconnect();
+    textureInputConnected.store(false);
+    textureInputProcessorStarted.store(false);
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
@@ -681,6 +712,495 @@ void VisualiserComponent::setOverlayFadeProgress(float progress) {
     overlayFadeCover.setVisible(fadeAlpha > 0.001f);
 }
 
+void VisualiserComponent::refreshTextureOutputButton() {
+    const bool wanted = textureOutputWanted.load();
+    const bool enabled = textureOutputEnabled.load();
+
+    textureOutputButton.setEnabled(isPrimaryVisualiser());
+    textureOutputButton.setToggleState(wanted || enabled, juce::NotificationType::dontSendNotification);
+
+    if (!isPrimaryVisualiser()) {
+        textureOutputButton.setTooltip("Texture output can only be started from the main visualiser.");
+        return;
+    }
+
+    if (wanted && !enabled) {
+        textureOutputButton.setTooltip("Texture output will start on the next rendered frame.");
+        return;
+    }
+
+    textureOutputButton.setTooltip(enabled ? "Stops texture output." : "Starts texture output.");
+}
+
+void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
+    if (enabled == textureOutputWanted.load()) {
+        refreshTextureOutputButton();
+        return;
+    }
+
+    if (!enabled) {
+        textureOutputWanted.store(false);
+        refreshTextureOutputButton();
+        return;
+    }
+
+    const Texture renderTexture = getRenderTexture();
+    if (renderTexture.id == 0 || renderTexture.width <= 0 || renderTexture.height <= 0) {
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Output",
+                                               "Texture output cannot start until the visualiser has rendered a frame.",
+                                               "OK");
+        refreshTextureOutputButton();
+        return;
+    }
+
+    const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+    if (!status.isAvailable() || !isPrimaryVisualiser()) {
+        const juce::String message = status.message.isNotEmpty()
+            ? status.message
+            : "Texture output is not available in this build.";
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                               "Texture Output",
+                                               message,
+                                               "OK");
+        refreshTextureOutputButton();
+        return;
+    }
+
+    const juce::String requestedSourceName = recordingSettings.getCustomTextureOutputName();
+    {
+        juce::SpinLock::ScopedLockType lock(textureOutputLock);
+        textureOutputSourceName = requestedSourceName;
+    }
+    textureOutputWanted.store(true);
+    refreshTextureOutputButton();
+}
+
+osci::texture::ErrorCode VisualiserComponent::startTextureOutputOnRenderThread() {
+    const Texture renderTexture = getRenderTexture();
+
+    osci::texture::OpenGLSenderDescription description;
+    {
+        juce::SpinLock::ScopedLockType lock(textureOutputLock);
+        description.sourceName = textureOutputSourceName;
+    }
+    if (description.sourceName.isEmpty()) {
+        description.sourceName = recordingSettings.getCustomTextureOutputName();
+        juce::SpinLock::ScopedLockType lock(textureOutputLock);
+        textureOutputSourceName = description.sourceName;
+    }
+    description.width = renderTexture.width;
+    description.height = renderTexture.height;
+
+    const osci::texture::ErrorCode error = textureOutputSender.start(std::move(description));
+    if (error == osci::texture::ErrorCode::none) {
+        textureOutputEnabled.store(true);
+        textureOutputFrameIndex = 0;
+        textureOutputSenderWidth = renderTexture.width;
+        textureOutputSenderHeight = renderTexture.height;
+    }
+
+    return error;
+}
+
+void VisualiserComponent::publishTextureOutputFrame() {
+    const Texture renderTexture = getRenderTexture();
+
+    osci::texture::OpenGLTextureFrame frame;
+    frame.textureId = static_cast<std::uint32_t>(renderTexture.id);
+    frame.textureTarget = osci::texture::openGLTexture2D;
+    frame.width = renderTexture.width;
+    frame.height = renderTexture.height;
+    frame.verticallyFlipped = false;
+    frame.frameIndex = textureOutputFrameIndex++;
+
+    const osci::texture::ErrorCode error = textureOutputSender.publish(frame);
+    if (error == osci::texture::ErrorCode::none) {
+        return;
+    }
+
+    textureOutputSender.stop();
+    textureOutputEnabled.store(false);
+    textureOutputWanted.store(false);
+    textureOutputSenderWidth = 0;
+    textureOutputSenderHeight = 0;
+    {
+        juce::SpinLock::ScopedLockType lock(textureOutputLock);
+        textureOutputSourceName.clear();
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, error] {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        safeThis->refreshTextureOutputButton();
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Output",
+                                               osci::texture::toString(error),
+                                               "OK");
+    });
+}
+
+void VisualiserComponent::serviceTextureOutputFrame() {
+    if (!textureOutputWanted.load()) {
+        if (textureOutputEnabled.load()) {
+            textureOutputSender.stop();
+            textureOutputEnabled.store(false);
+            textureOutputFrameIndex = 0;
+            textureOutputSenderWidth = 0;
+            textureOutputSenderHeight = 0;
+            {
+                juce::SpinLock::ScopedLockType lock(textureOutputLock);
+                textureOutputSourceName.clear();
+            }
+            juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+            juce::MessageManager::callAsync([safeThis] {
+                if (safeThis != nullptr) {
+                    safeThis->refreshTextureOutputButton();
+                }
+            });
+        }
+
+        return;
+    }
+
+    if (!textureOutputEnabled.load()) {
+        const osci::texture::ErrorCode error = startTextureOutputOnRenderThread();
+        if (error != osci::texture::ErrorCode::none) {
+            textureOutputWanted.store(false);
+            textureOutputEnabled.store(false);
+            textureOutputSenderWidth = 0;
+            textureOutputSenderHeight = 0;
+            {
+                juce::SpinLock::ScopedLockType lock(textureOutputLock);
+                textureOutputSourceName.clear();
+            }
+
+            const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+            const juce::String message = status.isAvailable() || status.message.isEmpty()
+                ? osci::texture::toString(error)
+                : status.message;
+
+            juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+            juce::MessageManager::callAsync([safeThis, message] {
+                if (safeThis == nullptr) {
+                    return;
+                }
+
+                safeThis->refreshTextureOutputButton();
+                juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                                       "Texture Output",
+                                                       message,
+                                                       "OK");
+            });
+            return;
+        }
+
+        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+        juce::MessageManager::callAsync([safeThis] {
+            if (safeThis != nullptr) {
+                safeThis->refreshTextureOutputButton();
+            }
+        });
+    }
+
+    const Texture renderTexture = getRenderTexture();
+    if (renderTexture.width != textureOutputSenderWidth || renderTexture.height != textureOutputSenderHeight) {
+        textureOutputSender.stop();
+        textureOutputEnabled.store(false);
+        textureOutputSenderWidth = 0;
+        textureOutputSenderHeight = 0;
+        const osci::texture::ErrorCode error = startTextureOutputOnRenderThread();
+        if (error != osci::texture::ErrorCode::none) {
+            textureOutputWanted.store(false);
+            return;
+        }
+    }
+
+    publishTextureOutputFrame();
+}
+
+void VisualiserComponent::setTextureInputSource(osci::texture::SourceInfo source) {
+    const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+    if (!status.isAvailable() || !isPrimaryVisualiser()) {
+        const juce::String message = status.message.isNotEmpty()
+            ? status.message
+            : "Texture input is not available in this build.";
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                               "Texture Input",
+                                               message,
+                                               "OK");
+        return;
+    }
+
+    if (source.displayName.trim().isEmpty() && source.opaqueId.trim().isEmpty()) {
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Input",
+                                               "The selected texture source is no longer available.",
+                                               "OK");
+        return;
+    }
+
+    {
+        juce::SpinLock::ScopedLockType lock(textureInputLock);
+        textureInputSource = std::move(source);
+    }
+
+    textureInputLastFrameIndex = std::numeric_limits<std::uint64_t>::max();
+    textureInputNeedsReconnect.store(true);
+    textureInputLastConnectError.store(osci::texture::ErrorCode::none);
+    textureInputWanted.store(true);
+}
+
+void VisualiserComponent::stopTextureInput() {
+    textureInputWanted.store(false);
+}
+
+bool VisualiserComponent::isTextureInputActive() const {
+    return textureInputWanted.load() || textureInputConnected.load() || textureInputProcessorStarted.load();
+}
+
+juce::String VisualiserComponent::getTextureInputName() const {
+    juce::SpinLock::ScopedLockType lock(textureInputLock);
+    if (textureInputSource.displayName.isNotEmpty()) {
+        return textureInputSource.displayName;
+    }
+
+    return "Texture Input";
+}
+
+void VisualiserComponent::notifyTextureInputStartedAsync(osci::texture::SourceInfo source, std::vector<std::uint8_t> initialFrame, int width, int height, bool verticallyFlipped) {
+    if (textureInputStarted == nullptr) {
+        return;
+    }
+
+    if (textureInputStartNotified.exchange(true)) {
+        return;
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, source, initialFrame = std::move(initialFrame), width, height, verticallyFlipped] {
+        if (safeThis == nullptr || safeThis->textureInputStarted == nullptr) {
+            return;
+        }
+
+        const juce::String name = source.displayName.isNotEmpty() ? source.displayName : "Texture Input";
+        safeThis->textureInputStarted(name, width, height);
+        safeThis->textureInputProcessorStarted.store(true);
+        if (!initialFrame.empty() && safeThis->textureInputFrameReady != nullptr) {
+            safeThis->textureInputFrameReady(initialFrame, width, height, verticallyFlipped);
+        }
+    });
+}
+
+void VisualiserComponent::notifyTextureInputStoppedAsync() {
+    if (!textureInputStartNotified.exchange(false)) {
+        return;
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    textureInputProcessorStarted.store(false);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis != nullptr && safeThis->textureInputStopped != nullptr) {
+            safeThis->textureInputStopped();
+        }
+    });
+}
+
+void VisualiserComponent::disconnectTextureInputOnRenderThread(bool notifyProcessor) {
+    textureInputReceiver.disconnect();
+    textureInputConnected.store(false);
+    textureInputLastFrameIndex = std::numeric_limits<std::uint64_t>::max();
+    textureInputLastConnectError.store(osci::texture::ErrorCode::none);
+
+    if (notifyProcessor) {
+        notifyTextureInputStoppedAsync();
+    } else {
+        textureInputStartNotified.store(false);
+        textureInputProcessorStarted.store(false);
+    }
+}
+
+bool VisualiserComponent::readTextureInputFrame(const osci::texture::ReceivedOpenGLTexture& received) {
+    using namespace juce::gl;
+
+    const auto& texture = received.texture;
+    if (texture.textureId == 0 || texture.width <= 0 || texture.height <= 0) {
+        return false;
+    }
+
+    if (textureInputReadbackFbo == 0) {
+        glGenFramebuffers(1, &textureInputReadbackFbo);
+    }
+
+    if (textureInputReadbackFbo == 0) {
+        return false;
+    }
+
+    GLint previousReadFramebuffer = 0;
+    GLint previousDrawFramebuffer = 0;
+    GLint previousReadBuffer = 0;
+    GLint previousDrawBuffer = 0;
+    GLint previousPackAlignment = 0;
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFramebuffer);
+    glGetIntegerv(GL_READ_BUFFER, &previousReadBuffer);
+    glGetIntegerv(GL_DRAW_BUFFER, &previousDrawBuffer);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &previousPackAlignment);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, textureInputReadbackFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_COLOR_ATTACHMENT0,
+                           static_cast<GLenum>(texture.textureTarget),
+                           static_cast<GLuint>(texture.textureId),
+                           0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+
+    const GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    bool success = framebufferStatus == GL_FRAMEBUFFER_COMPLETE;
+    if (success) {
+        textureInputReadbackPixels.resize((size_t)texture.width * (size_t)texture.height * 4);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(texture.originX,
+                     texture.originY,
+                     texture.width,
+                     texture.height,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     textureInputReadbackPixels.data());
+        const GLenum error = glGetError();
+        success = error == GL_NO_ERROR;
+    }
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_COLOR_ATTACHMENT0,
+                           static_cast<GLenum>(texture.textureTarget),
+                           0,
+                           0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)previousReadFramebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)previousDrawFramebuffer);
+    glReadBuffer(static_cast<GLenum>(previousReadBuffer));
+    glDrawBuffer(static_cast<GLenum>(previousDrawBuffer));
+    glPixelStorei(GL_PACK_ALIGNMENT, previousPackAlignment);
+
+    return success;
+}
+
+void VisualiserComponent::failTextureInput(osci::texture::ErrorCode error, juce::String message) {
+    textureInputWanted.store(false);
+    disconnectTextureInputOnRenderThread(true);
+
+    if (message.isEmpty()) {
+        const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+        message = status.isAvailable() || status.message.isEmpty()
+            ? osci::texture::toString(error)
+            : status.message;
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, message] {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Input",
+                                               message,
+                                               "OK");
+    });
+}
+
+void VisualiserComponent::serviceTextureInputFrame() {
+    if (textureInputNeedsReconnect.exchange(false)) {
+        if (textureInputConnected.load() || textureInputStartNotified.load()) {
+            disconnectTextureInputOnRenderThread(true);
+        }
+    }
+
+    if (!textureInputWanted.load()) {
+        if (textureInputConnected.load() || textureInputStartNotified.load() || textureInputProcessorStarted.load()) {
+            disconnectTextureInputOnRenderThread(true);
+        }
+        return;
+    }
+
+    if (!textureInputConnected.load()) {
+        osci::texture::SourceInfo source;
+        {
+            juce::SpinLock::ScopedLockType lock(textureInputLock);
+            source = textureInputSource;
+        }
+
+        const osci::texture::ErrorCode error = textureInputReceiver.connect(source);
+        if (error != osci::texture::ErrorCode::none) {
+            const osci::texture::ErrorCode previousError = textureInputLastConnectError.load();
+            if (previousError != error) {
+                textureInputLastConnectError.store(error);
+            }
+            if (error == osci::texture::ErrorCode::sourceNotFound || error == osci::texture::ErrorCode::connectionLost) {
+                textureInputConnected.store(false);
+                return;
+            }
+
+            failTextureInput(error);
+            return;
+        }
+
+        textureInputConnected.store(true);
+        textureInputLastConnectError.store(osci::texture::ErrorCode::none);
+    }
+
+    osci::texture::ReceivedOpenGLTexture received;
+    const osci::texture::ErrorCode error = textureInputReceiver.receive(received);
+    if (error == osci::texture::ErrorCode::receiveFailed) {
+        return;
+    }
+
+    if (error != osci::texture::ErrorCode::none) {
+        if (error == osci::texture::ErrorCode::sourceNotFound || error == osci::texture::ErrorCode::connectionLost) {
+            juce::String message = "The selected texture input source was removed.";
+            const juce::String sourceName = getTextureInputName();
+            if (sourceName.isNotEmpty() && sourceName != "Texture Input") {
+                message = "The texture input source \"" + sourceName + "\" was removed.";
+            }
+
+            failTextureInput(error, message);
+            return;
+        }
+
+        failTextureInput(error);
+        return;
+    }
+
+    if (!received.newFrame && received.texture.frameIndex == textureInputLastFrameIndex) {
+        return;
+    }
+
+    if (!readTextureInputFrame(received)) {
+        failTextureInput(osci::texture::ErrorCode::receiveFailed, "The selected texture could not be read by this OpenGL context.");
+        return;
+    }
+
+    textureInputLastFrameIndex = received.texture.frameIndex;
+    if (!textureInputStartNotified.load()) {
+        osci::texture::SourceInfo source = received.source;
+        source.width = received.texture.width;
+        source.height = received.texture.height;
+        notifyTextureInputStartedAsync(source, textureInputReadbackPixels, received.texture.width, received.texture.height, true);
+        return;
+    }
+
+    if (!textureInputProcessorStarted.load()) {
+        return;
+    }
+
+    if (textureInputFrameReady != nullptr) {
+        textureInputFrameReady(textureInputReadbackPixels, received.texture.width, received.texture.height, true);
+    }
+}
+
 void VisualiserComponent::updateRenderModeFromProcessor() {
     // Called on message thread
     if (!visualiserOnly) {
@@ -702,6 +1222,27 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
 }
 
 void VisualiserComponent::openGLContextClosing() {
+    using namespace juce::gl;
+
+    textureOutputSender.stop();
+    textureOutputEnabled.store(false);
+    textureOutputSenderWidth = 0;
+    textureOutputSenderHeight = 0;
+    if (!textureOutputWanted.load()) {
+        juce::SpinLock::ScopedLockType lock(textureOutputLock);
+        textureOutputSourceName.clear();
+    }
+
+    textureInputReceiver.disconnect();
+    textureInputConnected.store(false);
+    textureInputProcessorStarted.store(false);
+    textureInputLastFrameIndex = std::numeric_limits<std::uint64_t>::max();
+    notifyTextureInputStoppedAsync();
+    if (textureInputReadbackFbo != 0) {
+        glDeleteFramebuffers(1, &textureInputReadbackFbo);
+        textureInputReadbackFbo = 0;
+    }
+    textureInputReadbackPixels.clear();
     VisualiserRenderer::openGLContextClosing();
 }
 

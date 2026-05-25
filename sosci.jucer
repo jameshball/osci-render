@@ -261,6 +261,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -303,6 +304,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -352,6 +354,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -395,5 +398,6 @@
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
