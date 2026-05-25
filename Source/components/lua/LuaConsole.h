@@ -16,8 +16,11 @@ public:
     void setConsoleOpen(bool open);
     bool getConsoleOpen() { return consoleOpen; }
 
+    void paint(juce::Graphics& g) override;
     void resized() override;
+    void lookAndFeelChanged() override;
 private:
+    void updateColours();
 
     bool consoleOpen = false;
     juce::SpinLock lock;
