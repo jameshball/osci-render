@@ -411,11 +411,12 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     } else {
         juce::String extension = audioProcessor.getFileName(originalIndex).fromLastOccurrenceOf(".", true, false);
         const bool luaFile = extension == ".lua";
+        const bool txtFile = extension == ".txt";
         editorModel = std::make_shared<osci::LuaScriptEditorModel>(audioProcessor.getFileId(originalIndex),
                                                                    audioProcessor.getFileName(originalIndex),
                                                                    juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString(),
                                                                    luaFile,
-                                                                   250);
+                                                                   txtFile ? 0 : 250);
         if (extension == ".svg") {
             options.externalTokeniser = &xmlTokeniser;
         } else {
