@@ -58,16 +58,15 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     mtsEspLabel.setJustificationType(juce::Justification::centredRight);
 #endif
 
+    addAndMakeVisible(console);
+    console.setConsoleOpen(false);
+
     LuaParser::onPrint = [this](const std::string& message) {
-        if (auto model = getVisibleLuaEditorModel()) {
-            model->appendConsoleOutput(message);
-        }
+        console.print(message);
     };
 
     LuaParser::onClear = [this]() {
-        if (auto model = getVisibleLuaEditorModel()) {
-            model->clearConsoleHistory();
-        }
+        console.clear();
     };
 
     addAndMakeVisible(collapseButton);
@@ -330,6 +329,8 @@ void OscirenderAudioProcessorEditor::resized() {
                     juce::Component* rows[] = {&dummy3, &luaResizerBar, &lua};
                     luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
                     auto dummy3Bounds = dummy3.getBounds();
+                    console.setBounds(dummy3Bounds.removeFromBottom(console.getConsoleOpen() ? 200 : 30));
+                    dummy3Bounds.removeFromBottom(RESIZER_BAR_SIZE);
                     codeEditors[index]->setBounds(dummy3Bounds);
                     luaFileOpen = true;
                 } else {
@@ -354,6 +355,7 @@ void OscirenderAudioProcessorEditor::resized() {
         }
         resizerBar.setVisible(fileOpen);
 
+        console.setVisible(luaFileOpen);
         luaResizerBar.setVisible(luaFileOpen);
         lua.setVisible(luaFileOpen);
 
@@ -388,6 +390,13 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
     index++;
     std::shared_ptr<osci::LuaScriptEditorModel> editorModel;
     osci::LuaScriptEditorComponent::Options options;
+    options.showTitle = true;
+    options.showConsole = false;
+    options.legacyGroupChrome = true;
+    options.helpButtonSvg = juce::String(BinaryData::help_svg);
+    options.resetButtonSvg = juce::String(BinaryData::refresh_svg);
+    options.buttonColour = juce::Colours::white;
+    options.buttonOnColour = juce::Colours::white;
 
     if (index == 0) {
         editorModel = std::make_shared<osci::LuaScriptEditorModel>(LuaEffectState::UNIQUE_ID,
@@ -395,8 +404,6 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
                                                                    audioProcessor.luaEffectState != nullptr ? audioProcessor.luaEffectState->getCode() : "return { x, y, z }",
                                                                    true,
                                                                    250);
-        options.showTitle = true;
-        options.showConsole = true;
         options.showHelpButton = true;
         options.showResetButton = true;
     } else {
@@ -407,9 +414,11 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
                                                                    juce::MemoryInputStream(*audioProcessor.getFileBlock(originalIndex), false).readEntireStreamAsString(),
                                                                    luaFile,
                                                                    250);
-        options.useLuaTokeniser = luaFile;
-        options.showTitle = true;
-        options.showConsole = luaFile;
+        if (extension == ".svg") {
+            options.externalTokeniser = &xmlTokeniser;
+        } else {
+            options.useLuaTokeniser = luaFile;
+        }
         options.showHelpButton = luaFile;
         options.showResetButton = luaFile;
     }
@@ -429,19 +438,15 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
         }
 
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        if (model->getScriptId() == LuaEffectState::UNIQUE_ID) {
-            if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
-                audioProcessor.luaEffectState->parser->forgetAllStates();
-            }
-            return;
-        }
-
         auto parser = audioProcessor.getCurrentFileParser();
         if (parser != nullptr) {
             auto luaParser = parser->getLua();
             if (luaParser != nullptr) {
                 luaParser->forgetAllStates();
             }
+        }
+        if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
+            audioProcessor.luaEffectState->parser->forgetAllStates();
         }
     };
 
@@ -649,12 +654,18 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
 }
 
 void OscirenderAudioProcessorEditor::mouseDown(const juce::MouseEvent& e) {
-    juce::ignoreUnused(e);
+    if (console.getBoundsInParent().removeFromTop(30).contains(e.getPosition())) {
+        console.setConsoleOpen(!console.getConsoleOpen());
+        resized();
+    }
 }
 
 void OscirenderAudioProcessorEditor::mouseMove(const juce::MouseEvent& event) {
-    juce::ignoreUnused(event);
-    setMouseCursor(juce::MouseCursor::NormalCursor);
+    if (console.getBoundsInParent().removeFromTop(30).contains(event.getPosition())) {
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    } else {
+        setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
 }
 
 void OscirenderAudioProcessorEditor::openVisualiserSettings() {
