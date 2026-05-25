@@ -15,6 +15,7 @@
 
 #include <limits>
 #include <numbers>
+#include <cstdint>
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
@@ -318,6 +319,11 @@ public:
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
     juce::String getCurrentFileName();
+    void startTextureInput(juce::String sourceName, int width, int height);
+    void updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
+    void stopTextureInput();
+    bool isTextureInputActive() const { return textureInputActive.load(std::memory_order_acquire); }
+    juce::String getTextureInputName();
     juce::String getFileName(int index);
     juce::String getFileId(int index);
     std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
@@ -390,6 +396,11 @@ private:
     std::vector<ErrorListener*> errorListeners;
 
     ShapeSound::Ptr defaultSound;
+    std::shared_ptr<FileParser> liveTextureParser;
+    ShapeSound::Ptr liveTextureSound;
+    juce::String liveTextureInputName;
+    int liveTexturePreviousFile = -1;
+    std::atomic<bool> textureInputActive{false};
     VoiceManager synth;
 #if OSCI_PREMIUM
     mts_esp::Client mtsClient;

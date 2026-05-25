@@ -40,6 +40,13 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(closeFileButton);
     closeFileButton.setTooltip("Close the currently open file.");
     closeFileButton.onClick = [this] {
+        if (pluginEditor.visualiser.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
+            pluginEditor.visualiser.stopTextureInput();
+            audioProcessor.stopTextureInput();
+            updateFileLabel();
+            return;
+        }
+
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
         int index = audioProcessor.getCurrentFileIndex();
         if (index == -1) return;
@@ -117,13 +124,14 @@ void FileControlsComponent::resized()
 
 void FileControlsComponent::updateFileLabel()
 {
-    bool ableToOpenFiles = !audioProcessor.objectServerRendering && !audioProcessor.inputEnabled->getBoolValue();
+    const bool textureInputActive = audioProcessor.isTextureInputActive();
+    bool ableToOpenFiles = !audioProcessor.objectServerRendering && !audioProcessor.inputEnabled->getBoolValue() && !textureInputActive;
     bool fileOpen = audioProcessor.getCurrentFileIndex() != -1 && ableToOpenFiles;
     bool showLeftArrow  = audioProcessor.getCurrentFileIndex() > 0 && fileOpen;
     bool showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1 && fileOpen;
 
     openFileButton.setVisible(ableToOpenFiles);
-    closeFileButton.setVisible(fileOpen);
+    closeFileButton.setVisible(fileOpen || textureInputActive);
     leftArrow.setVisible(showLeftArrow);
     rightArrow.setVisible(showRightArrow);
     fileNumberLabel.setVisible(showLeftArrow || showRightArrow);
@@ -132,6 +140,8 @@ void FileControlsComponent::updateFileLabel()
         fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
     } else if (audioProcessor.inputEnabled->getBoolValue()) {
         fileLabel.setText("Using external audio", juce::dontSendNotification);
+    } else if (textureInputActive) {
+        fileLabel.setText("Using texture input: " + audioProcessor.getTextureInputName(), juce::dontSendNotification);
     } else if (audioProcessor.getCurrentFileIndex() == -1) {
         fileLabel.setText("No file open", juce::dontSendNotification);
     } else {

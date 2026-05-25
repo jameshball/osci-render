@@ -48,6 +48,89 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     setFrame(0);
 }
 
+ImageParser::ImageParser(OscirenderAudioProcessor& p, int initialWidth, int initialHeight) : audioProcessor(p) {
+    int safeWidth = juce::jmax(1, initialWidth);
+    int safeHeight = juce::jmax(1, initialHeight);
+    const int largestDimension = juce::jmax(safeWidth, safeHeight);
+    if (largestDimension > liveInputMaxDimension) {
+        const float scale = (float)liveInputMaxDimension / (float)largestDimension;
+        safeWidth = juce::jmax(1, juce::roundToInt((float)safeWidth * scale));
+        safeHeight = juce::jmax(1, juce::roundToInt((float)safeHeight * scale));
+    }
+    replaceSingleFrame(std::vector<std::uint8_t>((size_t)safeWidth * (size_t)safeHeight, 0), safeWidth, safeHeight);
+}
+
+void ImageParser::replaceSingleFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight) {
+    if (frameWidth <= 0 || frameHeight <= 0 || pixels.size() != (size_t)frameWidth * (size_t)frameHeight) {
+        return;
+    }
+
+    std::vector<std::vector<std::uint8_t>> replacementFrames;
+    replacementFrames.reserve(1);
+    replacementFrames.emplace_back(std::move(pixels));
+    std::vector<bool> replacementVisited((size_t)frameWidth * (size_t)frameHeight, false);
+
+    std::vector<std::vector<std::uint8_t>> oldFrames;
+    std::vector<bool> oldVisited;
+    {
+        juce::SpinLock::ScopedLockType scope(frameLock);
+        oldFrames.swap(frames);
+        oldVisited.swap(visited);
+        frames.swap(replacementFrames);
+        visited.swap(replacementVisited);
+        width = frameWidth;
+        height = frameHeight;
+        frameIndex = 0;
+        count = 0;
+        scanX = -1;
+        scanY = 1;
+        scanCount = 0;
+        resetPosition();
+    }
+}
+
+void ImageParser::setSingleFrameFromRgba(const std::vector<std::uint8_t>& rgba, int sourceWidth, int sourceHeight, bool verticallyFlipped) {
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+        return;
+    }
+
+    const size_t requiredBytes = (size_t)sourceWidth * (size_t)sourceHeight * 4;
+    if (rgba.size() < requiredBytes) {
+        return;
+    }
+
+    int targetWidth = sourceWidth;
+    int targetHeight = sourceHeight;
+    const int largestSourceDimension = juce::jmax(sourceWidth, sourceHeight);
+    if (largestSourceDimension > liveInputMaxDimension) {
+        const float scale = (float)liveInputMaxDimension / (float)largestSourceDimension;
+        targetWidth = juce::jmax(1, juce::roundToInt((float)sourceWidth * scale));
+        targetHeight = juce::jmax(1, juce::roundToInt((float)sourceHeight * scale));
+    }
+
+    std::vector<std::uint8_t> pixels((size_t)targetWidth * (size_t)targetHeight, 0);
+    for (int y = 0; y < targetHeight; y++) {
+        int sourceY = juce::jlimit(0, sourceHeight - 1, (int)(((int64_t)y * sourceHeight) / targetHeight));
+        if (verticallyFlipped) {
+            sourceY = sourceHeight - 1 - sourceY;
+        }
+
+        for (int x = 0; x < targetWidth; x++) {
+            const int sourceX = juce::jlimit(0, sourceWidth - 1, (int)(((int64_t)x * sourceWidth) / targetWidth));
+            const size_t sourceIndex = ((size_t)sourceY * (size_t)sourceWidth + (size_t)sourceX) * 4;
+            const int r = rgba[sourceIndex];
+            const int g = rgba[sourceIndex + 1];
+            const int b = rgba[sourceIndex + 2];
+            const int a = rgba[sourceIndex + 3];
+            const int luma = (54 * r + 183 * g + 19 * b) >> 8;
+            const std::uint8_t output = a == 0 ? 0 : (std::uint8_t)juce::jmax(1, luma);
+            pixels[(size_t)y * (size_t)targetWidth + (size_t)x] = output;
+        }
+    }
+
+    replaceSingleFrame(std::move(pixels), targetWidth, targetHeight);
+}
+
 void ImageParser::processGifFile(juce::File& file) {
     juce::String fileName = file.getFullPathName();
     gd_GIF *gif = gd_open_gif(fileName.toRawUTF8());
@@ -296,6 +379,11 @@ void ImageParser::handleError(juce::String message) {
 }
 
 void ImageParser::setFrame(int index) {
+    juce::SpinLock::ScopedLockType scope(frameLock);
+    if (frames.empty()) {
+        return;
+    }
+
     // Ensure that the frame number is within the bounds of the number of frames
     // This weird modulo trick is to handle negative numbers
     index = (frames.size() + (index % frames.size())) % frames.size();
@@ -303,6 +391,16 @@ void ImageParser::setFrame(int index) {
     frameIndex = index;
     resetPosition();
     std::fill(visited.begin(), visited.end(), false);
+}
+
+int ImageParser::getNumFrames() {
+    juce::SpinLock::ScopedLockType scope(frameLock);
+    return (int)frames.size();
+}
+
+int ImageParser::getCurrentFrame() const {
+    juce::SpinLock::ScopedLockType scope(frameLock);
+    return frameIndex;
 }
 
 bool ImageParser::isOverThreshold(double pixel, double thresholdPow) {
@@ -374,6 +472,11 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 }
 
 osci::Point ImageParser::getSample(int blockSampleIndex) {
+    juce::SpinLock::ScopedLockType scope(frameLock);
+    if (frames.empty() || width <= 0 || height <= 0 || frameIndex < 0 || frameIndex >= frames.size()) {
+        return osci::Point();
+    }
+
     if (ALGORITHM == "HILLIGOSS") {
         if (count % jumpFrequency() == 0) {
             resetPosition();

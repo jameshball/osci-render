@@ -141,6 +141,29 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         visualiserSettingsWindow.setVisible(false);
     };
 
+    {
+        juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
+        visualiser.textureInputStarted = [safeThis](juce::String sourceName, int width, int height) {
+            if (safeThis == nullptr) {
+                return;
+            }
+
+            safeThis->audioProcessor.startTextureInput(std::move(sourceName), width, height);
+        };
+
+        visualiser.textureInputStopped = [safeThis] {
+            if (safeThis == nullptr) {
+                return;
+            }
+
+            safeThis->audioProcessor.stopTextureInput();
+        };
+    }
+
+    visualiser.textureInputFrameReady = [processor = &audioProcessor](const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
+        processor->updateTextureInputFrame(rgba, width, height, verticallyFlipped);
+    };
+
 #if !OSCI_PREMIUM
     visualiserSettings.onUpgradeRequested = [this] {
         showPremiumSplashScreen();
@@ -162,6 +185,8 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    visualiser.stopTextureInput();
+    audioProcessor.stopTextureInput();
     visualiserSettingsWindow.removeKeyListener(this);
 
     // Clear the file removal callback
@@ -595,6 +620,12 @@ void OscirenderAudioProcessorEditor::updateCodeDocument() {
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     bool consumeKey = false;
+    const juce::juce_wchar textCharacter = key.getTextCharacter();
+    if ((textCharacter == 'j' || textCharacter == 'k') && (visualiser.isTextureInputActive() || audioProcessor.isTextureInputActive())) {
+        visualiser.stopTextureInput();
+        audioProcessor.stopTextureInput();
+    }
+
     {
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
@@ -603,7 +634,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         int currentFile = audioProcessor.getCurrentFileIndex();
         bool changedFile = false;
 
-        if (key.getTextCharacter() == 'j') {
+        if (textCharacter == 'j') {
             if (numFiles > 1) {
                 currentFile++;
                 if (currentFile == numFiles) {
@@ -612,7 +643,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
                 changedFile = true;
             }
             consumeKey = true;
-        } else if (key.getTextCharacter() == 'k') {
+        } else if (textCharacter == 'k') {
             if (numFiles > 1) {
                 currentFile--;
                 if (currentFile < 0) {

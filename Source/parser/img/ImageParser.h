@@ -3,20 +3,27 @@
 
 #include <osci_file_import/osci_file_import.h>
 
+#include <cstdint>
+
 class OscirenderAudioProcessor;
 class CommonPluginEditor;
 
 class ImageParser {
 public:
-    ImageParser(OscirenderAudioProcessor& p, juce::String fileName, juce::MemoryBlock image);
+    ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image);
+    ImageParser(OscirenderAudioProcessor& p, int initialWidth, int initialHeight);
     ~ImageParser();
 
     void setFrame(int index);
+    void setSingleFrameFromRgba(const std::vector<std::uint8_t>& rgba, int sourceWidth, int sourceHeight, bool verticallyFlipped);
     osci::Point getSample(int blockSampleIndex = 0);
-    int getNumFrames() { return frames.size(); }
-    int getCurrentFrame() const { return frameIndex; }
+    int getNumFrames();
+    int getCurrentFrame() const;
 
 private:
+    static constexpr int liveInputMaxDimension = 512;
+
+    void replaceSingleFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight);
     void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
     void resetPosition();
     float getPixelValue(int x, int y, bool invert);
@@ -36,6 +43,7 @@ private:
     const juce::String ALGORITHM = "HILLIGOSS";
 
     OscirenderAudioProcessor& audioProcessor;
+    mutable juce::SpinLock frameLock;
     juce::Random rng;
     int frameIndex = 0;
     std::vector<std::vector<uint8_t>> frames;

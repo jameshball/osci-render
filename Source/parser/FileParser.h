@@ -15,6 +15,8 @@ public:
 	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
 	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
+	void prepareLiveImageInput(int width, int height);
+	void updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
 	std::vector<std::unique_ptr<osci::Shape>> nextFrame() override;
 	osci::Point nextSample(lua_State*& L, LuaVariables& vars);
 
