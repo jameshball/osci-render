@@ -15,8 +15,11 @@
 #include "components/timeline/OscirenderAudioTimelineController.h"
 #include "components/menu/OsciMainMenuBarModel.h"
 #include "components/SplashScreenComponent.h"
-#include "video/TextureInputFrameGrabber.h"
 #include "visualiser/VisualiserSettings.h"
+
+#include <osci_texture_interop/osci_texture_interop.h>
+
+class TextureInputFrameGrabber;
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
 public:
@@ -39,6 +42,9 @@ public:
     void openVisualiserSettings();
     void openRecordingSettings() override;
     void showPremiumSplashScreen() override;
+    void openProject(const juce::File& file) override;
+    void openProject() override;
+    void resetToDefault() override;
     void setTextureInputSource(osci::texture::SourceInfo source);
     void stopTextureInput();
     bool isTextureInputActive() const;

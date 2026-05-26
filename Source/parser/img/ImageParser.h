@@ -3,7 +3,9 @@
 
 #include <osci_file_import/osci_file_import.h>
 
+#include <atomic>
 #include <cstdint>
+#include <limits>
 
 class OscirenderAudioProcessor;
 class CommonPluginEditor;
@@ -22,8 +24,15 @@ public:
 
 private:
     static constexpr int liveInputMaxDimension = 512;
+    static constexpr size_t liveInputMaxPixels = (size_t)liveInputMaxDimension * (size_t)liveInputMaxDimension;
+    static constexpr int noPendingFrameRequest = std::numeric_limits<int>::min();
 
-    void replaceSingleFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight);
+    void initialiseLiveFrame(int initialWidth, int initialHeight);
+    void publishLiveFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight);
+    void consumePendingLiveFrame();
+    void applyPendingFrameRequest();
+    int normaliseFrameIndex(int index) const;
+    void resetTraversalState();
     void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
     void resetPosition();
     float getPixelValue(int x, int y, bool invert);
@@ -43,11 +52,18 @@ private:
     const juce::String ALGORITHM = "HILLIGOSS";
 
     OscirenderAudioProcessor& audioProcessor;
-    juce::SpinLock frameLock;
+    juce::SpinLock pendingLiveFrameLock;
     juce::Random rng;
     int frameIndex = 0;
+    std::atomic<int> requestedFrameIndex = noPendingFrameRequest;
+    std::atomic<int> reportedFrameIndex = 0;
     std::vector<std::vector<uint8_t>> frames;
     std::vector<bool> visited;
+    std::vector<std::uint8_t> pendingLivePixels;
+    int pendingLiveWidth = 0;
+    int pendingLiveHeight = 0;
+    bool pendingLiveFrameAvailable = false;
+    bool liveInput = false;
     int currentX, currentY;
     int width = -1;
     int height = -1;

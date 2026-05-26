@@ -24,8 +24,8 @@ public:
 
     void handleCommandLine(const juce::String& commandLine);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
-    void openProject(const juce::File& file);
-    void openProject();
+    virtual void openProject(const juce::File& file);
+    virtual void openProject();
     void saveProject();
     void saveProjectAs();
     void updateTitle();
@@ -51,7 +51,7 @@ public:
 
     // Offline render: input audio file -> encoded video using Recording Settings
     void renderAudioFileToVideo();
-    void resetToDefault();
+    virtual void resetToDefault();
     void toggleFullScreen();
     void resized() override;
     void parentHierarchyChanged() override;
