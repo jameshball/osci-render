@@ -117,8 +117,8 @@ public:
     juce::SpinLock wavParserLock;
     WavParser wavParser{ [this] { return currentSampleRate.load(); } };
 
-    // Apply per-sample volume scaling and threshold clipping to a stereo buffer.
-    // Uses SIMD (FloatVectorOperations) when the animated buffer is not populated.
+    // Apply per-sample volume scaling and optional threshold clipping to a stereo buffer.
+    // A threshold at the top of the range leaves the scaled output unclipped.
     void applyVolumeAndThreshold(float* const* channels, int numSamples);
 
     juce::SpinLock effectsLock;

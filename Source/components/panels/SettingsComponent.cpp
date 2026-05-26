@@ -6,7 +6,7 @@
 #include "../../audio/modulation/LfoState.h"
 #include "../../parser/FileParser.h"
 #if OSCI_PREMIUM
-#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include <osci_standalone/osci_standalone.h>
 #endif
 
 // ============================================================================

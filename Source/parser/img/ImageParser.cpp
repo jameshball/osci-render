@@ -2,6 +2,7 @@
 #include "../../../modules/gifdec/gifdec.h"
 #include "../../PluginProcessor.h"
 #include "../../CommonPluginEditor.h"
+#include <regex>
 
 ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
     juce::File file = temp.getFile();

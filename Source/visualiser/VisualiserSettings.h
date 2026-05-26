@@ -10,6 +10,7 @@
 #ifndef SOSCI
 class OscirenderAudioProcessor;
 #endif
+class RecordingParameters;
 
 class GroupedSettings : public juce::GroupComponent {
 public:
@@ -50,7 +51,7 @@ private:
 
 class VisualiserSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
-    VisualiserSettings(VisualiserParameters&, int numChannels = 2);
+    VisualiserSettings(VisualiserParameters&, int numChannels, RecordingParameters& recordingParameters);
     ~VisualiserSettings();
 
 #ifndef SOSCI
@@ -63,10 +64,13 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     VisualiserParameters& parameters;
+    RecordingParameters& recordingParameters;
     int numChannels;
     std::function<void()> onUpgradeRequested;
 
 private:
+    void updateScreenOverlayItemsEnabled();
+
     GroupedSettings lineColour{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.hueEffect),
