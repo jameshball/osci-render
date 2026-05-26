@@ -217,29 +217,6 @@
               file="Source/audio/AudioThreadGuard.h"/>
         <FILE id="ATGrd2" name="AudioThreadGuard.cpp" compile="1" resource="0"
               file="Source/audio/AudioThreadGuard.cpp"/>
-        <GROUP id="{AUD_EFFECTS}" name="effects">
-          <FILE id="EjkbRe" name="PolygonizerEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/PolygonizerEffect.h"/>
-          <FILE id="XSUjDz" name="KaleidoscopeEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/KaleidoscopeEffect.h"/>
-          <FILE id="jfRtxu" name="VortexEffect.h" compile="0" resource="0" file="Source/audio/effects/VortexEffect.h"/>
-          <FILE id="de5H36" name="GodRayEffect.h" compile="0" resource="0" file="Source/audio/effects/GodRayEffect.h"/>
-          <FILE id="yxWOsR" name="DuplicatorEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/DuplicatorEffect.h"/>
-          <FILE id="GbAmhn" name="SpiralBitCrushEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/SpiralBitCrushEffect.h"/>
-          <FILE id="Bc8UeW" name="BitCrushEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/BitCrushEffect.h"/>
-          <FILE id="lOXxYe" name="BulgeEffect.h" compile="0" resource="0" file="Source/audio/effects/BulgeEffect.h"/>
-          <FILE id="I7B78q" name="DashedLineEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/DashedLineEffect.h"/>
-          <FILE id="SWC0tN" name="MultiplexEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/MultiplexEffect.h"/>
-          <FILE id="h0dMim" name="PerspectiveEffect.h" compile="0" resource="0"
-                file="Source/audio/effects/PerspectiveEffect.h"/>
-          <FILE id="RsHWPN" name="TwistEffect.h" compile="0" resource="0" file="Source/audio/effects/TwistEffect.h"/>
-          <FILE id="sgdTlo" name="WobbleEffect.h" compile="0" resource="0" file="Source/audio/effects/WobbleEffect.h"/>
-        </GROUP>
         <GROUP id="{AUD_MODULATION}" name="modulation">
           <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
                 file="Source/audio/modulation/DahdsrEnvelope.h"/>
@@ -462,38 +439,9 @@
         </GROUP>
       </GROUP>
       <GROUP id="{90BFF2D8-C8EE-510F-7993-421FDEEFA277}" name="lua"/>
-      <GROUP id="{2A41BAF3-5E83-B018-5668-39D89ABFA00C}" name="chinese_postman">
-        <FILE id="LcDpwe" name="BinaryHeap.cpp" compile="1" resource="0" file="modules/chinese_postman/BinaryHeap.cpp"/>
-        <FILE id="UYdaXR" name="BinaryHeap.h" compile="0" resource="0" file="modules/chinese_postman/BinaryHeap.h"/>
-        <FILE id="UnjMQ4" name="ChinesePostman.h" compile="0" resource="0"
-              file="modules/chinese_postman/ChinesePostman.h"/>
-        <FILE id="ItJWxN" name="Dijkstra.h" compile="0" resource="0" file="modules/chinese_postman/Dijkstra.h"/>
-        <FILE id="r66okI" name="Globals.h" compile="0" resource="0" file="modules/chinese_postman/Globals.h"/>
-        <FILE id="GN3vkN" name="Graph.cpp" compile="1" resource="0" file="modules/chinese_postman/Graph.cpp"/>
-        <FILE id="tpPZBV" name="Graph.h" compile="0" resource="0" file="modules/chinese_postman/Graph.h"/>
-        <FILE id="hz1Tov" name="Matching.cpp" compile="1" resource="0" file="modules/chinese_postman/Matching.cpp"/>
-        <FILE id="CdKZCg" name="Matching.h" compile="0" resource="0" file="modules/chinese_postman/Matching.h"/>
-      </GROUP>
       <GROUP id="{B1C2D3E4-5F67-8901-2345-678901234567}" name="gifdec">
         <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="modules/gifdec/gifdec.c"/>
         <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="modules/gifdec/gifdec.h"/>
-      </GROUP>
-      <GROUP id="{C2D3E4F5-6A78-9012-3456-789012345678}" name="tinyobjloader">
-        <FILE id="a4ILpa" name="tiny_obj_loader.cc" compile="1" resource="0"
-              file="modules/tinyobjloader/tiny_obj_loader.cc"/>
-        <FILE id="YdfYbM" name="tiny_obj_loader.h" compile="0" resource="0"
-              file="modules/tinyobjloader/tiny_obj_loader.h"/>
-      </GROUP>
-      <GROUP id="{E6ED85A9-3843-825F-EF48-BCF81E38F8AD}" name="obj">
-        <FILE id="ahOy0q" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
-        <FILE id="dUDESs" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
-        <FILE id="T6iC8q" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
-        <FILE id="ky5ZfA" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
-        <FILE id="Yfpzzn" name="ObjectServer.cpp" compile="1" resource="0"
-              file="Source/obj/ObjectServer.cpp"/>
-        <FILE id="CqYgqM" name="ObjectServer.h" compile="0" resource="0" file="Source/obj/ObjectServer.h"/>
-        <FILE id="YNsbe9" name="WorldObject.cpp" compile="1" resource="0" file="Source/obj/WorldObject.cpp"/>
-        <FILE id="SZBVI9" name="WorldObject.h" compile="0" resource="0" file="Source/obj/WorldObject.h"/>
       </GROUP>
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
         <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
@@ -502,11 +450,6 @@
         <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
           <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
           <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
-        </GROUP>
-        <GROUP id="{FC8A1D3F-7B92-4F01-A3D6-E12B5C8F9A01}" name="fractal">
-          <FILE id="Fr2001" name="FractalParser.cpp" compile="1" resource="0"
-                file="Source/parser/fractal/FractalParser.cpp"/>
-          <FILE id="Fr2002" name="FractalParser.h" compile="0" resource="0" file="Source/parser/fractal/FractalParser.h"/>
         </GROUP>
         <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg"/>
         <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt"/>
@@ -569,10 +512,10 @@
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="Jk6VkC"
                 bigIcon="Jk6VkC" externalLibraries="luajit" extraCompilerFlags="-mavx">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
-                       libraryPath="../../../modules/LuaJIT/src"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/LuaJIT/src"
-                       libraryPath="../../../modules/LuaJIT/src"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -591,14 +534,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
-        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -618,11 +561,13 @@
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
-                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
+                       headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        prebuildCommand="call ..\..\..\luajit_win.bat"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="osci-render" alwaysGenerateDebugSymbols="1"
                        debugInformationFormat="ProgramDatabase" winWarningLevel="2"
-                       libraryPath="..\..\..\modules\LuaJIT\src" headerPath="..\..\..\modules\LuaJIT\src"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
+                       headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
@@ -642,14 +587,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
-        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -671,17 +616,21 @@
                externalLibraries="luajit" userNotes="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-render needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
                        usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release" targetName="osci-render" customXcodeFlags="CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
                        codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Release (Development)" targetName="osci-render" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
         <CONFIGURATION name="Profiling" targetName="osci-render" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx,GCC_GENERATE_DEBUGGING_SYMBOLS=YES,GCC_DEBUGGING_SYMBOLS=full,DEBUG_INFORMATION_FORMAT=dwarf-with-dsym,STRIP_INSTALLED_PRODUCT = NO,COPY_PHASE_STRIP=NO,DWARF_DSYM_FILE_SHOULD_ACCOMPANY_PRODUCT=YES"
-                       headerPath="../../../modules/LuaJIt/src" libraryPath="../../../modules/LuaJIt/src"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
                        userNotes="Developer ID Application: James Ball (D86A3M3H2L)"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
@@ -701,14 +650,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
-        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
