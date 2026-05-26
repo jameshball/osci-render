@@ -154,6 +154,7 @@
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="redo01" name="redo.svg" compile="0" resource="1" file="Resources/svg/redo.svg"/>
         <FILE id="vOGcgi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
         <FILE id="Knzo1H" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
@@ -177,6 +178,7 @@
         <FILE id="ESR7bv" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
         <FILE id="ID1vTS" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
         <FILE id="Sw4WWb" name="twist.svg" compile="0" resource="1" file="Resources/svg/twist.svg"/>
+        <FILE id="undo1" name="undo.svg" compile="0" resource="1" file="Resources/svg/undo.svg"/>
         <FILE id="Y90Viq" name="unfold.svg" compile="0" resource="1" file="Resources/svg/unfold.svg"/>
         <FILE id="praXUY" name="vector-cancelling.svg" compile="0" resource="1"
               file="Resources/svg/vector-cancelling.svg"/>
