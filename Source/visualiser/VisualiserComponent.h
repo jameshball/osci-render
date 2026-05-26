@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 
 #include <algorithm>
+#include <cstdint>
 
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
@@ -15,6 +16,7 @@
 #include "RecordingSettings.h"
 #include "VisualiserSettings.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
+#include <osci_texture_interop/osci_texture_interop.h>
 
 enum class FullScreenMode {
     TOGGLE,
@@ -83,6 +85,11 @@ private:
     void updatePausedState();
     bool isPrimaryVisualiser() const;
     void setOverlayFadeProgress(float progress);
+    void refreshTextureOutputButton();
+    void setTextureOutputEnabled(bool enabled);
+    void requestTextureOutputService();
+    void serviceTextureOutputFrame();
+    void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
 
     std::atomic<bool> active = true;
 
@@ -103,6 +110,7 @@ private:
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+    osci::texture::OpenGLTexturePublisher textureOutputPublisher;
 
     int lastMouseX = 0;
     int lastMouseY = 0;

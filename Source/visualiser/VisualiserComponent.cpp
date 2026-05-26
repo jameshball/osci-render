@@ -5,6 +5,8 @@
 #include "../LookAndFeel.h"
 #include "VisualiserTextureAssets.h"
 
+#include <cstdint>
+
 VisualiserComponent::FadeCoverComponent::FadeCoverComponent() {
     setOpaque(false);
     setInterceptsMouseClicks(false, false);
@@ -39,6 +41,7 @@ VisualiserComponent::VisualiserComponent(
     if (isPrimaryVisualiser()) {
         active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         audioProcessor.visualiserParameters.visualiserPaused->addListener(this);
+        audioProcessor.visualiserParameters.textureOutputEnabled->addListener(this);
     }
 
     setShouldBeRunning(active);
@@ -86,10 +89,17 @@ VisualiserComponent::VisualiserComponent(
     settingsButton.setTooltip("Opens the visualiser settings window.");
 
     addAndMakeVisible(textureOutputButton);
-    textureOutputButton.setTooltip("Texture output is not available in this build.");
     textureOutputButton.setClickingTogglesState(false);
     textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
-    textureOutputButton.setEnabled(false);
+    textureOutputButton.onClick = [this] {
+#if OSCI_PREMIUM
+        const bool currentlyRequestedOrRunning = this->settings.parameters.textureOutputEnabled->getBoolValue() || textureOutputPublisher.isRunning();
+        setTextureOutputEnabled(!currentlyRequestedOrRunning);
+#else
+        editor.showPremiumSplashScreen();
+#endif
+    };
+    refreshTextureOutputButton();
 
     fullScreenButton.onClick = [this]() {
         if (this->parent != nullptr) {
@@ -141,6 +151,8 @@ VisualiserComponent::VisualiserComponent(
     };
 
     postRenderCallback = [this] {
+        serviceTextureOutputFrame();
+
         if (record.getToggleState()) {
 #if OSCI_PREMIUM
             if (recordingVideo) {
@@ -179,10 +191,12 @@ VisualiserComponent::~VisualiserComponent() {
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
+    textureOutputPublisher.stop();
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
         audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
+        audioProcessor.visualiserParameters.textureOutputEnabled->removeListener(this);
     }
     if (parent == nullptr) {
         audioProcessor.haltRecording = nullptr;
@@ -272,6 +286,8 @@ void VisualiserComponent::parameterValueChanged(int parameterIndex, float newVal
     juce::MessageManager::callAsync([safeThis] {
         if (safeThis == nullptr) return;
         safeThis->updatePausedState();
+        safeThis->refreshTextureOutputButton();
+        safeThis->requestTextureOutputService();
     });
 }
 
@@ -691,6 +707,157 @@ void VisualiserComponent::setOverlayFadeProgress(float progress) {
     overlayFadeCover.setVisible(fadeAlpha > 0.001f);
 }
 
+void VisualiserComponent::refreshTextureOutputButton() {
+    const bool wanted = settings.parameters.textureOutputEnabled->getBoolValue();
+    const bool running = textureOutputPublisher.isRunning();
+
+#if !OSCI_PREMIUM
+    textureOutputButton.setEnabled(true);
+    textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
+    textureOutputButton.setTooltip("Texture sharing via Syphon/Spout is a Premium feature. Click to learn more.");
+    return;
+#endif
+
+    textureOutputButton.setEnabled(isPrimaryVisualiser());
+    textureOutputButton.setToggleState(wanted || running, juce::NotificationType::dontSendNotification);
+
+    if (!isPrimaryVisualiser()) {
+        textureOutputButton.setTooltip("Texture output can only be started from the main visualiser.");
+        return;
+    }
+
+    if (wanted && !running) {
+        textureOutputButton.setTooltip("Texture output will start on the next rendered frame.");
+        return;
+    }
+
+    textureOutputButton.setTooltip(running ? "Stops texture output." : "Starts texture output.");
+}
+
+void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
+#if !OSCI_PREMIUM
+    if (enabled) {
+        editor.showPremiumSplashScreen();
+    }
+    settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+    refreshTextureOutputButton();
+    requestTextureOutputService();
+    return;
+#endif
+
+    if (enabled == settings.parameters.textureOutputEnabled->getBoolValue()) {
+        refreshTextureOutputButton();
+        requestTextureOutputService();
+        return;
+    }
+
+    if (!enabled) {
+        settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+        refreshTextureOutputButton();
+        requestTextureOutputService();
+        return;
+    }
+
+    const Texture renderTexture = getRenderTexture();
+    if (renderTexture.id == 0 || renderTexture.width <= 0 || renderTexture.height <= 0) {
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Output",
+                                               "Texture output cannot start until the visualiser has rendered a frame.",
+                                               "OK");
+        refreshTextureOutputButton();
+        requestTextureOutputService();
+        return;
+    }
+
+    const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+    if (!status.isAvailable() || !isPrimaryVisualiser()) {
+        const juce::String message = status.message.isNotEmpty()
+            ? status.message
+            : "Texture output is not available in this build.";
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                               "Texture Output",
+                                               message,
+                                               "OK");
+        refreshTextureOutputButton();
+        requestTextureOutputService();
+        return;
+    }
+
+    textureOutputPublisher.setSourceName(recordingSettings.getCustomTextureOutputName());
+    settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(true);
+    refreshTextureOutputButton();
+    requestTextureOutputService();
+}
+
+void VisualiserComponent::requestTextureOutputService() {
+    openGLContext.triggerRepaint();
+}
+
+void VisualiserComponent::serviceTextureOutputFrame() {
+#if !OSCI_PREMIUM
+    textureOutputPublisher.stop();
+
+    if (settings.parameters.textureOutputEnabled->getBoolValue()) {
+        settings.parameters.textureOutputEnabled->setBoolValue(false);
+        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+        juce::MessageManager::callAsync([safeThis] {
+            if (safeThis != nullptr) {
+                safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+                safeThis->refreshTextureOutputButton();
+            }
+        });
+    }
+    return;
+#else
+    if (!isPrimaryVisualiser()) {
+        return;
+    }
+
+    const bool shouldRun = settings.parameters.textureOutputEnabled->getBoolValue();
+    if (shouldRun && !textureOutputPublisher.isRunning()) {
+        textureOutputPublisher.setSourceName(recordingSettings.getCustomTextureOutputName());
+    }
+
+    const Texture renderTexture = getRenderTexture();
+    handleTextureOutputServiceResult(textureOutputPublisher.serviceTexture2D(shouldRun,
+                                                                             static_cast<std::uint32_t>(renderTexture.id),
+                                                                             renderTexture.width,
+                                                                             renderTexture.height));
+#endif
+}
+
+void VisualiserComponent::handleTextureOutputServiceResult(osci::texture::ServiceResult result) {
+    if (!result.changed()) {
+        return;
+    }
+
+    if (result.failed()) {
+        settings.parameters.textureOutputEnabled->setBoolValue(false);
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, result] {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        if (result.failed()) {
+            safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+        }
+
+        safeThis->refreshTextureOutputButton();
+
+        if (result.failed()) {
+            const bool publishFailure = result.error == osci::texture::ErrorCode::publishFailed
+                || result.error == osci::texture::ErrorCode::invalidTexture;
+            juce::AlertWindow::showMessageBoxAsync(publishFailure ? juce::MessageBoxIconType::WarningIcon : juce::MessageBoxIconType::InfoIcon,
+                                                   "Texture Output",
+                                                   result.message,
+                                                   "OK");
+        }
+    });
+}
+
 void VisualiserComponent::updateRenderModeFromProcessor() {
     // Called on message thread
     if (!visualiserOnly) {
@@ -712,6 +879,8 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
 }
 
 void VisualiserComponent::openGLContextClosing() {
+    textureOutputPublisher.stop();
+
     VisualiserRenderer::openGLContextClosing();
 }
 

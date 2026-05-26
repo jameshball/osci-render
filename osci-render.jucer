@@ -516,8 +516,6 @@
               file="Source/video/FFmpegEncoderManager.cpp"/>
         <FILE id="t2oI5O" name="FFmpegEncoderManager.h" compile="0" resource="0"
               file="Source/video/FFmpegEncoderManager.h"/>
-        <FILE id="xEIRCs" name="InvisibleOpenGLContextComponent.h" compile="0"
-              resource="0" file="Source/video/InvisibleOpenGLContextComponent.h"/>
       </GROUP>
       <GROUP id="{16A8DC64-BA02-898D-4DBA-AA3DDF6F9297}" name="visualiser">
         <FILE id="XpwLUN" name="RecordingSettings.cpp" compile="1" resource="0"
@@ -607,6 +605,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
@@ -657,6 +656,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
@@ -715,6 +715,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
@@ -763,5 +764,6 @@
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

@@ -580,7 +580,8 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
                     extension == ".mov" ||
                     extension == ".mp4";
 
-    bool skipProcessing = audioProcessor.objectServerRendering || fileName.isEmpty();
+    const bool textureInputActive = audioProcessor.isTextureInputActive();
+    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !textureInputActive);
 
     if (skipProcessing) {
         // do nothing
@@ -595,10 +596,10 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if (extension == ".gpla" || isImage) {
+    } else if (textureInputActive || extension == ".gpla" || isImage) {
         frame.setVisible(true);
-        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
-        frame.setImage(isImage);
+        frame.setAnimated(!textureInputActive && (extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4"));
+        frame.setImage(textureInputActive || isImage);
         frame.resized();
     }
     fileControls.updateFileLabel();

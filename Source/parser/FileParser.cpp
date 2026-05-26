@@ -2,8 +2,21 @@
 #include <numbers>
 #include "../PluginProcessor.h"
 
-FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback) 
+FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback)
     : errorCallback(errorCallback), audioProcessor(p) {}
+
+void FileParser::clearLoadedSource() {
+	object = nullptr;
+	svg = nullptr;
+	text = nullptr;
+	gpla = nullptr;
+	lua = nullptr;
+	img = nullptr;
+	wav = nullptr;
+#if OSCI_PREMIUM
+	fractal = nullptr;
+#endif
+}
 
 // Helper function to show file size warning
 void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
@@ -51,17 +64,8 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		fallbackLuaScript = lua->getScript();
 	}
 
-	object = nullptr;
-	svg = nullptr;
-	text = nullptr;
-	gpla = nullptr;
-	lua = nullptr;
-	img = nullptr;
-	wav = nullptr;
-#if OSCI_PREMIUM
-	fractal = nullptr;
-#endif
-	
+	clearLoadedSource();
+
 	if (extension == ".obj") {
 		const int64_t fileSize = stream->getTotalLength();
 		juce::String objContent = stream->readEntireStreamAsString();
@@ -120,6 +124,30 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 
 	isAnimatable = gpla != nullptr || (img != nullptr && (extension == ".gif" || extension == ".mp4" || extension == ".mov"));
 	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
+}
+
+void FileParser::prepareLiveImageInput(int width, int height) {
+	auto imageParser = std::make_shared<ImageParser>(audioProcessor, width, height);
+
+	juce::SpinLock::ScopedLockType scope(lock);
+
+	clearLoadedSource();
+	img = std::move(imageParser);
+	isAnimatable = false;
+	sampleSource = true;
+	active = true;
+}
+
+void FileParser::updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
+	std::shared_ptr<ImageParser> imageParser;
+	{
+		juce::SpinLock::ScopedLockType scope(lock);
+		imageParser = img;
+	}
+
+	if (imageParser != nullptr) {
+		imageParser->setSingleFrameFromRgba(rgba, width, height, verticallyFlipped);
+	}
 }
 
 std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {

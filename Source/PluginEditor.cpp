@@ -141,6 +141,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    stopTextureInput();
     stopTimer();
     visualiserSettingsWindow.removeKeyListener(this);
 
@@ -157,6 +158,110 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
     audioProcessor.fileChangeBroadcaster.removeChangeListener(this);
+}
+
+void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::SourceInfo source) {
+#if !OSCI_PREMIUM
+    juce::ignoreUnused(source);
+    showPremiumSplashScreen();
+    return;
+#endif
+
+    const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+    if (!status.isAvailable()) {
+        const juce::String message = status.message.isNotEmpty()
+            ? status.message
+            : "Texture input is not available in this build.";
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                               "Texture Input",
+                                               message,
+                                               "OK");
+        return;
+    }
+
+    if (source.displayName.trim().isEmpty() && source.opaqueId.trim().isEmpty()) {
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Input",
+                                               "The selected texture source is no longer available.",
+                                               "OK");
+        return;
+    }
+
+    stopTextureInput();
+
+    juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
+    auto grabber = std::make_unique<osci::texture::OpenGLTextureFrameGrabber>(std::move(source));
+    auto* grabberPtr = grabber.get();
+    grabber->inputStarted = [safeThis](juce::String sourceName, int width, int height) {
+        if (safeThis != nullptr) {
+            safeThis->audioProcessor.startTextureInput(std::move(sourceName), width, height);
+        }
+    };
+    grabber->inputStopped = [safeThis, grabberPtr] {
+        if (safeThis != nullptr && safeThis->textureInputFrameGrabber.get() == grabberPtr) {
+            safeThis->audioProcessor.stopTextureInput();
+            safeThis->textureInputFrameGrabber = nullptr;
+        }
+    };
+    grabber->inputFailed = [safeThis, grabberPtr](juce::String message) {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        if (safeThis->textureInputFrameGrabber.get() != grabberPtr) {
+            return;
+        }
+
+        safeThis->audioProcessor.stopTextureInput();
+        safeThis->textureInputFrameGrabber = nullptr;
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                               "Texture Input",
+                                               message,
+                                               "OK");
+    };
+    grabber->frameReady = [processor = &audioProcessor](const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
+        processor->updateTextureInputFrame(rgba, width, height, verticallyFlipped);
+    };
+
+    textureInputFrameGrabber = std::move(grabber);
+}
+
+void OscirenderAudioProcessorEditor::openProject(const juce::File& file) {
+    if (file != juce::File()) {
+        stopTextureInput();
+    }
+
+    CommonPluginEditor::openProject(file);
+}
+
+void OscirenderAudioProcessorEditor::openProject() {
+    CommonPluginEditor::openProject();
+}
+
+void OscirenderAudioProcessorEditor::resetToDefault() {
+    stopTextureInput();
+    CommonPluginEditor::resetToDefault();
+}
+
+void OscirenderAudioProcessorEditor::stopTextureInput() {
+    if (textureInputFrameGrabber != nullptr) {
+        textureInputFrameGrabber->stop();
+        textureInputFrameGrabber = nullptr;
+    }
+
+    audioProcessor.stopTextureInput();
+}
+
+bool OscirenderAudioProcessorEditor::isTextureInputActive() const {
+    return textureInputFrameGrabber != nullptr && textureInputFrameGrabber->isActive();
+}
+
+juce::String OscirenderAudioProcessorEditor::getTextureInputName() const {
+    if (textureInputFrameGrabber != nullptr && textureInputFrameGrabber->isActive()) {
+        return textureInputFrameGrabber->getSourceName();
+    }
+
+    return audioProcessor.getTextureInputName();
 }
 
 void OscirenderAudioProcessorEditor::setCodeEditorVisible(std::optional<bool> visible) {
@@ -188,6 +293,8 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     if (file.hasFileExtension("osci")) {
         openProject(file);
     } else {
+        stopTextureInput();
+
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 
@@ -614,6 +721,11 @@ std::shared_ptr<osci::LuaScriptEditorModel> OscirenderAudioProcessorEditor::getV
 
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     bool consumeKey = false;
+    const juce::juce_wchar textCharacter = key.getTextCharacter();
+    if ((textCharacter == 'j' || textCharacter == 'k') && (isTextureInputActive() || audioProcessor.isTextureInputActive())) {
+        stopTextureInput();
+    }
+
     {
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
@@ -622,7 +734,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         int currentFile = audioProcessor.getCurrentFileIndex();
         bool changedFile = false;
 
-        if (key.getTextCharacter() == 'j') {
+        if (textCharacter == 'j') {
             if (numFiles > 1) {
                 currentFile++;
                 if (currentFile == numFiles) {
@@ -631,7 +743,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
                 changedFile = true;
             }
             consumeKey = true;
-        } else if (key.getTextCharacter() == 'k') {
+        } else if (textCharacter == 'k') {
             if (numFiles > 1) {
                 currentFile--;
                 if (currentFile < 0) {

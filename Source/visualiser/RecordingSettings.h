@@ -116,7 +116,7 @@ public:
 
     juce::String getCustomTextureOutputName() {
         if (parameters.customTextureOutputName.isEmpty()) {
-            return "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
+            parameters.customTextureOutputName = "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
         }
         return parameters.customTextureOutputName;
     }

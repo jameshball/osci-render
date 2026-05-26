@@ -82,6 +82,7 @@
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="sRed01" name="redo.svg" compile="0" resource="1" file="Resources/svg/redo.svg"/>
         <FILE id="WDxwSi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
         <FILE id="gmY7I3" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
@@ -95,6 +96,7 @@
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
         <FILE id="xcg1tN" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
         <FILE id="JOyYQQ" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
+        <FILE id="sUnd01" name="undo.svg" compile="0" resource="1" file="Resources/svg/undo.svg"/>
         <FILE id="km6nQQ" name="vector-cancelling.svg" compile="0" resource="1"
               file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
@@ -252,6 +254,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -295,6 +298,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -345,6 +349,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
@@ -390,5 +395,6 @@
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
