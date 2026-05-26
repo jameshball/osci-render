@@ -11,34 +11,119 @@ void OsciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
     constexpr int RECENT_BASE_ID = 1000;
+    constexpr int TEXTURE_INPUT_DISCONNECT_ID = 2000;
+    constexpr int TEXTURE_INPUT_SOURCE_BASE_ID = 2100;
+    constexpr int fileMenu = 0;
+    constexpr int editMenu = 1;
+    constexpr int aboutMenu = 2;
+    constexpr int videoMenu = 3;
+    int nextMenu = 4;
+    const int audioMenu = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? nextMenu++ : -1;
+    const int interfaceMenu = nextMenu;
 
-    customMenuLogic = [this](juce::PopupMenu& menu, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
+    customMenuLogic = [this, fileMenu, videoMenu](juce::PopupMenu& menu, int topLevelMenuIndex) {
+        if (topLevelMenuIndex != fileMenu && topLevelMenuIndex != videoMenu) {
             return;
+        }
 
-        juce::PopupMenu recentMenu;
-        const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
-                                                                            RECENT_BASE_ID,
-                                                                            true,
-                                                                            true);
-        if (added == 0)
-            recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+        if (topLevelMenuIndex == fileMenu) {
+            juce::PopupMenu recentMenu;
+            const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
+                                                                                RECENT_BASE_ID,
+                                                                                true,
+                                                                                true);
+            if (added == 0) {
+                recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+            }
 
-        menu.addSubMenu("Open Recent", recentMenu);
+            menu.addSubMenu("Open Recent", recentMenu);
+            menu.addSeparator();
+            return;
+        }
+
+#if JUCE_MAC || JUCE_WINDOWS
+#if !OSCI_PREMIUM
+        menu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID, "Select Texture Input...");
         menu.addSeparator();
+#else
+        juce::PopupMenu sourceMenu;
+        textureInputMenuSources.clear();
+        const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+        if (!status.isAvailable()) {
+            const juce::String message = status.message.isNotEmpty() ? status.message : "Texture input is not available in this build.";
+            sourceMenu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID, message, false);
+        } else {
+            if (editor.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
+                sourceMenu.addItem(TEXTURE_INPUT_DISCONNECT_ID, "Disconnect Texture Input");
+                sourceMenu.addSeparator();
+            }
+
+            textureInputMenuSources = osci::texture::listOpenGLSources();
+            if (textureInputMenuSources.empty()) {
+                sourceMenu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID, "No texture sources available", false);
+            } else {
+                for (int i = 0; i < static_cast<int>(textureInputMenuSources.size()); i++) {
+                    const osci::texture::SourceInfo& source = textureInputMenuSources[static_cast<size_t>(i)];
+                    juce::String label = source.displayName.isNotEmpty() ? source.displayName : "Texture Source";
+                    if (source.applicationName.isNotEmpty()) {
+                        label += " (" + source.applicationName + ")";
+                    }
+                    if (source.width > 0 && source.height > 0) {
+                        label += " - " + juce::String(source.width) + "x" + juce::String(source.height);
+                    }
+                    sourceMenu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID + i, label, source.connectable);
+                }
+            }
+        }
+
+        menu.addSubMenu("Select Texture Input...", sourceMenu);
+        menu.addSeparator();
+#endif
+#endif
     };
 
-    customMenuSelectedLogic = [this](int menuItemID, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
-            return false;
+    customMenuSelectedLogic = [this, fileMenu, videoMenu](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == fileMenu && menuItemID >= RECENT_BASE_ID) {
+            const int index = menuItemID - RECENT_BASE_ID;
+            const auto file = audioProcessor.getRecentProjectFile(index);
+            if (file != juce::File() && file.existsAsFile()) {
+                editor.openProject(file);
+            }
 
-        if (menuItemID < RECENT_BASE_ID)
-            return false;
+            return true;
+        }
 
-        const int index = menuItemID - RECENT_BASE_ID;
-        const auto file = audioProcessor.getRecentProjectFile(index);
-        if (file != juce::File() && file.existsAsFile())
-            editor.openProject(file);
+#if JUCE_MAC || JUCE_WINDOWS
+#if !OSCI_PREMIUM
+        if (topLevelMenuIndex == videoMenu && menuItemID == TEXTURE_INPUT_SOURCE_BASE_ID) {
+            editor.showPremiumSplashScreen();
+            return true;
+        }
+#else
+        if (topLevelMenuIndex == videoMenu && menuItemID == TEXTURE_INPUT_DISCONNECT_ID) {
+            editor.stopTextureInput();
+            return true;
+        }
+
+        if (topLevelMenuIndex == videoMenu && menuItemID >= TEXTURE_INPUT_SOURCE_BASE_ID) {
+            const int sourceIndex = menuItemID - TEXTURE_INPUT_SOURCE_BASE_ID;
+            if (sourceIndex < 0 || sourceIndex >= static_cast<int>(textureInputMenuSources.size())) {
+                return true;
+            }
+
+            editor.setTextureInputSource(textureInputMenuSources[static_cast<size_t>(sourceIndex)]);
+            return true;
+        }
+#endif
+#endif
+
+        if (topLevelMenuIndex != fileMenu) {
+            return false;
+        }
+
+        if (menuItemID < RECENT_BASE_ID) {
+            return false;
+        }
 
         return true;
     };
@@ -51,14 +136,6 @@ void OsciMainMenuBarModel::resetMenuItems() {
         addTopLevelMenu("Audio");
     }
     addTopLevelMenu("Interface");
-
-    const int fileMenu      = 0;
-    const int editMenu      = 1;
-    const int aboutMenu     = 2;
-    const int videoMenu     = 3;
-    int nextMenu = 4;
-    const int audioMenu     = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? nextMenu++ : -1;
-    const int interfaceMenu = nextMenu;
 
     addMenuItem(fileMenu, "Open Project", [this] { editor.openProject(); });
     addMenuItem(fileMenu, "Save Project", [this] { editor.saveProject(); });
@@ -128,14 +205,6 @@ void OsciMainMenuBarModel::resetMenuItems() {
         editor.showPremiumSplashScreen();
 #endif
     });
-
-#if JUCE_MAC || JUCE_WINDOWS
-    addMenuItem(videoMenu, "Select Texture Input...", [this] {
-        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-                                               "Texture Input",
-                                               "Texture input is not available in this build.");
-    });
-#endif
 
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuItem(audioMenu, "Settings...", [this] {

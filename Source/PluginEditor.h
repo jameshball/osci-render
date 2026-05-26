@@ -15,6 +15,7 @@
 #include "components/SplashScreenComponent.h"
 #include "visualiser/VisualiserSettings.h"
 #include <osci_scripting/osci_scripting.h>
+#include <osci_texture_interop/osci_texture_interop.h>
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer {
 public:
@@ -37,6 +38,13 @@ public:
     void openVisualiserSettings();
     void openRecordingSettings() override;
     void showPremiumSplashScreen() override;
+    void openProject(const juce::File& file) override;
+    void openProject() override;
+    void resetToDefault() override;
+    void setTextureInputSource(osci::texture::SourceInfo source);
+    void stopTextureInput();
+    bool isTextureInputActive() const;
+    juce::String getTextureInputName() const;
     void timerCallback() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
@@ -47,6 +55,7 @@ private:
     void registerFileRemovedCallback();
 
     OscirenderAudioProcessor& audioProcessor;
+    std::unique_ptr<osci::texture::OpenGLTextureFrameGrabber> textureInputFrameGrabber;
 
 public:
     const double CLOSED_PREF_SIZE = 30.0;

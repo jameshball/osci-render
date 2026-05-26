@@ -56,6 +56,10 @@
 	path = modules/osci_audio_devices
 	url = git@github.com:jameshball/osci_audio_devices.git
 	branch = main
+[submodule "modules/osci_texture_interop"]
+	path = modules/osci_texture_interop
+	url = git@github.com:jameshball/osci_texture_interop.git
+	branch = main
 [submodule "modules/osci_standalone"]
 	path = modules/osci_standalone
 	url = git@github.com:jameshball/osci_standalone.git
