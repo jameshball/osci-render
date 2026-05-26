@@ -1,10 +1,9 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "components/AudioSettingsOverlay.h"
 #include "components/LicenseAndUpdatesComponent.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/RecordingSettingsOverlay.h"
-#include "standalone/CustomStandaloneFilterWindow.h"
+#include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
 #include "visualiser/OfflineAudioToVideoRenderer.h"
@@ -23,9 +22,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setLookAndFeel(&lookAndFeel);
 
     addAndMakeVisible(menuBar);
-    addAndMakeVisible(undoButton);
-    addAndMakeVisible(redoButton);
-    addAndMakeVisible(undoLabel);
+    addAndMakeVisible(undoRedoControls);
     addAndMakeVisible(betaUpdatesButton);
     addAndMakeVisible(updatePrompt);
     updatePrompt.setVisible(false);
@@ -36,22 +33,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     betaUpdatesButton.setTooltip("Beta updates are enabled. Click to manage.");
     betaUpdatesButton.onClick = [this] { openLicenseAndUpdates(); };
     refreshBetaUpdatesButton();
-    undoLabel.setJustificationType(juce::Justification::centredRight);
-    undoLabel.setFont(juce::Font(12.0f));
-    undoLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.7f));
-    redoButton.setTooltip("Redo");
-    undoButton.setEnabled(false);
-    redoButton.setEnabled(false);
-    undoButton.onClick = [this] {
-        audioProcessor.getUndoManager().undo();
-        updateUndoRedoState();
-    };
-    redoButton.onClick = [this] {
-        audioProcessor.getUndoManager().redo();
-        updateUndoRedoState();
-    };
-    startTimer(100);
-
 #if !OSCI_PREMIUM
     showPremiumSplashScreenGlobal = [safeThis = juce::Component::SafePointer<CommonPluginEditor>(this)]() {
         if (safeThis) safeThis->showPremiumSplashScreen();
@@ -100,7 +81,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 330);
+    recordingSettings.setSize(430, 430);
 
     menuBar.toFront(true);
 
@@ -304,7 +285,6 @@ CommonPluginEditor::~CommonPluginEditor() {
 #if !OSCI_PREMIUM
     showPremiumSplashScreenGlobal = nullptr;
 #endif
-    stopTimer();
     juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
     if (standalone != nullptr) {
         standalone->showAudioSettingsOverlay = nullptr;
@@ -325,28 +305,12 @@ CommonPluginEditor::~CommonPluginEditor() {
 // These always work regardless of getAcceptsKeys() — they are fundamental
 // editor operations, not "special keys" like j/k for file switching.
 
-void CommonPluginEditor::updateUndoRedoState() {
-    auto& um = audioProcessor.getUndoManager();
-
-    undoButton.setEnabled(um.canUndo());
-    redoButton.setEnabled(um.canRedo());
-
-    auto undoDesc = um.getUndoDescription();
-    undoLabel.setText(undoDesc.isNotEmpty() ? "Undo " + undoDesc : "",
-                      juce::dontSendNotification);
-
-    auto redoDesc = um.getRedoDescription();
-    redoButton.setTooltip(redoDesc.isNotEmpty() ? "Redo " + redoDesc : "Redo");
-}
-
 bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
     if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'Z') {
-        audioProcessor.getUndoManager().redo();
-        updateUndoRedoState();
+        undoRedoControls.redo();
         return true;
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z') {
-        audioProcessor.getUndoManager().undo();
-        updateUndoRedoState();
+        undoRedoControls.undo();
         return true;
     } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();
@@ -463,23 +427,9 @@ void CommonPluginEditor::fileUpdated(juce::String fileName) {
 }
 
 void CommonPluginEditor::openAudioSettings() {
-    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-    if (standalone == nullptr) {
-        return;
-    }
-
-    if (findActiveOverlay<AudioSettingsOverlay>() != nullptr) {
-        return;
-    }
-
-    auto content = standalone->createAudioSettingsComponent();
-    if (content == nullptr) {
-        return;
-    }
-
-    const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
-    content->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark().brighter(0.015f));
-    showOverlay(std::make_unique<AudioSettingsOverlay>(std::move(content), preferredContentSize));
+    osci::showStandaloneAudioSettingsOverlay(
+        *this,
+        juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize));
 }
 
 void CommonPluginEditor::openLicenseAndUpdates() {
@@ -494,7 +444,7 @@ void CommonPluginEditor::openRecordingSettings() {
         return;
     }
 
-    const juce::Point<int> preferredContentSize { 330, 360 };
+    const juce::Point<int> preferredContentSize { 430, 430 };
     recordingSettings.setSize(preferredContentSize.x, preferredContentSize.y);
     showOverlay(std::make_unique<RecordingSettingsOverlay>(recordingSettings, preferredContentSize));
 }

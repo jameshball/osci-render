@@ -4,8 +4,8 @@
 #include "../../LookAndFeel.h"
 
 // A read-only Lua code snippet component with syntax highlighting.
-// Uses the same Dracula colour scheme as the main code editor but
-// has no line numbers, no caret, and a compact dark background.
+// Uses the active osci code colour scheme but has no line numbers, no caret,
+// and a compact background.
 class LuaCodeSnippet : public juce::Component {
 public:
     LuaCodeSnippet() {
@@ -16,9 +16,9 @@ public:
 
         editor->setColourScheme(PluginLookAndFeel::getDefaultColourScheme());
 
-        editor->setColour(juce::CodeEditorComponent::backgroundColourId, osci::Colours::veryDark());
-        editor->setColour(juce::CodeEditorComponent::defaultTextColourId, osci::Dracula::foreground);
-        editor->setColour(juce::CodeEditorComponent::lineNumberBackgroundId, osci::Colours::veryDark());
+        editor->setColour(juce::CodeEditorComponent::backgroundColourId, osci::Colours::codeBackground());
+        editor->setColour(juce::CodeEditorComponent::defaultTextColourId, osci::Colours::codeForeground());
+        editor->setColour(juce::CodeEditorComponent::lineNumberBackgroundId, osci::Colours::codeBackground());
         editor->setColour(juce::CaretComponent::caretColourId, juce::Colours::transparentBlack);
 
         addAndMakeVisible(*editor);
@@ -32,10 +32,9 @@ public:
     void paint(juce::Graphics& g) override {
         auto bounds = getLocalBounds().toFloat();
         // Fill rounded background so the editor's rectangular bg doesn't peek through corners
-        g.setColour(osci::Colours::veryDark());
+        g.setColour(osci::Colours::codeBackground());
         g.fillRoundedRectangle(bounds, 6.0f);
-        // Draw the border
-        g.setColour(juce::Colours::white.withAlpha(0.15f));
+        g.setColour(osci::Colours::outlineSubtle());
         g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
     }
 

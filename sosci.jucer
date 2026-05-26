@@ -82,6 +82,7 @@
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
         <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="sRed01" name="redo.svg" compile="0" resource="1" file="Resources/svg/redo.svg"/>
         <FILE id="WDxwSi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
         <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
         <FILE id="gmY7I3" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
@@ -95,6 +96,7 @@
         <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
         <FILE id="xcg1tN" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
         <FILE id="JOyYQQ" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
+        <FILE id="sUnd01" name="undo.svg" compile="0" resource="1" file="Resources/svg/undo.svg"/>
         <FILE id="km6nQQ" name="vector-cancelling.svg" compile="0" resource="1"
               file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
@@ -120,6 +122,7 @@
             file="Source/JucewrightAutomation.h"/>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
+        <FILE id="OutCl2" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <FILE id="ATGrd3" name="AudioThreadGuard.h" compile="0" resource="0"
               file="Source/audio/AudioThreadGuard.h"/>
         <FILE id="ATGrd4" name="AudioThreadGuard.cpp" compile="1" resource="0"
@@ -133,16 +136,10 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="AudOvS" name="AudioSettingsOverlay.h" compile="0" resource="0"
-              file="Source/components/AudioSettingsOverlay.h"/>
         <FILE id="OffOvS" name="OfflineRenderOverlay.h" compile="0" resource="0"
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
               file="Source/components/RecordingSettingsOverlay.h"/>
-        <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
-              file="Source/components/VolumeComponent.cpp"/>
-        <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
-              file="Source/components/VolumeComponent.h"/>
         <GROUP id="{CMP_EFFECTS}" name="effects">
           <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
                 file="Source/components/effects/EffectComponent.cpp"/>
@@ -189,6 +186,8 @@
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
+        <FILE id="SoVGeo" name="VisualiserGeometry.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserGeometry.h"/>
         <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0"
@@ -214,12 +213,6 @@
             file="Source/SosciPluginProcessor.cpp"/>
       <FILE id="nSDgxn" name="SosciPluginProcessor.h" compile="0" resource="0"
             file="Source/SosciPluginProcessor.h"/>
-      <GROUP id="{STANDALONE}" name="standalone">
-        <FILE id="fqqP0r" name="CustomStandalone.cpp" compile="1" resource="0"
-              file="Source/standalone/CustomStandalone.cpp"/>
-        <FILE id="TFmWW0" name="CustomStandaloneFilterWindow.h" compile="0"
-              resource="0" file="Source/standalone/CustomStandaloneFilterWindow.h"/>
-      </GROUP>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
@@ -262,6 +255,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_texture_interop" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -305,6 +299,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_texture_interop" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -355,6 +350,7 @@
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_texture_interop" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -398,6 +394,7 @@
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>

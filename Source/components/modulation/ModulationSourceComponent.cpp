@@ -213,7 +213,7 @@ void ModulationSourceComponent::DepthIndicator::startTextEdit() {
         juce::String((int)(depth * 100.0f)),
         getLocalBounds().expanded(8, 2),
         { commitFn, cancelFn },
-        osci::Dracula::background, osci::Dracula::foreground,
+        osci::Colours::codeBackground(), osci::Colours::codeForeground(),
         owner.config.getSourceColour(sourceIndex), 11.0f);
     addAndMakeVisible(inlineEditor.get());
     inlineEditor->grabKeyboardFocus();
@@ -223,8 +223,8 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     if (!valuePopup) {
         valuePopup = std::make_unique<juce::Label>();
         valuePopup->setFont(juce::Font(11.0f, juce::Font::bold));
-        valuePopup->setColour(juce::Label::backgroundColourId, osci::Dracula::background);
-        valuePopup->setColour(juce::Label::textColourId, osci::Dracula::foreground);
+        valuePopup->setColour(juce::Label::backgroundColourId, osci::Colours::codeBackground());
+        valuePopup->setColour(juce::Label::textColourId, osci::Colours::codeForeground());
         valuePopup->setJustificationType(juce::Justification::centred);
         valuePopup->setInterceptsMouseClicks(false, false);
         valuePopup->addToDesktop(juce::ComponentPeer::windowIsTemporary | juce::ComponentPeer::windowIgnoresKeyPresses);
