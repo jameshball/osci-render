@@ -41,6 +41,7 @@ VisualiserComponent::VisualiserComponent(
     if (isPrimaryVisualiser()) {
         active = !audioProcessor.visualiserParameters.visualiserPaused->getBoolValue();
         audioProcessor.visualiserParameters.visualiserPaused->addListener(this);
+        audioProcessor.visualiserParameters.textureOutputEnabled->addListener(this);
     }
 
     setShouldBeRunning(active);
@@ -92,7 +93,8 @@ VisualiserComponent::VisualiserComponent(
     textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
     textureOutputButton.onClick = [this] {
 #if OSCI_PREMIUM
-        setTextureOutputEnabled(!textureOutputWanted.load());
+        const bool currentlyRequestedOrRunning = this->settings.parameters.textureOutputEnabled->getBoolValue() || textureOutputSender.isRunning();
+        setTextureOutputEnabled(!currentlyRequestedOrRunning);
 #else
         editor.showPremiumSplashScreen();
 #endif
@@ -172,8 +174,6 @@ VisualiserComponent::VisualiserComponent(
             }
         }
 
-        serviceTextureOutputFrame();
-
         stopwatch.addTime(juce::RelativeTime::seconds(1.0 / this->recordingSettings.getFrameRate()));
     };
 }
@@ -183,17 +183,16 @@ VisualiserComponent::~VisualiserComponent() {
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
-    textureOutputWanted.store(false);
     {
         juce::SpinLock::ScopedLockType lock(textureOutputLock);
         textureOutputSourceName.clear();
     }
     textureOutputSender.stop();
-    textureOutputEnabled.store(false);
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
         audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
+        audioProcessor.visualiserParameters.textureOutputEnabled->removeListener(this);
     }
     if (parent == nullptr) {
         audioProcessor.haltRecording = nullptr;
@@ -283,6 +282,8 @@ void VisualiserComponent::parameterValueChanged(int parameterIndex, float newVal
     juce::MessageManager::callAsync([safeThis] {
         if (safeThis == nullptr) return;
         safeThis->updatePausedState();
+        safeThis->refreshTextureOutputButton();
+        safeThis->requestTextureOutputService();
     });
 }
 
@@ -699,8 +700,8 @@ void VisualiserComponent::setOverlayFadeProgress(float progress) {
 }
 
 void VisualiserComponent::refreshTextureOutputButton() {
-    const bool wanted = textureOutputWanted.load();
-    const bool enabled = textureOutputEnabled.load();
+    const bool wanted = settings.parameters.textureOutputEnabled->getBoolValue();
+    const bool running = textureOutputSender.isRunning();
 
 #if !OSCI_PREMIUM
     textureOutputButton.setEnabled(true);
@@ -710,37 +711,42 @@ void VisualiserComponent::refreshTextureOutputButton() {
 #endif
 
     textureOutputButton.setEnabled(isPrimaryVisualiser());
-    textureOutputButton.setToggleState(wanted || enabled, juce::NotificationType::dontSendNotification);
+    textureOutputButton.setToggleState(wanted || running, juce::NotificationType::dontSendNotification);
 
     if (!isPrimaryVisualiser()) {
         textureOutputButton.setTooltip("Texture output can only be started from the main visualiser.");
         return;
     }
 
-    if (wanted && !enabled) {
+    if (wanted && !running) {
         textureOutputButton.setTooltip("Texture output will start on the next rendered frame.");
         return;
     }
 
-    textureOutputButton.setTooltip(enabled ? "Stops texture output." : "Starts texture output.");
+    textureOutputButton.setTooltip(running ? "Stops texture output." : "Starts texture output.");
 }
 
 void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
 #if !OSCI_PREMIUM
-    juce::ignoreUnused(enabled);
-    editor.showPremiumSplashScreen();
+    if (enabled) {
+        editor.showPremiumSplashScreen();
+    }
+    settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
     refreshTextureOutputButton();
+    requestTextureOutputService();
     return;
 #endif
 
-    if (enabled == textureOutputWanted.load()) {
+    if (enabled == settings.parameters.textureOutputEnabled->getBoolValue()) {
         refreshTextureOutputButton();
+        requestTextureOutputService();
         return;
     }
 
     if (!enabled) {
-        textureOutputWanted.store(false);
+        settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
         refreshTextureOutputButton();
+        requestTextureOutputService();
         return;
     }
 
@@ -751,6 +757,7 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
                                                "Texture output cannot start until the visualiser has rendered a frame.",
                                                "OK");
         refreshTextureOutputButton();
+        requestTextureOutputService();
         return;
     }
 
@@ -764,6 +771,7 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
                                                message,
                                                "OK");
         refreshTextureOutputButton();
+        requestTextureOutputService();
         return;
     }
 
@@ -772,8 +780,13 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
         juce::SpinLock::ScopedLockType lock(textureOutputLock);
         textureOutputSourceName = requestedSourceName;
     }
-    textureOutputWanted.store(true);
+    settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(true);
     refreshTextureOutputButton();
+    requestTextureOutputService();
+}
+
+void VisualiserComponent::requestTextureOutputService() {
+    openGLContext.triggerRepaint();
 }
 
 osci::texture::ErrorCode VisualiserComponent::startTextureOutputOnRenderThread() {
@@ -794,7 +807,6 @@ osci::texture::ErrorCode VisualiserComponent::startTextureOutputOnRenderThread()
 
     const osci::texture::ErrorCode error = textureOutputSender.start(std::move(description));
     if (error == osci::texture::ErrorCode::none) {
-        textureOutputEnabled.store(true);
         textureOutputFrameIndex = 0;
         textureOutputSenderWidth = renderTexture.width;
         textureOutputSenderHeight = renderTexture.height;
@@ -820,8 +832,7 @@ void VisualiserComponent::publishTextureOutputFrame() {
     }
 
     textureOutputSender.stop();
-    textureOutputEnabled.store(false);
-    textureOutputWanted.store(false);
+    settings.parameters.textureOutputEnabled->setBoolValue(false);
     textureOutputSenderWidth = 0;
     textureOutputSenderHeight = 0;
     {
@@ -835,6 +846,7 @@ void VisualiserComponent::publishTextureOutputFrame() {
             return;
         }
 
+        safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
         safeThis->refreshTextureOutputButton();
         juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
                                                "Texture Output",
@@ -844,10 +856,59 @@ void VisualiserComponent::publishTextureOutputFrame() {
 }
 
 void VisualiserComponent::serviceTextureOutputFrame() {
-    if (!textureOutputWanted.load()) {
-        if (textureOutputEnabled.load()) {
+#if !OSCI_PREMIUM
+    if (textureOutputSender.isRunning()) {
+        textureOutputSender.stop();
+    }
+
+    if (settings.parameters.textureOutputEnabled->getBoolValue()) {
+        settings.parameters.textureOutputEnabled->setBoolValue(false);
+        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+        juce::MessageManager::callAsync([safeThis] {
+            if (safeThis != nullptr) {
+                safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+                safeThis->refreshTextureOutputButton();
+            }
+        });
+    }
+    return;
+#else
+    if (!isPrimaryVisualiser()) {
+        return;
+    }
+
+    auto resetFailedStart = [this](osci::texture::ErrorCode error) {
+        settings.parameters.textureOutputEnabled->setBoolValue(false);
+        textureOutputSenderWidth = 0;
+        textureOutputSenderHeight = 0;
+        {
+            juce::SpinLock::ScopedLockType lock(textureOutputLock);
+            textureOutputSourceName.clear();
+        }
+
+        const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
+        const juce::String message = status.isAvailable() || status.message.isEmpty()
+            ? osci::texture::toString(error)
+            : status.message;
+
+        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+        juce::MessageManager::callAsync([safeThis, message] {
+            if (safeThis == nullptr) {
+                return;
+            }
+
+            safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+            safeThis->refreshTextureOutputButton();
+            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+                                                   "Texture Output",
+                                                   message,
+                                                   "OK");
+        });
+    };
+
+    if (!settings.parameters.textureOutputEnabled->getBoolValue()) {
+        if (textureOutputSender.isRunning()) {
             textureOutputSender.stop();
-            textureOutputEnabled.store(false);
             textureOutputFrameIndex = 0;
             textureOutputSenderWidth = 0;
             textureOutputSenderHeight = 0;
@@ -866,35 +927,10 @@ void VisualiserComponent::serviceTextureOutputFrame() {
         return;
     }
 
-    if (!textureOutputEnabled.load()) {
+    if (!textureOutputSender.isRunning()) {
         const osci::texture::ErrorCode error = startTextureOutputOnRenderThread();
         if (error != osci::texture::ErrorCode::none) {
-            textureOutputWanted.store(false);
-            textureOutputEnabled.store(false);
-            textureOutputSenderWidth = 0;
-            textureOutputSenderHeight = 0;
-            {
-                juce::SpinLock::ScopedLockType lock(textureOutputLock);
-                textureOutputSourceName.clear();
-            }
-
-            const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
-            const juce::String message = status.isAvailable() || status.message.isEmpty()
-                ? osci::texture::toString(error)
-                : status.message;
-
-            juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-            juce::MessageManager::callAsync([safeThis, message] {
-                if (safeThis == nullptr) {
-                    return;
-                }
-
-                safeThis->refreshTextureOutputButton();
-                juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-                                                       "Texture Output",
-                                                       message,
-                                                       "OK");
-            });
+            resetFailedStart(error);
             return;
         }
 
@@ -909,17 +945,22 @@ void VisualiserComponent::serviceTextureOutputFrame() {
     const Texture renderTexture = getRenderTexture();
     if (renderTexture.width != textureOutputSenderWidth || renderTexture.height != textureOutputSenderHeight) {
         textureOutputSender.stop();
-        textureOutputEnabled.store(false);
         textureOutputSenderWidth = 0;
         textureOutputSenderHeight = 0;
         const osci::texture::ErrorCode error = startTextureOutputOnRenderThread();
         if (error != osci::texture::ErrorCode::none) {
-            textureOutputWanted.store(false);
+            resetFailedStart(error);
             return;
         }
     }
 
     publishTextureOutputFrame();
+#endif
+}
+
+void VisualiserComponent::renderOpenGL() {
+    VisualiserRenderer::renderOpenGL();
+    serviceTextureOutputFrame();
 }
 
 void VisualiserComponent::updateRenderModeFromProcessor() {
@@ -944,10 +985,9 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
 
 void VisualiserComponent::openGLContextClosing() {
     textureOutputSender.stop();
-    textureOutputEnabled.store(false);
     textureOutputSenderWidth = 0;
     textureOutputSenderHeight = 0;
-    if (!textureOutputWanted.load()) {
+    if (!settings.parameters.textureOutputEnabled->getBoolValue()) {
         juce::SpinLock::ScopedLockType lock(textureOutputLock);
         textureOutputSourceName.clear();
     }

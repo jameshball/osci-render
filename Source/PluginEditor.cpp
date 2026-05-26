@@ -7,6 +7,7 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "components/effects/EffectComponent.h"
+#include "video/TextureInputFrameGrabber.h"
 
 namespace {
     constexpr double kDefaultCodeEditorMainPanelSize = -0.7;
@@ -240,6 +241,23 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
     textureInputFrameGrabber = std::move(grabber);
 }
 
+void OscirenderAudioProcessorEditor::openProject(const juce::File& file) {
+    if (file != juce::File()) {
+        stopTextureInput();
+    }
+
+    CommonPluginEditor::openProject(file);
+}
+
+void OscirenderAudioProcessorEditor::openProject() {
+    CommonPluginEditor::openProject();
+}
+
+void OscirenderAudioProcessorEditor::resetToDefault() {
+    stopTextureInput();
+    CommonPluginEditor::resetToDefault();
+}
+
 void OscirenderAudioProcessorEditor::stopTextureInput() {
     if (textureInputFrameGrabber != nullptr) {
         textureInputFrameGrabber->stop();
@@ -290,6 +308,8 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     if (file.hasFileExtension("osci")) {
         openProject(file);
     } else {
+        stopTextureInput();
+
         juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
         juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
 

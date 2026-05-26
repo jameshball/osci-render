@@ -87,6 +87,7 @@ private:
     void setOverlayFadeProgress(float progress);
     void refreshTextureOutputButton();
     void setTextureOutputEnabled(bool enabled);
+    void requestTextureOutputService();
     osci::texture::ErrorCode startTextureOutputOnRenderThread();
     void publishTextureOutputFrame();
     void serviceTextureOutputFrame();
@@ -113,8 +114,6 @@ private:
     osci::texture::OpenGLSender textureOutputSender;
     mutable juce::SpinLock textureOutputLock;
     juce::String textureOutputSourceName;
-    std::atomic<bool> textureOutputWanted = false;
-    std::atomic<bool> textureOutputEnabled = false;
     std::uint64_t textureOutputFrameIndex = 0;
     int textureOutputSenderWidth = 0;
     int textureOutputSenderHeight = 0;
@@ -153,6 +152,7 @@ private:
     juce::Rectangle<int> buttonRow;
 
     void popoutWindow();
+    void renderOpenGL() override;
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void stopTask() override;

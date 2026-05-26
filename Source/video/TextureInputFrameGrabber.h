@@ -10,19 +10,6 @@
 
 #include "InvisibleOpenGLContextComponent.h"
 
-#ifndef GL_READ_FRAMEBUFFER
-#define GL_READ_FRAMEBUFFER 0x8CA8
-#endif
-#ifndef GL_DRAW_FRAMEBUFFER
-#define GL_DRAW_FRAMEBUFFER 0x8CA9
-#endif
-#ifndef GL_READ_FRAMEBUFFER_BINDING
-#define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
-#endif
-#ifndef GL_DRAW_FRAMEBUFFER_BINDING
-#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
-#endif
-
 class TextureInputFrameGrabber final : public juce::Component, private juce::OpenGLRenderer {
 public:
     explicit TextureInputFrameGrabber(osci::texture::SourceInfo source) : source(std::move(source)) {
@@ -45,7 +32,7 @@ public:
     }
 
     [[nodiscard]] bool isActive() const {
-        return wanted.load() || connected.load() || processorStarted.load();
+        return wanted.load() || receiver.isConnected() || processorStarted.load();
     }
 
     [[nodiscard]] juce::String getSourceName() const {
@@ -100,17 +87,17 @@ private:
         }
 
         juce::Component::SafePointer<TextureInputFrameGrabber> safeThis(this);
+        auto callback = inputStopped;
         processorStarted.store(false);
-        juce::MessageManager::callAsync([safeThis] {
-            if (safeThis != nullptr && safeThis->inputStopped != nullptr) {
-                safeThis->inputStopped();
+        juce::MessageManager::callAsync([safeThis, callback] {
+            if (safeThis != nullptr && callback) {
+                callback();
             }
         });
     }
 
     void disconnect(bool notifyProcessor) {
         receiver.disconnect();
-        connected.store(false);
         lastFrameIndex = std::numeric_limits<std::uint64_t>::max();
         lastConnectError.store(osci::texture::ErrorCode::none);
 
@@ -122,11 +109,18 @@ private:
         }
     }
 
-    bool readFrame(const osci::texture::ReceivedOpenGLTexture& received) {
+    bool readFrame(const osci::texture::ReceivedOpenGLTexture& received, juce::String& failureMessage) {
         using namespace juce::gl;
 
         const auto& texture = received.texture;
         if (texture.textureId == 0 || texture.width <= 0 || texture.height <= 0) {
+            return false;
+        }
+
+        const size_t width = static_cast<size_t>(texture.width);
+        const size_t height = static_cast<size_t>(texture.height);
+        if (width > maxReadbackDimension || height > maxReadbackDimension || height > maxReadbackBytes / 4 / width) {
+            failureMessage = "The selected texture is too large to read safely.";
             return false;
         }
 
@@ -138,15 +132,7 @@ private:
             return false;
         }
 
-        GLint previousReadFramebuffer = 0;
-        GLint previousDrawFramebuffer = 0;
-        GLint previousReadBuffer = 0;
-        GLint previousDrawBuffer = 0;
         GLint previousPackAlignment = 0;
-        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
-        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFramebuffer);
-        glGetIntegerv(GL_READ_BUFFER, &previousReadBuffer);
-        glGetIntegerv(GL_DRAW_BUFFER, &previousDrawBuffer);
         glGetIntegerv(GL_PACK_ALIGNMENT, &previousPackAlignment);
 
         glBindFramebuffer(GL_FRAMEBUFFER, readbackFbo);
@@ -156,11 +142,12 @@ private:
                                static_cast<GLuint>(texture.textureId),
                                0);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
         const GLenum framebufferStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         bool success = framebufferStatus == GL_FRAMEBUFFER_COMPLETE;
         if (success) {
-            readbackPixels.resize((size_t)texture.width * (size_t)texture.height * 4);
+            readbackPixels.resize(width * height * 4);
             glPixelStorei(GL_PACK_ALIGNMENT, 1);
             glReadPixels(texture.originX,
                          texture.originY,
@@ -178,10 +165,7 @@ private:
                                static_cast<GLenum>(texture.textureTarget),
                                0,
                                0);
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)previousReadFramebuffer);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)previousDrawFramebuffer);
-        glReadBuffer(static_cast<GLenum>(previousReadBuffer));
-        glDrawBuffer(static_cast<GLenum>(previousDrawBuffer));
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glPixelStorei(GL_PACK_ALIGNMENT, previousPackAlignment);
 
         return success;
@@ -209,13 +193,13 @@ private:
 
     void serviceFrame() {
         if (!wanted.load()) {
-            if (connected.load() || startNotified.load() || processorStarted.load()) {
+            if (receiver.isConnected() || startNotified.load() || processorStarted.load()) {
                 disconnect(true);
             }
             return;
         }
 
-        if (!connected.load()) {
+        if (!receiver.isConnected()) {
             const osci::texture::ErrorCode error = receiver.connect(source);
             if (error != osci::texture::ErrorCode::none) {
                 const osci::texture::ErrorCode previousError = lastConnectError.load();
@@ -223,7 +207,7 @@ private:
                     lastConnectError.store(error);
                 }
                 if (error == osci::texture::ErrorCode::sourceNotFound || error == osci::texture::ErrorCode::connectionLost) {
-                    connected.store(false);
+                    fail(error, missingSourceMessage());
                     return;
                 }
 
@@ -231,7 +215,6 @@ private:
                 return;
             }
 
-            connected.store(true);
             lastConnectError.store(osci::texture::ErrorCode::none);
         }
 
@@ -261,8 +244,13 @@ private:
             return;
         }
 
-        if (!readFrame(received)) {
-            fail(osci::texture::ErrorCode::receiveFailed, "The selected texture could not be read by this OpenGL context.");
+        juce::String readFailureMessage;
+        if (!readFrame(received, readFailureMessage)) {
+            if (readFailureMessage.isEmpty()) {
+                readFailureMessage = "The selected texture could not be read by this OpenGL context.";
+            }
+
+            fail(osci::texture::ErrorCode::receiveFailed, readFailureMessage);
             return;
         }
 
@@ -284,11 +272,22 @@ private:
         }
     }
 
+    juce::String missingSourceMessage() const {
+        const juce::String sourceName = getSourceName();
+        if (sourceName.isNotEmpty() && sourceName != "Texture Input") {
+            return "The texture input source \"" + sourceName + "\" is no longer available.";
+        }
+
+        return "The selected texture input source is no longer available.";
+    }
+
+    static constexpr size_t maxReadbackDimension = 8192;
+    static constexpr size_t maxReadbackBytes = 64 * 1024 * 1024;
+
     osci::texture::SourceInfo source;
     osci::texture::OpenGLReceiver receiver;
     std::unique_ptr<InvisibleOpenGLContextComponent> openGLComponent;
     std::atomic<bool> wanted = false;
-    std::atomic<bool> connected = false;
     std::atomic<bool> startNotified = false;
     std::atomic<bool> processorStarted = false;
     std::atomic<osci::texture::ErrorCode> lastConnectError = osci::texture::ErrorCode::none;

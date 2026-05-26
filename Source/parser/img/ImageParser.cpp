@@ -57,36 +57,76 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, int initialWidth, int init
         safeWidth = juce::jmax(1, juce::roundToInt((float)safeWidth * scale));
         safeHeight = juce::jmax(1, juce::roundToInt((float)safeHeight * scale));
     }
-    replaceSingleFrame(std::vector<std::uint8_t>((size_t)safeWidth * (size_t)safeHeight, 0), safeWidth, safeHeight);
+    initialiseLiveFrame(safeWidth, safeHeight);
 }
 
-void ImageParser::replaceSingleFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight) {
-    if (frameWidth <= 0 || frameHeight <= 0 || pixels.size() != (size_t)frameWidth * (size_t)frameHeight) {
+void ImageParser::initialiseLiveFrame(int initialWidth, int initialHeight) {
+    if (initialWidth <= 0 || initialHeight <= 0) {
         return;
     }
 
-    std::vector<std::vector<std::uint8_t>> replacementFrames;
-    replacementFrames.reserve(1);
-    replacementFrames.emplace_back(std::move(pixels));
-    std::vector<bool> replacementVisited((size_t)frameWidth * (size_t)frameHeight, false);
+    liveInput = true;
+    width = initialWidth;
+    height = initialHeight;
+    frameIndex = 0;
+    requestedFrameIndex.store(noPendingFrameRequest, std::memory_order_release);
+    reportedFrameIndex.store(0, std::memory_order_release);
 
-    std::vector<std::vector<std::uint8_t>> oldFrames;
-    std::vector<bool> oldVisited;
-    {
-        juce::SpinLock::ScopedLockType scope(frameLock);
-        oldFrames.swap(frames);
-        oldVisited.swap(visited);
-        frames.swap(replacementFrames);
-        visited.swap(replacementVisited);
-        width = frameWidth;
-        height = frameHeight;
-        frameIndex = 0;
-        count = 0;
-        scanX = -1;
-        scanY = 1;
-        scanCount = 0;
-        resetPosition();
+    frames.clear();
+    frames.reserve(1);
+    frames.emplace_back();
+    frames[0].reserve(liveInputMaxPixels);
+    frames[0].assign((size_t)width * (size_t)height, 0);
+
+    visited.reserve(liveInputMaxPixels);
+    visited.assign((size_t)width * (size_t)height, false);
+
+    pendingLivePixels.reserve(liveInputMaxPixels);
+    resetTraversalState();
+}
+
+void ImageParser::publishLiveFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight) {
+    if (!liveInput || frameWidth <= 0 || frameHeight <= 0 || pixels.size() != (size_t)frameWidth * (size_t)frameHeight) {
+        return;
     }
+
+    juce::SpinLock::ScopedLockType scope(pendingLiveFrameLock);
+    pendingLivePixels = std::move(pixels);
+    pendingLiveWidth = frameWidth;
+    pendingLiveHeight = frameHeight;
+    pendingLiveFrameAvailable = true;
+}
+
+void ImageParser::consumePendingLiveFrame() {
+    if (!liveInput) {
+        return;
+    }
+
+    size_t frameSize = 0;
+
+    {
+        juce::SpinLock::ScopedTryLockType scope(pendingLiveFrameLock);
+        if (!scope.isLocked() || !pendingLiveFrameAvailable || frames.empty()) {
+            return;
+        }
+
+        frameSize = (size_t)pendingLiveWidth * (size_t)pendingLiveHeight;
+        if (pendingLiveWidth <= 0 || pendingLiveHeight <= 0 || pendingLivePixels.size() != frameSize || frameSize > liveInputMaxPixels) {
+            pendingLiveFrameAvailable = false;
+            return;
+        }
+
+        frames[0].swap(pendingLivePixels);
+        width = pendingLiveWidth;
+        height = pendingLiveHeight;
+        pendingLiveFrameAvailable = false;
+    }
+
+    frameIndex = 0;
+    requestedFrameIndex.store(noPendingFrameRequest, std::memory_order_release);
+    reportedFrameIndex.store(0, std::memory_order_release);
+    visited.resize(frameSize);
+    resetTraversalState();
 }
 
 void ImageParser::setSingleFrameFromRgba(const std::vector<std::uint8_t>& rgba, int sourceWidth, int sourceHeight, bool verticallyFlipped) {
@@ -128,7 +168,7 @@ void ImageParser::setSingleFrameFromRgba(const std::vector<std::uint8_t>& rgba, 
         }
     }
 
-    replaceSingleFrame(std::move(pixels), targetWidth, targetHeight);
+    publishLiveFrame(std::move(pixels), targetWidth, targetHeight);
 }
 
 void ImageParser::processGifFile(juce::File& file) {
@@ -379,28 +419,51 @@ void ImageParser::handleError(juce::String message) {
 }
 
 void ImageParser::setFrame(int index) {
-    juce::SpinLock::ScopedLockType scope(frameLock);
     if (frames.empty()) {
         return;
     }
 
-    // Ensure that the frame number is within the bounds of the number of frames
-    // This weird modulo trick is to handle negative numbers
-    index = (frames.size() + (index % frames.size())) % frames.size();
-    
-    frameIndex = index;
-    resetPosition();
-    std::fill(visited.begin(), visited.end(), false);
+    const int normalisedIndex = normaliseFrameIndex(index);
+    reportedFrameIndex.store(normalisedIndex, std::memory_order_release);
+    requestedFrameIndex.store(normalisedIndex, std::memory_order_release);
 }
 
 int ImageParser::getNumFrames() {
-    juce::SpinLock::ScopedLockType scope(frameLock);
     return (int)frames.size();
 }
 
 int ImageParser::getCurrentFrame() const {
-    juce::SpinLock::ScopedLockType scope(frameLock);
-    return frameIndex;
+    return reportedFrameIndex.load(std::memory_order_acquire);
+}
+
+int ImageParser::normaliseFrameIndex(int index) const {
+    if (frames.empty()) {
+        return 0;
+    }
+
+    const int frameCount = static_cast<int>(frames.size());
+    return (frameCount + (index % frameCount)) % frameCount;
+}
+
+void ImageParser::applyPendingFrameRequest() {
+    const int requestedIndex = requestedFrameIndex.exchange(noPendingFrameRequest, std::memory_order_acq_rel);
+    if (requestedIndex == noPendingFrameRequest || frames.empty()) {
+        return;
+    }
+
+    const int normalisedIndex = normaliseFrameIndex(requestedIndex);
+    frameIndex = normalisedIndex;
+    reportedFrameIndex.store(normalisedIndex, std::memory_order_release);
+    resetTraversalState();
+}
+
+void ImageParser::resetTraversalState() {
+    count = 0;
+    scanX = -1;
+    scanY = 1;
+    scanCount = 0;
+    resetPosition();
+    std::fill(visited.begin(), visited.end(), false);
 }
 
 bool ImageParser::isOverThreshold(double pixel, double thresholdPow) {
@@ -472,7 +535,9 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
 }
 
 osci::Point ImageParser::getSample(int blockSampleIndex) {
-    juce::SpinLock::ScopedLockType scope(frameLock);
+    consumePendingLiveFrame();
+    applyPendingFrameRequest();
+
     if (frames.empty() || width <= 0 || height <= 0 || frameIndex < 0 || frameIndex >= frames.size()) {
         return osci::Point();
     }
