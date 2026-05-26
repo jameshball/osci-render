@@ -137,9 +137,11 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiserSettingsWindow.addKeyListener(this);
 
     initialiseMenuBar(model);
+    startTimer(100);
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    stopTimer();
     visualiserSettingsWindow.removeKeyListener(this);
 
     for (auto& editorModel : codeModels) {
@@ -258,14 +260,12 @@ void OscirenderAudioProcessorEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
-        undoButton.setVisible(false);
-        redoButton.setVisible(false);
+        undoRedoControls.setVisible(false);
         betaUpdatesButton.setVisible(false);
         return;
     }
 
-    undoButton.setVisible(true);
-    redoButton.setVisible(true);
+    undoRedoControls.setVisible(true);
 
     if (!usingNativeMenuBar) {
         auto topBar = area.removeFromTop(kMenuBarHeight);
@@ -276,9 +276,7 @@ void OscirenderAudioProcessorEditor::resized() {
         // Menu bar gets priority — allocate from the left first
         menuBar.setBounds(topBar.removeFromLeft(juce::jmin(kMenuBarMaxWidth, topBar.getWidth())));
         // Right-side items share whatever remains, clamped to available width
-        redoButton.setBounds(topBar.removeFromRight(juce::jmin(25, topBar.getWidth())).reduced(2, 2));
-        undoButton.setBounds(topBar.removeFromRight(juce::jmin(25, topBar.getWidth())).reduced(2, 2));
-        undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+        undoRedoControls.setBounds(topBar.removeFromRight(juce::jmin(undoRedoControls.getPreferredWidth(), topBar.getWidth())));
 #if OSCI_PREMIUM
         if (mtsEspLabel.isVisible())
             mtsEspLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
@@ -698,8 +696,6 @@ void OscirenderAudioProcessorEditor::showPremiumSplashScreen() {
 }
 
 void OscirenderAudioProcessorEditor::timerCallback() {
-    CommonPluginEditor::timerCallback();
-
 #if OSCI_PREMIUM
     auto mtsEspDisplayText = [this]() -> juce::String {
         auto scaleName = audioProcessor.getMtsEspScaleName();
