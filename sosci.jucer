@@ -241,14 +241,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
-        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -285,14 +285,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
-        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>
@@ -336,14 +336,14 @@
         <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
-        <MODULEPATH id="chowdsp_dsp_utils" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_filters" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_simd" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_buffers" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_math" path="modules/chowdsp_utils/modules/dsp"/>
-        <MODULEPATH id="chowdsp_core" path="modules/chowdsp_utils/modules/common"/>
-        <MODULEPATH id="chowdsp_data_structures" path="modules/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="osci_audio_devices" path="modules"/>

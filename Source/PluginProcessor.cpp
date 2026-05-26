@@ -14,18 +14,6 @@
 #include "components/modulation/EnvelopeComponent.h"
 #include "components/modulation/RandomComponent.h"
 #include "components/modulation/SidechainComponent.h"
-#include "audio/effects/BitCrushEffect.h"
-#include "audio/effects/BulgeEffect.h"
-#include "audio/effects/TwistEffect.h"
-#include "audio/effects/PolygonizerEffect.h"
-#include "audio/effects/SpiralBitCrushEffect.h"
-#include "audio/effects/MultiplexEffect.h"
-#include "audio/effects/WobbleEffect.h"
-#include "audio/effects/DuplicatorEffect.h"
-#include "audio/effects/DashedLineEffect.h"
-#include "audio/effects/KaleidoscopeEffect.h"
-#include "audio/effects/VortexEffect.h"
-#include "audio/effects/GodRayEffect.h"
 #include "parser/FileParser.h"
 #include "audio/modulation/LfoPresetManager.h"
 #include <osci_render_core/osci_render_core.h>
@@ -38,10 +26,20 @@
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
 
+    objectServer.setCallbacks({
+        [this] {
+            return std::any_cast<int>(getProperty("objectServerPort", 51677));
+        },
+        [this](bool enabled) {
+            setObjectServerRendering(enabled);
+        },
+        [this](std::vector<std::unique_ptr<osci::Shape>>& frame, bool force) {
+            objectServerSound->addFrame(frame, force);
+        }
+    });
 
-
-    toggleableEffects.push_back(BitCrushEffect().build());
-    toggleableEffects.push_back(BulgeEffect().build());
+    toggleableEffects.push_back(BitCrushEffect().withIcon(BinaryData::bitcrush_svg).build());
+    toggleableEffects.push_back(BulgeEffect().withIcon(BinaryData::bulge_svg).build());
     toggleableEffects.push_back(VectorCancellingEffect().withIcon(BinaryData::vectorcancelling_svg).build());
     toggleableEffects.push_back(RippleEffectApp().withIcon(BinaryData::ripple_svg).build());
     toggleableEffects.push_back(RotateEffectApp().withIcon(BinaryData::rotate_svg).build());
@@ -49,23 +47,23 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     toggleableEffects.push_back(SwirlEffectApp().withIcon(BinaryData::swirl_svg).build());
     toggleableEffects.push_back(osci::SmoothEffect().withIcon(BinaryData::smoothing_svg).build());
     toggleableEffects.push_back(DelayEffect().withIcon(BinaryData::delay_svg).build());
-    toggleableEffects.push_back(DashedLineEffect().build());
-    toggleableEffects.push_back(TraceEffect().build());
-    toggleableEffects.push_back(WobbleEffect().build());
-    toggleableEffects.push_back(DuplicatorEffect().build());
+    toggleableEffects.push_back(DashedLineEffect().withIcon(BinaryData::dash_svg).build());
+    toggleableEffects.push_back(TraceEffect().withIcon(BinaryData::trace_svg).build());
+    toggleableEffects.push_back(WobbleEffect().withIcon(BinaryData::wobble_svg).build());
+    toggleableEffects.push_back(DuplicatorEffect().withIcon(BinaryData::duplicator_svg).build());
 
     std::vector<std::shared_ptr<osci::Effect>> premiumEffects;
 
-    premiumEffects.push_back(MultiplexEffect().build());
+    premiumEffects.push_back(MultiplexEffect().withIcon(BinaryData::multiplex_svg).build());
     premiumEffects.push_back(UnfoldEffect().withIcon(BinaryData::unfold_svg).build());
     premiumEffects.push_back(BounceEffect().withIcon(BinaryData::bounce_svg).build());
-    premiumEffects.push_back(TwistEffect().build());
+    premiumEffects.push_back(TwistEffect().withIcon(BinaryData::twist_svg).build());
     premiumEffects.push_back(SkewEffect().withIcon(BinaryData::skew_svg).build());
-    premiumEffects.push_back(PolygonizerEffect().build());
-    premiumEffects.push_back(KaleidoscopeEffect().build());
-    premiumEffects.push_back(VortexEffect().build());
-    premiumEffects.push_back(GodRayEffect().build());
-    premiumEffects.push_back(SpiralBitCrushEffect().build());
+    premiumEffects.push_back(PolygonizerEffect().withIcon(BinaryData::polygonizer_svg).build());
+    premiumEffects.push_back(KaleidoscopeEffect().withIcon(BinaryData::kaleidoscope_svg).build());
+    premiumEffects.push_back(VortexEffect().withIcon(BinaryData::vortex_svg).build());
+    premiumEffects.push_back(GodRayEffect().withIcon(BinaryData::god_ray_svg).build());
+    premiumEffects.push_back(SpiralBitCrushEffect().withIcon(BinaryData::spiral_bitcrush_svg).build());
 
     for (auto& premiumEffect : premiumEffects) {
         premiumEffect->setPremiumOnly(true);
