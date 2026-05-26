@@ -16,7 +16,7 @@
 #include "visualiser/VisualiserSettings.h"
 #include <osci_scripting/osci_scripting.h>
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
+class OscirenderAudioProcessorEditor : public CommonPluginEditor, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
