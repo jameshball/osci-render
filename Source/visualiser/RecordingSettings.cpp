@@ -283,16 +283,19 @@ void RecordingSettings::parameterGestureChanged(int parameterIndex, bool gesture
 }
 
 void RecordingSettings::resized() {
-	auto area = getLocalBounds().reduced(20);
+    auto area = getLocalBounds().reduced(20);
     double rowHeight = 30;
 
 #if OSCI_PREMIUM
+    const auto labelWidth = 170;
+    const auto controlWidth = juce::jlimit(100, 190, area.getWidth() - labelWidth - 20);
+
     losslessAudio.setBounds(area.removeFromTop(rowHeight));
     losslessVideo.setBounds(area.removeFromTop(rowHeight));
     quality.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
     auto row = area.removeFromTop(rowHeight);
-    canvasPresetLabel.setBounds(row.removeFromLeft(170));
-    canvasPresetSelector.setBounds(row.removeFromRight(100));
+    canvasPresetLabel.setBounds(row.removeFromLeft(labelWidth));
+    canvasPresetSelector.setBounds(row.removeFromRight(controlWidth));
     if (canvasWidth.isVisible()) {
         canvasWidth.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
         canvasHeight.setBounds(area.removeFromTop(rowHeight).expanded(6, 0));
@@ -302,18 +305,18 @@ void RecordingSettings::resized() {
     recordVideo.setBounds(area.removeFromTop(rowHeight));
 
     row = area.removeFromTop(rowHeight);
-    compressionPresetLabel.setBounds(row.removeFromLeft(170));
-    compressionPreset.setBounds(row.removeFromRight(100));
+    compressionPresetLabel.setBounds(row.removeFromLeft(labelWidth));
+    compressionPreset.setBounds(row.removeFromRight(controlWidth));
 
     area.removeFromTop(5);
     row = area.removeFromTop(rowHeight);
-    videoCodecLabel.setBounds(row.removeFromLeft(170));
-    videoCodecSelector.setBounds(row.removeFromRight(100));
+    videoCodecLabel.setBounds(row.removeFromLeft(labelWidth));
+    videoCodecSelector.setBounds(row.removeFromRight(controlWidth));
 
     area.removeFromTop(5);
     row = area.removeFromTop(rowHeight);
-    customTextureOutputLabel.setBounds(row.removeFromLeft(170));
-    customTextureOutputEditor.setBounds(row.removeFromRight(100));
+    customTextureOutputLabel.setBounds(row.removeFromLeft(labelWidth));
+    customTextureOutputEditor.setBounds(row.removeFromRight(controlWidth));
 #else
     recordVideoWarning.setBounds(area.removeFromTop(2 * rowHeight));
     area.removeFromTop(rowHeight / 2);

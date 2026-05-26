@@ -52,7 +52,7 @@ public:
     const double CLOSED_PREF_SIZE = 30.0;
     const double RESIZER_BAR_SIZE = 7.0;
     static constexpr int kMenuBarHeight = 25;
-    static constexpr int kMenuBarMaxWidth = 380;
+    static constexpr int kMenuBarMaxWidth = 450;
 
     std::atomic<bool> editingCustomFunction = false;
 
