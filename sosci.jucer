@@ -120,6 +120,7 @@
             file="Source/JucewrightAutomation.h"/>
       <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
         <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
+        <FILE id="OutCl2" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <FILE id="ATGrd3" name="AudioThreadGuard.h" compile="0" resource="0"
               file="Source/audio/AudioThreadGuard.h"/>
         <FILE id="ATGrd4" name="AudioThreadGuard.cpp" compile="1" resource="0"
@@ -133,16 +134,10 @@
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
               file="Source/components/AboutComponent.h"/>
-        <FILE id="AudOvS" name="AudioSettingsOverlay.h" compile="0" resource="0"
-              file="Source/components/AudioSettingsOverlay.h"/>
         <FILE id="OffOvS" name="OfflineRenderOverlay.h" compile="0" resource="0"
               file="Source/components/OfflineRenderOverlay.h"/>
         <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
               file="Source/components/RecordingSettingsOverlay.h"/>
-        <FILE id="HC8nNY" name="VolumeComponent.cpp" compile="1" resource="0"
-              file="Source/components/VolumeComponent.cpp"/>
-        <FILE id="qwpGcH" name="VolumeComponent.h" compile="0" resource="0"
-              file="Source/components/VolumeComponent.h"/>
         <GROUP id="{CMP_EFFECTS}" name="effects">
           <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
                 file="Source/components/effects/EffectComponent.cpp"/>
@@ -189,6 +184,8 @@
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"
               file="Source/visualiser/RecordingSettings.h"/>
+        <FILE id="SoVGeo" name="VisualiserGeometry.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserGeometry.h"/>
         <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0"
@@ -214,12 +211,6 @@
             file="Source/SosciPluginProcessor.cpp"/>
       <FILE id="nSDgxn" name="SosciPluginProcessor.h" compile="0" resource="0"
             file="Source/SosciPluginProcessor.h"/>
-      <GROUP id="{STANDALONE}" name="standalone">
-        <FILE id="fqqP0r" name="CustomStandalone.cpp" compile="1" resource="0"
-              file="Source/standalone/CustomStandalone.cpp"/>
-        <FILE id="TFmWW0" name="CustomStandaloneFilterWindow.h" compile="0"
-              resource="0" file="Source/standalone/CustomStandaloneFilterWindow.h"/>
-      </GROUP>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
@@ -261,6 +252,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -303,6 +295,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -352,6 +345,7 @@
         <MODULEPATH id="osci_audio_devices" path="modules"/>
         <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
@@ -395,5 +389,6 @@
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
 </JUCERPROJECT>
