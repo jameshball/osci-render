@@ -151,6 +151,8 @@ VisualiserComponent::VisualiserComponent(
     };
 
     postRenderCallback = [this] {
+        serviceTextureOutputFrame();
+
         if (record.getToggleState()) {
 #if OSCI_PREMIUM
             if (recordingVideo) {
@@ -956,11 +958,6 @@ void VisualiserComponent::serviceTextureOutputFrame() {
 
     publishTextureOutputFrame();
 #endif
-}
-
-void VisualiserComponent::renderOpenGL() {
-    VisualiserRenderer::renderOpenGL();
-    serviceTextureOutputFrame();
 }
 
 void VisualiserComponent::updateRenderModeFromProcessor() {

@@ -152,7 +152,6 @@ private:
     juce::Rectangle<int> buttonRow;
 
     void popoutWindow();
-    void renderOpenGL() override;
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void stopTask() override;
