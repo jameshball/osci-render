@@ -19,8 +19,6 @@
 
 #include <osci_texture_interop/osci_texture_interop.h>
 
-class TextureInputFrameGrabber;
-
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, private juce::CodeDocument::Listener, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
@@ -59,7 +57,7 @@ private:
     void registerFileRemovedCallback();
 
     OscirenderAudioProcessor& audioProcessor;
-    std::unique_ptr<TextureInputFrameGrabber> textureInputFrameGrabber;
+    std::unique_ptr<osci::texture::OpenGLTextureFrameGrabber> textureInputFrameGrabber;
 
 public:
     const double CLOSED_PREF_SIZE = 30.0;

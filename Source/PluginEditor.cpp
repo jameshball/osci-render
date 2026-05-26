@@ -7,7 +7,6 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "components/effects/EffectComponent.h"
-#include "video/TextureInputFrameGrabber.h"
 
 namespace {
     constexpr double kDefaultCodeEditorMainPanelSize = -0.7;
@@ -205,7 +204,7 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
     stopTextureInput();
 
     juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
-    auto grabber = std::make_unique<TextureInputFrameGrabber>(std::move(source));
+    auto grabber = std::make_unique<osci::texture::OpenGLTextureFrameGrabber>(std::move(source));
     auto* grabberPtr = grabber.get();
     grabber->inputStarted = [safeThis](juce::String sourceName, int width, int height) {
         if (safeThis != nullptr) {

@@ -93,7 +93,7 @@ VisualiserComponent::VisualiserComponent(
     textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
     textureOutputButton.onClick = [this] {
 #if OSCI_PREMIUM
-        const bool currentlyRequestedOrRunning = this->settings.parameters.textureOutputEnabled->getBoolValue() || textureOutputSender.isRunning();
+        const bool currentlyRequestedOrRunning = this->settings.parameters.textureOutputEnabled->getBoolValue() || textureOutputPublisher.isRunning();
         setTextureOutputEnabled(!currentlyRequestedOrRunning);
 #else
         editor.showPremiumSplashScreen();
@@ -185,11 +185,7 @@ VisualiserComponent::~VisualiserComponent() {
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
-    {
-        juce::SpinLock::ScopedLockType lock(textureOutputLock);
-        textureOutputSourceName.clear();
-    }
-    textureOutputSender.stop();
+    textureOutputPublisher.stop();
     setRecording(false);
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
@@ -703,7 +699,7 @@ void VisualiserComponent::setOverlayFadeProgress(float progress) {
 
 void VisualiserComponent::refreshTextureOutputButton() {
     const bool wanted = settings.parameters.textureOutputEnabled->getBoolValue();
-    const bool running = textureOutputSender.isRunning();
+    const bool running = textureOutputPublisher.isRunning();
 
 #if !OSCI_PREMIUM
     textureOutputButton.setEnabled(true);
@@ -777,11 +773,7 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
         return;
     }
 
-    const juce::String requestedSourceName = recordingSettings.getCustomTextureOutputName();
-    {
-        juce::SpinLock::ScopedLockType lock(textureOutputLock);
-        textureOutputSourceName = requestedSourceName;
-    }
+    textureOutputPublisher.setSourceName(recordingSettings.getCustomTextureOutputName());
     settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(true);
     refreshTextureOutputButton();
     requestTextureOutputService();
@@ -791,77 +783,9 @@ void VisualiserComponent::requestTextureOutputService() {
     openGLContext.triggerRepaint();
 }
 
-osci::texture::ErrorCode VisualiserComponent::startTextureOutputOnRenderThread() {
-    const Texture renderTexture = getRenderTexture();
-
-    osci::texture::OpenGLSenderDescription description;
-    {
-        juce::SpinLock::ScopedLockType lock(textureOutputLock);
-        description.sourceName = textureOutputSourceName;
-    }
-    if (description.sourceName.isEmpty()) {
-        description.sourceName = recordingSettings.getCustomTextureOutputName();
-        juce::SpinLock::ScopedLockType lock(textureOutputLock);
-        textureOutputSourceName = description.sourceName;
-    }
-    description.width = renderTexture.width;
-    description.height = renderTexture.height;
-
-    const osci::texture::ErrorCode error = textureOutputSender.start(std::move(description));
-    if (error == osci::texture::ErrorCode::none) {
-        textureOutputFrameIndex = 0;
-        textureOutputSenderWidth = renderTexture.width;
-        textureOutputSenderHeight = renderTexture.height;
-    }
-
-    return error;
-}
-
-void VisualiserComponent::publishTextureOutputFrame() {
-    const Texture renderTexture = getRenderTexture();
-
-    osci::texture::OpenGLTextureFrame frame;
-    frame.textureId = static_cast<std::uint32_t>(renderTexture.id);
-    frame.textureTarget = osci::texture::openGLTexture2D;
-    frame.width = renderTexture.width;
-    frame.height = renderTexture.height;
-    frame.verticallyFlipped = false;
-    frame.frameIndex = textureOutputFrameIndex++;
-
-    const osci::texture::ErrorCode error = textureOutputSender.publish(frame);
-    if (error == osci::texture::ErrorCode::none) {
-        return;
-    }
-
-    textureOutputSender.stop();
-    settings.parameters.textureOutputEnabled->setBoolValue(false);
-    textureOutputSenderWidth = 0;
-    textureOutputSenderHeight = 0;
-    {
-        juce::SpinLock::ScopedLockType lock(textureOutputLock);
-        textureOutputSourceName.clear();
-    }
-
-    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-    juce::MessageManager::callAsync([safeThis, error] {
-        if (safeThis == nullptr) {
-            return;
-        }
-
-        safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
-        safeThis->refreshTextureOutputButton();
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                               "Texture Output",
-                                               osci::texture::toString(error),
-                                               "OK");
-    });
-}
-
 void VisualiserComponent::serviceTextureOutputFrame() {
 #if !OSCI_PREMIUM
-    if (textureOutputSender.isRunning()) {
-        textureOutputSender.stop();
-    }
+    textureOutputPublisher.stop();
 
     if (settings.parameters.textureOutputEnabled->getBoolValue()) {
         settings.parameters.textureOutputEnabled->setBoolValue(false);
@@ -879,85 +803,49 @@ void VisualiserComponent::serviceTextureOutputFrame() {
         return;
     }
 
-    auto resetFailedStart = [this](osci::texture::ErrorCode error) {
-        settings.parameters.textureOutputEnabled->setBoolValue(false);
-        textureOutputSenderWidth = 0;
-        textureOutputSenderHeight = 0;
-        {
-            juce::SpinLock::ScopedLockType lock(textureOutputLock);
-            textureOutputSourceName.clear();
-        }
-
-        const osci::texture::BackendStatus status = osci::texture::getOpenGLBackendStatus();
-        const juce::String message = status.isAvailable() || status.message.isEmpty()
-            ? osci::texture::toString(error)
-            : status.message;
-
-        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-        juce::MessageManager::callAsync([safeThis, message] {
-            if (safeThis == nullptr) {
-                return;
-            }
-
-            safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
-            safeThis->refreshTextureOutputButton();
-            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-                                                   "Texture Output",
-                                                   message,
-                                                   "OK");
-        });
-    };
-
-    if (!settings.parameters.textureOutputEnabled->getBoolValue()) {
-        if (textureOutputSender.isRunning()) {
-            textureOutputSender.stop();
-            textureOutputFrameIndex = 0;
-            textureOutputSenderWidth = 0;
-            textureOutputSenderHeight = 0;
-            {
-                juce::SpinLock::ScopedLockType lock(textureOutputLock);
-                textureOutputSourceName.clear();
-            }
-            juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-            juce::MessageManager::callAsync([safeThis] {
-                if (safeThis != nullptr) {
-                    safeThis->refreshTextureOutputButton();
-                }
-            });
-        }
-
-        return;
-    }
-
-    if (!textureOutputSender.isRunning()) {
-        const osci::texture::ErrorCode error = startTextureOutputOnRenderThread();
-        if (error != osci::texture::ErrorCode::none) {
-            resetFailedStart(error);
-            return;
-        }
-
-        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-        juce::MessageManager::callAsync([safeThis] {
-            if (safeThis != nullptr) {
-                safeThis->refreshTextureOutputButton();
-            }
-        });
+    const bool shouldRun = settings.parameters.textureOutputEnabled->getBoolValue();
+    if (shouldRun && !textureOutputPublisher.isRunning()) {
+        textureOutputPublisher.setSourceName(recordingSettings.getCustomTextureOutputName());
     }
 
     const Texture renderTexture = getRenderTexture();
-    if (renderTexture.width != textureOutputSenderWidth || renderTexture.height != textureOutputSenderHeight) {
-        textureOutputSender.stop();
-        textureOutputSenderWidth = 0;
-        textureOutputSenderHeight = 0;
-        const osci::texture::ErrorCode error = startTextureOutputOnRenderThread();
-        if (error != osci::texture::ErrorCode::none) {
-            resetFailedStart(error);
-            return;
-        }
+    handleTextureOutputServiceResult(textureOutputPublisher.serviceTexture2D(shouldRun,
+                                                                             static_cast<std::uint32_t>(renderTexture.id),
+                                                                             renderTexture.width,
+                                                                             renderTexture.height));
+#endif
+}
+
+void VisualiserComponent::handleTextureOutputServiceResult(osci::texture::ServiceResult result) {
+    if (!result.changed()) {
+        return;
     }
 
-    publishTextureOutputFrame();
-#endif
+    if (result.failed()) {
+        settings.parameters.textureOutputEnabled->setBoolValue(false);
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis, result] {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        if (result.failed()) {
+            safeThis->settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
+        }
+
+        safeThis->refreshTextureOutputButton();
+
+        if (result.failed()) {
+            const bool publishFailure = result.error == osci::texture::ErrorCode::publishFailed
+                || result.error == osci::texture::ErrorCode::invalidTexture;
+            juce::AlertWindow::showMessageBoxAsync(publishFailure ? juce::MessageBoxIconType::WarningIcon : juce::MessageBoxIconType::InfoIcon,
+                                                   "Texture Output",
+                                                   result.message,
+                                                   "OK");
+        }
+    });
 }
 
 void VisualiserComponent::updateRenderModeFromProcessor() {
@@ -981,13 +869,7 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
 }
 
 void VisualiserComponent::openGLContextClosing() {
-    textureOutputSender.stop();
-    textureOutputSenderWidth = 0;
-    textureOutputSenderHeight = 0;
-    if (!settings.parameters.textureOutputEnabled->getBoolValue()) {
-        juce::SpinLock::ScopedLockType lock(textureOutputLock);
-        textureOutputSourceName.clear();
-    }
+    textureOutputPublisher.stop();
 
     VisualiserRenderer::openGLContextClosing();
 }

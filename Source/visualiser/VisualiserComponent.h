@@ -88,9 +88,8 @@ private:
     void refreshTextureOutputButton();
     void setTextureOutputEnabled(bool enabled);
     void requestTextureOutputService();
-    osci::texture::ErrorCode startTextureOutputOnRenderThread();
-    void publishTextureOutputFrame();
     void serviceTextureOutputFrame();
+    void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
 
     std::atomic<bool> active = true;
 
@@ -111,12 +110,7 @@ private:
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
-    osci::texture::OpenGLSender textureOutputSender;
-    mutable juce::SpinLock textureOutputLock;
-    juce::String textureOutputSourceName;
-    std::uint64_t textureOutputFrameIndex = 0;
-    int textureOutputSenderWidth = 0;
-    int textureOutputSenderHeight = 0;
+    osci::texture::OpenGLTexturePublisher textureOutputPublisher;
 
     int lastMouseX = 0;
     int lastMouseY = 0;
