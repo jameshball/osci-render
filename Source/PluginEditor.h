@@ -59,6 +59,7 @@ private:
     void registerFileRemovedCallback();
 
     OscirenderAudioProcessor& audioProcessor;
+    std::unique_ptr<TextureInputFrameGrabber> textureInputFrameGrabber;
 
 public:
     const double CLOSED_PREF_SIZE = 30.0;
@@ -127,8 +128,6 @@ public:
 
 private:
     void showLuaDocumentation();
-
-    std::unique_ptr<TextureInputFrameGrabber> textureInputFrameGrabber;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };
