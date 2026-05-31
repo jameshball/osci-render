@@ -19,7 +19,6 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "audio/effects/PerspectiveEffect.h"
 #include "audio/synth/VoiceManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
@@ -35,7 +34,8 @@
 #include "audio/modulation/SidechainParameters.h"
 #include "audio/modulation/ModulationEngine.h"
 #include "audio/modulation/ModulationTypes.h"
-#include "obj/ObjectServer.h"
+#include <osci_render_core/osci_render_core.h>
+#include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
 
 class FileParser;
@@ -409,7 +409,7 @@ private:
 
     std::unique_ptr<VoiceBuilder> voiceBuilder;
 
-    ObjectServer objectServer{*this};
+    ObjectServer objectServer;
 
     // Peak-rectified input audio: per-sample max(|L|, |R|), no smoothing.
     // Fed into envelope followers (sidechain, free-version per-parameter sidechain).

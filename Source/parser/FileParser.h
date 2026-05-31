@@ -1,13 +1,9 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../obj/WorldObject.h"
 #include "img/ImageParser.h"
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
-#if OSCI_PREMIUM
-#include "fractal/FractalParser.h"
-#endif
 
 class OscirenderAudioProcessor;
 class FileParser : public FrameSource {

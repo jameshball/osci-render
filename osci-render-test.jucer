@@ -8,12 +8,6 @@
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
-      <GROUP id="{9D1E8A66-A99C-4333-3CF8-A86432FE09A7}" name="obj">
-        <FILE id="moPMOL" name="Camera.cpp" compile="1" resource="0" file="Source/obj/Camera.cpp"/>
-        <FILE id="QPXpbZ" name="Camera.h" compile="0" resource="0" file="Source/obj/Camera.h"/>
-        <FILE id="V3Q6n2" name="Frustum.cpp" compile="1" resource="0" file="Source/obj/Frustum.cpp"/>
-        <FILE id="m9wauB" name="Frustum.h" compile="0" resource="0" file="Source/obj/Frustum.h"/>
-      </GROUP>
       <GROUP id="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" name="audio">
         <FILE id="OutCl3" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <GROUP id="{D2E3F4A5-B6C7-8901-ABCD-EF2345678901}" name="modulation">
@@ -87,10 +81,10 @@
     <LINUX_MAKE targetFolder="Builds/Test/LinuxMakefile" extraCompilerFlags="-mavx"
                 externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
-                       libraryPath="../../../modules/LuaJIT/src" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
-                       libraryPath="../../../modules/LuaJIT/src" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src" customXcodeFlags="CLANG_X86_VECTOR_INSTRUCTIONS=avx"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
@@ -114,10 +108,10 @@
     <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX"
             extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="..\..\..\modules\LuaJIT\src"
-                       libraryPath="..\..\..\modules\LuaJIT\src"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
@@ -140,10 +134,10 @@
     </VS2022>
     <XCODE_MAC targetFolder="Builds/Test/MacOSX" externalLibraries="luajit">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
-                       libraryPath="../../../modules/LuaJIT/src"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="../../../modules/LuaJIT/src"
-                       libraryPath="../../../modules/LuaJIT/src"/>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render-test" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-render-test" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
