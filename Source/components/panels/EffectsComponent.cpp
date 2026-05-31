@@ -1,5 +1,4 @@
 #include "EffectsComponent.h"
-#include "../../audio/effects/BitCrushEffect.h"
 #include "../../audio/modulation/ModulationTypes.h"
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/EnvState.h"

@@ -70,11 +70,11 @@ Feature flags that enable incompatible dependencies, currently `OSCI_GUI_ENABLE_
 
 The proprietary-compatible surface is expected to grow over time. Current reusable module boundaries are separate module repositories/submodules:
 
-- `osci_render_core`: core data types, effect framework, concurrency helpers, and reusable effect implementations that do not depend on app-only assets.
-- `osci_gui`: reusable JUCE controls and optional visualiser renderer code. App-specific visualiser assets should be supplied by the consuming app rather than assumed by the module.
-- `osci_file_import`: leaf importers, parser contracts, and JUCE-backed audio file parsing helpers for formats that are currently separable from app orchestration.
+- `osci_render_core`: core data types, effect framework, concurrency helpers, generic projection helpers, and reusable effect implementations that do not depend on app-only assets.
+- `osci_gui`: reusable JUCE controls and optional visualiser renderer code. App-specific visualiser assets should be supplied by the consuming app rather than assumed by the module. Optional ChowDSP source is nested under this module.
+- `osci_file_import`: leaf importers, parser contracts, JUCE-backed audio file parsing helpers, fractal parsing, OBJ parsing/path generation, and callback-based ObjectServer import support for formats that are currently separable from app orchestration. OBJ dependencies are nested under this module.
 - `osci_audio_devices`: JUCE-backed audio device UI and optional platform-native system-audio capture support.
-- `osci_scripting`: optional Lua/LuaJIT scripting integration and script-backed effect support.
+- `osci_scripting`: optional Lua/LuaJIT scripting integration and script-backed effect support. LuaJIT source is nested under this module.
 - `osci_licensing`: licensing, update, hardware identity, and backend-client infrastructure for products that want the osci-render licensing/update stack. This should be added directly by consuming products that need it, not pulled in transitively by renderer/core/gui/import modules.
 
 Application orchestration, product-specific UI around licensing/update flows, media capture, and unresolved import/effect areas should remain in the product repo until their dependencies, authorship, assets, and API boundaries are cleared.

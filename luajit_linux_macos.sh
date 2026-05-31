@@ -9,10 +9,10 @@ set -euo pipefail
 # Resolve DIR (allow user override). Prefer script directory so you can invoke from anywhere.
 : "${DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
-LUAJIT_SRC="$DIR/modules/LuaJIT/src"
+LUAJIT_SRC="$DIR/modules/osci_scripting/third_party/LuaJIT/src"
 if [[ ! -d "$LUAJIT_SRC" ]]; then
   echo "Error: LuaJIT source directory not found: $LUAJIT_SRC" >&2
-  echo "(Did you forget to init submodules or place LuaJIT under modules/LuaJIT?)" >&2
+  echo "(Did you forget to init submodules or place LuaJIT under modules/osci_scripting/third_party/LuaJIT?)" >&2
   exit 1
 fi
 
