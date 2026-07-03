@@ -5,6 +5,7 @@
 #include "../CommonPluginProcessor.h"
 #include <osci_gui/osci_gui.h>
 #include "InstallFlowHelpers.h"
+#include "OverlayDialogHelpers.h"
 
 class LicenseAndUpdatesComponent : public osci::OverlayComponent {
 public:
@@ -950,22 +951,21 @@ private:
     }
 
     void confirmDeactivateLicense() {
-        juce::MessageBoxOptions options = juce::MessageBoxOptions()
-            .withTitle ("Remove License")
-            .withMessage ("This removes the locally cached license from this computer. You can activate again later with your license key.")
-            .withButton ("Remove")
-            .withButton ("Cancel")
-            .withIconType (juce::AlertWindow::WarningIcon)
-            .withAssociatedComponent (this);
-
         auto safeThis = juce::Component::SafePointer<LicenseAndUpdatesComponent> (this);
-        juce::AlertWindow::showAsync (options, [safeThis] (int result) {
-            if (result != 1 || safeThis == nullptr) {
-                return;
-            }
-
-            safeThis->deactivateLicense();
-        });
+        osci::showOverlayConfirmationOrAlert(
+            this,
+            "Remove License",
+            "This removes the locally cached license from this computer. You can activate again later with your license key.",
+            "Remove",
+            "Cancel",
+            [safeThis] {
+                if (safeThis != nullptr) {
+                    safeThis->deactivateLicense();
+                }
+            },
+            {},
+            osci::ErrorOverlay::Icon::Warning,
+            { 500, 270 });
     }
 
     void deactivateLicense() {

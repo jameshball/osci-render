@@ -1,6 +1,8 @@
 #include "FileParser.h"
 #include <numbers>
+#include "../CommonPluginEditor.h"
 #include "../PluginProcessor.h"
+#include "../components/OverlayDialogHelpers.h"
 
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback)
     : errorCallback(errorCallback), audioProcessor(p) {}
@@ -31,29 +33,30 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may take a long time to open.\n\nWould you like to continue loading it?";
 	
 	juce::MessageManager::callAsync([this, message, callback]() {
-		juce::AlertWindow::showOkCancelBox(
-			juce::AlertWindow::WarningIcon,
+		auto* editor = dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor());
+		osci::showOverlayConfirmationOrAlert(
+			editor,
 			"Large File",
 			message,
 			"Continue",
 			"Cancel",
-			nullptr,
-			juce::ModalCallbackFunction::create([this, callback](int result) {
+			[this, callback] {
 				juce::SpinLock::ScopedLockType scope(lock);
-				if (result == 1) { // 1 = OK button pressed
-					callback();
-				} else {
-					disable(); // Mark this parser as inactive
-					
-					// Notify the processor to remove this parser
-					juce::MessageManager::callAsync([this] {
-						juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
-						juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-						audioProcessor.removeParser(this);
-					});
-				}
-			})
-		);
+				callback();
+			},
+			[this] {
+				juce::SpinLock::ScopedLockType scope(lock);
+				disable(); // Mark this parser as inactive
+
+				// Notify the processor to remove this parser
+				juce::MessageManager::callAsync([this] {
+					juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+					juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
+					audioProcessor.removeParser(this);
+				});
+			},
+			osci::ErrorOverlay::Icon::Warning,
+			{ 520, 330 });
 	});
 }
 
@@ -115,9 +118,13 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		wav = std::make_shared<WavParser>([this] { return audioProcessor.currentSampleRate.load(); });
 		if (!wav->parse(std::move(stream))) {
 			juce::MessageManager::callAsync([this, fileName] {
-				juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon,
+				auto* editor = dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor());
+				osci::showOverlayMessageOrAlert(editor,
 					"Error Loading " + fileName,
-					"The audio file '" + fileName + "' could not be loaded.");
+					"The audio file '" + fileName + "' could not be loaded.",
+					osci::ErrorOverlay::Icon::Warning,
+					juce::MessageBoxIconType::WarningIcon,
+					{ 500, 260 });
 			});
 		}
 	}

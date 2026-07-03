@@ -10,6 +10,7 @@
 
 #include "audio/AudioThreadGuard.h"
 #include "PluginEditor.h"
+#include "components/OverlayDialogHelpers.h"
 #include "components/modulation/LfoComponent.h"
 #include "components/modulation/EnvelopeComponent.h"
 #include "components/modulation/RandomComponent.h"
@@ -1506,14 +1507,17 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 #if !OSCI_PREMIUM
         if (xml->getBoolAttribute("premiumProject", false)) {
             juce::Logger::writeToLog("setStateInformation: premium project loaded in free build, some features unavailable");
-            juce::MessageManager::callAsync([]() {
-                juce::AlertWindow::showMessageBoxAsync(
-                    juce::AlertWindow::InfoIcon,
+            juce::MessageManager::callAsync([this] {
+                auto* editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+                osci::showOverlayMessageOrAlert(
+                    editor,
                     "Premium Project",
                     "This project was saved with the premium version of osci-render. "
                     "Some features (global LFOs, envelopes, random/sidechain modulation, "
                     "glide, legato, and premium effects) will not be available.",
-                    "OK");
+                    osci::ErrorOverlay::Icon::None,
+                    juce::MessageBoxIconType::InfoIcon,
+                    { 500, 300 });
             });
         }
 #endif
