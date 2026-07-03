@@ -5,6 +5,56 @@
 #include "../LookAndFeel.h"
 #include "VisualiserTextureAssets.h"
 
+namespace {
+
+void logOfflineAudioToVideo(const juce::String& message) {
+    juce::Logger::writeToLog("OfflineAudioToVideo: " + message);
+}
+
+juce::String renderModeToString(VisualiserRenderer::RenderMode mode) {
+    switch (mode) {
+        case VisualiserRenderer::RenderMode::XY:
+            return "XY";
+        case VisualiserRenderer::RenderMode::XYZ:
+            return "XYZ";
+        case VisualiserRenderer::RenderMode::XYRGB:
+            return "XYRGB";
+        default:
+            return "unknown";
+    }
+}
+
+juce::String videoCodecToString(VideoCodec codec) {
+    switch (codec) {
+        case VideoCodec::H264:
+            return "H264";
+        case VideoCodec::H265:
+            return "H265";
+        case VideoCodec::VP9:
+            return "VP9";
+#if JUCE_MAC
+        case VideoCodec::ProRes:
+            return "ProRes";
+#endif
+        default:
+            return "unknown";
+    }
+}
+
+juce::String yesNo(bool value) {
+    return value ? "yes" : "no";
+}
+
+juce::String fileSummary(const juce::File& file) {
+    return file.getFileName() + " (" + juce::String((juce::int64) file.getSize()) + " bytes)";
+}
+
+juce::String durationSummary(double seconds) {
+    return juce::String(seconds, 2) + "s";
+}
+
+}
+
 bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpegExe,
                                                        const juce::File& videoInput,
                                                        const juce::File& audioInput,
@@ -93,6 +143,7 @@ void OfflineAudioToVideoRendererComponent::OfflinePreviewRenderer::newOpenGLCont
 {
     VisualiserRenderer::newOpenGLContextCreated();
     glReadyEvent.signal();
+    logOfflineAudioToVideo("offline preview OpenGL context created");
 }
 
 OfflineAudioToVideoRendererComponent::WorkerThread::WorkerThread(OfflineAudioToVideoRendererComponent& owner)
@@ -111,14 +162,14 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
                                                                           osci::AudioBackgroundThreadManager& threadManager,
                                                                           RecordingSettings& recordingSettings,
                                                                           const juce::File& inputAudioFile,
-                                                                                                                                                    const juce::File& outputVideoFile,
-                                                                                                                                                    VisualiserRenderer::RenderMode initialRenderMode)
+                                                                          const juce::File& outputVideoFile,
+                                                                          VisualiserRenderer::RenderMode initialRenderMode)
     : processor(processor),
       recordingSettings(recordingSettings),
       inputAudioFile(inputAudioFile),
       outputVideoFile(outputVideoFile),
-            preview(visualiserParameters, threadManager, glReadyEvent),
-            initialRenderMode(initialRenderMode)
+      preview(visualiserParameters, threadManager, glReadyEvent),
+      initialRenderMode(initialRenderMode)
 {
     setOpaque(false);
 
@@ -126,7 +177,7 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
     addAndMakeVisible(progressBar);
     addAndMakeVisible(cancelButton);
 
-        preview.setRenderMode(initialRenderMode);
+    preview.setRenderMode(initialRenderMode);
 
     cancelButton.onClick = [this] { cancel(); };
 
@@ -139,6 +190,7 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
             const juce::ScopedLock lock(frameLock);
             framePixels.resize(requiredBytes);
             preview.getFrame(framePixels);
+            capturedFrameCount++;
         }
     });
 }
@@ -175,20 +227,30 @@ void OfflineAudioToVideoRendererComponent::resized()
 void OfflineAudioToVideoRendererComponent::start()
 {
     if (worker != nullptr)
+    {
+        logOfflineAudioToVideo("start ignored because worker is already running");
         return;
+    }
 
     cancelRequested.store(false);
     progressValue = 0.0;
     lastPostedProgressPercent.store(0);
+    capturedFrameCount.store(0);
     setProgressAsync(0.0);
 
     worker = std::make_unique<WorkerThread>(*this);
     worker->startThread();
+    logOfflineAudioToVideo("worker started");
 }
 
 void OfflineAudioToVideoRendererComponent::cancel()
 {
-    cancelRequested.store(true);
+    const bool wasAlreadyCancelling = cancelRequested.exchange(true);
+    if (!wasAlreadyCancelling && worker != nullptr && worker->isThreadRunning())
+    {
+        logOfflineAudioToVideo("cancel requested");
+    }
+
     cancelButton.setEnabled(false);
 
     // Unblock any waits so the worker thread can exit quickly.
@@ -224,6 +286,7 @@ void OfflineAudioToVideoRendererComponent::finishAsync(Result r)
 OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponent::renderToFile()
 {
     Result result;
+    const double renderStartedMs = juce::Time::getMillisecondCounterHiRes();
 
     auto shouldCancel = [&]() {
         return cancelRequested.load() || juce::Thread::currentThreadShouldExit();
@@ -231,24 +294,47 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
     if (shouldCancel())
     {
+        logOfflineAudioToVideo("render cancelled before start");
         result.cancelled = true;
         return result;
     }
 
     if (!inputAudioFile.existsAsFile())
     {
+        logOfflineAudioToVideo("render failed: input audio file not found: " + inputAudioFile.getFullPathName());
         result.errorMessage = "Input audio file not found.";
         return result;
     }
+
+    const double fps = recordingSettings.getFrameRate();
+    const auto renderSize = recordingSettings.getCanvasSize();
+    const auto codec = recordingSettings.getVideoCodec();
+    const int crf = recordingSettings.getCRF();
+    const auto preset = recordingSettings.getCompressionPreset();
+    const bool includeAudio = recordingSettings.recordingAudio();
+
+    logOfflineAudioToVideo(
+        "render starting: input=" + fileSummary(inputAudioFile)
+        + ", output=" + outputVideoFile.getFileName()
+        + ", canvas=" + juce::String(renderSize.width) + "x" + juce::String(renderSize.height)
+        + ", fps=" + juce::String(fps, 2)
+        + ", codec=" + videoCodecToString(codec)
+        + ", crf=" + juce::String(crf)
+        + ", preset=" + preset
+        + ", includeAudio=" + yesNo(includeAudio)
+        + ", initialMode=" + renderModeToString(initialRenderMode));
 
     // Wait for OpenGL to be ready so runTask() doesn't stall indefinitely.
     // Poll so cancellation can interrupt promptly.
     {
         bool ready = false;
+        const double glWaitStartedMs = juce::Time::getMillisecondCounterHiRes();
+        logOfflineAudioToVideo("waiting for offline preview OpenGL context");
         for (int i = 0; i < 80; ++i)
         {
             if (shouldCancel())
             {
+                logOfflineAudioToVideo("render cancelled while waiting for OpenGL context");
                 result.cancelled = true;
                 return result;
             }
@@ -262,19 +348,22 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
         if (!ready)
         {
+            const double waitedMs = juce::Time::getMillisecondCounterHiRes() - glWaitStartedMs;
+            logOfflineAudioToVideo("render failed: OpenGL context not ready after " + juce::String(waitedMs, 0) + " ms");
             result.errorMessage = "Visualiser could not initialise OpenGL.";
             return result;
         }
+
+        const double waitedMs = juce::Time::getMillisecondCounterHiRes() - glWaitStartedMs;
+        logOfflineAudioToVideo("offline preview OpenGL context ready after " + juce::String(waitedMs, 0) + " ms");
     }
 
-    const double fps = recordingSettings.getFrameRate();
     if (fps <= 0.0)
     {
+        logOfflineAudioToVideo("render failed: invalid frame rate " + juce::String(fps, 2));
         result.errorMessage = "Invalid frame rate in Recording Settings.";
         return result;
     }
-
-    const auto renderSize = recordingSettings.getCanvasSize();
 
     // Decode via WavParser (AudioFormatManager-backed), but lock it to the file sample rate.
     WavParser wav;
@@ -285,12 +374,14 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     std::unique_ptr<juce::InputStream> stream = inputAudioFile.createInputStream();
     if (!wav.parse(std::move(stream)))
     {
+        logOfflineAudioToVideo("render failed: input audio decode failed");
         result.errorMessage = "Failed to decode the input audio file.";
         return result;
     }
 
     if (shouldCancel())
     {
+        logOfflineAudioToVideo("render cancelled after input decode");
         result.cancelled = true;
         return result;
     }
@@ -298,6 +389,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     const double fileSampleRate = wav.getFileSampleRate();
     if (fileSampleRate <= 0.0)
     {
+        logOfflineAudioToVideo("render failed: invalid decoded sample rate " + juce::String(fileSampleRate, 2));
         result.errorMessage = "Could not determine audio file sample rate.";
         return result;
     }
@@ -317,28 +409,34 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     preview.setRenderMode(derivedRenderMode);
 
     const int samplesPerFrame = juce::jmax(1, (int) std::llround(fileSampleRate / fps));
+    const juce::int64 totalSamples = (juce::int64) wav.totalSamples.load();
+    const juce::int64 totalFrames = std::max<juce::int64>(1, (totalSamples + (juce::int64) samplesPerFrame - 1) / (juce::int64) samplesPerFrame);
+    const double audioDurationSeconds = fileSampleRate > 0.0 ? (double) totalSamples / fileSampleRate : 0.0;
+
+    logOfflineAudioToVideo(
+        "input decoded: sampleRate=" + juce::String(fileSampleRate, 2)
+        + ", channels=" + juce::String(decodeChannels)
+        + ", samples=" + juce::String(totalSamples)
+        + ", duration=" + durationSummary(audioDurationSeconds)
+        + ", derivedMode=" + renderModeToString(derivedRenderMode)
+        + ", samplesPerFrame=" + juce::String(samplesPerFrame)
+        + ", totalFrames=" + juce::String(totalFrames));
 
     // Configure preview renderer to match Recording Settings.
     preview.setRenderSize(renderSize);
     preview.setFrameRate(fps);
     preview.prepareTask(fileSampleRate, samplesPerFrame);
 
-    const juce::int64 totalSamples = (juce::int64) wav.totalSamples.load();
-    const juce::int64 totalFrames = std::max<juce::int64>(1, (totalSamples + (juce::int64) samplesPerFrame - 1) / (juce::int64) samplesPerFrame);
-
     // Setup ffmpeg video encoder (raw RGBA frames piped to stdin)
     auto ffmpegFile = processor.getFFmpegFile();
     if (!ffmpegFile.existsAsFile())
     {
+        logOfflineAudioToVideo("render failed: FFmpeg not available at " + ffmpegFile.getFullPathName());
         result.errorMessage = "FFmpeg not available.";
         return result;
     }
 
     FFmpegEncoderManager ffmpegEncoderManager(ffmpegFile);
-
-    const auto codec = recordingSettings.getVideoCodec();
-    const int crf = recordingSettings.getCRF();
-    const auto preset = recordingSettings.getCompressionPreset();
 
     juce::TemporaryFile tempVideo("." + recordingSettings.getFileExtensionForCodec());
     const auto tempVideoFile = tempVideo.getFile();
@@ -354,11 +452,20 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         preset,
         tempVideoFile);
 
+    logOfflineAudioToVideo(
+        "starting FFmpeg video encoder: codec=" + videoCodecToString(codec)
+        + ", crf=" + juce::String(crf)
+        + ", preset=" + preset
+        + ", tempVideo=" + tempVideoFile.getFileName());
+
     if (!ffmpegProcess.start(encodeCmd))
     {
+        logOfflineAudioToVideo("render failed: FFmpeg video encoder did not start; command=" + encodeCmd);
         result.errorMessage = "Failed to start FFmpeg video encoder.";
         return result;
     }
+
+    logOfflineAudioToVideo("FFmpeg video encoder started");
 
     // Prepare audio buffers.
     juce::AudioBuffer<float> decodeBuffer;
@@ -376,10 +483,26 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(5), 1.0f, samplesPerFrame);
     };
 
+    juce::int64 framesWritten = 0;
+    double lastHeartbeatMs = renderStartedMs;
+    constexpr int heartbeatProgressStepPercent = 25;
+    constexpr double heartbeatIntervalMs = 60000.0;
+    int lastHeartbeatPercent = -heartbeatProgressStepPercent;
+    int slowFrameWarningsLogged = 0;
+    int noCaptureWarningsLogged = 0;
+    bool slowFrameWarningsSuppressed = false;
+    bool noCaptureWarningsSuppressed = false;
+
+    logOfflineAudioToVideo(
+        "render loop starting: totalFrames=" + juce::String(totalFrames)
+        + ", expectedFrameBytes=" + juce::String((juce::int64) renderSize.width * (juce::int64) renderSize.height * 4)
+        + ", heartbeat=60s/25%");
+
     for (juce::int64 frameIndex = 0; frameIndex < totalFrames; ++frameIndex)
     {
         if (shouldCancel())
         {
+            logOfflineAudioToVideo("render cancelled before frame " + juce::String(frameIndex + 1) + " of " + juce::String(totalFrames));
             result.cancelled = true;
             break;
         }
@@ -410,7 +533,58 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         }
 
         // This blocks until the OpenGL thread has rendered.
+        const double frameStartedMs = juce::Time::getMillisecondCounterHiRes();
+        const int heartbeatPercent = (int) juce::jlimit(0.0, 100.0, std::floor(((double) frameIndex / (double) totalFrames) * 100.0));
+        if (frameIndex == 0 || heartbeatPercent >= lastHeartbeatPercent + heartbeatProgressStepPercent || frameStartedMs - lastHeartbeatMs >= heartbeatIntervalMs)
+        {
+            logOfflineAudioToVideo(
+                "rendering frame " + juce::String(frameIndex + 1) + " of " + juce::String(totalFrames)
+                + " (" + juce::String(heartbeatPercent) + "%), elapsed="
+                + durationSummary((frameStartedMs - renderStartedMs) / 1000.0)
+                + ", capturedFrames=" + juce::String(capturedFrameCount.load()));
+            lastHeartbeatMs = frameStartedMs;
+            lastHeartbeatPercent = heartbeatPercent;
+        }
+
+        const int capturedBeforeRender = capturedFrameCount.load();
         preview.runTask(renderBuffer);
+        const double frameRenderMs = juce::Time::getMillisecondCounterHiRes() - frameStartedMs;
+        const int capturedAfterRender = capturedFrameCount.load();
+
+        if (frameRenderMs >= 2500.0)
+        {
+            if (slowFrameWarningsLogged < 3)
+            {
+                logOfflineAudioToVideo(
+                    "slow frame render: frame=" + juce::String(frameIndex + 1)
+                    + ", renderMs=" + juce::String(frameRenderMs, 0)
+                    + ", capturedBefore=" + juce::String(capturedBeforeRender)
+                    + ", capturedAfter=" + juce::String(capturedAfterRender));
+                slowFrameWarningsLogged++;
+            }
+            else if (!slowFrameWarningsSuppressed)
+            {
+                logOfflineAudioToVideo("additional slow frame render warnings suppressed for this export");
+                slowFrameWarningsSuppressed = true;
+            }
+        }
+
+        if (capturedAfterRender == capturedBeforeRender)
+        {
+            if (noCaptureWarningsLogged < 3)
+            {
+                logOfflineAudioToVideo(
+                    "frame render returned without a new capture callback: frame=" + juce::String(frameIndex + 1)
+                    + ", renderMs=" + juce::String(frameRenderMs, 0)
+                    + ", capturedFrames=" + juce::String(capturedAfterRender));
+                noCaptureWarningsLogged++;
+            }
+            else if (!noCaptureWarningsSuppressed)
+            {
+                logOfflineAudioToVideo("additional missing capture callback warnings suppressed for this export");
+                noCaptureWarningsSuppressed = true;
+            }
+        }
 
         const auto tex = preview.getRenderTexture();
         const size_t expectedBytes = (size_t) (4 * tex.width * tex.height);
@@ -419,18 +593,28 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
             const juce::ScopedLock lock(frameLock);
             if (framePixels.empty())
             {
+                logOfflineAudioToVideo(
+                    "render failed: captured frame was empty at frame " + juce::String(frameIndex + 1)
+                    + ", texture=" + juce::String(tex.width) + "x" + juce::String(tex.height)
+                    + ", capturedFrames=" + juce::String(capturedAfterRender));
                 result.errorMessage = "Failed to capture rendered frame.";
                 break;
             }
 
             if (framePixels.size() != expectedBytes)
             {
+                logOfflineAudioToVideo(
+                    "render failed: captured frame size mismatch at frame " + juce::String(frameIndex + 1)
+                    + ", got=" + juce::String((juce::int64) framePixels.size())
+                    + ", expected=" + juce::String((juce::int64) expectedBytes)
+                    + ", texture=" + juce::String(tex.width) + "x" + juce::String(tex.height));
                 result.errorMessage = "Captured frame had unexpected size.";
                 break;
             }
 
             if (shouldCancel())
             {
+                logOfflineAudioToVideo("render cancelled before writing frame " + juce::String(frameIndex + 1));
                 result.cancelled = true;
                 break;
             }
@@ -438,37 +622,57 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
             // Use a short timeout so cancellation can be observed quickly.
             if (ffmpegProcess.write(framePixels.data(), expectedBytes, 250) == 0)
             {
+                logOfflineAudioToVideo(
+                    "render failed: FFmpeg frame write failed at frame " + juce::String(frameIndex + 1)
+                    + ", bytes=" + juce::String((juce::int64) expectedBytes)
+                    + ", renderMs=" + juce::String(frameRenderMs, 0));
                 result.errorMessage = "An error occurred while writing video frames to FFmpeg.";
                 break;
             }
+
+            framesWritten++;
         }
 
         if (result.cancelled)
+        {
             break;
+        }
 
         const double progress = (double) (frameIndex + 1) / (double) totalFrames;
         const int percent = (int) juce::jlimit(0.0, 100.0, std::floor(progress * 100.0));
         const int prevPercent = lastPostedProgressPercent.exchange(percent);
         if (percent != prevPercent)
+        {
             setProgressAsync(progress);
+        }
     }
 
     ffmpegProcess.close();
+    logOfflineAudioToVideo(
+        "render loop finished: framesWritten=" + juce::String(framesWritten)
+        + " of " + juce::String(totalFrames)
+        + ", capturedFrames=" + juce::String(capturedFrameCount.load())
+        + ", elapsed=" + durationSummary((juce::Time::getMillisecondCounterHiRes() - renderStartedMs) / 1000.0)
+        + ", cancelled=" + yesNo(result.cancelled)
+        + ", error=" + yesNo(result.errorMessage.isNotEmpty()));
 
     if (result.cancelled)
     {
+        logOfflineAudioToVideo("render returning cancelled");
         tempVideoFile.deleteFile();
         return result;
     }
 
     if (result.errorMessage.isNotEmpty())
     {
+        logOfflineAudioToVideo("render returning error: " + result.errorMessage);
         tempVideoFile.deleteFile();
         return result;
     }
 
     if (!tempVideoFile.existsAsFile())
     {
+        logOfflineAudioToVideo("render failed: FFmpeg did not produce temp video " + tempVideoFile.getFullPathName());
         result.errorMessage = "FFmpeg did not produce a video file.";
         return result;
     }
@@ -479,20 +683,26 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     if (recordingSettings.recordingAudio())
     {
         juce::String muxError;
-        if (!runFfmpegMux(ffmpegFile, tempVideoFile, inputAudioFile, tempFinal.getFile(), recordingSettings.getAudioCodecArgs(), cancelRequested, muxError))
+        const auto audioCodecArgs = recordingSettings.getAudioCodecArgs();
+        logOfflineAudioToVideo("muxing audio into final video: audioCodecArgs=" + audioCodecArgs.joinIntoString(" "));
+        if (!runFfmpegMux(ffmpegFile, tempVideoFile, inputAudioFile, tempFinal.getFile(), audioCodecArgs, cancelRequested, muxError))
         {
             tempFinal.getFile().deleteFile();
             tempVideoFile.deleteFile();
 
             if (shouldCancel())
             {
+                logOfflineAudioToVideo("mux cancelled");
                 result.cancelled = true;
                 return result;
             }
 
             result.errorMessage = muxError.isNotEmpty() ? muxError : "Failed to mux audio into video.";
+            logOfflineAudioToVideo("mux failed: " + result.errorMessage.substring(0, 500));
             return result;
         }
+
+        logOfflineAudioToVideo("mux complete");
     }
     else
     {
@@ -501,6 +711,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         {
             tempFinal.getFile().deleteFile();
             tempVideoFile.deleteFile();
+            logOfflineAudioToVideo("render failed: could not copy temp video to final temporary file");
             result.errorMessage = "Failed to write output video file.";
             return result;
         }
@@ -511,6 +722,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     {
         tempFinal.getFile().deleteFile();
         tempVideoFile.deleteFile();
+        logOfflineAudioToVideo("render failed: could not finalise output file " + outputVideoFile.getFullPathName());
         result.errorMessage = "Failed to finalise output video file.";
         return result;
     }
@@ -518,6 +730,9 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     tempVideoFile.deleteFile();
 
     result.success = true;
+    logOfflineAudioToVideo(
+        "render succeeded: output=" + fileSummary(outputVideoFile)
+        + ", totalElapsed=" + durationSummary((juce::Time::getMillisecondCounterHiRes() - renderStartedMs) / 1000.0));
     return result;
 }
 

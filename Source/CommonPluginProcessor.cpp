@@ -17,7 +17,6 @@ namespace
         osci::LicenseManager::Config config;
         const juce::String pluginName (JucePlugin_Name);
         config.productSlug = pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
-        config.allowAutomationLicenseBypass = osci::isJucewrightAutomationLaunch();
         return config;
     }
 }
@@ -76,6 +75,11 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     const auto licenseCacheResult = licenseManager.loadCachedToken();
     if (licenseCacheResult.failed()) {
         juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());
+    }
+    const auto licenseStatus = licenseManager.status();
+    if (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
+        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline) {
+        licenseManager.scheduleBackgroundRefresh();
     }
 
     // Restore recently-opened project files (shared across instances).

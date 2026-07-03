@@ -18,8 +18,8 @@ public:
           helpButton ("accountHelp",
                       juce::String::createStringFromData (BinaryData::help_svg, BinaryData::help_svgSize),
                       juce::Colours::white) {
-        setOverlayTitle (requiresPremiumLicense() ? juce::String() : "Account");
-        setDismissible(!requiresPremiumLicense());
+        setOverlayTitle ("Account");
+        setDismissible(true);
 
         licenseCard.onActivate = [this] {
             activateLicense();
@@ -62,6 +62,7 @@ public:
         addPanelControlAndMakeVisible (helpButton);
 
         refreshState();
+        refreshCachedLicenseIfNeeded();
     }
 
 private:
@@ -616,6 +617,7 @@ private:
     bool updateDownloadInProgress = false;
     bool licenseKeyRevealed = false;
     bool updatesCardVisible = false;
+    bool autoRefreshAttempted = false;
     juce::String currentLicenseKey;
     Notice licenseNotice;
     Notice updateNotice;
@@ -626,7 +628,7 @@ private:
         }
 
         if (!updatesCardVisible) {
-            return { 600, 390 };
+            return { 600, 430 };
         }
 
         const auto licenseCardHeight = licenseNotice.text.isNotEmpty() ? 240 : 210;
@@ -637,10 +639,8 @@ private:
     void resizeContent (juce::Rectangle<int> area) override {
         const auto premiumRequired = requiresPremiumLicense();
         auto topBar = getPanelBoundsInPanelLayer().reduced (24).removeFromTop (28);
-        if (!premiumRequired) {
-            topBar.removeFromRight (28);
-            topBar.removeFromRight (12);
-        }
+        topBar.removeFromRight (28);
+        topBar.removeFromRight (12);
         helpButton.setBounds (topBar.removeFromRight (28).withSizeKeepingCentre (26, 26));
 
         const auto premium = processor.licenseManager.hasPremium();
@@ -683,13 +683,13 @@ private:
         currentLicenseKey = state.getProperty ("license_key").toString();
         updatesCardVisible = premium && currentLicenseKey.isNotEmpty();
 
-        setOverlayTitle (premiumRequired ? juce::String() : "Account");
-        setDismissible(!premiumRequired);
+        setOverlayTitle ("Account");
+        setDismissible(true);
 
         LicenseProfileCard::State licenseState;
         licenseState.productName = premium ? juce::String() : productName;
         licenseState.title = premium ? productName
-                                     : (premiumRequired ? "Activate premium" : "Free version");
+                                     : (premiumRequired ? "Activate premium" : unlicensedTitle());
         licenseState.detail = detailTextForState (state, premium, premiumRequired);
         licenseState.badge = badgeTextForState (status, premium, premiumRequired);
         licenseState.licenseKey = currentLicenseKey;
@@ -732,7 +732,11 @@ private:
             return {};
         }
 
+#if OSCI_PREMIUM
+        return "This build is usable without activation.";
+#else
         return "No premium license activated.";
+#endif
     }
 
     static juce::String badgeTextForState (const juce::String& status, bool premium, bool premiumRequired) {
@@ -749,10 +753,14 @@ private:
         }
 
         if (status == "expired_offline") {
-            return "Expired";
+            return "Refresh needed";
         }
 
+#if OSCI_PREMIUM
+        return "Unlicensed";
+#else
         return "Free";
+#endif
     }
 
     void applyEffectiveLicenseNotice (LicenseProfileCard::State& state, const juce::String& status) const {
@@ -767,7 +775,7 @@ private:
             state.notice = "Connect to refresh your license.";
             state.noticeKind = NoticeKind::Warning;
         } else if (status == "expired_offline") {
-            state.notice = "License refresh expired. Enter your license key again.";
+            state.notice = "Cached license needs refresh. This build remains usable.";
             state.noticeKind = NoticeKind::Warning;
         }
     }
@@ -789,10 +797,14 @@ private:
     }
 
     bool requiresPremiumLicense() const {
-#if OSCI_PREMIUM
-        return !processor.licenseManager.hasPremium();
-#else
         return false;
+    }
+
+    static juce::String unlicensedTitle() {
+#if OSCI_PREMIUM
+        return "License not activated";
+#else
+        return "Free version";
 #endif
     }
 
@@ -887,6 +899,31 @@ private:
                 safeThis->refreshState();
             });
         });
+    }
+
+    void refreshCachedLicenseIfNeeded() {
+        if (autoRefreshAttempted || busy) {
+            return;
+        }
+
+        const auto status = processor.licenseManager.status();
+        if (status != osci::LicenseManager::Status::PremiumCachedToken
+            && status != osci::LicenseManager::Status::ExpiredOffline) {
+            return;
+        }
+
+        autoRefreshAttempted = true;
+        auto& manager = processor.licenseManager;
+        runAsync ("Refreshing license...",
+                  NoticeTarget::License,
+                  [&manager] {
+                      const auto result = manager.refreshNow();
+                      return result.failed() ? failWithContext ("Could not refresh license", result)
+                                             : result;
+                  },
+                  [this] {
+                      setNotice (NoticeTarget::License, "License refreshed.", NoticeKind::Success);
+                  });
     }
 
     void activateLicense() {

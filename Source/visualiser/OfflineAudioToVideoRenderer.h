@@ -103,6 +103,7 @@ private:
 
     juce::CriticalSection frameLock;
     std::vector<unsigned char> framePixels;
+    std::atomic<int> capturedFrameCount { 0 };
 
     std::atomic<int> lastPostedProgressPercent { -1 };
 

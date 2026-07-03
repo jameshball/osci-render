@@ -66,6 +66,8 @@ public:
         addChildComponent (progressBar);
     }
 
+    std::function<void()> onLicenseRequired;
+
     void scheduleInitialCheck() {
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
         juce::Timer::callAfterDelay (1800, [safeThis] {
@@ -271,7 +273,7 @@ private:
         progressBar.setVisible (false);
         setReleaseNotes (version.notesMarkdown);
         titleLabel.setText ("Update available", juce::dontSendNotification);
-        detailLabel.setText ("Version " + version.semver + " is ready to install.", juce::dontSendNotification);
+        detailLabel.setText (updateAvailableDetailText (version), juce::dontSendNotification);
         primaryButton.setButtonText ("Update");
         secondaryButton.setButtonText ("Later");
         secondaryButton.setVisible (true);
@@ -303,6 +305,14 @@ private:
             return;
         }
 
+        const auto token = processor.licenseManager.getCachedToken();
+        if (isPremiumDownloadWithoutToken (*availableVersion, token)) {
+            if (onLicenseRequired) {
+                onLicenseRequired();
+            }
+            return;
+        }
+
         busy = true;
         mode = Mode::Downloading;
         progressBar.setProgress (0.0);
@@ -317,7 +327,6 @@ private:
         auto downloaded = std::make_shared<juce::File>();
         auto result = std::make_shared<juce::Result> (juce::Result::ok());
         const auto version = *availableVersion;
-        const auto token = processor.licenseManager.getCachedToken();
         const auto product = processor.getProductSlug();
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
 
@@ -414,6 +423,18 @@ private:
         }
 
         return compiledVariant();
+    }
+
+    juce::String updateAvailableDetailText (const osci::VersionInfo& version) const {
+        if (isPremiumDownloadWithoutToken (version, processor.licenseManager.getCachedToken())) {
+            return "Version " + version.semver + " is available. A license key is required to download this premium update.";
+        }
+
+        return "Version " + version.semver + " is ready to install.";
+    }
+
+    static bool isPremiumDownloadWithoutToken (const osci::VersionInfo& version, juce::StringRef token) {
+        return version.variant == "premium" && token.isEmpty();
     }
 
     static juce::String compiledVariant() {

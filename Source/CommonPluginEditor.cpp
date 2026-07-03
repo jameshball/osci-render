@@ -32,6 +32,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     betaUpdatesButton.setColour(juce::TextButton::textColourOnId, osci::Colours::veryDark());
     betaUpdatesButton.setTooltip("Beta updates are enabled. Click to manage.");
     betaUpdatesButton.onClick = [this] { openLicenseAndUpdates(); };
+    updatePrompt.onLicenseRequired = [this] { openLicenseAndUpdates(); };
     refreshBetaUpdatesButton();
 #if !OSCI_PREMIUM
     showPremiumSplashScreenGlobal = [safeThis = juce::Component::SafePointer<CommonPluginEditor>(this)]() {
@@ -106,14 +107,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
     updatePrompt.showPendingInstallStatusIfNeeded();
     updatePrompt.scheduleInitialCheck();
-
-#if OSCI_PREMIUM
-    juce::MessageManager::callAsync([safeThis]
-    {
-        if (safeThis != nullptr && !safeThis->audioProcessor.licenseManager.hasPremium())
-            safeThis->openLicenseAndUpdates();
-    });
-#endif
 }
 
 void CommonPluginEditor::parentHierarchyChanged()
