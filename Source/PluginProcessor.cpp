@@ -911,14 +911,6 @@ void OscirenderAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
         return;
     }
 
-#if OSCI_PREMIUM
-    if (! licenseManager.hasPremium()) {
-        midiMessages.clear();
-        buffer.clear();
-        return;
-    }
-#endif
-
     // Audio info variables
     int totalNumInputChannels = getTotalNumInputChannels();
     int totalNumOutputChannels = getTotalNumOutputChannels();
