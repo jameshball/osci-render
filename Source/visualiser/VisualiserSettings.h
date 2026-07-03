@@ -19,7 +19,9 @@ public:
             addAndMakeVisible(effect.get());
         }
 
-        setColour(osci::groupComponentBackgroundColourId, osci::Colours::veryDark().withMultipliedBrightness(3.0));
+        const auto effectRowColour = osci::Colours::darker().overlaidWith(juce::Colours::transparentBlack.withAlpha(0.2f));
+        setColour(osci::groupComponentBackgroundColourId, effectRowColour);
+        setColour(osci::effectComponentBackgroundColourId, juce::Colours::transparentBlack);
     }
 
 #ifndef SOSCI
