@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "../LookAndFeel.h"
 #include "KnobContainerComponent.h"
-#include "LabelledTextBox.h"
+#include <osci_gui/osci_gui.h>
 #include <osci_render_core/effect/osci_EffectParameter.h>
 
 // Modern settings popup for parameter range editing.

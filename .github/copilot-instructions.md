@@ -4,10 +4,16 @@
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
 - **README files**: Do not edit `README.md` files unless the user explicitly asks for README changes.
+- **Formatting scope**: Apply the formatting rules below to new code and to lines you are already changing for the task. Do not reformat unrelated code just to satisfy style rules.
+- **Long-running commands**: For builds, tests, deployments, and exhaustive automation runs, prefer one blocking command with a long timeout and wait for completion. Avoid frequent short polling or progress checks unless the user asks for live updates or the command is genuinely interactive.
+- **Visualiser render semaphore logic**: Do not change the `VisualiserRenderer` render semaphore / `triggerRepaint()` / `renderingSemaphore.acquire()` logic unless the user explicitly asks for that specific work. This synchronization is subtle and easy to break.
 - **Brace style**: Use same-line opening braces for functions and control flow, e.g. `void f() {` and `if (condition) {`, not Allman-style braces on the next line.
 - **Else style**: Put `else` on the same line as the preceding closing brace, e.g. `} else {`.
 - **Required braces**: Always use braces for control-flow bodies, even for single-line `if`, `else`, `for`, and `while` bodies.
 - **Control flow clarity**: Avoid initializer statements in `if`/`switch` conditions. Prefer a named local variable before the condition, especially for `juce::Result` values.
+- **Unary operator spacing**: Do not put a space between a unary operator and its operand, e.g. use `!anyHeavy`.
+- **Expression spacing**: Avoid unnecessary spaces inside expressions. For example, use `freeChoiceButton.setEnabled(!busy);`, not `freeChoiceButton.setEnabled (!busy);`, and `static_cast<float>(value)`, not `static_cast<float> (value)`.
+- **Compact signatures and calls**: Do not split function signatures or call arguments across extra lines just because a parameter was added. Keep arguments on the same line when reasonable, and prefer compact wrapping over one-argument-per-line formatting.
 
 ## GitHub Actions Monitoring
 
@@ -41,12 +47,12 @@ JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audi
 - `Source/lua/` — LuaJIT scripting integration
 - `Source/obj/` — OBJ/Blender 3D object loading
 - `Source/components/` — UI components
-- `Source/video/` — FFmpeg encoding, Syphon/Spout
+- `Source/video/` — FFmpeg encoding and video/OpenGL support
 
 ### Key Modules (`modules/`)
 
 - **osci_render_core** — `osci::Point`, `osci::Shape`, `osci::Effect`, `osci::EffectParameter`, `osci::FloatParameter`, `osci::BooleanParameter`, `osci::IntParameter`
-- **LuaJIT**, **chowdsp_utils**, **juce_sharedtexture**, **pluginval**, **Mathter**, **melatonin_blur**, **tinyobjloader**
+- **LuaJIT**, **chowdsp_utils**, **pluginval**, **Mathter**, **melatonin_blur**, **tinyobjloader**
 
 ### Data Flow
 
@@ -85,6 +91,11 @@ cd /Users/james/osci-render \
              -scheme "osci-render - Standalone Plugin" \
              -configuration Debug -arch arm64 build
 ```
+
+### Projucer Resave Order
+`JuceLibraryCode/` is generated, ignored, and shared by both `osci-render.jucer` and `sosci.jucer`. Always resave the exact `.jucer` you are about to build immediately before running `xcodebuild`.
+
+When switching products, do not reuse the previous generated `JuceLibraryCode/JuceHeader.h` or module include files. For example, resaving `osci-render.jucer` can leave `sosci` builds compiling osci-render-only modules such as `osci_scripting`, while resaving `sosci.jucer` can remove generated include files that `osci-render` needs. To validate both products, resave and build one product, then resave and build the other product.
 
 ### Post-build Relaunch
 After a successful macOS standalone build that changes runtime behavior or UI, automatically relaunch:
@@ -126,6 +137,18 @@ See `.github/docs/build-details.md`.
 ```
 
 Tests live in `tests/`, configured by `osci-render-test.jucer`.
+
+### UI Automation
+
+Use the cross-platform Jucewright browser runner for standalone UI coverage:
+```bash
+python3 scripts/browse_osci_render_with_jucewright.py --quick
+python3 scripts/browse_osci_render_with_jucewright.py
+```
+
+The runner discovers platform-specific build outputs and app profile paths automatically. Use `--build-app` to rebuild first, `--jucewright` to point at a specific CLI executable, and `--app` to override the standalone app path.
+
+Do not launch osci-render for Jucewright by calling `jucewright prepare-juce-profile` or `jucewright launch` directly unless the prepared profile has first gone through the runner's `disable_profile_audio_input()` path. On macOS, launching with a preserved input device can leave the microphone permission prompt open indefinitely and block automation.
 
 ### Validation
 

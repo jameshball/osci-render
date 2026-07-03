@@ -2,14 +2,14 @@
 
 #include <JuceHeader.h>
 
-#include "VisualiserRenderer.h"
+#include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 #include "RecordingSettings.h"
 
 #if OSCI_PREMIUM
 
 #include "../CommonPluginProcessor.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../audio/wav/WavParser.h"
+#include <osci_file_import/osci_file_import.h>
 
 class OfflineAudioToVideoRendererComponent;
 
@@ -44,8 +44,6 @@ public:
     void setOnFinished(FinishedCallback cb) { onFinished = std::move(cb); }
 
 private:
-    static juce::String toPercentString(double progress);
-
     static bool runFfmpegMux(const juce::File& ffmpegExe,
                              const juce::File& videoInput,
                              const juce::File& audioInput,
@@ -105,6 +103,7 @@ private:
 
     juce::CriticalSection frameLock;
     std::vector<unsigned char> framePixels;
+    std::atomic<int> capturedFrameCount { 0 };
 
     std::atomic<int> lastPostedProgressPercent { -1 };
 

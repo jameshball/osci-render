@@ -8,6 +8,9 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "JucewrightAutomation.h"
+#include "audio/OutputClip.h"
+#include "components/OverlayDialogHelpers.h"
 
 #include <cmath>
 
@@ -75,6 +78,11 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
     const auto licenseCacheResult = licenseManager.loadCachedToken();
     if (licenseCacheResult.failed()) {
         juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());
+    }
+    const auto licenseStatus = licenseManager.status();
+    if (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
+        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline) {
+        licenseManager.scheduleBackgroundRefresh();
     }
 
     // Restore internal sample-rate ratio (1.0 = follow device).
@@ -401,7 +409,7 @@ void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         return;
     }
 
-    internalSampleRate.process (buffer, midi, [this] (auto& b, auto& m) { processBlockInternal (b, m); });
+    internalSampleRate.process(buffer, midi, [this](auto& b, auto& m) { processBlockInternal(b, m); });
 }
 
 bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
@@ -417,11 +425,11 @@ void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
     juce::ignoreUnused(ratio);
     return;
 #else
-    if (! supportsInternalSampleRateOverride()) {
+    if (!supportsInternalSampleRateOverride()) {
         return;
     }
 
-    if (! internalSampleRate.setRatio(ratio)) {
+    if (!internalSampleRate.setRatio(ratio)) {
         return;
     }
 
@@ -480,6 +488,15 @@ osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
     auto it = paramIdMap.find(id);
     if (it == paramIdMap.end()) return nullptr;
     return dynamic_cast<osci::IntParameter*>(it->second);
+}
+
+//==============================================================================
+bool CommonAudioProcessor::hasEditor() const {
+    return true;
+}
+
+double CommonAudioProcessor::getSampleRate() {
+    return getEffectiveSampleRate();
 }
 
 double CommonAudioProcessor::getEffectiveSampleRate() {
@@ -662,23 +679,25 @@ bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
         juce::Time now = juce::Time::getCurrentTime();
         bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
-            if (((start > end || end == juce::Time()) && heartbeatStale) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
-                // Ensure the custom look and feel is set before showing the dialog,
-                // since the editor (which normally creates it) hasn't been opened yet.
-                PluginLookAndFeel::getSharedInstance();
+            if ((start > end || end == juce::Time()) && heartbeatStale) {
+                if (!osci::isJucewrightAutomationLaunch() && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+                    // Ensure the custom look and feel is set before showing the dialog,
+                    // since the editor (which normally creates it) hasn't been opened yet.
+                    PluginLookAndFeel::getSharedInstance();
 
-                juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
-                bool userPressedReset = juce::AlertWindow::showOkCancelBox(
-                    juce::AlertWindow::WarningIcon,
-                    "Possible Crash Detected",
-                    message + "\n\nDo you want to reset to a new project, or continue loading your previous session?",
-                    "Reset to New Project",
-                    "Continue",
-                    nullptr,
-                    nullptr
-                );
-                if (userPressedReset) {
-                    userWantsToReset = true;
+                    juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
+                    bool userPressedReset = juce::AlertWindow::showOkCancelBox(
+                        juce::AlertWindow::WarningIcon,
+                        "Possible Crash Detected",
+                        message + "\n\nDo you want to reset to a new project, or continue loading your previous session?",
+                        "Reset to New Project",
+                        "Continue",
+                        nullptr,
+                        nullptr
+                    );
+                    if (userPressedReset) {
+                        userWantsToReset = true;
+                    }
                 }
             }
         }
@@ -788,13 +807,13 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
 #endif
                 ;
 
-            juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                .withTitle("FFmpeg Incompatible")
-                .withMessage(message)
-                .withButton("OK")
-                .withIconType(juce::AlertWindow::WarningIcon)
-                .withAssociatedComponent(editor);
-            juce::AlertWindow::showAsync(options, nullptr);
+            osci::showOverlayMessageOrAlert(editor,
+                                            "FFmpeg Incompatible",
+                                            message,
+                                            osci::ErrorOverlay::Icon::Warning,
+                                            juce::MessageBoxIconType::WarningIcon,
+                                            { 500, 360 },
+                                            juce::Justification::centredTop);
             return false;
         }
 
@@ -818,25 +837,29 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
         }
     };
 
-    // Ask the user if they want to download ffmpeg
-    juce::MessageBoxOptions options = juce::MessageBoxOptions()
-        .withTitle("FFmpeg Required")
-        .withMessage("FFmpeg is required to process video files.\n\nWould you like to download it now?")
-        .withButton("Yes")
-        .withButton("No")
-        .withIconType(juce::AlertWindow::QuestionIcon)
-        .withAssociatedComponent(editor);
+    auto safeEditor = juce::Component::SafePointer<CommonPluginEditor>(editor);
+    osci::showOverlayConfirmationOrAlert(
+        editor,
+        "FFmpeg Required",
+        "FFmpeg is required to process video files.\n\nWould you like to download it now?",
+        "Yes",
+        "No",
+        [this, onStart, safeEditor] {
+            if (safeEditor == nullptr) {
+                return;
+            }
 
-    juce::AlertWindow::showAsync(options, [this, onStart, editor](int result) {
-        if (result == 1) {  // Yes
-            editor->ffmpegDownloader.setVisible(true);
-            editor->ffmpegDownloader.download();
+            auto* editorComponent = safeEditor.getComponent();
+            editorComponent->ffmpegDownloader.setVisible(true);
+            editorComponent->ffmpegDownloader.download();
             if (onStart != nullptr) {
                 onStart();
             }
-            editor->resized();
-        }
-    });
+            editorComponent->resized();
+        },
+        {},
+        osci::ErrorOverlay::Icon::Warning,
+        { 460, 280 });
 
     return false;
 }
@@ -850,7 +873,7 @@ void CommonAudioProcessor::applyVolumeAndThreshold(float* const* channels, int n
     for (int i = 0; i < numSamples; ++i) {
         float vol = volBuf ? volBuf[i] : volFallback;
         float thr = thrBuf ? thrBuf[i] : thrFallback;
-        channels[0][i] = juce::jlimit(-thr, thr, channels[0][i] * vol);
-        channels[1][i] = juce::jlimit(-thr, thr, channels[1][i] * vol);
+        channels[0][i] = osci::applyVolumeAndOptionalClip(channels[0][i], vol, thr);
+        channels[1][i] = osci::applyVolumeAndOptionalClip(channels[1][i], vol, thr);
     }
 }

@@ -1,17 +1,21 @@
 #include "VisualiserSettings.h"
 #include "VisualiserComponent.h"
+#include "RecordingSettings.h"
 #ifndef SOSCI
 #include "../PluginProcessor.h"
 #endif
 
-VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels) : parameters(p), numChannels(numChannels) {
+VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels, RecordingParameters& recordingParameters)
+    : parameters(p), recordingParameters(recordingParameters), numChannels(numChannels) {
     addAndMakeVisible(lineColour);
     addAndMakeVisible(lightEffects);
     addAndMakeVisible(videoEffects);
     addAndMakeVisible(lineEffects);
     addAndMakeVisible(sweepMs);
     addAndMakeVisible(triggerValue);
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
     addAndMakeVisible(upsamplingToggle);
+#endif
     addAndMakeVisible(sweepToggle);
     addAndMakeVisible(screenOverlayLabel);
     addAndMakeVisible(screenOverlay);
@@ -38,7 +42,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     for (int i = 1; i <= parameters.screenOverlay->max; i++) {
         screenOverlay.addItem(parameters.screenOverlay->getText(parameters.screenOverlay->getNormalisedValue(i)), i);
     }
-    screenOverlay.setSelectedId(parameters.screenOverlay->getValueUnnormalised());
+    screenOverlay.setSelectedId(parameters.screenOverlay->getValueUnnormalised(), juce::dontSendNotification);
     screenOverlay.onChange = [this] {
         parameters.screenOverlay->setUnnormalisedValueNotifyingHost(screenOverlay.getSelectedId());
     };
@@ -55,10 +59,15 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels)
     };
 
     parameters.screenOverlay->addListener(this);
+    recordingParameters.canvasWidth.addListener(this);
+    recordingParameters.canvasHeight.addListener(this);
+    updateScreenOverlayItemsEnabled();
 }
 
 VisualiserSettings::~VisualiserSettings() {
     parameters.screenOverlay->removeListener(this);
+    recordingParameters.canvasWidth.removeListener(this);
+    recordingParameters.canvasHeight.removeListener(this);
 }
 
 #ifndef SOSCI
@@ -79,6 +88,18 @@ void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
 
 void VisualiserSettings::paint(juce::Graphics& g) {
     g.fillAll(osci::Colours::darker());
+}
+
+void VisualiserSettings::updateScreenOverlayItemsEnabled() {
+    auto selectedOverlay = static_cast<ScreenOverlay>((int)parameters.screenOverlay->getValueUnnormalised());
+#if OSCI_GUI_ENABLE_ADVANCED_VISUALISER_FEATURES
+    const auto canvasSize = recordingParameters.getCanvasSize();
+    const bool realisticOverlaysEnabled = VisualiserGeometry::isSquare(canvasSize);
+    screenOverlay.setItemEnabled(static_cast<int>(ScreenOverlay::Real), realisticOverlaysEnabled);
+    screenOverlay.setItemEnabled(static_cast<int>(ScreenOverlay::VectorDisplay), realisticOverlaysEnabled);
+    selectedOverlay = getScreenOverlayForRenderSize(selectedOverlay, canvasSize);
+#endif
+    screenOverlay.setSelectedId(static_cast<int>(selectedOverlay), juce::dontSendNotification);
 }
 
 void VisualiserSettings::resized() {
@@ -116,7 +137,9 @@ void VisualiserSettings::resized() {
 
 #if !OSCI_PREMIUM
 #endif
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
     upsamplingToggle.setBounds(area.removeFromTop(rowHeight));
+#endif
     sweepToggle.setBounds(area.removeFromTop(rowHeight));
     sweepMs.setBounds(area.removeFromTop(rowHeight));
     triggerValue.setBounds(area.removeFromTop(rowHeight));
@@ -130,8 +153,18 @@ void VisualiserSettings::resized() {
 }
 
 void VisualiserSettings::parameterValueChanged(int parameterIndex, float newValue) {
-    if (parameterIndex == parameters.screenOverlay->getParameterIndex()) {
-        screenOverlay.setSelectedId(parameters.screenOverlay->getValueUnnormalised());
+    juce::ignoreUnused(newValue);
+
+    const bool screenOverlayChanged = parameterIndex == parameters.screenOverlay->getParameterIndex();
+    const bool canvasSizeChanged = parameterIndex == recordingParameters.canvasWidth.getParameterIndex()
+                                || parameterIndex == recordingParameters.canvasHeight.getParameterIndex();
+
+    if (screenOverlayChanged || canvasSizeChanged) {
+        juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<VisualiserSettings>(this)] {
+            if (safeThis != nullptr) {
+                safeThis->updateScreenOverlayItemsEnabled();
+            }
+        });
     }
 }
 

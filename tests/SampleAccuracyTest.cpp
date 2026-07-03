@@ -147,12 +147,7 @@ public:
         // Step 2: Fill LFO block buffers
         juce::MidiBuffer emptyMidi;
         std::atomic<bool> voiceActive[16] = {};
-        osci::DawPosition dawPosition;
-        dawPosition.bpm.store(120.0, std::memory_order_relaxed);
-        dawPosition.secondsPerSample.store(1.0 / sampleRate, std::memory_order_relaxed);
-        dawPosition.beatsPerSample.store(120.0 / sampleRate / 60.0, std::memory_order_relaxed);
-        dawPosition.syncSecondsPerSample.store(1.0 / sampleRate, std::memory_order_relaxed);
-        lfoParams.fillBlockBuffers<16>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
+        lfoParams.fillBlockBuffers<16>(blockSize, sampleRate, emptyMidi, 120.0, voiceActive);
 
         // Step 3: Apply modulation to animated buffers
         engine.applyAllModulation(blockSize);
@@ -294,48 +289,14 @@ public:
 static LfoPhaseContinuityTest lfoPhaseContinuityTest;
 
 // ============================================================================
-// Test 6: Generic DAW position snapshot
-// ============================================================================
-class DawPositionSnapshotTest : public juce::UnitTest {
-public:
-    DawPositionSnapshotTest() : juce::UnitTest("DAW Position Snapshot", "LFO") {}
-
-    void runTest() override {
-        beginTest("PPQ and BPM produce Vital-style sync seconds");
-
-        juce::AudioPlayHead::PositionInfo positionInfo;
-        positionInfo.setBpm(120.0);
-        positionInfo.setTimeInSeconds(99.0);
-        positionInfo.setPpqPosition(2.0);
-
-        auto dawPosition = DawPosition::fromPositionInfo(positionInfo, 100.0);
-        expectWithinAbsoluteError(dawPosition.syncSeconds.load(std::memory_order_relaxed), 1.0, 1.0e-9);
-        expectWithinAbsoluteError(dawPosition.beatsPerSample.load(std::memory_order_relaxed), 0.02, 1.0e-9);
-        expectWithinAbsoluteError(dawPosition.syncSecondsPerSample.load(std::memory_order_relaxed), 0.01, 1.0e-9);
-        expect(dawPosition.hasBeatPosition.load(std::memory_order_relaxed)
-            && dawPosition.hasSyncPosition.load(std::memory_order_relaxed));
-
-        beginTest("Standalone BPM override is applied before derived sync fields");
-
-        auto options = DawPosition::Options::withBpmOverride(60.0);
-        dawPosition.storeFrom(DawPosition::fromPositionInfo(positionInfo, 100.0, options));
-        expectWithinAbsoluteError(dawPosition.bpm.load(std::memory_order_relaxed), 60.0, 1.0e-9);
-        expectWithinAbsoluteError(dawPosition.syncSeconds.load(std::memory_order_relaxed), 2.0, 1.0e-9);
-        expectWithinAbsoluteError(dawPosition.beatsPerSample.load(std::memory_order_relaxed), 0.01, 1.0e-9);
-    }
-};
-
-static DawPositionSnapshotTest dawPositionSnapshotTest;
-
-// ============================================================================
-// Test 7: Synced global LFO derives phase from the host timeline
+// Test 6: Synced global LFO derives phase from host timeline seconds
 // ============================================================================
 class LfoSyncTimelineAnchorTest : public juce::UnitTest {
 public:
     LfoSyncTimelineAnchorTest() : juce::UnitTest("LFO Sync Timeline Anchor", "LFO") {}
 
     void runTest() override {
-        beginTest("Sync mode uses host timeline position instead of stored phase");
+        beginTest("Sync mode uses host timeline seconds instead of stored phase");
 
         const int blockSize = 4;
         const double sampleRate = 100.0;
@@ -358,17 +319,9 @@ public:
         lfoParams.waveformChanged(0, ramp);
 
         auto renderFirstSampleAt = [&](double syncStartSeconds) {
-            osci::DawPosition dawPosition;
-            dawPosition.bpm.store(120.0, std::memory_order_relaxed);
-            dawPosition.beats.store(120.0 * syncStartSeconds / 60.0, std::memory_order_relaxed);
-            dawPosition.beatsPerSample.store(120.0 / sampleRate / 60.0, std::memory_order_relaxed);
-            dawPosition.hasBeatPosition.store(true, std::memory_order_relaxed);
-            dawPosition.syncSeconds.store(syncStartSeconds, std::memory_order_relaxed);
-            dawPosition.syncSecondsPerSample.store(1.0 / sampleRate, std::memory_order_relaxed);
-            dawPosition.hasSyncPosition.store(true, std::memory_order_relaxed);
-
             lfoParams.audioStates[0].phase = 0.73f;
-            lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
+            lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0,
+                                          voiceActive, syncStartSeconds, true);
             return lfoParams.blockBuffer[0][0];
         };
 
@@ -376,23 +329,45 @@ public:
         expectWithinAbsoluteError(renderFirstSampleAt(1.25), 0.5f, 0.01f);
         expectWithinAbsoluteError(renderFirstSampleAt(0.125), 0.25f, 0.01f);
 
-        beginTest("Sync mode frequency rates use the DAW sync timeline");
-
-        lfoParams.setRateMode(0, LfoRateMode::Seconds);
-        lfoParams.rate[0]->setUnnormalisedValueNotifyingHost(2.0f);
-
-        osci::DawPosition dawPosition;
-        dawPosition.bpm.store(120.0, std::memory_order_relaxed);
-        dawPosition.seconds.store(99.3, std::memory_order_relaxed);
-        dawPosition.hasTimePosition.store(true, std::memory_order_relaxed);
-        dawPosition.secondsPerSample.store(1.0 / sampleRate, std::memory_order_relaxed);
-        dawPosition.syncSeconds.store(0.25, std::memory_order_relaxed);
-        dawPosition.syncSecondsPerSample.store(1.0 / sampleRate, std::memory_order_relaxed);
-        dawPosition.hasSyncPosition.store(true, std::memory_order_relaxed);
-
+        beginTest("Sync mode holds the host timeline value when transport is paused");
         lfoParams.audioStates[0].phase = 0.73f;
-        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
-        expectWithinAbsoluteError(lfoParams.blockBuffer[0][0], 0.5f, 0.01f);
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0, voiceActive, 0.125, true, false);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+
+        beginTest("Paused Sync mode outputs a constant value with smoothing enabled");
+        lfoParams.setSmoothAmount(0, 1.0f);
+        lfoParams.smoothedOutput[0] = 0.75f;
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0, voiceActive, 0.125, true, false);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+        lfoParams.setSmoothAmount(0, 0.0f);
+
+        beginTest("Sync mode is active on a MIDI-disabled note-on block");
+        voiceActive[0].store(false, std::memory_order_relaxed);
+        juce::MidiBuffer midiDisabledTrigger;
+        midiDisabledTrigger.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 0);
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, midiDisabledTrigger, 120.0, voiceActive, 0.125, true, false);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+
+        beginTest("Untouched Free LFOs can default to Sync");
+        LfoParameters defaultParams;
+        defaultParams.setIsCustom(1, true);
+        ModAssignment assignment;
+        assignment.sourceIndex = 2;
+        assignment.paramId = "target";
+        defaultParams.addAssignment(assignment);
+        defaultParams.switchUnmodifiedFreeToSync();
+        expect(defaultParams.getMode(0) == LfoMode::Sync);
+        expect(defaultParams.getMode(1) == LfoMode::Free);
+        expect(defaultParams.getMode(2) == LfoMode::Free);
+        testutil::cleanupLfoParams(defaultParams);
 
         testutil::cleanupLfoParams(lfoParams);
     }

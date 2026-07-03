@@ -3,8 +3,7 @@
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "../KnobContainerComponent.h"
-#include "../SwitchButton.h"
-#include "../ParameterBarComponent.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 
@@ -40,8 +39,7 @@ private:
     KnobContainerComponent animationSpeedKnob{"SPEED"};
 
 #if !OSCI_PREMIUM
-    jux::SwitchButton midiToggle{audioProcessor.midiEnabled};
-    juce::Label midiLabel{"", "Enable MIDI"};
+    SvgSwitchButton midiSwitch{"midi", juce::String(BinaryData::midi_svg), audioProcessor.midiEnabled};
     ParameterBarComponent voicesBar{audioProcessor.voices, "VOICES"};
 #endif
 

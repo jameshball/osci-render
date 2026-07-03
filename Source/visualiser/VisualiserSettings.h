@@ -3,16 +3,14 @@
 #include <JuceHeader.h>
 
 #include "../LookAndFeel.h"
-#include "../audio/effects/SmoothEffect.h"
-#include "../audio/effects/StereoEffect.h"
 #include "../components/effects/EffectComponent.h"
 #include <osci_gui/osci_gui.h>
-#include "../components/SwitchButton.h"
-#include "VisualiserParameters.h"
+#include <osci_gui/visualiser/osci_VisualiserParameters.h>
 
 #ifndef SOSCI
 class OscirenderAudioProcessor;
 #endif
+class RecordingParameters;
 
 class GroupedSettings : public juce::GroupComponent {
 public:
@@ -21,7 +19,9 @@ public:
             addAndMakeVisible(effect.get());
         }
 
-        setColour(osci::groupComponentBackgroundColourId, osci::Colours::veryDark().withMultipliedBrightness(3.0));
+        const auto effectRowColour = osci::Colours::darker().overlaidWith(juce::Colours::transparentBlack.withAlpha(0.2f));
+        setColour(osci::groupComponentBackgroundColourId, effectRowColour);
+        setColour(osci::effectComponentBackgroundColourId, juce::Colours::transparentBlack);
     }
 
 #ifndef SOSCI
@@ -53,7 +53,7 @@ private:
 
 class VisualiserSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
-    VisualiserSettings(VisualiserParameters&, int numChannels = 2);
+    VisualiserSettings(VisualiserParameters&, int numChannels, RecordingParameters& recordingParameters);
     ~VisualiserSettings();
 
 #ifndef SOSCI
@@ -66,10 +66,13 @@ public:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     VisualiserParameters& parameters;
+    RecordingParameters& recordingParameters;
     int numChannels;
     std::function<void()> onUpgradeRequested;
 
 private:
+    void updateScreenOverlayItemsEnabled();
+
     GroupedSettings lineColour{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.hueEffect),
@@ -123,7 +126,9 @@ private:
     juce::Label screenOverlayLabel{"Screen Overlay", "Screen Overlay"};
     juce::ComboBox screenOverlay;
 
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
     jux::SwitchButton upsamplingToggle{parameters.upsamplingEnabled};
+#endif
     jux::SwitchButton sweepToggle{parameters.sweepEnabled};
 
 #if OSCI_PREMIUM

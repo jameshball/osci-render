@@ -6,7 +6,7 @@
 #include "ModulationModeComponent.h"
 #include "../../audio/modulation/RandomState.h"
 #include "ModulationSourceComponent.h"
-#include "../ParameterSyncHelper.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessor;
 

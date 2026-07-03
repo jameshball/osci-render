@@ -1,6 +1,6 @@
 #include "ModulationRateComponent.h"
 #include "../../LookAndFeel.h"
-#include "InlineEditorHelper.h"
+#include <osci_gui/osci_gui.h>
 
 ModulationRateComponent::ModulationRateComponent(const ModulationRateConfig& cfg, int index)
     : config(cfg)

@@ -1,12 +1,9 @@
 #pragma once
-#include "../DraggableListBox.h"
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "EffectComponent.h"
-#include "../ComponentList.h"
-#include "../SwitchButton.h"
-#include "EffectTypeGridComponent.h"
 #include <osci_gui/osci_gui.h>
+#include "EffectTypeGridComponent.h"
 #include <random>
 #include <unordered_map>
 

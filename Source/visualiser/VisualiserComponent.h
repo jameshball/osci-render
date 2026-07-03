@@ -3,20 +3,20 @@
 #include <JuceHeader.h>
 
 #include <algorithm>
+#include <cstdint>
 
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../audio/AudioRecorder.h"
-#include "../components/DownloaderComponent.h"
-#include "../components/StopwatchComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "../components/timeline/TimelineComponent.h"
 #include "../components/timeline/TimelineController.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../audio/wav/WavParser.h"
+#include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
 #include "VisualiserSettings.h"
-#include "VisualiserRenderer.h"
+#include <osci_gui/visualiser/osci_VisualiserRenderer.h>
+#include <osci_texture_interop/osci_texture_interop.h>
 
 enum class FullScreenMode {
     TOGGLE,
@@ -26,14 +26,11 @@ enum class FullScreenMode {
 
 class CommonPluginEditor;
 class VisualiserWindow;
-class VisualiserComponent : public VisualiserRenderer, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
+class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
         CommonPluginEditor& editor,
-#if OSCI_PREMIUM
-        SharedTextureManager& sharedTextureManager,
-#endif
         juce::File ffmpegFile,
         VisualiserSettings& settings,
         RecordingSettings& recordingSettings,
@@ -58,6 +55,9 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
+    void prepareOverlayFadeIn();
+    void fadeInAfterOverlay();
+    void cancelOverlayFadeIn();
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
@@ -74,8 +74,22 @@ public:
     };
 
 private:
+    class FadeCoverComponent : public juce::Component {
+    public:
+        FadeCoverComponent();
+        void paint(juce::Graphics& g) override;
+    };
+
+    static constexpr int overlayFadeDurationMs = 225;
+
     void updatePausedState();
     bool isPrimaryVisualiser() const;
+    void setOverlayFadeProgress(float progress);
+    void refreshTextureOutputButton();
+    void setTextureOutputEnabled(bool enabled);
+    void requestTextureOutputService();
+    void serviceTextureOutputFrame();
+    void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
 
     std::atomic<bool> active = true;
 
@@ -95,17 +109,8 @@ private:
     osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
-    osci::SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
-    osci::SvgButton svgExportButton{
-        "svgExport",
-        R"svg(<svg xmlns="http://www.w3.org/2000/svg" id="mdi-file-export-outline" viewBox="0 0 24 24"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20M16 11V18.1L13.9 16L11.1 18.8L8.3 16L11.1 13.2L8.9 11H16Z" /></svg>)svg",
-        juce::Colours::white,
-        juce::Colours::white};
-
-#if OSCI_PREMIUM
-    SharedTextureManager& sharedTextureManager;
-    SharedTextureSender* sharedTextureSender = nullptr;
-#endif
+    osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+    osci::texture::OpenGLTexturePublisher textureOutputPublisher;
 
     int lastMouseX = 0;
     int lastMouseY = 0;
@@ -114,6 +119,8 @@ private:
     bool hideButtonRow = false;
     bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;
+    osci::ToggleAnimationController overlayFadeController { this };
+    FadeCoverComponent overlayFadeCover;
 
     juce::File ffmpegFile;
     bool recordingAudio = true;
@@ -123,6 +130,7 @@ private:
     bool downloading = false;
 
     long numFrames = 0;
+    VisualiserRenderSize recordingRenderSize;
     std::vector<unsigned char> framePixels;
     osci::WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
@@ -133,22 +141,15 @@ private:
     osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::FileChooser> svgExportChooser;
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
     AudioRecorder audioRecorder;
 
     juce::Rectangle<int> buttonRow;
 
     void popoutWindow();
-    void exportCurrentFrameAsSvg();
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void stopTask() override;
-
-#if OSCI_PREMIUM
-    void initialiseSharedTexture();
-    void closeSharedTexture();
-#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
     JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)
@@ -156,7 +157,7 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons), parent(parent) {
+    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
         setAlwaysOnTop(true);
     }
 

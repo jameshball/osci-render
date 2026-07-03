@@ -4,9 +4,9 @@
 
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
-#include "../parser/fractal/FractalParser.h"
 #include "KnobContainerComponent.h"
 #include <osci_gui/osci_gui.h>
+#include <osci_file_import/osci_file_import.h>
 
 class OscirenderAudioProcessorEditor;
 

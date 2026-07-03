@@ -3,22 +3,42 @@
 #include <unordered_set>
 #include <functional>
 #include <clipper2/clipper.h>
-#include "../../../modules/Mathter/include/Mathter/Matrix.hpp"
 
 namespace {
-    using Mat3 = mathter::Matrix<float, 3, 3, mathter::eMatrixOrder::PRECEDE_VECTOR, mathter::eMatrixLayout::ROW_MAJOR, false>;
-    using Vec3 = mathter::Vector<float, 3, false>;
+    struct Mat3 {
+        float v[3][3] {};
+    };
+
+    inline Mat3 identityMat3() {
+        Mat3 result;
+        result.v[0][0] = 1.0f;
+        result.v[1][1] = 1.0f;
+        result.v[2][2] = 1.0f;
+        return result;
+    }
 
     inline Mat3 toMat3(const tvg::Matrix& m) {
-        Mat3 r;
-        r(0,0)=m.e11; r(0,1)=m.e12; r(0,2)=m.e13;
-        r(1,0)=m.e21; r(1,1)=m.e22; r(1,2)=m.e23;
-        r(2,0)=m.e31; r(2,1)=m.e32; r(2,2)=m.e33;
-        return r;
+        return {{{m.e11, m.e12, m.e13},
+                 {m.e21, m.e22, m.e23},
+                 {m.e31, m.e32, m.e33}}};
+    }
+
+    inline Mat3 multiply(const Mat3& a, const Mat3& b) {
+        Mat3 result;
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 3; ++col) {
+                for (int k = 0; k < 3; ++k) {
+                    result.v[row][col] += a.v[row][k] * b.v[k][col];
+                }
+            }
+        }
+        return result;
     }
 
     inline tvg::Matrix toTvgMatrix(const Mat3& m) {
-        return {m(0,0), m(0,1), m(0,2), m(1,0), m(1,1), m(1,2), m(2,0), m(2,1), m(2,2)};
+        return {m.v[0][0], m.v[0][1], m.v[0][2],
+                m.v[1][0], m.v[1][1], m.v[1][2],
+                m.v[2][0], m.v[2][1], m.v[2][2]};
     }
 
     // Global refcount for thorvg Initializer across all LottieParser instances.
@@ -47,21 +67,24 @@ namespace {
     // Walk from `leaf` up to (but not including) `root`, multiplying each
     // ancestor's local transform to produce the world-space transform.
     tvg::Matrix accumulatedTransform(const tvg::Paint* leaf, const tvg::Paint* root) {
-        Mat3 m = mathter::Identity();
+        Mat3 m = identityMat3();
         std::vector<const tvg::Paint*> chain;
         for (auto p = leaf; p != nullptr && p != root; p = p->parent()) {
             chain.push_back(p);
         }
         // Multiply root->leaf so we accumulate correctly.
         for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
-            m = m * toMat3(const_cast<tvg::Paint*>(*it)->transform());
+            m = multiply(m, toMat3(const_cast<tvg::Paint*>(*it)->transform()));
         }
         return toTvgMatrix(m);
     }
 
     inline tvg::Point applyMatrix(const tvg::Matrix& m, tvg::Point p) {
-        const Vec3 result = toMat3(m) * Vec3{p.x, p.y, 1.0f};
-        return {result[0], result[1]};
+        const auto matrix = toMat3(m);
+        return {
+            matrix.v[0][0] * p.x + matrix.v[0][1] * p.y + matrix.v[0][2],
+            matrix.v[1][0] * p.x + matrix.v[1][1] * p.y + matrix.v[1][2]
+        };
     }
 
     float accumulatedOpacity(const tvg::Paint* leaf, const tvg::Paint* root) {

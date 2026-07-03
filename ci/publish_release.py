@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a single release artifact to api.osci-render.com.
+"""Publish a single release artifact to release-plane.
 
 Used by the CI release pipeline (and runnable manually) to:
 
@@ -11,7 +11,7 @@ Used by the CI release pipeline (and runnable manually) to:
 
 Environment variables (all required):
 
-    PUBLISH_API_BASE              e.g. https://api.osci-render.com
+    PUBLISH_API_BASE              e.g. https://jameshball.releaseplane.org
     PUBLISH_API_TOKEN             bearer token (server PUBLISH_API_TOKEN secret)
     RELEASE_SIGNING_PRIVATE_KEY   base64-encoded 32-byte Ed25519 seed
                                   (or pass --release-key path/to/seed.b64)
@@ -23,7 +23,7 @@ Example::
         --semver 2.6.0.0 \\
         --platform mac-universal \\
         --artifact-kind pkg \\
-        --artifact bin/sosci-mac.pkg \\
+        --artifact bin/sosci.pkg \\
         --notes "Bug fixes."
 """
 from __future__ import annotations
@@ -80,7 +80,7 @@ def sha256_file(path: Path, *, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 60.0) -> dict:
+def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 300.0) -> dict:
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode('utf-8'),
@@ -92,6 +92,10 @@ def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 60.0
             return json.loads(resp.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         raise SystemExit(f'POST {url} -> HTTP {e.code}: {e.read().decode("utf-8", errors="replace")}')
+    except TimeoutError:
+        raise SystemExit(f'POST {url} timed out after {timeout:g}s waiting for the API response')
+    except urllib.error.URLError as e:
+        raise SystemExit(f'POST {url} failed: {e.reason}')
 
 
 def http_put_file(url: str, path: Path, *, content_type: str = 'application/octet-stream', timeout: float = 600.0) -> int:
@@ -123,7 +127,7 @@ def main(argv: list[str]) -> int:
                    help='Release track to register with the API. CI should publish alpha.')
     p.add_argument('--variant', default='premium', choices=['free', 'premium'],
                    help='Licensing variant of the build (free or premium); separate Version row per variant.')
-    p.add_argument('--artifact-kind', required=True, choices=['pkg', 'exe', 'zip', 'appimage', 'tar.gz'])
+    p.add_argument('--artifact-kind', required=True, choices=['pkg', 'dmg', 'exe', 'binary', 'zip', 'appimage', 'tar.gz'])
     p.add_argument('--artifact', required=True, type=Path,
                    help='Path to the artifact file on disk; uploaded as-is to R2')
     p.add_argument('--filename', default=None,
@@ -132,7 +136,7 @@ def main(argv: list[str]) -> int:
     p.add_argument('--notes-file', default=None, type=Path, help='Read release notes from file')
     p.add_argument('--min-supported-from', default=None,
                    help='Optional: oldest semver that should auto-upgrade to this build')
-    p.add_argument('--api-base', default=os.environ.get('PUBLISH_API_BASE', 'https://api.osci-render.com'))
+    p.add_argument('--api-base', default=os.environ.get('PUBLISH_API_BASE', 'https://jameshball.releaseplane.org'))
     p.add_argument('--api-token', default=os.environ.get('PUBLISH_API_TOKEN'),
                    help='Bearer token; defaults to $PUBLISH_API_TOKEN')
     p.add_argument('--release-key', default=None,

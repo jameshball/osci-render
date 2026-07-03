@@ -1,6 +1,6 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include "standalone/CustomStandaloneFilterWindow.h"
+#include <osci_standalone/osci_standalone.h>
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     // Create timeline controller for audio playback
@@ -69,13 +69,9 @@ void SosciPluginEditor::resized() {
     } else {
         auto topBar = area.removeFromTop(25);
         layoutBetaUpdatesButton(topBar);
-        redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
-        undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
-        undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
+        undoRedoControls.setBounds(topBar.removeFromRight(juce::jmin(undoRedoControls.getPreferredWidth(), topBar.getWidth())));
         menuBar.setBounds(topBar);
-        undoLabel.toFront(false);
-        undoButton.toFront(false);
-        redoButton.toFront(false);
+        undoRedoControls.toFront(false);
 
         if (juce::JUCEApplication::isStandaloneApp()) {
             auto volumeArea = area.removeFromLeft(35);
@@ -133,8 +129,7 @@ void SosciPluginEditor::visualiserFullScreenChanged() {
     }
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
-    undoButton.setVisible(!fullScreen);
-    redoButton.setVisible(!fullScreen);
+    undoRedoControls.setVisible(!fullScreen);
     resized();
     repaint();
 }
