@@ -6,14 +6,8 @@ static constexpr int kToggleSectionWidth = 36;
 
 MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 
-    addAndMakeVisible(midiToggle);
+    addAndMakeVisible(midiSwitch);
     addAndMakeVisible(voicesBar);
-#if !OSCI_PREMIUM
-    midiLabel.setFont(juce::Font(12.0f));
-    midiLabel.setColour(juce::Label::textColourId, juce::Colours::white);
-    midiLabel.setJustificationType(juce::Justification::centredLeft);
-    addAndMakeVisible(midiLabel);
-#endif
 #if OSCI_PREMIUM
     addAndMakeVisible(bendBar);
     addAndMakeVisible(velTrkKnob);
@@ -96,12 +90,11 @@ void MidiComponent::resized() {
     auto area = getLocalBounds();
 
 #if !OSCI_PREMIUM
-    // Free mode: toggle + "Enable MIDI" label + voices bar, no backgrounds
+    // Free mode: MIDI icon + toggle + voices bar, no backgrounds
     {
         auto row = area.reduced(4, 0);
-        midiToggle.setBounds(row.removeFromLeft(30).withSizeKeepingCentre(30, 20));
+        midiSwitch.setBounds(row.removeFromLeft(kToggleSectionWidth));
         row.removeFromLeft(4);
-        midiLabel.setBounds(row.removeFromLeft(80));
 
         bool midiOn = audioProcessor.midiEnabled->getBoolValue();
         voicesBar.setVisible(midiOn);
@@ -117,7 +110,7 @@ void MidiComponent::resized() {
 
     // Toggle section on the left
     auto toggleSection = area.removeFromLeft(kToggleSectionWidth);
-    midiToggle.setBounds(toggleSection.withSizeKeepingCentre(30, 20));
+    midiSwitch.setBounds(toggleSection);
 
     // Settings section — cumulative boundary layout to avoid jitter
     auto settingsArea = area.reduced(5, 3);

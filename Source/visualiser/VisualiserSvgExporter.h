@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "VisualiserParameters.h"
+#include <osci_gui/visualiser/osci_VisualiserParameters.h>
 
 class VisualiserSvgExporter {
 public:

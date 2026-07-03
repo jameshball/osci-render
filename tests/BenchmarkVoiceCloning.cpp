@@ -29,7 +29,7 @@ public:
     }
 };
 
-// Small-state effect (like AutoGainControl, KaleidoscopeEffect, etc.)
+// Small-state effect (like KaleidoscopeEffect, etc.)
 class BenchSmallStateEffect : public EffectApplication {
 public:
     osci::Point apply(int index, osci::Point input, osci::Point externalInput,

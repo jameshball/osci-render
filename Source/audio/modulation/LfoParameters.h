@@ -140,23 +140,31 @@ public:
         return customState[i].load(std::memory_order_relaxed);
     }
 
-    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
-    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
-    void switchUnmodifiedFreeToTrigger() {
+    void switchUnmodifiedFreeTo(LfoMode targetMode) {
         auto allAssignments = getAssignments();
         int assignCount[NUM_LFOS] = {};
-        for (const auto& a : allAssignments)
-            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS)
+        for (const auto& a : allAssignments) {
+            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS) {
                 assignCount[a.sourceIndex]++;
+            }
+        }
 
         for (int i = 0; i < NUM_LFOS; ++i) {
             bool isFree = getMode(i) == LfoMode::Free;
             bool unassigned = assignCount[i] == 0;
             bool unmodified = !getIsCustom(i);
-            if (isFree && unassigned && unmodified)
-                setMode(i, LfoMode::Trigger);
+            if (isFree && unassigned && unmodified) {
+                setMode(i, targetMode);
+            }
         }
     }
+
+    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
+    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
+    void switchUnmodifiedFreeToTrigger() { switchUnmodifiedFreeTo(LfoMode::Trigger); }
+
+    // Switch untouched Free-mode LFOs to DAW Sync when MIDI is disabled in a plugin host.
+    void switchUnmodifiedFreeToSync() { switchUnmodifiedFreeTo(LfoMode::Sync); }
 
     void setIsCustom(int i, bool custom) {
         if (i < 0 || i >= NUM_LFOS) return;

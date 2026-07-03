@@ -15,15 +15,11 @@
 
 #include <limits>
 #include <numbers>
+#include <cstdint>
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "audio/effects/CustomEffect.h"
-#include "audio/effects/DelayEffect.h"
-#include "audio/modulation/LuaEffectState.h"
-#include "audio/effects/PerspectiveEffect.h"
 #include "audio/synth/VoiceManager.h"
-#include "audio/platform/SampleRateManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
 #include "audio/synth/VoiceBuilder.h"
@@ -38,15 +34,11 @@
 #include "audio/modulation/SidechainParameters.h"
 #include "audio/modulation/ModulationEngine.h"
 #include "audio/modulation/ModulationTypes.h"
-#include "obj/ObjectServer.h"
+#include <osci_render_core/osci_render_core.h>
+#include <osci_file_import/osci_file_import.h>
+#include <osci_scripting/osci_scripting.h>
 
 class FileParser;
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-#include "parser/img/ImageParser.h"
-#include "../modules/juce_sharedtexture/SharedTexture.h"
-#include "video/SyphonFrameGrabber.h"
-#endif
 
 //==============================================================================
 
@@ -78,18 +70,6 @@ private:
     struct Entry { void* key; Callback callback; };
     std::vector<Entry> entries;
 };
-
-// Extensions recognised as Lottie animation files (with or without the leading dot).
-inline bool isLottieExtension(const juce::String& extension) {
-#if OSCI_PREMIUM
-    auto e = extension.toLowerCase();
-    return e == "json" || e == "lottie" || e == "lot"
-        || e == ".json" || e == ".lottie" || e == ".lot";
-#else
-    (void) extension;
-    return false;
-#endif
-}
 
 /**
  */
@@ -312,7 +292,7 @@ public:
     std::atomic<double> animationFrame = 0.f;
 
     const double FONT_SIZE = 1.0f;
-    juce::Font font = juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), FONT_SIZE, juce::Font::plain));
+    juce::Font font = juce::Font(juce::Font::getDefaultMonospacedFontName(), FONT_SIZE, juce::Font::plain);
 
     ShapeSound::Ptr objectServerSound = new ShapeSound();
 
@@ -337,6 +317,11 @@ public:
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
     juce::String getCurrentFileName();
+    void startTextureInput(juce::String sourceName, int width, int height);
+    void updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
+    void stopTextureInput();
+    bool isTextureInputActive() const { return textureInputActive.load(std::memory_order_acquire); }
+    juce::String getTextureInputName();
     juce::String getFileName(int index);
     juce::String getFileId(int index);
     std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
@@ -349,8 +334,8 @@ public:
     // Preview API: set/clear a temporary effect by ID for hover auditioning
     void setPreviewEffectId(const juce::String& effectId);
     void clearPreviewEffect();
-    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() { 
-        return std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect); 
+    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() {
+        return std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect);
     }
 
     // Get the external input buffer for effects that need it
@@ -392,9 +377,6 @@ public:
         "lsystem",
         "mp4",
         "mov",
-        "json",
-        "lottie",
-        "lot",
 #endif
     };
 
@@ -412,6 +394,11 @@ private:
     std::vector<ErrorListener*> errorListeners;
 
     ShapeSound::Ptr defaultSound;
+    std::shared_ptr<FileParser> liveTextureParser;
+    ShapeSound::Ptr liveTextureSound;
+    juce::String liveTextureInputName;
+    int liveTexturePreviousFile = -1;
+    std::atomic<bool> textureInputActive{false};
     VoiceManager synth;
 #if OSCI_PREMIUM
     mts_esp::Client mtsClient;
@@ -420,7 +407,7 @@ private:
 
     std::unique_ptr<VoiceBuilder> voiceBuilder;
 
-    ObjectServer objectServer{*this};
+    ObjectServer objectServer;
 
     // Peak-rectified input audio: per-sample max(|L|, |R|), no smoothing.
     // Fed into envelope followers (sidechain, free-version per-parameter sidechain).
@@ -470,6 +457,8 @@ private:
         return std::lexicographical_compare(parsedA, parsedA + 3, parsedB, parsedB + 3);
     }
 
+    juce::AudioPlayHead* playHead;
+
     // Precomputed paramId → (effect*, paramIndex) lookup for O(1) modulation target resolution.
     // Built once after all effects are populated; the effect lists are stable after construction.
     std::unordered_map<juce::String, ParamLocation> paramLocationMap;
@@ -478,14 +467,6 @@ private:
     // Modulation engine: operates on all sources via common ModulationSource interface.
     // Must be declared after paramLocationMap (it holds a reference to it).
     ModulationEngine modulationEngine{paramLocationMap};
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-public:
-    std::atomic<bool> syphonInputActive = false;
-
-    ImageParser syphonImageParser = ImageParser(*this);
-#endif
-
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessor)

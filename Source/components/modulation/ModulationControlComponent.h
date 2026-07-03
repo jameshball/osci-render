@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../LabelledBarComponent.h"
+#include <osci_gui/osci_gui.h>
 
 // Base class for Vital-inspired dark-bar modulation controls.
 // Inherits from LabelledBarComponent (generic dark bar + label strip)

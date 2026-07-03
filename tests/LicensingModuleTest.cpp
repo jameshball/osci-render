@@ -31,15 +31,15 @@ namespace
     {
         auto payload = juce::var (new juce::DynamicObject());
         auto* object = payload.getDynamicObject();
-        object->setProperty ("v", 1);
-        object->setProperty ("kid", 1);
-        object->setProperty ("lk", "LICENSE-KEY");
-        object->setProperty ("pid", "osci-render");
-        object->setProperty ("prv", "gumroad");
-        object->setProperty ("em", "buyer@example.com");
-        object->setProperty ("tr", std::move (tier));
-        object->setProperty ("iat", issuedAtSeconds);
-        object->setProperty ("exp", expiresAtSeconds);
+        object->setProperty ("token_format_version", 3);
+        object->setProperty ("key_id", 1);
+        object->setProperty ("license_key", "LICENSE-KEY");
+        object->setProperty ("provider_product_id", "osci-render");
+        object->setProperty ("provider", "gumroad");
+        object->setProperty ("email", "buyer@example.com");
+        object->setProperty ("tier", std::move (tier));
+        object->setProperty ("issued_at", issuedAtSeconds);
+        object->setProperty ("expires_at", expiresAtSeconds);
 
         const auto payloadJson = juce::JSON::toString (payload, true);
         const juce::MemoryBlock payloadBytes (payloadJson.toRawUTF8(), std::strlen (payloadJson.toRawUTF8()));
@@ -372,16 +372,25 @@ public:
         beginTest ("DAW matcher recognises known hosts without broad false positives");
         {
             juce::String display;
-            expect (osci::DawProcessDetector::isKnownDawProcessName (
+            expect(osci::DawProcessDetector::isKnownDawProcessName(
                 "/Applications/Ableton Live 12 Suite.app/Contents/MacOS/Ableton Live 12 Suite", &display));
-            expectEquals (display, juce::String ("Ableton Live"));
-            expect (osci::DawProcessDetector::isKnownDawProcessName ("pluginval", &display));
-            expectEquals (display, juce::String ("pluginval"));
-            expect (osci::DawProcessDetector::isKnownDawProcessName ("VST3PluginTestHost.exe", &display));
-            expectEquals (display, juce::String ("VST3 plugin test host"));
-            expect (osci::DawProcessDetector::isKnownDawProcessName ("auval", &display));
-            expectEquals (display, juce::String ("AU validation tool"));
-            expect (! osci::DawProcessDetector::isKnownDawProcessName ("Final Cut Pro"));
+            expectEquals(display, juce::String("Ableton Live"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName(
+                "/Applications/Logic Pro X.app/Contents/MacOS/Logic Pro X", &display));
+            expectEquals(display, juce::String("Logic Pro"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName(
+                "C:\\Program Files\\Steinberg\\Cubase 13\\Cubase13.exe", &display));
+            expectEquals(display, juce::String("Cubase"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName("pluginval", &display));
+            expectEquals(display, juce::String("pluginval"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName("VST3PluginTestHost.exe", &display));
+            expectEquals(display, juce::String("VST3 plugin test host"));
+            expect(osci::DawProcessDetector::isKnownDawProcessName("auval", &display));
+            expectEquals(display, juce::String("AU validation tool"));
+            expect(!osci::DawProcessDetector::isKnownDawProcessName(
+                "/Applications/Logic Pro X.app/Contents/PlugIns/LogicProThumbnailExtension.appex/Contents/MacOS/LogicProThumbnailExtension"));
+            expect(!osci::DawProcessDetector::isKnownDawProcessName("LogicProThumbnailExtension"));
+            expect(!osci::DawProcessDetector::isKnownDawProcessName("Final Cut Pro"));
         }
 
         beginTest ("Hardware helpers return stable local values");

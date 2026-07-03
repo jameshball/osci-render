@@ -4,7 +4,7 @@
 #include "ShapeSound.h"
 #include "../modulation/DahdsrEnvelope.h"
 #include "../modulation/EnvState.h"
-#include "../../lua/LuaParser.h"
+#include <osci_scripting/osci_scripting.h>
 
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {

@@ -8,11 +8,9 @@
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/LfoPresetManager.h"
 #include "ModulationSourceComponent.h"
-#include "../PhaseSliderComponent.h"
 #include <osci_gui/osci_gui.h>
 #include "../KnobContainerComponent.h"
 
-#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessor;
 
@@ -37,7 +35,7 @@ public:
 
     static juce::Colour getLfoColour(int lfoIndex);
 
-    // Restrict LFO features when MIDI is disabled (only Free mode available)
+    // Restrict LFO features when MIDI is disabled.
     void setMidiEnabled(bool enabled);
 
     void syncFromProcessorState() override;

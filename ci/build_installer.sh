@@ -19,8 +19,8 @@ if [ "$OS" = "linux" ]; then
   cd "$ROOT/Builds/$APP/LinuxMakefile"
   make -j"$(nproc)" CONFIG=Release
 
-  cd build
-  zip -r "$ROOT/bin/$OUTPUT_NAME-linux.zip" "$APP"
+  cp "$ROOT/Builds/$APP/LinuxMakefile/build/$APP" "$ROOT/bin/$OUTPUT_NAME"
+  chmod +x "$ROOT/bin/$OUTPUT_NAME"
 fi
 
 if [ "$OS" = "win" ]; then
@@ -40,9 +40,6 @@ if [ "$OS" = "win" ]; then
     "//p:RestorePackagesConfig=true"
 
   cp "$ROOT/Builds/$APP/VisualStudio2022/x64/Release/App/$APP.exe" "$ROOT/bin/$OUTPUT_NAME.exe"
-  cd "$ROOT/bin"
-  7z a "$OUTPUT_NAME-windows.zip" "$OUTPUT_NAME.exe"
-  rm -f "$OUTPUT_NAME.exe"
 fi
 
 cd "$ROOT"

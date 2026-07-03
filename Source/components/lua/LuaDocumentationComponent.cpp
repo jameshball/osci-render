@@ -8,7 +8,7 @@ LuaDocumentationComponent::LuaDocumentationComponent()
     viewport.setScrollBarsShown(true, false);
     viewport.setColour(juce::ScrollBar::thumbColourId, osci::Colours::grey());
     viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
-    addAndMakeVisible(viewport);
+    addPanelContentAndMakeVisible(viewport);
 
     buildDocumentation();
 }

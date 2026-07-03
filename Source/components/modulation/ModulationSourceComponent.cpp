@@ -2,7 +2,7 @@
 #include "../effects/EffectComponent.h"
 #include "../../LookAndFeel.h"
 #include "../../audio/modulation/ModulationTypes.h"
-#include "InlineEditorHelper.h"
+#include <osci_gui/osci_gui.h>
 #include <osci_render_core/midi/osci_MidiCCManager.h>
 
 // ============================================================================
@@ -213,7 +213,7 @@ void ModulationSourceComponent::DepthIndicator::startTextEdit() {
         juce::String((int)(depth * 100.0f)),
         getLocalBounds().expanded(8, 2),
         { commitFn, cancelFn },
-        osci::Dracula::background, osci::Dracula::foreground,
+        osci::Colours::codeBackground(), osci::Colours::codeForeground(),
         owner.config.getSourceColour(sourceIndex), 11.0f);
     addAndMakeVisible(inlineEditor.get());
     inlineEditor->grabKeyboardFocus();
@@ -223,8 +223,8 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     if (!valuePopup) {
         valuePopup = std::make_unique<juce::Label>();
         valuePopup->setFont(juce::Font(11.0f, juce::Font::bold));
-        valuePopup->setColour(juce::Label::backgroundColourId, osci::Dracula::background);
-        valuePopup->setColour(juce::Label::textColourId, osci::Dracula::foreground);
+        valuePopup->setColour(juce::Label::backgroundColourId, osci::Colours::codeBackground());
+        valuePopup->setColour(juce::Label::textColourId, osci::Colours::codeForeground());
         valuePopup->setJustificationType(juce::Justification::centred);
         valuePopup->setInterceptsMouseClicks(false, false);
         valuePopup->addToDesktop(juce::ComponentPeer::windowIsTemporary | juce::ComponentPeer::windowIgnoresKeyPresses);
@@ -238,7 +238,7 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     int pct = (int)(depth * 100.0f);
     valuePopup->setText(paramName + " " + juce::String(pct) + "%", juce::dontSendNotification);
 
-    int popupW = valuePopup->getFont().getStringWidth(valuePopup->getText()) + 14;
+    int popupW = juce::GlyphArrangement::getStringWidthInt(valuePopup->getFont(), valuePopup->getText()) + 14;
     int popupH = 20;
     auto screenPos = localPointToGlobal(juce::Point<int>(getWidth() / 2, 0));
     valuePopup->setBounds(screenPos.x - popupW / 2, screenPos.y - popupH - 4, popupW, popupH);
@@ -257,6 +257,10 @@ ModulationSourceComponent::ModTabHandle::ModTabHandle(
         const juce::String& l, int idx, ModulationSourceComponent& o)
     : label(l), sourceIndex(idx), owner(o) {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    hoverAnimationController.setValueChangedCallback ([this] (auto value) {
+        hoverProgress = static_cast<float>(value);
+        repaint();
+    });
 }
 
 void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
@@ -409,34 +413,12 @@ void ModulationSourceComponent::ModTabHandle::mouseUp(const juce::MouseEvent& e)
 
 void ModulationSourceComponent::ModTabHandle::mouseEnter(const juce::MouseEvent&) {
     isHovering = true;
-    float startP = hoverProgress;
-    hoverAnim = juce::ValueAnimatorBuilder{}
-        .withOnStartReturningValueChangedCallback([this, startP] {
-            return [this, startP](float p) {
-                hoverProgress = startP + p * (1.0f - startP);
-                repaint();
-            };
-        })
-        .withDurationMs(150.0)
-        .build();
-    hoverAnim->start();
-    hoverAnimUpdater.addAnimator(*hoverAnim);
+    hoverAnimationController.animateTo (true, 150, juce::Easings::createEaseOut());
 }
 
 void ModulationSourceComponent::ModTabHandle::mouseExit(const juce::MouseEvent&) {
     isHovering = false;
-    float startP = hoverProgress;
-    hoverAnim = juce::ValueAnimatorBuilder{}
-        .withOnStartReturningValueChangedCallback([this, startP] {
-            return [this, startP](float p) {
-                hoverProgress = startP * (1.0f - p);
-                repaint();
-            };
-        })
-        .withDurationMs(150.0)
-        .build();
-    hoverAnim->start();
-    hoverAnimUpdater.addAnimator(*hoverAnim);
+    hoverAnimationController.animateTo (false, 150, juce::Easings::createEaseOut());
 }
 
 void ModulationSourceComponent::ModTabHandle::resized() {

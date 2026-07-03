@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 
-#include "../CustomMidiKeyboardComponent.h"
 #include <osci_gui/osci_gui.h>
 
 #include "../../LookAndFeel.h"
@@ -63,7 +62,6 @@ private:
     juce::CustomMidiKeyboardComponent keyboard;
 
     bool examplesVisible = false;
-    bool frameSettingsVisible = false;
 
     // Horizontal layout for top section: visColumn | resizer | effectsColumn
     juce::StretchableLayoutManager mainLayout;

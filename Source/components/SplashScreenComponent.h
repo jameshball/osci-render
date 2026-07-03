@@ -12,6 +12,7 @@ public:
     std::function<void()> onUpgradeClicked;
 
 protected:
+    juce::Point<int> getPreferredPanelSize() const override;
     void resizeContent(juce::Rectangle<int> contentArea) override;
 
 private:

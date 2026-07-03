@@ -2,7 +2,6 @@
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
 #include <osci_gui/osci_gui.h>
-#include <osci_gui/osci_gui.h>
 #include "../../PluginEditor.h"
 #include <unordered_set>
 #include <algorithm>

@@ -24,14 +24,6 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
         return;
     }
 
-#if OSCI_PREMIUM
-    if (! licenseManager.hasPremium()) {
-        midiMessages.clear();
-        buffer.clear();
-        return;
-    }
-#endif
-
     juce::AudioBuffer<float> input = getBusBuffer(buffer, true, 0);
     juce::AudioBuffer<float> output = getBusBuffer(buffer, false, 0);
     const float EPSILON = 0.0001f;
@@ -68,7 +60,7 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
     workBuffer.setSize(6, numSamples, false, true, true);
     auto sourceArray = sourceBuffer.getArrayOfReadPointers();
     auto workArray = workBuffer.getArrayOfWritePointers();
-    
+
     // Copy X and Y channels
     for (int ch = 0; ch < 2; ++ch) {
         if (sourceBuffer.getNumChannels() > ch) {
@@ -77,7 +69,7 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
             juce::FloatVectorOperations::clear(workArray[ch], numSamples);
         }
     }
-    
+
     // Detect brightness mode: check if channel 2 has any signal > EPSILON
     if (!brightnessEnabled && sourceBuffer.getNumChannels() > 2 && !forceDisableBrightnessInput) {
         auto range = juce::FloatVectorOperations::findMinAndMax(sourceArray[2], numSamples);
@@ -85,14 +77,14 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
             brightnessEnabled = true;
         }
     }
-    
+
     // Detect RGB mode: check if channels 3 or 4 have any signal > EPSILON
     bool haveG = sourceBuffer.getNumChannels() > 3;
     bool haveB = sourceBuffer.getNumChannels() > 4;
     if (!rgbEnabled && !forceDisableRgbInput && (haveG || haveB)) {
         bool hasGSignal = false;
         bool hasBSignal = false;
-        
+
         if (haveG) {
             auto gRange = juce::FloatVectorOperations::findMinAndMax(sourceArray[3], numSamples);
             hasGSignal = std::abs(gRange.getStart()) > EPSILON || std::abs(gRange.getEnd()) > EPSILON;
@@ -101,29 +93,29 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
             auto bRange = juce::FloatVectorOperations::findMinAndMax(sourceArray[4], numSamples);
             hasBSignal = std::abs(bRange.getStart()) > EPSILON || std::abs(bRange.getEnd()) > EPSILON;
         }
-        
+
         if (hasGSignal || hasBSignal) {
             rgbEnabled = true;
         }
     }
-    
+
     // Populate remaining channels based on detected mode
     if (rgbEnabled && !forceDisableRgbInput) {
         // RGB mode: z = 1.0; r = ch2 (or 1.0 if unavailable); g = ch3 (or 0.0); b = ch4 (or 0.0)
         juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
-        
+
         if (sourceBuffer.getNumChannels() > 2) {
             juce::FloatVectorOperations::copy(workArray[3], sourceArray[2], numSamples);
         } else {
             juce::FloatVectorOperations::fill(workArray[3], 1.0f, numSamples);
         }
-        
+
         if (haveG) {
             juce::FloatVectorOperations::copy(workArray[4], sourceArray[3], numSamples);
         } else {
             juce::FloatVectorOperations::clear(workArray[4], numSamples);
         }
-        
+
         if (haveB) {
             juce::FloatVectorOperations::copy(workArray[5], sourceArray[4], numSamples);
         } else {
@@ -136,12 +128,12 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
         } else {
             juce::FloatVectorOperations::fill(workArray[2], 1.0f, numSamples);
         }
-        
+
         juce::FloatVectorOperations::fill(workArray[3], 1.0f, numSamples);
         juce::FloatVectorOperations::clear(workArray[4], numSamples);
         juce::FloatVectorOperations::clear(workArray[5], numSamples);
     }
-    
+
     // Clamp brightness channel
     juce::FloatVectorOperations::clip(workBuffer.getWritePointer(2), workBuffer.getReadPointer(2), 0.0f, 1.0f, numSamples);
 
@@ -184,11 +176,11 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     // we need to stop recording the visualiser when saving the state, otherwise
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
-    
+
     if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
         haltRecording();
     }
-    
+
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
@@ -221,7 +213,7 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     recordingParameters.save(xml.get());
 
     midiCCManager.save(xml.get());
-    
+
     saveProperties(*xml);
 
     copyXmlToBinary(*xml, destData);
@@ -291,7 +283,7 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         }
 
         recordingParameters.load(xml.get());
-        
+
         loadProperties(*xml);
 
         loadMidiCCState(xml.get());

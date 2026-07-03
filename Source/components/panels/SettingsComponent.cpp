@@ -5,9 +5,8 @@
 #include "../../audio/modulation/EnvState.h"
 #include "../../audio/modulation/LfoState.h"
 #include "../../parser/FileParser.h"
-#include "../CustomMidiKeyboardComponent.h"
 #if OSCI_PREMIUM
-#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include <osci_standalone/osci_standalone.h>
 #endif
 
 // ============================================================================
@@ -81,7 +80,6 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
 #endif
     addAndMakeVisible(midi);
-    addChildComponent(quickControls);
     addChildComponent(frame);
 #if OSCI_PREMIUM
     addChildComponent(fractalEditor);
@@ -194,6 +192,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
 
     double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));
+    double mainLayoutModSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutModSize", -0.35));
 
 #if !OSCI_PREMIUM
     {
@@ -278,6 +277,7 @@ void SettingsComponent::resized() {
 }
 
 void SettingsComponent::layoutChildren() {
+    auto padding = 7;
     static constexpr int kGap = 3; // small gap between stacked panels
 
     auto area = getLocalBounds();
@@ -317,9 +317,7 @@ void SettingsComponent::layoutChildren() {
     // --- Effects column (shared by both modes) ---
     auto layoutEffectsColumn = [&](juce::Rectangle<int> effectsBounds) {
         if (!examplesVisible) {
-            frame.setVisible(frameSettingsVisible);
-            if (frameSettingsVisible) {
-                frame.resized();
+            if (frame.isVisible()) {
                 int preferredHeight = frame.getPreferredHeight();
                 frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
                 effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
@@ -561,45 +559,33 @@ void SettingsComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
     g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), osci::LookAndFeel::RECT_RADIUS);
 
-    if (! keyboardPanelBounds.isEmpty()) {
+    if (!keyboardPanelBounds.isEmpty()) {
         g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
         g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) osci::LookAndFeel::RECT_RADIUS);
 
     }
 }
 
-// syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
-    frameSettingsVisible = false;
     frame.setVisible(false);
 #if OSCI_PREMIUM
     fractalEditor.setVisible(false);
 #endif
 
-    // Check if the file is an image based on extension or Syphon/Spout input
-    bool isSyphonActive = false;
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    isSyphonActive = audioProcessor.syphonInputActive;
-#endif
-
-    bool isImage = isSyphonActive ||
-                   (extension == ".gif" ||
+    bool isImage = extension == ".gif" ||
                     extension == ".png" ||
                     extension == ".jpg" ||
                     extension == ".jpeg" ||
                     extension == ".mov" ||
-                    extension == ".mp4");
-
-    bool isAnimated = extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4"
+                    extension == ".mp4";
+    bool isLottie = false;
 #if OSCI_PREMIUM
-            || isLottieExtension(extension)
+    isLottie = extension == ".lottie" || extension == ".json" || extension == ".lot";
 #endif
-            ;
-    quickControls.setAnimated(isAnimated);
 
-    // Skip processing if object server is rendering or if no file is selected and no Syphon input
-    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !isSyphonActive);
+    const bool textureInputActive = audioProcessor.isTextureInputActive();
+    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !textureInputActive);
 
     if (skipProcessing) {
         // do nothing
@@ -614,10 +600,10 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if ((isAnimated && !juce::JUCEApplicationBase::isStandaloneApp()) || isImage) {
-        frameSettingsVisible = true;
-        frame.setAnimated(isAnimated);
-        frame.setImage(isImage);
+    } else if (textureInputActive || extension == ".gpla" || isImage || isLottie) {
+        frame.setVisible(true);
+        frame.setAnimated(!textureInputActive && (extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4" || isLottie));
+        frame.setImage(textureInputActive || isImage);
         frame.resized();
     }
     fileControls.updateFileLabel();
@@ -625,6 +611,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 }
 
 void SettingsComponent::update() {
+    frame.update();
 }
 
 void SettingsComponent::mouseMove(const juce::MouseEvent& event) {

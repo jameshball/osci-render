@@ -761,16 +761,29 @@ void LfoComponent::setMidiEnabled(bool enabled) {
     if (enabled) {
         modeControl.setModes(getAllLfoModePairs());
     } else {
-        // Only Free mode when MIDI is off
-        modeControl.setModes({
+        const bool pluginHost = !juce::JUCEApplicationBase::isStandaloneApp();
+        std::vector<std::pair<int, juce::String>> allowedModes = {
             { static_cast<int>(LfoMode::Free), "Free" },
-        });
-        // Force Free mode on ALL LFO sources, not just the visible one
+        };
+        if (pluginHost) {
+            allowedModes.push_back({ static_cast<int>(LfoMode::Sync), "Sync" });
+        }
+
+        modeControl.setModes(allowedModes);
+        if (pluginHost) {
+            audioProcessor.lfoParameters.switchUnmodifiedFreeToSync();
+        }
+
         for (int i = 0; i < NUM_LFOS; ++i) {
-            if (audioProcessor.lfoParameters.getMode(i) != LfoMode::Free)
-                audioProcessor.lfoParameters.setMode(i, LfoMode::Free);
+            LfoMode mode = audioProcessor.lfoParameters.getMode(i);
+            const bool modeAllowed = mode == LfoMode::Free || (pluginHost && mode == LfoMode::Sync);
+            if (!modeAllowed) {
+                audioProcessor.lfoParameters.setMode(i, pluginHost ? LfoMode::Sync : LfoMode::Free);
+            }
         }
     }
+
+    modeControl.syncFromProcessor();
 }
 
 void LfoComponent::copyWaveformToClipboard() {
