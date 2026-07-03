@@ -2,6 +2,7 @@
 #include "CommonPluginEditor.h"
 #include "components/LicenseAndUpdatesComponent.h"
 #include "components/OfflineRenderOverlay.h"
+#include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
 #include <osci_standalone/osci_standalone.h>
 
@@ -151,10 +152,10 @@ void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
                 if (file.getFileExtension().toLowerCase() == "." + projectFileType.toLowerCase()) {
                     openProject(file);
                 } else {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "Invalid file type: " + file.getFullPathName());
+                    osci::showOverlayMessage(*this, "Invalid Command Line", "Invalid file type: " + file.getFullPathName());
                 }
             } else {
-                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "File not found: " + filePath);
+                osci::showOverlayMessage(*this, "Invalid Command Line", "File not found: " + filePath);
             }
         }
     }
@@ -558,10 +559,9 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 if (resultHolder != nullptr && resultHolder->has_value()) {
                     const auto& r = resultHolder->value();
                     if (!r.success && !r.cancelled) {
-                        juce::AlertWindow::showMessageBoxAsync(
-                            juce::AlertWindow::WarningIcon,
-                            "Render Failed",
-                            r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+                        osci::showOverlayMessage(*safeThis.getComponent(),
+                                                 "Render Failed",
+                                                 r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
                     }
                 }
             };

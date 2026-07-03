@@ -3,6 +3,7 @@
 #include "../CommonPluginEditor.h"
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
+#include "../components/OverlayDialogHelpers.h"
 #include "VisualiserTextureAssets.h"
 
 #include <cstdint>
@@ -168,11 +169,13 @@ VisualiserComponent::VisualiserComponent(
                 if (ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height, 3000) == 0) {
                     record.setToggleState(false, juce::NotificationType::dontSendNotification);
 
-                    juce::MessageManager::callAsync([this] {
-                        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                            "Recording Error",
-                            "An error occurred while writing the video frame to the ffmpeg process. Recording has been stopped.",
-                            "OK");
+                    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+                    juce::MessageManager::callAsync([safeThis] {
+                        if (safeThis != nullptr) {
+                            osci::showOverlayMessage(*safeThis.getComponent(),
+                                                     "Recording Error",
+                                                     "An error occurred while writing the video frame to the ffmpeg process. Recording has been stopped.");
+                        }
                     });
                 }
             }
@@ -455,15 +458,14 @@ void VisualiserComponent::setRecording(bool recording) {
             if (!ffmpegProcess.start(cmd)) {
                 juce::Logger::writeToLog("Recording: ffmpegProcess.start() failed for command: " + cmd);
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
-                juce::MessageManager::callAsync([this] {
-                    juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                        .withTitle("Recording Error")
-                        .withMessage("Failed to start the FFmpeg video encoder.\n\n"
-                                     "Please check that FFmpeg is compatible with your system.")
-                        .withButton("OK")
-                        .withIconType(juce::AlertWindow::WarningIcon)
-                        .withAssociatedComponent(this);
-                    juce::AlertWindow::showAsync(options, nullptr);
+                juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+                juce::MessageManager::callAsync([safeThis] {
+                    if (safeThis != nullptr) {
+                        osci::showOverlayMessage(*safeThis.getComponent(),
+                                                 "Recording Error",
+                                                 "Failed to start the FFmpeg video encoder.\n\n"
+                                                 "Please check that FFmpeg is compatible with your system.");
+                    }
                 });
                 return;
             }
@@ -760,10 +762,9 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
 
     const Texture renderTexture = getRenderTexture();
     if (renderTexture.id == 0 || renderTexture.width <= 0 || renderTexture.height <= 0) {
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                               "Texture Output",
-                                               "Texture output cannot start until the visualiser has rendered a frame.",
-                                               "OK");
+        osci::showOverlayMessage(*this,
+                                 "Texture Output",
+                                 "Texture output cannot start until the visualiser has rendered a frame.");
         refreshTextureOutputButton();
         requestTextureOutputService();
         return;
@@ -774,10 +775,7 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
         const juce::String message = status.message.isNotEmpty()
             ? status.message
             : "Texture output is not available in this build.";
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-                                               "Texture Output",
-                                               message,
-                                               "OK");
+        osci::showOverlayMessage(*this, "Texture Output", message, osci::ErrorOverlay::Icon::None);
         refreshTextureOutputButton();
         requestTextureOutputService();
         return;
@@ -850,10 +848,10 @@ void VisualiserComponent::handleTextureOutputServiceResult(osci::texture::Servic
         if (result.failed()) {
             const bool publishFailure = result.error == osci::texture::ErrorCode::publishFailed
                 || result.error == osci::texture::ErrorCode::invalidTexture;
-            juce::AlertWindow::showMessageBoxAsync(publishFailure ? juce::MessageBoxIconType::WarningIcon : juce::MessageBoxIconType::InfoIcon,
-                                                   "Texture Output",
-                                                   result.message,
-                                                   "OK");
+            osci::showOverlayMessage(*safeThis.getComponent(),
+                                     "Texture Output",
+                                     result.message,
+                                     publishFailure ? osci::ErrorOverlay::Icon::Warning : osci::ErrorOverlay::Icon::None);
         }
     });
 }

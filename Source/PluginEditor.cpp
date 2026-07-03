@@ -7,6 +7,7 @@
 #include "PluginProcessor.h"
 #include "parser/FileParser.h"
 #include "components/effects/EffectComponent.h"
+#include "components/OverlayDialogHelpers.h"
 
 namespace {
     constexpr double kDefaultCodeEditorMainPanelSize = -0.7;
@@ -172,18 +173,12 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
         const juce::String message = status.message.isNotEmpty()
             ? status.message
             : "Texture input is not available in this build.";
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-                                               "Texture Input",
-                                               message,
-                                               "OK");
+        osci::showOverlayMessage(*this, "Texture Input", message, osci::ErrorOverlay::Icon::None);
         return;
     }
 
     if (source.displayName.trim().isEmpty() && source.opaqueId.trim().isEmpty()) {
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                               "Texture Input",
-                                               "The selected texture source is no longer available.",
-                                               "OK");
+        osci::showOverlayMessage(*this, "Texture Input", "The selected texture source is no longer available.");
         return;
     }
 
@@ -214,10 +209,7 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
 
         safeThis->audioProcessor.stopTextureInput();
         safeThis->textureInputFrameGrabber = nullptr;
-        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
-                                               "Texture Input",
-                                               message,
-                                               "OK");
+        osci::showOverlayMessage(*safeThis.getComponent(), "Texture Input", message);
     };
     grabber->frameReady = [processor = &audioProcessor](const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
         processor->updateTextureInputFrame(rgba, width, height, verticallyFlipped);

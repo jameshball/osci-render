@@ -10,6 +10,7 @@
 #include "CommonPluginEditor.h"
 #include "JucewrightAutomation.h"
 #include "audio/OutputClip.h"
+#include "components/OverlayDialogHelpers.h"
 
 namespace
 {
@@ -737,13 +738,13 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
 #endif
                 ;
 
-            juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                .withTitle("FFmpeg Incompatible")
-                .withMessage(message)
-                .withButton("OK")
-                .withIconType(juce::AlertWindow::WarningIcon)
-                .withAssociatedComponent(editor);
-            juce::AlertWindow::showAsync(options, nullptr);
+            osci::showOverlayMessageOrAlert(editor,
+                                            "FFmpeg Incompatible",
+                                            message,
+                                            osci::ErrorOverlay::Icon::Warning,
+                                            juce::MessageBoxIconType::WarningIcon,
+                                            { 500, 360 },
+                                            juce::Justification::centredTop);
             return false;
         }
 
@@ -767,25 +768,29 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
         }
     };
 
-    // Ask the user if they want to download ffmpeg
-    juce::MessageBoxOptions options = juce::MessageBoxOptions()
-        .withTitle("FFmpeg Required")
-        .withMessage("FFmpeg is required to process video files.\n\nWould you like to download it now?")
-        .withButton("Yes")
-        .withButton("No")
-        .withIconType(juce::AlertWindow::QuestionIcon)
-        .withAssociatedComponent(editor);
+    auto safeEditor = juce::Component::SafePointer<CommonPluginEditor>(editor);
+    osci::showOverlayConfirmationOrAlert(
+        editor,
+        "FFmpeg Required",
+        "FFmpeg is required to process video files.\n\nWould you like to download it now?",
+        "Yes",
+        "No",
+        [this, onStart, safeEditor] {
+            if (safeEditor == nullptr) {
+                return;
+            }
 
-    juce::AlertWindow::showAsync(options, [this, onStart, editor](int result) {
-        if (result == 1) {  // Yes
-            editor->ffmpegDownloader.setVisible(true);
-            editor->ffmpegDownloader.download();
+            auto* editorComponent = safeEditor.getComponent();
+            editorComponent->ffmpegDownloader.setVisible(true);
+            editorComponent->ffmpegDownloader.download();
             if (onStart != nullptr) {
                 onStart();
             }
-            editor->resized();
-        }
-    });
+            editorComponent->resized();
+        },
+        {},
+        osci::ErrorOverlay::Icon::Warning,
+        { 460, 280 });
 
     return false;
 }
