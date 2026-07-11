@@ -47,6 +47,7 @@ class BrowserSession:
         app_path_env = os.environ.get("APP_PATH") or os.environ.get("APP_BUNDLE")
         self.app_path = Path(args.app_path or app_path_env or default_app_path(self.root_dir)).resolve()
         self.app_executable = Path(args.app_executable or os.environ.get("APP_EXECUTABLE", default_app_executable(self.app_path))).resolve()
+        self.audio_output = (args.audio_output or os.environ.get("AUTOMATION_AUDIO_OUTPUT", "")).strip() or None
         self.jucewright = Path(args.jucewright or os.environ.get("JUCEWRIGHT", "")).resolve() if (args.jucewright or os.environ.get("JUCEWRIGHT")) else None
         self.jucewright_build_dir = Path(os.environ.get("JUCEWRIGHT_BUILD_DIR", default_build_dir())).resolve()
 
@@ -142,7 +143,7 @@ class BrowserSession:
         self.optional_failures.append(f"{label} (exit 1): {file}")
 
     def die(self, message: str) -> None:
-        raise SystemExit(message)
+        raise StepError(message)
 
     def find_jucewright(self) -> bool:
         if self.jucewright is not None and is_executable(self.jucewright):
@@ -301,16 +302,39 @@ class BrowserSession:
         if not settings_file:
             self.die("Jucewright profile output did not include a settingsFile; refusing to launch without disabling audio input.")
 
-        audio_output = self.disable_profile_audio_input(Path(settings_file))
+        audio_output = self.disable_profile_audio_input(Path(settings_file), self.audio_output)
         profile["disabledAudioInput"] = True
         profile["audioOutputDeviceName"] = audio_output
         if not audio_output:
             self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
 
+        profile["ffmpegFile"] = self.copy_profile_ffmpeg(profile, launch_home)
+
         return profile
 
+    def copy_profile_ffmpeg(self, profile: dict, launch_home: Path) -> str | None:
+        support_directory_value = profile.get("supportDirectory")
+        if not support_directory_value:
+            return None
+
+        support_directory = Path(support_directory_value)
+        try:
+            relative_support_directory = support_directory.relative_to(launch_home)
+        except ValueError:
+            return None
+
+        executable_name = "ffmpeg.exe" if is_windows() else "ffmpeg"
+        source = self.source_home / relative_support_directory / "osci-render" / executable_name
+        if not source.is_file():
+            return None
+
+        destination = support_directory / "osci-render" / executable_name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        return str(destination)
+
     @staticmethod
-    def disable_profile_audio_input(settings_file: Path) -> str | None:
+    def disable_profile_audio_input(settings_file: Path, audio_output_override: str | None = None) -> str | None:
         if settings_file.exists():
             tree = ET.parse(settings_file)
             root = tree.getroot()
@@ -334,6 +358,8 @@ class BrowserSession:
         setup.set("audioInputDeviceName", "")
         setup.set("audioDeviceInChans", "0")
         setup.attrib.pop("audioDeviceOutChans", None)
+        if audio_output_override is not None:
+            setup.set("audioOutputDeviceName", audio_output_override)
         audio_output = setup.get("audioOutputDeviceName")
 
         for midi_input in list(setup.findall("MIDIINPUT")):
