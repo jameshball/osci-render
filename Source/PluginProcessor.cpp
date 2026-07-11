@@ -1266,7 +1266,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
 
-    if (!creatingFeedbackSnapshot.load(std::memory_order_acquire) && haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
+    if (!creatingFeedbackSnapshot && haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
         haltRecording();
     }
 
