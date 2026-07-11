@@ -59,23 +59,6 @@ juce::String feedbackBuild(juce::StringRef version) {
     return parts.isEmpty() ? juce::String() : parts[parts.size() - 1];
 }
 
-osci::FeedbackAttachmentData encodeFeedbackScreenshot(const juce::Image& image, juce::StringRef productSlug) {
-    osci::FeedbackAttachmentData attachment;
-    if (!image.isValid()) {
-        return attachment;
-    }
-    juce::PNGImageFormat png;
-    juce::MemoryOutputStream output(attachment.data, false);
-    if (!png.writeImageToStream(image, output)) {
-        attachment.data.reset();
-        return attachment;
-    }
-    attachment.kind = osci::FeedbackAttachmentKind::screenshot;
-    attachment.filename = juce::String(productSlug) + "-ui.png";
-    attachment.contentType = "image/png";
-    return attachment;
-}
-
 juce::var feedbackClientContext(CommonAudioProcessor& processor) {
     auto* object = new juce::DynamicObject();
     object->setProperty("juce_version", juce::SystemStats::getJUCEVersion());
@@ -570,12 +553,16 @@ void CommonPluginEditor::openFeedback() {
 
     auto screenshot = createComponentSnapshot(getLocalBounds(), true, 1.0f);
     feedback.automaticScreenshotPreview = screenshot;
-    feedback.automaticScreenshot = encodeFeedbackScreenshot(screenshot, feedback.context.productSlug);
+    feedback.automaticScreenshot.kind = osci::FeedbackAttachmentKind::screenshot;
+    feedback.automaticScreenshot.filename = feedback.context.productSlug + "-ui.png";
+    feedback.automaticScreenshot.contentType = "image/png";
 
     feedback.projectSnapshot.kind = osci::FeedbackAttachmentKind::project;
     feedback.projectSnapshot.filename = feedback.context.productSlug + "-feedback." + projectFileType;
     feedback.projectSnapshot.contentType = "application/octet-stream";
-    audioProcessor.getFeedbackProjectSnapshot(feedback.projectSnapshot.data);
+    feedback.projectSnapshotProvider = [processor = &audioProcessor](juce::MemoryBlock& destination) {
+        processor->getFeedbackProjectSnapshot(destination);
+    };
 
 #if DEBUG
     const auto automationBaseUrl = juce::SystemStats::getEnvironmentVariable("OSCI_FEEDBACK_API_BASE_URL", {});
