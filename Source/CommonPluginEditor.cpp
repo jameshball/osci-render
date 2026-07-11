@@ -27,8 +27,10 @@ juce::String feedbackOsName() {
 }
 
 juce::String feedbackArchitecture() {
-#if JUCE_ARM64
+#if JUCE_ARM && JUCE_64BIT
     return "arm64";
+#elif JUCE_ARM
+    return "arm";
 #elif JUCE_64BIT
     return "x86_64";
 #elif JUCE_INTEL

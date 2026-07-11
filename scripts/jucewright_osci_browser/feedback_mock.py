@@ -30,13 +30,24 @@ class FeedbackMockServer:
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
+        sanitized_submission = None
+        if self.submission is not None:
+            sanitized_submission = dict(self.submission)
+            if sanitized_submission.get("license_token"):
+                sanitized_submission["license_token"] = "<redacted>"
         payload = {
             "descriptors": list(self.upload_descriptors.values()),
             "uploadSizes": {key: len(value) for key, value in self.uploads.items()},
-            "submission": self.submission,
+            "submission": sanitized_submission,
             "errors": self.errors,
         }
         (self.artifact_dir / "feedback-mock.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        for index, (upload_id, body) in enumerate(self.uploads.items(), start=1):
+            descriptor = self.upload_descriptors.get(upload_id, {})
+            if descriptor.get("kind") != "screenshot":
+                continue
+            filename = Path(str(descriptor.get("filename") or f"screenshot-{index}.png")).name
+            (self.artifact_dir / f"submitted-{index}-{filename}").write_bytes(body)
 
     def assert_valid_submission(self) -> str:
         if self.errors:
@@ -56,6 +67,10 @@ class FeedbackMockServer:
             raise AssertionError("diagnostic log was not supplied")
         if not isinstance(self.submission.get("client_context"), dict):
             raise AssertionError("client context was not supplied")
+        platform = str(self.submission.get("platform") or "")
+        architecture = self.submission.get("architecture")
+        if platform.endswith("-arm64") and architecture != "arm64":
+            raise AssertionError("ARM64 build reported the wrong architecture")
 
         submitted_ids = self.submission.get("upload_ids") or []
         descriptors = [self.upload_descriptors.get(value) for value in submitted_ids]
