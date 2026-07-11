@@ -64,6 +64,7 @@ private:
     int pendingLiveHeight = 0;
     bool pendingLiveFrameAvailable = false;
     bool liveInput = false;
+    bool waitingForFFmpeg = false;
     int currentX, currentY;
     int width = -1;
     int height = -1;
