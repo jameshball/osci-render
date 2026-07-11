@@ -121,6 +121,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
         };
         aboutInfo.websiteUrl = "https://osci-render.com";
         aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
+        aboutInfo.onReportIssue = [this] { editor.openFeedback(); };
         aboutInfo.credits = {
             { "Neil Thapen",    "Allowing adaptation of the brilliant dood.al/oscilloscope" },
             { "Kevin Kripper",  "Guiding much of the features and development of sosci" },
@@ -132,6 +133,9 @@ void SosciMainMenuBarModel::resetMenuItems() {
     });
     addMenuItem(aboutMenu, "License and Updates...", [&]() {
         editor.openLicenseAndUpdates();
+    });
+    addMenuItem(aboutMenu, "Send Feedback...", [this] {
+        editor.openFeedback();
     });
     addDiagnosticsMenuItems(aboutMenu, processor);
 

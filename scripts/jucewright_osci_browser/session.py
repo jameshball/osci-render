@@ -52,6 +52,7 @@ class BrowserSession:
 
         self.build_app_requested = args.build_app
         self.quick = args.quick
+        self.feedback_only = args.feedback_only
         self.keep_app = args.keep_app
         self.include_native = args.native_dialogs
         self.step = 0
