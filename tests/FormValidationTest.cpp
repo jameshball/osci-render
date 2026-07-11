@@ -93,6 +93,15 @@ public:
         expect(form.getResult().isValid());
         form.resetValidation();
         expect(!form.hasBeenSubmitted());
+
+        beginTest("Form field labels expose required semantics");
+        osci::FormFieldLabel fieldLabel("Contact email", true);
+        expectEquals(fieldLabel.getFieldName(), juce::String("Contact email"));
+        expect(fieldLabel.isRequired());
+        expect(fieldLabel.getText().containsIgnoreCase("required"));
+        fieldLabel.setRequired(false);
+        expect(!fieldLabel.isRequired());
+        expect(!fieldLabel.getText().containsIgnoreCase("required"));
     }
 };
 
