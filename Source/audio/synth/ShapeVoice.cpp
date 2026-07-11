@@ -16,7 +16,7 @@ void ShapeVoice::initializeEffectsFromGlobal() {
         if (simpleEffect) {
             auto cloned = simpleEffect->cloneWithSharedParameters();
             // Initialize the effect with current sample rate
-            const double sampleRate = audioProcessor.currentSampleRate.load();
+            const double sampleRate = audioProcessor.getEffectiveSampleRate();
             if (sampleRate > 0) {
                 cloned->prepareToPlay(sampleRate, 512);
             }
@@ -29,7 +29,7 @@ void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
     if (effect) {
         voicePreviewEffect = effect->cloneWithSharedParameters();
         // Initialize the effect with current sample rate
-        const double sampleRate = audioProcessor.currentSampleRate.load();
+        const double sampleRate = audioProcessor.getEffectiveSampleRate();
         if (sampleRate > 0) {
             voicePreviewEffect->prepareToPlay(sampleRate, 512);
         }
@@ -284,7 +284,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     frameSyncBuffer.clear();
 
     const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
-    const double sampleRate = audioProcessor.currentSampleRate.load();
+    const double sampleRate = audioProcessor.getEffectiveSampleRate();
     const double dt = 1.0 / sampleRate;
 
     // Snapshot DAW transport once per block (constant within a processBlock call)
