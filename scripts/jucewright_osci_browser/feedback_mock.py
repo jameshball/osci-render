@@ -125,7 +125,7 @@ class FeedbackMockServer:
                             uploads.append({
                                 "id": upload_id,
                                 "kind": descriptor["kind"],
-                                "url": f"{owner.base_url}/upload/{upload_id}",
+                                "url": f"{owner.base_url}/upload/{upload_id}?signature=feedback-test",
                                 "method": "PUT",
                                 "headers": {"Content-Type": descriptor["content_type"]},
                             })
@@ -145,10 +145,15 @@ class FeedbackMockServer:
                     self._send(500, {"success": False, "error": "mock failure"})
 
             def do_PUT(self) -> None:
-                upload_id = urlparse(self.path).path.rsplit("/", 1)[-1]
+                parsed = urlparse(self.path)
+                upload_id = parsed.path.rsplit("/", 1)[-1]
                 descriptor = owner.upload_descriptors.get(upload_id)
                 if descriptor is None:
                     self._send(404, {"success": False, "error": "unknown upload"})
+                    return
+                if parsed.query != "signature=feedback-test":
+                    owner.errors.append("signed upload query was not preserved")
+                    self._send(400, {"success": False, "error": "invalid upload signature"})
                     return
                 size = int(self.headers.get("Content-Length", "0"))
                 owner.uploads[upload_id] = self.rfile.read(size)
