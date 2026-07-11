@@ -271,7 +271,7 @@ void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> ove
         visualiser.setVisible(false);
     }
 
-    if (!overlay->lightweight) {
+    if (!overlay->lightweight && !overlay->hasCapturedBackdrop()) {
         overlay->captureBackdropFrom(*this);
     }
 
@@ -570,7 +570,9 @@ void CommonPluginEditor::openFeedback() {
         feedback.backend.apiBaseUrl = automationBaseUrl;
     }
 #endif
-    showOverlay(std::make_unique<osci::FeedbackOverlay>(std::move(feedback)));
+    auto overlay = std::make_unique<osci::FeedbackOverlay>(std::move(feedback));
+    overlay->captureBackdropFrom(screenshot);
+    showOverlay(std::move(overlay));
 }
 
 void CommonPluginEditor::openRecordingSettings() {
