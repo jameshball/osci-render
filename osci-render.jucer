@@ -301,6 +301,10 @@
           <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
         </GROUP>
+        <GROUP id="{AUD_PLATFORM}" name="platform">
+          <FILE id="IsrCtl" name="InternalSampleRateController.h" compile="0"
+                resource="0" file="Source/audio/platform/InternalSampleRateController.h"/>
+        </GROUP>
         <GROUP id="{AUD_WAV}" name="wav"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
@@ -440,6 +444,10 @@
                 file="Source/components/timeline/TimelineLookAndFeel.h"/>
         </GROUP>
         <GROUP id="{CMP_MENU}" name="menu">
+          <FILE id="IsrMnuC" name="InternalSampleRateMenu.cpp" compile="1" resource="0"
+                file="Source/components/menu/InternalSampleRateMenu.cpp"/>
+          <FILE id="IsrMnuH" name="InternalSampleRateMenu.h" compile="0" resource="0"
+                file="Source/components/menu/InternalSampleRateMenu.h"/>
           <FILE id="CfBFAE" name="MainMenuBarModel.cpp" compile="1" resource="0"
                 file="Source/components/menu/MainMenuBarModel.cpp"/>
           <FILE id="ubDcnO" name="MainMenuBarModel.h" compile="0" resource="0"
