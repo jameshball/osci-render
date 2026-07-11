@@ -46,22 +46,13 @@ namespace {
         static juce::SpinLock l;
         return l;
     }
-    int& initializerCount() {
-        static int c = 0;
-        return c;
-    }
     void acquireThorVG() {
         juce::SpinLock::ScopedLockType sl(initializerLock());
-        if (initializerCount() == 0) {
-            tvg::Initializer::init(0);
-        }
-        ++initializerCount();
+        tvg::Initializer::init(0);
     }
     void releaseThorVG() {
         juce::SpinLock::ScopedLockType sl(initializerLock());
-        if (--initializerCount() == 0) {
-            tvg::Initializer::term();
-        }
+        tvg::Initializer::term();
     }
 
     // Walk from `leaf` up to (but not including) `root`, multiplying each
@@ -538,13 +529,12 @@ void OsciLottieParser::extractShapesAtCurrentFrame(std::vector<std::unique_ptr<o
     };
 
     struct Ctx {
-        OsciLottieParser* self;
         const tvg::Paint* root;
         const std::unordered_set<const tvg::Paint*>* maskTargets;
         std::vector<CollectedShape>* collected;
     };
     std::vector<CollectedShape> collected;
-    Ctx ctx { this, picture, &maskTargets, &collected };
+    Ctx ctx { picture, &maskTargets, &collected };
 
     std::unique_ptr<tvg::Accessor> accessor(tvg::Accessor::gen());
     accessor->set(picture, [](const tvg::Paint* paint, void* data) -> bool {
