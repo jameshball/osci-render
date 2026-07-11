@@ -533,6 +533,7 @@ void CommonPluginEditor::openFeedback() {
 
     osci::FeedbackOverlayConfig feedback;
     feedback.closeButtonSvg = juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
+    feedback.settingsButtonSvg = juce::String::createStringFromData(BinaryData::cog_svg, BinaryData::cog_svgSize);
     feedback.productDisplayName = appName;
     feedback.context.productSlug = audioProcessor.getProductSlug();
     feedback.context.productVersion = ProjectInfo::versionString;
