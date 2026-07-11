@@ -544,7 +544,7 @@ void CommonPluginEditor::openFeedback() {
     feedback.submissionProvider = [processor = &audioProcessor, wrapperType, displayScale, displayWidth, displayHeight](
                                       osci::FeedbackRequest& request,
                                       osci::FeedbackAttachmentData& projectSnapshot,
-                                      bool includeProjectSnapshot) {
+                                      osci::FeedbackOverlayConfig::SubmissionOptions options) {
         request.releaseTrack = osci::BackendClient::toString(osci::UpdateSettings(request.productSlug).releaseTrack());
         request.platform = osci::HardwareInfo::getCurrentPlatform();
         request.osName = feedbackOsName();
@@ -558,12 +558,17 @@ void CommonPluginEditor::openFeedback() {
         request.pluginFormat = feedbackPluginFormat(wrapperType);
         request.clientContextSchemaVersion = 1;
         request.clientContext = feedbackClientContext(*processor);
-        request.licenseToken = processor->licenseManager.getCachedToken();
+        const auto currentPayload = processor->licenseManager.getPayload();
+        if (currentPayload.has_value() && currentPayload->expiresAt > juce::Time::getCurrentTime()) {
+            request.licenseToken = processor->licenseManager.getCachedToken();
+        }
         request.displayScale = displayScale;
         request.displayWidth = displayWidth;
         request.displayHeight = displayHeight;
-        request.log = processor->getFeedbackLogSnapshot(request.logTruncated);
-        if (includeProjectSnapshot && projectSnapshot.data.isEmpty()) {
+        if (options.includeDiagnosticLog) {
+            request.log = processor->getFeedbackLogSnapshot(request.logTruncated);
+        }
+        if (options.includeProjectSnapshot && projectSnapshot.data.isEmpty()) {
             processor->getFeedbackProjectSnapshot(projectSnapshot.data);
         }
     };

@@ -185,7 +185,7 @@ public:
     }
     
 protected:
-    std::atomic<bool> creatingFeedbackSnapshot { false };
+    inline static thread_local bool creatingFeedbackSnapshot = false;
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;

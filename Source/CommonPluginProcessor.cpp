@@ -132,45 +132,54 @@ juce::String CommonAudioProcessor::getProductSlug() const
 }
 
 void CommonAudioProcessor::getFeedbackProjectSnapshot(juce::MemoryBlock& destData) {
-    const auto wasCreatingSnapshot = creatingFeedbackSnapshot.exchange(true, std::memory_order_acq_rel);
+    const juce::ScopedValueSetter<bool> snapshotScope(creatingFeedbackSnapshot, true);
     getStateInformation(destData);
-    creatingFeedbackSnapshot.store(wasCreatingSnapshot, std::memory_order_release);
 }
 
 juce::String CommonAudioProcessor::getFeedbackLogSnapshot(bool& truncated) const {
     constexpr size_t maxBytes = 256 * 1024;
+    constexpr juce::int64 maxSourceBytes = 1024 * 1024;
     truncated = false;
     const auto logFile = applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log");
-    auto log = logFile.loadFileAsString();
+    juce::FileInputStream stream(logFile);
+    if (!stream.openedOk()) {
+        return {};
+    }
+
+    const auto sourceStart = juce::jmax<juce::int64>(0, stream.getTotalLength() - maxSourceBytes);
+    stream.setPosition(sourceStart);
+    auto log = stream.readEntireStreamAsString();
+    if (sourceStart > 0) {
+        truncated = true;
+        log = log.fromFirstOccurrenceOf("\n", false, false);
+    }
     if (log.isEmpty()) {
         return {};
     }
 
+    const juce::StringArray safePrefixes {
+        "==== ",
+        "Version: ",
+        "Wrapper: ",
+        "JUCE: ",
+        "OS: ",
+        "CPU: ",
+        "RAM: ",
+        "prepareToPlay: ",
+        "getStateInformation: ",
+        "MidiCCManager::save: "
+    };
     juce::StringArray lines;
     lines.addLines(log);
     juce::String sanitized;
     for (const auto& line : lines) {
         const auto trimmed = line.trimStart();
-        if (trimmed.startsWithIgnoreCase("User:") || trimmed.startsWithIgnoreCase("Device:")) {
-            continue;
+        for (const auto& prefix : safePrefixes) {
+            if (trimmed.startsWith(prefix)) {
+                sanitized << trimmed << "\n";
+                break;
+            }
         }
-        sanitized << line << "\n";
-    }
-
-    const auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory).getFullPathName();
-    const auto username = juce::SystemStats::getLogonName();
-    const auto computerName = juce::SystemStats::getComputerName();
-    if (home.isNotEmpty()) {
-        sanitized = sanitized.replace(home, "<home>");
-    }
-    if (username.isNotEmpty()) {
-        sanitized = sanitized.replace(username, "<user>");
-    }
-    if (computerName.isNotEmpty()) {
-        sanitized = sanitized.replace(computerName, "<computer>");
-    }
-    if (currentProjectFile.isNotEmpty()) {
-        sanitized = sanitized.replace(currentProjectFile, "<project-file>");
     }
 
     while (static_cast<size_t>(sanitized.getNumBytesAsUTF8()) > maxBytes && sanitized.length() > 0) {
@@ -230,7 +239,7 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
 {
-    if (creatingFeedbackSnapshot.load(std::memory_order_acquire)) {
+    if (creatingFeedbackSnapshot) {
         return;
     }
     if (!juce::JUCEApplicationBase::isStandaloneApp())
