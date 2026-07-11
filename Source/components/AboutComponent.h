@@ -20,8 +20,7 @@ public:
         bool isPremium = false;
         bool betaUpdatesEnabled = false;
         juce::String websiteUrl;
-        juce::String githubUrl;
-        std::function<void()> onReportIssue;
+        std::function<void()> onSendFeedback;
         std::vector<CreditEntry> credits;
         int blenderPort = -1;
         std::function<void(bool enabled)> onBetaUpdatesChanged;
@@ -41,7 +40,7 @@ private:
     Info info;
     juce::Image logo;
     juce::ImageComponent logoComponent;
-    juce::TextButton websiteBtn, discordBtn, issuesBtn;
+    juce::TextButton websiteBtn, discordBtn, feedbackBtn;
     juce::Rectangle<float> versionStatusBounds;
     juce::String betaUnlockMessage;
     int betaUnlockClicks = 0;
