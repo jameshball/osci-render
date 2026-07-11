@@ -131,6 +131,55 @@ juce::String CommonAudioProcessor::getProductSlug() const
     return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
 }
 
+void CommonAudioProcessor::getFeedbackProjectSnapshot(juce::MemoryBlock& destData) {
+    const auto wasCreatingSnapshot = creatingFeedbackSnapshot.exchange(true, std::memory_order_acq_rel);
+    getStateInformation(destData);
+    creatingFeedbackSnapshot.store(wasCreatingSnapshot, std::memory_order_release);
+}
+
+juce::String CommonAudioProcessor::getFeedbackLogSnapshot(bool& truncated) const {
+    constexpr size_t maxBytes = 256 * 1024;
+    truncated = false;
+    const auto logFile = applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log");
+    auto log = logFile.loadFileAsString();
+    if (log.isEmpty()) {
+        return {};
+    }
+
+    juce::StringArray lines;
+    lines.addLines(log);
+    juce::String sanitized;
+    for (const auto& line : lines) {
+        const auto trimmed = line.trimStart();
+        if (trimmed.startsWithIgnoreCase("User:") || trimmed.startsWithIgnoreCase("Device:")) {
+            continue;
+        }
+        sanitized << line << "\n";
+    }
+
+    const auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory).getFullPathName();
+    const auto username = juce::SystemStats::getLogonName();
+    const auto computerName = juce::SystemStats::getComputerName();
+    if (home.isNotEmpty()) {
+        sanitized = sanitized.replace(home, "<home>");
+    }
+    if (username.isNotEmpty()) {
+        sanitized = sanitized.replace(username, "<user>");
+    }
+    if (computerName.isNotEmpty()) {
+        sanitized = sanitized.replace(computerName, "<computer>");
+    }
+    if (currentProjectFile.isNotEmpty()) {
+        sanitized = sanitized.replace(currentProjectFile, "<project-file>");
+    }
+
+    while (static_cast<size_t>(sanitized.getNumBytesAsUTF8()) > maxBytes && sanitized.length() > 0) {
+        truncated = true;
+        sanitized = sanitized.substring(juce::jmin(4096, sanitized.length()));
+    }
+    return sanitized;
+}
+
 int CommonAudioProcessor::getNumRecentProjectFiles() const
 {
     return recentProjectFiles.getNumFiles();
@@ -181,6 +230,9 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
 {
+    if (creatingFeedbackSnapshot.load(std::memory_order_acquire)) {
+        return;
+    }
     if (!juce::JUCEApplicationBase::isStandaloneApp())
         return;
 

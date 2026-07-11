@@ -35,6 +35,8 @@ public:
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
+    void getFeedbackProjectSnapshot(juce::MemoryBlock& destData);
+    juce::String getFeedbackLogSnapshot(bool& truncated) const;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -183,6 +185,7 @@ public:
     }
     
 protected:
+    std::atomic<bool> creatingFeedbackSnapshot { false };
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;

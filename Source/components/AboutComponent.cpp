@@ -23,21 +23,25 @@ AboutComponent::AboutComponent(const Info& info) : info(info) {
     logoComponent.setImage(logo);
     addAndMakeVisible(logoComponent);
 
-    auto setupBtn = [this](juce::TextButton& btn, const juce::String& text, const juce::String& url, juce::Colour tint) {
+    auto setupBtn = [this](juce::TextButton& btn, const juce::String& text, std::function<void()> action, juce::Colour tint) {
         btn.setButtonText(text);
         btn.setColour(juce::TextButton::buttonColourId, tint.withAlpha(0.15f));
         btn.setColour(juce::TextButton::buttonOnColourId, tint.withAlpha(0.25f));
         btn.setColour(juce::TextButton::textColourOnId, tint);
         btn.setColour(juce::TextButton::textColourOffId, tint);
-        btn.onClick = [url]() { juce::URL(url).launchInDefaultBrowser(); };
+        btn.onClick = std::move(action);
         addAndMakeVisible(btn);
     };
 
     // Brighten Discord brand colour so its hover/contrast feels similar to the accent buttons.
     const juce::Colour discordColour = juce::Colour::fromRGB(0x58, 0x65, 0xF2).brighter(0.4f);
-    setupBtn(websiteBtn, "Website", info.websiteUrl, osci::Colours::accentColor());
-    setupBtn(discordBtn, "Join Discord", "https://discord.gg/ekjpQvT68C", discordColour);
-    setupBtn(issuesBtn, "Report Issue", info.githubUrl + "/issues", osci::Colours::accentColor());
+    setupBtn(websiteBtn, "Website", [url = info.websiteUrl] { juce::URL(url).launchInDefaultBrowser(); }, osci::Colours::accentColor());
+    setupBtn(discordBtn, "Join Discord", [] { juce::URL("https://discord.gg/ekjpQvT68C").launchInDefaultBrowser(); }, discordColour);
+    auto reportIssueAction = info.onReportIssue;
+    if (reportIssueAction == nullptr) {
+        reportIssueAction = [url = info.githubUrl + "/issues"] { juce::URL(url).launchInDefaultBrowser(); };
+    }
+    setupBtn(issuesBtn, "Send Feedback", std::move(reportIssueAction), osci::Colours::accentColor());
 
     auto sz = preferredSize(info);
     setSize(sz.x, sz.y);

@@ -21,6 +21,7 @@ public:
         bool betaUpdatesEnabled = false;
         juce::String websiteUrl;
         juce::String githubUrl;
+        std::function<void()> onReportIssue;
         std::vector<CreditEntry> credits;
         int blenderPort = -1;
         std::function<void(bool enabled)> onBetaUpdatesChanged;
