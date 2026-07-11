@@ -7,6 +7,7 @@
 #include "LfoState.h"
 #include "ModulationParameterTypes.h"
 #include "ModulationSource.h"
+#include <osci_render_core/transport/osci_DawPosition.h>
 
 // Encapsulates all DAW-automatable LFO parameters, waveform data, assignments,
 // and audio-thread state. Follows the VisualiserParameters pattern:
@@ -241,7 +242,8 @@ public:
     // === Block buffer generation (called from audio thread each processBlock) ===
     // Processes MIDI note events for LFO triggering and computes per-sample LFO values.
     template<int MaxVoices>
-    void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi, double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices], double syncStartSeconds = 0.0, bool useHostSync = false, bool hostSyncShouldAdvance = true) {
+    void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi,
+                          const osci::DawPosition& dawPosition, const std::atomic<bool> (&voiceActive)[MaxVoices]) {
         if (numSamples <= 0) return;
 
         // Process MIDI note events to drive LFO triggering for non-Free modes
@@ -308,7 +310,7 @@ public:
                 } else {
                     int tdIdx = tempoDivision[l] ? tempoDivision[l]->getValueUnnormalised() : 8;
                     int idx = juce::jlimit(0, (int)divisions.size() - 1, tdIdx);
-                    r = (float)divisions[idx].toHz(bpm, rateMd);
+                    r = (float)divisions[idx].toHz(dawPosition.bpm.load(std::memory_order_relaxed), rateMd);
                 }
                 float sr = (float)sampleRate;
                 LfoMode md = mode[l] ? (LfoMode)mode[l]->getValueUnnormalised() : LfoMode::Free;
@@ -340,17 +342,31 @@ public:
 
                 int advanceSamples = numSamples - delaySkipSamples;
                 if (advanceSamples > 0) {
-                    double segmentSyncStartSeconds = syncStartSeconds;
-                    if (useHostSync && sampleRate > 0.0)
-                        segmentSyncStartSeconds += (double)delaySkipSamples / sampleRate;
-                    audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples, r, sr, waveforms[l], md, phaseOff, segmentSyncStartSeconds, useHostSync, hostSyncShouldAdvance);
+                    if (md == LfoMode::Sync && dawPosition.hasSyncPosition.load(std::memory_order_relaxed)) {
+                        auto* out = blockBuffer[l].data() + delaySkipSamples;
+                        const double syncStartSeconds = dawPosition.syncSeconds.load(std::memory_order_relaxed);
+                        const double syncSecondsPerSample = dawPosition.syncSecondsPerSample.load(std::memory_order_relaxed);
+                        for (int s = 0; s < advanceSamples; ++s) {
+                            const int blockSample = delaySkipSamples + s;
+                            const double syncSeconds = syncStartSeconds + (double)blockSample * syncSecondsPerSample;
+                            const double phase = syncSeconds * (double)r + (double)phaseOff;
+                            const float wrappedPhase = (float)(phase - std::floor(phase));
+                            audioStates[l].phase = wrappedPhase;
+                            out[s] = waveforms[l].evaluate(wrappedPhase);
+                        }
+                    } else {
+                        audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples,
+                                                    r, sr, waveforms[l], md, phaseOff);
+                    }
                 }
                 if (md == LfoMode::Sync && !effectiveVoiceActive) {
                     for (int s = 0; s < numSamples; ++s)
                         blockBuffer[l][s] = 0.0f;
                 }
 
-                const bool syncHeldByTransport = md == LfoMode::Sync && useHostSync && !hostSyncShouldAdvance;
+                const bool syncHeldByTransport = md == LfoMode::Sync
+                    && dawPosition.hasSyncPosition.load(std::memory_order_relaxed)
+                    && !dawPosition.isPlaying.load(std::memory_order_relaxed);
                 float smoothSecs = smoothAmount[l] ? smoothAmount[l]->getValueUnnormalised() : 0.005f;
                 if (syncHeldByTransport) {
                     smoothedOutput[l] = blockBuffer[l][numSamples - 1];

@@ -10,6 +10,7 @@ LUA_EXAMPLES = ["Spiral", "Shape Generator", "Squiggles", "Donut", "Graph", "Gra
 MODEL_EXAMPLES = ["Cube", "Diamond", "Dodecahedron", "Humanoid Quad", "Icosahedron", "Lamp", "Shuttle", "Suzanne", "Teapot", "Tetrahedron"]
 SVG_EXAMPLES = ["Air Horn", "Alien", "Bicycle", "Card", "Cash", "Cat", "Clippy", "Desktop", "Puzzle", "Skull", "Snowflake", "Yin Yang"]
 FRACTAL_EXAMPLES = ["Koch Snowflake", "Sierpinski Triangle", "Dragon Curve", "Binary Tree", "Hilbert Curve"]
+LOTTIE_EXAMPLES = ["Android Wave", "Switch", "Heart", "Cat", "Dice", "Pin Jump", "Lottie Logo 1", "Lottie Logo 2", "Hello", "Spinning Squares", "Wave", "Blinking Eye"]
 EFFECTS = ["Bit Crush", "Bounce", "Bulge", "Dash", "Delay", "Distort", "Duplicator", "God Ray", "Kaleidoscope", "Lua Effect", "Multiplex", "Polygonizer", "Ripple", "Rotate", "Scale", "Skew", "Smoothing", "Spiral Bit Crush", "Swirl", "Trace", "Translate", "Twist", "Unfold", "Vector Cancelling", "Vortex", "Wobble"]
 MOD_TABS = ["LFO 1", "LFO 2", "LFO 3", "LFO 4", "LFO 5", "LFO 6", "LFO 7", "LFO 8", "RAND 1", "RAND 2", "RAND 3", "INPUT", "ENV 1", "ENV 2", "ENV 3", "ENV 4", "ENV 5"]
 
@@ -20,6 +21,8 @@ EXAMPLE_INDEX = {name: index for index, name in enumerate([
     "Bicycle", "Card", "Cash", "Cat", "Clippy", "Desktop", "Puzzle", "Skull", "Snowflake", "Yin Yang",
     "Koch Snowflake", "Sierpinski Triangle", "Dragon Curve", "Binary Tree", "Hilbert Curve",
 ])}
+
+LOTTIE_EXAMPLE_INDEX = {name: 43 + index for index, name in enumerate(LOTTIE_EXAMPLES)}
 
 EFFECT_INDEX = {name: index for index, name in enumerate(EFFECTS)}
 

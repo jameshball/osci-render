@@ -1,4 +1,5 @@
 #include "SettingsComponent.h"
+#include "../../parser/FileFormatRegistry.h"
 
 #include "../../PluginEditor.h"
 #include "../effects/EffectComponent.h"
@@ -559,7 +560,7 @@ void SettingsComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
     g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), osci::LookAndFeel::RECT_RADIUS);
 
-    if (! keyboardPanelBounds.isEmpty()) {
+    if (!keyboardPanelBounds.isEmpty()) {
         g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
         g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) osci::LookAndFeel::RECT_RADIUS);
 
@@ -573,15 +574,13 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     fractalEditor.setVisible(false);
 #endif
 
-    bool isImage = extension == ".gif" ||
-                    extension == ".png" ||
-                    extension == ".jpg" ||
-                    extension == ".jpeg" ||
-                    extension == ".mov" ||
-                    extension == ".mp4";
+    const bool isImage = osci::files::isImage(extension);
 
     const bool textureInputActive = audioProcessor.isTextureInputActive();
     bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !textureInputActive);
+    const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);
+    const bool usesFrameControls = isImage || osci::files::isAnimated(extension);
+    quickControls.setAnimated(!skipProcessing && isAnimatedFile);
 
     if (skipProcessing) {
         // do nothing
@@ -596,9 +595,9 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
             }
         }
 #endif
-    } else if (textureInputActive || extension == ".gpla" || isImage) {
+    } else if (textureInputActive || usesFrameControls) {
         frame.setVisible(true);
-        frame.setAnimated(!textureInputActive && (extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4"));
+        frame.setAnimated(isAnimatedFile);
         frame.setImage(textureInputActive || isImage);
         frame.resized();
     }

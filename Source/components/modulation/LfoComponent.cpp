@@ -48,7 +48,7 @@ void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     }
 
     g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
     auto textArea = bounds.toNearestInt();
     textArea.removeFromLeft(leftArrowArea.getWidth());
     textArea.removeFromRight(rightArrowArea.getWidth());
@@ -221,7 +221,7 @@ static ModulationRateConfig buildLfoRateConfig(OscirenderAudioProcessor& proc) {
     cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.lfoParameters.setRateMode(i, m); };
     cfg.getTempoDivision = [&proc](int i) { return proc.lfoParameters.getTempoDivision(i); };
     cfg.setTempoDivision = [&proc](int i, int d) { proc.lfoParameters.setTempoDivision(i, d); };
-    cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
+    cfg.getCurrentBpm = [&proc]() { return proc.dawPosition.bpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_LFOS;
     return cfg;
 }

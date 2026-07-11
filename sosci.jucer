@@ -104,6 +104,10 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{9182E7E6-C853-4D53-A6D4-BF588DB62B31}" name="parser">
+        <FILE id="FmtSos1" name="FileFormatRegistry.h" compile="0" resource="0"
+              file="Source/parser/FileFormatRegistry.h"/>
+      </GROUP>
       <GROUP id="{34BCEBE9-062C-27E1-5661-B33652D8F4F5}" name="video">
         <FILE id="pmHHqY" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
               file="Source/video/FFmpegEncoderManager.cpp"/>
