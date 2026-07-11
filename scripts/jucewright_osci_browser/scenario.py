@@ -38,17 +38,23 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step("open feedback dialog", self.select_menu_item("Send Feedback..."))
         self.run_step("feedback dialog snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "16", "--class", "osci::FeedbackOverlay"))
         self.run_step("feedback dialog screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-form.png"))
+        self.run_step("open feedback report settings", self.cli("click", "--component-id", "feedbackSettingsButton", "--timeout-ms", "5000"))
+        self.run_step("feedback report settings snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12", "--component-id", "feedbackSettingsOverlay"))
         for component_name, label in [
-            ("App screenshot", "automatic screenshot enabled"),
             ("Diagnostic log", "diagnostic log enabled"),
             ("Current project", "project snapshot enabled"),
-            ("Technical details", "technical details enabled"),
         ]:
             self.ensure_checked_switch(component_name, label, True)
+        self.run_step("feedback report settings screenshot", self.cli("screenshot", "--component-id", "feedbackSettingsOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-settings.png"))
+        self.run_step("close feedback report settings", self.close_overlay)
+        self.run_step("validate required feedback fields", self.cli("click", "--component-id", "submitFeedback", "--timeout-ms", "5000"))
+        self.run_step("feedback required field message", self.cli("wait-for-locator", "--text", "Complete the highlighted required fields before sending.", "--timeout-ms", "3000"))
         self.run_step("fill feedback email", self.cli("fill", "--component-id", "contact_email", "--timeout-ms", "3000", "automation@example.com"))
         self.run_step("fill feedback title", self.cli("fill", "--component-id", "feedback_title", "--timeout-ms", "3000", "Automation feedback report"))
         self.run_step("fill feedback details", self.cli("fill", "--component-id", "feedback_details", "--timeout-ms", "3000", "Jucewright verifies the complete in-app feedback submission flow."))
         self.run_step("drop user feedback screenshot", self.cli("drop-files", "--file", self.root_dir / "Resources" / "oscilloscope" / "real.png", "--class", "osci::FileDropZoneComponent", "--timeout-ms", "5000"))
+        self.run_step("remove user feedback screenshot", self.cli("click", "--component-id", "removeUserScreenshot1", "--timeout-ms", "5000"))
+        self.run_step("drop user feedback screenshot again", self.cli("drop-files", "--file", self.root_dir / "Resources" / "oscilloscope" / "real.png", "--class", "osci::FileDropZoneComponent", "--timeout-ms", "5000"))
         self.run_step("feedback attachments screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-attachments.png"))
         self.run_step("scroll feedback form to previews", self.cli("wheel", feedback_viewport_centre_x, "560", "--dy", "-2"))
         self.run_step("feedback previews screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-previews.png"))
