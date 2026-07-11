@@ -35,8 +35,7 @@ public:
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
-    void getFeedbackProjectSnapshot(juce::MemoryBlock& destData);
-    juce::String getFeedbackLogSnapshot(bool& truncated) const;
+    void getPortableProjectSnapshot(juce::MemoryBlock& destData);
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -185,7 +184,7 @@ public:
     }
     
 protected:
-    inline static thread_local bool creatingFeedbackSnapshot = false;
+    bool isCreatingPortableProjectSnapshot() const;
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;
@@ -262,6 +261,8 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)
 
 private:
+    inline static thread_local bool creatingPortableProjectSnapshot = false;
+
     void startHeartbeat();
     void stopHeartbeat();
     void timerCallback() override;

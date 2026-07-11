@@ -4,7 +4,7 @@
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
-#include "JucewrightAutomation.h"
+#include "feedback/FeedbackReportBuilder.h"
 #include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
@@ -12,64 +12,6 @@
 #endif
 
 std::function<void()> showPremiumSplashScreenGlobal;
-
-namespace {
-juce::String feedbackOsName() {
-#if JUCE_MAC
-    return "macos";
-#elif JUCE_WINDOWS
-    return "windows";
-#elif JUCE_LINUX
-    return "linux";
-#else
-    return "other";
-#endif
-}
-
-juce::String feedbackArchitecture() {
-#if JUCE_ARM && JUCE_64BIT
-    return "arm64";
-#elif JUCE_ARM
-    return "arm";
-#elif JUCE_64BIT
-    return "x86_64";
-#elif JUCE_INTEL
-    return "x86";
-#else
-    return "other";
-#endif
-}
-
-juce::String feedbackPluginFormat(juce::AudioProcessor::WrapperType wrapperType) {
-    switch (wrapperType) {
-        case juce::AudioProcessor::wrapperType_Standalone: return "Standalone";
-        case juce::AudioProcessor::wrapperType_VST: return "VST";
-        case juce::AudioProcessor::wrapperType_VST3: return "VST3";
-        case juce::AudioProcessor::wrapperType_AudioUnit: return "AU";
-        case juce::AudioProcessor::wrapperType_AudioUnitv3: return "AUv3";
-        case juce::AudioProcessor::wrapperType_AAX: return "AAX";
-        case juce::AudioProcessor::wrapperType_LV2: return "LV2";
-        default: return "Other";
-    }
-}
-
-juce::String feedbackBuild(juce::StringRef version) {
-    juce::StringArray parts;
-    parts.addTokens(juce::String(version), ".", {});
-    return parts.isEmpty() ? juce::String() : parts[parts.size() - 1];
-}
-
-juce::var feedbackClientContext(CommonAudioProcessor& processor) {
-    auto* object = new juce::DynamicObject();
-    object->setProperty("juce_version", juce::SystemStats::getJUCEVersion());
-    object->setProperty("renderer", "opengl");
-    object->setProperty("sample_rate", processor.getSampleRate());
-    object->setProperty("block_size", processor.getBlockSize());
-    object->setProperty("input_channels", processor.getTotalNumInputChannels());
-    object->setProperty("output_channels", processor.getTotalNumOutputChannels());
-    return juce::var(object);
-}
-} // namespace
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
     : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
@@ -514,82 +456,8 @@ void CommonPluginEditor::openFeedback() {
         return;
     }
 
-    osci::FeedbackOverlayConfig feedback;
-    feedback.closeButtonSvg = juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
-    feedback.settingsButtonSvg = juce::String::createStringFromData(BinaryData::cog_svg, BinaryData::cog_svgSize);
-    feedback.magnifierSvg = juce::String::createStringFromData(BinaryData::magnify_svg, BinaryData::magnify_svgSize);
-    feedback.context.productSlug = audioProcessor.getProductSlug();
-    feedback.context.productVersion = ProjectInfo::versionString;
-    feedback.context.productBuild = feedbackBuild(ProjectInfo::versionString);
-#if OSCI_PREMIUM
-    feedback.context.productVariant = "premium";
-#else
-    feedback.context.productVariant = "free";
-#endif
-    const auto payload = audioProcessor.licenseManager.getPayload();
-    if (payload.has_value()) {
-        feedback.context.contactEmail = payload->email;
-    }
-
-    double displayScale = 1.0;
-    int displayWidth = 0;
-    int displayHeight = 0;
-    auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds());
-    if (display != nullptr) {
-        displayScale = display->scale;
-        displayWidth = juce::roundToInt(display->totalArea.getWidth() * display->scale);
-        displayHeight = juce::roundToInt(display->totalArea.getHeight() * display->scale);
-    }
-
-    const auto wrapperType = audioProcessor.wrapperType;
-    feedback.submissionProvider = [processor = &audioProcessor, wrapperType, displayScale, displayWidth, displayHeight](
-                                      osci::FeedbackRequest& request,
-                                      osci::FeedbackAttachmentData& projectSnapshot,
-                                      osci::FeedbackOverlayConfig::SubmissionOptions options) {
-        request.releaseTrack = osci::BackendClient::toString(osci::UpdateSettings(request.productSlug).releaseTrack());
-        request.platform = osci::HardwareInfo::getCurrentPlatform();
-        request.osName = feedbackOsName();
-        request.osVersion = juce::SystemStats::getOperatingSystemName();
-        request.architecture = feedbackArchitecture();
-        request.locale = juce::SystemStats::getUserLanguage() + "-" + juce::SystemStats::getUserRegion();
-        const juce::PluginHostType host;
-        request.hostApplication = wrapperType == juce::AudioProcessor::wrapperType_Standalone
-            ? "Standalone"
-            : juce::String(host.getHostDescription());
-        request.pluginFormat = feedbackPluginFormat(wrapperType);
-        request.clientContextSchemaVersion = 1;
-        request.clientContext = feedbackClientContext(*processor);
-        const auto currentPayload = processor->licenseManager.getPayload();
-        if (currentPayload.has_value() && currentPayload->expiresAt > juce::Time::getCurrentTime()) {
-            request.licenseToken = processor->licenseManager.getCachedToken();
-        }
-        request.displayScale = displayScale;
-        request.displayWidth = displayWidth;
-        request.displayHeight = displayHeight;
-        if (options.includeDiagnosticLog) {
-            request.log = processor->getFeedbackLogSnapshot(request.logTruncated);
-        }
-        if (options.includeProjectSnapshot && projectSnapshot.data.isEmpty()) {
-            processor->getFeedbackProjectSnapshot(projectSnapshot.data);
-        }
-    };
-
-    auto screenshot = createComponentSnapshot(getLocalBounds(), true, 1.0f);
-    feedback.automaticScreenshotPreview = screenshot;
-    feedback.automaticScreenshot.kind = osci::FeedbackAttachmentKind::screenshot;
-    feedback.automaticScreenshot.filename = feedback.context.productSlug + "-ui.png";
-    feedback.automaticScreenshot.contentType = "image/png";
-
-    feedback.projectSnapshot.kind = osci::FeedbackAttachmentKind::project;
-    feedback.projectSnapshot.filename = feedback.context.productSlug + "-feedback." + projectFileType;
-    feedback.projectSnapshot.contentType = "application/octet-stream";
-
-#if DEBUG
-    const auto automationBaseUrl = juce::SystemStats::getEnvironmentVariable("OSCI_FEEDBACK_API_BASE_URL", {});
-    if (osci::isJucewrightAutomationLaunch() && automationBaseUrl.isNotEmpty()) {
-        feedback.backend.apiBaseUrl = automationBaseUrl;
-    }
-#endif
+    auto feedback = FeedbackReportBuilder::create(audioProcessor, *this, projectFileType);
+    const auto screenshot = feedback.automaticScreenshotPreview;
     auto overlay = std::make_unique<osci::FeedbackOverlay>(std::move(feedback));
     overlay->captureBackdropFrom(screenshot);
     showOverlay(std::move(overlay));
