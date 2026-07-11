@@ -65,7 +65,7 @@ static bool _buildVersionInfo(uint32_t* major, uint32_t* minor, uint32_t* micro)
     uint32_t microVal = atoi(p);
 
     char sum[7];
-    snprintf(sum, sizeof(sum), "%d%02d%02d", majorVal, minorVal, microVal);
+    snprintf(sum, sizeof(sum), "%u%02u%02u", majorVal, minorVal, microVal);
     _version = atoi(sum);
 
     if (major) *major = majorVal;
