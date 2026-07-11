@@ -37,11 +37,8 @@ AboutComponent::AboutComponent(const Info& info) : info(info) {
     const juce::Colour discordColour = juce::Colour::fromRGB(0x58, 0x65, 0xF2).brighter(0.4f);
     setupBtn(websiteBtn, "Website", [url = info.websiteUrl] { juce::URL(url).launchInDefaultBrowser(); }, osci::Colours::accentColor());
     setupBtn(discordBtn, "Join Discord", [] { juce::URL("https://discord.gg/ekjpQvT68C").launchInDefaultBrowser(); }, discordColour);
-    auto reportIssueAction = info.onReportIssue;
-    if (reportIssueAction == nullptr) {
-        reportIssueAction = [url = info.githubUrl + "/issues"] { juce::URL(url).launchInDefaultBrowser(); };
-    }
-    setupBtn(issuesBtn, "Send Feedback", std::move(reportIssueAction), osci::Colours::accentColor());
+    jassert(info.onSendFeedback != nullptr);
+    setupBtn(feedbackBtn, "Send Feedback", info.onSendFeedback, osci::Colours::accentColor());
 
     auto sz = preferredSize(info);
     setSize(sz.x, sz.y);
@@ -148,7 +145,7 @@ void AboutComponent::resized() {
     btnRow.removeFromLeft((int)kBtnGap);
     discordBtn.setBounds(btnRow.removeFromLeft(btnW));
     btnRow.removeFromLeft((int)kBtnGap);
-    issuesBtn.setBounds(btnRow);
+    feedbackBtn.setBounds(btnRow);
 }
 
 void AboutComponent::mouseUp(const juce::MouseEvent& event) {
