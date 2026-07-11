@@ -520,36 +520,53 @@ void CommonPluginEditor::openFeedback() {
     feedback.context.productSlug = audioProcessor.getProductSlug();
     feedback.context.productVersion = ProjectInfo::versionString;
     feedback.context.productBuild = feedbackBuild(ProjectInfo::versionString);
-    feedback.context.releaseTrack = osci::BackendClient::toString(osci::UpdateSettings(feedback.context.productSlug).releaseTrack());
 #if OSCI_PREMIUM
     feedback.context.productVariant = "premium";
 #else
     feedback.context.productVariant = "free";
 #endif
-    feedback.context.platform = osci::HardwareInfo::getCurrentPlatform();
-    feedback.context.osName = feedbackOsName();
-    feedback.context.osVersion = juce::SystemStats::getOperatingSystemName();
-    feedback.context.architecture = feedbackArchitecture();
-    feedback.context.locale = juce::SystemStats::getUserLanguage() + "-" + juce::SystemStats::getUserRegion();
-    const juce::PluginHostType host;
-    feedback.context.hostApplication = audioProcessor.wrapperType == juce::AudioProcessor::wrapperType_Standalone
-        ? "Standalone"
-        : juce::String(host.getHostDescription());
-    feedback.context.pluginFormat = feedbackPluginFormat(audioProcessor.wrapperType);
-    feedback.context.clientContextSchemaVersion = 1;
-    feedback.context.clientContext = feedbackClientContext(audioProcessor);
-    feedback.context.licenseToken = audioProcessor.licenseManager.getCachedToken();
     const auto payload = audioProcessor.licenseManager.getPayload();
     if (payload.has_value()) {
         feedback.context.contactEmail = payload->email;
     }
+
+    double displayScale = 1.0;
+    int displayWidth = 0;
+    int displayHeight = 0;
     auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds());
     if (display != nullptr) {
-        feedback.context.displayScale = display->scale;
-        feedback.context.displayWidth = juce::roundToInt(display->totalArea.getWidth() * display->scale);
-        feedback.context.displayHeight = juce::roundToInt(display->totalArea.getHeight() * display->scale);
+        displayScale = display->scale;
+        displayWidth = juce::roundToInt(display->totalArea.getWidth() * display->scale);
+        displayHeight = juce::roundToInt(display->totalArea.getHeight() * display->scale);
     }
-    feedback.context.log = audioProcessor.getFeedbackLogSnapshot(feedback.context.logTruncated);
+
+    const auto wrapperType = audioProcessor.wrapperType;
+    feedback.submissionProvider = [processor = &audioProcessor, wrapperType, displayScale, displayWidth, displayHeight](
+                                      osci::FeedbackRequest& request,
+                                      osci::FeedbackAttachmentData& projectSnapshot,
+                                      bool includeProjectSnapshot) {
+        request.releaseTrack = osci::BackendClient::toString(osci::UpdateSettings(request.productSlug).releaseTrack());
+        request.platform = osci::HardwareInfo::getCurrentPlatform();
+        request.osName = feedbackOsName();
+        request.osVersion = juce::SystemStats::getOperatingSystemName();
+        request.architecture = feedbackArchitecture();
+        request.locale = juce::SystemStats::getUserLanguage() + "-" + juce::SystemStats::getUserRegion();
+        const juce::PluginHostType host;
+        request.hostApplication = wrapperType == juce::AudioProcessor::wrapperType_Standalone
+            ? "Standalone"
+            : juce::String(host.getHostDescription());
+        request.pluginFormat = feedbackPluginFormat(wrapperType);
+        request.clientContextSchemaVersion = 1;
+        request.clientContext = feedbackClientContext(*processor);
+        request.licenseToken = processor->licenseManager.getCachedToken();
+        request.displayScale = displayScale;
+        request.displayWidth = displayWidth;
+        request.displayHeight = displayHeight;
+        request.log = processor->getFeedbackLogSnapshot(request.logTruncated);
+        if (includeProjectSnapshot && projectSnapshot.data.isEmpty()) {
+            processor->getFeedbackProjectSnapshot(projectSnapshot.data);
+        }
+    };
 
     auto screenshot = createComponentSnapshot(getLocalBounds(), true, 1.0f);
     feedback.automaticScreenshotPreview = screenshot;
@@ -560,9 +577,6 @@ void CommonPluginEditor::openFeedback() {
     feedback.projectSnapshot.kind = osci::FeedbackAttachmentKind::project;
     feedback.projectSnapshot.filename = feedback.context.productSlug + "-feedback." + projectFileType;
     feedback.projectSnapshot.contentType = "application/octet-stream";
-    feedback.projectSnapshotProvider = [processor = &audioProcessor](juce::MemoryBlock& destination) {
-        processor->getFeedbackProjectSnapshot(destination);
-    };
 
 #if DEBUG
     const auto automationBaseUrl = juce::SystemStats::getEnvironmentVariable("OSCI_FEEDBACK_API_BASE_URL", {});
