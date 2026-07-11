@@ -30,8 +30,7 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     else {
         processImageFile(file);
     }
-    
-    if (frames.size() == 0) {
+    if (frames.empty() && !waitingForFFmpeg) {
         if (extension.equalsIgnoreCase(".gif")) {
             handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
         }
@@ -257,7 +256,9 @@ void ImageParser::processVideoFile(juce::File& file) {
         }
     } else {
         // Ask user to download ffmpeg
+        waitingForFFmpeg = true;
         audioProcessor.ensureFFmpegExists(nullptr, [this, file]() {
+            waitingForFFmpeg = false;
             // This will be called once ffmpeg is successfully downloaded
             juce::File ffmpegFile = audioProcessor.getFFmpegFile();
             if (!loadAllVideoFrames(file, ffmpegFile)) {

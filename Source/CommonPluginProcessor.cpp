@@ -769,28 +769,34 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     };
 
     auto safeEditor = juce::Component::SafePointer<CommonPluginEditor>(editor);
-    osci::showOverlayConfirmationOrAlert(
-        editor,
-        "FFmpeg Required",
-        "FFmpeg is required to process video files.\n\nWould you like to download it now?",
-        "Yes",
-        "No",
-        [this, onStart, safeEditor] {
-            if (safeEditor == nullptr) {
-                return;
-            }
+    juce::MessageManager::callAsync([this, onStart, safeEditor] {
+        if (safeEditor == nullptr) {
+            return;
+        }
 
-            auto* editorComponent = safeEditor.getComponent();
-            editorComponent->ffmpegDownloader.setVisible(true);
-            editorComponent->ffmpegDownloader.download();
-            if (onStart != nullptr) {
-                onStart();
-            }
-            editorComponent->resized();
-        },
-        {},
-        osci::ErrorOverlay::Icon::Warning,
-        { 460, 280 });
+        osci::showOverlayConfirmationOrAlert(
+            safeEditor.getComponent(),
+            "FFmpeg Required",
+            "FFmpeg is required to process video files.\n\nWould you like to download it now?",
+            "Yes",
+            "No",
+            [this, onStart, safeEditor] {
+                if (safeEditor == nullptr) {
+                    return;
+                }
+
+                auto* editorComponent = safeEditor.getComponent();
+                editorComponent->ffmpegDownloader.setVisible(true);
+                editorComponent->ffmpegDownloader.download();
+                if (onStart != nullptr) {
+                    onStart();
+                }
+                editorComponent->resized();
+            },
+            {},
+            osci::ErrorOverlay::Icon::Warning,
+            { 460, 280 });
+    });
 
     return false;
 }
