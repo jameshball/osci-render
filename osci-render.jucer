@@ -483,6 +483,12 @@
         <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserSettings.h"/>
       </GROUP>
+      <GROUP id="{B801DAEE-F8DF-49E2-95CB-46F8FC480B33}" name="feedback">
+        <FILE id="FbRptC" name="FeedbackReportBuilder.cpp" compile="1" resource="0"
+              file="Source/feedback/FeedbackReportBuilder.cpp"/>
+        <FILE id="FbRptH" name="FeedbackReportBuilder.h" compile="0" resource="0"
+              file="Source/feedback/FeedbackReportBuilder.h"/>
+      </GROUP>
       <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
       <FILE id="nKwxzJ" name="CommonPluginEditor.h" compile="0" resource="0"

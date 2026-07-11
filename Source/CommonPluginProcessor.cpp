@@ -131,62 +131,13 @@ juce::String CommonAudioProcessor::getProductSlug() const
     return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
 }
 
-void CommonAudioProcessor::getFeedbackProjectSnapshot(juce::MemoryBlock& destData) {
-    const juce::ScopedValueSetter<bool> snapshotScope(creatingFeedbackSnapshot, true);
+void CommonAudioProcessor::getPortableProjectSnapshot(juce::MemoryBlock& destData) {
+    const juce::ScopedValueSetter<bool> snapshotScope(creatingPortableProjectSnapshot, true);
     getStateInformation(destData);
 }
 
-juce::String CommonAudioProcessor::getFeedbackLogSnapshot(bool& truncated) const {
-    constexpr size_t maxBytes = 256 * 1024;
-    constexpr juce::int64 maxSourceBytes = 1024 * 1024;
-    truncated = false;
-    const auto logFile = applicationFolder.getChildFile(juce::String(JucePlugin_Name) + ".log");
-    juce::FileInputStream stream(logFile);
-    if (!stream.openedOk()) {
-        return {};
-    }
-
-    const auto sourceStart = juce::jmax<juce::int64>(0, stream.getTotalLength() - maxSourceBytes);
-    stream.setPosition(sourceStart);
-    auto log = stream.readEntireStreamAsString();
-    if (sourceStart > 0) {
-        truncated = true;
-        log = log.fromFirstOccurrenceOf("\n", false, false);
-    }
-    if (log.isEmpty()) {
-        return {};
-    }
-
-    const juce::StringArray safePrefixes {
-        "==== ",
-        "Version: ",
-        "Wrapper: ",
-        "JUCE: ",
-        "OS: ",
-        "CPU: ",
-        "RAM: ",
-        "prepareToPlay: ",
-        "getStateInformation: ",
-        "MidiCCManager::save: "
-    };
-    juce::StringArray lines;
-    lines.addLines(log);
-    juce::String sanitized;
-    for (const auto& line : lines) {
-        const auto trimmed = line.trimStart();
-        for (const auto& prefix : safePrefixes) {
-            if (trimmed.startsWith(prefix)) {
-                sanitized << trimmed << "\n";
-                break;
-            }
-        }
-    }
-
-    while (static_cast<size_t>(sanitized.getNumBytesAsUTF8()) > maxBytes && sanitized.length() > 0) {
-        truncated = true;
-        sanitized = sanitized.substring(juce::jmin(4096, sanitized.length()));
-    }
-    return sanitized;
+bool CommonAudioProcessor::isCreatingPortableProjectSnapshot() const {
+    return creatingPortableProjectSnapshot;
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const
@@ -239,7 +190,7 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
 {
-    if (creatingFeedbackSnapshot) {
+    if (creatingPortableProjectSnapshot) {
         return;
     }
     if (!juce::JUCEApplicationBase::isStandaloneApp())
