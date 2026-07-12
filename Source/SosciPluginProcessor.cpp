@@ -14,7 +14,7 @@ SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesPropertie
 
 SosciAudioProcessor::~SosciAudioProcessor() {}
 
-void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
+void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
@@ -177,7 +177,7 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
     
-    if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
+    if (!isCreatingPortableProjectSnapshot() && haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
         haltRecording();
     }
     

@@ -13,6 +13,7 @@
 #include <any>
 #include <osci_file_import/osci_file_import.h>
 
+#include "audio/platform/InternalSampleRateController.h"
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
 
@@ -35,16 +36,21 @@ public:
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
+    void getPortableProjectSnapshot(juce::MemoryBlock& destData);
 
-    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override final;
     void releaseResources() override;
 
    #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
 
-    virtual void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
-    virtual juce::AudioProcessorEditor* createEditor() = 0;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
+    virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
+    virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
+    virtual bool supportsInternalSampleRateOverride() const { return false; }
+
+    juce::AudioProcessorEditor* createEditor() override = 0;
 
     bool hasEditor() const override;
 
@@ -60,6 +66,10 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
     double getSampleRate();
+    double getEffectiveSampleRate();
+    double getInternalSampleRateRatio() const { return internalSampleRate.getRatio(); }
+    bool canSetInternalSampleRateRatio(double ratio) const;
+    void setInternalSampleRateRatio(double ratio);
     void loadAudioFile(const juce::File& file);
     void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
     void stopAudioFile();
@@ -183,6 +193,7 @@ public:
     }
     
 protected:
+    bool isCreatingPortableProjectSnapshot() const;
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;
@@ -259,6 +270,9 @@ protected:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)
 
 private:
+    InternalSampleRateController internalSampleRate;
+    inline static thread_local bool creatingPortableProjectSnapshot = false;
+
     void startHeartbeat();
     void stopHeartbeat();
     void timerCallback() override;

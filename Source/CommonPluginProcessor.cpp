@@ -12,6 +12,8 @@
 #include "audio/OutputClip.h"
 #include "components/OverlayDialogHelpers.h"
 
+#include <cmath>
+
 namespace
 {
     osci::LicenseManager::Config makeLicenseManagerConfig() {
@@ -83,6 +85,15 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         licenseManager.scheduleBackgroundRefresh();
     }
 
+    // Restore internal sample-rate ratio (1.0 = follow device).
+    {
+#if OSCI_PREMIUM
+        internalSampleRate.restoreSavedRatio(globalSettings.getDouble(InternalSampleRateController::settingKey, 1.0));
+#else
+        internalSampleRate.restoreSavedRatio(1.0);
+#endif
+    }
+
     // Restore recently-opened project files (shared across instances).
     recentProjectFiles.setMaxNumberOfItems(10);
     {
@@ -129,6 +140,15 @@ juce::String CommonAudioProcessor::getProductSlug() const
 {
     const juce::String pluginName (JucePlugin_Name);
     return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+}
+
+void CommonAudioProcessor::getPortableProjectSnapshot(juce::MemoryBlock& destData) {
+    const juce::ScopedValueSetter<bool> snapshotScope(creatingPortableProjectSnapshot, true);
+    getStateInformation(destData);
+}
+
+bool CommonAudioProcessor::isCreatingPortableProjectSnapshot() const {
+    return creatingPortableProjectSnapshot;
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const
@@ -181,6 +201,9 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
 {
+    if (creatingPortableProjectSnapshot) {
+        return;
+    }
     if (!juce::JUCEApplicationBase::isStandaloneApp())
         return;
 
@@ -371,13 +394,66 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         + " samplesPerBlock=" + juce::String(samplesPerBlock)
         + " effects=" + juce::String(effects.size()));
 
-	currentSampleRate = sampleRate;
+    const int numChannels = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels(), 1);
+    const auto prepared = internalSampleRate.prepare(sampleRate, samplesPerBlock, numChannels, supportsInternalSampleRateOverride());
+    const double internalRate = prepared.sampleRate;
+    const int internalBlock = prepared.blockSize;
+    currentSampleRate.store(internalRate);
+    setLatencySamples(prepared.latencySamples);
 
     for (auto& effect : effects) {
-        effect->prepareToPlay(currentSampleRate, samplesPerBlock);
+        effect->prepareToPlay(internalRate, internalBlock);
     }
 
-    threadManager.prepare(sampleRate, samplesPerBlock);
+    threadManager.prepare(internalRate, internalBlock);
+    prepareToPlayInternal(internalRate, internalBlock);
+}
+
+void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    const int deviceNumSamples = buffer.getNumSamples();
+    if (deviceNumSamples <= 0) {
+        return;
+    }
+
+    if (isSuspended()) {
+        buffer.clear();
+        midi.clear();
+        return;
+    }
+
+    internalSampleRate.process(buffer, midi, [this](auto& b, auto& m) { processBlockInternal(b, m); });
+}
+
+bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
+#if OSCI_PREMIUM
+    return supportsInternalSampleRateOverride() && internalSampleRate.canSetRatio(ratio);
+#else
+    return std::abs(ratio - 1.0) < 0.000001;
+#endif
+}
+
+void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
+#if !OSCI_PREMIUM
+    juce::ignoreUnused(ratio);
+    return;
+#else
+    if (!supportsInternalSampleRateOverride()) {
+        return;
+    }
+
+    if (!internalSampleRate.setRatio(ratio)) {
+        return;
+    }
+
+    globalSettings.set(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
+    globalSettings.save();
+
+    if (internalSampleRate.hasPreparedDevice()) {
+        suspendProcessing(true);
+        prepareToPlay(internalSampleRate.getLastDeviceSampleRate(), internalSampleRate.getLastDeviceBlockSize());
+        suspendProcessing(false);
+    }
+#endif
 }
 
 void CommonAudioProcessor::releaseResources() {
@@ -428,11 +504,16 @@ osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
 
 //==============================================================================
 bool CommonAudioProcessor::hasEditor() const {
-    return true; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 double CommonAudioProcessor::getSampleRate() {
-    return currentSampleRate;
+    return getEffectiveSampleRate();
+}
+
+double CommonAudioProcessor::getEffectiveSampleRate() {
+    const double sampleRate = currentSampleRate.load();
+    return sampleRate > 0.0 ? sampleRate : 192000.0;
 }
 
 void CommonAudioProcessor::loadAudioFile(const juce::File& file) {

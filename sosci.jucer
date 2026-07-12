@@ -71,6 +71,7 @@
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="Q2mSgZ" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="e19TQV" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
+        <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="uEmfHD" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
         <FILE id="WoY9r2" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
@@ -104,6 +105,16 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{9182E7E6-C853-4D53-A6D4-BF588DB62B31}" name="parser">
+        <FILE id="FmtSos1" name="FileFormatRegistry.h" compile="0" resource="0"
+              file="Source/parser/FileFormatRegistry.h"/>
+      </GROUP>
+      <GROUP id="{B801DAEE-F8DF-49E2-95CB-46F8FC480B34}" name="feedback">
+        <FILE id="SFbRpC" name="FeedbackReportBuilder.cpp" compile="1" resource="0"
+              file="Source/feedback/FeedbackReportBuilder.cpp"/>
+        <FILE id="SFbRpH" name="FeedbackReportBuilder.h" compile="0" resource="0"
+              file="Source/feedback/FeedbackReportBuilder.h"/>
+      </GROUP>
       <GROUP id="{34BCEBE9-062C-27E1-5661-B33652D8F4F5}" name="video">
         <FILE id="pmHHqY" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
               file="Source/video/FFmpegEncoderManager.cpp"/>

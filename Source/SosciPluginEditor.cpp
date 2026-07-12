@@ -1,5 +1,6 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
+#include "parser/FileFormatRegistry.h"
 #include <osci_standalone/osci_standalone.h>
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
@@ -97,12 +98,7 @@ bool SosciPluginEditor::isInterestedInFileDrag(const juce::StringArray& files) {
         return false;
     }
     juce::File file(files[0]);
-    return file.hasFileExtension("wav") ||
-           file.hasFileExtension("mp3") ||
-           file.hasFileExtension("aiff") ||
-           file.hasFileExtension("flac") ||
-           file.hasFileExtension("ogg") ||
-           file.hasFileExtension("sosci");
+    return osci::files::isAudio(file.getFileExtension()) || osci::files::isSosciProject(file);
 }
 
 void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -112,7 +108,7 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
     }
     juce::File file(files[0]);
     
-    if (file.hasFileExtension("sosci")) {
+    if (osci::files::isSosciProject(file)) {
         openProject(file);
     } else {
         audioProcessor.loadAudioFile(file);

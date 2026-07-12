@@ -53,7 +53,8 @@ double AnimationTimelineController::getCurrentPosition()
     if (parser == nullptr) return 0.0;
     int totalFrames = parser->getNumFrames();
     if (totalFrames <= 1) return 0.0;
-    double frame = std::fmod(audioProcessor.animationFrame, totalFrames);
+    double frame = std::fmod(audioProcessor.animationFrame, (double)totalFrames);
+    if (frame < 0.0) frame += (double)totalFrames;
     return frame / (totalFrames - 1);
 }
 

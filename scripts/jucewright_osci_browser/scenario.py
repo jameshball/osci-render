@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
+import time
+import zipfile
 from pathlib import Path
 
 from .constants import (
@@ -10,6 +13,8 @@ from .constants import (
     EFFECTS,
     EXAMPLE_INDEX,
     FRACTAL_EXAMPLES,
+    LOTTIE_EXAMPLE_INDEX,
+    LOTTIE_EXAMPLES,
     LUA_EXAMPLES,
     MODEL_EXAMPLES,
     MOD_HANDLE_INDEX,
@@ -19,12 +24,71 @@ from .constants import (
 )
 from .controls import ControlDiscoveryMixin
 from .errors import StepError
+from .feedback_mock import FeedbackMockServer
 from .platform_support import is_executable
 from .session import BrowserSession
 from .utils import bool_text, slug, walk_tree
 
 
 class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
+    SOURCE_EDITOR_CLASS = "osci::LuaScriptEditorComponent::Editor"
+
+    def close_feedback_image_preview(self) -> None:
+        self.call(self.cli("press", "Escape", "--component-id", "feedbackImagePreviewOverlay", "--timeout-ms", "3000"))
+        self.call(self.cli("wait", "--ms", "250"))
+
+    def exercise_feedback_dialog(self) -> None:
+        feedback_viewport_centre_x = (self.window_width or 1100) // 2
+        user_preview_centre_x = feedback_viewport_centre_x - 282
+
+        self.run_step("open feedback dialog", self.select_menu_item("Send Feedback..."))
+        self.run_step("feedback dialog snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "16", "--class", "osci::FeedbackOverlay"))
+        self.run_step("feedback dialog screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-form.png"))
+        self.run_step("open feedback report settings", self.cli("click", "--component-id", "feedbackSettingsButton", "--timeout-ms", "5000"))
+        self.run_step("feedback report settings snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12", "--component-id", "feedbackSettingsOverlay"))
+        for component_name, label in [
+            ("Diagnostic log", "diagnostic log enabled"),
+            ("Current project", "project snapshot enabled"),
+        ]:
+            self.ensure_checked_switch(component_name, label, True)
+        self.run_step("feedback report settings screenshot", self.cli("screenshot", "--component-id", "feedbackSettingsOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-settings.png"))
+        self.run_step("close feedback report settings", self.close_overlay)
+        self.run_step("validate required feedback fields", self.cli("click", "--component-id", "submitFeedback", "--timeout-ms", "5000"))
+        self.run_step("feedback required field message", self.cli("wait-for-locator", "--text", "Complete the highlighted required fields before sending.", "--timeout-ms", "3000"))
+        self.run_step("fill feedback email", self.cli("fill", "--component-id", "contact_email", "--timeout-ms", "3000", "automation@example.com"))
+        self.run_step("fill feedback title", self.cli("fill", "--component-id", "feedback_title", "--timeout-ms", "3000", "Automation feedback report"))
+        self.run_step("fill feedback details", self.cli("fill", "--component-id", "feedback_details", "--timeout-ms", "3000", "Jucewright verifies the complete in-app feedback submission flow."))
+        self.run_step("drop user feedback screenshot", self.cli("drop-files", "--file", self.root_dir / "Resources" / "oscilloscope" / "real.png", "--class", "osci::FileDropZoneComponent", "--timeout-ms", "5000"))
+        self.run_step("remove user feedback screenshot", self.cli("click", "--component-id", "removeUserScreenshot1", "--timeout-ms", "5000"))
+        self.run_step("drop user feedback screenshot again", self.cli("drop-files", "--file", self.root_dir / "Resources" / "oscilloscope" / "real.png", "--class", "osci::FileDropZoneComponent", "--timeout-ms", "5000"))
+        self.run_step("feedback attachments screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-attachments.png"))
+        self.run_step("scroll feedback form to previews", self.cli("wheel", feedback_viewport_centre_x, "560", "--dy", "-2"))
+        self.run_step("feedback previews screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-previews.png"))
+        self.run_step("hover user screenshot preview", self.cli("hover", user_preview_centre_x, "256"))
+        self.run_step("wait for screenshot preview hover", self.cli("wait", "--ms", "250"))
+        self.run_step("screenshot preview hover screenshot", self.cli("screenshot", "--component-id", "userScreenshotPreview1", "--source", "component", "--file", self.artifact_dir / "feedback-preview-hover.png"))
+        self.run_step("open user screenshot preview", self.cli("click", "--component-id", "userScreenshotPreview1", "--timeout-ms", "5000"))
+        self.run_step("wait for user screenshot preview transition", self.cli("wait", "--ms", "400"))
+        self.run_step("user screenshot preview screenshot", self.cli("screenshot", "--component-id", "feedbackImagePreviewOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-user-image-preview.png"))
+        self.run_step("close user screenshot preview", self.close_feedback_image_preview)
+        self.run_step("open automatic screenshot preview", self.cli("click", "--component-id", "automaticScreenshotPreview", "--timeout-ms", "5000"))
+        self.run_step("wait for automatic screenshot preview transition", self.cli("wait", "--ms", "400"))
+        self.run_step("automatic screenshot preview screenshot", self.cli("screenshot", "--component-id", "feedbackImagePreviewOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-automatic-image-preview.png"))
+        self.run_step("close automatic screenshot preview", self.close_feedback_image_preview)
+        self.run_step("scroll feedback form to submit", self.cli("wheel", feedback_viewport_centre_x, "560", "--dy", "-8"))
+        self.run_step("feedback footer screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-footer.png"))
+        self.run_step("submit feedback", self.cli("click", "--component-id", "submitFeedback", "--timeout-ms", "5000"))
+        self.run_step("wait for feedback reference", self.cli("wait-for-locator", "--text", "FB-AUTOMATION", "--timeout-ms", "20000"))
+        self.run_step("wait for feedback success layout", self.cli("wait", "--ms", "500"))
+        self.run_step("feedback success screenshot", self.cli("screenshot", "--class", "osci::FeedbackSuccessOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-success.png"))
+        self.run_step("feedback mock payload validation", self.feedback_mock.assert_valid_submission)
+        self.run_step("close feedback success", self.cli("click", "--component-id", "dismissFeedbackSuccess", "--timeout-ms", "3000"))
+        self.run_step("open about dialog for feedback entry", self.select_menu_item("About osci-render"))
+        self.run_step("open feedback from about dialog", self.cli("click", "--name", "Send Feedback", "--exact", "--timeout-ms", "5000"))
+        self.run_step("wait for feedback from about dialog", self.cli("wait-for-locator", "--class", "osci::FeedbackOverlay", "--timeout-ms", "5000"))
+        self.run_step("feedback from about screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-from-about.png"))
+        self.run_step("close feedback from about dialog", self.close_overlay)
+
     def open_examples_panel(self) -> None:
         self.ensure_midi_mode(False, "before opening examples")
         self.try_step("disable external audio before opening examples", self.cli("set-checked", "--component-name", "inputEnabled", "--exact", "--timeout-ms", "3000", "false"))
@@ -33,8 +97,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step("examples panel is open", self.cli("locator", "--class", "OpenFileComponent", "--timeout-ms", "5000"))
         self.try_step("examples panel snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "10"))
 
-    def load_example(self, name: str, expect_source: bool = False) -> None:
-        nth = EXAMPLE_INDEX.get(name)
+    def load_example(self, name: str, expect_source: bool = False, index_map: dict[str, int] = EXAMPLE_INDEX) -> None:
+        nth = index_map.get(name)
         if nth is None:
             self.die(f"No example index mapping for '{name}'")
 
@@ -43,7 +107,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step(f"wait after loading {name}", self.cli("wait", "--ms", "400"))
         self.run_step(f"snapshot after loading {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
         if expect_source:
-            self.try_step(f"source editor for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", "ErrorCodeEditorComponent", "--nth", "0"))
+            self.try_step(f"source editor for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", self.SOURCE_EDITOR_CLASS, "--nth", "0"))
         self.try_step(f"visualiser screenshot after {name}", self.cli("screenshot", "--class", "VisualiserComponent", "--nth", "0", "--source", "auto", "--file", self.artifact_dir / f"visualiser_{slug(name)}.png"))
         self.try_step(f"dismiss transient overlays after {name}", self.cli("press", "Escape"))
 
@@ -61,7 +125,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.try_step(f"select text font for {name}", self.cli("select-option", "--class", "TxtComponent", "--nth", "0", "--index", "0", "--timeout-ms", "3000"))
 
     def exercise_lua_file_controls(self, name: str) -> None:
-        self.try_step(f"lua source editor for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", "ErrorCodeEditorComponent", "--nth", "0"))
+        self.try_step(f"lua source editor for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", self.SOURCE_EDITOR_CLASS, "--nth", "0"))
         self.try_step(f"reset lua state for {name}", self.cli("click", "--name", "luaReset", "--exact", "--timeout-ms", "3000"))
         self.try_step(f"open lua scripting reference for {name}", self.cli("click", "--name", "luaHelp", "--exact", "--timeout-ms", "3000"))
         self.try_step(f"lua scripting reference snapshot for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "10"))
@@ -72,21 +136,21 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.try_step(f"clear lua console for {name}", self.cli("click", "--name", "clearConsole", "--exact", "--timeout-ms", "3000"))
 
     def exercise_fractal_file_controls(self, name: str) -> None:
-        self.try_step(f"fractal editor describe for {name}", self.cli("describe", "--json", "--interesting", "--depth", "10", "--class", "FractalComponent"))
-        self.exercise_visible_controls(f"fractal editor for {name}", 0, "--class", "FractalComponent")
+        self.try_step(f"fractal editor describe for {name}", self.cli("describe", "--json", "--interesting", "--depth", "10", "--class", "FractalComponent", "--nth", "0"))
+        self.exercise_visible_controls(f"fractal editor for {name}", 0, "--class", "FractalComponent", "--nth", "0")
         self.try_step(f"add fractal rule for {name}", self.cli("click", "--name", "+ Add Rule", "--exact", "--timeout-ms", "3000"))
 
     def exercise_frame_and_timeline_controls(self, label: str, kind: str) -> None:
-        if kind in ["gpla", "gif", "mp4", "mov"]:
-            self.try_step(f"frame settings describe for {label}", self.cli("describe", "--json", "--interesting", "--depth", "10", "--name", "Frame settings", "--exact"))
-            self.try_step(f"set frames per second for {label}", self.cli("fill", "--role", "editableText", "--name", "Frames per second", "--exact", "--timeout-ms", "3000", "12.00"))
+        animated_types = ["gpla", "gif", "flac", "json", "lot", "lottie", "mp4", "mov"]
+        if kind in animated_types:
+            self.try_step(f"set animation speed for {label}", self.cli("set-value", "--class", "RotaryKnobComponent", "--nth", "3", "--timeout-ms", "3000", "1.25"))
 
         if kind in ["gif", "png", "jpg", "mp4", "mov"]:
             self.try_step(f"toggle invert image for {label}", self.cli("click", "--role", "button", "--name", "Invert Image", "--exact", "--timeout-ms", "3000"))
             self.try_step(f"set image threshold for {label}", self.cli("set-value", "--role", "slider", "--name", "Image Threshold", "--exact", "--timeout-ms", "3000", "0.4"))
             self.try_step(f"set image stride for {label}", self.cli("set-value", "--role", "slider", "--name", "Image Stride", "--exact", "--timeout-ms", "3000", "3"))
 
-        if kind in ["gpla", "gif", "flac", "mp4", "mov"]:
+        if kind in animated_types:
             self.try_step(f"timeline describe for {label}", self.cli("describe", "--json", "--interesting", "--depth", "8", "--class", "TimelineComponent"))
             self.try_step(f"timeline pause for {label}", self.cli("click", "--name", "Pause", "--exact", "--timeout-ms", "3000"))
             self.try_step(f"timeline play for {label}", self.cli("click", "--name", "Play", "--exact", "--timeout-ms", "3000"))
@@ -206,7 +270,9 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step(f"wait after modulation drop {tab}", self.cli("wait", "--ms", "250"))
         self.run_step(f"snapshot modulation assignment {tab}", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "ModTabHandle", "--nth", handle_nth))
         self.run_step(f"drag modulation strength {tab}", self.cli("drag", "--class", "DepthIndicator", "--nth", "0", "--dx", "0", "--dy", "-18", "--steps", "8", "--force", "--timeout-ms", "5000"))
-        self.run_step(f"right click modulation strength {tab} and set bipolar", self.cli("right-click", "--class", "DepthIndicator", "--nth", "0", "--force", "--menu-item", "Make Bipolar", "--timeout-ms", "5000"))
+        self.try_step(f"open modulation strength menu {tab}", self.cli("right-click", "--class", "DepthIndicator", "--nth", "0", "--force", "--timeout-ms", "5000"))
+        time.sleep(0.25)
+        self.try_step(f"set modulation strength {tab} bipolar", self.cli("click", "--role", "menuItem", "--name", "Make Bipolar", "--exact", "--force", "--timeout-ms", "5000"))
         self.try_step(f"dismiss modulation context menu {tab}", self.cli("press", "Escape"))
 
     def exercise_modulation_tabs(self, tabs: list[str], env_visible: bool) -> None:
@@ -222,9 +288,9 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
     def exercise_hello_world_editor(self) -> None:
         edited_text = "hello\njucewright automation\nworld"
-        self.run_step("edit Hello World source text", self.cli("fill", "--class", "ErrorCodeEditorComponent", "--nth", "0", "--timeout-ms", "5000", edited_text))
+        self.run_step("edit Hello World source text", self.cli("fill", "--class", self.SOURCE_EDITOR_CLASS, "--nth", "0", "--timeout-ms", "5000", edited_text))
         self.run_step("wait after editing Hello World source text", self.cli("wait", "--ms", "500"))
-        self.run_step("snapshot after editing Hello World source text", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", "ErrorCodeEditorComponent", "--nth", "0"))
+        self.run_step("snapshot after editing Hello World source text", self.cli("snapshot", "--json", "--interesting", "--depth", "8", "--class", self.SOURCE_EDITOR_CLASS, "--nth", "0"))
         self.run_step("collapse Hello World source editor", self.cli("click", "--role", "button", "--name", "Collapse", "--exact", "--timeout-ms", "3000"))
         self.run_step("snapshot after collapsing Hello World source editor", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
 
@@ -236,7 +302,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         else:
             self.log(f"INFO effect browser for {effect} was already open or will be verified by the next required step -> {file}")
 
-    def exercise_effect(self, effect: str) -> None:
+    def exercise_effect(self, effect: str, added_effect_nth: int) -> None:
         nth = EFFECT_INDEX.get(effect)
         if nth is None:
             self.die(f"No effect index mapping for '{effect}'")
@@ -245,8 +311,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step(f"find effect browser item {effect}", self.cli("locator", "--class", "osci::GridItemComponent", "--nth", nth, "--timeout-ms", "5000"))
         self.run_step(f"add effect {effect}", self.cli("click", "--class", "osci::GridItemComponent", "--nth", nth, "--force", "--timeout-ms", "6000"))
         self.try_step(f"wait after adding effect {effect}", self.cli("wait", "--ms", "200"))
-        self.try_step(f"snapshot selected effect {effect}", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "DraggableListBox"))
-        self.exercise_visible_controls(f"selected effect {effect}", 18, "--class", "DraggableListBox")
+        self.try_step(f"snapshot selected effect {effect}", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "EffectsListComponent", "--nth", added_effect_nth))
+        self.exercise_visible_controls(f"selected effect {effect}", 18, "--class", "EffectsListComponent", "--nth", added_effect_nth)
 
     def exercise_menu(self, menu: str) -> None:
         self.try_step(f"open menu {menu}", self.cli("click", "--role", "menuItem", "--name", menu, "--exact", "--timeout-ms", "3000"))
@@ -254,14 +320,14 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.try_step(f"close menu {menu}", self.cli("press", "Escape"))
 
     def close_overlay(self) -> None:
-        self.call(self.cli("click", "--role", "button", "--name", "closeOverlay", "--exact", "--timeout-ms", "3000"))
+        self.call(self.cli("click", "--name", "closeOverlay", "--exact", "--timeout-ms", "3000"))
         self.call(self.cli("wait", "--ms", "250"))
 
     def exercise_about_dialog(self) -> None:
         self.run_step("open about dialog", self.select_menu_item("About osci-render"))
         self.run_step("about dialog snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
         self.try_step("about website button trial", self.cli("click", "--name", "Website", "--exact", "--trial", "--timeout-ms", "3000"))
-        self.try_step("about report issue button trial", self.cli("click", "--name", "Report Issue", "--exact", "--trial", "--timeout-ms", "3000"))
+        self.try_step("about feedback button trial", self.cli("click", "--name", "Send Feedback", "--exact", "--trial", "--timeout-ms", "3000"))
         self.run_step("close about dialog", self.close_overlay)
 
     def exercise_license_dialog(self) -> None:
@@ -297,6 +363,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step("close visualiser settings dialog", self.cli("press", "Escape", "--role", "dialogWindow", "--name", "Visualiser Settings", "--exact", "--timeout-ms", "3000"))
 
     def exercise_application_dialogs(self) -> None:
+        self.exercise_feedback_dialog()
         self.exercise_about_dialog()
         self.exercise_license_dialog()
         self.exercise_recording_dialog()
@@ -346,9 +413,15 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             "automation.flac": self.root_dir / "Resources" / "audio" / "sosci.flac",
             "automation.mp4": self.root_dir / "tests" / "fixtures" / "jucewright" / "cubes.mp4",
             "automation.mov": self.root_dir / "tests" / "fixtures" / "jucewright" / "cubes.mp4",
+            "automation.lottie": self.root_dir / "Resources" / "lottie" / "switch.lottie",
         }
         for name, source in fixtures.items():
             shutil.copyfile(source, self.fixture_dir / name)
+
+        with zipfile.ZipFile(fixtures["automation.lottie"]) as archive:
+            animation_json = archive.read("animations/switch.json")
+        (self.fixture_dir / "automation.json").write_bytes(animation_json)
+        (self.fixture_dir / "automation.lot").write_bytes(animation_json)
 
     def exercise_external_file(self, kind: str, path: Path) -> None:
         self.launch_app(f"external {kind}")
@@ -364,9 +437,9 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
     def exercise_external_file_type_passes(self) -> None:
         self.prepare_external_fixtures()
-        external_types = ["gpla", "gif", "png", "jpg", "flac", "mp4", "mov"]
+        external_types = ["gpla", "gif", "png", "jpg", "flac", "lottie", "json", "lot", "mp4", "mov"]
         if self.quick:
-            external_types = ["gpla", "gif", "flac"]
+            external_types = ["gpla", "gif", "flac", "lottie"]
 
         for kind in external_types:
             self.exercise_external_file(kind, self.fixture_dir / f"automation.{kind}")
@@ -398,6 +471,10 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.log(f"Completed without required failures. Summary: {self.artifact_dir / 'summary.json'}")
 
     def run(self) -> int:
+        self.feedback_mock = FeedbackMockServer(self.artifact_dir)
+        self.feedback_mock.start()
+        previous_feedback_url = os.environ.get("OSCI_FEEDBACK_API_BASE_URL")
+        os.environ["OSCI_FEEDBACK_API_BASE_URL"] = self.feedback_mock.base_url
         try:
             if not self.find_jucewright():
                 self.build_jucewright()
@@ -417,6 +494,14 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.log(f"App: {self.app_executable}")
 
             self.launch_app("clean startup")
+
+            if self.feedback_only:
+                self.run_step("windows", self.cli("windows"))
+                if self.window_width is not None and self.window_height is not None:
+                    self.run_step("resize feedback test window", self.cli("resize-window", "--w", self.window_width, "--h", self.window_height))
+                    self.run_step("wait for feedback test resize", self.cli("wait", "--ms", "400"))
+                self.exercise_feedback_dialog()
+                return 1 if self.failures else 0
 
             self.run_step("list sessions", self.jw("list"))
             self.run_step("capabilities", self.cli("capabilities"))
@@ -450,6 +535,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             model_examples = ["Cube"] if self.quick else MODEL_EXAMPLES
             svg_examples = ["Air Horn"] if self.quick else SVG_EXAMPLES
             fractal_examples = ["Koch Snowflake"] if self.quick else FRACTAL_EXAMPLES
+            lottie_examples = ["Switch"] if self.quick else LOTTIE_EXAMPLES
 
             for example in model_examples:
                 self.load_example(example)
@@ -468,6 +554,11 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
                 self.load_example(example)
                 self.exercise_current_file_common(f"fractal {example}")
                 self.exercise_fractal_file_controls(example)
+
+            for example in lottie_examples:
+                self.load_example(example, index_map=LOTTIE_EXAMPLE_INDEX)
+                self.exercise_current_file_common(f"lottie {example}")
+                self.exercise_frame_and_timeline_controls(f"lottie {example}", "lottie")
 
             for example in text_examples:
                 self.load_example(example, True)
@@ -509,8 +600,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.run_step("effect browser snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "EffectTypeGridComponent"))
 
             effects = ["Bit Crush", "Rotate", "Scale"] if self.quick else EFFECTS
-            for effect in effects:
-                self.exercise_effect(effect)
+            for added_effect_nth, effect in enumerate(effects):
+                self.exercise_effect(effect, added_effect_nth)
 
             self.try_step("visualiser settings button", self.cli("click", "--name", "settings", "--timeout-ms", "3000"))
             self.try_step("visualiser settings snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12"))
@@ -543,3 +634,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         finally:
             self.write_summary()
             self.stop_app()
+            self.feedback_mock.stop()
+            if previous_feedback_url is None:
+                os.environ.pop("OSCI_FEEDBACK_API_BASE_URL", None)
+            else:
+                os.environ["OSCI_FEEDBACK_API_BASE_URL"] = previous_feedback_url
