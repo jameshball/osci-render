@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--jucewright", help="Use a specific jucewright executable.")
     parser.add_argument("--app", "--app-path", "--app-bundle", dest="app_path", help="Use a specific app bundle or standalone executable.")
     parser.add_argument("--app-executable", help="Executable path used only for preflight existence checks.")
+    parser.add_argument("--audio-output", help="Use this audio output in the isolated automation profile.")
     parser.add_argument("--session", help="Jucewright session name.")
     return parser.parse_args()
 

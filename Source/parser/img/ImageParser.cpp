@@ -2,7 +2,9 @@
 #include "../../../modules/gifdec/gifdec.h"
 #include "../../PluginProcessor.h"
 #include "../../CommonPluginEditor.h"
-#include <regex>
+#include "../../components/OverlayDialogHelpers.h"
+#include "../../video/FFmpegMediaInfo.h"
+#include "../FileFormatRegistry.h"
 
 ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
     juce::File file = temp.getFile();
@@ -18,7 +20,7 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
             return;
         }
     }
-    
+
     if (extension.equalsIgnoreCase(".gif")) {
         processGifFile(file);
     }
@@ -30,7 +32,7 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     else {
         processImageFile(file);
     }
-    
+
     if (frames.size() == 0) {
         if (extension.equalsIgnoreCase(".gif")) {
             handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
@@ -184,8 +186,10 @@ void ImageParser::processGifFile(juce::File& file) {
         visited = std::vector<bool>(frameSize, false);
 
         int i = 0;
+        int totalDelayHundredths = 0;
         while (gd_get_frame(gif) > 0) {
             gd_render_frame(gif, tempBuffer.data());
+            totalDelayHundredths += gif->gce.delay;
 
             frames.emplace_back(std::vector<uint8_t>(frameSize));
 
@@ -199,6 +203,10 @@ void ImageParser::processGifFile(juce::File& file) {
             i++;
         }
 
+        if (i > 0 && totalDelayHundredths > 0) {
+            frameRate = (double)i * 100.0 / (double)totalDelayHundredths;
+        }
+
         gd_close_gif(gif);
     } else {
         handleError("The GIF could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
@@ -209,14 +217,14 @@ void ImageParser::processImageFile(juce::File& file) {
     juce::Image image = juce::ImageFileFormat::loadFrom(file);
     if (image.isValid()) {
         image.desaturate();
-        
+
         width = image.getWidth();
         height = image.getHeight();
         int frameSize = width * height;
-        
+
         visited = std::vector<bool>(frameSize, false);
         frames.emplace_back(std::vector<uint8_t>(frameSize));
-        
+
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 juce::Colour pixel = image.getPixelAt(x, y);
@@ -234,22 +242,22 @@ void ImageParser::processImageFile(juce::File& file) {
 
 #if OSCI_PREMIUM
 bool ImageParser::isVideoFile(const juce::String& extension) const {
-    return extension.equalsIgnoreCase(".mp4") || extension.equalsIgnoreCase(".mov");
+    return osci::files::isVideo(extension);
 }
 
 void ImageParser::processVideoFile(juce::File& file) {
     // Set video processing flag
     isVideo = true;
-    
+
     // assert on the message thread
     if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
         handleError("Could not process video file - not on the message thread.");
         return;
     }
-    
-    // Try to get ffmpeg 
+
+    // Try to get ffmpeg
     juce::File ffmpegFile = audioProcessor.getFFmpegFile();
-    
+
     if (ffmpegFile.exists()) {
         // FFmpeg exists, continue with video processing
         if (!loadAllVideoFrames(file, ffmpegFile)) {
@@ -273,33 +281,15 @@ void ImageParser::processVideoFile(juce::File& file) {
 }
 
 bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile) {
-    // Use StringArray for arguments to handle quoting reliably
-    juce::StringArray metadataCommand;
-    metadataCommand.add(ffmpegFile.getFullPathName());
-    metadataCommand.add("-i");
-    metadataCommand.add(file.getFullPathName());
-    metadataCommand.add("-hide_banner");
-
-    if (!ffmpegProcess.start(metadataCommand))
-    {
-        handleError("Failed to start ffmpeg process for metadata.");
-        return false;
+    const auto mediaInfo = osci::video::probeFFmpegMediaInfo(ffmpegFile, file);
+    if (mediaInfo.width > 0 && mediaInfo.height > 0) {
+        width = mediaInfo.width;
+        height = mediaInfo.height;
     }
-    juce::String output = ffmpegProcess.readAllProcessOutput();
-    
-    if (output.isNotEmpty()) {
-        // Look for resolution in format "1920x1080"
-        std::regex resolutionRegex(R"((\d{2,5})x(\d{2,5}))");
-        std::smatch match;
-        std::string stdOut = output.toStdString();
-
-        if (std::regex_search(stdOut, match, resolutionRegex) && match.size() == 3)
-        {
-            width = std::stoi(match[1].str());
-            height = std::stoi(match[2].str());
-        }
+    if (mediaInfo.frameRate > 0.0) {
+        frameRate = mediaInfo.frameRate;
     }
-    
+
     // If still no dimensions or dimensions are too large, use reasonable defaults
     if (width <= 0 || height <= 0) {
         width = 320;
@@ -318,19 +308,19 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
             }
         }
     }
-    
+
     // Now prepare for frame reading
     int frameSize = width * height;
     videoFrameSize = frameSize;
     visited = std::vector<bool>(frameSize, false);
     frameBuffer.resize(frameSize);
-    
+
     // Clear any existing frames
     frames.clear();
-    
+
     // Cap the number of frames to prevent excessive memory usage
     const int MAX_FRAMES = 10000;
-    
+
     // Determine available hardware acceleration options
 #if JUCE_MAC
    // Try to use videotoolbox on macOS
@@ -372,29 +362,29 @@ bool ImageParser::loadAllVideoFrames(const juce::File& file, const juce::File& f
 
     // Read all frames into memory
     int framesRead = 0;
-    
+
     while (framesRead < MAX_FRAMES) {
         size_t bytesRead = ffmpegProcess.readProcessOutput(frameBuffer.data(), frameBuffer.size());
-        
+
         if (bytesRead != frameBuffer.size()) {
             break; // End of video or error
         }
-        
+
         // Create a new frame
         frames.emplace_back(std::vector<uint8_t>(videoFrameSize));
-        
+
         // Copy data to the current frame
         for (int i = 0; i < videoFrameSize; i++) {
             // value of 0 is reserved for transparent pixels
             frames.back()[i] = juce::jmax(1, (int)frameBuffer[i]);
         }
-        
+
         framesRead++;
     }
-    
+
     // Close the ffmpeg process
     ffmpegProcess.kill();
-    
+
     // Return true if we successfully loaded at least one frame
     return frames.size() > 0;
 }
@@ -409,10 +399,16 @@ ImageParser::~ImageParser() {
 }
 
 void ImageParser::handleError(juce::String message) {
-    juce::MessageManager::callAsync([this, message] {
-        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Error", message);
+    juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor()));
+    juce::MessageManager::callAsync([editor, message] {
+        osci::showOverlayMessageOrAlert(editor.getComponent(),
+            "Error",
+            message,
+            osci::ErrorOverlay::Icon::Warning,
+            juce::MessageBoxIconType::WarningIcon,
+            { 500, 260 });
     });
-    
+
     width = 1;
     height = 1;
     frames.emplace_back(std::vector<uint8_t>(1));
@@ -516,7 +512,7 @@ void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int
                 y += stride * spiralSteps[dir][1];
 
                 if (x < 0 || x >= width || y < 0 || y >= height) break;
-                
+
                 float pixel = getPixelValue(x, y, invert);
 
                 int index = (height - y - 1) * width + x;
@@ -547,13 +543,13 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
         if (count % jumpFrequency() == 0) {
             resetPosition();
         }
-        
+
         if (count % 10 * jumpFrequency() == 0) {
             std::fill(visited.begin(), visited.end(), false);
         }
-        
+
         float thresholdPow = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) * 10 + 1;
-        
+
         findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)), audioProcessor.invertImage->getValue());
         float maxDim = juce::jmax(width, height);
         count++;
@@ -563,19 +559,19 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
     } else {
         double scanIncrement = audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) / 100;
         float thresholdVal = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex));
-        
+
         double pixel = 0;
         int maxIterations = 10000;
         while (pixel <= thresholdVal && maxIterations > 0) {
             int x = (int) ((scanX + 1) * width / 2);
             int y = (int) ((scanY + 1) * height / 2);
             pixel = getPixelValue(x, y, audioProcessor.invertImage->getValue());
-            
+
             double increment = 0.01;
             if (pixel > thresholdVal) {
                 increment = (1 - std::tanh(4 * pixel)) * 0.3;
             }
-            
+
             scanX += increment;
             if (scanX >= 1) {
                 scanX = -1;
@@ -586,10 +582,10 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
                 scanY = 1 - offset;
                 scanCount++;
             }
-            
+
             maxIterations--;
         }
-        
+
         return osci::Point(scanX, scanY);
     }
 }
