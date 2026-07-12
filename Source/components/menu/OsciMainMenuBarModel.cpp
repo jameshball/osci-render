@@ -180,7 +180,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             editor.resized();
         };
         aboutInfo.websiteUrl = "https://osci-render.com";
-        aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
+        aboutInfo.onSendFeedback = [this] { editor.openFeedback(); };
         aboutInfo.credits = {
             { "DJ_Level_3",          "Contributed several features to osci-render" },
             { "Anthony Hall",        "Added many new effects, and improved existing ones" },
@@ -195,6 +195,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
     });
     addMenuItem(aboutMenu, "License and Updates...", [this] {
         editor.openLicenseAndUpdates();
+    });
+    addMenuItem(aboutMenu, "Send Feedback...", [this] {
+        editor.openFeedback();
     });
     addDiagnosticsMenuItems(aboutMenu, audioProcessor);
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {

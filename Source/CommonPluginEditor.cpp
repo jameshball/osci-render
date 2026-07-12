@@ -4,6 +4,7 @@
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
+#include "feedback/FeedbackReportBuilder.h"
 #include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
@@ -212,7 +213,7 @@ void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> ove
         visualiser.setVisible(false);
     }
 
-    if (!overlay->lightweight) {
+    if (!overlay->lightweight && !overlay->hasCapturedBackdrop()) {
         overlay->captureBackdropFrom(*this);
     }
 
@@ -431,6 +432,35 @@ void CommonPluginEditor::openLicenseAndUpdates() {
         return;
 
     showOverlay(std::make_unique<LicenseAndUpdatesComponent>(audioProcessor));
+}
+
+void CommonPluginEditor::openFeedback() {
+    if (findActiveOverlay<osci::FeedbackOverlay>() != nullptr) {
+        return;
+    }
+    if (!activeOverlays.empty()) {
+        auto* overlay = activeOverlays.back().get();
+        auto dismissAndContinue = std::move(overlay->onDismissRequested);
+        const juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        overlay->onDismissRequested = [safeThis, dismissAndContinue = std::move(dismissAndContinue)]() mutable {
+            juce::MessageManager::callAsync([safeThis] {
+                if (safeThis != nullptr) {
+                    safeThis->openFeedback();
+                }
+            });
+            if (dismissAndContinue != nullptr) {
+                dismissAndContinue();
+            }
+        };
+        overlay->requestDismiss();
+        return;
+    }
+
+    auto feedback = FeedbackReportBuilder::create(audioProcessor, *this, projectFileType);
+    const auto screenshot = feedback.automaticScreenshotPreview;
+    auto overlay = std::make_unique<osci::FeedbackOverlay>(std::move(feedback));
+    overlay->captureBackdropFrom(screenshot);
+    showOverlay(std::move(overlay));
 }
 
 void CommonPluginEditor::openRecordingSettings() {

@@ -107,16 +107,15 @@ private:
         return juce::Colours::white.withAlpha (0.68f);
     }
 
-    static void drawCardBackground (juce::Graphics& g, juce::Rectangle<int> bounds) {
-        const auto card = bounds.toFloat();
-        juce::Path shadowPath;
-        shadowPath.addRoundedRectangle (card, 8.0f);
-        juce::DropShadow (juce::Colours::black.withAlpha (0.22f), 14, { 0, 4 }).drawForPath (g, shadowPath);
-
-        g.setColour (osci::Colours::veryDark().brighter (0.035f));
-        g.fillRoundedRectangle (card, 8.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.11f));
-        g.drawRoundedRectangle (card.reduced (0.5f), 8.0f, 1.0f);
+    static osci::CardComponent::Style accountCardStyle() {
+        osci::CardComponent::Style style;
+        style.backgroundColour = osci::Colours::veryDark().brighter (0.035f);
+        style.outlineColour = juce::Colours::white.withAlpha (0.11f);
+        style.shadowColour = juce::Colours::black.withAlpha (0.22f);
+        style.shadowOffset = { 0, 4 };
+        style.cornerRadius = 8.0f;
+        style.shadowRadius = 14;
+        return style;
     }
 
     static void stylePrimaryButton (juce::TextButton& button) {
@@ -133,13 +132,14 @@ private:
         button.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
     }
 
-    class LicenseProfileCard final : public juce::Component {
+    class LicenseProfileCard final : public osci::CardComponent {
     public:
         LicenseProfileCard (juce::Image productImageToUse,
                             juce::String copySvg,
                             juce::String eyeSvg,
                             juce::String eyeOffSvg)
-            : productImage (std::move (productImageToUse)),
+            : osci::CardComponent (accountCardStyle()),
+              productImage (std::move (productImageToUse)),
               copyButton ("copyLicenseKey", std::move (copySvg), juce::Colours::white.withAlpha (0.76f)),
               revealButton ("revealLicenseKey",
                             std::move (eyeSvg),
@@ -252,7 +252,7 @@ private:
             detailLabel.setVisible (state.detail.isNotEmpty());
             badgeText = state.badge;
             licenseKey = state.licenseKey;
-            drawChrome = state.drawChrome;
+            setPaintsCard (state.drawChrome);
             topRightReserve = state.topRightReserve;
 
             const auto hasLicenseKey = licenseKey.isNotEmpty();
@@ -292,9 +292,7 @@ private:
         }
 
         void paint (juce::Graphics& g) override {
-            if (drawChrome) {
-                drawCardBackground (g, getLocalBounds());
-            }
+            osci::CardComponent::paint (g);
 
             const auto iconBounds = iconArea.toFloat();
             if (productImage.isValid()) {
@@ -329,8 +327,8 @@ private:
         }
 
         void resized() override {
-            auto area = drawChrome ? getLocalBounds().reduced (24)
-                                   : getLocalBounds();
+            auto area = getPaintsCard() ? getLocalBounds().reduced (24)
+                                        : getLocalBounds();
             auto header = area.removeFromTop (detailLabel.isVisible() ? 94 : 82);
             iconArea = header.removeFromLeft (98).withSizeKeepingCentre (76, 76);
             header.removeFromLeft (16);
@@ -415,7 +413,6 @@ private:
         juce::String badgeText;
         juce::String licenseKey;
         NoticeKind noticeKind = NoticeKind::None;
-        bool drawChrome = true;
         int topRightReserve = 0;
         juce::Rectangle<int> iconArea;
         juce::Rectangle<int> badgeBounds;
@@ -435,9 +432,10 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LicenseProfileCard)
     };
 
-    class UpdateStatusCard final : public juce::Component {
+    class UpdateStatusCard final : public osci::CardComponent {
     public:
-        UpdateStatusCard() {
+        UpdateStatusCard()
+            : osci::CardComponent (accountCardStyle()) {
             configureLabel (titleLabel, juce::Font (juce::FontOptions (22.0f, juce::Font::bold)), juce::Justification::centredLeft);
             titleLabel.setText ("Updates", juce::dontSendNotification);
             addAndMakeVisible (titleLabel);
@@ -540,10 +538,6 @@ private:
         void hideDownload() {
             downloadProgress.setVisible (false);
             downloadProgress.reset();
-        }
-
-        void paint (juce::Graphics& g) override {
-            drawCardBackground (g, getLocalBounds());
         }
 
         void resized() override {

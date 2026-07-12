@@ -36,6 +36,7 @@ public:
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
+    void getPortableProjectSnapshot(juce::MemoryBlock& destData);
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override final;
     void releaseResources() override;
@@ -192,6 +193,7 @@ public:
     }
     
 protected:
+    bool isCreatingPortableProjectSnapshot() const;
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;
@@ -269,6 +271,7 @@ protected:
 
 private:
     InternalSampleRateController internalSampleRate;
+    inline static thread_local bool creatingPortableProjectSnapshot = false;
 
     void startHeartbeat();
     void stopHeartbeat();
