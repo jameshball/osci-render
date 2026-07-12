@@ -26,7 +26,7 @@ juce::String readSanitizedLogSnapshot(const CommonAudioProcessor& processor, boo
         return {};
     }
 
-    const auto sourceStart = juce::jmax<juce::int64>(0, stream.getTotalLength() - maxSourceBytes);
+    const auto sourceStart = std::max<juce::int64>(0, stream.getTotalLength() - maxSourceBytes);
     stream.setPosition(sourceStart);
     auto log = stream.readEntireStreamAsString();
     if (sourceStart > 0) {

@@ -11,8 +11,6 @@
 #include "visualiser/OfflineAudioToVideoRenderer.h"
 #endif
 
-std::function<void()> showPremiumSplashScreenGlobal;
-
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
     : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
 {
