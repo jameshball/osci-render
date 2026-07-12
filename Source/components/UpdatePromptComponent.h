@@ -8,8 +8,8 @@
 
 class UpdatePromptComponent : public juce::Component {
 public:
-    explicit UpdatePromptComponent (CommonAudioProcessor& processorToUse)
-        : processor (processorToUse) {
+    UpdatePromptComponent(CommonAudioProcessor& processorToUse, juce::String closeButtonSvg)
+        : processor(processorToUse), notification(std::move(closeButtonSvg)) {
         setVisible (false);
         setAlwaysOnTop (true);
 
@@ -48,8 +48,6 @@ public:
                 installUpdate();
             } else if (mode == Mode::PendingInstallFailed) {
                 retryPendingInstall();
-            } else if (mode == Mode::InstallSucceeded) {
-                hidePrompt();
             } else if (mode == Mode::Available || mode == Mode::Failed) {
                 downloadUpdate();
             }
@@ -64,6 +62,8 @@ public:
         addAndMakeVisible (primaryButton);
         addAndMakeVisible (secondaryButton);
         addChildComponent (progressBar);
+        addChildComponent(notification);
+        notification.onDismiss = [this] { hidePrompt(); };
     }
 
     std::function<void()> onLicenseRequired;
@@ -95,7 +95,9 @@ public:
         return true;
     }
 
-    int getPreferredWidth() const noexcept { return 560; }
+    int getPreferredWidth() const noexcept {
+        return mode == Mode::InstallSucceeded ? 410 : 560;
+    }
 
     int getPreferredHeight() const noexcept {
         if (mode == Mode::Available && releaseNotesEditor.isVisible()) {
@@ -106,10 +108,14 @@ public:
             return 178;
         }
 
-        return 150;
+        return mode == Mode::InstallSucceeded ? 88 : 150;
     }
 
     void paint (juce::Graphics& g) override {
+        if (mode == Mode::InstallSucceeded) {
+            return;
+        }
+
         const auto bounds = getCardBounds().toFloat();
 
         juce::Path shadowPath;
@@ -123,6 +129,19 @@ public:
     }
 
     void resized() override {
+        if (mode == Mode::InstallSucceeded) {
+            titleLabel.setBounds({});
+            detailLabel.setBounds({});
+            releaseNotesLabel.setBounds({});
+            releaseNotesEditor.setBounds({});
+            primaryButton.setBounds({});
+            secondaryButton.setBounds({});
+            progressBar.setBounds({});
+            notification.setBounds(getLocalBounds());
+            return;
+        }
+
+        notification.setBounds({});
         auto area = getCardBounds().reduced (28, 22);
         titleLabel.setBounds (area.removeFromTop (24));
         area.removeFromTop (8);
@@ -201,6 +220,7 @@ private:
     juce::TextButton primaryButton { "Update" };
     juce::TextButton secondaryButton { "Later" };
     UpdateProgressBar progressBar;
+    osci::NotificationComponent notification;
     std::optional<osci::VersionInfo> availableVersion;
     std::optional<osci::PendingInstallMarker> pendingInstallRetryMarker;
     juce::File downloadedFile;
@@ -460,11 +480,7 @@ private:
         mode = Mode::InstallSucceeded;
         progressBar.setVisible (false);
         clearReleaseNotes();
-        titleLabel.setText ("Update installed", juce::dontSendNotification);
-        detailLabel.setText ("Version " + marker.targetVersion + " is now running.", juce::dontSendNotification);
-        primaryButton.setButtonText ("OK");
-        secondaryButton.setVisible (false);
-        primaryButton.setEnabled (true);
+        notification.setNotification("Update installed", "Version " + marker.targetVersion + " is now running.");
         setVisible (true);
         refreshParentLayout();
         repaint();
@@ -508,6 +524,7 @@ private:
 
     void hidePrompt() {
         mode = Mode::Hidden;
+        notification.setVisible(false);
         setVisible (false);
         refreshParentLayout();
     }
