@@ -2,6 +2,7 @@
 
 #include "../../PluginEditor.h"
 #include "../../PluginProcessor.h"
+#include "InternalSampleRateMenu.h"
 
 OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& e) : audioProcessor(p), editor(e) {
     resetMenuItems();
@@ -13,6 +14,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
     constexpr int RECENT_BASE_ID = 1000;
     constexpr int TEXTURE_INPUT_DISCONNECT_ID = 2000;
     constexpr int TEXTURE_INPUT_SOURCE_BASE_ID = 2100;
+    constexpr int SAMPLE_RATE_BASE_ID = 3000;
     constexpr int fileMenu = 0;
     constexpr int editMenu = 1;
     constexpr int aboutMenu = 2;
@@ -21,11 +23,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
     const int audioMenu = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? nextMenu++ : -1;
     const int interfaceMenu = nextMenu;
 
-    customMenuLogic = [this, fileMenu, videoMenu](juce::PopupMenu& menu, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != fileMenu && topLevelMenuIndex != videoMenu) {
-            return;
-        }
-
+    customMenuLogic = [this, fileMenu, videoMenu, audioMenu](juce::PopupMenu& menu, int topLevelMenuIndex) {
         if (topLevelMenuIndex == fileMenu) {
             juce::PopupMenu recentMenu;
             const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
@@ -38,6 +36,15 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
             menu.addSubMenu("Open Recent", recentMenu);
             menu.addSeparator();
+            return;
+        }
+
+        if (topLevelMenuIndex == audioMenu) {
+            InternalSampleRateMenu::addSubmenu(menu, audioProcessor, SAMPLE_RATE_BASE_ID);
+            return;
+        }
+
+        if (topLevelMenuIndex != videoMenu) {
             return;
         }
 
@@ -82,7 +89,13 @@ void OsciMainMenuBarModel::resetMenuItems() {
 #endif
     };
 
-    customMenuSelectedLogic = [this, fileMenu, videoMenu](int menuItemID, int topLevelMenuIndex) {
+    customMenuSelectedLogic = [this, fileMenu, videoMenu, audioMenu](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == audioMenu
+            && InternalSampleRateMenu::handleMenuId(menuItemID, SAMPLE_RATE_BASE_ID, audioProcessor, [this] { editor.showPremiumSplashScreen(); })) {
+            resetMenuItems();
+            return true;
+        }
+
         if (topLevelMenuIndex == fileMenu && menuItemID >= RECENT_BASE_ID) {
             const int index = menuItemID - RECENT_BASE_ID;
             const auto file = audioProcessor.getRecentProjectFile(index);
@@ -167,7 +180,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             editor.resized();
         };
         aboutInfo.websiteUrl = "https://osci-render.com";
-        aboutInfo.githubUrl = "https://github.com/jameshball/osci-render";
+        aboutInfo.onSendFeedback = [this] { editor.openFeedback(); };
         aboutInfo.credits = {
             { "DJ_Level_3",          "Contributed several features to osci-render" },
             { "Anthony Hall",        "Added many new effects, and improved existing ones" },
@@ -182,6 +195,9 @@ void OsciMainMenuBarModel::resetMenuItems() {
     });
     addMenuItem(aboutMenu, "License and Updates...", [this] {
         editor.openLicenseAndUpdates();
+    });
+    addMenuItem(aboutMenu, "Send Feedback...", [this] {
+        editor.openFeedback();
     });
     addDiagnosticsMenuItems(aboutMenu, audioProcessor);
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {

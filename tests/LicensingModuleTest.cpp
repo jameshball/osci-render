@@ -134,6 +134,12 @@ public:
         expectEquals (osci::LicenseToken::releaseSigningMessage ("2.8.10.8", "mac-arm64", "ABCDEF"),
                       juce::String ("2.8.10.8|mac-arm64|abcdef"));
 
+        beginTest ("Feedback values match the API contract");
+        expectEquals (osci::FeedbackClient::kindToString (osci::FeedbackKind::bug), juce::String ("bug"));
+        expectEquals (osci::FeedbackClient::kindToString (osci::FeedbackKind::featureRequest), juce::String ("feature_request"));
+        expectEquals (osci::FeedbackClient::attachmentKindToString (osci::FeedbackAttachmentKind::screenshot), juce::String ("screenshot"));
+        expectEquals (osci::FeedbackClient::attachmentKindToString (osci::FeedbackAttachmentKind::project), juce::String ("project"));
+
         beginTest ("Release signature verifier uses configured public key");
         expect (osci::LicenseToken::verifyReleaseSignature ("2.8.10.8", "mac-arm64", "abcdef", makeSignature()));
 

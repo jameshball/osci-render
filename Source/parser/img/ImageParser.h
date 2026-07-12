@@ -21,6 +21,7 @@ public:
     osci::Point getSample(int blockSampleIndex = 0);
     int getNumFrames();
     int getCurrentFrame() const;
+    double getFrameRate() const { return frameRate.load(std::memory_order_relaxed); }
 
 private:
     static constexpr int liveInputMaxDimension = 512;
@@ -69,6 +70,7 @@ private:
     int width = -1;
     int height = -1;
     int count = 0;
+    std::atomic<double> frameRate{30.0};
 
     juce::TemporaryFile temp{".temp"};
 

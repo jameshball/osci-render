@@ -57,7 +57,7 @@ static ModulationRateConfig buildRandomRateConfig(OscirenderAudioProcessor& proc
     cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.randomParameters.setRateMode(i, m); };
     cfg.getTempoDivision = [&proc](int i) { return proc.randomParameters.getTempoDivision(i); };
     cfg.setTempoDivision = [&proc](int i, int d) { proc.randomParameters.setTempoDivision(i, d); };
-    cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
+    cfg.getCurrentBpm = [&proc]() { return proc.dawPosition.bpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_RANDOM_SOURCES;
     return cfg;
 }
