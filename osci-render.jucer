@@ -132,6 +132,7 @@
         <FILE id="WdfE7J" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="WnBZf0" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
         <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
+        <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="midi01" name="midi.svg" compile="0" resource="1" file="Resources/svg/midi.svg"/>
         <FILE id="YuYfcJ" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
@@ -617,6 +618,12 @@
               file="Source/visualiser/VisualiserSettings.cpp"/>
         <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserSettings.h"/>
+      </GROUP>
+      <GROUP id="{B801DAEE-F8DF-49E2-95CB-46F8FC480B33}" name="feedback">
+        <FILE id="FbRptC" name="FeedbackReportBuilder.cpp" compile="1" resource="0"
+              file="Source/feedback/FeedbackReportBuilder.cpp"/>
+        <FILE id="FbRptH" name="FeedbackReportBuilder.h" compile="0" resource="0"
+              file="Source/feedback/FeedbackReportBuilder.h"/>
       </GROUP>
       <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
