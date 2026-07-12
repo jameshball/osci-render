@@ -1,11 +1,46 @@
 #include "FileParser.h"
+#include "FileFormatRegistry.h"
 #include <numbers>
 #include "../CommonPluginEditor.h"
 #include "../PluginProcessor.h"
 #include "../components/OverlayDialogHelpers.h"
 
+#if OSCI_PREMIUM
+#include "lottie/DotLottieArchive.h"
+#endif
+
+#if OSCI_PREMIUM
+namespace {
+bool looksLikeLottieJson(const juce::String& jsonContent) {
+	auto parsed = juce::JSON::parse(jsonContent);
+	auto* object = parsed.getDynamicObject();
+	if (object == nullptr) {
+		return false;
+	}
+
+	return object->hasProperty(juce::Identifier("v"))
+		&& object->hasProperty(juce::Identifier("fr"))
+		&& object->hasProperty(juce::Identifier("op"))
+		&& object->getProperty(juce::Identifier("layers")).isArray();
+}
+
+void showLottieLoadError(OscirenderAudioProcessor& processor, juce::String title, juce::String message) {
+	juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(processor.getActiveEditor()));
+	juce::MessageManager::callAsync([editor, title = std::move(title), message = std::move(message)] {
+		osci::showOverlayMessageOrAlert(editor.getComponent(),
+			title,
+			message,
+			osci::ErrorOverlay::Icon::Warning,
+			juce::MessageBoxIconType::WarningIcon,
+			{ 500, 260 });
+	});
+}
+
+}
+#endif
+
 FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback)
-    : errorCallback(errorCallback), audioProcessor(p) {}
+    : audioProcessor(p), errorCallback(errorCallback) {}
 
 void FileParser::clearLoadedSource() {
 	object = nullptr;
@@ -15,8 +50,10 @@ void FileParser::clearLoadedSource() {
 	lua = nullptr;
 	img = nullptr;
 	wav = nullptr;
+	frameRate.store(30.0, std::memory_order_relaxed);
 #if OSCI_PREMIUM
 	fractal = nullptr;
+	lottie = nullptr;
 #endif
 }
 
@@ -99,14 +136,16 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			stream->setPosition(0);
 			gpla = std::make_shared<LineArtParser>(stream->readEntireStreamAsString());
 		}
-	} else if (extension == ".gif" || extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".mp4" || extension == ".mov") {
+		frameRate.store(gpla->getFrameRate(), std::memory_order_relaxed);
+	} else if (osci::files::isImage(extension)) {
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 
-		showFileSizeWarning(fileName, bytesRead, 20, (extension == ".mp4" || extension == ".mov") ? "video" : "image",
+		showFileSizeWarning(fileName, bytesRead, 20, osci::files::isVideo(extension) ? "video" : "image",
 			[this, buffer, extension]() {
 				img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
-                isAnimatable = extension == ".gif" || extension == ".mp4" || extension == ".mov";
+				frameRate.store(img->getFrameRate(), std::memory_order_relaxed);
+				isAnimatable = osci::files::isAnimated(extension);
                 sampleSource = true;
 			}
 		);
@@ -114,7 +153,41 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 #if OSCI_PREMIUM
 		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
 #endif
-	} else if (extension == ".wav" || extension == ".aiff" || extension == ".flac" || extension == ".ogg" || extension == ".mp3") {
+#if OSCI_PREMIUM
+	} else if (osci::files::isLottie(extension)) {
+		auto buffer = std::make_shared<juce::MemoryBlock>();
+		int bytesRead = stream->readIntoMemoryBlock(*buffer);
+		showFileSizeWarning(fileName, bytesRead, 10, "Lottie", [this, buffer, extension] {
+			juce::String jsonContent;
+			if (extension == ".lottie") {
+				jsonContent = osci::lottie::extractAnimationJsonFromDotLottie(*buffer);
+				if (jsonContent.isEmpty()) {
+					showLottieLoadError(audioProcessor,
+						"Error Loading Lottie",
+						"The .lottie archive did not contain a Lottie animation JSON.");
+					return;
+				}
+			} else {
+				jsonContent = juce::String::fromUTF8(static_cast<const char*>(buffer->getData()),
+					(int)buffer->getSize());
+			}
+
+			if (!looksLikeLottieJson(jsonContent)) {
+				showLottieLoadError(audioProcessor,
+					"Unsupported JSON",
+					"The selected JSON file does not look like a Lottie animation.");
+				return;
+			}
+
+			lottie = std::make_shared<OsciLottieParser>(jsonContent, [this](juce::String message) {
+				showLottieLoadError(audioProcessor, "Error Loading Lottie", std::move(message));
+			});
+			frameRate.store(lottie->getFrameRate(), std::memory_order_relaxed);
+			isAnimatable = true;
+			sampleSource = false;
+		});
+#endif
+	} else if (osci::files::isAudio(extension)) {
 		wav = std::make_shared<WavParser>([this] { return audioProcessor.currentSampleRate.load(); });
 		if (!wav->parse(std::move(stream))) {
 			juce::MessageManager::callAsync([this, fileName] {
@@ -129,7 +202,10 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		}
 	}
 
-	isAnimatable = gpla != nullptr || (img != nullptr && (extension == ".gif" || extension == ".mp4" || extension == ".mov"));
+	isAnimatable = gpla != nullptr || (img != nullptr && osci::files::isAnimated(extension));
+#if OSCI_PREMIUM
+	isAnimatable = isAnimatable || lottie != nullptr;
+#endif
 	sampleSource = lua != nullptr || img != nullptr || wav != nullptr;
 }
 
@@ -170,6 +246,9 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
         return gpla->draw();
     }
 #if OSCI_PREMIUM
+    else if (lottie != nullptr) {
+        return lottie->draw();
+    }
     else if (fractal != nullptr) {
         fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthEffect->getActualValue()));
         return fractal->draw();
@@ -264,6 +343,10 @@ std::shared_ptr<WavParser> FileParser::getWav() {
 std::shared_ptr<FractalParser> FileParser::getFractal() {
     return fractal;
 }
+
+std::shared_ptr<OsciLottieParser> FileParser::getLottie() {
+    return lottie;
+}
 #endif
 
 int FileParser::getNumFrames() {
@@ -272,6 +355,11 @@ int FileParser::getNumFrames() {
     } else if (img != nullptr) {
         return img->getNumFrames();
     }
+#if OSCI_PREMIUM
+    if (lottie != nullptr) {
+        return lottie->getNumFrames();
+    }
+#endif
     return 1; // Default to 1 frame for non-animatable content
 }
 
@@ -281,6 +369,11 @@ int FileParser::getCurrentFrame() {
     } else if (img != nullptr) {
         return img->getCurrentFrame();
     }
+#if OSCI_PREMIUM
+    if (lottie != nullptr) {
+        return lottie->getCurrentFrame();
+    }
+#endif
     return 0; // Default to frame 0 for non-animatable content
 }
 
@@ -290,4 +383,16 @@ void FileParser::setFrame(int frame) {
     } else if (img != nullptr) {
         img->setFrame(frame);
     }
+#if OSCI_PREMIUM
+    else if (lottie != nullptr) {
+        lottie->setFrame(frame);
+    }
+#endif
+}
+
+double FileParser::getFrameRate() const {
+	if (img != nullptr) {
+		return img->getFrameRate();
+	}
+	return frameRate.load(std::memory_order_relaxed);
 }

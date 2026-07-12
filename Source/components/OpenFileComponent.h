@@ -48,6 +48,7 @@ private:
     CategoryViews svgsCat { juce::GroupComponent({}, "SVGs"), osci::GridComponent{} };
 #if OSCI_PREMIUM
     CategoryViews fractalCat { juce::GroupComponent({}, "Fractals"), osci::GridComponent{} };
+    CategoryViews lottieCat { juce::GroupComponent({}, "Lottie"), osci::GridComponent{} };
 #endif
 
     // Helpers

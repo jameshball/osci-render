@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "parser/FileFormatRegistry.h"
 
 #include <cmath>
 #include <memory>
@@ -271,9 +272,7 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
         return false;
     }
     juce::File file(files[0]);
-    juce::String ext = file.getFileExtension().toLowerCase();
-    ext = ext.substring(1); // Remove the dot
-    return std::find(audioProcessor.FILE_EXTENSIONS.begin(), audioProcessor.FILE_EXTENSIONS.end(), ext) != audioProcessor.FILE_EXTENSIONS.end();
+    return osci::files::isSupportedSource(file) || osci::files::isOsciProject(file);
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -282,7 +281,7 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     }
     juce::File file(files[0]);
 
-    if (file.hasFileExtension("osci")) {
+    if (osci::files::isOsciProject(file)) {
         openProject(file);
     } else {
         stopTextureInput();
@@ -298,26 +297,7 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
 
 // Anything with these extensions will not be opened in the code editor
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
-    name = name.toLowerCase();
-    return name.endsWith(".gpla")
-        || name.endsWith(".gif")
-        || name.endsWith(".png")
-        || name.endsWith(".jpg")
-        || name.endsWith(".jpeg")
-        || name.endsWith(".wav")
-        || name.endsWith(".aiff")
-        || name.endsWith(".ogg")
-        || name.endsWith(".mp3")
-        || name.endsWith(".flac")
-        || name.endsWith(".mp4")
-        || name.endsWith(".mov")
-        // doesn't really make sense to edit SVG or OBJ files as text in this context
-        || name.endsWith(".svg")
-        || name.endsWith(".obj")
-#if OSCI_PREMIUM
-        || name.endsWith(".lsystem")
-#endif
-        ;
+    return !osci::files::isCodeEditable(name);
 }
 
 // parsersLock must be held
