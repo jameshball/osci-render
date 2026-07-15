@@ -20,11 +20,11 @@ jobs:
     name: Build (${{ matrix.project }} ${{ matrix.version }} @ ${{ matrix.os }})
     if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest, windows-2022]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-2022]
         project: [osci-render, sosci, osci-installer]
         version: [free, premium]
         exclude:
@@ -47,13 +47,21 @@ jobs:
         run: |
           if [[ "${{ matrix.os }}" == ubuntu* ]]; then
             echo "OS=linux" >> $GITHUB_ENV
-            echo "OS_ARTIFACT=linux" >> $GITHUB_ENV
+            if [[ "${{ matrix.os }}" == *-arm ]]; then
+              echo "OS_ARTIFACT=linux-arm64" >> $GITHUB_ENV
+              echo "RELEASE_PLATFORM=linux-arm64" >> $GITHUB_ENV
+            else
+              echo "OS_ARTIFACT=linux-x86_64" >> $GITHUB_ENV
+              echo "RELEASE_PLATFORM=linux-x86_64" >> $GITHUB_ENV
+            fi
           elif [[ "${{ matrix.os }}" == macos* ]]; then
             echo "OS=mac" >> $GITHUB_ENV
             echo "OS_ARTIFACT=macos" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=mac-universal" >> $GITHUB_ENV
           else
             echo "OS=win" >> $GITHUB_ENV
             echo "OS_ARTIFACT=windows" >> $GITHUB_ENV
+            echo "RELEASE_PLATFORM=win-x86_64" >> $GITHUB_ENV
           fi
 
           # sosci and osci-installer have only one release artifact name.
@@ -141,7 +149,7 @@ jobs:
 
       # Install MEGAcmd for pluginval-log uploads.
       - name: Install MEGAcmd (Linux/macOS)
-        if: matrix.project != 'osci-installer' && runner.os != 'Windows'
+        if: matrix.project != 'osci-installer' && runner.os != 'Windows' && matrix.os != 'ubuntu-24.04-arm'
         shell: bash
         run: |
           if [[ "${{ runner.os }}" == "Linux" ]]; then
@@ -209,7 +217,7 @@ jobs:
 
       # Upload pluginval logs and crash dumps to MEGA (runs even if pluginval failed)
       - name: Upload pluginval logs to MEGA (Unix)
-        if: always() && matrix.project != 'osci-installer' && runner.os != 'Windows' && hashFiles('bin/pluginval-logs/**') != ''
+        if: always() && matrix.project != 'osci-installer' && runner.os != 'Windows' && matrix.os != 'ubuntu-24.04-arm' && hashFiles('bin/pluginval-logs/**') != ''
         continue-on-error: true
         timeout-minutes: 5
         shell: bash
@@ -450,7 +458,7 @@ jobs:
           fi
 
           if [[ "${{ matrix.os }}" == macos* ]]; then
-            PLATFORM='mac-universal'
+            PLATFORM='${{ env.RELEASE_PLATFORM }}'
             if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
               ARTIFACT="bin/${OUTPUT_NAME}.dmg"
               KIND='dmg'
@@ -459,11 +467,11 @@ jobs:
               KIND='pkg'
             fi
           elif [[ "${{ matrix.os }}" == windows* ]]; then
-            PLATFORM='win-x86_64'
+            PLATFORM='${{ env.RELEASE_PLATFORM }}'
             ARTIFACT="bin/${OUTPUT_NAME}.exe"
             KIND='exe'
           elif [[ "${{ matrix.os }}" == ubuntu* ]]; then
-            PLATFORM='linux-x86_64'
+            PLATFORM='${{ env.RELEASE_PLATFORM }}'
             if [[ "${{ matrix.project }}" == "osci-installer" ]]; then
               ARTIFACT="bin/${OUTPUT_NAME}"
               KIND='binary'
