@@ -53,6 +53,7 @@ jobs:
             else
               echo "OS_ARTIFACT=linux-x86_64" >> $GITHUB_ENV
               echo "RELEASE_PLATFORM=linux-x86_64" >> $GITHUB_ENV
+              echo "CFLAGS=-mavx" >> $GITHUB_ENV
             fi
           elif [[ "${{ matrix.os }}" == macos* ]]; then
             echo "OS=mac" >> $GITHUB_ENV
