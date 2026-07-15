@@ -5,7 +5,7 @@
 #include "../../audio/modulation/ModAssignment.h"
 #include <osci_gui/osci_gui.h>
 
-namespace osci { class MidiCCManager; }
+namespace osci { class MidiManager; }
 
 class EffectComponent;
 
@@ -41,9 +41,9 @@ struct ModulationSourceConfig {
     bool alwaysShowTabs = false;
 
     // MIDI CC manager (optional) — enables Learn/Remove MIDI CC on depth indicators.
-    osci::MidiCCManager* midiCCManager = nullptr;
+    osci::MidiManager* midiManager = nullptr;
 
-    // Builds the custom-target id used by midiCCManager to map CC → depth for
+    // Builds the custom-target id used by midiManager to map CC → depth for
     // (sourceIndex, paramId). Usually OscirenderAudioProcessor::modDepthCustomId.
     std::function<juce::String(int sourceIndex, const juce::String& paramId)> buildModDepthCustomId;
 

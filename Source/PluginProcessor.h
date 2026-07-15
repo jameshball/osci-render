@@ -119,7 +119,7 @@ public:
 
     // --- Modulation-depth MIDI CC helpers ---
 
-    // Builds the MidiCCManager custom-target id for a (typeId, sourceIndex, paramId)
+    // Builds the MidiManager custom-target id for a (typeId, sourceIndex, paramId)
     // modulation assignment. Stable across sessions — used both at learn time and at load.
     static juce::String modDepthCustomId(const juce::String& typeId,
                                           int sourceIndex,
@@ -135,7 +135,7 @@ public:
 
     // Call this after mod assignments have been (re)loaded to re-attach live
     // setters to any custom-target CC mappings that were restored inert by
-    // MidiCCManager::load().
+    // MidiManager::load().
     void rebindAllModDepthCCMappings();
     DahdsrParams getCurrentDahdsrParams() const;
     DahdsrParams getCurrentDahdsrParams(int envIndex) const;
@@ -313,7 +313,7 @@ public:
     void addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data);
     void removeFile(int index);
     int numFiles();
-    void changeCurrentFile(int index);
+    void selectFile(int index);
     void openFile(int index);
     int getCurrentFileIndex();
     std::shared_ptr<FileParser> getCurrentFileParser();
@@ -328,6 +328,10 @@ public:
     std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
     void setObjectServerPort(int port);
+    static constexpr int kProgramChangeOff = -1;
+    static constexpr int kProgramChangeOmni = 0;
+    int getProgramChangeChannel() const { return programChangeChannel.load(std::memory_order_acquire); }
+    void setProgramChangeChannel(int channel);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);
@@ -368,6 +372,21 @@ private:
     juce::AudioBuffer<float> outputBuffer3d;
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
+
+    static constexpr int kNoPendingFileSelection = -2;
+    static constexpr int kProgramChangeSelectionOffset = 128;
+
+    enum class FileSelectionSource {
+        user,
+        internal,
+        parameter,
+        programChange,
+        stateRestore
+    };
+
+    std::atomic<int> programChangeChannel { kProgramChangeOmni };
+    std::atomic<int> pendingFileSelection { kNoPendingFileSelection };
+    std::atomic<int> lastObservedFileSelect { 1 };
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;
@@ -412,7 +431,9 @@ private:
     void changeSound(ShapeSound::Ptr sound);
 
     // parsersLock AND effectsLock must be held when calling this
-    void applyFileSelectLocked();
+    bool selectFileLocked(int index, FileSelectionSource source);
+    void applyPendingFileSelectionLocked();
+    void notifyFileSelectionChanged();
 
     std::atomic<ShapeSound*> activeShapeSound { nullptr };
 

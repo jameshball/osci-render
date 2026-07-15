@@ -220,11 +220,13 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
 }
 
 void OscirenderAudioProcessorEditor::openProject(const juce::File& file) {
+    const int programChangeChannel = audioProcessor.getProgramChangeChannel();
     if (file != juce::File()) {
         stopTextureInput();
     }
 
     CommonPluginEditor::openProject(file);
+    audioProcessor.setProgramChangeChannel(programChangeChannel);
 }
 
 void OscirenderAudioProcessorEditor::openProject() {
@@ -232,8 +234,10 @@ void OscirenderAudioProcessorEditor::openProject() {
 }
 
 void OscirenderAudioProcessorEditor::resetToDefault() {
+    const int programChangeChannel = audioProcessor.getProgramChangeChannel();
     stopTextureInput();
     CommonPluginEditor::resetToDefault();
+    audioProcessor.setProgramChangeChannel(programChangeChannel);
 }
 
 void OscirenderAudioProcessorEditor::stopTextureInput() {
@@ -698,13 +702,11 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         stopTextureInput();
     }
 
+    int targetFile = -1;
     {
         juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-
         int numFiles = audioProcessor.numFiles();
         int currentFile = audioProcessor.getCurrentFileIndex();
-        bool changedFile = false;
 
         if (textCharacter == 'j') {
             if (numFiles > 1) {
@@ -712,7 +714,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
                 if (currentFile == numFiles) {
                     currentFile = 0;
                 }
-                changedFile = true;
+                targetFile = currentFile;
             }
             consumeKey = true;
         } else if (textCharacter == 'k') {
@@ -721,15 +723,14 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
                 if (currentFile < 0) {
                     currentFile = numFiles - 1;
                 }
-                changedFile = true;
+                targetFile = currentFile;
             }
             consumeKey = true;
         }
+    }
 
-        if (changedFile) {
-            audioProcessor.changeCurrentFile(currentFile);
-            fileUpdated(audioProcessor.getCurrentFileName());
-        }
+    if (targetFile >= 0) {
+        audioProcessor.selectFile(targetFile);
     }
 
     if (CommonPluginEditor::keyPressed(key))
