@@ -653,7 +653,7 @@
                JUCE_WEB_BROWSER="0" JUCE_ASIO="1" JUCE_ENABLE_LIVE_CONSTANT_EDITOR="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="Jk6VkC"
-                bigIcon="Jk6VkC" externalLibraries="luajit" extraCompilerFlags="-mavx">
+                bigIcon="Jk6VkC" externalLibraries="luajit">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
                        libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>

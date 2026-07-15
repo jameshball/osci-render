@@ -230,7 +230,7 @@
                JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
-                bigIcon="KigaoN" extraCompilerFlags="-mavx">
+                bigIcon="KigaoN">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci"/>
