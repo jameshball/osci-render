@@ -141,8 +141,8 @@
       <FILE id="VmT1" name="VoiceManagerTest.cpp" compile="1" resource="0"
             file="tests/VoiceManagerTest.cpp"/>
       <FILE id="MtsT1" name="MTSESPTest.cpp" compile="1" resource="0" file="tests/MTSESPTest.cpp"/>
-      <FILE id="MdCCT" name="MidiCCManagerTest.cpp" compile="1" resource="0"
-            file="tests/MidiCCManagerTest.cpp"/>
+      <FILE id="MdCCT" name="MidiManagerTest.cpp" compile="1" resource="0"
+            file="tests/MidiManagerTest.cpp"/>
       <FILE id="LicMod" name="LicensingModuleTest.cpp" compile="1" resource="0"
             file="tests/LicensingModuleTest.cpp"/>
       <FILE id="FrmVal" name="FormValidationTest.cpp" compile="1" resource="0"

@@ -270,30 +270,30 @@ void CommonAudioProcessor::addAllParameters() {
         }
     }
     undoManager.clearUndoHistory();
-    midiCCManager.setUndoManager(&undoManager, &undoSuppressed, &stateTree);
+    midiManager.setUndoManager(&undoManager, &undoSuppressed, &stateTree);
 
-    // Set MidiCCManager on all parameters so UI components can auto-discover
+    // Set MidiManager on all parameters so UI components can auto-discover
     // CC support from the parameter they're bound to — no manual wiring needed.
     for (auto* param : getParameters()) {
         if (auto* fp = dynamic_cast<osci::FloatParameter*>(param))
-            fp->midiCCManager = &midiCCManager;
+            fp->midiManager = &midiManager;
         else if (auto* bp = dynamic_cast<osci::BooleanParameter*>(param))
-            bp->midiCCManager = &midiCCManager;
+            bp->midiManager = &midiManager;
         else if (auto* ip = dynamic_cast<osci::IntParameter*>(param))
-            ip->midiCCManager = &midiCCManager;
+            ip->midiManager = &midiManager;
     }
 }
 
 void CommonAudioProcessor::loadMidiCCState(const juce::XmlElement* xml) {
-    midiCCManager.load(xml, [this](const juce::String& paramId) -> osci::MidiCCManager::ParamBinding {
+    midiManager.load(xml, [this](const juce::String& paramId) -> osci::MidiManager::ParamBinding {
         if (auto* fp = getFloatParameter(paramId)) {
             auto* ep = dynamic_cast<osci::EffectParameter*>(fp);
-            return osci::MidiCCManager::makeBinding(fp, ep);
+            return osci::MidiManager::makeBinding(fp, ep);
         }
         if (auto* ip = getIntParameter(paramId))
-            return osci::MidiCCManager::makeBinding(ip);
+            return osci::MidiManager::makeBinding(ip);
         if (auto* bp = getBooleanParameter(paramId))
-            return osci::MidiCCManager::makeBinding(bp);
+            return osci::MidiManager::makeBinding(bp);
         return {};
     });
 }

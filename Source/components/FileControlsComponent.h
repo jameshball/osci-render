@@ -19,6 +19,8 @@ public:
     void updateFileLabel();
 
 private:
+    void showProgramChangeMenu(juce::Point<int> screenPosition);
+
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
 
@@ -28,7 +30,7 @@ private:
     osci::SvgButton rightArrow     { "rightArrow", juce::String(BinaryData::right_arrow_svg), juce::Colours::white };
     osci::SvgButton closeFileButton{ "closeFile",  juce::String(BinaryData::delete_svg),       juce::Colours::red };
     osci::SvgButton openFileButton { "openFiles", juce::String(BinaryData::plus_svg), juce::Colours::white, juce::Colours::white };
-    juce::Label fileLabel;
+    osci::ContextMenuLabel fileLabel;
     juce::Label fileNumberLabel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FileControlsComponent)

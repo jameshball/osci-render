@@ -35,7 +35,7 @@ static ModulationSourceConfig buildSidechainConfig(OscirenderAudioProcessor& pro
     cfg.setActiveTab = [&proc](int i) { proc.sidechainParameters.activeTab = i; };
 #if OSCI_PREMIUM
     cfg.typeId = "sc";
-    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.midiManager = &proc.midiManager;
     cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
         return OscirenderAudioProcessor::modDepthCustomId("sc", idx, pid);
     };

@@ -15,24 +15,32 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(leftArrow);
     leftArrow.setTooltip("Change to previous file (k).");
     leftArrow.onClick = [this] {
-        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-        int index = audioProcessor.getCurrentFileIndex();
-        if (index > 0) {
-            audioProcessor.changeCurrentFile(index - 1);
-            pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+        int targetIndex = -1;
+        {
+            juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+            const int currentIndex = audioProcessor.getCurrentFileIndex();
+            if (currentIndex > 0) {
+                targetIndex = currentIndex - 1;
+            }
+        }
+        if (targetIndex >= 0) {
+            audioProcessor.selectFile(targetIndex);
         }
     };
 
     addAndMakeVisible(rightArrow);
     rightArrow.setTooltip("Change to next file (j).");
     rightArrow.onClick = [this] {
-        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-        int index = audioProcessor.getCurrentFileIndex();
-        if (index < audioProcessor.numFiles() - 1) {
-            audioProcessor.changeCurrentFile(index + 1);
-            pluginEditor.fileUpdated(audioProcessor.getCurrentFileName());
+        int targetIndex = -1;
+        {
+            juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+            const int currentIndex = audioProcessor.getCurrentFileIndex();
+            if (currentIndex < audioProcessor.numFiles() - 1) {
+                targetIndex = currentIndex + 1;
+            }
+        }
+        if (targetIndex >= 0) {
+            audioProcessor.selectFile(targetIndex);
         }
     };
 
@@ -46,9 +54,12 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
             return;
         }
 
-        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
         int index = audioProcessor.getCurrentFileIndex();
-        if (index == -1) return;
+        if (index == -1) {
+            return;
+        }
         audioProcessor.removeFile(audioProcessor.getCurrentFileIndex());
         updateFileLabel();
     };
@@ -63,10 +74,44 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     // Current file label
     addAndMakeVisible(fileLabel);
     fileLabel.setJustificationType(juce::Justification::centred);
+    fileLabel.onContextMenu = [this](juce::Point<int> screenPosition) {
+        showProgramChangeMenu(screenPosition);
+    };
     updateFileLabel();
 
     addAndMakeVisible(fileNumberLabel);
     fileNumberLabel.setJustificationType(juce::Justification::right);
+}
+
+void FileControlsComponent::showProgramChangeMenu(juce::Point<int> screenPosition) {
+    constexpr int offId = 1;
+    constexpr int omniId = 2;
+    constexpr int firstChannelId = 100;
+
+    const int currentChannel = audioProcessor.getProgramChangeChannel();
+    juce::PopupMenu menu;
+    menu.addItem(offId, "Off", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOff);
+    menu.addItem(omniId, "Omni", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOmni);
+    menu.addSeparator();
+    for (int channel = 1; channel <= 16; channel++) {
+        menu.addItem(firstChannelId + channel, "Channel " + juce::String(channel), true, currentChannel == channel);
+    }
+
+    auto safeThis = juce::Component::SafePointer<FileControlsComponent>(this);
+    osci::showContextMenuAsync(std::move(menu), screenPosition, this, [safeThis, offId, omniId, firstChannelId](int result) {
+        if (safeThis == nullptr || result == 0) {
+            return;
+        }
+
+        if (result == offId) {
+            safeThis->audioProcessor.setProgramChangeChannel(OscirenderAudioProcessor::kProgramChangeOff);
+        } else if (result == omniId) {
+            safeThis->audioProcessor.setProgramChangeChannel(OscirenderAudioProcessor::kProgramChangeOmni);
+        } else if (result > firstChannelId && result <= firstChannelId + 16) {
+            safeThis->audioProcessor.setProgramChangeChannel(result - firstChannelId);
+        }
+        safeThis->updateFileLabel();
+    });
 }
 
 void FileControlsComponent::paint(juce::Graphics& g)
@@ -147,6 +192,15 @@ void FileControlsComponent::updateFileLabel()
         fileNumberLabel.setText(" (" + juce::String(audioProcessor.getCurrentFileIndex() + 1) + "/" + juce::String(audioProcessor.numFiles()) + ")", juce::dontSendNotification); 
         fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
     }
+
+    const int programChangeChannel = audioProcessor.getProgramChangeChannel();
+    juce::String programChangeDescription = "Off";
+    if (programChangeChannel == OscirenderAudioProcessor::kProgramChangeOmni) {
+        programChangeDescription = "Omni";
+    } else if (programChangeChannel > 0) {
+        programChangeDescription = "Channel " + juce::String(programChangeChannel);
+    }
+    fileLabel.setTooltip("Program Change input: " + programChangeDescription);
 
     resized();
 }
