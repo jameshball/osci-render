@@ -330,6 +330,7 @@ public:
     void setObjectServerPort(int port);
     static constexpr int kProgramChangeOff = -1;
     static constexpr int kProgramChangeOmni = 0;
+    static constexpr int kMaxProgramChangeFiles = 100;
     int getProgramChangeChannel() const { return programChangeChannel.load(std::memory_order_acquire); }
     void setProgramChangeChannel(int channel);
     void addErrorListener(ErrorListener* listener);
@@ -399,6 +400,7 @@ private:
     ShapeSound::Ptr liveTextureSound;
     juce::String liveTextureInputName;
     int liveTexturePreviousFile = -1;
+    int objectServerPreviousFile = -1;
     std::atomic<bool> textureInputActive{false};
     VoiceManager synth;
 #if OSCI_PREMIUM
