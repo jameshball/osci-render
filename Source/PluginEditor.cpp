@@ -299,6 +299,118 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
     }
 }
 
+void OscirenderAudioProcessorEditor::editFile(int index) {
+    juce::String fileName;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        if (index < 0 || index >= audioProcessor.numFiles()) {
+            return;
+        }
+        fileName = audioProcessor.getFileName(index);
+    }
+
+    if (isBinaryFile(fileName)) {
+        return;
+    }
+
+    if (editingCustomFunction) {
+        editCustomFunction(false);
+    }
+    audioProcessor.selectFile(index);
+    setCodeEditorVisible(true);
+}
+
+juce::String OscirenderAudioProcessorEditor::renameFile(int index, juce::String newName) {
+    const juce::String renamedFile = audioProcessor.renameFile(index, std::move(newName));
+    if (renamedFile.isEmpty()) {
+        return {};
+    }
+
+    juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+    const int modelIndex = index + 1;
+    if (modelIndex >= 0 && modelIndex < static_cast<int>(codeModels.size())) {
+        codeModels[(size_t)modelIndex]->setDisplayName(renamedFile);
+    }
+    if (audioProcessor.getCurrentFileIndex() == index) {
+        fileUpdated(renamedFile);
+    }
+    return renamedFile;
+}
+
+void OscirenderAudioProcessorEditor::duplicateFile(int index) {
+    const int modelIndex = index + 1;
+    if (modelIndex >= 0 && modelIndex < static_cast<int>(codeModels.size())) {
+        codeModels[(size_t)modelIndex]->flushPendingEdit();
+    }
+
+    const int duplicateIndex = audioProcessor.duplicateFile(index);
+    if (duplicateIndex < 0) {
+        return;
+    }
+
+    juce::String duplicateName;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        addCodeEditor(duplicateIndex);
+        duplicateName = audioProcessor.getFileName(duplicateIndex);
+        fileUpdated(duplicateName);
+    }
+}
+
+void OscirenderAudioProcessorEditor::exportFile(int index) {
+    const int modelIndex = index + 1;
+    if (modelIndex >= 0 && modelIndex < static_cast<int>(codeModels.size())) {
+        codeModels[(size_t)modelIndex]->flushPendingEdit();
+    }
+
+    juce::String fileName;
+    std::shared_ptr<juce::MemoryBlock> fileData;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        if (index < 0 || index >= audioProcessor.numFiles()) {
+            return;
+        }
+        fileName = audioProcessor.getFileName(index);
+        fileData = std::make_shared<juce::MemoryBlock>(*audioProcessor.getFileBlock(index));
+    }
+
+    const juce::String extension = fileName.fromLastOccurrenceOf(".", true, false);
+    const juce::String wildcard = extension.isNotEmpty() ? "*" + extension : "*";
+    const juce::File suggestedFile = audioProcessor.getLastOpenedDirectory().getChildFile(fileName);
+    chooser = std::make_unique<juce::FileChooser>("Export file", suggestedFile, wildcard);
+    const int flags = juce::FileBrowserComponent::saveMode
+        | juce::FileBrowserComponent::canSelectFiles
+        | juce::FileBrowserComponent::warnAboutOverwriting;
+
+    juce::Component::SafePointer<OscirenderAudioProcessorEditor> safeThis(this);
+    chooser->launchAsync(flags, [safeThis, fileData, extension](const juce::FileChooser& fileChooser) {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        juce::File outputFile = fileChooser.getResult();
+        if (outputFile == juce::File()) {
+            return;
+        }
+        if (outputFile.getFileExtension().isEmpty() && extension.isNotEmpty()) {
+            outputFile = outputFile.withFileExtension(extension);
+        }
+
+        safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
+        if (!outputFile.replaceWithData(fileData->getData(), fileData->getSize())) {
+            osci::showOverlayMessage(*safeThis.getComponent(), "Export file", "The file could not be written to the selected location.");
+        }
+    });
+}
+
+void OscirenderAudioProcessorEditor::removeFile(int index) {
+    juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
+    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
+    if (index >= 0 && index < audioProcessor.numFiles()) {
+        audioProcessor.removeFile(index);
+    }
+}
+
 // Anything with these extensions will not be opened in the code editor
 bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
     return !osci::files::isCodeEditable(name);
