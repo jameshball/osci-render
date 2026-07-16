@@ -48,6 +48,11 @@ public:
     void timerCallback() override;
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
+    void editFile(int index);
+    juce::String renameFile(int index, juce::String newName);
+    void duplicateFile(int index);
+    void exportFile(int index);
+    void removeFile(int index);
 
     void editCustomFunction(bool enabled);
 

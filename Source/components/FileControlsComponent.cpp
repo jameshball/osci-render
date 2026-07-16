@@ -1,6 +1,16 @@
 #include "FileControlsComponent.h"
 #include "../PluginEditor.h"
 
+namespace {
+
+int getTextWidth(const juce::Font& font, const juce::String& text) {
+    juce::GlyphArrangement glyphs;
+    glyphs.addLineOfText(font, text, 0.0f, 0.0f);
+    return juce::roundToInt(glyphs.getBoundingBox(0, glyphs.getNumGlyphs(), true).getWidth());
+}
+
+} // namespace
+
 FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor)
     : audioProcessor(p), pluginEditor(editor)
 {
@@ -54,14 +64,7 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
             return;
         }
 
-        juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-        int index = audioProcessor.getCurrentFileIndex();
-        if (index == -1) {
-            return;
-        }
-        audioProcessor.removeFile(audioProcessor.getCurrentFileIndex());
-        updateFileLabel();
+        removeFile(audioProcessor.getCurrentFileIndex());
     };
 
     // microphone icon
@@ -75,18 +78,55 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(fileLabel);
     fileLabel.setJustificationType(juce::Justification::centred);
     fileLabel.onContextMenu = [this](juce::Point<int> screenPosition) {
-        showProgramChangeMenu(screenPosition);
+        showFileMenu(screenPosition);
     };
+
+    addChildComponent(renameEditor);
+    renameEditor.setMultiLine(false);
+    renameEditor.setReturnKeyStartsNewLine(false);
+    renameEditor.setJustification(juce::Justification::centred);
+    renameEditor.setFont(fileLabel.getFont());
+    renameEditor.setIndents(8, 0);
+    renameEditor.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+    renameEditor.setColour(juce::TextEditor::textColourId, juce::Colours::white);
+    renameEditor.setColour(juce::TextEditor::outlineColourId, osci::Colours::grey().withAlpha(0.45f));
+    renameEditor.setColour(juce::TextEditor::focusedOutlineColourId, osci::Colours::accentColor());
+    renameEditor.setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(0.45f));
+    renameEditor.onReturnKey = [this] { finishRenameFile(true); };
+    renameEditor.onEscapeKey = [this] { finishRenameFile(false); };
+    renameEditor.onFocusLost = [this] { finishRenameFile(true); };
+    renameEditor.onTextChange = [this] { layoutRenameEditor(); };
+
+    addChildComponent(renameExtensionLabel);
+    renameExtensionLabel.setFont(fileLabel.getFont());
+    renameExtensionLabel.setJustificationType(juce::Justification::centredLeft);
+    renameExtensionLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.72f));
     updateFileLabel();
 
     addAndMakeVisible(fileNumberLabel);
     fileNumberLabel.setJustificationType(juce::Justification::right);
 }
 
-void FileControlsComponent::showProgramChangeMenu(juce::Point<int> screenPosition) {
-    constexpr int offId = 1;
-    constexpr int omniId = 2;
-    constexpr int firstChannelId = 100;
+void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
+    constexpr int editFileId = 1;
+    constexpr int renameFileId = 2;
+    constexpr int duplicateFileId = 3;
+    constexpr int exportFileId = 4;
+    constexpr int removeFileId = 5;
+    constexpr int offId = 100;
+    constexpr int omniId = 101;
+    constexpr int firstChannelId = 200;
+
+    int fileIndex = -1;
+    juce::String fileName;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        fileIndex = audioProcessor.getCurrentFileIndex();
+        if (fileIndex >= 0 && fileIndex < audioProcessor.numFiles()) {
+            fileName = audioProcessor.getFileName(fileIndex);
+        }
+    }
+    const bool hasFile = fileName.isNotEmpty();
 
     const int currentChannel = audioProcessor.getProgramChangeChannel();
     juce::PopupMenu channelMenu;
@@ -94,20 +134,45 @@ void FileControlsComponent::showProgramChangeMenu(juce::Point<int> screenPositio
         channelMenu.addItem(firstChannelId + channel, "Channel " + juce::String(channel), true, currentChannel == channel);
     }
 
+    juce::PopupMenu programChangeMenu;
+    programChangeMenu.addItem(offId, "Disabled", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOff);
+    programChangeMenu.addItem(omniId, "Omni", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOmni);
+    programChangeMenu.addSubMenu("Channel", channelMenu, true, nullptr, currentChannel > 0);
+
     juce::PopupMenu menu;
-    menu.addSectionHeader("Program Change File Selection");
-    menu.addItem(offId, "Off", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOff);
-    menu.addItem(omniId, "Omni (all channels)", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOmni);
-    menu.addSeparator();
-    menu.addSubMenu("MIDI Channel", channelMenu);
+    if (hasFile) {
+        if (!pluginEditor.isBinaryFile(fileName)) {
+            menu.addItem(editFileId, "Edit file");
+        }
+        menu.addItem(renameFileId, "Rename file...");
+        menu.addItem(duplicateFileId, "Duplicate file");
+        menu.addItem(exportFileId, "Export file...");
+        menu.addSeparator();
+    }
+    menu.addSubMenu("MIDI Program Change", programChangeMenu);
+    if (hasFile) {
+        menu.addSeparator();
+        menu.addItem(removeFileId, "Remove file");
+    }
 
     auto safeThis = juce::Component::SafePointer<FileControlsComponent>(this);
-    osci::showContextMenuAsync(std::move(menu), screenPosition, this, [safeThis, offId, omniId, firstChannelId](int result) {
+    osci::showContextMenuAsync(std::move(menu), screenPosition, this,
+        [safeThis, fileIndex, editFileId, renameFileId, duplicateFileId, exportFileId, removeFileId, offId, omniId, firstChannelId](int result) {
         if (safeThis == nullptr || result == 0) {
             return;
         }
 
-        if (result == offId) {
+        if (result == editFileId) {
+            safeThis->pluginEditor.editFile(fileIndex);
+        } else if (result == renameFileId) {
+            safeThis->beginRenameFile(fileIndex);
+        } else if (result == duplicateFileId) {
+            safeThis->pluginEditor.duplicateFile(fileIndex);
+        } else if (result == exportFileId) {
+            safeThis->pluginEditor.exportFile(fileIndex);
+        } else if (result == removeFileId) {
+            safeThis->removeFile(fileIndex);
+        } else if (result == offId) {
             safeThis->audioProcessor.setProgramChangeChannel(OscirenderAudioProcessor::kProgramChangeOff);
         } else if (result == omniId) {
             safeThis->audioProcessor.setProgramChangeChannel(OscirenderAudioProcessor::kProgramChangeOmni);
@@ -116,6 +181,81 @@ void FileControlsComponent::showProgramChangeMenu(juce::Point<int> screenPositio
         }
         safeThis->updateFileLabel();
     });
+}
+
+void FileControlsComponent::beginRenameFile(int index) {
+    juce::String fileName;
+    {
+        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
+        if (index < 0 || index >= audioProcessor.numFiles() || index != audioProcessor.getCurrentFileIndex()) {
+            return;
+        }
+        fileName = audioProcessor.getFileName(index);
+    }
+
+    const int extensionStart = fileName.lastIndexOfChar('.');
+    renameExtension = extensionStart > 0 ? fileName.substring(extensionStart) : juce::String();
+    const juce::String baseName = renameExtension.isNotEmpty() ? fileName.dropLastCharacters(renameExtension.length()) : fileName;
+    renameFileIndex = index;
+    renamingFile = true;
+    renameEditor.setText(baseName, false);
+    renameEditor.selectAll();
+    renameExtensionLabel.setText(renameExtension, juce::dontSendNotification);
+    fileLabel.setVisible(false);
+    renameEditor.setVisible(true);
+    renameExtensionLabel.setVisible(renameExtension.isNotEmpty());
+    layoutRenameEditor();
+    renameEditor.toFront(false);
+    renameEditor.grabKeyboardFocus();
+}
+
+void FileControlsComponent::finishRenameFile(bool commit) {
+    if (!renamingFile) {
+        return;
+    }
+
+    juce::String requestedName = renameEditor.getText().trim();
+    const int fileIndex = renameFileIndex;
+    renamingFile = false;
+    renameFileIndex = -1;
+    renameEditor.setVisible(false);
+    renameExtensionLabel.setVisible(false);
+    fileLabel.setVisible(true);
+
+    if (commit && requestedName.isNotEmpty()) {
+        requestedName += renameExtension;
+        pluginEditor.renameFile(fileIndex, std::move(requestedName));
+    }
+    renameExtension.clear();
+    updateFileLabel();
+}
+
+void FileControlsComponent::layoutRenameEditor() {
+    if (!renamingFile) {
+        return;
+    }
+
+    const auto area = fileLabel.getBounds().reduced(2, 0);
+    const auto font = renameEditor.getFont();
+    const int extensionWidth = renameExtension.isNotEmpty()
+        ? getTextWidth(font, renameExtension) + 6
+        : 0;
+    const int maximumEditorWidth = juce::jmax(1, area.getWidth() - extensionWidth);
+    const int minimumEditorWidth = juce::jmin(80, maximumEditorWidth);
+    const int editorWidth = juce::jlimit(minimumEditorWidth, maximumEditorWidth,
+        getTextWidth(font, renameEditor.getText()) + 28);
+    const int totalWidth = editorWidth + extensionWidth;
+    const int left = area.getCentreX() - totalWidth / 2;
+    renameEditor.setBounds(left, area.getY(), editorWidth, area.getHeight());
+    renameExtensionLabel.setBounds(left + editorWidth, area.getY(), extensionWidth, area.getHeight());
+}
+
+void FileControlsComponent::removeFile(int index) {
+    if (index < 0) {
+        return;
+    }
+    pluginEditor.removeFile(index);
+    updateFileLabel();
 }
 
 void FileControlsComponent::paint(juce::Graphics& g)
@@ -168,6 +308,7 @@ void FileControlsComponent::resized()
     }
     
     fileLabel.setBounds(bounds);
+    layoutRenameEditor();
 }
 
 void FileControlsComponent::updateFileLabel()
@@ -178,11 +319,19 @@ void FileControlsComponent::updateFileLabel()
     bool showLeftArrow  = audioProcessor.getCurrentFileIndex() > 0 && fileOpen;
     bool showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1 && fileOpen;
 
+    if (renamingFile && (!fileOpen || audioProcessor.getCurrentFileIndex() != renameFileIndex)) {
+        finishRenameFile(false);
+        return;
+    }
+
     openFileButton.setVisible(ableToOpenFiles);
     closeFileButton.setVisible(fileOpen || textureInputActive);
     leftArrow.setVisible(showLeftArrow);
     rightArrow.setVisible(showRightArrow);
     fileNumberLabel.setVisible(showLeftArrow || showRightArrow);
+    fileLabel.setVisible(!renamingFile);
+    renameEditor.setVisible(renamingFile && fileOpen);
+    renameExtensionLabel.setVisible(renamingFile && fileOpen && renameExtension.isNotEmpty());
 
     if (audioProcessor.objectServerRendering) {
         fileLabel.setText("Rendering from Blender", juce::dontSendNotification);

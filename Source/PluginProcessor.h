@@ -311,6 +311,8 @@ public:
     void addFile(juce::File file);
     void addFile(juce::String fileName, const char* data, const int size);
     void addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data);
+    juce::String renameFile(int index, juce::String newName);
+    int duplicateFile(int index);
     void removeFile(int index);
     int numFiles();
     void selectFile(int index);
