@@ -122,7 +122,7 @@ def main(argv: list[str]) -> int:
                    help='Gumroad product id, Payhip product link, product slug, or numeric internal id')
     p.add_argument('--semver', required=True, help='e.g. 2.6.0.0')
     p.add_argument('--platform', required=True,
-                   choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64'])
+                   choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64', 'linux-arm64'])
     p.add_argument('--release-track', default='alpha', choices=['alpha', 'beta', 'stable'],
                    help='Release track to register with the API. CI should publish alpha.')
     p.add_argument('--variant', default='premium', choices=['free', 'premium'],
