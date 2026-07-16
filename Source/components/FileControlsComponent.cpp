@@ -89,13 +89,17 @@ void FileControlsComponent::showProgramChangeMenu(juce::Point<int> screenPositio
     constexpr int firstChannelId = 100;
 
     const int currentChannel = audioProcessor.getProgramChangeChannel();
-    juce::PopupMenu menu;
-    menu.addItem(offId, "Off", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOff);
-    menu.addItem(omniId, "Omni", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOmni);
-    menu.addSeparator();
+    juce::PopupMenu channelMenu;
     for (int channel = 1; channel <= 16; channel++) {
-        menu.addItem(firstChannelId + channel, "Channel " + juce::String(channel), true, currentChannel == channel);
+        channelMenu.addItem(firstChannelId + channel, "Channel " + juce::String(channel), true, currentChannel == channel);
     }
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader("Program Change File Selection");
+    menu.addItem(offId, "Off", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOff);
+    menu.addItem(omniId, "Omni (all channels)", true, currentChannel == OscirenderAudioProcessor::kProgramChangeOmni);
+    menu.addSeparator();
+    menu.addSubMenu("MIDI Channel", channelMenu);
 
     auto safeThis = juce::Component::SafePointer<FileControlsComponent>(this);
     osci::showContextMenuAsync(std::move(menu), screenPosition, this, [safeThis, offId, omniId, firstChannelId](int result) {
@@ -192,15 +196,6 @@ void FileControlsComponent::updateFileLabel()
         fileNumberLabel.setText(" (" + juce::String(audioProcessor.getCurrentFileIndex() + 1) + "/" + juce::String(audioProcessor.numFiles()) + ")", juce::dontSendNotification); 
         fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
     }
-
-    const int programChangeChannel = audioProcessor.getProgramChangeChannel();
-    juce::String programChangeDescription = "Off";
-    if (programChangeChannel == OscirenderAudioProcessor::kProgramChangeOmni) {
-        programChangeDescription = "Omni";
-    } else if (programChangeChannel > 0) {
-        programChangeDescription = "Channel " + juce::String(programChangeChannel);
-    }
-    fileLabel.setTooltip("Program Change input: " + programChangeDescription);
 
     resized();
 }
