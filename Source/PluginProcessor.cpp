@@ -244,8 +244,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
                 return;
             }
 
+            const int program = message.getProgramChangeNumber();
+            if (program >= kMaxProgramChangeFiles) {
+                return;
+            }
+
             pendingFileSelection.store(
-                kProgramChangeSelectionOffset + message.getProgramChangeNumber(),
+                kProgramChangeSelectionOffset + program,
                 std::memory_order_release);
         });
 
@@ -421,12 +426,17 @@ bool OscirenderAudioProcessor::selectFileLocked(int index, FileSelectionSource s
         liveTextureInputName.clear();
     }
 
-    const int previousFileIndex = currentFile.load();
+    const int previousFileIndex = objectSourceActive ? objectServerPreviousFile : currentFile.load();
     auto* previousSound = activeShapeSound.load(std::memory_order_acquire);
 
     auto* selectedFileSound = index >= 0 ? sounds[(size_t)index].get() : defaultSound.get();
     auto* selectedSound = objectSourceActive ? objectServerSound.get() : selectedFileSound;
-    currentFile.store(index);
+    if (objectSourceActive) {
+        objectServerPreviousFile = index;
+        currentFile.store(-1);
+    } else {
+        currentFile.store(index);
+    }
     activeShapeSound.store(selectedSound, std::memory_order_release);
 
     if (index >= 0 && source != FileSelectionSource::parameter) {
@@ -742,7 +752,9 @@ void OscirenderAudioProcessor::startTextureInput(juce::String sourceName, int wi
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         if (!textureInputActive.load(std::memory_order_acquire)) {
-            liveTexturePreviousFile = currentFile.load();
+            liveTexturePreviousFile = objectServerRendering.load(std::memory_order_acquire)
+                ? objectServerPreviousFile
+                : currentFile.load();
         }
 
         if (liveTextureParser == nullptr) {
@@ -757,6 +769,7 @@ void OscirenderAudioProcessor::startTextureInput(juce::String sourceName, int wi
 
         liveTextureInputName = sourceName.trim().isNotEmpty() ? sourceName : "Texture Input";
         objectServerRendering.store(false);
+        objectServerPreviousFile = -1;
         textureInputActive.store(true, std::memory_order_release);
         currentFile.store(-1);
         changeSound(liveTextureSound);
@@ -827,12 +840,27 @@ void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
         juce::SpinLock::ScopedLockType lock1(parsersLock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        objectServerRendering = enabled;
+        const bool wasEnabled = objectServerRendering.load(std::memory_order_acquire);
+        if (enabled == wasEnabled) {
+            return;
+        }
+
         if (enabled) {
+            objectServerPreviousFile = textureInputActive.load(std::memory_order_acquire)
+                ? liveTexturePreviousFile
+                : currentFile.load();
+            textureInputActive.store(false, std::memory_order_release);
+            liveTextureInputName.clear();
+            liveTexturePreviousFile = -1;
+            objectServerRendering.store(true, std::memory_order_release);
+            currentFile.store(-1);
             changeSound(objectServerSound);
             notifyFileSelectionChanged();
         } else {
-            selectFileLocked(currentFile.load(), FileSelectionSource::internal);
+            const int restoreIndex = objectServerPreviousFile;
+            objectServerPreviousFile = -1;
+            objectServerRendering.store(false, std::memory_order_release);
+            selectFileLocked(restoreIndex, FileSelectionSource::internal);
         }
     }
 }
@@ -1330,7 +1358,12 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         auto base64 = fileBlocks[i]->toBase64Encoding();
         fileXml->addTextElement(base64);
     }
-    const int savedCurrentFile = textureInputActive.load(std::memory_order_acquire) ? liveTexturePreviousFile : currentFile.load();
+    int savedCurrentFile = currentFile.load();
+    if (textureInputActive.load(std::memory_order_acquire)) {
+        savedCurrentFile = liveTexturePreviousFile;
+    } else if (objectServerRendering.load(std::memory_order_acquire)) {
+        savedCurrentFile = objectServerPreviousFile;
+    }
     xml->setAttribute("currentFile", savedCurrentFile);
 
     recordingParameters.save(xml.get());
