@@ -23,41 +23,6 @@
 #include "parser/img/ImageParser.h"
 #endif
 
-namespace {
-
-juce::String makeUniqueFileName(const std::vector<juce::String>& fileNames, juce::String requestedName, int ignoredIndex = -1) {
-    const juce::String legalName = juce::File::createLegalFileName(requestedName.trim());
-    if (legalName.isEmpty()) {
-        return {};
-    }
-
-    auto nameExists = [&fileNames, ignoredIndex](const juce::String& candidate) {
-        for (int index = 0; index < static_cast<int>(fileNames.size()); index++) {
-            if (index != ignoredIndex && fileNames[(size_t)index].equalsIgnoreCase(candidate)) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    if (!nameExists(legalName)) {
-        return legalName;
-    }
-
-    const int extensionStart = legalName.lastIndexOfChar('.');
-    const bool hasExtension = extensionStart > 0;
-    const juce::String baseName = hasExtension ? legalName.substring(0, extensionStart) : legalName;
-    const juce::String extension = hasExtension ? legalName.substring(extensionStart) : juce::String();
-    for (int suffix = 2;; suffix++) {
-        const juce::String candidate = baseName + " " + juce::String(suffix) + extension;
-        if (!nameExists(candidate)) {
-            return candidate;
-        }
-    }
-}
-
-} // namespace
-
 //==============================================================================
 OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     // locking isn't necessary here because we are in the constructor
@@ -668,11 +633,11 @@ juce::String OscirenderAudioProcessor::renameFile(int index, juce::String newNam
         return {};
     }
 
-    const juce::String uniqueName = makeUniqueFileName(fileNames, std::move(newName), index);
-    if (uniqueName.isNotEmpty()) {
-        fileNames[(size_t)index] = uniqueName;
+    const juce::String legalName = juce::File::createLegalFileName(newName.trim());
+    if (legalName.isNotEmpty()) {
+        fileNames[(size_t)index] = legalName;
     }
-    return uniqueName;
+    return legalName;
 }
 
 int OscirenderAudioProcessor::duplicateFile(int index) {
@@ -682,14 +647,9 @@ int OscirenderAudioProcessor::duplicateFile(int index) {
         return -1;
     }
 
-    const juce::String sourceName = fileNames[(size_t)index];
-    const int extensionStart = sourceName.lastIndexOfChar('.');
-    const bool hasExtension = extensionStart > 0;
-    const juce::String baseName = hasExtension ? sourceName.substring(0, extensionStart) : sourceName;
-    const juce::String extension = hasExtension ? sourceName.substring(extensionStart) : juce::String();
-    const juce::String duplicateName = makeUniqueFileName(fileNames, baseName + " copy" + extension);
+    const juce::File sourceFile(fileNames[(size_t)index]);
     auto duplicateData = std::make_shared<juce::MemoryBlock>(*fileBlocks[(size_t)index]);
-    addFile(duplicateName, std::move(duplicateData));
+    addFile(sourceFile.getFileNameWithoutExtension() + " copy" + sourceFile.getFileExtension(), std::move(duplicateData));
     return static_cast<int>(fileBlocks.size()) - 1;
 }
 
