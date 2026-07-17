@@ -229,6 +229,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
 
     fileSelectionNotifier = std::make_unique<FileSelectionAsyncNotifier>(*this);
 
+    // Standalone MIDI routing is global; plugin instances start on Omni until their host restores instance state.
     const int savedProgramChangeChannel = juce::JUCEApplicationBase::isStandaloneApp()
         ? globalSettings.getInt("programChangeChannel", kProgramChangeOmni)
         : kProgramChangeOmni;
@@ -236,11 +237,8 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
     midiManager.setMessageHandler(osci::MidiManager::MessageType::programChange,
         [this](const juce::MidiMessage& message) {
             const int configuredChannel = programChangeChannel.load(std::memory_order_acquire);
-            const bool channelMatches = configuredChannel == kProgramChangeOmni
-                || configuredChannel == message.getChannel();
-            if (configuredChannel == kProgramChangeOff || !channelMatches
-                || textureInputActive.load(std::memory_order_acquire)
-                || objectServerRendering.load(std::memory_order_acquire)) {
+            const bool channelMatches = configuredChannel == kProgramChangeOmni || configuredChannel == message.getChannel();
+            if (configuredChannel == kProgramChangeOff || !channelMatches || textureInputActive.load(std::memory_order_acquire) || objectServerRendering.load(std::memory_order_acquire)) {
                 return;
             }
 
