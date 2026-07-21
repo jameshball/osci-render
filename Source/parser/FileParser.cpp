@@ -87,8 +87,6 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 
 				// Notify the processor to remove this parser
 				juce::MessageManager::callAsync([this] {
-					juce::SpinLock::ScopedLockType lock1(audioProcessor.getFileSelectionController().lock);
-					juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
 					audioProcessor.getFileSelectionController().removeParser(this);
 				});
 			},

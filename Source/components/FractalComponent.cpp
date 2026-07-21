@@ -168,8 +168,6 @@ void FractalComponent::updateFileFromUI() {
     block->append(json.toRawUTF8(), json.getNumBytesAsUTF8());
 
     auto& files = audioProcessor.getFileSelectionController();
-    juce::SpinLock::ScopedLockType lock1(files.lock);
-    juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
     files.updateFile(currentFileIndex, block);
 }
 

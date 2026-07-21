@@ -39,8 +39,6 @@
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
 
-class FileParser;
-
 //==============================================================================
 
 // Central 60 Hz timer that drives modulation display updates (LFO overlays,
@@ -241,7 +239,7 @@ public:
     // Used as glide source so any voice can portamento from the last note.
     double getLastPlayedNoteFreq() const;
 
-    ShapeSound* getActiveShapeSound() const { return static_cast<ShapeSound*>(fileSelection.getActiveSound()); }
+    ShapeSound* getActiveShapeSound() const { return fileSelection.getActiveSound(); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -292,19 +290,7 @@ public:
     void applyEffectOrder(const std::vector<juce::String>& order);
     FileSelectionController& getFileSelectionController() { return fileSelection; }
     const FileSelectionController& getFileSelectionController() const { return fileSelection; }
-    void startTextureInput(juce::String sourceName, int width, int height);
-    void updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
-    void stopTextureInput();
-    bool isTextureInputActive() const { return fileSelection.isTextureInputActive(); }
-    juce::String getTextureInputName() { return fileSelection.getTextureInputName(); }
-    void setObjectServerRendering(bool enabled);
-    bool isObjectServerRendering() const { return fileSelection.isObjectServerActive(); }
     void setObjectServerPort(int port);
-    static constexpr int kProgramChangeOff = FileSelectionController::programChangeOff;
-    static constexpr int kProgramChangeOmni = FileSelectionController::programChangeOmni;
-    static constexpr int kMaxProgramChangeFiles = FileSelectionController::maxSelectableFiles;
-    int getProgramChangeChannel() const { return fileSelection.getProgramChangeChannel(); }
-    void setProgramChangeChannel(int channel);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
     void notifyErrorListeners(int lineNumber, juce::String id, juce::String error);

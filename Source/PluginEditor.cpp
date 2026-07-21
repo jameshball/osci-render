@@ -190,12 +190,12 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
     auto* grabberPtr = grabber.get();
     grabber->inputStarted = [safeThis](juce::String sourceName, int width, int height) {
         if (safeThis != nullptr) {
-            safeThis->audioProcessor.startTextureInput(std::move(sourceName), width, height);
+            safeThis->audioProcessor.getFileSelectionController().startTextureInput(std::move(sourceName), width, height);
         }
     };
     grabber->inputStopped = [safeThis, grabberPtr] {
         if (safeThis != nullptr && safeThis->textureInputFrameGrabber.get() == grabberPtr) {
-            safeThis->audioProcessor.stopTextureInput();
+            safeThis->audioProcessor.getFileSelectionController().stopTextureInput();
             safeThis->textureInputFrameGrabber = nullptr;
         }
     };
@@ -208,12 +208,12 @@ void OscirenderAudioProcessorEditor::setTextureInputSource(osci::texture::Source
             return;
         }
 
-        safeThis->audioProcessor.stopTextureInput();
+        safeThis->audioProcessor.getFileSelectionController().stopTextureInput();
         safeThis->textureInputFrameGrabber = nullptr;
         osci::showOverlayMessage(*safeThis.getComponent(), "Texture Input", message);
     };
     grabber->frameReady = [processor = &audioProcessor](const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
-        processor->updateTextureInputFrame(rgba, width, height, verticallyFlipped);
+        processor->getFileSelectionController().updateTextureInputFrame(rgba, width, height, verticallyFlipped);
     };
 
     textureInputFrameGrabber = std::move(grabber);
@@ -242,7 +242,7 @@ void OscirenderAudioProcessorEditor::stopTextureInput() {
         textureInputFrameGrabber = nullptr;
     }
 
-    audioProcessor.stopTextureInput();
+    audioProcessor.getFileSelectionController().stopTextureInput();
 }
 
 bool OscirenderAudioProcessorEditor::isTextureInputActive() const {
@@ -254,7 +254,7 @@ juce::String OscirenderAudioProcessorEditor::getTextureInputName() const {
         return textureInputFrameGrabber->getSourceName();
     }
 
-    return audioProcessor.getTextureInputName();
+    return audioProcessor.getFileSelectionController().getTextureInputName();
 }
 
 void OscirenderAudioProcessorEditor::setCodeEditorVisible(std::optional<bool> visible) {
@@ -288,9 +288,6 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
         stopTextureInput();
 
         auto& fileSelection = audioProcessor.getFileSelectionController();
-        juce::SpinLock::ScopedLockType fileLock(fileSelection.lock);
-        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-
         const int fileIndex = fileSelection.addFile(file);
         addCodeEditor(fileIndex);
         fileUpdated(fileSelection.getCurrentFileName());
@@ -317,15 +314,12 @@ void OscirenderAudioProcessorEditor::editFile(int index) {
     }
     auto& files = audioProcessor.getFileSelectionController();
     files.clearPendingSelection();
-    juce::SpinLock::ScopedLockType fileLock(files.lock);
-    juce::SpinLock::ScopedLockType effectLock(audioProcessor.effectsLock);
     files.selectFile(index);
     setCodeEditorVisible(true);
 }
 
 juce::String OscirenderAudioProcessorEditor::renameFile(int index, juce::String newName) {
     auto& files = audioProcessor.getFileSelectionController();
-    juce::SpinLock::ScopedLockType lock(files.lock);
     const juce::String renamedFile = files.renameFile(index, std::move(newName));
     if (renamedFile.isEmpty()) {
         return {};
@@ -348,8 +342,6 @@ void OscirenderAudioProcessorEditor::duplicateFile(int index) {
     }
 
     auto& files = audioProcessor.getFileSelectionController();
-    juce::SpinLock::ScopedLockType fileLock(files.lock);
-    juce::SpinLock::ScopedLockType effectLock(audioProcessor.effectsLock);
     const int duplicateIndex = files.duplicateFile(index);
     if (duplicateIndex < 0) {
         return;
@@ -411,12 +403,7 @@ void OscirenderAudioProcessorEditor::exportFile(int index) {
 }
 
 void OscirenderAudioProcessorEditor::removeFile(int index) {
-    auto& files = audioProcessor.getFileSelectionController();
-    juce::SpinLock::ScopedLockType parserLock(files.lock);
-    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-    if (files.contains(index)) {
-        files.removeFile(index);
-    }
+    audioProcessor.getFileSelectionController().removeFile(index);
 }
 
 // Anything with these extensions will not be opened in the code editor
@@ -794,22 +781,27 @@ void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
 
 void OscirenderAudioProcessorEditor::commitCodeModel(osci::LuaScriptEditorModel& model) {
     auto& files = audioProcessor.getFileSelectionController();
-    juce::SpinLock::ScopedLockType parserLock(files.lock);
-    juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
-
     const auto code = model.getCode();
     if (model.getScriptId() == LuaEffectState::UNIQUE_ID) {
+        juce::SpinLock::ScopedLockType effectsLock(audioProcessor.effectsLock);
         if (audioProcessor.luaEffectState != nullptr) {
             audioProcessor.luaEffectState->updateCode(code);
         }
         return;
     }
 
-    for (int i = 0; i < files.size(); i++) {
-        if (files.getFileId(i) == model.getScriptId()) {
-            files.updateFile(i, std::make_shared<juce::MemoryBlock>(code.toRawUTF8(), code.getNumBytesAsUTF8() + 1));
-            return;
+    int fileIndex = -1;
+    {
+        juce::SpinLock::ScopedLockType fileLock(files.lock);
+        for (int i = 0; i < files.size(); i++) {
+            if (files.getFileId(i) == model.getScriptId()) {
+                fileIndex = i;
+                break;
+            }
         }
+    }
+    if (fileIndex >= 0) {
+        files.updateFile(fileIndex, std::make_shared<juce::MemoryBlock>(code.toRawUTF8(), code.getNumBytesAsUTF8() + 1));
     }
 }
 
@@ -826,7 +818,8 @@ std::shared_ptr<osci::LuaScriptEditorModel> OscirenderAudioProcessorEditor::getV
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     bool consumeKey = false;
     const juce::juce_wchar textCharacter = key.getTextCharacter();
-    if ((textCharacter == 'j' || textCharacter == 'k') && (isTextureInputActive() || audioProcessor.isTextureInputActive())) {
+    if ((textCharacter == 'j' || textCharacter == 'k')
+        && (isTextureInputActive() || audioProcessor.getFileSelectionController().isTextureInputActive())) {
         stopTextureInput();
     }
 
@@ -862,8 +855,6 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     if (targetFile >= 0) {
         auto& files = audioProcessor.getFileSelectionController();
         files.clearPendingSelection();
-        juce::SpinLock::ScopedLockType fileLock(files.lock);
-        juce::SpinLock::ScopedLockType effectLock(audioProcessor.effectsLock);
         files.selectFile(targetFile);
     }
 
