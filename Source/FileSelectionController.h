@@ -65,13 +65,6 @@ private:
 
     static constexpr int maxSelectableFiles = 100;
 
-    enum class Source {
-        user,
-        internal,
-        parameter,
-        stateRestore
-    };
-
     enum class ActiveSource {
         files,
         textureInput,
@@ -86,15 +79,15 @@ private:
         ShapeSound::Ptr sound;
     };
 
-    int addFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data,
+    int appendFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data,
         std::shared_ptr<FileParser> parser, ShapeSound::Ptr sound);
     void initialise();
     void clearFiles();
     void removeFile(int index, bool notifyEditor);
     void parseFile(int index);
-    void selectFile(int index, Source source);
-    void selectNoFile(Source source);
-    void select(std::optional<int> index, Source source, bool forceSoundUpdate = false);
+    void selectFileUnlocked(int index, bool forceSoundUpdate = false);
+    void applySelection(int index, bool forceSoundUpdate = false);
+    void clearSelection();
     std::optional<int> getSelectedFileForState() const noexcept;
     void updatePendingSelectionFromParameter() noexcept;
     void queueProgramChange(int program, int midiChannel) noexcept;
