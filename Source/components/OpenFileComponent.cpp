@@ -122,9 +122,9 @@ void OpenFileComponent::addExample(CategoryViews& cat, const juce::String& fileN
     }
     auto* item = new osci::GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
     item->onItemSelected = [this, fileName, data, size](const juce::String&) {
-        juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
-        audioProcessor.addFile(fileName, data, size);
-        int fileIndex = audioProcessor.numFiles() - 1;
+        auto& files = audioProcessor.getFileSelectionController();
+        juce::SpinLock::ScopedLockType fileLock(files.lock);
+        const int fileIndex = files.addFile(fileName, data, size);
         if (fileName.equalsIgnoreCase("shape_generator.lua"))
             initialiseShapeGeneratorLuaSliders(audioProcessor);
         const bool openEditor = fileName.endsWithIgnoreCase(".lua") || fileName.endsWithIgnoreCase(".txt");
@@ -208,7 +208,8 @@ void OpenFileComponent::openFileChooser()
                  juce::FileBrowserComponent::canSelectFiles;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooserRef) {
-        juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
+        auto& files = audioProcessor.getFileSelectionController();
+        juce::SpinLock::ScopedLockType fileLock(files.lock);
         
         auto results = chooserRef.getResults();
         if (results.isEmpty()) return;
@@ -218,8 +219,7 @@ void OpenFileComponent::openFileChooser()
         for (auto& file : results) {
             if (file != juce::File()) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-                audioProcessor.addFile(file);
-                int fileIndex = audioProcessor.numFiles() - 1;
+                const int fileIndex = files.addFile(file);
                 juce::String fileName = file.getFileName();
                 if (fileName.equalsIgnoreCase("shape_generator.lua"))
                     initialiseShapeGeneratorLuaSliders(audioProcessor);

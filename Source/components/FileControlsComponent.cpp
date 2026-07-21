@@ -25,32 +25,24 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(leftArrow);
     leftArrow.setTooltip("Change to previous file (k).");
     leftArrow.onClick = [this] {
-        int targetIndex = -1;
-        {
-            juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-            const auto currentIndex = audioProcessor.getCurrentFileIndex();
-            if (currentIndex.has_value() && *currentIndex > 0) {
-                targetIndex = static_cast<int>(*currentIndex - 1);
-            }
-        }
-        if (targetIndex >= 0) {
-            audioProcessor.selectFile(targetIndex);
+        auto& files = audioProcessor.getFileSelectionController();
+        juce::SpinLock::ScopedLockType fileLock(files.lock);
+        juce::SpinLock::ScopedLockType effectLock(audioProcessor.effectsLock);
+        const auto previousFile = files.getAdjacentFileIndex(-1);
+        if (previousFile.has_value()) {
+            files.selectFile(*previousFile);
         }
     };
 
     addAndMakeVisible(rightArrow);
     rightArrow.setTooltip("Change to next file (j).");
     rightArrow.onClick = [this] {
-        int targetIndex = -1;
-        {
-            juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-            const auto currentIndex = audioProcessor.getCurrentFileIndex();
-            if (currentIndex.has_value() && *currentIndex + 1 < static_cast<std::size_t>(audioProcessor.numFiles())) {
-                targetIndex = static_cast<int>(*currentIndex + 1);
-            }
-        }
-        if (targetIndex >= 0) {
-            audioProcessor.selectFile(targetIndex);
+        auto& files = audioProcessor.getFileSelectionController();
+        juce::SpinLock::ScopedLockType fileLock(files.lock);
+        juce::SpinLock::ScopedLockType effectLock(audioProcessor.effectsLock);
+        const auto nextFile = files.getAdjacentFileIndex(1);
+        if (nextFile.has_value()) {
+            files.selectFile(*nextFile);
         }
     };
 
@@ -64,9 +56,9 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
             return;
         }
 
-        const auto currentFile = audioProcessor.getCurrentFileIndex();
+        const auto currentFile = audioProcessor.getFileSelectionController().getCurrentFileIndex();
         if (currentFile.has_value()) {
-            removeFile(static_cast<int>(*currentFile));
+            removeFile(*currentFile);
         }
     };
 
@@ -123,11 +115,12 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
     int fileIndex = -1;
     juce::String fileName;
     {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        const auto currentFile = audioProcessor.getCurrentFileIndex();
-        fileIndex = currentFile.has_value() ? static_cast<int>(*currentFile) : -1;
-        if (fileIndex >= 0 && fileIndex < audioProcessor.numFiles()) {
-            fileName = audioProcessor.getFileName(fileIndex);
+        auto& files = audioProcessor.getFileSelectionController();
+        juce::SpinLock::ScopedLockType lock(files.lock);
+        const auto currentFile = files.getCurrentFileIndex();
+        fileIndex = currentFile.value_or(-1);
+        if (files.contains(fileIndex)) {
+            fileName = files.getFileName(fileIndex);
         }
     }
     const bool hasFile = fileName.isNotEmpty();
@@ -190,12 +183,12 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
 void FileControlsComponent::beginRenameFile(int index) {
     juce::String fileName;
     {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        if (index < 0 || index >= audioProcessor.numFiles()
-            || audioProcessor.getCurrentFileIndex() != static_cast<std::size_t>(index)) {
+        auto& files = audioProcessor.getFileSelectionController();
+        juce::SpinLock::ScopedLockType lock(files.lock);
+        if (!files.contains(index) || files.getCurrentFileIndex() != index) {
             return;
         }
-        fileName = audioProcessor.getFileName(index);
+        fileName = files.getFileName(index);
     }
 
     const int extensionStart = fileName.lastIndexOfChar('.');
@@ -320,13 +313,13 @@ void FileControlsComponent::updateFileLabel()
 {
     const bool textureInputActive = pluginEditor.isTextureInputActive() || audioProcessor.isTextureInputActive();
     bool ableToOpenFiles = !audioProcessor.isObjectServerRendering() && !audioProcessor.inputEnabled->getBoolValue() && !textureInputActive;
-    const auto currentFile = audioProcessor.getCurrentFileIndex();
+    auto& files = audioProcessor.getFileSelectionController();
+    const auto currentFile = files.getCurrentFileIndex();
     bool fileOpen = currentFile.has_value() && ableToOpenFiles;
     bool showLeftArrow = currentFile.has_value() && *currentFile > 0 && fileOpen;
-    bool showRightArrow = currentFile.has_value()
-        && *currentFile + 1 < static_cast<std::size_t>(audioProcessor.numFiles()) && fileOpen;
+    bool showRightArrow = files.getAdjacentFileIndex(1).has_value() && fileOpen;
 
-    if (renamingFile && (!fileOpen || currentFile != static_cast<std::size_t>(renameFileIndex))) {
+    if (renamingFile && (!fileOpen || currentFile != renameFileIndex)) {
         finishRenameFile(false);
         return;
     }
@@ -349,8 +342,8 @@ void FileControlsComponent::updateFileLabel()
     } else if (!currentFile.has_value()) {
         fileLabel.setText("No file open", juce::dontSendNotification);
     } else {
-        fileNumberLabel.setText(" (" + juce::String(static_cast<int>(*currentFile) + 1) + "/" + juce::String(audioProcessor.numFiles()) + ")", juce::dontSendNotification);
-        fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
+        fileNumberLabel.setText(" (" + juce::String(*currentFile + 1) + "/" + juce::String(files.size()) + ")", juce::dontSendNotification);
+        fileLabel.setText(files.getCurrentFileName(), juce::dontSendNotification);
     }
 
     resized();

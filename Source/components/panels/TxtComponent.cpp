@@ -11,7 +11,7 @@ TxtComponent::TxtComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessor
 	update();
 
 	onChange = [this]() {
-		juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+		juce::SpinLock::ScopedLockType lock1(audioProcessor.getFileSelectionController().lock);
 		juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
 		if (installedFonts.isEmpty()) {
 			return;

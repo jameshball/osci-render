@@ -633,10 +633,14 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
-      <FILE id="FSlMnC" name="FileSelectionManager.cpp" compile="1" resource="0"
-            file="Source/FileSelectionManager.cpp"/>
-      <FILE id="FSlMnH" name="FileSelectionManager.h" compile="0" resource="0"
-            file="Source/FileSelectionManager.h"/>
+      <FILE id="FSlMnC" name="FileSelectionController.cpp" compile="1" resource="0"
+            file="Source/FileSelectionController.cpp"/>
+      <FILE id="FSlMnH" name="FileSelectionController.h" compile="0" resource="0"
+            file="Source/FileSelectionController.h"/>
+      <FILE id="FSlDpC" name="FileSelectionControllerDependencies.cpp" compile="1"
+            resource="0" file="Source/FileSelectionControllerDependencies.cpp"/>
+      <FILE id="FSlDpH" name="FileSelectionControllerDependencies.h" compile="0"
+            resource="0" file="Source/FileSelectionControllerDependencies.h"/>
       <FILE id="JwAu01" name="JucewrightAutomation.h" compile="0" resource="0"
             file="Source/JucewrightAutomation.h"/>
       <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
