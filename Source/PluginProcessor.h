@@ -19,7 +19,7 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "FileSelectionManager.h"
+#include "FileSelectionController.h"
 #include "audio/synth/VoiceManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
@@ -181,16 +181,7 @@ public:
     // Updated on the audio thread; read by audio-thread voices and message-thread UI.
     osci::DawPosition dawPosition;
 
-    juce::SpinLock parsersLock;
-    std::vector<std::shared_ptr<FileParser>> parsers;
-    std::vector<ShapeSound::Ptr> sounds;
-    std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
-    std::vector<juce::String> fileNames;
-    int currentFileId = 0;
-    std::vector<int> fileIds;
-
     juce::ChangeBroadcaster broadcaster;
-    juce::ChangeBroadcaster fileChangeBroadcaster;
 
     // === Envelope modulation state ===
     EnvelopeParameters envelopeParameters;
@@ -250,9 +241,7 @@ public:
     // Used as glide source so any voice can portamento from the last note.
     double getLastPlayedNoteFreq() const;
 
-    // Audio-thread readable pointer to the currently selected sound.
-    // Lifetime is owned by defaultSound/objectServerSound/sounds[].
-    ShapeSound* getActiveShapeSound() const { return activeShapeSound.load(std::memory_order_acquire); }
+    ShapeSound* getActiveShapeSound() const { return static_cast<ShapeSound*>(fileSelection.getActiveSound()); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -294,45 +283,26 @@ public:
     const double FONT_SIZE = 1.0f;
     juce::Font font = juce::Font(juce::Font::getDefaultMonospacedFontName(), FONT_SIZE, juce::Font::plain);
 
-    ShapeSound::Ptr objectServerSound = new ShapeSound();
-
     std::function<void()> haltRecording;
-
-    // Add a callback to notify the editor when a file is removed
-    std::function<void(int)> fileRemovedCallback;
 
     void addLuaSlider();
     void updateEffectPrecedence();
     // Apply a saved effect ordering by ID.  Used by undo/redo — safe to call
     // even if the editor has been destroyed and recreated.
     void applyEffectOrder(const std::vector<juce::String>& order);
-    void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
-    void addFile(juce::File file);
-    void addFile(juce::String fileName, const char* data, const int size);
-    void addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data);
-    juce::String renameFile(int index, juce::String newName);
-    int duplicateFile(int index);
-    void removeFile(int index);
-    int numFiles();
-    void selectFile(int index);
-    void openFile(int index);
-    std::optional<std::size_t> getCurrentFileIndex() const;
-    std::shared_ptr<FileParser> getCurrentFileParser();
-    juce::String getCurrentFileName();
+    FileSelectionController& getFileSelectionController() { return fileSelection; }
+    const FileSelectionController& getFileSelectionController() const { return fileSelection; }
     void startTextureInput(juce::String sourceName, int width, int height);
     void updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
     void stopTextureInput();
     bool isTextureInputActive() const { return fileSelection.isTextureInputActive(); }
-    juce::String getTextureInputName();
-    juce::String getFileName(int index);
-    juce::String getFileId(int index);
-    std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
+    juce::String getTextureInputName() { return fileSelection.getTextureInputName(); }
     void setObjectServerRendering(bool enabled);
     bool isObjectServerRendering() const { return fileSelection.isObjectServerActive(); }
     void setObjectServerPort(int port);
-    static constexpr int kProgramChangeOff = FileSelectionManager::programChangeOff;
-    static constexpr int kProgramChangeOmni = FileSelectionManager::programChangeOmni;
-    static constexpr int kMaxProgramChangeFiles = FileSelectionManager::maxProgramChangeFiles;
+    static constexpr int kProgramChangeOff = FileSelectionController::programChangeOff;
+    static constexpr int kProgramChangeOmni = FileSelectionController::programChangeOmni;
+    static constexpr int kMaxProgramChangeFiles = FileSelectionController::maxSelectableFiles;
     int getProgramChangeChannel() const { return fileSelection.getProgramChangeChannel(); }
     void setProgramChangeChannel(int channel);
     void addErrorListener(ErrorListener* listener);
@@ -360,12 +330,6 @@ public:
         const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
         const std::shared_ptr<osci::Effect>& previewEffectInstance);
 
-    // Setter for the callback
-    void setFileRemovedCallback(std::function<void(int)> callback);
-
-    // Added declaration for the new `removeParser` method.
-    void removeParser(FileParser* parser);
-
 private:
     osci::FloatParameter* legacyAnimationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30.0f, -1000.0f, 1000.0f);
     std::atomic<bool> legacyAnimationRateActive{false};
@@ -376,19 +340,14 @@ private:
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
-    FileSelectionManager fileSelection;
-
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;
 
     juce::SpinLock errorListenersLock;
     std::vector<ErrorListener*> errorListeners;
 
-    ShapeSound::Ptr defaultSound;
-    std::shared_ptr<FileParser> liveTextureParser;
-    ShapeSound::Ptr liveTextureSound;
-    juce::String liveTextureInputName;
     VoiceManager synth;
+    FileSelectionController fileSelection;
 #if OSCI_PREMIUM
     mts_esp::Client mtsClient;
 #endif
@@ -416,22 +375,6 @@ private:
     osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
     void migrateLegacyAnimationRate(juce::XmlElement& legacyParameterXml);
-    // parsersLock AND effectsLock must be held when calling these.
-    bool selectFileLocked(std::optional<std::size_t> index, FileSelectionManager::Source source);
-    bool applyFileSelectionChangeLocked(const FileSelectionManager::Change& change);
-    void applyPendingFileSelectionLocked();
-    void notifyFileSelectionChanged();
-
-    std::atomic<ShapeSound*> activeShapeSound { nullptr };
-
-    struct FileSelectionAsyncNotifier : public juce::AsyncUpdater {
-        explicit FileSelectionAsyncNotifier(OscirenderAudioProcessor& p) : processor(p) {}
-        void handleAsyncUpdate() override { processor.fileChangeBroadcaster.sendChangeMessage(); }
-        OscirenderAudioProcessor& processor;
-    };
-
-    std::unique_ptr<FileSelectionAsyncNotifier> fileSelectionNotifier;
-
     void parseVersion(int result[3], const juce::String& input) {
         std::istringstream parser(input.toStdString());
         parser >> result[0];

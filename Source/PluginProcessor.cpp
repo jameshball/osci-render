@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 
+#include "FileSelectionControllerDependencies.h"
 #include "audio/AudioThreadGuard.h"
 #include "PluginEditor.h"
 #include "components/OverlayDialogHelpers.h"
@@ -24,7 +25,10 @@
 #endif
 
 //==============================================================================
-OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
+OscirenderAudioProcessor::OscirenderAudioProcessor()
+    : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true)
+          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      fileSelection(*fileSelect, font, createFileSelectionDependencies(*this, synth, errorCallback)) {
     // locking isn't necessary here because we are in the constructor
 
     objectServer.setCallbacks({
@@ -35,7 +39,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
             setObjectServerRendering(enabled);
         },
         [this](std::vector<std::unique_ptr<osci::Shape>>& frame, bool force) {
-            objectServerSound->addFrame(frame, force);
+            static_cast<ShapeSound&>(fileSelection.getObjectServerSound()).addFrame(frame, force);
         }
     });
 
@@ -222,12 +226,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor() : CommonAudioProcessor(Buse
         luaEffects[i]->parameters[0]->addListener(this);
     }
 
-    defaultSound = new ShapeSound(*this, std::make_shared<FileParser>(*this));
+    auto defaultParser = std::make_shared<FileParser>(*this);
+    ShapeSound::Ptr defaultSound = new ShapeSound(*this, defaultParser);
     synth.addSound(defaultSound.get());
-
-    activeShapeSound.store(defaultSound.get(), std::memory_order_release);
-
-    fileSelectionNotifier = std::make_unique<FileSelectionAsyncNotifier>(*this);
+    fileSelection.initialise(defaultSound.get(), new ShapeSound());
 
     // Standalone MIDI routing is global; plugin instances start on Omni until their host restores instance state.
     const int savedProgramChangeChannel = juce::JUCEApplicationBase::isStandaloneApp()
@@ -392,69 +394,6 @@ OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     voices->removeListener(this);
 }
 
-bool OscirenderAudioProcessor::selectFileLocked(
-    std::optional<std::size_t> index, FileSelectionManager::Source source) {
-    const auto change = fileSelection.select(index, source, fileBlocks.size());
-    return applyFileSelectionChangeLocked(change);
-}
-
-bool OscirenderAudioProcessor::applyFileSelectionChangeLocked(const FileSelectionManager::Change& change) {
-    if (change.changed && change.previousActiveSource == FileSelectionManager::ActiveSource::textureInput
-        && change.activeSource != FileSelectionManager::ActiveSource::textureInput) {
-        liveTextureInputName.clear();
-    }
-
-    if (change.updateParameter && change.fileIndex.has_value()) {
-        const int parameterValue = juce::jlimit(1, 100, static_cast<int>(*change.fileIndex) + 1);
-        if (change.notifyHost) {
-            fileSelect->setUnnormalisedValueNotifyingHost((float)parameterValue);
-        } else {
-            fileSelect->setValueUnnormalised((float)parameterValue);
-        }
-    }
-
-    if (!change.changed) {
-        return false;
-    }
-
-    auto* previousSound = activeShapeSound.load(std::memory_order_acquire);
-    ShapeSound* selectedSound = defaultSound.get();
-    if (change.activeSource == FileSelectionManager::ActiveSource::objectServer) {
-        selectedSound = objectServerSound.get();
-    } else if (change.activeSource == FileSelectionManager::ActiveSource::textureInput) {
-        selectedSound = liveTextureSound.get();
-    } else if (change.fileIndex.has_value() && *change.fileIndex < sounds.size()) {
-        selectedSound = sounds[*change.fileIndex].get();
-    }
-    activeShapeSound.store(selectedSound, std::memory_order_release);
-
-    assert(selectedSound != nullptr);
-    if (selectedSound != previousSound) {
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-            if (voice != nullptr) {
-                voice->updateSound(selectedSound);
-            }
-        }
-    }
-
-    notifyFileSelectionChanged();
-    return true;
-}
-
-void OscirenderAudioProcessor::applyPendingFileSelectionLocked() {
-    if (const auto change = fileSelection.applyPendingSelection(fileBlocks.size())) {
-        applyFileSelectionChangeLocked(*change);
-    }
-}
-
-void OscirenderAudioProcessor::notifyFileSelectionChanged() {
-    // Safe on the audio thread; AsyncUpdater delivers on the message thread.
-    if (fileSelectionNotifier != nullptr) {
-        fileSelectionNotifier->triggerAsyncUpdate();
-    }
-}
-
 void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const juce::AudioBuffer<float>&)> callback) {
     juce::SpinLock::ScopedLockType lock(audioThreadCallbackLock);
     audioThreadCallback = callback;
@@ -546,140 +485,6 @@ void OscirenderAudioProcessor::applyEffectOrder(const std::vector<juce::String>&
     broadcaster.sendChangeMessage();
 }
 
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block) {
-    if (index < 0 || index >= fileBlocks.size()) {
-        return;
-    }
-    fileBlocks[index] = block;
-    openFile(index);
-}
-
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::addFile(juce::File file) {
-    fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
-    fileNames.push_back(file.getFileName());
-    fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
-    sounds.push_back(new ShapeSound(*this, parsers.back()));
-    file.createInputStream()->readIntoMemoryBlock(*fileBlocks.back());
-
-    openFile(fileBlocks.size() - 1);
-}
-
-
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::addFile(juce::String fileName, const char* data, const int size) {
-    fileBlocks.push_back(std::make_shared<juce::MemoryBlock>());
-    fileNames.push_back(fileName);
-    fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
-    sounds.push_back(new ShapeSound(*this, parsers.back()));
-    fileBlocks.back()->append(data, size);
-
-    openFile(fileBlocks.size() - 1);
-}
-
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data) {
-    fileBlocks.push_back(data);
-    fileNames.push_back(fileName);
-    fileIds.push_back(currentFileId++);
-    parsers.push_back(std::make_shared<FileParser>(*this, errorCallback));
-    sounds.push_back(new ShapeSound(*this, parsers.back()));
-
-    openFile(fileBlocks.size() - 1);
-}
-
-juce::String OscirenderAudioProcessor::renameFile(int index, juce::String newName) {
-    juce::SpinLock::ScopedLockType lock(parsersLock);
-    if (index < 0 || index >= static_cast<int>(fileNames.size())) {
-        return {};
-    }
-
-    const juce::String legalName = juce::File::createLegalFileName(newName.trim());
-    if (legalName.isNotEmpty()) {
-        fileNames[(size_t)index] = legalName;
-    }
-    return legalName;
-}
-
-int OscirenderAudioProcessor::duplicateFile(int index) {
-    juce::SpinLock::ScopedLockType parserLock(parsersLock);
-    juce::SpinLock::ScopedLockType effectLock(effectsLock);
-    if (index < 0 || index >= static_cast<int>(fileBlocks.size())) {
-        return -1;
-    }
-
-    const juce::File sourceFile(fileNames[(size_t)index]);
-    auto duplicateData = std::make_shared<juce::MemoryBlock>(*fileBlocks[(size_t)index]);
-    addFile(sourceFile.getFileNameWithoutExtension() + " copy" + sourceFile.getFileExtension(), std::move(duplicateData));
-    return static_cast<int>(fileBlocks.size()) - 1;
-}
-
-// Setter for the callback
-void OscirenderAudioProcessor::setFileRemovedCallback(std::function<void(int)> callback) {
-    fileRemovedCallback = std::move(callback);
-}
-
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::removeFile(int index) {
-    if (index < 0 || index >= fileBlocks.size()) {
-        return;
-    }
-    fileBlocks.erase(fileBlocks.begin() + index);
-    fileNames.erase(fileNames.begin() + index);
-    fileIds.erase(fileIds.begin() + index);
-    parsers.erase(parsers.begin() + index);
-    sounds.erase(sounds.begin() + index);
-
-    applyFileSelectionChangeLocked(fileSelection.removeFile((std::size_t)index, fileBlocks.size()));
-
-    // Notify the editor about the file removal
-    if (fileRemovedCallback) {
-        fileRemovedCallback(index);
-    }
-}
-
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::removeParser(FileParser* parser) {
-    int parserIndex = -1;
-    for (int i = 0; i < parsers.size(); i++) {
-        if (parsers[i].get() == parser) {
-            parserIndex = i;
-            break;
-        }
-    }
-
-    if (parserIndex >= 0) {
-        removeFile(parserIndex);
-    }
-}
-
-int OscirenderAudioProcessor::numFiles() {
-    return fileBlocks.size();
-}
-
-// used for opening NEW files. Should be the default way of opening files as
-// it will reparse any existing files, so it is safer.
-// parsersLock AND effectsLock must be locked before calling this function
-void OscirenderAudioProcessor::openFile(int index) {
-    if (index < 0 || index >= fileBlocks.size()) {
-        return;
-    }
-    parsers[index]->parse(juce::String(fileIds[index]), fileNames[index], fileNames[index].fromLastOccurrenceOf(".", true, false).toLowerCase(), std::make_unique<juce::MemoryInputStream>(*fileBlocks[index], false), font);
-    selectFileLocked((std::size_t)index, FileSelectionManager::Source::internal);
-}
-
-void OscirenderAudioProcessor::selectFile(int index) {
-    fileSelection.clearPendingSelection();
-    juce::SpinLock::ScopedLockType parserLock(parsersLock);
-    juce::SpinLock::ScopedLockType effectLock(effectsLock);
-    if (index >= 0) {
-        selectFileLocked((std::size_t)index, FileSelectionManager::Source::user);
-    }
-}
-
 void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String id, juce::String error) {
     juce::SpinLock::ScopedLockType lock(errorListenersLock);
     for (auto listener : errorListeners) {
@@ -689,108 +494,32 @@ void OscirenderAudioProcessor::notifyErrorListeners(int lineNumber, juce::String
     }
 }
 
-std::optional<std::size_t> OscirenderAudioProcessor::getCurrentFileIndex() const {
-    return fileSelection.getVisibleFile();
-}
-
-std::shared_ptr<FileParser> OscirenderAudioProcessor::getCurrentFileParser() {
-    if (fileSelection.isTextureInputActive()) {
-        return liveTextureParser;
-    }
-
-    const auto index = fileSelection.getVisibleFile();
-    if (!index.has_value() || *index >= parsers.size()) {
-        return nullptr;
-    }
-    return parsers[*index];
-}
-
-juce::String OscirenderAudioProcessor::getCurrentFileName() {
-    if (fileSelection.isTextureInputActive()) {
-        return liveTextureInputName;
-    }
-
-    const auto index = fileSelection.getVisibleFile();
-    return index.has_value() && *index < fileNames.size() ? fileNames[*index] : juce::String();
-}
-
 void OscirenderAudioProcessor::startTextureInput(juce::String sourceName, int width, int height) {
     if (inputEnabled->getBoolValue()) {
         inputEnabled->setBoolValueNotifyingHost(false);
     }
 
-    bool selectionChanged = false;
-    {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
-        juce::SpinLock::ScopedLockType lock2(effectsLock);
-
-        if (liveTextureParser == nullptr) {
-            liveTextureParser = std::make_shared<FileParser>(*this, errorCallback);
-        }
-
-        liveTextureParser->prepareLiveImageInput(width, height);
-
-        if (liveTextureSound == nullptr) {
-            liveTextureSound = new ShapeSound(*this, liveTextureParser);
-        }
-
-        liveTextureInputName = sourceName.trim().isNotEmpty() ? sourceName : "Texture Input";
-        selectionChanged = applyFileSelectionChangeLocked(fileSelection.startTextureInput());
-    }
-
-    if (!selectionChanged) {
-        notifyFileSelectionChanged();
-    }
+    juce::SpinLock::ScopedLockType fileLock(fileSelection.lock);
+    juce::SpinLock::ScopedLockType effectLock(effectsLock);
+    fileSelection.startTextureInput(std::move(sourceName), width, height);
 }
 
 void OscirenderAudioProcessor::updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
-    std::shared_ptr<FileParser> parser;
-    {
-        juce::SpinLock::ScopedLockType lock(parsersLock);
-        if (!fileSelection.isTextureInputActive() || liveTextureParser == nullptr) {
-            return;
-        }
-        parser = liveTextureParser;
-    }
-
-    parser->updateLiveImageFrame(rgba, width, height, verticallyFlipped);
+    fileSelection.updateTextureInputFrame(rgba, width, height, verticallyFlipped);
 }
 
 void OscirenderAudioProcessor::stopTextureInput() {
-    juce::SpinLock::ScopedLockType lock1(parsersLock);
-    juce::SpinLock::ScopedLockType lock2(effectsLock);
-    if (fileSelection.isTextureInputActive()) {
-        applyFileSelectionChangeLocked(fileSelection.stopTextureInput());
-    }
-}
-
-juce::String OscirenderAudioProcessor::getTextureInputName() {
-    return liveTextureInputName;
-}
-
-juce::String OscirenderAudioProcessor::getFileName(int index) {
-    return fileNames[index];
-}
-
-juce::String OscirenderAudioProcessor::getFileId(int index) {
-    return juce::String(fileIds[index]);
-}
-
-std::shared_ptr<juce::MemoryBlock> OscirenderAudioProcessor::getFileBlock(int index) {
-    return fileBlocks[index];
+    juce::SpinLock::ScopedLockType fileLock(fileSelection.lock);
+    juce::SpinLock::ScopedLockType effectLock(effectsLock);
+    fileSelection.stopTextureInput();
 }
 
 void OscirenderAudioProcessor::setObjectServerRendering(bool enabled) {
     {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        const bool wasEnabled = fileSelection.isObjectServerActive();
-        if (enabled == wasEnabled) {
-            return;
-        }
-
-        applyFileSelectionChangeLocked(fileSelection.setObjectServerActive(enabled));
+        fileSelection.setObjectServerActive(enabled);
     }
 }
 
@@ -800,10 +529,9 @@ void OscirenderAudioProcessor::setObjectServerPort(int port) {
 }
 
 void OscirenderAudioProcessor::setProgramChangeChannel(int channel) {
-    const int validatedChannel = juce::jlimit(kProgramChangeOff, 16, channel);
-    fileSelection.setProgramChangeChannel(validatedChannel);
+    fileSelection.setProgramChangeChannel(channel);
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        globalSettings.set("programChangeChannel", validatedChannel);
+        globalSettings.set("programChangeChannel", fileSelection.getProgramChangeChannel());
         globalSettings.save();
     }
 }
@@ -1067,10 +795,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         applyToggleableEffectsGlobally = true;
         toggleableExternalInput = &inputBuffer;
     } else {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        applyPendingFileSelectionLocked();
+        fileSelection.applyPendingSelection();
 
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
     }
@@ -1101,10 +829,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         // Rate = native file framerate * user-controlled speed multiplier.
         double nativeRate = 30.0;
         {
-            juce::SpinLock::ScopedLockType lock1(parsersLock);
-            const auto fileIndex = fileSelection.getVisibleFile();
-            if (fileIndex.has_value() && *fileIndex < sounds.size() && sounds[*fileIndex]->parser != nullptr) {
-                nativeRate = sounds[*fileIndex]->parser->getFrameRate();
+            juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
+            const auto parser = fileSelection.getCurrentParser();
+            if (parser != nullptr) {
+                nativeRate = parser->getFrameRate();
             }
         }
 
@@ -1127,12 +855,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
             animationFrame = animationFrame + frameIncrement;
         }
 
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-        const auto fileIndex = fileSelection.getVisibleFile();
-        if (fileIndex.has_value() && *fileIndex < sounds.size() && sounds[*fileIndex]->parser != nullptr
-            && sounds[*fileIndex]->parser->isAnimatable) {
-            auto parser = sounds[*fileIndex]->parser;
+        const auto parser = fileSelection.getCurrentParser();
+        if (parser != nullptr && parser->isAnimatable) {
             const int totalFrames = parser->getNumFrames();
             if (totalFrames > 0) {
             if (loopAnimation->getBoolValue()) {
@@ -1151,13 +877,13 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
 
     {
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         // If we're in audio-input mode, the synth path above didn't run, but we still
         // want file selection to affect Lua/custom processing on the audio thread.
         if (usingInput) {
-            applyPendingFileSelectionLocked();
+            fileSelection.applyPendingSelection();
         }
 
         // Note: toggleableEffects/previewEffect are applied via shared helper:
@@ -1168,8 +894,8 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         for (auto& effect : permanentEffects) {
             effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
         }
-        const auto fileIndex = fileSelection.getVisibleFile();
-        auto lua = fileIndex.has_value() && *fileIndex < sounds.size() ? sounds[*fileIndex]->parser->getLua() : nullptr;
+        const auto parser = fileSelection.getCurrentParser();
+        auto lua = parser != nullptr ? parser->getLua() : nullptr;
         if (lua != nullptr || custom->enabled->getBoolValue()) {
             for (auto& effect : luaEffects) {
                 effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
@@ -1223,7 +949,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         haltRecording();
     }
 
-    juce::SpinLock::ScopedLockType lock1(parsersLock);
+    juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
@@ -1279,14 +1005,14 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     auto filesXml = xml->createNewChildElement("files");
 
-    for (int i = 0; i < fileBlocks.size(); i++) {
+    for (int i = 0; i < fileSelection.size(); ++i) {
         auto fileXml = filesXml->createNewChildElement("file");
-        fileXml->setAttribute("name", fileNames[i]);
-        auto base64 = fileBlocks[i]->toBase64Encoding();
+        fileXml->setAttribute("name", fileSelection.getFileName(i));
+        auto base64 = fileSelection.getFileData(i)->toBase64Encoding();
         fileXml->addTextElement(base64);
     }
-    const auto savedCurrentFile = fileSelection.getSelectedFile();
-    xml->setAttribute("currentFile", savedCurrentFile.has_value() ? static_cast<int>(*savedCurrentFile) : -1);
+    const auto savedCurrentFile = fileSelection.getSelectedFileForState();
+    xml->setAttribute("currentFile", savedCurrentFile.value_or(-1));
 
     recordingParameters.save(xml.get());
 
@@ -1296,7 +1022,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     copyXmlToBinary(*xml, destData);
     juce::Logger::writeToLog("getStateInformation: saved " + juce::String(effects.size()) + " effects, "
-        + juce::String(fileBlocks.size()) + " files, " + juce::String((int)destData.getSize()) + " bytes");
+        + juce::String(fileSelection.size()) + " files, " + juce::String((int)destData.getSize()) + " bytes");
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
@@ -1325,7 +1051,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
     restoreStandaloneProjectFilePathFromXml(*xml);
 
-    if (xml->hasAttribute("programChangeChannel")) {
+    if (!juce::JUCEApplicationBase::isStandaloneApp() && xml->hasAttribute("programChangeChannel")) {
         setProgramChangeChannel(xml->getIntAttribute("programChangeChannel", kProgramChangeOmni));
     }
 
@@ -1337,7 +1063,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
         juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
 
-        juce::SpinLock::ScopedLockType lock1(parsersLock);
+        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         const bool serializedLegacyAnimationRateActive = xml->getBoolAttribute("legacyAnimationRateActive", false);
@@ -1419,11 +1145,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             font = juce::Font(family, FONT_SIZE, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
         }
 
-        // close all files
-        auto numFiles = fileBlocks.size();
-        for (int i = 0; i < numFiles; i++) {
-            removeFile(0);
-        }
+        fileSelection.clear();
 
         auto filesXml = xml->getChildByName("files");
         if (filesXml != nullptr) {
@@ -1443,7 +1165,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                     fileBlock->fromBase64Encoding(text);
                 }
 
-                addFile(fileName, fileBlock);
+                fileSelection.addFile(fileName, fileBlock);
                 fileCount++;
             }
             juce::Logger::writeToLog("setStateInformation: restored " + juce::String(fileCount) + " files");
@@ -1452,8 +1174,11 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         }
         fileSelection.clearPendingSelection();
         const int restoredFile = xml->getIntAttribute("currentFile", -1);
-        selectFileLocked(restoredFile >= 0 ? std::optional<std::size_t>((std::size_t)restoredFile) : std::nullopt,
-            FileSelectionManager::Source::stateRestore);
+        if (restoredFile >= 0) {
+            fileSelection.selectFile(restoredFile, FileSelectionController::Source::stateRestore);
+        } else {
+            fileSelection.selectNoFile(FileSelectionController::Source::stateRestore);
+        }
 
         if (legacyAnimationRateXml != nullptr
             && !hasAnimationSpeedState
@@ -1555,7 +1280,7 @@ void OscirenderAudioProcessor::migrateLegacyAnimationRate(juce::XmlElement& lega
     legacyAnimationRate->load(&legacyParameterXml);
 
     double nativeFrameRate = 30.0;
-    auto parser = getCurrentFileParser();
+    auto parser = fileSelection.getCurrentParser();
     if (parser != nullptr && parser->getFrameRate() > 0.0) {
         nativeFrameRate = parser->getFrameRate();
     }

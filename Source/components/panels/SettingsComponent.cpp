@@ -586,11 +586,12 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
         // do nothing
     } else if (extension == ".lsystem") {
 #if OSCI_PREMIUM
-        const auto fileIndex = audioProcessor.getCurrentFileIndex();
+        auto& files = audioProcessor.getFileSelectionController();
+        const auto fileIndex = files.getCurrentFileIndex();
         if (fileIndex.has_value()) {
-            auto parser = audioProcessor.getCurrentFileParser();
+            auto parser = files.getCurrentParser();
             if (parser != nullptr) {
-                fractalEditor.setParser(parser->getFractal(), static_cast<int>(*fileIndex));
+                fractalEditor.setParser(parser->getFractal(), *fileIndex);
                 fractalEditor.setVisible(true);
             }
         }

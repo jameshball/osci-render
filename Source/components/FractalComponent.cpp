@@ -167,9 +167,10 @@ void FractalComponent::updateFileFromUI() {
     auto block = std::make_shared<juce::MemoryBlock>();
     block->append(json.toRawUTF8(), json.getNumBytesAsUTF8());
 
-    juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
+    auto& files = audioProcessor.getFileSelectionController();
+    juce::SpinLock::ScopedLockType lock1(files.lock);
     juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-    audioProcessor.updateFileBlock(currentFileIndex, block);
+    files.updateFile(currentFileIndex, block);
 }
 
 void FractalComponent::timerCallback() {}
