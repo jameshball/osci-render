@@ -8,9 +8,9 @@ OscirenderAudioTimelineController::OscirenderAudioTimelineController(OscirenderA
 
 std::shared_ptr<WavParser> OscirenderAudioTimelineController::getWavParser()
 {
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    if (currentFileIndex >= 0 && audioProcessor.parsers[currentFileIndex] != nullptr) {
-        return audioProcessor.parsers[currentFileIndex]->getWav();
+    const auto currentFileIndex = audioProcessor.getCurrentFileIndex();
+    if (currentFileIndex.has_value() && audioProcessor.parsers[*currentFileIndex] != nullptr) {
+        return audioProcessor.parsers[*currentFileIndex]->getWav();
     }
     return nullptr;
 }

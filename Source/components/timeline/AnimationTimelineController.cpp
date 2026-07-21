@@ -10,9 +10,11 @@ AnimationTimelineController::AnimationTimelineController(OscirenderAudioProcesso
 void AnimationTimelineController::onValueChange(double value)
 {
     juce::SpinLock::ScopedLockType sl(audioProcessor.parsersLock);
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    if (currentFileIndex < 0) return;
-    auto parser = audioProcessor.parsers[currentFileIndex];
+    const auto currentFileIndex = audioProcessor.getCurrentFileIndex();
+    if (!currentFileIndex.has_value()) {
+        return;
+    }
+    auto parser = audioProcessor.parsers[*currentFileIndex];
     if (parser != nullptr) {
         audioProcessor.animationFrame = value * (parser->getNumFrames() - 1);
         parser->setFrame((int)audioProcessor.animationFrame);
@@ -47,9 +49,11 @@ bool AnimationTimelineController::isActive()
 double AnimationTimelineController::getCurrentPosition()
 {
     juce::SpinLock::ScopedLockType sl(audioProcessor.parsersLock);
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    if (currentFileIndex < 0) return 0.0;
-    auto parser = audioProcessor.parsers[currentFileIndex];
+    const auto currentFileIndex = audioProcessor.getCurrentFileIndex();
+    if (!currentFileIndex.has_value()) {
+        return 0.0;
+    }
+    auto parser = audioProcessor.parsers[*currentFileIndex];
     if (parser == nullptr) return 0.0;
     int totalFrames = parser->getNumFrames();
     if (totalFrames <= 1) return 0.0;
@@ -63,10 +67,10 @@ void AnimationTimelineController::setup(
     std::function<void(bool)> setPlayingCallback,
     std::function<void(bool)> setRepeatCallback)
 {
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
+    const auto currentFileIndex = audioProcessor.getCurrentFileIndex();
     
-    if (currentFileIndex >= 0) {
-        auto parser = audioProcessor.parsers[currentFileIndex];
+    if (currentFileIndex.has_value()) {
+        auto parser = audioProcessor.parsers[*currentFileIndex];
         
         if (parser->isAnimatable) {
             int totalFrames = parser->getNumFrames();

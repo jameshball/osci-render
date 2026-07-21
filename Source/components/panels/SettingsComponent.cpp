@@ -577,7 +577,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     const bool isImage = osci::files::isImage(extension);
 
     const bool textureInputActive = audioProcessor.isTextureInputActive();
-    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !textureInputActive);
+    bool skipProcessing = audioProcessor.isObjectServerRendering() || (fileName.isEmpty() && !textureInputActive);
     const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);
     const bool usesFrameControls = isImage || osci::files::isAnimated(extension);
     quickControls.setAnimated(!skipProcessing && isAnimatedFile);
@@ -586,11 +586,11 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
         // do nothing
     } else if (extension == ".lsystem") {
 #if OSCI_PREMIUM
-        int fileIndex = audioProcessor.getCurrentFileIndex();
-        if (fileIndex >= 0) {
+        const auto fileIndex = audioProcessor.getCurrentFileIndex();
+        if (fileIndex.has_value()) {
             auto parser = audioProcessor.getCurrentFileParser();
             if (parser != nullptr) {
-                fractalEditor.setParser(parser->getFractal(), fileIndex);
+                fractalEditor.setParser(parser->getFractal(), static_cast<int>(*fileIndex));
                 fractalEditor.setVisible(true);
             }
         }
