@@ -8,10 +8,6 @@
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
-      <FILE id="FSlTsC" name="FileSelectionController.cpp" compile="1" resource="0"
-            file="Source/FileSelectionController.cpp"/>
-      <FILE id="FSlTsH" name="FileSelectionController.h" compile="0" resource="0"
-            file="Source/FileSelectionController.h"/>
       <GROUP id="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" name="audio">
         <FILE id="OutCl3" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <GROUP id="{D2E3F4A5-B6C7-8901-ABCD-EF2345678901}" name="modulation">
@@ -147,8 +143,6 @@
       <FILE id="MtsT1" name="MTSESPTest.cpp" compile="1" resource="0" file="tests/MTSESPTest.cpp"/>
       <FILE id="MdCCT" name="MidiManagerTest.cpp" compile="1" resource="0"
             file="tests/MidiManagerTest.cpp"/>
-      <FILE id="FSlTst" name="FileSelectionControllerTest.cpp" compile="1"
-            resource="0" file="tests/FileSelectionControllerTest.cpp"/>
       <FILE id="LicMod" name="LicensingModuleTest.cpp" compile="1" resource="0"
             file="tests/LicensingModuleTest.cpp"/>
       <FILE id="FrmVal" name="FormValidationTest.cpp" compile="1" resource="0"

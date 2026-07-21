@@ -576,8 +576,9 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     const bool isImage = osci::files::isImage(extension);
 
-    const bool textureInputActive = audioProcessor.isTextureInputActive();
-    bool skipProcessing = audioProcessor.isObjectServerRendering() || (fileName.isEmpty() && !textureInputActive);
+    auto& files = audioProcessor.getFileSelectionController();
+    const bool textureInputActive = files.isTextureInputActive();
+    bool skipProcessing = files.isObjectServerActive() || (fileName.isEmpty() && !textureInputActive);
     const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);
     const bool usesFrameControls = isImage || osci::files::isAnimated(extension);
     quickControls.setAnimated(!skipProcessing && isAnimatedFile);
@@ -586,7 +587,6 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
         // do nothing
     } else if (extension == ".lsystem") {
 #if OSCI_PREMIUM
-        auto& files = audioProcessor.getFileSelectionController();
         const auto fileIndex = files.getCurrentFileIndex();
         if (fileIndex.has_value()) {
             auto parser = files.getCurrentParser();

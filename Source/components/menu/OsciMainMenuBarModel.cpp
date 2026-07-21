@@ -60,7 +60,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
             const juce::String message = status.message.isNotEmpty() ? status.message : "Texture input is not available in this build.";
             sourceMenu.addItem(TEXTURE_INPUT_SOURCE_BASE_ID, message, false);
         } else {
-            if (editor.isTextureInputActive() || audioProcessor.isTextureInputActive()) {
+            if (editor.isTextureInputActive() || audioProcessor.getFileSelectionController().isTextureInputActive()) {
                 sourceMenu.addItem(TEXTURE_INPUT_DISCONNECT_ID, "Disconnect Texture Input");
                 sourceMenu.addSeparator();
             }
