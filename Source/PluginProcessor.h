@@ -19,6 +19,7 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
+#include "FileSelectionManager.h"
 #include "audio/synth/VoiceManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
@@ -187,10 +188,8 @@ public:
     std::vector<juce::String> fileNames;
     int currentFileId = 0;
     std::vector<int> fileIds;
-    std::atomic<int> currentFile = -1;
 
     juce::ChangeBroadcaster broadcaster;
-    std::atomic<bool> objectServerRendering = false;
     juce::ChangeBroadcaster fileChangeBroadcaster;
 
     // === Envelope modulation state ===
@@ -317,23 +316,24 @@ public:
     int numFiles();
     void selectFile(int index);
     void openFile(int index);
-    int getCurrentFileIndex();
+    std::optional<std::size_t> getCurrentFileIndex() const;
     std::shared_ptr<FileParser> getCurrentFileParser();
     juce::String getCurrentFileName();
     void startTextureInput(juce::String sourceName, int width, int height);
     void updateTextureInputFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
     void stopTextureInput();
-    bool isTextureInputActive() const { return textureInputActive.load(std::memory_order_acquire); }
+    bool isTextureInputActive() const { return fileSelection.isTextureInputActive(); }
     juce::String getTextureInputName();
     juce::String getFileName(int index);
     juce::String getFileId(int index);
     std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
     void setObjectServerRendering(bool enabled);
+    bool isObjectServerRendering() const { return fileSelection.isObjectServerActive(); }
     void setObjectServerPort(int port);
-    static constexpr int kProgramChangeOff = -1;
-    static constexpr int kProgramChangeOmni = 0;
-    static constexpr int kMaxProgramChangeFiles = 100;
-    int getProgramChangeChannel() const { return programChangeChannel.load(std::memory_order_acquire); }
+    static constexpr int kProgramChangeOff = FileSelectionManager::programChangeOff;
+    static constexpr int kProgramChangeOmni = FileSelectionManager::programChangeOmni;
+    static constexpr int kMaxProgramChangeFiles = FileSelectionManager::maxProgramChangeFiles;
+    int getProgramChangeChannel() const { return fileSelection.getProgramChangeChannel(); }
     void setProgramChangeChannel(int channel);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
@@ -376,20 +376,7 @@ private:
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
-    static constexpr int kNoPendingFileSelection = -2;
-    static constexpr int kProgramChangeSelectionOffset = 128;
-
-    enum class FileSelectionSource {
-        user,
-        internal,
-        parameter,
-        programChange,
-        stateRestore
-    };
-
-    std::atomic<int> programChangeChannel { kProgramChangeOmni };
-    std::atomic<int> pendingFileSelection { kNoPendingFileSelection };
-    std::atomic<int> lastObservedFileSelect { 1 };
+    FileSelectionManager fileSelection;
 
     juce::SpinLock audioThreadCallbackLock;
     std::function<void(const juce::AudioBuffer<float>&)> audioThreadCallback;
@@ -401,9 +388,6 @@ private:
     std::shared_ptr<FileParser> liveTextureParser;
     ShapeSound::Ptr liveTextureSound;
     juce::String liveTextureInputName;
-    int liveTexturePreviousFile = -1;
-    int objectServerPreviousFile = -1;
-    std::atomic<bool> textureInputActive{false};
     VoiceManager synth;
 #if OSCI_PREMIUM
     mts_esp::Client mtsClient;
@@ -432,10 +416,9 @@ private:
     osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
     void migrateLegacyAnimationRate(juce::XmlElement& legacyParameterXml);
-    void changeSound(ShapeSound::Ptr sound);
-
-    // parsersLock AND effectsLock must be held when calling this
-    bool selectFileLocked(int index, FileSelectionSource source);
+    // parsersLock AND effectsLock must be held when calling these.
+    bool selectFileLocked(std::optional<std::size_t> index, FileSelectionManager::Source source);
+    bool applyFileSelectionChangeLocked(const FileSelectionManager::Change& change);
     void applyPendingFileSelectionLocked();
     void notifyFileSelectionChanged();
 

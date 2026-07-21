@@ -28,9 +28,9 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
         int targetIndex = -1;
         {
             juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-            const int currentIndex = audioProcessor.getCurrentFileIndex();
-            if (currentIndex > 0) {
-                targetIndex = currentIndex - 1;
+            const auto currentIndex = audioProcessor.getCurrentFileIndex();
+            if (currentIndex.has_value() && *currentIndex > 0) {
+                targetIndex = static_cast<int>(*currentIndex - 1);
             }
         }
         if (targetIndex >= 0) {
@@ -44,9 +44,9 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
         int targetIndex = -1;
         {
             juce::SpinLock::ScopedLockType parserLock(audioProcessor.parsersLock);
-            const int currentIndex = audioProcessor.getCurrentFileIndex();
-            if (currentIndex < audioProcessor.numFiles() - 1) {
-                targetIndex = currentIndex + 1;
+            const auto currentIndex = audioProcessor.getCurrentFileIndex();
+            if (currentIndex.has_value() && *currentIndex + 1 < static_cast<std::size_t>(audioProcessor.numFiles())) {
+                targetIndex = static_cast<int>(*currentIndex + 1);
             }
         }
         if (targetIndex >= 0) {
@@ -64,7 +64,10 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
             return;
         }
 
-        removeFile(audioProcessor.getCurrentFileIndex());
+        const auto currentFile = audioProcessor.getCurrentFileIndex();
+        if (currentFile.has_value()) {
+            removeFile(static_cast<int>(*currentFile));
+        }
     };
 
     // microphone icon
@@ -121,7 +124,8 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
     juce::String fileName;
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        fileIndex = audioProcessor.getCurrentFileIndex();
+        const auto currentFile = audioProcessor.getCurrentFileIndex();
+        fileIndex = currentFile.has_value() ? static_cast<int>(*currentFile) : -1;
         if (fileIndex >= 0 && fileIndex < audioProcessor.numFiles()) {
             fileName = audioProcessor.getFileName(fileIndex);
         }
@@ -187,7 +191,8 @@ void FileControlsComponent::beginRenameFile(int index) {
     juce::String fileName;
     {
         juce::SpinLock::ScopedLockType lock(audioProcessor.parsersLock);
-        if (index < 0 || index >= audioProcessor.numFiles() || index != audioProcessor.getCurrentFileIndex()) {
+        if (index < 0 || index >= audioProcessor.numFiles()
+            || audioProcessor.getCurrentFileIndex() != static_cast<std::size_t>(index)) {
             return;
         }
         fileName = audioProcessor.getFileName(index);
@@ -314,12 +319,14 @@ void FileControlsComponent::resized()
 void FileControlsComponent::updateFileLabel()
 {
     const bool textureInputActive = pluginEditor.isTextureInputActive() || audioProcessor.isTextureInputActive();
-    bool ableToOpenFiles = !audioProcessor.objectServerRendering && !audioProcessor.inputEnabled->getBoolValue() && !textureInputActive;
-    bool fileOpen = audioProcessor.getCurrentFileIndex() != -1 && ableToOpenFiles;
-    bool showLeftArrow  = audioProcessor.getCurrentFileIndex() > 0 && fileOpen;
-    bool showRightArrow = audioProcessor.getCurrentFileIndex() < audioProcessor.numFiles() - 1 && fileOpen;
+    bool ableToOpenFiles = !audioProcessor.isObjectServerRendering() && !audioProcessor.inputEnabled->getBoolValue() && !textureInputActive;
+    const auto currentFile = audioProcessor.getCurrentFileIndex();
+    bool fileOpen = currentFile.has_value() && ableToOpenFiles;
+    bool showLeftArrow = currentFile.has_value() && *currentFile > 0 && fileOpen;
+    bool showRightArrow = currentFile.has_value()
+        && *currentFile + 1 < static_cast<std::size_t>(audioProcessor.numFiles()) && fileOpen;
 
-    if (renamingFile && (!fileOpen || audioProcessor.getCurrentFileIndex() != renameFileIndex)) {
+    if (renamingFile && (!fileOpen || currentFile != static_cast<std::size_t>(renameFileIndex))) {
         finishRenameFile(false);
         return;
     }
@@ -333,16 +340,16 @@ void FileControlsComponent::updateFileLabel()
     renameEditor.setVisible(renamingFile && fileOpen);
     renameExtensionLabel.setVisible(renamingFile && fileOpen && renameExtension.isNotEmpty());
 
-    if (audioProcessor.objectServerRendering) {
+    if (audioProcessor.isObjectServerRendering()) {
         fileLabel.setText("Rendering from Blender", juce::dontSendNotification);
     } else if (audioProcessor.inputEnabled->getBoolValue()) {
         fileLabel.setText("Using external audio", juce::dontSendNotification);
     } else if (textureInputActive) {
         fileLabel.setText("Using texture input: " + pluginEditor.getTextureInputName(), juce::dontSendNotification);
-    } else if (audioProcessor.getCurrentFileIndex() == -1) {
+    } else if (!currentFile.has_value()) {
         fileLabel.setText("No file open", juce::dontSendNotification);
     } else {
-        fileNumberLabel.setText(" (" + juce::String(audioProcessor.getCurrentFileIndex() + 1) + "/" + juce::String(audioProcessor.numFiles()) + ")", juce::dontSendNotification); 
+        fileNumberLabel.setText(" (" + juce::String(static_cast<int>(*currentFile) + 1) + "/" + juce::String(audioProcessor.numFiles()) + ")", juce::dontSendNotification);
         fileLabel.setText(audioProcessor.getCurrentFileName(), juce::dontSendNotification);
     }
 
