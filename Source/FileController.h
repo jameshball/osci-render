@@ -25,6 +25,7 @@ public:
     int addFile(juce::String name, const char* data, int size);
     int addFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data);
     void updateFile(int index, std::shared_ptr<juce::MemoryBlock> data);
+    void updateFileById(const juce::String& id, std::shared_ptr<juce::MemoryBlock> data);
     juce::String renameFile(int index, juce::String newName);
     int duplicateFile(int index);
     void removeFile(int index);
@@ -83,6 +84,8 @@ private:
         std::shared_ptr<FileParser> parser, ShapeSound::Ptr sound);
     void initialise();
     void clearFiles();
+    void updateFileUnlocked(int index, std::shared_ptr<juce::MemoryBlock> data);
+    std::optional<int> findFileIndexByIdUnlocked(const juce::String& id) const;
     void removeFileUnlocked(int index);
     void parseFile(int index);
     void selectFileUnlocked(int index, bool forceSoundUpdate = false);

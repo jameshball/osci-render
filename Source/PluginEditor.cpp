@@ -21,6 +21,10 @@ namespace {
 
         return preferredSize;
     }
+
+    bool isBinaryFile(const juce::String& name) {
+        return !osci::files::isCodeEditable(name);
+    }
 }
 
 void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
@@ -30,7 +34,7 @@ void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
             return;
 
         safeThis->removeCodeEditor(index);
-        safeThis->fileUpdated(safeThis->audioProcessor.getFileController().getCurrentFileName());
+        safeThis->refreshFileUi(safeThis->audioProcessor.getFileController().getCurrentFileName());
         juce::MessageManager::callAsync([safeThis] {
             if (safeThis != nullptr)
                 safeThis->resized();
@@ -290,7 +294,7 @@ void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files
         auto& fileController = audioProcessor.getFileController();
         const int fileIndex = fileController.addFile(file);
         addCodeEditor(fileIndex);
-        fileUpdated(fileController.getCurrentFileName());
+        refreshFileUi(fileController.getCurrentFileName());
     }
 }
 
@@ -330,7 +334,7 @@ juce::String OscirenderAudioProcessorEditor::renameFile(int index, juce::String 
         codeModels[(size_t)modelIndex]->setDisplayName(renamedFile);
     }
     if (files.getCurrentFileIndex() == index) {
-        fileUpdated(renamedFile);
+        refreshFileUi(renamedFile);
     }
     return renamedFile;
 }
@@ -351,7 +355,7 @@ void OscirenderAudioProcessorEditor::duplicateFile(int index) {
     {
         addCodeEditor(duplicateIndex);
         duplicateName = files.getFileName(duplicateIndex);
-        fileUpdated(duplicateName);
+        refreshFileUi(duplicateName);
     }
 }
 
@@ -402,15 +406,6 @@ void OscirenderAudioProcessorEditor::exportFile(int index) {
     });
 }
 
-void OscirenderAudioProcessorEditor::removeFile(int index) {
-    audioProcessor.getFileController().removeFile(index);
-}
-
-// Anything with these extensions will not be opened in the code editor
-bool OscirenderAudioProcessorEditor::isBinaryFile(juce::String name) {
-    return !osci::files::isCodeEditable(name);
-}
-
 // FileController::lock must be held.
 void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
     for (auto& editorModel : codeModels) {
@@ -428,7 +423,7 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
         addCodeEditor(i);
     }
     bool codeEditorVisible = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
-    fileUpdated(files.getCurrentFileName(), codeEditorVisible);
+    refreshFileUi(files.getCurrentFileName(), codeEditorVisible);
 }
 
 void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) {
@@ -709,7 +704,7 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
 }
 
 // FileController::lock must be held.
-void OscirenderAudioProcessorEditor::fileUpdated(juce::String fileName, bool shouldOpenEditor) {
+void OscirenderAudioProcessorEditor::refreshFileUi(juce::String fileName, bool shouldOpenEditor) {
     CommonPluginEditor::fileUpdated(fileName);
     settings.fileUpdated(fileName);
     updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
@@ -733,7 +728,7 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
         auto& files = audioProcessor.getFileController();
         juce::SpinLock::ScopedLockType fileLock(files.lock);
         // Triggered when the processor changes the current file (e.g. Blender or automation).
-        fileUpdated(files.getCurrentFileName());
+        refreshFileUi(files.getCurrentFileName());
     }
 }
 
@@ -790,19 +785,8 @@ void OscirenderAudioProcessorEditor::commitCodeModel(osci::LuaScriptEditorModel&
         return;
     }
 
-    int fileIndex = -1;
-    {
-        juce::SpinLock::ScopedLockType fileLock(files.lock);
-        for (int i = 0; i < files.size(); i++) {
-            if (files.getFileId(i) == model.getScriptId()) {
-                fileIndex = i;
-                break;
-            }
-        }
-    }
-    if (fileIndex >= 0) {
-        files.updateFile(fileIndex, std::make_shared<juce::MemoryBlock>(code.toRawUTF8(), code.getNumBytesAsUTF8() + 1));
-    }
+    files.updateFileById(model.getScriptId(),
+        std::make_shared<juce::MemoryBlock>(code.toRawUTF8(), code.getNumBytesAsUTF8() + 1));
 }
 
 std::shared_ptr<osci::LuaScriptEditorModel> OscirenderAudioProcessorEditor::getVisibleLuaEditorModel() const {

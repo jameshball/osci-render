@@ -27,11 +27,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    bool isBinaryFile(juce::String name);
-    void initialiseCodeEditors();
     void addCodeEditor(int index);
-    void removeCodeEditor(int index);
-    void fileUpdated(juce::String fileName, bool shouldOpenEditor = false);
+    void refreshFileUi(juce::String fileName, bool shouldOpenEditor = false);
     void handleAsyncUpdate() override;
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void toggleLayout(juce::StretchableLayoutManager& layout, double prefSize);
@@ -52,11 +49,12 @@ public:
     juce::String renameFile(int index, juce::String newName);
     void duplicateFile(int index);
     void exportFile(int index);
-    void removeFile(int index);
 
     void editCustomFunction(bool enabled);
 
 private:
+    void initialiseCodeEditors();
+    void removeCodeEditor(int index);
     void registerFileRemovedCallback();
 
     OscirenderAudioProcessor& audioProcessor;
