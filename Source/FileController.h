@@ -13,13 +13,13 @@ class FileParser;
 class OscirenderAudioProcessor;
 class VoiceManager;
 
-class FileSelectionController : public juce::ChangeBroadcaster, private juce::AsyncUpdater {
+class FileController : public juce::ChangeBroadcaster, private juce::AsyncUpdater {
 public:
     static constexpr int programChangeOff = -1;
     static constexpr int programChangeOmni = 0;
 
-    FileSelectionController(OscirenderAudioProcessor& processor, VoiceManager& voices);
-    ~FileSelectionController() override;
+    FileController(OscirenderAudioProcessor& processor, VoiceManager& voices);
+    ~FileController() override;
 
     int addFile(const juce::File& file);
     int addFile(juce::String name, const char* data, int size);
@@ -83,7 +83,7 @@ private:
         std::shared_ptr<FileParser> parser, ShapeSound::Ptr sound);
     void initialise();
     void clearFiles();
-    void removeFile(int index, bool notifyEditor);
+    void removeFileUnlocked(int index);
     void parseFile(int index);
     void selectFileUnlocked(int index, bool forceSoundUpdate = false);
     void applySelection(int index, bool forceSoundUpdate = false);

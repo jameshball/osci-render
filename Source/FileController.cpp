@@ -1,4 +1,4 @@
-#include "FileSelectionController.h"
+#include "FileController.h"
 
 #include "PluginProcessor.h"
 #include "audio/synth/ShapeVoice.h"
@@ -7,15 +7,15 @@
 
 #include <algorithm>
 
-FileSelectionController::FileSelectionController(OscirenderAudioProcessor& processor, VoiceManager& voices)
+FileController::FileController(OscirenderAudioProcessor& processor, VoiceManager& voices)
     : processor(processor), voices(voices) {}
 
-FileSelectionController::~FileSelectionController() {
+FileController::~FileController() {
     processor.midiManager.setMessageHandler(osci::MidiManager::MessageType::programChange, {});
     cancelPendingUpdate();
 }
 
-void FileSelectionController::initialise() {
+void FileController::initialise() {
     auto defaultParser = std::make_shared<FileParser>(processor);
     defaultSound = new ShapeSound(processor, defaultParser);
     objectServerSound = new ShapeSound();
@@ -33,7 +33,7 @@ void FileSelectionController::initialise() {
         });
 }
 
-int FileSelectionController::addFile(const juce::File& file) {
+int FileController::addFile(const juce::File& file) {
     auto data = std::make_shared<juce::MemoryBlock>();
     auto stream = file.createInputStream();
     if (stream != nullptr) {
@@ -42,13 +42,13 @@ int FileSelectionController::addFile(const juce::File& file) {
     return addFile(file.getFileName(), std::move(data));
 }
 
-int FileSelectionController::addFile(juce::String name, const char* data, int size) {
+int FileController::addFile(juce::String name, const char* data, int size) {
     auto block = std::make_shared<juce::MemoryBlock>();
     block->append(data, static_cast<size_t>(size));
     return addFile(std::move(name), std::move(block));
 }
 
-int FileSelectionController::addFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data) {
+int FileController::addFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
@@ -58,7 +58,7 @@ int FileSelectionController::addFile(juce::String name, std::shared_ptr<juce::Me
     return index;
 }
 
-int FileSelectionController::appendFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data,
+int FileController::appendFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data,
     std::shared_ptr<FileParser> parser, ShapeSound::Ptr sound) {
     files.push_back({ nextFileId++, std::move(name), std::move(data), std::move(parser), std::move(sound) });
     const int index = size() - 1;
@@ -66,7 +66,7 @@ int FileSelectionController::appendFile(juce::String name, std::shared_ptr<juce:
     return index;
 }
 
-void FileSelectionController::updateFile(int index, std::shared_ptr<juce::MemoryBlock> data) {
+void FileController::updateFile(int index, std::shared_ptr<juce::MemoryBlock> data) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     if (!contains(index)) {
@@ -77,7 +77,7 @@ void FileSelectionController::updateFile(int index, std::shared_ptr<juce::Memory
     selectFileUnlocked(index);
 }
 
-juce::String FileSelectionController::renameFile(int index, juce::String newName) {
+juce::String FileController::renameFile(int index, juce::String newName) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     if (!contains(index)) {
         return {};
@@ -90,7 +90,7 @@ juce::String FileSelectionController::renameFile(int index, juce::String newName
     return legalName;
 }
 
-int FileSelectionController::duplicateFile(int index) {
+int FileController::duplicateFile(int index) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     if (!contains(index)) {
@@ -107,13 +107,13 @@ int FileSelectionController::duplicateFile(int index) {
     return duplicateIndex;
 }
 
-void FileSelectionController::removeFile(int index) {
+void FileController::removeFile(int index) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    removeFile(index, true);
+    removeFileUnlocked(index);
 }
 
-void FileSelectionController::removeFile(int index, bool notifyEditor) {
+void FileController::removeFileUnlocked(int index) {
     if (!contains(index)) {
         return;
     }
@@ -125,37 +125,37 @@ void FileSelectionController::removeFile(int index, bool notifyEditor) {
         selectFileUnlocked(std::min(index, size() - 1), true);
     }
 
-    if (notifyEditor && fileRemovedCallback) {
+    if (fileRemovedCallback) {
         fileRemovedCallback(index);
     }
 }
 
-void FileSelectionController::removeParser(FileParser* parser) {
+void FileController::removeParser(FileParser* parser) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     const auto match = std::find_if(files.begin(), files.end(), [parser](const File& file) {
         return file.parser.get() == parser;
     });
     if (match != files.end()) {
-        removeFile(static_cast<int>(std::distance(files.begin(), match)), true);
+        removeFileUnlocked(static_cast<int>(std::distance(files.begin(), match)));
     }
 }
 
-void FileSelectionController::clearFiles() {
+void FileController::clearFiles() {
     while (!files.empty()) {
-        removeFile(0, true);
+        removeFileUnlocked(0);
     }
 }
 
-int FileSelectionController::size() const noexcept {
+int FileController::size() const noexcept {
     return static_cast<int>(files.size());
 }
 
-bool FileSelectionController::contains(int index) const noexcept {
+bool FileController::contains(int index) const noexcept {
     return index >= 0 && index < size();
 }
 
-std::optional<int> FileSelectionController::getCurrentFileIndex() const noexcept {
+std::optional<int> FileController::getCurrentFileIndex() const noexcept {
     if (activeSource.load(std::memory_order_acquire) != ActiveSource::files
         || !hasSelectedFile.load(std::memory_order_acquire)) {
         return std::nullopt;
@@ -163,7 +163,7 @@ std::optional<int> FileSelectionController::getCurrentFileIndex() const noexcept
     return selectedFileIndex.load(std::memory_order_acquire);
 }
 
-std::optional<int> FileSelectionController::getAdjacentFileIndex(int offset) const noexcept {
+std::optional<int> FileController::getAdjacentFileIndex(int offset) const noexcept {
     const auto current = getSelectedFileForState();
     if (!current.has_value()) {
         return std::nullopt;
@@ -172,7 +172,7 @@ std::optional<int> FileSelectionController::getAdjacentFileIndex(int offset) con
     return contains(adjacent) ? std::optional<int>(adjacent) : std::nullopt;
 }
 
-std::shared_ptr<FileParser> FileSelectionController::getCurrentParser() const {
+std::shared_ptr<FileParser> FileController::getCurrentParser() const {
     if (isTextureInputActive()) {
         return textureInputParser;
     }
@@ -180,11 +180,11 @@ std::shared_ptr<FileParser> FileSelectionController::getCurrentParser() const {
     return index.has_value() ? getParser(*index) : nullptr;
 }
 
-std::shared_ptr<FileParser> FileSelectionController::getParser(int index) const {
+std::shared_ptr<FileParser> FileController::getParser(int index) const {
     return contains(index) ? files[index].parser : nullptr;
 }
 
-juce::String FileSelectionController::getCurrentFileName() const {
+juce::String FileController::getCurrentFileName() const {
     if (isTextureInputActive()) {
         return textureInputName;
     }
@@ -192,25 +192,25 @@ juce::String FileSelectionController::getCurrentFileName() const {
     return index.has_value() ? getFileName(*index) : juce::String();
 }
 
-juce::String FileSelectionController::getFileName(int index) const {
+juce::String FileController::getFileName(int index) const {
     return contains(index) ? files[index].name : juce::String();
 }
 
-juce::String FileSelectionController::getFileId(int index) const {
+juce::String FileController::getFileId(int index) const {
     return contains(index) ? juce::String(files[index].id) : juce::String();
 }
 
-std::shared_ptr<juce::MemoryBlock> FileSelectionController::getFileData(int index) const {
+std::shared_ptr<juce::MemoryBlock> FileController::getFileData(int index) const {
     return contains(index) ? files[index].data : nullptr;
 }
 
-void FileSelectionController::selectFile(int index) {
+void FileController::selectFile(int index) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     selectFileUnlocked(index);
 }
 
-void FileSelectionController::selectAdjacentFile(int offset) {
+void FileController::selectAdjacentFile(int offset) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     const auto adjacentFile = getAdjacentFileIndex(offset);
@@ -219,7 +219,7 @@ void FileSelectionController::selectAdjacentFile(int offset) {
     }
 }
 
-void FileSelectionController::selectFileUnlocked(int index, bool forceSoundUpdate) {
+void FileController::selectFileUnlocked(int index, bool forceSoundUpdate) {
     if (!contains(index)) {
         return;
     }
@@ -230,7 +230,7 @@ void FileSelectionController::selectFileUnlocked(int index, bool forceSoundUpdat
     applySelection(index, forceSoundUpdate);
 }
 
-void FileSelectionController::applySelection(int index, bool forceSoundUpdate) {
+void FileController::applySelection(int index, bool forceSoundUpdate) {
     jassert(contains(index));
     const auto previousFile = getSelectedFileForState();
     selectedFileIndex.store(index, std::memory_order_release);
@@ -242,7 +242,7 @@ void FileSelectionController::applySelection(int index, bool forceSoundUpdate) {
     }
 }
 
-void FileSelectionController::clearSelection() {
+void FileController::clearSelection() {
     jassert(files.empty());
     if (!hasSelectedFile.exchange(false, std::memory_order_acq_rel)) {
         return;
@@ -251,14 +251,14 @@ void FileSelectionController::clearSelection() {
     notifySelectionChanged();
 }
 
-void FileSelectionController::updatePendingSelectionFromParameter() noexcept {
+void FileController::updatePendingSelectionFromParameter() noexcept {
     const int fileNumber = std::clamp(processor.fileSelect->getValueUnnormalised(), 1, maxSelectableFiles);
     if (lastObservedParameter.exchange(fileNumber, std::memory_order_acq_rel) != fileNumber) {
         pendingFileNumber.store(fileNumber, std::memory_order_release);
     }
 }
 
-void FileSelectionController::queueProgramChange(int program, int midiChannel) noexcept {
+void FileController::queueProgramChange(int program, int midiChannel) noexcept {
     const int configuredChannel = getProgramChangeChannel();
     if (configuredChannel == programChangeOff || (configuredChannel != programChangeOmni && configuredChannel != midiChannel)) {
         return;
@@ -270,7 +270,7 @@ void FileSelectionController::queueProgramChange(int program, int midiChannel) n
     pendingFileNumber.store(fileNumber, std::memory_order_release);
 }
 
-void FileSelectionController::applyPendingSelection() {
+void FileController::applyPendingSelection() {
     const int fileNumber = pendingFileNumber.exchange(0, std::memory_order_acq_rel);
     if (fileNumber == 0 || files.empty()) {
         return;
@@ -278,11 +278,11 @@ void FileSelectionController::applyPendingSelection() {
     applySelection(std::min(fileNumber - 1, size() - 1));
 }
 
-void FileSelectionController::clearPendingSelection() noexcept {
+void FileController::clearPendingSelection() noexcept {
     pendingFileNumber.store(0, std::memory_order_release);
 }
 
-void FileSelectionController::startTextureInput(juce::String sourceName, int width, int height) {
+void FileController::startTextureInput(juce::String sourceName, int width, int height) {
     if (processor.inputEnabled->getBoolValue()) {
         processor.inputEnabled->setBoolValueNotifyingHost(false);
     }
@@ -303,7 +303,7 @@ void FileSelectionController::startTextureInput(juce::String sourceName, int wid
     notifySelectionChanged();
 }
 
-void FileSelectionController::updateTextureInputFrame(
+void FileController::updateTextureInputFrame(
     const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped) {
     std::shared_ptr<FileParser> parser;
     {
@@ -316,7 +316,7 @@ void FileSelectionController::updateTextureInputFrame(
     parser->updateLiveImageFrame(rgba, width, height, verticallyFlipped);
 }
 
-void FileSelectionController::stopTextureInput() {
+void FileController::stopTextureInput() {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     if (activeSource.exchange(ActiveSource::files, std::memory_order_acq_rel) == ActiveSource::textureInput) {
@@ -326,15 +326,15 @@ void FileSelectionController::stopTextureInput() {
     }
 }
 
-bool FileSelectionController::isTextureInputActive() const noexcept {
+bool FileController::isTextureInputActive() const noexcept {
     return activeSource.load(std::memory_order_acquire) == ActiveSource::textureInput;
 }
 
-juce::String FileSelectionController::getTextureInputName() const {
+juce::String FileController::getTextureInputName() const {
     return textureInputName;
 }
 
-void FileSelectionController::setObjectServerActive(bool active) {
+void FileController::setObjectServerActive(bool active) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     const auto previousSource = activeSource.load(std::memory_order_acquire);
@@ -350,30 +350,30 @@ void FileSelectionController::setObjectServerActive(bool active) {
     notifySelectionChanged();
 }
 
-bool FileSelectionController::isObjectServerActive() const noexcept {
+bool FileController::isObjectServerActive() const noexcept {
     return activeSource.load(std::memory_order_acquire) == ActiveSource::objectServer;
 }
 
-void FileSelectionController::addObjectServerFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force) {
+void FileController::addObjectServerFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force) {
     objectServerSound->addFrame(frame, force);
 }
 
-ShapeSound* FileSelectionController::getActiveSound() const noexcept {
+ShapeSound* FileController::getActiveSound() const noexcept {
     return activeSound.load(std::memory_order_acquire);
 }
 
-std::optional<int> FileSelectionController::getSelectedFileForState() const noexcept {
+std::optional<int> FileController::getSelectedFileForState() const noexcept {
     if (!hasSelectedFile.load(std::memory_order_acquire)) {
         return std::nullopt;
     }
     return selectedFileIndex.load(std::memory_order_acquire);
 }
 
-int FileSelectionController::getProgramChangeChannel() const noexcept {
+int FileController::getProgramChangeChannel() const noexcept {
     return programChangeChannel.load(std::memory_order_acquire);
 }
 
-void FileSelectionController::setProgramChangeChannel(int channel) {
+void FileController::setProgramChangeChannel(int channel) {
     const int validChannel = std::clamp(channel, programChangeOff, 16);
     programChangeChannel.store(validChannel, std::memory_order_release);
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
@@ -382,7 +382,7 @@ void FileSelectionController::setProgramChangeChannel(int channel) {
     }
 }
 
-void FileSelectionController::saveState(juce::XmlElement& xml) const {
+void FileController::saveState(juce::XmlElement& xml) const {
     xml.setAttribute("programChangeChannel", getProgramChangeChannel());
     auto* filesXml = xml.createNewChildElement("files");
     for (const auto& file : files) {
@@ -395,7 +395,7 @@ void FileSelectionController::saveState(juce::XmlElement& xml) const {
     xml.setAttribute("currentFile", files.empty() ? -1 : selectedFile.value_or(0));
 }
 
-void FileSelectionController::restoreState(const juce::XmlElement& xml, bool legacyFileEncoding) {
+void FileController::restoreState(const juce::XmlElement& xml, bool legacyFileEncoding) {
     if (!juce::JUCEApplicationBase::isStandaloneApp() && xml.hasAttribute("programChangeChannel")) {
         setProgramChangeChannel(xml.getIntAttribute("programChangeChannel", programChangeOmni));
     }
@@ -435,11 +435,11 @@ void FileSelectionController::restoreState(const juce::XmlElement& xml, bool leg
     }
 }
 
-void FileSelectionController::setFileRemovedCallback(std::function<void(int)> callback) {
+void FileController::setFileRemovedCallback(std::function<void(int)> callback) {
     fileRemovedCallback = std::move(callback);
 }
 
-void FileSelectionController::parseFile(int index) {
+void FileController::parseFile(int index) {
     auto& file = files[index];
     if (file.data == nullptr) {
         return;
@@ -449,7 +449,7 @@ void FileSelectionController::parseFile(int index) {
         std::make_unique<juce::MemoryInputStream>(*file.data, false), processor.font);
 }
 
-void FileSelectionController::updateActiveSound(bool forceUpdate) {
+void FileController::updateActiveSound(bool forceUpdate) {
     auto* sound = defaultSound.get();
     const auto source = activeSource.load(std::memory_order_acquire);
     if (source == ActiveSource::objectServer) {
@@ -474,12 +474,12 @@ void FileSelectionController::updateActiveSound(bool forceUpdate) {
     }
 }
 
-void FileSelectionController::notifySelectionChanged() {
+void FileController::notifySelectionChanged() {
     if (juce::MessageManager::getInstanceWithoutCreating() != nullptr) {
         triggerAsyncUpdate();
     }
 }
 
-void FileSelectionController::handleAsyncUpdate() {
+void FileController::handleAsyncUpdate() {
     sendChangeMessage();
 }

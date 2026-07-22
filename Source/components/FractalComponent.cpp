@@ -167,7 +167,7 @@ void FractalComponent::updateFileFromUI() {
     auto block = std::make_shared<juce::MemoryBlock>();
     block->append(json.toRawUTF8(), json.getNumBytesAsUTF8());
 
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     files.updateFile(currentFileIndex, block);
 }
 

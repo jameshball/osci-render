@@ -122,7 +122,7 @@ void OpenFileComponent::addExample(CategoryViews& cat, const juce::String& fileN
     }
     auto* item = new osci::GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
     item->onItemSelected = [this, fileName, data, size](const juce::String&) {
-        auto& files = audioProcessor.getFileSelectionController();
+        auto& files = audioProcessor.getFileController();
         const int fileIndex = files.addFile(fileName, data, size);
         if (fileName.equalsIgnoreCase("shape_generator.lua"))
             initialiseShapeGeneratorLuaSliders(audioProcessor);
@@ -207,7 +207,7 @@ void OpenFileComponent::openFileChooser()
                  juce::FileBrowserComponent::canSelectFiles;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooserRef) {
-        auto& files = audioProcessor.getFileSelectionController();
+        auto& files = audioProcessor.getFileController();
         auto results = chooserRef.getResults();
         if (results.isEmpty()) return;
         

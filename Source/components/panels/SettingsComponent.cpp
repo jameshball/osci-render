@@ -576,7 +576,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     const bool isImage = osci::files::isImage(extension);
 
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     const bool textureInputActive = files.isTextureInputActive();
     bool skipProcessing = files.isObjectServerActive() || (fileName.isEmpty() && !textureInputActive);
     const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);

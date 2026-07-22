@@ -87,7 +87,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 
 				// Notify the processor to remove this parser
 				juce::MessageManager::callAsync([this] {
-					audioProcessor.getFileSelectionController().removeParser(this);
+					audioProcessor.getFileController().removeParser(this);
 				});
 			},
 			osci::ErrorOverlay::Icon::Warning,
