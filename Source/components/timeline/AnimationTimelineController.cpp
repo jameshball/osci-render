@@ -9,7 +9,7 @@ AnimationTimelineController::AnimationTimelineController(OscirenderAudioProcesso
 
 void AnimationTimelineController::onValueChange(double value)
 {
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     juce::SpinLock::ScopedLockType sl(files.lock);
     auto parser = files.getCurrentParser();
     if (parser != nullptr) {
@@ -45,7 +45,7 @@ bool AnimationTimelineController::isActive()
 
 double AnimationTimelineController::getCurrentPosition()
 {
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     juce::SpinLock::ScopedLockType sl(files.lock);
     auto parser = files.getCurrentParser();
     if (parser == nullptr) return 0.0;
@@ -61,7 +61,7 @@ void AnimationTimelineController::setup(
     std::function<void(bool)> setPlayingCallback,
     std::function<void(bool)> setRepeatCallback)
 {
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     juce::SpinLock::ScopedLockType sl(files.lock);
     auto parser = files.getCurrentParser();
     if (parser != nullptr && parser->isAnimatable) {

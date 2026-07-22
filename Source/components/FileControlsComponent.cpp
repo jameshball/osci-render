@@ -25,26 +25,26 @@ FileControlsComponent::FileControlsComponent(OscirenderAudioProcessor& p, Oscire
     addAndMakeVisible(leftArrow);
     leftArrow.setTooltip("Change to previous file (k).");
     leftArrow.onClick = [this] {
-        audioProcessor.getFileSelectionController().selectAdjacentFile(-1);
+        audioProcessor.getFileController().selectAdjacentFile(-1);
     };
 
     addAndMakeVisible(rightArrow);
     rightArrow.setTooltip("Change to next file (j).");
     rightArrow.onClick = [this] {
-        audioProcessor.getFileSelectionController().selectAdjacentFile(1);
+        audioProcessor.getFileController().selectAdjacentFile(1);
     };
 
     // Close current file
     addAndMakeVisible(closeFileButton);
     closeFileButton.setTooltip("Close the currently open file.");
     closeFileButton.onClick = [this] {
-        if (pluginEditor.isTextureInputActive() || audioProcessor.getFileSelectionController().isTextureInputActive()) {
+        if (pluginEditor.isTextureInputActive() || audioProcessor.getFileController().isTextureInputActive()) {
             pluginEditor.stopTextureInput();
             updateFileLabel();
             return;
         }
 
-        const auto currentFile = audioProcessor.getFileSelectionController().getCurrentFileIndex();
+        const auto currentFile = audioProcessor.getFileController().getCurrentFileIndex();
         if (currentFile.has_value()) {
             removeFile(*currentFile);
         }
@@ -103,7 +103,7 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
     int fileIndex = -1;
     juce::String fileName;
     {
-        auto& files = audioProcessor.getFileSelectionController();
+        auto& files = audioProcessor.getFileController();
         juce::SpinLock::ScopedLockType lock(files.lock);
         const auto currentFile = files.getCurrentFileIndex();
         fileIndex = currentFile.value_or(-1);
@@ -113,7 +113,7 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
     }
     const bool hasFile = fileName.isNotEmpty();
 
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     const int currentChannel = files.getProgramChangeChannel();
     juce::PopupMenu channelMenu;
     for (int channel = 1; channel <= 16; channel++) {
@@ -121,8 +121,8 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
     }
 
     juce::PopupMenu programChangeMenu;
-    programChangeMenu.addItem(offId, "Disabled", true, currentChannel == FileSelectionController::programChangeOff);
-    programChangeMenu.addItem(omniId, "Omni", true, currentChannel == FileSelectionController::programChangeOmni);
+    programChangeMenu.addItem(offId, "Disabled", true, currentChannel == FileController::programChangeOff);
+    programChangeMenu.addItem(omniId, "Omni", true, currentChannel == FileController::programChangeOmni);
     programChangeMenu.addSubMenu("Channel", channelMenu, true, nullptr, currentChannel > 0);
 
     juce::PopupMenu menu;
@@ -148,7 +148,7 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
             return;
         }
 
-        auto& files = safeThis->audioProcessor.getFileSelectionController();
+        auto& files = safeThis->audioProcessor.getFileController();
         if (result == editFileId) {
             safeThis->pluginEditor.editFile(fileIndex);
         } else if (result == renameFileId) {
@@ -160,9 +160,9 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
         } else if (result == removeFileId) {
             safeThis->removeFile(fileIndex);
         } else if (result == offId) {
-            files.setProgramChangeChannel(FileSelectionController::programChangeOff);
+            files.setProgramChangeChannel(FileController::programChangeOff);
         } else if (result == omniId) {
-            files.setProgramChangeChannel(FileSelectionController::programChangeOmni);
+            files.setProgramChangeChannel(FileController::programChangeOmni);
         } else if (result > firstChannelId && result <= firstChannelId + 16) {
             files.setProgramChangeChannel(result - firstChannelId);
         }
@@ -173,7 +173,7 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
 void FileControlsComponent::beginRenameFile(int index) {
     juce::String fileName;
     {
-        auto& files = audioProcessor.getFileSelectionController();
+        auto& files = audioProcessor.getFileController();
         juce::SpinLock::ScopedLockType lock(files.lock);
         if (!files.contains(index) || files.getCurrentFileIndex() != index) {
             return;
@@ -301,7 +301,7 @@ void FileControlsComponent::resized()
 
 void FileControlsComponent::updateFileLabel()
 {
-    auto& files = audioProcessor.getFileSelectionController();
+    auto& files = audioProcessor.getFileController();
     const bool textureInputActive = pluginEditor.isTextureInputActive() || files.isTextureInputActive();
     bool ableToOpenFiles = !files.isObjectServerActive() && !audioProcessor.inputEnabled->getBoolValue() && !textureInputActive;
     const auto currentFile = files.getCurrentFileIndex();

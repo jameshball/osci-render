@@ -19,7 +19,7 @@
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "FileSelectionController.h"
+#include "FileController.h"
 #include "audio/synth/VoiceManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
@@ -239,7 +239,7 @@ public:
     // Used as glide source so any voice can portamento from the last note.
     double getLastPlayedNoteFreq() const;
 
-    ShapeSound* getActiveShapeSound() const { return fileSelection.getActiveSound(); }
+    ShapeSound* getActiveShapeSound() const { return fileController.getActiveSound(); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -288,8 +288,8 @@ public:
     // Apply a saved effect ordering by ID.  Used by undo/redo — safe to call
     // even if the editor has been destroyed and recreated.
     void applyEffectOrder(const std::vector<juce::String>& order);
-    FileSelectionController& getFileSelectionController() { return fileSelection; }
-    const FileSelectionController& getFileSelectionController() const { return fileSelection; }
+    FileController& getFileController() { return fileController; }
+    const FileController& getFileController() const { return fileController; }
     void setObjectServerPort(int port);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
@@ -333,7 +333,7 @@ private:
     std::vector<ErrorListener*> errorListeners;
 
     VoiceManager synth;
-    FileSelectionController fileSelection;
+    FileController fileController;
 #if OSCI_PREMIUM
     mts_esp::Client mtsClient;
 #endif

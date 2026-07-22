@@ -27,7 +27,7 @@
 OscirenderAudioProcessor::OscirenderAudioProcessor()
     : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(2), true)
           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      fileSelection(*this, synth) {
+      fileController(*this, synth) {
     // locking isn't necessary here because we are in the constructor
 
     objectServer.setCallbacks({
@@ -35,10 +35,10 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
             return std::any_cast<int>(getProperty("objectServerPort", 51677));
         },
         [this](bool enabled) {
-            fileSelection.setObjectServerActive(enabled);
+            fileController.setObjectServerActive(enabled);
         },
         [this](std::vector<std::unique_ptr<osci::Shape>>& frame, bool force) {
-            fileSelection.addObjectServerFrame(frame, force);
+            fileController.addObjectServerFrame(frame, force);
         }
     });
 
@@ -225,7 +225,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         luaEffects[i]->parameters[0]->addListener(this);
     }
 
-    fileSelection.initialise();
+    fileController.initialise();
 
     // Default to MIDI enabled when running as a plugin (VST/AU)
     if (!juce::JUCEApplicationBase::isStandaloneApp()) {
@@ -596,7 +596,7 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     // merge keyboard state and midi messages
     keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
-    fileSelection.updatePendingSelectionFromParameter();
+    fileController.updatePendingSelectionFromParameter();
 
     // Process MIDI mappings and handlers (always active, even when synth MIDI is off).
     midiManager.processMidiBuffer(midiMessages);
@@ -741,10 +741,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         applyToggleableEffectsGlobally = true;
         toggleableExternalInput = &inputBuffer;
     } else {
-        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
+        juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
-        fileSelection.applyPendingSelection();
+        fileController.applyPendingSelection();
 
         synth.renderNextBlock(outputBuffer3d, midiMessages, 0, buffer.getNumSamples());
     }
@@ -775,8 +775,8 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         // Rate = native file framerate * user-controlled speed multiplier.
         double nativeRate = 30.0;
         {
-            juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
-            const auto parser = fileSelection.getCurrentParser();
+            juce::SpinLock::ScopedLockType lock1(fileController.lock);
+            const auto parser = fileController.getCurrentParser();
             if (parser != nullptr) {
                 nativeRate = parser->getFrameRate();
             }
@@ -801,9 +801,9 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
             animationFrame = animationFrame + frameIncrement;
         }
 
-        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
+        juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
-        const auto parser = fileSelection.getCurrentParser();
+        const auto parser = fileController.getCurrentParser();
         if (parser != nullptr && parser->isAnimatable) {
             const int totalFrames = parser->getNumFrames();
             if (totalFrames > 0) {
@@ -823,13 +823,13 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
 
     {
-        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
+        juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         // If we're in audio-input mode, the synth path above didn't run, but we still
         // want file selection to affect Lua/custom processing on the audio thread.
         if (usingInput) {
-            fileSelection.applyPendingSelection();
+            fileController.applyPendingSelection();
         }
 
         // Note: toggleableEffects/previewEffect are applied via shared helper:
@@ -840,7 +840,7 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         for (auto& effect : permanentEffects) {
             effect->processBlockWithInputs(outputBuffer3d, midiMessages, nullptr, &currentVolumeBuffer, nullptr);
         }
-        const auto parser = fileSelection.getCurrentParser();
+        const auto parser = fileController.getCurrentParser();
         auto lua = parser != nullptr ? parser->getLua() : nullptr;
         if (lua != nullptr || custom->enabled->getBoolValue()) {
             for (auto& effect : luaEffects) {
@@ -895,7 +895,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         haltRecording();
     }
 
-    juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
+    juce::SpinLock::ScopedLockType lock1(fileController.lock);
     juce::SpinLock::ScopedLockType lock2(effectsLock);
 
     std::unique_ptr<juce::XmlElement> xml = std::make_unique<juce::XmlElement>("project");
@@ -948,7 +948,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     fontXml->setAttribute("bold", font.isBold());
     fontXml->setAttribute("italic", font.isItalic());
 
-    fileSelection.saveState(*xml);
+    fileController.saveState(*xml);
 
     recordingParameters.save(xml.get());
 
@@ -958,7 +958,7 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
 
     copyXmlToBinary(*xml, destData);
     juce::Logger::writeToLog("getStateInformation: saved " + juce::String(effects.size()) + " effects, "
-        + juce::String(fileSelection.size()) + " files, " + juce::String((int)destData.getSize()) + " bytes");
+        + juce::String(fileController.size()) + " files, " + juce::String((int)destData.getSize()) + " bytes");
 }
 
 void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
@@ -995,7 +995,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
         juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
 
-        juce::SpinLock::ScopedLockType lock1(fileSelection.lock);
+        juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
         const bool serializedLegacyAnimationRateActive = xml->getBoolAttribute("legacyAnimationRateActive", false);
@@ -1077,7 +1077,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             font = juce::Font(family, FONT_SIZE, (bold ? juce::Font::bold : 0) | (italic ? juce::Font::italic : 0));
         }
 
-        fileSelection.restoreState(*xml, lessThanVersion(version, "2.2.0"));
+        fileController.restoreState(*xml, lessThanVersion(version, "2.2.0"));
 
         if (legacyAnimationRateXml != nullptr
             && !hasAnimationSpeedState
@@ -1179,7 +1179,7 @@ void OscirenderAudioProcessor::migrateLegacyAnimationRate(juce::XmlElement& lega
     legacyAnimationRate->load(&legacyParameterXml);
 
     double nativeFrameRate = 30.0;
-    auto parser = fileSelection.getCurrentParser();
+    auto parser = fileController.getCurrentParser();
     if (parser != nullptr && parser->getFrameRate() > 0.0) {
         nativeFrameRate = parser->getFrameRate();
     }
