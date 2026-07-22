@@ -112,7 +112,7 @@ static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     cfg.setActiveTab = [&proc](int i) { proc.envelopeParameters.activeTab = i; };
 #if OSCI_PREMIUM
     cfg.typeId = "env";
-    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.midiManager = &proc.midiManager;
     cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
         return OscirenderAudioProcessor::modDepthCustomId("env", idx, pid);
     };

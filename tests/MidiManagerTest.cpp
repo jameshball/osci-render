@@ -2,8 +2,8 @@
 #include "TestCleanup.h"
 
 // ============================================================================
-// MIDI CC Manager Tests — functional correctness and stress tests for
-// the MidiCCManager class: assignment, learning, serialization, and
+// MIDI Manager Tests — functional correctness and stress tests for
+// the MidiManager class: assignment, learning, serialization, and
 // concurrent audio + message thread access.
 // ============================================================================
 
@@ -37,7 +37,13 @@ static juce::MidiBuffer makeCCBuffer(int ccNumber, int ccValue, int channel = 1)
     return buf;
 }
 
-// Drain the MidiCCManager's timer polling by calling processCC on the audio
+static juce::MidiBuffer makeProgramChangeBuffer(int program, int channel = 1) {
+    juce::MidiBuffer buffer;
+    buffer.addEvent(juce::MidiMessage::programChange(channel, program), 0);
+    return buffer;
+}
+
+// Drain the MidiManager's timer polling by calling processCC on the audio
 // thread and then manually pumping its change messages. Since in a test we
 // don't have a real message loop, we simulate it.
 static void pumpMessageLoop(int ms = 100) {
@@ -78,6 +84,99 @@ static void ensureMessageManagerExists() {
 // Functional Tests
 // ============================================================================
 
+class MidiMessageDispatchTest : public juce::UnitTest {
+public:
+    MidiMessageDispatchTest() : juce::UnitTest("MIDI Message Dispatch", "Midi") {}
+
+    void initialise() override {
+        ensureMessageManagerExists();
+    }
+
+    void runTest() override {
+        beginTest("Program Change messages reach their handler");
+        {
+            osci::MidiManager manager;
+            int receivedChannel = -1;
+            int receivedProgram = -1;
+            manager.setMessageHandler(osci::MidiManager::MessageType::programChange,
+                [&](const juce::MidiMessage& message) {
+                    receivedChannel = message.getChannel();
+                    receivedProgram = message.getProgramChangeNumber();
+                });
+
+            manager.processMidiBuffer(makeProgramChangeBuffer(42, 7));
+            expectEquals(receivedChannel, 7);
+            expectEquals(receivedProgram, 42);
+        }
+
+        beginTest("Unrelated messages do not reach Program Change handler");
+        {
+            osci::MidiManager manager;
+            int calls = 0;
+            manager.setMessageHandler(osci::MidiManager::MessageType::programChange,
+                [&](const juce::MidiMessage&) { ++calls; });
+
+            auto buffer = makeCCBuffer(10, 64);
+            buffer.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 1);
+            manager.processMidiBuffer(buffer);
+            expectEquals(calls, 0);
+        }
+
+        beginTest("CC and Program Change handlers share one buffer pass");
+        {
+            osci::MidiManager manager;
+            auto parameter = makeFloat("mixed", 0.0f);
+            manager.startLearning(parameter.get());
+            manager.processMidiBuffer(makeCCBuffer(12, 0));
+            pumpMessageLoop(200);
+
+            int receivedProgram = -1;
+            manager.setMessageHandler(osci::MidiManager::MessageType::programChange,
+                [&](const juce::MidiMessage& message) {
+                    receivedProgram = message.getProgramChangeNumber();
+                });
+
+            juce::MidiBuffer buffer;
+            buffer.addEvent(juce::MidiMessage::controllerEvent(1, 12, 127), 0);
+            buffer.addEvent(juce::MidiMessage::programChange(1, 9), 1);
+            manager.processMidiBuffer(buffer);
+            pumpMessageLoop(200);
+
+            expectWithinAbsoluteError(parameter->getValueUnnormalised(), 1.0f, 0.15f);
+            expectEquals(receivedProgram, 9);
+        }
+
+        beginTest("The final Program Change remains the latest request");
+        {
+            osci::MidiManager manager;
+            int latestProgram = -1;
+            manager.setMessageHandler(osci::MidiManager::MessageType::programChange,
+                [&](const juce::MidiMessage& message) {
+                    latestProgram = message.getProgramChangeNumber();
+                });
+
+            juce::MidiBuffer buffer;
+            buffer.addEvent(juce::MidiMessage::programChange(1, 2), 0);
+            buffer.addEvent(juce::MidiMessage::programChange(1, 17), 1);
+            manager.processMidiBuffer(buffer);
+            expectEquals(latestProgram, 17);
+        }
+
+        beginTest("An empty handler disables dispatch");
+        {
+            osci::MidiManager manager;
+            int calls = 0;
+            manager.setMessageHandler(osci::MidiManager::MessageType::programChange,
+                [&](const juce::MidiMessage&) { ++calls; });
+            manager.setMessageHandler(osci::MidiManager::MessageType::programChange, {});
+            manager.processMidiBuffer(makeProgramChangeBuffer(1));
+            expectEquals(calls, 0);
+        }
+    }
+};
+
+static MidiMessageDispatchTest midiMessageDispatchTest;
+
 class MidiCCAssignmentTest : public juce::UnitTest {
 public:
     MidiCCAssignmentTest() : juce::UnitTest("MIDI CC Assignment", "MidiCC") {}
@@ -105,7 +204,7 @@ private:
     void testDirectAssignmentViaLearning() {
         beginTest("Learn assigns CC to parameter");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("testParam", 0.5f, 0.0f, 1.0f);
 
         mgr.startLearning(param.get());
@@ -125,7 +224,7 @@ private:
     void testRemoveAssignment() {
         beginTest("Remove CC assignment");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("testParam");
 
         // Assign CC 20
@@ -148,7 +247,7 @@ private:
     void testReassignCC() {
         beginTest("Reassigning a CC to a new param removes old mapping");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto paramA = makeFloat("paramA");
         auto paramB = makeFloat("paramB");
 
@@ -169,7 +268,7 @@ private:
     void testMultipleParamsSeparateCCs() {
         beginTest("Multiple params can have different CCs");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto paramA = makeFloat("paramA");
         auto paramB = makeFloat("paramB");
 
@@ -188,7 +287,7 @@ private:
     void testCCValueMapsToFloat() {
         beginTest("CC value 0-127 maps to float parameter range");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("testFloat", 0.0f, 0.0f, 10.0f);
 
         mgr.startLearning(param.get());
@@ -210,7 +309,7 @@ private:
     void testCCValueMapsToBool() {
         beginTest("CC value maps to boolean parameter (>=64 = on)");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeBool("testBool", false);
 
         mgr.startLearning(param.get());
@@ -231,7 +330,7 @@ private:
     void testCCValueMapsToInt() {
         beginTest("CC value maps to int parameter range");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeInt("testInt", 0, 0, 10);
 
         mgr.startLearning(param.get());
@@ -252,7 +351,7 @@ private:
     void testLearningCancellation() {
         beginTest("stopLearning cancels without assigning");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("testParam");
 
         mgr.startLearning(param.get());
@@ -270,7 +369,7 @@ private:
     void testNoAssignment() {
         beginTest("CC with no assignment does not affect parameter");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("testParam", 0.5f, 0.0f, 1.0f);
 
         float before = param->getValueUnnormalised();
@@ -282,7 +381,7 @@ private:
     void testSameCCDifferentChannels() {
         beginTest("Same CC on different channels maps to different parameters");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto paramA = makeFloat("paramA", 0.0f, 0.0f, 1.0f);
         auto paramB = makeFloat("paramB", 0.0f, 0.0f, 1.0f);
 
@@ -318,7 +417,7 @@ private:
     void testChannelIsRespected() {
         beginTest("CC on an unassigned channel does not affect parameter");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("p", 0.0f, 0.0f, 1.0f);
 
         mgr.startLearning(param.get());
@@ -344,7 +443,7 @@ private:
     void testLearnCapturesChannel() {
         beginTest("Learn records the MIDI channel from the incoming message");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("p");
 
         mgr.startLearning(param.get());
@@ -385,7 +484,7 @@ private:
         std::atomic<int>   calls { 0 };
     };
 
-    static osci::MidiCCManager::CustomSetter makeCapturingSetter(CapturedValue& capture) {
+    static osci::MidiManager::CustomSetter makeCapturingSetter(CapturedValue& capture) {
         return [&capture](float v) {
             capture.value.store(v, std::memory_order_release);
             capture.calls.fetch_add(1, std::memory_order_release);
@@ -398,7 +497,7 @@ private:
         auto paramB = makeBool("paramB");
 
         // Set up assignments in source manager
-        osci::MidiCCManager source;
+        osci::MidiManager source;
         source.startLearning(paramA.get());
         source.processMidiBuffer(makeCCBuffer(1, 64));
         pumpMessageLoop(200);
@@ -418,10 +517,10 @@ private:
         auto paramA2 = makeFloat("paramA");
         auto paramB2 = makeBool("paramB");
 
-        osci::MidiCCManager dest;
-        dest.load(&xml, [&](const juce::String& id) -> osci::MidiCCManager::ParamBinding {
-            if (id == "paramA") return osci::MidiCCManager::makeBinding(paramA2.get());
-            if (id == "paramB") return osci::MidiCCManager::makeBinding(paramB2.get());
+        osci::MidiManager dest;
+        dest.load(&xml, [&](const juce::String& id) -> osci::MidiManager::ParamBinding {
+            if (id == "paramA") return osci::MidiManager::makeBinding(paramA2.get());
+            if (id == "paramB") return osci::MidiManager::makeBinding(paramB2.get());
             return {};
         });
 
@@ -439,7 +538,7 @@ private:
 
         auto param = makeFloat("existingParam");
 
-        osci::MidiCCManager source;
+        osci::MidiManager source;
         source.startLearning(param.get());
         source.processMidiBuffer(makeCCBuffer(5, 64));
         pumpMessageLoop(200);
@@ -448,8 +547,8 @@ private:
         source.save(&xml);
 
         // Load into a manager where "existingParam" doesn't exist
-        osci::MidiCCManager dest;
-        dest.load(&xml, [](const juce::String&) -> osci::MidiCCManager::ParamBinding {
+        osci::MidiManager dest;
+        dest.load(&xml, [](const juce::String&) -> osci::MidiManager::ParamBinding {
             return {}; // All params "missing"
         });
 
@@ -460,9 +559,9 @@ private:
     void testLoadEmptyXml() {
         beginTest("Load with no midiCCAssignments element is harmless");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         juce::XmlElement xml("state"); // no child element
-        mgr.load(&xml, [](const juce::String&) -> osci::MidiCCManager::ParamBinding {
+        mgr.load(&xml, [](const juce::String&) -> osci::MidiManager::ParamBinding {
             return {};
         });
         // Should not crash, and have no assignments
@@ -472,7 +571,7 @@ private:
     void testClearAllAssignments() {
         beginTest("clearAllAssignments removes everything");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("testParam");
 
         mgr.startLearning(param.get());
@@ -490,7 +589,7 @@ private:
         auto paramA = makeFloat("paramA", 0.0f, 0.0f, 1.0f);
         auto paramB = makeFloat("paramB", 0.0f, 0.0f, 1.0f);
 
-        osci::MidiCCManager src;
+        osci::MidiManager src;
         // paramA: CC 4 ch 1
         src.startLearning(paramA.get());
         src.processMidiBuffer(makeCCBuffer(4, 64, 1));
@@ -505,10 +604,10 @@ private:
 
         auto paramA2 = makeFloat("paramA", 0.0f, 0.0f, 1.0f);
         auto paramB2 = makeFloat("paramB", 0.0f, 0.0f, 1.0f);
-        osci::MidiCCManager dst;
-        dst.load(&xml, [&](const juce::String& id) -> osci::MidiCCManager::ParamBinding {
-            if (id == "paramA") return osci::MidiCCManager::makeBinding(paramA2.get());
-            if (id == "paramB") return osci::MidiCCManager::makeBinding(paramB2.get());
+        osci::MidiManager dst;
+        dst.load(&xml, [&](const juce::String& id) -> osci::MidiManager::ParamBinding {
+            if (id == "paramA") return osci::MidiManager::makeBinding(paramA2.get());
+            if (id == "paramB") return osci::MidiManager::makeBinding(paramB2.get());
             return {};
         });
 
@@ -538,9 +637,9 @@ private:
         // no "channel" attribute
 
         auto param = makeFloat("p");
-        osci::MidiCCManager mgr;
-        mgr.load(&xml, [&](const juce::String& id) -> osci::MidiCCManager::ParamBinding {
-            if (id == "p") return osci::MidiCCManager::makeBinding(param.get());
+        osci::MidiManager mgr;
+        mgr.load(&xml, [&](const juce::String& id) -> osci::MidiManager::ParamBinding {
+            if (id == "p") return osci::MidiManager::makeBinding(param.get());
             return {};
         });
 
@@ -552,7 +651,7 @@ private:
     void testCustomTargetLearnAndDeliver() {
         beginTest("Custom target: learn binds CC and delivers values to setter");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         CapturedValue captured;
 
         mgr.startLearningCustom("mod:lfo:0:someParam", makeCapturingSetter(captured));
@@ -587,7 +686,7 @@ private:
     void testCustomTargetSaveAndLoadPreservesBinding() {
         beginTest("Custom target: save/load restores binding (inert until rebind)");
 
-        osci::MidiCCManager src;
+        osci::MidiManager src;
         CapturedValue srcCapture;
         src.startLearningCustom("mod:env:1:thing", makeCapturingSetter(srcCapture));
         src.processMidiBuffer(makeCCBuffer(9, 64, 4));
@@ -601,8 +700,8 @@ private:
         src.save(&xml);
 
         // Load: XML contains the custom entry, which should be restored inert.
-        osci::MidiCCManager dst;
-        dst.load(&xml, [](const juce::String&) -> osci::MidiCCManager::ParamBinding { return {}; });
+        osci::MidiManager dst;
+        dst.load(&xml, [](const juce::String&) -> osci::MidiManager::ParamBinding { return {}; });
 
         auto dstAssign = dst.getCustomAssignment("mod:env:1:thing");
         expectEquals(dstAssign.cc, 9);
@@ -623,7 +722,7 @@ private:
     void testCustomTargetRemove() {
         beginTest("Custom target: removeCustomAssignment detaches and halts delivery");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         CapturedValue captured;
         mgr.startLearningCustom("mod:rng:2:foo", makeCapturingSetter(captured));
         mgr.processMidiBuffer(makeCCBuffer(12, 64, 1));
@@ -645,7 +744,7 @@ private:
         beginTest("Custom target: learn replaces a param mapping in the same slot");
 
         // Start with a param CC mapping on CC 20 ch 1
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("somePar");
         mgr.startLearning(param.get());
         mgr.processMidiBuffer(makeCCBuffer(20, 64, 1));
@@ -685,7 +784,7 @@ private:
     void testConcurrentAudioAndMessageThread() {
         beginTest("Concurrent processMidiBuffer + query/remove does not crash");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
 
         // Create a pool of parameters
         static constexpr int NUM_PARAMS = 20;
@@ -709,7 +808,7 @@ private:
 
         // Audio thread: hammers processMidiBuffer with random CC messages
         struct AudioThread : juce::Thread {
-            AudioThread(osci::MidiCCManager& m, std::atomic<bool>& r, std::atomic<int>& c)
+            AudioThread(osci::MidiManager& m, std::atomic<bool>& r, std::atomic<int>& c)
                 : juce::Thread("AudioThread"), mgr(m), running(r), count(c) {}
             void run() override {
                 juce::Random rng(42);
@@ -721,14 +820,14 @@ private:
                     count.fetch_add(1);
                 }
             }
-            osci::MidiCCManager& mgr;
+            osci::MidiManager& mgr;
             std::atomic<bool>& running;
             std::atomic<int>& count;
         };
 
         // Second thread: queries and removes assignments (lock-contention with audio)
         struct QueryThread : juce::Thread {
-            QueryThread(osci::MidiCCManager& m,
+            QueryThread(osci::MidiManager& m,
                         std::vector<std::unique_ptr<osci::FloatParameter>>& p,
                         std::atomic<bool>& r, std::atomic<int>& c)
                 : juce::Thread("QueryThread"), mgr(m), params(p), running(r), count(c) {}
@@ -743,7 +842,7 @@ private:
                     count.fetch_add(1);
                 }
             }
-            osci::MidiCCManager& mgr;
+            osci::MidiManager& mgr;
             std::vector<std::unique_ptr<osci::FloatParameter>>& params;
             std::atomic<bool>& running;
             std::atomic<int>& count;
@@ -770,7 +869,7 @@ private:
     void testRapidLearningCycles() {
         beginTest("Rapid learn->assign->remove cycles");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         auto param = makeFloat("rapidParam");
 
         for (int i = 0; i < 200; ++i) {
@@ -789,7 +888,7 @@ private:
     void testAllCCsAssigned() {
         beginTest("All 128 CCs can be assigned simultaneously");
 
-        osci::MidiCCManager mgr;
+        osci::MidiManager mgr;
         std::vector<std::unique_ptr<osci::FloatParameter>> params;
 
         for (int i = 0; i < 128; ++i) {

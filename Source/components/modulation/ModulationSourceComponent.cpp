@@ -3,7 +3,7 @@
 #include "../../LookAndFeel.h"
 #include "../../audio/modulation/ModulationTypes.h"
 #include <osci_gui/osci_gui.h>
-#include <osci_render_core/midi/osci_MidiCCManager.h>
+#include <osci_render_core/midi/osci_MidiManager.h>
 
 // ============================================================================
 // DepthIndicator – small arc knob for a single source→param connection
@@ -134,7 +134,7 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
     menu.addItem(3, "Enter Value");
 
 #if OSCI_PREMIUM
-    osci::MidiCCManager* ccMgr = owner.config.midiCCManager;
+    osci::MidiManager* ccMgr = owner.config.midiManager;
     juce::String ccId;
     if (ccMgr != nullptr
         && owner.config.buildModDepthCustomId

@@ -9,8 +9,8 @@
 #endif
 
 KnobContainerComponent::~KnobContainerComponent() {
-    if (midiCCManager)
-        midiCCManager->removeChangeListener(this);
+    if (midiManager)
+        midiManager->removeChangeListener(this);
 #ifndef SOSCI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
@@ -64,8 +64,8 @@ void KnobContainerComponent::wireModulation(OscirenderAudioProcessor& processor)
 
 #endif
 
-void KnobContainerComponent::wireMidiCC(osci::MidiCCManager& manager) {
-    ParameterContextMenu::wireMidiCCListener(midiCCManager, manager, this);
+void KnobContainerComponent::wireMidiCC(osci::MidiManager& manager) {
+    ParameterContextMenu::wireMidiCCListener(midiManager, manager, this);
     setupMidiCCContextMenu();
 }
 
@@ -74,7 +74,7 @@ void KnobContainerComponent::setupMidiCCContextMenu() {
         ParameterContextMenu::Context ctx;
         ctx.param = boundParam;
         ctx.effectParam = effectParam;
-        ctx.midiCCManager = midiCCManager;
+        ctx.midiManager = midiManager;
         ctx.canResetToDefault = knob.isDoubleClickReturnEnabled();
         ctx.ccEffectParam = effectParam;
 

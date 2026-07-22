@@ -55,8 +55,8 @@ public:
         if (boundParam)
             boundParam->addListener(this);
 
-        if (param->midiCCManager != nullptr)
-            wireMidiCC(*param->midiCCManager);
+        if (param->midiManager != nullptr)
+            wireMidiCC(*param->midiManager);
 
         double minVal = param->min.load();
         double maxVal = param->max.load();
@@ -230,8 +230,8 @@ public:
         auto bounds = getLocalBounds().toFloat();
         float alpha = isEnabled() ? 1.0f : 0.3f;
 
-        bool isLearningCC = midiCCManager != nullptr && boundParam != nullptr
-                            && midiCCManager->isLearning(boundParam);
+        bool isLearningCC = midiManager != nullptr && boundParam != nullptr
+                            && midiManager->isLearning(boundParam);
 
         // Faint rounded rectangle behind the label only
         auto labelArea = bounds.removeFromBottom(osci::Colours::kLabelHeight);
@@ -269,13 +269,13 @@ private:
     osci::EffectParameter* effectParam = nullptr;
     bool modDropHighlight = false;
     bool labelHovered = false;
-    osci::MidiCCManager* midiCCManager = nullptr;
+    osci::MidiManager* midiManager = nullptr;
 
 #ifndef SOSCI
     ModulationUpdateBroadcaster* modBroadcaster = nullptr;
 #endif
 
-    void wireMidiCC(osci::MidiCCManager& manager);
+    void wireMidiCC(osci::MidiManager& manager);
     void setupMidiCCContextMenu();
 
     void showSettingsPopup();

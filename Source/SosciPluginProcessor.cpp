@@ -30,7 +30,7 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
     const int numSamples = input.getNumSamples();
 
     // Process MIDI CC → parameter mappings before clearing the buffer
-    midiCCManager.processMidiBuffer(midiMessages);
+    midiManager.processMidiBuffer(midiMessages);
 
     midiMessages.clear();
 
@@ -212,7 +212,7 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
 
     recordingParameters.save(xml.get());
 
-    midiCCManager.save(xml.get());
+    midiManager.save(xml.get());
     
     saveProperties(*xml);
 

@@ -67,8 +67,6 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
     slider.addListener(this);
     lfoSlider.addListener(this);
 
-    label.setFont(juce::Font(14.0f));
-
     if (lfoEnabled) {
         lfo.addItem("Static", static_cast<int>(osci::LfoType::Static));
         lfo.addItem("Sine", static_cast<int>(osci::LfoType::Sine));
@@ -79,8 +77,6 @@ EffectComponent::EffectComponent(osci::Effect& effect, int index) : effect(effec
         lfo.addItem("Reverse Sawtooth", static_cast<int>(osci::LfoType::ReverseSawtooth));
         lfo.addItem("Noise", static_cast<int>(osci::LfoType::Noise));
     }
-
-    label.setMouseCursor(juce::MouseCursor::PointingHandCursor);
 
     effect.addListener(index, this);
     setupComponent();
@@ -100,8 +96,8 @@ void EffectComponent::setSliderValueIfChanged(osci::FloatParameter* parameter, j
 void EffectComponent::setupComponent() {
     osci::EffectParameter* parameter = effect.parameters[index];
 
-    if (parameter->midiCCManager != nullptr)
-        wireMidiCC(*parameter->midiCCManager);
+    if (parameter->midiManager != nullptr)
+        wireMidiCC(*parameter->midiManager);
 
     setEnabled(effect.enabled == nullptr || effect.enabled->getBoolValue());
 
@@ -115,9 +111,9 @@ void EffectComponent::setupComponent() {
 
     setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
-    label.setInterceptsMouseClicks(true, false);
-    label.removeMouseListener(this);
-    label.addMouseListener(this, false);
+    label.onContextMenu = [this](juce::Point<int> screenPosition) {
+        showContextMenu(screenPosition);
+    };
 
     slider.setRange(parameter->min, parameter->max, parameter->step);
     setSliderValueIfChanged(parameter, slider);
@@ -198,8 +194,8 @@ void EffectComponent::setupComponent() {
 }
 
 EffectComponent::~EffectComponent() {
-    if (midiCCManager)
-        midiCCManager->removeChangeListener(this);
+    if (midiManager)
+        midiManager->removeChangeListener(this);
 #ifndef SOSCI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
@@ -301,12 +297,12 @@ void EffectComponent::changeListenerCallback(juce::ChangeBroadcaster*) {
 }
 
 void EffectComponent::updateLabelAppearance() {
-    bool learning = midiCCManager != nullptr && midiCCManager->isLearning(effect.parameters[index]);
+    bool learning = midiManager != nullptr && midiManager->isLearning(effect.parameters[index]);
     if (learning) {
-        label.setColour(juce::Label::textColourId, osci::Colours::midiLearnText());
+        label.setTextColours(osci::Colours::midiLearnText(), osci::Colours::midiLearnText());
         label.setText(osci::Colours::midiLearnLabel(), juce::dontSendNotification);
     } else {
-        label.setColour(juce::Label::textColourId, labelHovered ? osci::Colours::accentColor() : juce::Colours::white);
+        label.setTextColours(juce::Colours::white, osci::Colours::accentColor());
         label.setText(effect.parameters[index]->name, juce::dontSendNotification);
     }
 }
@@ -494,33 +490,16 @@ void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
 }
 #endif
 
-void EffectComponent::wireMidiCC(osci::MidiCCManager& manager) {
-    ParameterContextMenu::wireMidiCCListener(midiCCManager, manager, this);
+void EffectComponent::wireMidiCC(osci::MidiManager& manager) {
+    ParameterContextMenu::wireMidiCCListener(midiManager, manager, this);
 }
 
 void EffectComponent::mouseDown(const juce::MouseEvent& event) {
-    auto* source = event.originalComponent;
-    if (event.mods.isRightButtonDown() || source == &label) {
+    if (event.mods.isRightButtonDown()) {
         showContextMenu(event.getScreenPosition());
         return;
     }
     juce::Component::mouseDown(event);
-}
-
-void EffectComponent::mouseEnter(const juce::MouseEvent& event) {
-    if (event.originalComponent == &label) {
-        labelHovered = true;
-        updateLabelAppearance();
-    }
-    juce::Component::mouseEnter(event);
-}
-
-void EffectComponent::mouseExit(const juce::MouseEvent& event) {
-    if (event.originalComponent == &label) {
-        labelHovered = false;
-        updateLabelAppearance();
-    }
-    juce::Component::mouseExit(event);
 }
 
 void EffectComponent::showContextMenu(juce::Point<int> screenPos) {
@@ -529,7 +508,7 @@ void EffectComponent::showContextMenu(juce::Point<int> screenPos) {
     ParameterContextMenu::Context ctx;
     ctx.param = param;
     ctx.effectParam = rangeEnabled ? param : nullptr;
-    ctx.midiCCManager = midiCCManager;
+    ctx.midiManager = midiManager;
     ctx.ccEffectParam = param;
 
     auto safeThis = juce::Component::SafePointer<EffectComponent>(this);

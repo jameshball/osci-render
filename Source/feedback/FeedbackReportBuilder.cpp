@@ -47,7 +47,7 @@ juce::String readSanitizedLogSnapshot(const CommonAudioProcessor& processor, boo
         "RAM: ",
         "prepareToPlay: ",
         "getStateInformation: ",
-        "MidiCCManager::save: "
+        "MidiManager::save: "
     };
     juce::StringArray lines;
     lines.addLines(log);
