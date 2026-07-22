@@ -103,7 +103,7 @@ public:
 
     osci::BooleanParameter* muteParameter = nullptr;
 
-    osci::MidiCCManager midiCCManager;
+    osci::MidiManager midiManager;
 
     std::shared_ptr<osci::Effect> volumeEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(

@@ -19,6 +19,12 @@ public:
     void updateFileLabel();
 
 private:
+    void showFileMenu(juce::Point<int> screenPosition);
+    void beginRenameFile(int index);
+    void finishRenameFile(bool commit);
+    void layoutRenameEditor();
+    void removeFile(int index);
+
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
 
@@ -28,8 +34,13 @@ private:
     osci::SvgButton rightArrow     { "rightArrow", juce::String(BinaryData::right_arrow_svg), juce::Colours::white };
     osci::SvgButton closeFileButton{ "closeFile",  juce::String(BinaryData::delete_svg),       juce::Colours::red };
     osci::SvgButton openFileButton { "openFiles", juce::String(BinaryData::plus_svg), juce::Colours::white, juce::Colours::white };
-    juce::Label fileLabel;
+    osci::ContextMenuLabel fileLabel;
+    osci::TextEditor renameEditor{"renameFile"};
+    juce::Label renameExtensionLabel;
     juce::Label fileNumberLabel;
+    juce::String renameExtension;
+    int renameFileIndex = -1;
+    bool renamingFile = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FileControlsComponent)
 };

@@ -203,7 +203,7 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     cfg.setActiveTab = [&proc](int i) { proc.lfoParameters.activeTab = i; };
 #if OSCI_PREMIUM
     cfg.typeId = "lfo";
-    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.midiManager = &proc.midiManager;
     cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
         return OscirenderAudioProcessor::modDepthCustomId("lfo", idx, pid);
     };

@@ -189,7 +189,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
     examples.onFileOpened = [this](const juce::String& fileName, bool shouldOpenEditor, int fileIndex) {
         pluginEditor.addCodeEditor(fileIndex);
-        pluginEditor.fileUpdated(fileName, shouldOpenEditor);
+        pluginEditor.refreshFileUi(fileName, shouldOpenEditor);
     };
 
     double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));
@@ -576,8 +576,9 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
 
     const bool isImage = osci::files::isImage(extension);
 
-    const bool textureInputActive = audioProcessor.isTextureInputActive();
-    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !textureInputActive);
+    auto& files = audioProcessor.getFileController();
+    const bool textureInputActive = files.isTextureInputActive();
+    bool skipProcessing = files.isObjectServerActive() || (fileName.isEmpty() && !textureInputActive);
     const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);
     const bool usesFrameControls = isImage || osci::files::isAnimated(extension);
     quickControls.setAnimated(!skipProcessing && isAnimatedFile);
@@ -586,11 +587,11 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
         // do nothing
     } else if (extension == ".lsystem") {
 #if OSCI_PREMIUM
-        int fileIndex = audioProcessor.getCurrentFileIndex();
-        if (fileIndex >= 0) {
-            auto parser = audioProcessor.getCurrentFileParser();
+        const auto fileIndex = files.getCurrentFileIndex();
+        if (fileIndex.has_value()) {
+            auto parser = files.getCurrentParser();
             if (parser != nullptr) {
-                fractalEditor.setParser(parser->getFractal(), fileIndex);
+                fractalEditor.setParser(parser->getFractal(), *fileIndex);
                 fractalEditor.setVisible(true);
             }
         }
