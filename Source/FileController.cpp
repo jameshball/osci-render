@@ -69,12 +69,34 @@ int FileController::appendFile(juce::String name, std::shared_ptr<juce::MemoryBl
 void FileController::updateFile(int index, std::shared_ptr<juce::MemoryBlock> data) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
+    updateFileUnlocked(index, std::move(data));
+}
+
+void FileController::updateFileById(const juce::String& id, std::shared_ptr<juce::MemoryBlock> data) {
+    juce::SpinLock::ScopedLockType fileLock(lock);
+    juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
+    const auto index = findFileIndexByIdUnlocked(id);
+    if (index.has_value()) {
+        updateFileUnlocked(*index, std::move(data));
+    }
+}
+
+void FileController::updateFileUnlocked(int index, std::shared_ptr<juce::MemoryBlock> data) {
     if (!contains(index)) {
         return;
     }
     files[index].data = std::move(data);
     parseFile(index);
     selectFileUnlocked(index);
+}
+
+std::optional<int> FileController::findFileIndexByIdUnlocked(const juce::String& id) const {
+    for (int index = 0; index < size(); index++) {
+        if (juce::String(files[index].id) == id) {
+            return index;
+        }
+    }
+    return std::nullopt;
 }
 
 juce::String FileController::renameFile(int index, juce::String newName) {

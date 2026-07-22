@@ -189,7 +189,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
     examples.onFileOpened = [this](const juce::String& fileName, bool shouldOpenEditor, int fileIndex) {
         pluginEditor.addCodeEditor(fileIndex);
-        pluginEditor.fileUpdated(fileName, shouldOpenEditor);
+        pluginEditor.refreshFileUi(fileName, shouldOpenEditor);
     };
 
     double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));

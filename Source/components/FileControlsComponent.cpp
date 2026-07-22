@@ -1,5 +1,6 @@
 #include "FileControlsComponent.h"
 #include "../PluginEditor.h"
+#include "../parser/FileFormatRegistry.h"
 
 namespace {
 
@@ -127,7 +128,7 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
 
     juce::PopupMenu menu;
     if (hasFile) {
-        if (!pluginEditor.isBinaryFile(fileName)) {
+        if (osci::files::isCodeEditable(fileName)) {
             menu.addItem(editFileId, "Edit file");
         }
         menu.addItem(renameFileId, "Rename file...");
@@ -242,7 +243,7 @@ void FileControlsComponent::removeFile(int index) {
     if (index < 0) {
         return;
     }
-    pluginEditor.removeFile(index);
+    audioProcessor.getFileController().removeFile(index);
     updateFileLabel();
 }
 
