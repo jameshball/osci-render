@@ -785,8 +785,7 @@ void OscirenderAudioProcessorEditor::commitCodeModel(osci::LuaScriptEditorModel&
         return;
     }
 
-    files.updateFileById(model.getScriptId(),
-        std::make_shared<juce::MemoryBlock>(code.toRawUTF8(), code.getNumBytesAsUTF8() + 1));
+    files.updateFileById(model.getScriptId(), std::make_shared<juce::MemoryBlock>(code.toRawUTF8(), code.getNumBytesAsUTF8() + 1));
 }
 
 std::shared_ptr<osci::LuaScriptEditorModel> OscirenderAudioProcessorEditor::getVisibleLuaEditorModel() const {
@@ -802,8 +801,7 @@ std::shared_ptr<osci::LuaScriptEditorModel> OscirenderAudioProcessorEditor::getV
 bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
     bool consumeKey = false;
     const juce::juce_wchar textCharacter = key.getTextCharacter();
-    if ((textCharacter == 'j' || textCharacter == 'k')
-        && (isTextureInputActive() || audioProcessor.getFileController().isTextureInputActive())) {
+    if ((textCharacter == 'j' || textCharacter == 'k') && (isTextureInputActive() || audioProcessor.getFileController().isTextureInputActive())) {
         stopTextureInput();
     }
 
