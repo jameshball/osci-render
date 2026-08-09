@@ -5,11 +5,18 @@
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
 #include "feedback/FeedbackReportBuilder.h"
+#include "logging/WorkflowLogger.h"
 #include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
 #include "visualiser/OfflineAudioToVideoRenderer.h"
 #endif
+
+namespace {
+#if OSCI_PREMIUM
+const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
+#endif
+}
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
     : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
@@ -481,9 +488,12 @@ void CommonPluginEditor::renderAudioFileToVideo() {
     return;
 #else
     if (auto* existing = findActiveOverlay<OfflineRenderOverlay>()) {
+        offlineRenderLog.event("existing render brought to front");
         existing->toFront(true);
         return;
     }
+
+    offlineRenderLog.started();
 
     // Step 1: choose input audio file
     chooser = std::make_unique<juce::FileChooser>(
@@ -495,13 +505,20 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         juce::FileBrowserComponent::canSelectFiles;
 
     juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    offlineRenderLog.event("input selection opened");
     chooser->launchAsync(openFlags, [safeThis](const juce::FileChooser& inputChooser) {
-        if (safeThis == nullptr)
+        if (safeThis == nullptr) {
+            offlineRenderLog.cancelled("input selection because editor closed");
             return;
+        }
 
         const auto inputFile = inputChooser.getResult();
-        if (inputFile == juce::File())
+        if (inputFile == juce::File()) {
+            offlineRenderLog.cancelled("input selection");
             return;
+        }
+
+        offlineRenderLog.event("input selected", "file=" + inputFile.getFileName());
 
         safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
 
@@ -518,23 +535,33 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         auto saveFlags = juce::FileBrowserComponent::saveMode |
             juce::FileBrowserComponent::canSelectFiles;
 
+        offlineRenderLog.event("output selection opened");
         safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext](const juce::FileChooser& outputChooser) {
-            if (safeThis == nullptr)
+            if (safeThis == nullptr) {
+                offlineRenderLog.cancelled("output selection because editor closed");
                 return;
+            }
 
             auto outputFile = outputChooser.getResult();
-            if (outputFile == juce::File())
+            if (outputFile == juce::File()) {
+                offlineRenderLog.cancelled("output selection");
                 return;
+            }
 
             // Ensure the file extension matches the codec container by default.
             if (outputFile.getFileExtension().isEmpty())
                 outputFile = outputFile.withFileExtension(ext);
 
+            offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
             safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
 
             // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
-            if (!safeThis->audioProcessor.ensureFFmpegExists())
+            if (!safeThis->audioProcessor.ensureFFmpegExists()) {
+                offlineRenderLog.event("render deferred", "FFmpeg unavailable");
                 return;
+            }
+
+            offlineRenderLog.event("FFmpeg ready");
 
             // Stop any live recording and pause the main visualiser.
             if (safeThis->audioProcessor.haltRecording != nullptr)
@@ -561,10 +588,20 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             content->setSize(700, 520);
 
             content->setOnFinished([safeThis, resultHolder, overlayHolder](OfflineAudioToVideoRendererComponent::Result r) {
-                if (safeThis == nullptr)
+                if (safeThis == nullptr) {
+                    offlineRenderLog.cancelled("result delivery because editor closed");
                     return;
+                }
 
                 *resultHolder = r;
+
+                if (r.success) {
+                    offlineRenderLog.completed();
+                } else if (r.cancelled) {
+                    offlineRenderLog.cancelled("render");
+                } else {
+                    offlineRenderLog.failed("render", r.errorMessage);
+                }
 
                 if (auto* overlay = overlayHolder->getComponent()) {
                     overlay->requestDismiss();
@@ -595,6 +632,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             };
 
             safeThis->showOverlay(std::move(overlay));
+            offlineRenderLog.event("render UI opened");
             contentPtr->start();
         });
     });
