@@ -54,6 +54,7 @@ public:
 
 private:
     void initialiseCodeEditors();
+    void refreshFileUiLocked(const juce::String& fileName, bool shouldOpenEditor);
     void removeCodeEditor(int index);
     void registerFileRemovedCallback();
 

@@ -34,10 +34,12 @@ void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
             return;
 
         safeThis->removeCodeEditor(index);
-        safeThis->refreshFileUi(safeThis->audioProcessor.getFileController().getCurrentFileName());
+        safeThis->refreshFileUiLocked(safeThis->audioProcessor.getFileController().getCurrentFileName(), false);
         juce::MessageManager::callAsync([safeThis] {
-            if (safeThis != nullptr)
+            if (safeThis != nullptr) {
+                safeThis->updateTimelineController();
                 safeThis->resized();
+            }
         });
     });
 }
@@ -91,6 +93,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         juce::SpinLock::ScopedLockType lock(audioProcessor.getFileController().lock);
         initialiseCodeEditors();
     }
+    updateTimelineController();
 
     {
         juce::MessageManagerLock lock;
@@ -423,7 +426,7 @@ void OscirenderAudioProcessorEditor::initialiseCodeEditors() {
         addCodeEditor(i);
     }
     bool codeEditorVisible = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
-    refreshFileUi(files.getCurrentFileName(), codeEditorVisible);
+    refreshFileUiLocked(files.getCurrentFileName(), codeEditorVisible);
 }
 
 void OscirenderAudioProcessorEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) {
@@ -703,12 +706,19 @@ void OscirenderAudioProcessorEditor::updateCodeEditor(bool binaryFile, bool shou
     triggerAsyncUpdate();
 }
 
-// FileController::lock must be held.
 void OscirenderAudioProcessorEditor::refreshFileUi(juce::String fileName, bool shouldOpenEditor) {
+    {
+        juce::SpinLock::ScopedLockType fileLock(audioProcessor.getFileController().lock);
+        refreshFileUiLocked(fileName, shouldOpenEditor);
+    }
+    updateTimelineController();
+}
+
+// FileController::lock must be held.
+void OscirenderAudioProcessorEditor::refreshFileUiLocked(const juce::String& fileName, bool shouldOpenEditor) {
     CommonPluginEditor::fileUpdated(fileName);
     settings.fileUpdated(fileName);
     updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
-    updateTimelineController();
 }
 
 void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
@@ -722,13 +732,17 @@ void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcas
             initialiseCodeEditors();
             settings.update();
         }
+        updateTimelineController();
         resized();
         repaint();
     } else if (source == &audioProcessor.getFileController()) {
         auto& files = audioProcessor.getFileController();
-        juce::SpinLock::ScopedLockType fileLock(files.lock);
-        // Triggered when the processor changes the current file (e.g. Blender or automation).
-        refreshFileUi(files.getCurrentFileName());
+        {
+            juce::SpinLock::ScopedLockType fileLock(files.lock);
+            // Triggered when the processor changes the current file (e.g. Blender or automation).
+            refreshFileUiLocked(files.getCurrentFileName(), false);
+        }
+        updateTimelineController();
     }
 }
 
@@ -921,17 +935,20 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
     std::shared_ptr<TimelineController> controller = nullptr;
 
     auto& files = audioProcessor.getFileController();
-    const auto currentFileIndex = files.getCurrentFileIndex();
-    if (currentFileIndex.has_value()) {
-        auto parser = files.getParser(*currentFileIndex);
+    {
+        juce::SpinLock::ScopedLockType fileLock(files.lock);
+        const auto currentFileIndex = files.getCurrentFileIndex();
+        if (currentFileIndex.has_value()) {
+            auto parser = files.getParser(*currentFileIndex);
 
-        // Check if it's an animatable file (gpla, gif, video)
-        if (parser->isAnimatable) {
-            controller = animationTimelineController;
-        }
-        // Check if it's an audio file (FileParser contains a WavParser)
-        else if (parser->getWav() != nullptr) {
-            controller = audioTimelineController;
+            // Check if it's an animatable file (gpla, gif, video)
+            if (parser->isAnimatable) {
+                controller = animationTimelineController;
+            }
+            // Check if it's an audio file (FileParser contains a WavParser)
+            else if (parser->getWav() != nullptr) {
+                controller = audioTimelineController;
+            }
         }
     }
 
