@@ -4,6 +4,7 @@
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../components/OverlayDialogHelpers.h"
+#include "../video/VideoEncodingConstants.h"
 #include "VisualiserTextureAssets.h"
 
 #include <cstdint>
@@ -166,7 +167,7 @@ VisualiserComponent::VisualiserComponent(
                     framePixels.resize(renderTexture.width * renderTexture.height * 4);
                 }
                 getFrame(framePixels);
-                if (ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height, 3000) == 0) {
+                if (ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height, VideoEncodingConstants::frameWriteTimeoutMs) == 0) {
                     record.setToggleState(false, juce::NotificationType::dontSendNotification);
 
                     juce::Component::SafePointer<VisualiserComponent> safeThis(this);

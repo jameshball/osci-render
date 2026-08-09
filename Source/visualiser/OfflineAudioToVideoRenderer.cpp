@@ -3,6 +3,7 @@
 #if OSCI_PREMIUM
 
 #include "../LookAndFeel.h"
+#include "../video/VideoEncodingConstants.h"
 #include "VisualiserTextureAssets.h"
 
 namespace {
@@ -619,8 +620,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
                 break;
             }
 
-            // Use a short timeout so cancellation can be observed quickly.
-            if (ffmpegProcess.write(framePixels.data(), expectedBytes, 250) == 0)
+            if (ffmpegProcess.write(framePixels.data(), expectedBytes, VideoEncodingConstants::frameWriteTimeoutMs) == 0)
             {
                 logOfflineAudioToVideo(
                     "render failed: FFmpeg frame write failed at frame " + juce::String(frameIndex + 1)
