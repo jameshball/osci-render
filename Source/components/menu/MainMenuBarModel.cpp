@@ -51,7 +51,6 @@ void MainMenuBarModel::addEditMenuItems(int topLevelMenuIndex, CommonAudioProces
 void MainMenuBarModel::addListenForSpecialKeysMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor) {
     addToggleMenuItem(topLevelMenuIndex, "Listen for Special Keys", [this, &processor] {
         processor.setAcceptsKeys(! processor.getAcceptsKeys());
-        resetMenuItems();
     }, [&processor] { return processor.getAcceptsKeys(); });
 }
 
