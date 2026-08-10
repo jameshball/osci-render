@@ -608,6 +608,9 @@ private:
 
     std::optional<osci::VersionInfo> availableVersion;
     juce::File downloadedFile;
+#if JUCE_LINUX
+    std::unique_ptr<osci::LinuxUpdateInstallThread> linuxInstallThread;
+#endif
     bool busy = false;
     bool updateDownloadInProgress = false;
     bool licenseKeyRevealed = false;
@@ -1126,6 +1129,53 @@ private:
         osci::showInstallConfirmation (
             this,
             [safeThis, file, version, product, currentVersion, noticeTarget] {
+#if JUCE_LINUX
+                if (!version.has_value() || safeThis == nullptr) {
+                    return;
+                }
+
+                safeThis->updateDownloadInProgress = true;
+                safeThis->updateCard.resetDownload();
+                safeThis->updateCard.setDownloadStatus ("Installing application and plugins...");
+                safeThis->updateCard.setDownloadProgress (0.0);
+                safeThis->setBusy (true, "Installing update...", noticeTarget);
+
+                safeThis->linuxInstallThread = osci::installLinuxUpdateAsync (
+                    file, *version, product, currentVersion,
+                    [safeThis] (double fraction, juce::StringRef stage) {
+                        juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
+                            if (safeThis != nullptr) {
+                                safeThis->updateCard.setDownloadProgress (fraction);
+                                safeThis->updateCard.setDownloadStatus (stage);
+                            }
+                        });
+                    },
+                    [safeThis, noticeTarget] (juce::Result result, osci::LinuxInstaller::Report report) {
+                        if (safeThis == nullptr) {
+                            return;
+                        }
+
+                        safeThis->updateDownloadInProgress = false;
+                        safeThis->updateCard.hideDownload();
+                        safeThis->setBusy (false);
+                        if (result.failed()) {
+                            safeThis->setNotice (noticeTarget, result.getErrorMessage(), NoticeKind::Error);
+                        } else {
+                            auto message = juce::String ("Update installed. Restart the app or plugin host to use it.");
+                            if (!report.warnings.isEmpty()) {
+                                message << " " << report.warnings.joinIntoString (" ");
+                            }
+                            safeThis->setNotice (noticeTarget, message, NoticeKind::Success);
+                        }
+                        safeThis->refreshState();
+                    });
+                if (safeThis->linuxInstallThread == nullptr) {
+                    safeThis->updateDownloadInProgress = false;
+                    safeThis->setBusy (false);
+                    safeThis->setNotice (noticeTarget, "Could not start the Linux installer thread", NoticeKind::Error);
+                    safeThis->refreshState();
+                }
+#else
                 const auto launchResult = osci::launchInstallerWithPendingMarkerResult (file, version, product, currentVersion);
                 if (safeThis == nullptr) {
                     return;
@@ -1141,6 +1191,7 @@ private:
                                      "Installer launched. Reopen the app after installation finishes.",
                                      NoticeKind::Success);
                 safeThis->refreshState();
+#endif
             });
     }
 

@@ -201,6 +201,9 @@ private:
     std::optional<osci::VersionInfo> availableVersion;
     std::optional<osci::PendingInstallMarker> pendingInstallRetryMarker;
     juce::File downloadedFile;
+#if JUCE_LINUX
+    std::unique_ptr<osci::LinuxUpdateInstallThread> linuxInstallThread;
+#endif
     Mode mode = Mode::Hidden;
     bool busy = false;
     melatonin::DropShadow shadow {
@@ -384,6 +387,56 @@ private:
         osci::showInstallConfirmation (
             this,
             [safeThis, file, version, product, currentVersion] {
+#if JUCE_LINUX
+                if (!version.has_value() || safeThis == nullptr) {
+                    return;
+                }
+
+                safeThis->busy = true;
+                safeThis->mode = Mode::Downloading;
+                safeThis->progressBar.setProgress (0.0);
+                safeThis->progressBar.setVisible (true);
+                safeThis->titleLabel.setText ("Installing update", juce::dontSendNotification);
+                safeThis->primaryButton.setEnabled (false);
+                safeThis->secondaryButton.setEnabled (false);
+                safeThis->refreshParentLayout();
+
+                safeThis->linuxInstallThread = osci::installLinuxUpdateAsync (
+                    file, *version, product, currentVersion,
+                    [safeThis] (double fraction, juce::StringRef stage) {
+                        juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
+                            if (safeThis != nullptr) {
+                                safeThis->progressBar.setProgress (fraction);
+                                safeThis->detailLabel.setText (stage, juce::dontSendNotification);
+                            }
+                        });
+                    },
+                    [safeThis, version] (juce::Result result, osci::LinuxInstaller::Report report) {
+                        if (safeThis == nullptr) {
+                            return;
+                        }
+
+                        safeThis->busy = false;
+                        if (result.failed()) {
+                            safeThis->showFailure (result.getErrorMessage());
+                            return;
+                        }
+
+                        auto detail = "Version " + version->semver + " is installed. Restart the app or plugin host to use it.";
+                        if (!report.warnings.isEmpty()) {
+                            detail << " " << report.warnings.joinIntoString (" ");
+                        }
+                        safeThis->mode = Mode::InstallSucceeded;
+                        safeThis->progressBar.setVisible (false);
+                        safeThis->notification.setNotification ("Update installed", detail);
+                        safeThis->refreshParentLayout();
+                        safeThis->repaint();
+                    });
+                if (safeThis->linuxInstallThread == nullptr) {
+                    safeThis->busy = false;
+                    safeThis->showFailure ("Could not start the Linux installer thread");
+                }
+#else
                 if (!osci::launchInstallerWithPendingMarker(file, version, product, currentVersion, safeThis.getComponent())) {
                     return;
                 }
@@ -391,6 +444,7 @@ private:
                 if (safeThis != nullptr) {
                     safeThis->hidePrompt();
                 }
+#endif
             });
     }
 
