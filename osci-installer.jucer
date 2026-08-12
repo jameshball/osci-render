@@ -10,6 +10,14 @@
     <GROUP id="{3E43E8D7-6C31-4F48-9B36-6E2D9F53E991}" name="Source">
       <GROUP id="{F7307549-98C6-4E26-8FD8-BFFFC2E56622}" name="installer">
         <FILE id="iMain1" name="Main.cpp" compile="1" resource="0" file="Source/installer/Main.cpp"/>
+        <FILE id="iInstComp" name="InstallerComponent.h" compile="0" resource="0"
+              file="Source/installer/InstallerComponent.h"/>
+        <FILE id="iInstWin" name="InstallerWindow.h" compile="0" resource="0"
+              file="Source/installer/InstallerWindow.h"/>
+        <FILE id="iInstLoc" name="LinuxInstallLocationsComponent.h" compile="0"
+              resource="0" file="Source/installer/LinuxInstallLocationsComponent.h"/>
+        <FILE id="iInstDone" name="InstallCompletionComponent.h" compile="0"
+              resource="0" file="Source/installer/InstallCompletionComponent.h"/>
       </GROUP>
       <GROUP id="{39802B06-0587-444B-99C7-7122C60E85AF}" name="components">
         <FILE id="iFlow1" name="InstallFlowHelpers.h" compile="0" resource="0"

@@ -8,7 +8,7 @@
 #include "visualiser/VisualiserSettings.h"
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
-#include "components/UpdatePromptComponent.h"
+#include "components/ProductUpdateConfig.h"
 
 #if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
@@ -100,7 +100,9 @@ public:
         osci::kOutputClipPeakEpsilon
     };
     juce::TextButton betaUpdatesButton { "Beta updates" };
-    UpdatePromptComponent updatePrompt { audioProcessor };
+    osci::UpdatePromptComponent updatePrompt {
+        audioProcessor.licenseManager, osci::makeProductUpdateConfig()
+    };
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
