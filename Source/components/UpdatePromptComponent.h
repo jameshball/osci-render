@@ -8,9 +8,8 @@
 
 class UpdatePromptComponent : public juce::Component {
 public:
-    UpdatePromptComponent(CommonAudioProcessor& processorToUse, juce::String closeButtonSvg)
-        : processor(processorToUse), closeButton(closeButtonSvg, "Dismiss update", osci::Colours::text(), osci::Colours::text()),
-          notification(std::move(closeButtonSvg)) {
+    explicit UpdatePromptComponent(CommonAudioProcessor& processorToUse)
+        : processor(processorToUse), closeButton("Dismiss update", osci::Colours::text(), osci::Colours::text()) {
         setVisible (false);
         setAlwaysOnTop (true);
 
@@ -385,7 +384,7 @@ private:
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
 
         osci::InstallPrompt::showConfirmation ({
-            this, osci::makeOverlayCloseButtonSvg(),
+            this,
             [safeThis, file, version, product, currentVersion] {
 #if JUCE_LINUX
                 if (!version.has_value() || safeThis == nullptr) {
@@ -406,7 +405,7 @@ private:
                 request.version = *version;
                 request.currentVersion = currentVersion;
                 request.manifest = osci::linuxInstallManifest (product);
-                request.iconPng = osci::linuxProductIconPng (product);
+                request.iconPng = osci::linuxProductIconPng();
                 request.progress = [safeThis] (double fraction, juce::StringRef stage) {
                     juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
                         if (safeThis != nullptr) {
@@ -444,8 +443,7 @@ private:
 #else
                 const auto result = osci::UpdateInstaller::launchWithPendingMarker ({ file, version, product, currentVersion });
                 if (result.failed()) {
-                    osci::InstallPrompt::showError (safeThis.getComponent(), osci::makeOverlayCloseButtonSvg(),
-                                                    "Install Update", result.getErrorMessage());
+                    osci::InstallPrompt::showError (safeThis.getComponent(), "Install Update", result.getErrorMessage());
                     return;
                 }
 

@@ -100,7 +100,7 @@ public:
         osci::kOutputClipPeakEpsilon
     };
     juce::TextButton betaUpdatesButton { "Beta updates" };
-    UpdatePromptComponent updatePrompt{audioProcessor, juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize)};
+    UpdatePromptComponent updatePrompt { audioProcessor };
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;

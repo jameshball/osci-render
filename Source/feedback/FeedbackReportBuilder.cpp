@@ -78,7 +78,6 @@ osci::FeedbackOverlayConfig FeedbackReportBuilder::create(CommonAudioProcessor& 
                                                            juce::Component& screenshotSource,
                                                            juce::String projectFileType) {
     osci::FeedbackOverlayConfig feedback;
-    feedback.closeButtonSvg = binarySvg(BinaryData::close_svg, BinaryData::close_svgSize);
     feedback.settingsButtonSvg = binarySvg(BinaryData::cog_svg, BinaryData::cog_svgSize);
     feedback.magnifierSvg = binarySvg(BinaryData::magnify_svg, BinaryData::magnify_svgSize);
 

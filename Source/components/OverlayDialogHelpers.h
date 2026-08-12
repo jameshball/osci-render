@@ -5,10 +5,6 @@
 
 namespace osci {
 
-inline juce::String makeDialogOverlayCloseButtonSvg() {
-    return juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
-}
-
 inline void showOverlayMessage(juce::Component& parent,
                                juce::StringRef title,
                                juce::StringRef message,
@@ -16,7 +12,6 @@ inline void showOverlayMessage(juce::Component& parent,
                                juce::Point<int> preferredPanelSize = { 420, 420 },
                                juce::Justification messageJustification = juce::Justification::centred) {
     ErrorOverlay::Options options;
-    options.closeButtonSvg = makeDialogOverlayCloseButtonSvg();
     options.title = title;
     options.message = message;
     options.icon = icon;
@@ -59,7 +54,6 @@ inline void showOverlayConfirmationOrAlert(juce::Component* parent,
 
     if (parent != nullptr) {
         ErrorOverlay::Options options;
-        options.closeButtonSvg = makeDialogOverlayCloseButtonSvg();
         options.title = title;
         options.message = message;
         options.icon = icon;

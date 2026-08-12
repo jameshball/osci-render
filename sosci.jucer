@@ -54,7 +54,6 @@
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="YzPzNV" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
         <FILE id="CHkskO" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
-        <FILE id="k5TKs2" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="XC04mb" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
         <FILE id="qIMww8" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>

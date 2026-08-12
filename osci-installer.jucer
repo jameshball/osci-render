@@ -37,7 +37,6 @@
               file="Resources/images/sosci_mac_saturated.png"/>
       </GROUP>
       <GROUP id="{E6EC7E61-00B9-4A79-8712-A456D25EAE4D}" name="svg">
-        <FILE id="iClose" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="iHelp1" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
       </GROUP>
     </GROUP>

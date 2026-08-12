@@ -12,15 +12,12 @@ namespace osci {
                  { "osci-render.vst3" }, { "osci-render-instrument.vst3" }, "AudioVideo;Audio;" };
     }
 
-    inline juce::MemoryBlock linuxProductIconPng (juce::StringRef product) {
-        if (juce::String (product) == "sosci") {
-            return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
-        }
-
+    inline juce::MemoryBlock linuxProductIconPng() {
+#if defined (SOSCI)
+        return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
+#else
         return { BinaryData::osci_mac_png, static_cast<size_t> (BinaryData::osci_mac_pngSize) };
+#endif
     }
 
-    inline juce::String makeOverlayCloseButtonSvg() {
-        return juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
-    }
 }

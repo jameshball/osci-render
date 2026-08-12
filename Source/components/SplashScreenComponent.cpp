@@ -2,8 +2,7 @@
 
 #include <array>
 
-SplashScreenComponent::SplashScreenComponent()
-    : osci::OverlayComponent (juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize)) {
+SplashScreenComponent::SplashScreenComponent() {
     setOverlayTitle("Upgrade to osci-render Premium");
     const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
 
