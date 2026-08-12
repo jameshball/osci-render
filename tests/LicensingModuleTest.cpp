@@ -421,6 +421,7 @@ public:
             deleteTempSettings (options);
         }
 
+#if JUCE_LINUX
         beginTest ("Linux installer validates, installs and migrates known files");
         {
             auto root = makeTempSettingsDirectory();
@@ -611,6 +612,7 @@ public:
             root.deleteRecursively();
             deleteTempSettings (*config.settingsOptions);
         }
+#endif
 
         beginTest ("PendingInstall stores markers and validates artifacts");
         {
