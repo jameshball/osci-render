@@ -142,6 +142,8 @@
         <GROUP id="{AUD_WAV_S}" name="wav"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="ProdUpdS" name="ProductUpdateConfig.h" compile="0" resource="0"
+              file="Source/components/ProductUpdateConfig.h"/>
         <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"

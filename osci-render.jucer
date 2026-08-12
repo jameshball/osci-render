@@ -308,6 +308,8 @@
         <GROUP id="{AUD_WAV}" name="wav"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="ProdUpdCfg" name="ProductUpdateConfig.h" compile="0" resource="0"
+              file="Source/components/ProductUpdateConfig.h"/>
         <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"

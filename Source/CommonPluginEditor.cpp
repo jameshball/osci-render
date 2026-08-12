@@ -1,6 +1,5 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "components/LicenseAndUpdatesComponent.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
@@ -61,7 +60,6 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         if (standalone != nullptr) {
-            standalone->getMuteInputValue().setValue(false);
             juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
             standalone->commandLineCallback = [safeThis](const juce::String& commandLine) {
                 if (safeThis != nullptr) {
@@ -431,10 +429,15 @@ void CommonPluginEditor::openAudioSettings() {
 }
 
 void CommonPluginEditor::openLicenseAndUpdates() {
-    if (findActiveOverlay<LicenseAndUpdatesComponent>() != nullptr)
+    if (findActiveOverlay<osci::LicenseAndUpdatesComponent>() != nullptr)
         return;
 
-    showOverlay(std::make_unique<LicenseAndUpdatesComponent>(audioProcessor));
+    showOverlay(std::make_unique<osci::LicenseAndUpdatesComponent>(
+        audioProcessor.licenseManager,
+        osci::makeProductUpdateConfig ([this] {
+            refreshBetaUpdatesButton();
+            resized();
+        })));
 }
 
 void CommonPluginEditor::openFeedback() {
