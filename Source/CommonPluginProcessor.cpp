@@ -384,7 +384,7 @@ void CommonAudioProcessor::setCurrentProgram(int index) {
 }
 
 const juce::String CommonAudioProcessor::getProgramName(int index) {
-    return "Default";
+    return {};
 }
 
 void CommonAudioProcessor::changeProgramName(int index, const juce::String& newName) {}
