@@ -1359,10 +1359,8 @@ private:
                     safeThis->statusLabel.setText ("Launching installer...", juce::dontSendNotification);
                 }
 
-                const auto launchResult = osci::launchInstallerWithPendingMarkerResult (installerFile,
-                                                                                        version,
-                                                                                        request.productSlug,
-                                                                                        currentInstallerVersionBaseline());
+                const auto launchResult = osci::UpdateInstaller::launchWithPendingMarker (
+                    { installerFile, version, request.productSlug, currentInstallerVersionBaseline() });
                 if (launchResult.failed()) {
                     if (safeThis != nullptr) {
                         safeThis->progressValue = 0.0;
