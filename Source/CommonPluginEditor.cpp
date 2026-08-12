@@ -427,9 +427,7 @@ void CommonPluginEditor::fileUpdated(juce::String fileName) {
 }
 
 void CommonPluginEditor::openAudioSettings() {
-    osci::showStandaloneAudioSettingsOverlay(
-        *this,
-        juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize));
+    osci::showStandaloneAudioSettingsOverlay(*this);
 }
 
 void CommonPluginEditor::openLicenseAndUpdates() {

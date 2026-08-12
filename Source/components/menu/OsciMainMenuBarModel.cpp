@@ -190,8 +190,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
         };
         aboutInfo.blenderPort = std::any_cast<int>(audioProcessor.getProperty("objectServerPort"));
 
-        auto closeButtonSvg = juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
-        editor.showOverlay(AboutComponent::createOverlay(aboutInfo, std::move(closeButtonSvg)));
+        editor.showOverlay(AboutComponent::createOverlay(aboutInfo));
     });
     addMenuItem(aboutMenu, "License and Updates...", [this] {
         editor.openLicenseAndUpdates();

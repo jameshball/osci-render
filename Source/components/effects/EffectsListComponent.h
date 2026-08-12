@@ -227,7 +227,7 @@ protected:
     ComponentListModel listModel { ROW_HEIGHT };
     VListBox list;
     jux::SwitchButton enabled = { effect.enabled };
-    osci::SvgButton closeButton = osci::SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
+    osci::CloseButton closeButton { "Close effect", juce::Colours::white, juce::Colours::white };
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

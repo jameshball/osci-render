@@ -9,6 +9,16 @@
 
 namespace {
 
+#if JUCE_LINUX
+    juce::MemoryBlock productIconPng (juce::StringRef product) {
+        if (juce::String (product) == "sosci") {
+            return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
+        }
+
+        return { BinaryData::osci_mac_png, static_cast<size_t> (BinaryData::osci_mac_pngSize) };
+    }
+#endif
+
     enum class ProductChoice {
         None,
         OsciRender,
@@ -470,8 +480,7 @@ private:
             return;
         }
 
-        supportOverlay = std::make_unique<osci::LicenseHelpOverlay> (
-            juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize));
+        supportOverlay = std::make_unique<osci::LicenseHelpOverlay>();
         supportOverlay->onDismissRequested = [this] {
             supportOverlay = nullptr;
         };
@@ -714,7 +723,6 @@ private:
 
         auto overlay = std::make_unique<osci::ComponentOverlay> (
             locationsPanel,
-            juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize),
             installLocationsTitle (path),
             juce::Point<int> { 620, 210 },
             true);
@@ -1091,7 +1099,7 @@ private:
             installThread = nullptr;
             const auto message = juce::String ("Could not start the installation worker.");
             setBusy (false, message);
-            osci::InstallPrompt::showError (this, osci::makeOverlayCloseButtonSvg(), "Install failed", message);
+            osci::InstallPrompt::showError (this, "Install failed", message);
         }
 #else
         juce::Thread::launch ([safeThis, request] {
@@ -1204,7 +1212,7 @@ private:
             installRequest.manifest = osci::linuxInstallManifest (request.productSlug);
             installRequest.archive = installerFile;
             installRequest.locations = request.locations;
-            installRequest.iconPng = osci::linuxProductIconPng (request.productSlug);
+            installRequest.iconPng = productIconPng (request.productSlug);
             installRequest.progress = [safeThis] (double fraction, juce::StringRef stage) {
                 juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
                     if (safeThis != nullptr) {
@@ -1318,7 +1326,7 @@ private:
         if (result.failed()) {
             progressValue = 0.0;
             setBusy (false, result.getErrorMessage());
-            osci::InstallPrompt::showError (this, osci::makeOverlayCloseButtonSvg(), "Install failed", result.getErrorMessage());
+            osci::InstallPrompt::showError (this, "Install failed", result.getErrorMessage());
             return;
         }
 
@@ -1326,7 +1334,7 @@ private:
             progressValue = 0.0;
             const auto message = "The installer downloaded, but the installer file was not found on disk.";
             setBusy (false, message);
-            osci::InstallPrompt::showError (this, osci::makeOverlayCloseButtonSvg(), "Install failed", message);
+            osci::InstallPrompt::showError (this, "Install failed", message);
             return;
         }
 
@@ -1343,7 +1351,7 @@ private:
 
         auto safeThis = juce::Component::SafePointer<InstallerComponent> (this);
         osci::InstallPrompt::showConfirmation ({
-            this, osci::makeOverlayCloseButtonSvg(),
+            this,
             [safeThis, request, version, installerFile] {
                 if (safeThis != nullptr) {
                     safeThis->statusLabel.setText ("Launching installer...", juce::dontSendNotification);
@@ -1355,8 +1363,8 @@ private:
                     if (safeThis != nullptr) {
                         safeThis->progressValue = 0.0;
                         safeThis->setBusy (false, launchResult.getErrorMessage());
-                        osci::InstallPrompt::showError (safeThis.getComponent(), osci::makeOverlayCloseButtonSvg(),
-                                                       "Install failed", launchResult.getErrorMessage());
+                        osci::InstallPrompt::showError (safeThis.getComponent(), "Install failed",
+                                                       launchResult.getErrorMessage());
                     }
                     return;
                 }

@@ -10,8 +10,7 @@
 class LicenseAndUpdatesComponent : public osci::OverlayComponent {
 public:
     explicit LicenseAndUpdatesComponent (CommonAudioProcessor& processorToUse)
-        : osci::OverlayComponent (juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize)),
-          processor (processorToUse),
+        : processor (processorToUse),
           licenseCard (loadProductIcon(),
                        juce::String::createStringFromData (BinaryData::copy_svg, BinaryData::copy_svgSize),
                        juce::String::createStringFromData (BinaryData::eye_svg, BinaryData::eye_svgSize),
@@ -1127,7 +1126,7 @@ private:
         auto safeThis = juce::Component::SafePointer<LicenseAndUpdatesComponent> (this);
 
         osci::InstallPrompt::showConfirmation ({
-            this, osci::makeOverlayCloseButtonSvg(),
+            this,
             [safeThis, file, version, product, currentVersion, noticeTarget] {
 #if JUCE_LINUX
                 if (!version.has_value() || safeThis == nullptr) {
@@ -1145,7 +1144,7 @@ private:
                 request.version = *version;
                 request.currentVersion = currentVersion;
                 request.manifest = osci::linuxInstallManifest (product);
-                request.iconPng = osci::linuxProductIconPng (product);
+                request.iconPng = osci::linuxProductIconPng();
                 request.progress = [safeThis] (double fraction, juce::StringRef stage) {
                     juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
                         if (safeThis != nullptr) {
@@ -1208,8 +1207,7 @@ private:
             return;
         }
 
-        helpOverlay = std::make_unique<osci::LicenseHelpOverlay> (
-            juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize));
+        helpOverlay = std::make_unique<osci::LicenseHelpOverlay>();
         helpOverlay->onDismissRequested = [this] {
             helpOverlay = nullptr;
             resized();
