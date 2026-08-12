@@ -1,7 +1,6 @@
 #include "LuaDocumentationComponent.h"
 
-LuaDocumentationComponent::LuaDocumentationComponent()
-    : osci::OverlayComponent (juce::String::createStringFromData (BinaryData::close_svg, BinaryData::close_svgSize)) {
+LuaDocumentationComponent::LuaDocumentationComponent() {
     setOverlayTitle("Lua Scripting Reference");
 
     viewport.setViewedComponent(&contentComponent, false);

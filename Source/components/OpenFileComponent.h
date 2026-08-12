@@ -32,7 +32,7 @@ private:
     juce::Component content;        // Holds all headings + category grids
 
     // Close icon overlayed in the group header
-    osci::SvgButton closeButton { "closeExamples", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white };
+    osci::CloseButton closeButton { "Close examples", juce::Colours::white, juce::Colours::white };
 
     std::unique_ptr<juce::FileChooser> chooser;
 

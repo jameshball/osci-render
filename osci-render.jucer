@@ -88,7 +88,6 @@
         <FILE id="GQM3jZ" name="cash.svg" compile="0" resource="1" file="Resources/svg/cash.svg"/>
         <FILE id="HtrsBQ" name="cat.svg" compile="0" resource="1" file="Resources/svg/cat.svg"/>
         <FILE id="y9tCpG" name="clippy.svg" compile="0" resource="1" file="Resources/svg/clippy.svg"/>
-        <FILE id="jYG5GY" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="cPySvg" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
         <FILE id="pTnUPp" name="cube.svg" compile="0" resource="1" file="Resources/svg/cube.svg"/>
@@ -309,6 +308,8 @@
         <GROUP id="{AUD_WAV}" name="wav"/>
       </GROUP>
       <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="ProdUpdCfg" name="ProductUpdateConfig.h" compile="0" resource="0"
+              file="Source/components/ProductUpdateConfig.h"/>
         <FILE id="gPTmR4" name="AboutComponent.cpp" compile="1" resource="0"
               file="Source/components/AboutComponent.cpp"/>
         <FILE id="vDlOTn" name="AboutComponent.h" compile="0" resource="0"

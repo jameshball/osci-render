@@ -87,6 +87,58 @@ namespace
     {
         options.getDefaultFile().getParentDirectory().deleteRecursively();
     }
+
+    osci::LinuxInstallManifest makeOsciRenderManifest()
+    {
+        return { "osci-render", "osci-render", "osci-render",
+                 { "osci-render.vst3" }, { "osci-render-instrument.vst3" }, "AudioVideo;Audio;" };
+    }
+
+    juce::String testLinuxArchitectureDirectory() {
+#if JUCE_ARM && JUCE_64BIT
+        return "aarch64-linux";
+#else
+        return "x86_64-linux";
+#endif
+    }
+
+    juce::File makeLinuxArchive (const juce::File& directory,
+                                 bool includeUnexpectedFile = false,
+                                 bool omitInstrument = false,
+                                 bool wrongInstrumentArchitecture = false)
+    {
+        const auto payload = directory.getChildFile ("payload");
+        payload.createDirectory();
+        const auto standalone = payload.getChildFile ("osci-render");
+        const auto effect = payload.getChildFile ("effect.so");
+        const auto instrument = payload.getChildFile ("instrument.so");
+        standalone.replaceWithText ("standalone");
+        effect.replaceWithText ("effect");
+        instrument.replaceWithText ("instrument");
+
+        juce::ZipFile::Builder builder;
+        builder.addFile (standalone, 0, "osci-render");
+        const auto architecture = testLinuxArchitectureDirectory();
+        builder.addFile (effect, 0, "osci-render.vst3/Contents/" + architecture + "/osci-render.so");
+        if (!omitInstrument) {
+            const auto instrumentArchitecture = wrongInstrumentArchitecture
+                ? (architecture == "aarch64-linux" ? "x86_64-linux" : "aarch64-linux")
+                : architecture;
+            builder.addFile (instrument, 0, "osci-render-instrument.vst3/Contents/" + instrumentArchitecture
+                                             + "/osci-render-instrument.so");
+        }
+        if (includeUnexpectedFile) {
+            builder.addFile (effect, 0, "unexpected.txt");
+        }
+
+        const auto archive = directory.getChildFile (includeUnexpectedFile ? "invalid.zip" : "valid.zip");
+        juce::FileOutputStream output (archive);
+        if (!output.openedOk() || !builder.writeToStream (output, nullptr)) {
+            return {};
+        }
+        output.flush();
+        return archive;
+    }
 }
 
 class LicensingModuleTest : public juce::UnitTest
@@ -334,6 +386,230 @@ public:
             expect (sosciUpdates.releaseTrack() == osci::ReleaseTrack::Stable);
             expect (! sosciUpdates.isDismissed ("2.9.1.0", 120.0));
             deleteTempSettings (options);
+        }
+
+        beginTest ("Linux install settings use defaults and isolate products");
+        {
+            auto options = makeTempSettingsOptions ("linux-install-settings");
+            osci::LinuxInstallSettings osciSettings ("osci-render", osci::SettingsStore (options));
+            osci::LinuxInstallSettings sosciSettings ("sosci", osci::SettingsStore (options));
+            std::optional<osci::LinuxInstallLocations> savedLocations;
+            expect (osciSettings.loadSaved (savedLocations).wasOk());
+            expect (!savedLocations.has_value());
+
+            const auto root = makeTempSettingsDirectory();
+            const osci::LinuxInstallLocations locations {
+                root.getChildFile ("applications"), root.getChildFile ("plugins")
+            };
+            expect (osciSettings.save (locations).wasOk());
+            expect (osciSettings.loadSaved (savedLocations).wasOk());
+            expect (savedLocations.has_value());
+            osci::LinuxInstallLocations loaded;
+            expect (osciSettings.load (loaded).wasOk());
+            expect (loaded == locations);
+            expect (sosciSettings.loadSaved (savedLocations).wasOk());
+            expect (!savedLocations.has_value());
+
+            osci::SettingsStore incompleteStore (options);
+            incompleteStore.remove (osci::LinuxInstallSettings::vst3Key ("osci-render"));
+            expect (incompleteStore.save());
+            loaded = {};
+            osci::LinuxInstallSettings incompleteSettings ("osci-render", osci::SettingsStore (options));
+            expect (incompleteSettings.loadSaved (savedLocations).failed());
+            expect (incompleteSettings.load (loaded).failed());
+            root.deleteRecursively();
+            deleteTempSettings (options);
+        }
+
+        beginTest ("Linux installer validates, installs and migrates known files");
+        {
+            auto root = makeTempSettingsDirectory();
+            auto options = makeTempSettingsOptions ("linux-installer");
+            osci::LinuxInstaller::Config config;
+            config.dataHome = root.getChildFile ("data");
+            config.settingsOptions = options;
+            config.refreshDesktopCaches = false;
+            osci::LinuxInstaller installer (config);
+
+            osci::LinuxInstaller::Request request;
+            request.manifest = makeOsciRenderManifest();
+            request.archive = makeLinuxArchive (root);
+            request.locations = { root.getChildFile ("first % $/bin"), root.getChildFile ("first % $/vst3") };
+            juce::Image icon (juce::Image::ARGB, 1024, 1024, true);
+            juce::MemoryOutputStream iconOutput;
+            expect (juce::PNGImageFormat().writeImageToStream (icon, iconOutput));
+            request.iconPng = iconOutput.getMemoryBlock();
+
+            osci::LinuxInstaller::Report report;
+            auto result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (request.locations.standaloneDirectory.getChildFile ("osci-render").existsAsFile());
+            expect (request.locations.vst3Directory.getChildFile ("osci-render.vst3").isDirectory());
+            expect (request.locations.vst3Directory.getChildFile ("osci-render-instrument.vst3").isDirectory());
+            const auto desktopFile = config.dataHome.getChildFile ("applications/osci-render.desktop");
+            const auto installedIcon = config.dataHome.getChildFile ("icons/hicolor/256x256/apps/osci-render.png");
+            expect (desktopFile.existsAsFile());
+            expect (desktopFile.loadFileAsString().contains ("first %% \\\\$"));
+            expect (desktopFile.loadFileAsString().contains ("Categories=AudioVideo;Audio;"));
+            expect (installedIcon.existsAsFile());
+            expectEquals (juce::ImageFileFormat::loadFrom (installedIcon).getWidth(), 256);
+
+            result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (request.locations.standaloneDirectory.getChildFile ("osci-render").existsAsFile());
+
+            const auto physicalLocations = request.locations;
+            const osci::LinuxInstallLocations linkedLocations {
+                root.getChildFile ("linked-bin"), root.getChildFile ("linked-vst3")
+            };
+            expect (physicalLocations.standaloneDirectory.createSymbolicLink (linkedLocations.standaloneDirectory, true));
+            expect (physicalLocations.vst3Directory.createSymbolicLink (linkedLocations.vst3Directory, true));
+            request.locations = linkedLocations;
+            result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (physicalLocations.standaloneDirectory.getChildFile ("osci-render").existsAsFile());
+
+            const auto previousLocations = request.locations;
+            previousLocations.standaloneDirectory.getChildFile ("unrelated").replaceWithText ("keep");
+            request.locations = { root.getChildFile ("second/bin"), root.getChildFile ("second/vst3") };
+            result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (!previousLocations.standaloneDirectory.getChildFile ("osci-render").exists());
+            expect (!previousLocations.vst3Directory.getChildFile ("osci-render.vst3").exists());
+            expect (previousLocations.standaloneDirectory.getChildFile ("unrelated").existsAsFile());
+            expect (request.locations.standaloneDirectory.getChildFile ("osci-render").existsAsFile());
+
+            const osci::LinuxInstallLocations realLocations {
+                root.getChildFile ("real-parent/bin"), root.getChildFile ("real-parent/vst3")
+            };
+            request.locations = realLocations;
+            result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            const auto aliasParent = root.getChildFile ("alias-parent");
+            expect (realLocations.standaloneDirectory.getParentDirectory().createSymbolicLink (aliasParent, true));
+            request.locations = { aliasParent.getChildFile ("bin"), aliasParent.getChildFile ("vst3") };
+            result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (realLocations.standaloneDirectory.getChildFile ("osci-render").existsAsFile());
+            expect (realLocations.vst3Directory.getChildFile ("osci-render.vst3").isDirectory());
+
+            request.locations = { realLocations.vst3Directory.getChildFile ("osci-render.vst3"),
+                                  root.getChildFile ("overlap-vst3") };
+            result = installer.install (request, report);
+            expect (result.failed());
+            expect (result.getErrorMessage().contains ("overlap"));
+            expect (realLocations.vst3Directory.getChildFile ("osci-render.vst3").isDirectory());
+
+            const auto nestedDestination = realLocations.vst3Directory.getChildFile ("osci-render.vst3/nested-bin");
+            request.locations = { nestedDestination, root.getChildFile ("nested-overlap-vst3") };
+            result = installer.install (request, report);
+            expect (result.failed());
+            expect (result.getErrorMessage().contains ("overlap"));
+            expect (!nestedDestination.exists());
+
+            expect (config.dataHome.deleteRecursively());
+            expect (config.dataHome.replaceWithText ("blocks desktop registration"));
+            request.locations = { root.getChildFile ("launcher-failure/bin"), root.getChildFile ("launcher-failure/vst3") };
+            result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (!report.warnings.isEmpty());
+            expect (realLocations.standaloneDirectory.getChildFile ("osci-render").existsAsFile());
+
+            osci::LinuxInstallSettings saved ("osci-render", osci::SettingsStore (options));
+            std::optional<osci::LinuxInstallLocations> savedLocations;
+            expect (saved.loadSaved (savedLocations).wasOk());
+            expect (savedLocations.has_value());
+            osci::LinuxInstallLocations loaded;
+            expect (saved.load (loaded).wasOk());
+            expect (loaded == request.locations);
+            root.deleteRecursively();
+            deleteTempSettings (options);
+        }
+
+        beginTest ("Linux installer rejects unexpected archive contents");
+        {
+            auto root = makeTempSettingsDirectory();
+            osci::LinuxInstaller::Config config;
+            config.dataHome = root.getChildFile ("data");
+            config.settingsOptions = makeTempSettingsOptions ("linux-installer-invalid");
+            config.refreshDesktopCaches = false;
+            osci::LinuxInstaller installer (config);
+            osci::LinuxInstaller::Request request;
+            request.manifest = makeOsciRenderManifest();
+            request.archive = makeLinuxArchive (root, true);
+            request.locations = { root.getChildFile ("bin"), root.getChildFile ("vst3") };
+            osci::LinuxInstaller::Report report;
+            const auto result = installer.install (request, report);
+            expect (result.failed());
+            expect (result.getErrorMessage().contains ("unexpected entry"));
+            root.deleteRecursively();
+            deleteTempSettings (*config.settingsOptions);
+        }
+
+        beginTest ("Linux installer accepts an omitted optional plugin");
+        {
+            auto root = makeTempSettingsDirectory();
+            osci::LinuxInstaller::Config config;
+            config.dataHome = root.getChildFile ("data");
+            config.settingsOptions = makeTempSettingsOptions ("linux-installer-missing-plugin");
+            config.refreshDesktopCaches = false;
+            osci::LinuxInstaller installer (config);
+            osci::LinuxInstaller::Request request;
+            request.manifest = makeOsciRenderManifest();
+            request.archive = makeLinuxArchive (root, false, true);
+            request.locations = { root.getChildFile ("bin"), root.getChildFile ("vst3") };
+            const auto staleInstrument = request.locations.vst3Directory
+                .getChildFile ("osci-render-instrument.vst3/Contents/" + testLinuxArchitectureDirectory()
+                               + "/osci-render-instrument.so");
+            expect (staleInstrument.getParentDirectory().createDirectory());
+            expect (staleInstrument.replaceWithText ("old instrument"));
+            osci::LinuxInstaller::Report report;
+            const auto result = installer.install (request, report);
+            expect (result.wasOk(), result.getErrorMessage());
+            expect (request.locations.vst3Directory.getChildFile ("osci-render.vst3").isDirectory());
+            expect (!request.locations.vst3Directory.getChildFile ("osci-render-instrument.vst3").exists());
+            root.deleteRecursively();
+            deleteTempSettings (*config.settingsOptions);
+        }
+
+        beginTest ("Linux installer rejects an optional plugin for the wrong architecture");
+        {
+            auto root = makeTempSettingsDirectory();
+            osci::LinuxInstaller::Config config;
+            config.dataHome = root.getChildFile ("data");
+            config.settingsOptions = makeTempSettingsOptions ("linux-installer-wrong-optional-architecture");
+            config.refreshDesktopCaches = false;
+            osci::LinuxInstaller::Request request;
+            request.manifest = makeOsciRenderManifest();
+            request.archive = makeLinuxArchive (root, false, false, true);
+            request.locations = { root.getChildFile ("bin"), root.getChildFile ("vst3") };
+            osci::LinuxInstaller::Report report;
+            const auto result = osci::LinuxInstaller (config).install (request, report);
+            expect (result.failed());
+            expect (result.getErrorMessage().contains ("plugin binary"));
+            root.deleteRecursively();
+            deleteTempSettings (*config.settingsOptions);
+        }
+
+        beginTest ("Linux installer does not recreate unavailable saved locations");
+        {
+            auto root = makeTempSettingsDirectory();
+            osci::LinuxInstaller::Config config;
+            config.dataHome = root.getChildFile ("data");
+            config.settingsOptions = makeTempSettingsOptions ("linux-installer-unavailable-location");
+            config.refreshDesktopCaches = false;
+            osci::LinuxInstaller::Request request;
+            request.manifest = makeOsciRenderManifest();
+            request.archive = makeLinuxArchive (root);
+            request.locations = { root.getChildFile ("missing/bin"), root.getChildFile ("missing/vst3") };
+            request.missingDirectoryPolicy = osci::LinuxInstaller::MissingDirectoryPolicy::Reject;
+            osci::LinuxInstaller::Report report;
+            const auto result = osci::LinuxInstaller (config).install (request, report);
+            expect (result.failed());
+            expect (!request.locations.standaloneDirectory.exists());
+            expect (!request.locations.vst3Directory.exists());
+            root.deleteRecursively();
+            deleteTempSettings (*config.settingsOptions);
         }
 
         beginTest ("PendingInstall stores markers and validates artifacts");

@@ -9,10 +9,9 @@ juce::Point<int> AboutComponent::preferredSize(const Info& info) {
     return { 520, (int)std::ceil(h) };
 }
 
-std::unique_ptr<osci::OverlayComponent> AboutComponent::createOverlay(const Info& info, juce::String closeButtonSvg) {
+std::unique_ptr<osci::OverlayComponent> AboutComponent::createOverlay(const Info& info) {
     auto content = std::make_unique<AboutComponent>(info);
     return std::make_unique<osci::ComponentOverlay>(std::move(content),
-                                                    std::move(closeButtonSvg),
                                                     juce::String(),
                                                     preferredSize(info),
                                                     false);
