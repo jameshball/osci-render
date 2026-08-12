@@ -34,7 +34,7 @@ public:
 
     static juce::Point<int> preferredSize(const Info& info);
 
-    static std::unique_ptr<osci::OverlayComponent> createOverlay(const Info& info, juce::String closeButtonSvg);
+    static std::unique_ptr<osci::OverlayComponent> createOverlay(const Info& info);
 
 private:
     Info info;

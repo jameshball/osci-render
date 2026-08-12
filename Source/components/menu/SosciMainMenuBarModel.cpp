@@ -127,8 +127,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
             { "DJ_Level_3",     "Testing throughout and helping add features" },
         };
 
-        auto closeButtonSvg = juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize);
-        editor.showOverlay(AboutComponent::createOverlay(aboutInfo, std::move(closeButtonSvg)));
+        editor.showOverlay(AboutComponent::createOverlay(aboutInfo));
     });
     addMenuItem(aboutMenu, "License and Updates...", [&]() {
         editor.openLicenseAndUpdates();

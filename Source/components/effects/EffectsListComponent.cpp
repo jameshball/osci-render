@@ -44,7 +44,7 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
     addAndMakeVisible(list);
     addAndMakeVisible(enabled);
 
-    closeButton.setEdgeIndent(2);
+    closeButton.setIconPadding(2);
     closeButton.onClick = [this]() {
         // Check if this is the custom Lua effect and close the editor if so
         bool isCustomEffect = false;
@@ -147,8 +147,7 @@ void EffectsListComponent::resized() {
     auto area = getLocalBounds();
     auto leftBar = area.removeFromLeft(LEFT_BAR_WIDTH);
     auto buttonBounds = area.removeFromRight(RIGHT_BAR_WIDTH);
-    closeButton.setBounds(buttonBounds);
-    closeButton.setImageTransform(juce::AffineTransform::translation(0, -2));
+    closeButton.setBounds(buttonBounds.translated(0, -2));
     leftBar.removeFromLeft(20);
     enabled.setBounds(leftBar.withSizeKeepingCentre(30, 20));
     // TODO: this is super slow

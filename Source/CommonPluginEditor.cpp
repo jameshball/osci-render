@@ -1,6 +1,5 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "components/LicenseAndUpdatesComponent.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
@@ -427,16 +426,19 @@ void CommonPluginEditor::fileUpdated(juce::String fileName) {
 }
 
 void CommonPluginEditor::openAudioSettings() {
-    osci::showStandaloneAudioSettingsOverlay(
-        *this,
-        juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize));
+    osci::showStandaloneAudioSettingsOverlay(*this);
 }
 
 void CommonPluginEditor::openLicenseAndUpdates() {
-    if (findActiveOverlay<LicenseAndUpdatesComponent>() != nullptr)
+    if (findActiveOverlay<osci::LicenseAndUpdatesComponent>() != nullptr)
         return;
 
-    showOverlay(std::make_unique<LicenseAndUpdatesComponent>(audioProcessor));
+    showOverlay(std::make_unique<osci::LicenseAndUpdatesComponent>(
+        audioProcessor.licenseManager,
+        osci::makeProductUpdateConfig ([this] {
+            refreshBetaUpdatesButton();
+            resized();
+        })));
 }
 
 void CommonPluginEditor::openFeedback() {

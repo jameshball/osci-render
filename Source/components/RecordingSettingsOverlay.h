@@ -8,7 +8,6 @@ public:
     RecordingSettingsOverlay(juce::Component& content,
                              juce::Point<int> preferredContentSize)
         : osci::ComponentOverlay(content,
-                                 juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize),
                                  "Recording Settings",
                                  preferredContentSize,
                                  true) {}
