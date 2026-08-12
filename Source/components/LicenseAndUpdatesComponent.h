@@ -1126,8 +1126,8 @@ private:
         const auto currentVersion = juce::String (JucePlugin_VersionString);
         auto safeThis = juce::Component::SafePointer<LicenseAndUpdatesComponent> (this);
 
-        osci::showInstallConfirmation (
-            this,
+        osci::InstallPrompt::showConfirmation ({
+            this, osci::makeOverlayCloseButtonSvg(),
             [safeThis, file, version, product, currentVersion, noticeTarget] {
 #if JUCE_LINUX
                 if (!version.has_value() || safeThis == nullptr) {
@@ -1140,35 +1140,40 @@ private:
                 safeThis->updateCard.setDownloadProgress (0.0);
                 safeThis->setBusy (true, "Installing update...", noticeTarget);
 
-                safeThis->linuxInstallThread = osci::installLinuxUpdateAsync (
-                    file, *version, product, currentVersion,
-                    [safeThis] (double fraction, juce::StringRef stage) {
-                        juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
-                            if (safeThis != nullptr) {
-                                safeThis->updateCard.setDownloadProgress (fraction);
-                                safeThis->updateCard.setDownloadStatus (stage);
-                            }
-                        });
-                    },
-                    [safeThis, noticeTarget] (juce::Result result, osci::LinuxInstaller::Report report) {
-                        if (safeThis == nullptr) {
-                            return;
+                osci::LinuxUpdateInstallThread::Request request;
+                request.archive = file;
+                request.version = *version;
+                request.currentVersion = currentVersion;
+                request.manifest = osci::linuxInstallManifest (product);
+                request.iconPng = osci::linuxProductIconPng (product);
+                request.progress = [safeThis] (double fraction, juce::StringRef stage) {
+                    juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
+                        if (safeThis != nullptr) {
+                            safeThis->updateCard.setDownloadProgress (fraction);
+                            safeThis->updateCard.setDownloadStatus (stage);
                         }
-
-                        safeThis->updateDownloadInProgress = false;
-                        safeThis->updateCard.hideDownload();
-                        safeThis->setBusy (false);
-                        if (result.failed()) {
-                            safeThis->setNotice (noticeTarget, result.getErrorMessage(), NoticeKind::Error);
-                        } else {
-                            auto message = juce::String ("Update installed. Restart the app or plugin host to use it.");
-                            if (!report.warnings.isEmpty()) {
-                                message << " " << report.warnings.joinIntoString (" ");
-                            }
-                            safeThis->setNotice (noticeTarget, message, NoticeKind::Success);
-                        }
-                        safeThis->refreshState();
                     });
+                };
+                request.completion = [safeThis, noticeTarget] (juce::Result result, osci::LinuxInstaller::Report report) {
+                    if (safeThis == nullptr) {
+                        return;
+                    }
+
+                    safeThis->updateDownloadInProgress = false;
+                    safeThis->updateCard.hideDownload();
+                    safeThis->setBusy (false);
+                    if (result.failed()) {
+                        safeThis->setNotice (noticeTarget, result.getErrorMessage(), NoticeKind::Error);
+                    } else {
+                        auto message = juce::String ("Update installed. Restart the app or plugin host to use it.");
+                        if (!report.warnings.isEmpty()) {
+                            message << " " << report.warnings.joinIntoString (" ");
+                        }
+                        safeThis->setNotice (noticeTarget, message, NoticeKind::Success);
+                    }
+                    safeThis->refreshState();
+                };
+                safeThis->linuxInstallThread = osci::UpdateInstaller::installLinuxAsync (std::move (request));
                 if (safeThis->linuxInstallThread == nullptr) {
                     safeThis->updateDownloadInProgress = false;
                     safeThis->setBusy (false);
@@ -1193,7 +1198,8 @@ private:
                                      NoticeKind::Success);
                 safeThis->refreshState();
 #endif
-            });
+            }
+        });
     }
 
     void showLicenseHelpOverlay() {

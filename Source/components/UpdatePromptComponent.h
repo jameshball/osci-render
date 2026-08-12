@@ -384,8 +384,8 @@ private:
         const auto currentVersion = juce::String (JucePlugin_VersionString);
         auto safeThis = juce::Component::SafePointer<UpdatePromptComponent> (this);
 
-        osci::showInstallConfirmation (
-            this,
+        osci::InstallPrompt::showConfirmation ({
+            this, osci::makeOverlayCloseButtonSvg(),
             [safeThis, file, version, product, currentVersion] {
 #if JUCE_LINUX
                 if (!version.has_value() || safeThis == nullptr) {
@@ -401,43 +401,51 @@ private:
                 safeThis->secondaryButton.setEnabled (false);
                 safeThis->refreshParentLayout();
 
-                safeThis->linuxInstallThread = osci::installLinuxUpdateAsync (
-                    file, *version, product, currentVersion,
-                    [safeThis] (double fraction, juce::StringRef stage) {
-                        juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
-                            if (safeThis != nullptr) {
-                                safeThis->progressBar.setProgress (fraction);
-                                safeThis->detailLabel.setText (stage, juce::dontSendNotification);
-                            }
-                        });
-                    },
-                    [safeThis, version] (juce::Result result, osci::LinuxInstaller::Report report) {
-                        if (safeThis == nullptr) {
-                            return;
+                osci::LinuxUpdateInstallThread::Request request;
+                request.archive = file;
+                request.version = *version;
+                request.currentVersion = currentVersion;
+                request.manifest = osci::linuxInstallManifest (product);
+                request.iconPng = osci::linuxProductIconPng (product);
+                request.progress = [safeThis] (double fraction, juce::StringRef stage) {
+                    juce::MessageManager::callAsync ([safeThis, fraction, stage = juce::String (stage)] {
+                        if (safeThis != nullptr) {
+                            safeThis->progressBar.setProgress (fraction);
+                            safeThis->detailLabel.setText (stage, juce::dontSendNotification);
                         }
-
-                        safeThis->busy = false;
-                        if (result.failed()) {
-                            safeThis->showFailure (result.getErrorMessage());
-                            return;
-                        }
-
-                        auto detail = "Version " + version->semver + " is installed. Restart the app or plugin host to use it.";
-                        if (!report.warnings.isEmpty()) {
-                            detail << " " << report.warnings.joinIntoString (" ");
-                        }
-                        safeThis->mode = Mode::InstallSucceeded;
-                        safeThis->progressBar.setVisible (false);
-                        safeThis->notification.setNotification ("Update installed", detail);
-                        safeThis->refreshParentLayout();
-                        safeThis->repaint();
                     });
+                };
+                request.completion = [safeThis, version] (juce::Result result, osci::LinuxInstaller::Report report) {
+                    if (safeThis == nullptr) {
+                        return;
+                    }
+
+                    safeThis->busy = false;
+                    if (result.failed()) {
+                        safeThis->showFailure (result.getErrorMessage());
+                        return;
+                    }
+
+                    auto detail = "Version " + version->semver + " is installed. Restart the app or plugin host to use it.";
+                    if (!report.warnings.isEmpty()) {
+                        detail << " " << report.warnings.joinIntoString (" ");
+                    }
+                    safeThis->mode = Mode::InstallSucceeded;
+                    safeThis->progressBar.setVisible (false);
+                    safeThis->notification.setNotification ("Update installed", detail);
+                    safeThis->refreshParentLayout();
+                    safeThis->repaint();
+                };
+                safeThis->linuxInstallThread = osci::UpdateInstaller::installLinuxAsync (std::move (request));
                 if (safeThis->linuxInstallThread == nullptr) {
                     safeThis->busy = false;
                     safeThis->showFailure ("Could not start the Linux installer thread");
                 }
 #else
-                if (!osci::launchInstallerWithPendingMarker(file, version, product, currentVersion, safeThis.getComponent())) {
+                const auto result = osci::UpdateInstaller::launchWithPendingMarker ({ file, version, product, currentVersion });
+                if (result.failed()) {
+                    osci::InstallPrompt::showError (safeThis.getComponent(), osci::makeOverlayCloseButtonSvg(),
+                                                    "Install Update", result.getErrorMessage());
                     return;
                 }
 
@@ -445,7 +453,8 @@ private:
                     safeThis->hidePrompt();
                 }
 #endif
-            });
+            }
+        });
     }
 
     void dismissFor48Hours() {
