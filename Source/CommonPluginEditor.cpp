@@ -60,6 +60,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
 
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         if (standalone != nullptr) {
+            standalone->getMuteInputValue().setValue(false);
             juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
             standalone->commandLineCallback = [safeThis](const juce::String& commandLine) {
                 if (safeThis != nullptr) {
