@@ -1176,7 +1176,8 @@ private:
                     safeThis->refreshState();
                 }
 #else
-                const auto launchResult = osci::launchInstallerWithPendingMarkerResult (file, version, product, currentVersion);
+                const auto launchResult = osci::UpdateInstaller::launchWithPendingMarker (
+                    { file, version, product, currentVersion });
                 if (safeThis == nullptr) {
                     return;
                 }
