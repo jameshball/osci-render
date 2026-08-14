@@ -343,12 +343,14 @@ void VoiceBuilder::run() {
                 // Re-check: is this voice still needed?
                 if (targetCount.load(std::memory_order_acquire) > current) {
                     processor.synth.addVoice(voice); // internally locked
+                    readyVoiceCount.store(current + 1, std::memory_order_release);
                 } else {
                     delete voice;
                 }
             } else {
                 // Removal is cheap — just do it directly.
                 processor.synth.removeVoice(current - 1); // internally locked
+                readyVoiceCount.store(current - 1, std::memory_order_release);
             }
         }
     }
@@ -623,8 +625,12 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
     // if midi has just been disabled or we need to retrigger
     if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
-        midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
-        retriggerMidi = false;
+        if (voiceBuilder != nullptr && voiceBuilder->hasAnyVoiceReady()) {
+            midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), juce::jmin(17, numSamples - 1));
+            retriggerMidi = false;
+        } else {
+            retriggerMidi = true;
+        }
     }
 
     prevMidiEnabled = usingMidi;
