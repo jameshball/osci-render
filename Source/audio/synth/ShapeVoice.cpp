@@ -26,16 +26,8 @@ void ShapeVoice::initializeEffectsFromGlobal() {
 }
 
 void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
-    if (effect) {
-        voicePreviewEffect = effect->cloneWithSharedParameters();
-        // Initialize the effect with current sample rate
-        const double sampleRate = audioProcessor.getEffectiveSampleRate();
-        if (sampleRate > 0) {
-            voicePreviewEffect->prepareToPlay(sampleRate, 512);
-        }
-    } else {
-        voicePreviewEffect = nullptr;
-    }
+    auto existingEffect = effect != nullptr ? voiceEffectsMap.find(effect->getId()) : voiceEffectsMap.end();
+    voicePreviewEffect = existingEffect != voiceEffectsMap.end() ? existingEffect->second : nullptr;
 }
 
 void ShapeVoice::clearPreviewEffect() {
@@ -46,10 +38,6 @@ void ShapeVoice::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Update sample rate for all voice effects
     for (auto& pair : voiceEffectsMap) {
         pair.second->prepareToPlay(sampleRate, samplesPerBlock);
-    }
-    // Update sample rate for preview effect if set
-    if (voicePreviewEffect) {
-        voicePreviewEffect->prepareToPlay(sampleRate, samplesPerBlock);
     }
 }
 
