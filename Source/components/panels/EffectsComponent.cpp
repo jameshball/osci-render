@@ -78,8 +78,8 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         {
         CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
 
-        // Find the chosen effect (read-only under lock)
         {
+            // Keep the preview-to-enabled transition atomic for the audio thread.
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             for (auto& eff : audioProcessor.toggleableEffects) {
                 if (eff->getId() == effectId) {
@@ -87,21 +87,26 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
                     break;
                 }
             }
+
+            if (chosen != nullptr) {
+                chosen->selected->setBoolValue(true);
+                chosen->enabled->setBoolValue(true);
+
+                // Keep the enabled effect last, matching its preview position.
+                int idx = 0;
+                for (auto& e : itemData.data) {
+                    if (e != chosen) {
+                        e->setPrecedence(idx++);
+                    }
+                }
+                chosen->setPrecedence(idx++);
+                audioProcessor.updateEffectPrecedence();
+            }
         }
-        // Set parameters OUTSIDE the SpinLock (they do ValueTree/UndoManager work)
+        // Persist and notify after the audio-visible transition is complete.
         if (chosen != nullptr) {
             chosen->selected->setBoolValueNotifyingHost(true);
             chosen->enabled->setBoolValueNotifyingHost(true);
-        }
-        // Place chosen effect at the end of the visible (selected) list and update precedence
-        if (chosen != nullptr) {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            int idx = 0;
-            for (auto& e : itemData.data) {
-                if (e != chosen) e->setPrecedence(idx++);
-            }
-            chosen->setPrecedence(idx++);
-            audioProcessor.updateEffectPrecedence();
         }
         // Promote any preview LFO assignments so hover-end won't remove them
         audioProcessor.promotePreviewLfoAssignments();

@@ -234,8 +234,11 @@ void OsciMainMenuBarModel::resetMenuItems() {
         audioProcessor.globalSettings.set("previewEffectOnHover", newValue);
         audioProcessor.globalSettings.save();
         if (!newValue) {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            audioProcessor.clearPreviewEffect();
+            {
+                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                audioProcessor.clearPreviewEffect();
+            }
+            audioProcessor.clearPreviewLfoAssignments();
         }
         resetMenuItems(); // update tick state
         }, [this] { return audioProcessor.globalSettings.getBool("previewEffectOnHover", true);

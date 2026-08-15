@@ -24,6 +24,7 @@ private:
     OscirenderAudioProcessorEditor& editor;
     osci::GridComponent grid;
     juce::TextButton cancelButton { "Cancel" };
+    bool hoverPreviewActive = false;
 
     void setupEffectItems();
 

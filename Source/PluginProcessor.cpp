@@ -1428,14 +1428,12 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
 
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
     ScopedFlag suppress(undoSuppressed);
-    lfoParameters.startPreview(effectId, toggleableEffects,
-                               [this](const osci::Effect& e) { removeAllAssignmentsForEffect(e); });
+    lfoParameters.startPreview(effectId, toggleableEffects);
 }
 
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
     ScopedFlag suppress(undoSuppressed);
-    lfoParameters.stopPreview(toggleableEffects,
-                              [this](const osci::Effect& e) { removeAllAssignmentsForEffect(e); });
+    lfoParameters.stopPreview();
 }
 
 void OscirenderAudioProcessor::promotePreviewLfoAssignments() {
