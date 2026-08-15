@@ -82,24 +82,34 @@ void EffectTypeGridComponent::setupEffectItems()
                     onEffectSelected(effectId);
             };
             item->onHoverStart = [this](const juce::String& effectId) {
-                if (audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
+                if (!audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
+                    return;
+                }
+
+                {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.setPreviewEffectId(effectId);
                 }
+                hoverPreviewActive = true;
 #if OSCI_PREMIUM
                 if (audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
                     audioProcessor.autoAssignLfosForPreview(effectId);
-                    audioProcessor.broadcaster.sendChangeMessage();
                 }
 #endif
             };
             item->onHoverEnd = [this]() {
-                if (audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
+                if (!hoverPreviewActive) {
+                    return;
+                }
+                hoverPreviewActive = false;
+
+                {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.clearPreviewEffect();
                 }
+#if OSCI_PREMIUM
                 audioProcessor.clearPreviewLfoAssignments();
-                audioProcessor.broadcaster.sendChangeMessage();
+#endif
             };
         }
 

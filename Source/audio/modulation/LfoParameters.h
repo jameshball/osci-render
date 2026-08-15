@@ -47,6 +47,8 @@ public:
     std::atomic<bool> customState[NUM_LFOS] = {};  // true when LFO waveform is user-modified
 
     LfoParameters() {
+        previewSavedLfoStates.reserve(NUM_LFOS);
+
         for (int i = 0; i < NUM_LFOS; ++i) {
             juce::String idx = juce::String(i + 1);
             juce::String pfx = "lfo" + idx;
@@ -447,7 +449,7 @@ public:
 
     // Automatically assign LFOs to modulate the parameters of an effect,
     // based on each parameter's lfoTypeDefault and lfoRateDefault.
-    void autoAssignForEffect(osci::Effect& effect) {
+    void autoAssignForEffect(osci::Effect& effect, bool isPreview = false) {
         std::vector<LfoAssignment> currentAssignments = getAssignments();
 
         int assignmentCount[NUM_LFOS] = {};
@@ -490,13 +492,26 @@ public:
         };
 
         auto configureLfo = [&](int lfoIdx, LfoPreset desiredPreset, float desiredRate, int score) {
+            if (isPreview && score <= 3) {
+                savePreviewLfoState(lfoIdx, score <= 2);
+            }
             if (score <= 2) {
+                if (isPreview) {
+                    preset[lfoIdx]->setValueUnnormalised(static_cast<float>(desiredPreset));
+                } else {
+                    setPreset(lfoIdx, desiredPreset);
+                }
+                auto replacement = createLfoPreset(desiredPreset);
                 juce::SpinLock::ScopedLockType lock(waveformLock);
-                setPreset(lfoIdx, desiredPreset);
-                waveforms[lfoIdx] = createLfoPreset(desiredPreset);
+                std::swap(waveforms[lfoIdx].nodes, replacement.nodes);
+                std::swap(waveforms[lfoIdx].smooth, replacement.smooth);
             }
             if (score <= 3 && rate[lfoIdx] != nullptr) {
-                rate[lfoIdx]->setUnnormalisedValueNotifyingHost(desiredRate);
+                if (isPreview) {
+                    rate[lfoIdx]->setValueUnnormalised(desiredRate);
+                } else {
+                    rate[lfoIdx]->setUnnormalisedValueNotifyingHost(desiredRate);
+                }
             }
         };
 
@@ -523,7 +538,11 @@ public:
             }
             configureLfo(chosenLfo, desiredPreset, desiredRate, score);
 
-            param->setUnnormalisedValueNotifyingHost(param->min.load());
+            if (isPreview) {
+                param->setValueUnnormalised(param->min.load());
+            } else {
+                param->setUnnormalisedValueNotifyingHost(param->min.load());
+            }
 
             LfoAssignment assignment;
             assignment.sourceIndex = chosenLfo;
@@ -540,94 +559,99 @@ public:
     // Temporarily auto-assigns LFOs while hovering an effect in the grid.
 
     // Preview state (message-thread only — no lock needed)
-    juce::String previewEffectId;
-    std::vector<std::pair<juce::String, float>> previewSavedParamValues;
+    std::vector<std::pair<osci::EffectParameter*, float>> previewSavedParamValues;
+    std::vector<LfoAssignment> previewSavedAssignments;
 
     struct SavedLfoState {
         int lfoIndex;
         LfoPreset preset;
-        LfoWaveform waveform;
-        bool isCustom;
+        std::optional<LfoWaveform> waveform;
         float rateValue;
     };
     std::vector<SavedLfoState> previewSavedLfoStates;
 
+    void savePreviewLfoState(int lfoIndex, bool saveWaveform) {
+        auto saved = std::find_if(previewSavedLfoStates.begin(), previewSavedLfoStates.end(),
+                                  [lfoIndex](const SavedLfoState& state) { return state.lfoIndex == lfoIndex; });
+        if (saved == previewSavedLfoStates.end()) {
+            previewSavedLfoStates.push_back({ lfoIndex, getPreset(lfoIndex), std::nullopt,
+                                              rate[lfoIndex] != nullptr ? rate[lfoIndex]->getValueUnnormalised() : 1.0f });
+            saved = std::prev(previewSavedLfoStates.end());
+        }
+        if (saveWaveform && !saved->waveform.has_value()) {
+            juce::SpinLock::ScopedLockType lock(waveformLock);
+            saved->waveform = waveforms[lfoIndex];
+        }
+    }
+
+    void resetPreviewState() {
+        previewSavedParamValues.clear();
+        previewSavedAssignments.clear();
+        previewSavedLfoStates.clear();
+    }
+
+    bool isPreviewParameter(const LfoAssignment& assignment) const {
+        return std::any_of(previewSavedParamValues.begin(), previewSavedParamValues.end(),
+                           [&assignment](const auto& saved) { return saved.first->paramID == assignment.paramId; });
+    }
+
     // Start previewing: save current param values, auto-assign LFOs to the effect.
-    void startPreview(const juce::String& effectId,
-                      const std::vector<std::shared_ptr<osci::Effect>>& effects,
-                      std::function<void(const osci::Effect&)> removeAllAssignments) {
+    void startPreview(const juce::String& effectId, const std::vector<std::shared_ptr<osci::Effect>>& effects) {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        stopPreview(effects, removeAllAssignments);
+        stopPreview();
         for (auto& eff : effects) {
             if (eff->getId() == effectId) {
-                previewSavedParamValues.clear();
-                previewSavedLfoStates.clear();
+                previewSavedParamValues.reserve(eff->parameters.size());
 
                 // Save param values
                 for (auto* param : eff->parameters) {
-                    if (param->lfoTypeDefault != osci::LfoType::Static)
-                        previewSavedParamValues.emplace_back(param->paramID, param->getValueUnnormalised());
+                    if (param->lfoTypeDefault != osci::LfoType::Static) {
+                        previewSavedParamValues.emplace_back(param, param->getValueUnnormalised());
+                    }
                 }
 
-                // Save LFO waveform/preset state for all LFOs (before auto-assign modifies them)
-                previewSavedLfoStates.reserve(NUM_LFOS);
-                for (int i = 0; i < NUM_LFOS; ++i) {
-                    juce::SpinLock::ScopedLockType lock(waveformLock);
-                    previewSavedLfoStates.push_back({
-                        i, getPreset(i), waveforms[i], getIsCustom(i),
-                        rate[i] != nullptr ? rate[i]->getValueUnnormalised() : 1.0f
-                    });
+                for (const auto& assignment : getAssignments()) {
+                    if (isPreviewParameter(assignment)) {
+                        previewSavedAssignments.push_back(assignment);
+                    }
                 }
 
-                autoAssignForEffect(*eff);
-                previewEffectId = effectId;
+                autoAssignForEffect(*eff, true);
                 break;
             }
         }
     }
 
     // Stop previewing: remove assignments and restore saved parameter values.
-    void stopPreview(const std::vector<std::shared_ptr<osci::Effect>>& effects,
-                     std::function<void(const osci::Effect&)> removeAllAssignments) {
+    void stopPreview() {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        if (previewEffectId.isEmpty()) return;
-        for (auto& eff : effects) {
-            if (eff->getId() == previewEffectId) {
-                removeAllAssignments(*eff);
-                for (const auto& [paramId, savedValue] : previewSavedParamValues) {
-                    for (auto* param : eff->parameters) {
-                        if (param->paramID == paramId) {
-                            param->setUnnormalisedValueNotifyingHost(savedValue);
-                            break;
-                        }
-                    }
-                }
-                break;
+        for (const auto& assignment : getAssignments()) {
+            if (isPreviewParameter(assignment)) {
+                removeAssignment(assignment.sourceIndex, assignment.paramId);
             }
         }
+        for (const auto& assignment : previewSavedAssignments) {
+            addAssignment(assignment);
+        }
 
-        // Restore LFO waveform/preset states
-        for (const auto& saved : previewSavedLfoStates) {
-            {
+        for (const auto& [param, savedValue] : previewSavedParamValues) {
+            param->setValueUnnormalised(savedValue);
+        }
+
+        // Restore only the LFO state changed by auto-assignment.
+        for (auto& saved : previewSavedLfoStates) {
+            preset[saved.lfoIndex]->setValueUnnormalised(static_cast<float>(saved.preset));
+            if (saved.waveform.has_value()) {
                 juce::SpinLock::ScopedLockType lock(waveformLock);
-                setPreset(saved.lfoIndex, saved.preset);
-                waveforms[saved.lfoIndex] = saved.waveform;
-                setIsCustom(saved.lfoIndex, saved.isCustom);
+                std::swap(waveforms[saved.lfoIndex].nodes, saved.waveform->nodes);
+                std::swap(waveforms[saved.lfoIndex].smooth, saved.waveform->smooth);
             }
-            if (rate[saved.lfoIndex] != nullptr)
-                rate[saved.lfoIndex]->setUnnormalisedValueNotifyingHost(saved.rateValue);
+            if (rate[saved.lfoIndex] != nullptr) {
+                rate[saved.lfoIndex]->setValueUnnormalised(saved.rateValue);
+            }
         }
 
-        previewSavedParamValues.clear();
-        previewSavedLfoStates.clear();
-        previewEffectId = juce::String();
+        resetPreviewState();
     }
 
-    // Promote preview: keep assignments and param values, just clear preview tracking.
-    void promotePreview() {
-        jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        previewSavedParamValues.clear();
-        previewSavedLfoStates.clear();
-        previewEffectId = juce::String();
-    }
 };
