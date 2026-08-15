@@ -14,8 +14,6 @@
 // owns parameters and exposes vectors for the processor to adopt at construction.
 class LfoParameters : public ModulationSource {
 public:
-    enum class AutoAssignMode { persistent, preview };
-
     // DAW-automatable parameters (one per LFO)
     osci::FloatParameter* rate[NUM_LFOS] = {};
     LfoPresetParameter* preset[NUM_LFOS] = {};
@@ -451,8 +449,7 @@ public:
 
     // Automatically assign LFOs to modulate the parameters of an effect,
     // based on each parameter's lfoTypeDefault and lfoRateDefault.
-    void autoAssignForEffect(osci::Effect& effect, AutoAssignMode mode = AutoAssignMode::persistent) {
-        const bool isPreview = mode == AutoAssignMode::preview;
+    void autoAssignForEffect(osci::Effect& effect, bool isPreview = false) {
         std::vector<LfoAssignment> currentAssignments = getAssignments();
 
         int assignmentCount[NUM_LFOS] = {};
@@ -619,7 +616,7 @@ public:
                     }
                 }
 
-                autoAssignForEffect(*eff, AutoAssignMode::preview);
+                autoAssignForEffect(*eff, true);
                 break;
             }
         }
