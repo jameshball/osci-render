@@ -657,24 +657,6 @@ public:
     // Promote preview: keep assignments and param values, just clear preview tracking.
     void promotePreview() {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        for (const auto& saved : previewSavedParamValues) {
-            auto* param = saved.first;
-            const float currentValue = param->getValueUnnormalised();
-            if (currentValue != saved.second) {
-                param->setUnnormalisedValueNotifyingHost(currentValue);
-            }
-        }
-        for (const auto& saved : previewSavedLfoStates) {
-            auto* presetParam = preset[saved.lfoIndex];
-            const auto currentPreset = static_cast<LfoPreset>(presetParam->getValueUnnormalised());
-            if (currentPreset != saved.preset) {
-                presetParam->setUnnormalisedValueNotifyingHost(static_cast<float>(currentPreset));
-            }
-            auto* rateParam = rate[saved.lfoIndex];
-            if (rateParam != nullptr && rateParam->getValueUnnormalised() != saved.rateValue) {
-                rateParam->setUnnormalisedValueNotifyingHost(rateParam->getValueUnnormalised());
-            }
-        }
         resetPreviewState();
     }
 };
