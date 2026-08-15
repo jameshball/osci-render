@@ -628,7 +628,11 @@ public:
     // Stop previewing: remove assignments and restore saved parameter values.
     void stopPreview() {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        removeAssignmentsIf([this](const LfoAssignment& assignment) { return isPreviewParameter(assignment); });
+        for (const auto& assignment : getAssignments()) {
+            if (isPreviewParameter(assignment)) {
+                removeAssignment(assignment.sourceIndex, assignment.paramId);
+            }
+        }
         for (const auto& assignment : previewSavedAssignments) {
             addAssignment(assignment);
         }
