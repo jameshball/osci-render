@@ -17,6 +17,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     std::function<void()> onAddNewEffectRequested; // callback hooked by parent to open the grid
 
     AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
+        data.reserve(audioProcessor.toggleableEffects.size());
         resetData();
     }
 

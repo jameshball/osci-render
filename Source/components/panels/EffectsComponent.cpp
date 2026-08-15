@@ -76,45 +76,49 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         auto& um = audioProcessor.getUndoManager();
         um.beginNewTransaction("Add Effect");
         {
-        CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+            CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
 
-        // Find the chosen effect (read-only under lock)
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            for (auto& eff : audioProcessor.toggleableEffects) {
-                if (eff->getId() == effectId) {
-                    chosen = eff;
-                    break;
+            {
+                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                for (auto& eff : audioProcessor.toggleableEffects) {
+                    if (eff->getId() == effectId) {
+                        chosen = eff;
+                        break;
+                    }
+                }
+
+                if (chosen != nullptr) {
+                    chosen->selected->setBoolValue(true);
+                    chosen->enabled->setBoolValue(true);
+
+                    int idx = 0;
+                    for (auto& effect : itemData.data) {
+                        if (effect != chosen) {
+                            effect->setPrecedence(idx++);
+                        }
+                    }
+                    chosen->setPrecedence(idx);
+                    audioProcessor.updateEffectPrecedence();
                 }
             }
-        }
-        // Set parameters OUTSIDE the SpinLock (they do ValueTree/UndoManager work)
-        if (chosen != nullptr) {
-            chosen->selected->setBoolValueNotifyingHost(true);
-            chosen->enabled->setBoolValueNotifyingHost(true);
-        }
-        // Place chosen effect at the end of the visible (selected) list and update precedence
-        if (chosen != nullptr) {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            int idx = 0;
-            for (auto& e : itemData.data) {
-                if (e != chosen) e->setPrecedence(idx++);
+
+            // Persist and notify outside the audio-thread lock.
+            if (chosen != nullptr) {
+                ParameterSyncHelper::ScopedUpdateSuppression suppressListRefresh(paramSync);
+                chosen->selected->setBoolValueNotifyingHost(true);
+                chosen->enabled->setBoolValueNotifyingHost(true);
             }
-            chosen->setPrecedence(idx++);
-            audioProcessor.updateEffectPrecedence();
-        }
-        // Promote any preview LFO assignments so hover-end won't remove them
-        audioProcessor.promotePreviewLfoAssignments();
-        // Auto-assign LFOs if the toggle is enabled
+            // Auto-assign LFOs if the toggle is enabled.
 #if OSCI_PREMIUM
-        if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
-            audioProcessor.autoAssignLfosForEffect(*chosen);
-            audioProcessor.broadcaster.sendChangeMessage();
-        }
+            if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
+                audioProcessor.autoAssignLfosForEffect(*chosen);
+            }
 #endif
         }
-        // Refresh list content to include newly selected
-        itemData.resetData();
+        // The chosen effect already has the final precedence and belongs at the end.
+        if (chosen != nullptr) {
+            itemData.data.push_back(chosen);
+        }
         listBox.updateContent();
         showingGrid = false;
         listBox.setVisible(true);

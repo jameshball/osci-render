@@ -45,13 +45,6 @@ struct ModulationAssignmentStore {
         dest = items;
     }
 
-    // Remove all assignments matching a predicate
-    template<typename Pred>
-    void removeIf(Pred pred) {
-        juce::SpinLock::ScopedLockType scopedLock(lock);
-        items.erase(std::remove_if(items.begin(), items.end(), pred), items.end());
-    }
-
     void clear() {
         juce::SpinLock::ScopedLockType scopedLock(lock);
         items.clear();

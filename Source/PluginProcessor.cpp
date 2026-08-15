@@ -343,12 +343,14 @@ void VoiceBuilder::run() {
                 // Re-check: is this voice still needed?
                 if (targetCount.load(std::memory_order_acquire) > current) {
                     processor.synth.addVoice(voice); // internally locked
+                    readyVoiceCount.store(current + 1, std::memory_order_release);
                 } else {
                     delete voice;
                 }
             } else {
                 // Removal is cheap — just do it directly.
                 processor.synth.removeVoice(current - 1); // internally locked
+                readyVoiceCount.store(current - 1, std::memory_order_release);
             }
         }
     }
@@ -623,8 +625,11 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
     // if midi has just been disabled or we need to retrigger
     if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
-        midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 17);
-        retriggerMidi = false;
+        retriggerMidi = true;
+        if (numSamples > 0 && voiceBuilder != nullptr && voiceBuilder->hasAnyVoiceReady()) {
+            midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), juce::jmin(17, numSamples - 1));
+            retriggerMidi = false;
+        }
     }
 
     prevMidiEnabled = usingMidi;
@@ -1422,18 +1427,12 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
 
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
     ScopedFlag suppress(undoSuppressed);
-    lfoParameters.startPreview(effectId, toggleableEffects,
-                               [this](const osci::Effect& e) { removeAllAssignmentsForEffect(e); });
+    lfoParameters.startPreview(effectId, toggleableEffects);
 }
 
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
     ScopedFlag suppress(undoSuppressed);
-    lfoParameters.stopPreview(toggleableEffects,
-                              [this](const osci::Effect& e) { removeAllAssignmentsForEffect(e); });
-}
-
-void OscirenderAudioProcessor::promotePreviewLfoAssignments() {
-    lfoParameters.promotePreview();
+    lfoParameters.stopPreview();
 }
 
 juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& paramId) const {
