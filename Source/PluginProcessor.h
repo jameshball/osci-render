@@ -202,7 +202,6 @@ public:
     void autoAssignLfosForEffect(osci::Effect& effect);
     void autoAssignLfosForPreview(const juce::String& effectId);
     void clearPreviewLfoAssignments();
-    void promotePreviewLfoAssignments();
 
 #if OSCI_PREMIUM
     // Convert per-parameter LFOs from a free project into global LFO assignments

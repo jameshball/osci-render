@@ -654,9 +654,4 @@ public:
         resetPreviewState();
     }
 
-    // Promote preview: keep assignments and param values, just clear preview tracking.
-    void promotePreview() {
-        jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        resetPreviewState();
-    }
 };
