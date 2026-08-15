@@ -106,6 +106,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         if (chosen != nullptr) {
             chosen->selected->setBoolValueNotifyingHost(true);
             chosen->enabled->setBoolValueNotifyingHost(true);
+            paramSync.cancelPendingUpdate();
         }
         // Promote any preview LFO assignments so hover-end won't remove them
         audioProcessor.promotePreviewLfoAssignments();
@@ -113,12 +114,13 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 #if OSCI_PREMIUM
         if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
             audioProcessor.autoAssignLfosForEffect(*chosen);
-            audioProcessor.broadcaster.sendChangeMessage();
         }
 #endif
         }
-        // Refresh list content to include newly selected
-        itemData.resetData();
+        // The chosen effect already has the final precedence and belongs at the end.
+        if (chosen != nullptr) {
+            itemData.data.push_back(chosen);
+        }
         listBox.updateContent();
         showingGrid = false;
         listBox.setVisible(true);
