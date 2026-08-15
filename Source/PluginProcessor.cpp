@@ -625,11 +625,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
     // if midi has just been disabled or we need to retrigger
     if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
-        if (voiceBuilder != nullptr && voiceBuilder->hasAnyVoiceReady()) {
+        retriggerMidi = true;
+        if (numSamples > 0 && voiceBuilder != nullptr && voiceBuilder->hasAnyVoiceReady()) {
             midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), juce::jmin(17, numSamples - 1));
             retriggerMidi = false;
-        } else {
-            retriggerMidi = true;
         }
     }
 
@@ -1434,10 +1433,6 @@ void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effe
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.stopPreview();
-}
-
-void OscirenderAudioProcessor::promotePreviewLfoAssignments() {
-    lfoParameters.promotePreview();
 }
 
 juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& paramId) const {

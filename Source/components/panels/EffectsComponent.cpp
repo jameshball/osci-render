@@ -76,45 +76,43 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         auto& um = audioProcessor.getUndoManager();
         um.beginNewTransaction("Add Effect");
         {
-        CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+            CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
 
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            for (auto& eff : audioProcessor.toggleableEffects) {
-                if (eff->getId() == effectId) {
-                    chosen = eff;
-                    break;
-                }
-            }
-
-            if (chosen != nullptr) {
-                chosen->selected->setBoolValue(true);
-                chosen->enabled->setBoolValue(true);
-
-                int idx = 0;
-                for (auto& effect : itemData.data) {
-                    if (effect != chosen) {
-                        effect->setPrecedence(idx++);
+            {
+                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                for (auto& eff : audioProcessor.toggleableEffects) {
+                    if (eff->getId() == effectId) {
+                        chosen = eff;
+                        break;
                     }
                 }
-                chosen->setPrecedence(idx);
-                audioProcessor.updateEffectPrecedence();
-            }
-        }
 
-        // Persist and notify outside the audio-thread lock.
-        if (chosen != nullptr) {
-            chosen->selected->setBoolValueNotifyingHost(true);
-            chosen->enabled->setBoolValueNotifyingHost(true);
-            paramSync.cancelPendingUpdate();
-        }
-        // Promote any preview LFO assignments so hover-end won't remove them
-        audioProcessor.promotePreviewLfoAssignments();
-        // Auto-assign LFOs if the toggle is enabled
+                if (chosen != nullptr) {
+                    chosen->selected->setBoolValue(true);
+                    chosen->enabled->setBoolValue(true);
+
+                    int idx = 0;
+                    for (auto& effect : itemData.data) {
+                        if (effect != chosen) {
+                            effect->setPrecedence(idx++);
+                        }
+                    }
+                    chosen->setPrecedence(idx);
+                    audioProcessor.updateEffectPrecedence();
+                }
+            }
+
+            // Persist and notify outside the audio-thread lock.
+            if (chosen != nullptr) {
+                ParameterSyncHelper::ScopedUpdateSuppression suppressListRefresh(paramSync);
+                chosen->selected->setBoolValueNotifyingHost(true);
+                chosen->enabled->setBoolValueNotifyingHost(true);
+            }
+            // Auto-assign LFOs if the toggle is enabled.
 #if OSCI_PREMIUM
-        if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
-            audioProcessor.autoAssignLfosForEffect(*chosen);
-        }
+            if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
+                audioProcessor.autoAssignLfosForEffect(*chosen);
+            }
 #endif
         }
         // The chosen effect already has the final precedence and belongs at the end.
