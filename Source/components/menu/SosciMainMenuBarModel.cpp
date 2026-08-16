@@ -175,7 +175,6 @@ void SosciMainMenuBarModel::resetMenuItems() {
         const bool enabled = processor.globalSettings.getBool("showVideoAfterExport", false);
         processor.globalSettings.set("showVideoAfterExport", !enabled);
         processor.globalSettings.save();
-        resetMenuItems();
     }, [this] { return processor.globalSettings.getBool("showVideoAfterExport", false); });
     addMenuSeparator(videoMenu);
     addMenuItem(videoMenu, "Recording Settings...", [this] {

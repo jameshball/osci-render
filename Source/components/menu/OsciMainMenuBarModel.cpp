@@ -272,7 +272,6 @@ void OsciMainMenuBarModel::resetMenuItems() {
         const bool enabled = audioProcessor.globalSettings.getBool("showVideoAfterExport", false);
         audioProcessor.globalSettings.set("showVideoAfterExport", !enabled);
         audioProcessor.globalSettings.save();
-        resetMenuItems();
     }, [this] { return audioProcessor.globalSettings.getBool("showVideoAfterExport", false); });
     addMenuSeparator(videoMenu);
     addMenuItem(videoMenu, "Recording Settings...", [this] {

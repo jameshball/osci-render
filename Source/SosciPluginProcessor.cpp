@@ -148,13 +148,15 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
 
     if (juce::JUCEApplication::isStandaloneApp()) {
         applyVolumeAndThreshold(workArray, numSamples);
+    }
 
-        // apply mute if active
-        if (muteParameter->getBoolValue()) {
-            juce::FloatVectorOperations::clear(workArray[0], numSamples);
-            juce::FloatVectorOperations::clear(workArray[1], numSamples);
-        }
+    // Mute the physical output in both standalone and plugin wrappers.
+    if (muteParameter->getBoolValue()) {
+        juce::FloatVectorOperations::clear(workArray[0], numSamples);
+        juce::FloatVectorOperations::clear(workArray[1], numSamples);
+    }
 
+    if (juce::JUCEApplication::isStandaloneApp()) {
         threadManager.write(workBuffer, "VolumeComponent");
     }
 

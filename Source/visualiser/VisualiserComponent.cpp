@@ -338,7 +338,9 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
                         // Check both fullscreen or pop-out mode
                         if (timerId == newTimerId && (fullScreen || this->parent != nullptr)) {
                             hideButtonRow = true;
-                            setMouseCursor(juce::MouseCursor::NoCursor);
+                            if (fullScreen) {
+                                setMouseCursor(juce::MouseCursor::NoCursor);
+                            }
                             resized();
                         }
                     }
@@ -525,17 +527,36 @@ void VisualiserComponent::setRecording(bool recording) {
                     file = file.withFileExtension(extension);
                 }
 
+                bool saved = false;
                 if (wasRecordingAudio && wasRecordingVideo) {
                     // delete the file if it exists
-                    if (file.existsAsFile()) {
-                        file.deleteFile();
+                    if (file.existsAsFile() && !file.deleteFile()) {
+                        osci::showOverlayMessage(*this, "Save Recording Failed", "Could not replace:\n" + file.getFullPathName());
+                        return;
                     }
-                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy " + recordingSettings.getAudioCodecArgs().joinIntoString(" ") + " -y \"" + file.getFullPathName() + "\"");
-                    ffmpegProcess.close();
+                    juce::StringArray args;
+                    args.add(ffmpegFile.getFullPathName());
+                    args.addArray({"-i", tempVideoFile->getFile().getFullPathName(), "-i", tempAudioFile->getFile().getFullPathName(), "-c:v", "copy"});
+                    args.addArray(recordingSettings.getAudioCodecArgs());
+                    args.addArray({"-y", file.getFullPathName()});
+                    juce::ChildProcess muxProcess;
+                    saved = muxProcess.start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr);
+                    if (saved) {
+                        const auto processOutput = muxProcess.readAllProcessOutput();
+                        saved = muxProcess.waitForProcessToFinish(-1) && muxProcess.getExitCode() == 0
+                             && file.existsAsFile() && file.getSize() > 0;
+                        if (!saved && processOutput.isNotEmpty()) {
+                            juce::Logger::writeToLog("Recording mux failed: " + processOutput.substring(0, 500));
+                        }
+                    }
                 } else if (wasRecordingAudio) {
-                    tempAudioFile->getFile().copyFileTo(file);
+                    saved = tempAudioFile->getFile().copyFileTo(file);
                 } else if (wasRecordingVideo) {
-                    tempVideoFile->getFile().copyFileTo(file);
+                    saved = tempVideoFile->getFile().copyFileTo(file);
+                }
+                if (!saved) {
+                    osci::showOverlayMessage(*this, "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
+                    return;
                 }
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
                 audioProcessor.recordingExportCompleted(file);
@@ -549,7 +570,10 @@ void VisualiserComponent::setRecording(bool recording) {
                     file = file.withFileExtension(extension);
                 }
 
-                tempAudioFile->getFile().copyFileTo(file);
+                if (!tempAudioFile->getFile().copyFileTo(file)) {
+                    osci::showOverlayMessage(*this, "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
+                    return;
+                }
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
                 audioProcessor.recordingExportCompleted(file);
             } });
@@ -578,6 +602,12 @@ void VisualiserComponent::resized() {
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
+#if OSCI_PREMIUM
+        if (parent != nullptr) {
+            pinButton.setVisible(true);
+            pinButton.setBounds(getLocalBounds().removeFromBottom(25).removeFromRight(30));
+        }
+#endif
         overlayFadeCover.setBounds(getLocalBounds());
         overlayFadeCover.toFront(false);
         setViewportArea(area);
