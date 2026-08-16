@@ -84,7 +84,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
+    visualiserSettings.setSizeToFitWidth(550);
     visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
@@ -96,7 +96,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 
-    tooltipWindow->setMillisecondsBeforeTipAppears(100);
+    tooltipWindow->setMillisecondsBeforeTipAppears(500);
 
     updateTitle();
 
