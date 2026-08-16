@@ -136,6 +136,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     booleanParameters.push_back(loopAnimation);
     booleanParameters.push_back(animationSyncBPM);
     booleanParameters.push_back(invertImage);
+    booleanParameters.push_back(swapXYOutput);
+    booleanParameters.push_back(invertXOutput);
+    booleanParameters.push_back(invertYOutput);
 
     // Adopt envelope parameters
     for (auto* p : envelopeParameters.getFloatParameters())
@@ -192,6 +195,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 
     intParameters.push_back(voices);
     intParameters.push_back(fileSelect);
+    intParameters.push_back(midiInputChannel);
 #if OSCI_PREMIUM
     intParameters.push_back(pitchBendRange);
 #endif
@@ -220,6 +224,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
 #endif
     voiceBuilder->setTargetVoiceCount(initialVoices + 1); // +1 overlap voice for kill-fade
     voiceBuilder->startThread(juce::Thread::Priority::low);
+    filteredMidiMessages.ensureSize(65536);
 
     for (int i = 0; i < luaEffects.size(); i++) {
         luaEffects[i]->parameters[0]->addListener(this);
@@ -595,9 +600,6 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     // Calculated time per sample in seconds.
     double sTimeSec = blockDawPosition.secondsPerSample.load(std::memory_order_relaxed);
 
-    // merge keyboard state and midi messages
-    keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
-
     fileController.updatePendingSelectionFromParameter();
 
     // Process MIDI mappings and handlers (always active, even when synth MIDI is off).
@@ -607,6 +609,23 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     // Parse MTS SysEx from incoming MIDI for microtuning support
     mtsClient.parseMidiBuffer(midiMessages);
 #endif
+
+    const int selectedMidiChannel = midiInputChannel->getValueUnnormalised();
+    if (selectedMidiChannel != 0) {
+        filteredMidiMessages.clear();
+        for (const auto metadata : midiMessages) {
+            const auto message = metadata.getMessage();
+            if (message.getChannel() == 0 || message.getChannel() == selectedMidiChannel) {
+                filteredMidiMessages.addEvent(message, metadata.samplePosition);
+            }
+        }
+        midiMessages.clear();
+        midiMessages.addEvents(filteredMidiMessages, 0, -1, 0);
+    }
+
+    // The on-screen keyboard remains usable regardless of the external MIDI
+    // channel filter.
+    keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
 
     bool usingInput = inputEnabled->getBoolValue();
 
@@ -868,12 +887,18 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         juce::FloatVectorOperations::clear(outputArray[1], numSamples);
     }
     
-    // Copy to output channels
+    // Apply hardware routing after publishing the visualiser feed so these
+    // corrections affect physical outputs and recordings, not the preview.
+    const bool swapOutput = swapXYOutput->getBoolValue();
+    const int xSource = swapOutput ? 1 : 0;
+    const int ySource = swapOutput ? 0 : 1;
+    const float xGain = invertXOutput->getBoolValue() ? -1.0f : 1.0f;
+    const float yGain = invertYOutput->getBoolValue() ? -1.0f : 1.0f;
     if (totalNumOutputChannels >= 2) {
-        juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
-        juce::FloatVectorOperations::copy(channelData[1], outputArray[1], numSamples);
+        juce::FloatVectorOperations::copyWithMultiply(channelData[0], outputArray[xSource], xGain, numSamples);
+        juce::FloatVectorOperations::copyWithMultiply(channelData[1], outputArray[ySource], yGain, numSamples);
     } else if (totalNumOutputChannels == 1) {
-        juce::FloatVectorOperations::copy(channelData[0], outputArray[0], numSamples);
+        juce::FloatVectorOperations::copyWithMultiply(channelData[0], outputArray[xSource], xGain, numSamples);
     }
     
     // used for any callback that must guarantee all audio is recieved (e.g. when recording to a file)
@@ -881,6 +906,12 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     if (audioThreadCallback != nullptr) {
         audioThreadCallback(buffer);
     }
+}
+
+void OscirenderAudioProcessor::sendMidiPanic(bool immediate) {
+    keyboardState.allNotesOff(0);
+    synth.handleMidiEvent(immediate ? juce::MidiMessage::allSoundOff(1)
+                                    : juce::MidiMessage::allNotesOff(1));
 }
 
 juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
