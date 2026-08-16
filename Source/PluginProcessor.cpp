@@ -622,6 +622,12 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         midiMessages.clear();
         midiMessages.addEvents(filteredMidiMessages, 0, -1, 0);
     }
+    if (selectedMidiChannel != previousMidiInputChannel) {
+        // VoiceManager treats allSoundOff globally, so one message releases
+        // notes that would otherwise be hidden by the new channel filter.
+        midiMessages.addEvent(juce::MidiMessage::allSoundOff(1), 0);
+        previousMidiInputChannel = selectedMidiChannel;
+    }
 
     // The on-screen keyboard remains usable regardless of the external MIDI
     // channel filter.
