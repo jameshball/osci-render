@@ -143,7 +143,6 @@
               file="Resources/svg/oscilloscope.svg"/>
         <FILE id="pStSvg" name="paste.svg" compile="0" resource="1" file="Resources/svg/paste.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
-        <FILE id="pUshPin" name="push_pin.svg" compile="0" resource="1" file="Resources/svg/push_pin.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
         <FILE id="sfWuFd" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>

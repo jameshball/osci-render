@@ -86,14 +86,6 @@ VisualiserComponent::VisualiserComponent(
         addAndMakeVisible(popOutButton);
         popOutButton.setTooltip("Opens the oscilloscope in a new window.");
     }
-    if (parent != nullptr) {
-        addAndMakeVisible(pinButton);
-        pinButton.setTooltip("Keep the popout window always on top.");
-        pinButton.setToggleState(parent->isPopoutAlwaysOnTop(), juce::NotificationType::dontSendNotification);
-        pinButton.onClick = [this] {
-            this->parent->setPopoutAlwaysOnTop(pinButton.getToggleState());
-        };
-    }
 #endif
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
@@ -595,19 +587,12 @@ void VisualiserComponent::resized() {
         buttonRow = area.removeFromBottom(0);
         fullScreenButton.setVisible(false);
         popOutButton.setVisible(false);
-        pinButton.setVisible(false);
         settingsButton.setVisible(false);
         audioInputButton.setVisible(false);
         textureOutputButton.setVisible(false);
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
-#if OSCI_PREMIUM
-        if (parent != nullptr) {
-            pinButton.setVisible(true);
-            pinButton.setBounds(getLocalBounds().removeFromBottom(25).removeFromRight(30));
-        }
-#endif
         overlayFadeCover.setBounds(getLocalBounds());
         overlayFadeCover.toFront(false);
         setViewportArea(area);
@@ -621,10 +606,6 @@ void VisualiserComponent::resized() {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
 #if OSCI_PREMIUM
-    if (parent != nullptr) {
-        pinButton.setVisible(true);
-        pinButton.setBounds(buttons.removeFromRight(30));
-    }
     if (child == nullptr && parent == nullptr) {
         popOutButton.setVisible(true);
         popOutButton.setBounds(buttons.removeFromRight(30));
@@ -741,9 +722,6 @@ void VisualiserComponent::setPopoutAlwaysOnTop(bool alwaysOnTop) {
     audioProcessor.globalSettings.save();
     if (popout != nullptr) {
         popout->setPinned(alwaysOnTop);
-    }
-    if (child != nullptr) {
-        child->pinButton.setToggleState(alwaysOnTop, juce::NotificationType::dontSendNotification);
     }
 }
 
