@@ -17,8 +17,15 @@ void MainMenuBarModel::addMenuItem(int topLevelMenuIndex, const juce::String& na
     menuItemsChanged();
 }
 
-void MainMenuBarModel::addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked) {
-    menuItems[topLevelMenuIndex].push_back({ name, std::move(action), std::move(isTicked), true });
+void MainMenuBarModel::addMenuSeparator(int topLevelMenuIndex) {
+    MenuItem separator;
+    separator.isSeparator = true;
+    menuItems[topLevelMenuIndex].push_back(std::move(separator));
+    menuItemsChanged();
+}
+
+void MainMenuBarModel::addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked, const juce::String& shortcutKey) {
+    menuItems[topLevelMenuIndex].push_back({ name, std::move(action), std::move(isTicked), true, shortcutKey });
     menuItemsChanged();
 }
 
@@ -38,8 +45,8 @@ void MainMenuBarModel::addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudi
 
 void MainMenuBarModel::addEditMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor) {
    #if JUCE_MAC
-    const juce::String undoShortcut = juce::String::fromUTF8("\xe2\x8c\x98Z");       // ⌘Z
-    const juce::String redoShortcut = juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"); // ⇧⌘Z
+    const juce::String undoShortcut = "Cmd+Z";
+    const juce::String redoShortcut = "Cmd+Shift+Z";
    #else
     const juce::String undoShortcut = "Ctrl+Z";
     const juce::String redoShortcut = "Ctrl+Shift+Z";
@@ -67,6 +74,10 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
 
     for (int i = 0; i < (int) menuItems[topLevelMenuIndex].size(); i++) {
         auto& mi = menuItems[topLevelMenuIndex][i];
+        if (mi.isSeparator) {
+            menu.addSeparator();
+            continue;
+        }
         juce::PopupMenu::Item item(mi.name);
         item.itemID = i + 1;
         if (mi.shortcutKey.isNotEmpty())

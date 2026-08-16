@@ -10,8 +10,9 @@ public:
 
     void addTopLevelMenu(const juce::String& name);
     void addMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, const juce::String& shortcutKey = {});
+    void addMenuSeparator(int topLevelMenuIndex);
     // Adds a toggle (ticked) menu item whose tick state is provided dynamically via isTicked()
-    void addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked);
+    void addToggleMenuItem(int topLevelMenuIndex, const juce::String& name, std::function<void()> action, std::function<bool()> isTicked, const juce::String& shortcutKey = {});
     // Adds the common "Open Log File", "Open App Settings File", "Open Global Settings File"
     // items shared across all apps.
     void addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor);
@@ -37,6 +38,7 @@ private:
         std::function<bool()> isTicked; // optional tick state
         bool hasTick = false;
         juce::String shortcutKey;
+        bool isSeparator = false;
     };
 
     juce::StringArray topLevelMenuNames;
