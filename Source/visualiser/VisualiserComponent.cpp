@@ -667,7 +667,7 @@ void VisualiserComponent::popoutWindow() {
     child = visualiser;
     childUpdated();
     visualiser->setSize(350, 350);
-    const auto windowTitle = editor.appName == "sosci" ? "sosci Software Oscilloscope" : "Software Oscilloscope";
+    const auto windowTitle = editor.appName == "sosci" ? "sosci - Software Oscilloscope" : "Software Oscilloscope";
     popout = std::make_unique<VisualiserWindow>(windowTitle, this, isPopoutAlwaysOnTop());
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
