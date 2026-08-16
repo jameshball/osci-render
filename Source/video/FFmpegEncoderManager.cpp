@@ -31,6 +31,58 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
     }
 }
 
+bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const juce::File& audioInput, const juce::File& output,
+                                            const juce::StringArray& audioCodecArgs, juce::String& error, const std::atomic<bool>* cancelRequested) const {
+    error.clear();
+    if (!ffmpegExecutable.existsAsFile()) {
+        error = "FFmpeg executable not found.";
+        return false;
+    }
+    if (!videoInput.existsAsFile()) {
+        error = "Temporary video file was not created.";
+        return false;
+    }
+    if (!audioInput.existsAsFile()) {
+        error = "Input audio file not found.";
+        return false;
+    }
+    if (output.existsAsFile() && !output.deleteFile()) {
+        error = "Could not replace output file.";
+        return false;
+    }
+
+    juce::StringArray command { ffmpegExecutable.getFullPathName(),
+                                "-hide_banner", "-loglevel", "error",
+                                "-i", videoInput.getFullPathName(),
+                                "-i", audioInput.getFullPathName(),
+                                "-c:v", "copy" };
+    command.addArray(audioCodecArgs);
+    command.addArray({ "-shortest", "-y", output.getFullPathName() });
+
+    juce::ChildProcess process;
+    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+        error = "Failed to start FFmpeg for audio mux.";
+        return false;
+    }
+
+    while (process.isRunning()) {
+        if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()) {
+            process.kill();
+            error = "Cancelled.";
+            return false;
+        }
+        process.waitForProcessToFinish(200);
+    }
+
+    const juce::String processOutput = process.readAllProcessOutput();
+    const bool succeeded = process.getExitCode() == 0 && output.existsAsFile() && output.getSize() > 0;
+    if (!succeeded) {
+        output.deleteFile();
+        error = processOutput.isNotEmpty() ? processOutput : "FFmpeg mux failed.";
+    }
+    return succeeded;
+}
+
 int FFmpegEncoderManager::estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue) {
     // Heuristic to estimate bitrate from CRF, resolution, and frame rate.
     // CRF values typically range from 0 (lossless) to 51 (worst quality).

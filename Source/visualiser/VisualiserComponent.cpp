@@ -521,25 +521,10 @@ void VisualiserComponent::setRecording(bool recording) {
 
                 bool saved = false;
                 if (wasRecordingAudio && wasRecordingVideo) {
-                    // delete the file if it exists
-                    if (file.existsAsFile() && !file.deleteFile()) {
-                        osci::showOverlayMessage(*this, "Save Recording Failed", "Could not replace:\n" + file.getFullPathName());
-                        return;
-                    }
-                    juce::StringArray args;
-                    args.add(ffmpegFile.getFullPathName());
-                    args.addArray({"-i", tempVideoFile->getFile().getFullPathName(), "-i", tempAudioFile->getFile().getFullPathName(), "-c:v", "copy"});
-                    args.addArray(recordingSettings.getAudioCodecArgs());
-                    args.addArray({"-y", file.getFullPathName()});
-                    juce::ChildProcess muxProcess;
-                    saved = muxProcess.start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr);
-                    if (saved) {
-                        const auto processOutput = muxProcess.readAllProcessOutput();
-                        saved = muxProcess.waitForProcessToFinish(-1) && muxProcess.getExitCode() == 0
-                             && file.existsAsFile() && file.getSize() > 0;
-                        if (!saved && processOutput.isNotEmpty()) {
-                            juce::Logger::writeToLog("Recording mux failed: " + processOutput.substring(0, 500));
-                        }
+                    juce::String muxError;
+                    saved = ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile->getFile(), tempAudioFile->getFile(), file, recordingSettings.getAudioCodecArgs(), muxError);
+                    if (!saved && muxError.isNotEmpty()) {
+                        juce::Logger::writeToLog("Recording mux failed: " + muxError.substring(0, 500));
                     }
                 } else if (wasRecordingAudio) {
                     saved = tempAudioFile->getFile().copyFileTo(file);

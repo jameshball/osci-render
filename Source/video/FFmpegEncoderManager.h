@@ -26,6 +26,9 @@ public:
         const juce::String& compressionPreset,
         const juce::File& outputFile);
 
+    bool muxAudioAndVideo(const juce::File& videoInput, const juce::File& audioInput, const juce::File& output,
+                          const juce::StringArray& audioCodecArgs, juce::String& error, const std::atomic<bool>* cancelRequested = nullptr) const;
+
     // Get available encoders for a given codec
     juce::Array<EncoderDetails> getAvailableEncodersForCodec(VideoCodec codec);
 
