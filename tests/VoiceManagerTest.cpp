@@ -241,6 +241,16 @@ public:
             expectEquals(vm->getNumPressedNotes(), 0);
         }
 
+        beginTest("allSoundOff clears notes across MIDI channels");
+        {
+            auto [vm, _] = createVM(4);
+            sendNoteOn(*vm, 60, 0.8f, 2);
+            sendNoteOn(*vm, 67, 0.8f, 9);
+            vm->handleMidiEvent(juce::MidiMessage::allSoundOff(1));
+            expectEquals(vm->getNumPressedNotes(), 0);
+            expectEquals(countAudibleVoices(*vm), 0);
+        }
+
         beginTest("velocity-0 noteOn treated as noteOff");
         {
             auto [vm, _] = createVM(4);

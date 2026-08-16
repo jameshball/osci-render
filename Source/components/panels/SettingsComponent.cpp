@@ -253,6 +253,22 @@ SettingsComponent::~SettingsComponent() {
     audioProcessor.midiEnabled->removeListener(this);
 }
 
+void SettingsComponent::resetLayoutToDefault() {
+    constexpr double defaultVisualiserSize = -0.25;
+    mainLayout.setItemLayout(0, -0.1, -0.5, defaultVisualiserSize);
+    mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
+    mainLayout.setItemLayout(2, -0.1, -0.9, -(1.0 + defaultVisualiserSize));
+    audioProcessor.setProperty("mainLayoutVisSize", defaultVisualiserSize);
+
+#if OSCI_PREMIUM
+    modPanelCollapsed = true;
+    modPanelHeight = kCollapsedModHeight;
+    audioProcessor.setProperty("mainLayoutModSize", -0.35);
+#endif
+
+    resized();
+}
+
 void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue) {
     auto safeThis = juce::Component::SafePointer<SettingsComponent>(this);
     bool midiJustEnabled = (parameterIndex == audioProcessor.midiEnabled->getParameterIndex()

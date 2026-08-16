@@ -38,6 +38,7 @@ public:
     // Show or hide the example files grid panel on the right-hand side
     void showExamples(bool shouldShow);
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
+    void resetLayoutToDefault();
 
 private:
     OscirenderAudioProcessor& audioProcessor;

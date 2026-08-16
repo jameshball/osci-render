@@ -10,14 +10,11 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 void SosciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
+    constexpr int CLEAR_RECENT_PROJECTS_ID = 900;
     constexpr int RECENT_BASE_ID = 1000;
+    constexpr int RECENT_RECORDING_BASE_ID = 2000;
 
-    addTopLevelMenu("File");
-    addTopLevelMenu("Edit");
-    addTopLevelMenu("About");
-    addTopLevelMenu("Video");
-    addTopLevelMenu("Audio");
-    addTopLevelMenu("Interface");
+    addStandardTopLevelMenus();
 
     const int fileMenu      = 0;
     const int editMenu      = 1;
@@ -35,19 +32,18 @@ void SosciMainMenuBarModel::resetMenuItems() {
     };
 
     // This is a hack - ideally I would improve the MainMenuBarModel class to allow for submenus
-    customMenuLogic = [this, examples](juce::PopupMenu& menu, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
+    customMenuLogic = [this, examples, fileMenu, videoMenu](juce::PopupMenu& menu, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == videoMenu) {
+            addRecentRecordingsSubmenu(menu, processor, RECENT_RECORDING_BASE_ID);
+            menu.addSeparator();
             return;
+        }
 
-        juce::PopupMenu recentMenu;
-        const int added = processor.createRecentProjectsPopupMenuItems(recentMenu,
-                                                                       RECENT_BASE_ID,
-                                                                       true,
-                                                                       true);
-        if (added == 0)
-            recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+        if (topLevelMenuIndex != fileMenu) {
+            return;
+        }
 
-        menu.addSubMenu("Open Recent", recentMenu);
+        addRecentProjectsSubmenu(menu, processor, RECENT_BASE_ID, CLEAR_RECENT_PROJECTS_ID);
 
         juce::PopupMenu submenu;
         for (int i = 0; i < (int) examples.size(); i++) {
@@ -58,15 +54,16 @@ void SosciMainMenuBarModel::resetMenuItems() {
         menu.addSeparator();
     };
 
-    customMenuSelectedLogic = [this, examples](int menuItemID, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
-            return false;
+    customMenuSelectedLogic = [this, examples, fileMenu, videoMenu](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == videoMenu && handleRecentRecordingMenuItem(menuItemID, processor, RECENT_RECORDING_BASE_ID)) {
+            return true;
+        }
 
-        if (menuItemID >= RECENT_BASE_ID) {
-            const int index = menuItemID - RECENT_BASE_ID;
-            const auto file = processor.getRecentProjectFile(index);
-            if (file != juce::File() && file.existsAsFile())
-                editor.openProject(file);
+        if (topLevelMenuIndex != fileMenu) {
+            return false;
+        }
+
+        if (handleRecentProjectMenuItem(menuItemID, processor, editor, RECENT_BASE_ID, CLEAR_RECENT_PROJECTS_ID)) {
             return true;
         }
 
@@ -90,12 +87,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
             }
         });
     });
-    addMenuItem(fileMenu, "Open Project", [&]() { editor.openProject(); });
-    addMenuItem(fileMenu, "Save Project", [&]() { editor.saveProject(); });
-    addMenuItem(fileMenu, "Save Project As", [&]() { editor.saveProjectAs(); });
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(fileMenu, "Create New Project", [&]() { editor.resetToDefault(); });
-    }
+    addProjectMenuItems(fileMenu, processor, editor);
 
     addEditMenuItems(editMenu, processor);
 
@@ -129,21 +121,12 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
         editor.showOverlay(AboutComponent::createOverlay(aboutInfo));
     });
-    addMenuItem(aboutMenu, "License and Updates...", [&]() {
-        editor.openLicenseAndUpdates();
-    });
-    addMenuItem(aboutMenu, "Send Feedback...", [this] {
-        editor.openFeedback();
-    });
-    addDiagnosticsMenuItems(aboutMenu, processor);
-
-    addMenuItem(videoMenu, "Settings...", [this] {
-        editor.openRecordingSettings();
-    });
+    addSupportMenuItems(aboutMenu, processor, editor);
 
     addMenuItem(videoMenu, "Render Audio File to Video...", [this] {
         editor.renderAudioFileToVideo();
     });
+    addRecordingPreferencesMenuItems(videoMenu, processor, editor);
 
     addMenuItem(audioMenu, "Force Disable Brightness Input", [&]() {
         processor.forceDisableBrightnessInput = !processor.forceDisableBrightnessInput;
@@ -162,10 +145,9 @@ void SosciMainMenuBarModel::resetMenuItems() {
         menuItemsChanged();
     });
 
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(audioMenu, "Settings...", [&]() { editor.openAudioSettings(); });
-    }
+    addMuteMenuItem(audioMenu, processor);
+    addStandaloneAudioSettingsMenuItem(audioMenu, processor, editor);
 
     // Interface menu
-    addListenForSpecialKeysMenuItem(interfaceMenu, processor);
+    addCommonInterfaceMenuItems(interfaceMenu, processor, editor);
 }

@@ -11,36 +11,46 @@ OsciMainMenuBarModel::OsciMainMenuBarModel(OscirenderAudioProcessor& p, Oscirend
 void OsciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
+    constexpr int CLEAR_RECENT_PROJECTS_ID = 900;
     constexpr int RECENT_BASE_ID = 1000;
     constexpr int TEXTURE_INPUT_DISCONNECT_ID = 2000;
     constexpr int TEXTURE_INPUT_SOURCE_BASE_ID = 2100;
     constexpr int SAMPLE_RATE_BASE_ID = 3000;
+    constexpr int MIDI_CHANNEL_BASE_ID = 4000;
+    constexpr int MIDI_PANIC_ID = 4100;
+    constexpr int MIDI_KILL_ID = 4101;
+    constexpr int RECENT_RECORDING_BASE_ID = 6000;
     constexpr int fileMenu = 0;
     constexpr int editMenu = 1;
     constexpr int aboutMenu = 2;
     constexpr int videoMenu = 3;
     int nextMenu = 4;
-    const int audioMenu = (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) ? nextMenu++ : -1;
+    const int audioMenu = nextMenu++;
     const int interfaceMenu = nextMenu;
 
     customMenuLogic = [this, fileMenu, videoMenu, audioMenu](juce::PopupMenu& menu, int topLevelMenuIndex) {
         if (topLevelMenuIndex == fileMenu) {
-            juce::PopupMenu recentMenu;
-            const int added = audioProcessor.createRecentProjectsPopupMenuItems(recentMenu,
-                                                                                RECENT_BASE_ID,
-                                                                                true,
-                                                                                true);
-            if (added == 0) {
-                recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
-            }
-
-            menu.addSubMenu("Open Recent", recentMenu);
+            addRecentProjectsSubmenu(menu, audioProcessor, RECENT_BASE_ID, CLEAR_RECENT_PROJECTS_ID);
             menu.addSeparator();
             return;
         }
 
         if (topLevelMenuIndex == audioMenu) {
             InternalSampleRateMenu::addSubmenu(menu, audioProcessor, SAMPLE_RATE_BASE_ID);
+
+            juce::PopupMenu channelMenu;
+            const int selectedChannel = audioProcessor.midiInputChannel->getValueUnnormalised();
+            channelMenu.addItem(MIDI_CHANNEL_BASE_ID, "Omni", true, selectedChannel == 0);
+            for (int channel = 1; channel <= 16; channel++) {
+                channelMenu.addItem(MIDI_CHANNEL_BASE_ID + channel, "Channel " + juce::String(channel), true, selectedChannel == channel);
+            }
+
+            juce::PopupMenu midiMenu;
+            midiMenu.addSubMenu("Input Channel", channelMenu);
+            midiMenu.addSeparator();
+            midiMenu.addItem(MIDI_PANIC_ID, "Panic (Release All Notes)");
+            midiMenu.addItem(MIDI_KILL_ID, "Kill Voices Immediately");
+            menu.addSubMenu("MIDI", midiMenu);
             return;
         }
 
@@ -87,22 +97,35 @@ void OsciMainMenuBarModel::resetMenuItems() {
         menu.addSeparator();
 #endif
 #endif
+
+        addRecentRecordingsSubmenu(menu, audioProcessor, RECENT_RECORDING_BASE_ID);
+        menu.addSeparator();
     };
 
     customMenuSelectedLogic = [this, fileMenu, videoMenu, audioMenu](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == audioMenu && menuItemID >= MIDI_CHANNEL_BASE_ID && menuItemID <= MIDI_CHANNEL_BASE_ID + 16) {
+            audioProcessor.midiInputChannel->setUnnormalisedValueNotifyingHost(menuItemID - MIDI_CHANNEL_BASE_ID);
+            return true;
+        }
+        if (topLevelMenuIndex == audioMenu && menuItemID == MIDI_PANIC_ID) {
+            audioProcessor.sendMidiPanic(false);
+            return true;
+        }
+        if (topLevelMenuIndex == audioMenu && menuItemID == MIDI_KILL_ID) {
+            audioProcessor.sendMidiPanic(true);
+            return true;
+        }
         if (topLevelMenuIndex == audioMenu
             && InternalSampleRateMenu::handleMenuId(menuItemID, SAMPLE_RATE_BASE_ID, audioProcessor, [this] { editor.showPremiumSplashScreen(); })) {
             resetMenuItems();
             return true;
         }
 
-        if (topLevelMenuIndex == fileMenu && menuItemID >= RECENT_BASE_ID) {
-            const int index = menuItemID - RECENT_BASE_ID;
-            const auto file = audioProcessor.getRecentProjectFile(index);
-            if (file != juce::File() && file.existsAsFile()) {
-                editor.openProject(file);
-            }
+        if (topLevelMenuIndex == fileMenu && handleRecentProjectMenuItem(menuItemID, audioProcessor, editor, RECENT_BASE_ID, CLEAR_RECENT_PROJECTS_ID)) {
+            return true;
+        }
 
+        if (topLevelMenuIndex == videoMenu && handleRecentRecordingMenuItem(menuItemID, audioProcessor, RECENT_RECORDING_BASE_ID)) {
             return true;
         }
 
@@ -130,32 +153,12 @@ void OsciMainMenuBarModel::resetMenuItems() {
 #endif
 #endif
 
-        if (topLevelMenuIndex != fileMenu) {
-            return false;
-        }
-
-        if (menuItemID < RECENT_BASE_ID) {
-            return false;
-        }
-
-        return true;
+        return false;
     };
 
-    addTopLevelMenu("File");
-    addTopLevelMenu("Edit");
-    addTopLevelMenu("About");
-    addTopLevelMenu("Video");
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addTopLevelMenu("Audio");
-    }
-    addTopLevelMenu("Interface");
+    addStandardTopLevelMenus();
 
-    addMenuItem(fileMenu, "Open Project", [this] { editor.openProject(); });
-    addMenuItem(fileMenu, "Save Project", [this] { editor.saveProject(); });
-    addMenuItem(fileMenu, "Save Project As", [this] { editor.saveProjectAs(); });
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(fileMenu, "Create New Project", [this] { editor.resetToDefault(); });
-    }
+    addProjectMenuItems(fileMenu, audioProcessor, editor);
 
     addEditMenuItems(editMenu, audioProcessor);
 
@@ -192,13 +195,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
 
         editor.showOverlay(AboutComponent::createOverlay(aboutInfo));
     });
-    addMenuItem(aboutMenu, "License and Updates...", [this] {
-        editor.openLicenseAndUpdates();
-    });
-    addMenuItem(aboutMenu, "Send Feedback...", [this] {
-        editor.openFeedback();
-    });
-    addDiagnosticsMenuItems(aboutMenu, audioProcessor);
+    addSupportMenuItems(aboutMenu, audioProcessor, editor);
     addMenuItem(aboutMenu, "Randomize Blender Port", [this] {
         audioProcessor.setObjectServerPort(juce::Random::getSystemRandom().nextInt(juce::Range<int>(51600, 51700)));
     });
@@ -209,10 +206,6 @@ void OsciMainMenuBarModel::resetMenuItems() {
     });
 #endif
 
-    addMenuItem(videoMenu, "Recording Settings...", [this] {
-        editor.openRecordingSettings();
-    });
-
     addMenuItem(videoMenu, "Render Audio File to Video...", [this] {
 #if OSCI_PREMIUM
         editor.renderAudioFileToVideo();
@@ -220,13 +213,19 @@ void OsciMainMenuBarModel::resetMenuItems() {
         editor.showPremiumSplashScreen();
 #endif
     });
+    addRecordingPreferencesMenuItems(videoMenu, audioProcessor, editor);
 
-    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(audioMenu, "Settings...", [this] {
-            editor.openAudioSettings();
-        });
-    }
-
+    addMuteMenuItem(audioMenu, audioProcessor);
+    addToggleMenuItem(audioMenu, "Swap X/Y", [this] {
+        audioProcessor.swapXYOutput->setBoolValueNotifyingHost(!audioProcessor.swapXYOutput->getBoolValue());
+    }, [this] { return audioProcessor.swapXYOutput->getBoolValue(); });
+    addToggleMenuItem(audioMenu, "Invert X", [this] {
+        audioProcessor.invertXOutput->setBoolValueNotifyingHost(!audioProcessor.invertXOutput->getBoolValue());
+    }, [this] { return audioProcessor.invertXOutput->getBoolValue(); });
+    addToggleMenuItem(audioMenu, "Invert Y", [this] {
+        audioProcessor.invertYOutput->setBoolValueNotifyingHost(!audioProcessor.invertYOutput->getBoolValue());
+    }, [this] { return audioProcessor.invertYOutput->getBoolValue(); });
+    addStandaloneAudioSettingsMenuItem(audioMenu, audioProcessor, editor);
     // Interface menu
     addToggleMenuItem(interfaceMenu, "Preview effect on hover", [this] {
         bool current = audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
@@ -244,7 +243,7 @@ void OsciMainMenuBarModel::resetMenuItems() {
         }, [this] { return audioProcessor.globalSettings.getBool("previewEffectOnHover", true);
     });
 
-    addListenForSpecialKeysMenuItem(interfaceMenu, audioProcessor);
+    addCommonInterfaceMenuItems(interfaceMenu, audioProcessor, editor);
 
     addToggleMenuItem(interfaceMenu, "Show MIDI Keyboard", [this] {
         bool current = audioProcessor.globalSettings.getBool("showMidiKeyboard", true);

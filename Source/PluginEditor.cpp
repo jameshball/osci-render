@@ -765,6 +765,24 @@ void OscirenderAudioProcessorEditor::toggleLayout(juce::StretchableLayoutManager
     }
 }
 
+void OscirenderAudioProcessorEditor::resetWindowSizeAndPosition() {
+    CommonPluginEditor::resetWindowSizeAndPosition();
+
+    layout.setItemLayout(0, -0.3, -1.0, kDefaultCodeEditorMainPanelSize);
+    layout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
+    layout.setItemLayout(2, -0.0, -1.0, -(1.0 + kDefaultCodeEditorMainPanelSize));
+
+    constexpr double defaultLuaLayoutSize = -0.7;
+    luaLayout.setItemLayout(0, -0.3, -1.0, defaultLuaLayoutSize);
+    luaLayout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
+    luaLayout.setItemLayout(2, -0.1, -1.0, -(1.0 + defaultLuaLayoutSize));
+
+    audioProcessor.setProperty("codeEditorLayoutPreferredSize", kDefaultCodeEditorMainPanelSize);
+    audioProcessor.setProperty("luaLayoutPreferredSize", defaultLuaLayoutSize);
+    settings.resetLayoutToDefault();
+    resized();
+}
+
 void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
     if (enable) {
         // Record whether the code editor was open before entering custom-function edit mode.

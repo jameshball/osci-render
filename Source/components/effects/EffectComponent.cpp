@@ -110,6 +110,7 @@ void EffectComponent::setupComponent() {
     }
 
     setTooltip(parameter->description);
+    label.setTooltip(parameter->description);
     label.setText(parameter->name, juce::dontSendNotification);
     label.onContextMenu = [this](juce::Point<int> screenPosition) {
         showContextMenu(screenPosition);

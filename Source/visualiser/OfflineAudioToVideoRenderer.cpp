@@ -55,80 +55,6 @@ juce::String durationSummary(double seconds) {
 
 }
 
-bool OfflineAudioToVideoRendererComponent::runFfmpegMux(const juce::File& ffmpegExe,
-                                                       const juce::File& videoInput,
-                                                       const juce::File& audioInput,
-                                                       const juce::File& output,
-                                                       const juce::StringArray& audioCodecArgs,
-                                                       const std::atomic<bool>& cancelRequested,
-                                                       juce::String& outError)
-{
-    if (!ffmpegExe.existsAsFile())
-    {
-        outError = "FFmpeg executable not found.";
-        return false;
-    }
-
-    if (!videoInput.existsAsFile())
-    {
-        outError = "Temporary video file was not created.";
-        return false;
-    }
-
-    if (!audioInput.existsAsFile())
-    {
-        outError = "Input audio file not found.";
-        return false;
-    }
-
-    juce::StringArray args;
-    args.add(ffmpegExe.getFullPathName());
-    args.addArray({"-hide_banner", "-loglevel", "error"});
-    args.addArray({"-i", videoInput.getFullPathName()});
-    args.addArray({"-i", audioInput.getFullPathName()});
-    args.addArray({"-c:v", "copy"});
-    args.addArray(audioCodecArgs);
-    args.addArray({"-shortest"});
-    args.addArray({"-y", output.getFullPathName()});
-
-    juce::ChildProcess process;
-    if (!process.start(args, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
-    {
-        outError = "Failed to start FFmpeg for audio mux.";
-        return false;
-    }
-
-    // Wait until completion, but allow cancellation.
-    while (process.isRunning())
-    {
-        if (cancelRequested.load() || juce::Thread::currentThreadShouldExit())
-        {
-            process.kill();
-            outError = "Cancelled.";
-            return false;
-        }
-
-        process.waitForProcessToFinish(200);
-    }
-
-    const juce::String ffmpegOutput = process.readAllProcessOutput();
-
-    // ChildProcess doesn't reliably expose an exit code across platforms; treat missing output file as failure.
-    if (!output.existsAsFile())
-    {
-        outError = ffmpegOutput.isNotEmpty() ? ffmpegOutput : "FFmpeg mux failed.";
-        return false;
-    }
-
-    if (ffmpegOutput.isNotEmpty())
-    {
-        // Sometimes ffmpeg prints warnings; keep it concise.
-        outError = ffmpegOutput;
-    }
-
-    return true;
-}
-
 OfflineAudioToVideoRendererComponent::OfflinePreviewRenderer::OfflinePreviewRenderer(
     VisualiserParameters& parameters,
     osci::AudioBackgroundThreadManager& manager,
@@ -684,7 +610,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         juce::String muxError;
         const auto audioCodecArgs = recordingSettings.getAudioCodecArgs();
         offlineRenderLog.event("muxing audio into final video: audioCodecArgs=" + audioCodecArgs.joinIntoString(" "));
-        if (!runFfmpegMux(ffmpegFile, tempVideoFile, inputAudioFile, tempFinal.getFile(), audioCodecArgs, cancelRequested, muxError))
+        if (!ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile, inputAudioFile, tempFinal.getFile(), audioCodecArgs, muxError, &cancelRequested))
         {
             tempFinal.getFile().deleteFile();
             tempVideoFile.deleteFile();
