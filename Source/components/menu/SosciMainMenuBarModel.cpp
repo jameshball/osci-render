@@ -208,6 +208,11 @@ void SosciMainMenuBarModel::resetMenuItems() {
 
     // Interface menu
     addListenForSpecialKeysMenuItem(interfaceMenu, processor);
+#if OSCI_PREMIUM
+    addToggleMenuItem(interfaceMenu, "Keep Oscilloscope Window on Top", [this] {
+        editor.visualiser.setPopoutAlwaysOnTop(!editor.visualiser.isPopoutAlwaysOnTop());
+    }, [this] { return editor.visualiser.isPopoutAlwaysOnTop(); });
+#endif
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addToggleMenuItem(interfaceMenu, "Full Screen", [this] { editor.toggleFullScreen(); }, [this] { return editor.isFullScreen(); }, "F11");
         addMenuItem(interfaceMenu, "Reset Window Size and Position", [this] { editor.resetWindowSizeAndPosition(); });
