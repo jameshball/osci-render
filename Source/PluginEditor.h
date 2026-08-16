@@ -38,6 +38,7 @@ public:
     void openProject(const juce::File& file) override;
     void openProject() override;
     void resetToDefault() override;
+    void resetWindowSizeAndPosition() override;
     void setTextureInputSource(osci::texture::SourceInfo source);
     void stopTextureInput();
     bool isTextureInputActive() const;
@@ -85,7 +86,7 @@ public:
     LuaComponent lua{audioProcessor, *this};
     TxtComponent txtFont{audioProcessor, *this};
 
-    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500, VISUALISER_SETTINGS_HEIGHT);
+    SettingsWindow visualiserSettingsWindow = SettingsWindow("Visualiser Settings", visualiserSettings, 550, 500, 1500);
 
     osci::LuaConsoleComponent console;
 

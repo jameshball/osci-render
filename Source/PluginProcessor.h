@@ -39,6 +39,21 @@
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
 
+class MidiInputChannelParameter : public osci::IntParameter {
+public:
+    MidiInputChannelParameter() : osci::IntParameter("MIDI Input Channel", "midiInputChannel", VERSION_HINT, 0, 0, 16) {}
+
+    juce::String getText(float value, int maximumStringLength) const override {
+        const int channel = (int)getUnnormalisedValue(value);
+        const juce::String text = channel == 0 ? "Omni" : "Channel " + juce::String(channel);
+        return text.substring(0, maximumStringLength);
+    }
+
+    float getValueForText(const juce::String& text) const override {
+        return getNormalisedValue(text.equalsIgnoreCase("Omni") ? 0 : text.getTrailingIntValue());
+    }
+};
+
 //==============================================================================
 
 // Central 60 Hz timer that drives modulation display updates (LFO overlays,
@@ -214,6 +229,7 @@ public:
     juce::MidiKeyboardState keyboardState;
 
     osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+    MidiInputChannelParameter* midiInputChannel = new MidiInputChannelParameter();
 
     // 1..100 maps to file index with a 1-based offset (1 = first file, 2 = second, ...). Intended for DAW automation.
     osci::IntParameter* fileSelect = new osci::IntParameter("File Select", "fileSelect", VERSION_HINT, 1, 1, 100);
@@ -233,6 +249,7 @@ public:
 
     // Number of MIDI notes currently held. Audio-thread only.
     int getNumPressedNotes() const;
+    void sendMidiPanic(bool immediate);
 
     // Frequency of the globally-last-played note (before the current noteOn).
     // Used as glide source so any voice can portamento from the last note.
@@ -252,6 +269,9 @@ public:
     osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
+    osci::BooleanParameter* swapXYOutput = new osci::BooleanParameter("Swap X/Y Output", "swapXYOutput", VERSION_HINT, false, "Swaps the physical X and Y audio output channels.");
+    osci::BooleanParameter* invertXOutput = new osci::BooleanParameter("Invert X Output", "invertXOutput", VERSION_HINT, false, "Inverts the polarity of the physical X audio output.");
+    osci::BooleanParameter* invertYOutput = new osci::BooleanParameter("Invert Y Output", "invertYOutput", VERSION_HINT, false, "Inverts the polarity of the physical Y audio output.");
     std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Image Threshold",
@@ -322,6 +342,8 @@ private:
     juce::AudioBuffer<float> inputBuffer;
     juce::AudioBuffer<float> inputFrequencyBuffer;
     juce::AudioBuffer<float> outputBuffer3d;
+    juce::MidiBuffer filteredMidiMessages;
+    int previousMidiInputChannel = 0;
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 

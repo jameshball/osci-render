@@ -102,6 +102,14 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
             recentProjectFiles.restoreFromString(savedRecent);
     }
 
+    recentRecordingFiles.setMaxNumberOfItems(10);
+    {
+        const auto savedRecordings = globalSettings.getString("recentRecordingFiles");
+        if (savedRecordings.isNotEmpty()) {
+            recentRecordingFiles.restoreFromString(savedRecordings);
+        }
+    }
+
     // locking isn't necessary here because we are in the constructor
 
     for (auto effect : visualiserParameters.effects) {
@@ -197,6 +205,41 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
                                                    showFullPaths,
                                                    dontAddNonExistentFiles,
                                                    nullptr);
+}
+
+void CommonAudioProcessor::clearRecentProjectFiles() {
+    recentProjectFiles.clear();
+    globalSettings.set("recentProjectFiles", juce::String());
+    globalSettings.save();
+}
+
+void CommonAudioProcessor::recordingExportCompleted(const juce::File& file) {
+    if (file == juce::File()) {
+        return;
+    }
+
+    recentRecordingFiles.addFile(file);
+    globalSettings.set("recentRecordingFiles", recentRecordingFiles.toString());
+    globalSettings.save();
+    if (globalSettings.getBool("showVideoAfterExport", false)) {
+        file.revealToUser();
+    }
+}
+
+juce::File CommonAudioProcessor::getRecentRecordingFile(int index) const {
+    return recentRecordingFiles.getFile(index);
+}
+
+int CommonAudioProcessor::createRecentRecordingsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo, int baseItemId) {
+    const auto before = recentRecordingFiles.toString();
+    recentRecordingFiles.removeNonExistentFiles();
+    const auto after = recentRecordingFiles.toString();
+    if (after != before) {
+        globalSettings.set("recentRecordingFiles", after);
+        globalSettings.save();
+    }
+
+    return recentRecordingFiles.createPopupMenuItems(menuToAddItemsTo, baseItemId, false, true, nullptr);
 }
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const

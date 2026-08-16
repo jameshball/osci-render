@@ -330,7 +330,9 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
                         // Check both fullscreen or pop-out mode
                         if (timerId == newTimerId && (fullScreen || this->parent != nullptr)) {
                             hideButtonRow = true;
-                            setMouseCursor(juce::MouseCursor::NoCursor);
+                            if (fullScreen) {
+                                setMouseCursor(juce::MouseCursor::NoCursor);
+                            }
                             resized();
                         }
                     }
@@ -503,7 +505,9 @@ void VisualiserComponent::setRecording(bool recording) {
         audioRecorder.stop();
         juce::String extension = "wav";
 #endif
-        chooser = std::make_unique<juce::FileChooser>("Save recording", audioProcessor.getLastOpenedDirectory(), "*." + extension);
+        const auto timestamp = juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S");
+        const auto suggestedFile = audioProcessor.getLastOpenedDirectory().getChildFile(editor.appName + "_" + timestamp + "." + extension);
+        chooser = std::make_unique<juce::FileChooser>("Save recording", suggestedFile, "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if OSCI_PREMIUM
@@ -515,19 +519,24 @@ void VisualiserComponent::setRecording(bool recording) {
                     file = file.withFileExtension(extension);
                 }
 
+                bool saved = false;
                 if (wasRecordingAudio && wasRecordingVideo) {
-                    // delete the file if it exists
-                    if (file.existsAsFile()) {
-                        file.deleteFile();
+                    juce::String muxError;
+                    saved = ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile->getFile(), tempAudioFile->getFile(), file, recordingSettings.getAudioCodecArgs(), muxError);
+                    if (!saved && muxError.isNotEmpty()) {
+                        juce::Logger::writeToLog("Recording mux failed: " + muxError.substring(0, 500));
                     }
-                    ffmpegProcess.start("\"" + ffmpegFile.getFullPathName() + "\" -i \"" + tempVideoFile->getFile().getFullPathName() + "\" -i \"" + tempAudioFile->getFile().getFullPathName() + "\" -c:v copy " + recordingSettings.getAudioCodecArgs().joinIntoString(" ") + " -y \"" + file.getFullPathName() + "\"");
-                    ffmpegProcess.close();
                 } else if (wasRecordingAudio) {
-                    tempAudioFile->getFile().copyFileTo(file);
+                    saved = tempAudioFile->getFile().copyFileTo(file);
                 } else if (wasRecordingVideo) {
-                    tempVideoFile->getFile().copyFileTo(file);
+                    saved = tempVideoFile->getFile().copyFileTo(file);
+                }
+                if (!saved) {
+                    osci::showOverlayMessage(*this, "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
+                    return;
                 }
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+                audioProcessor.recordingExportCompleted(file);
             } });
 #else
         chooser->launchAsync(flags, [this, extension](const juce::FileChooser &chooser) {
@@ -538,8 +547,12 @@ void VisualiserComponent::setRecording(bool recording) {
                     file = file.withFileExtension(extension);
                 }
 
-                tempAudioFile->getFile().copyFileTo(file);
+                if (!tempAudioFile->getFile().copyFileTo(file)) {
+                    osci::showOverlayMessage(*this, "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
+                    return;
+                }
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+                audioProcessor.recordingExportCompleted(file);
             } });
 #endif
     }
@@ -650,7 +663,8 @@ void VisualiserComponent::popoutWindow() {
     child = visualiser;
     childUpdated();
     visualiser->setSize(350, 350);
-    popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
+    const auto windowTitle = editor.appName + " - Software Oscilloscope";
+    popout = std::make_unique<VisualiserWindow>(windowTitle, this, isPopoutAlwaysOnTop());
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
@@ -686,6 +700,18 @@ void VisualiserComponent::childUpdated() {
             setRecording(false);
         };
     }
+}
+
+void VisualiserComponent::setPopoutAlwaysOnTop(bool alwaysOnTop) {
+    audioProcessor.globalSettings.set("popoutAlwaysOnTop", alwaysOnTop);
+    audioProcessor.globalSettings.save();
+    if (popout != nullptr) {
+        popout->setPinned(alwaysOnTop);
+    }
+}
+
+bool VisualiserComponent::isPopoutAlwaysOnTop() const {
+    return audioProcessor.globalSettings.getBool("popoutAlwaysOnTop", true);
 }
 
 void VisualiserComponent::prepareOverlayFadeIn() {

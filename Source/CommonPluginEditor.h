@@ -27,6 +27,7 @@ public:
     virtual void openProject();
     void saveProject();
     void saveProjectAs();
+    virtual void resetWindowSizeAndPosition();
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
@@ -53,11 +54,14 @@ public:
     void renderAudioFileToVideo();
     virtual void resetToDefault();
     void toggleFullScreen();
+    bool isFullScreen();
     void resized() override;
     void parentHierarchyChanged() override;
 
 private:
     CommonAudioProcessor& audioProcessor;
+    int defaultEditorWidth = 0;
+    int defaultEditorHeight = 0;
     bool fullScreen = false;
     juce::Rectangle<int> windowedBounds;
 public:
@@ -69,12 +73,6 @@ public:
 
 #if OSCI_PREMIUM
     DownloaderComponent ffmpegDownloader;
-#endif
-
-#if OSCI_PREMIUM
-    int VISUALISER_SETTINGS_HEIGHT = 1300;
-#else
-    int VISUALISER_SETTINGS_HEIGHT = 770;
 #endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3, audioProcessor.recordingParameters);

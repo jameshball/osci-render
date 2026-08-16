@@ -44,14 +44,6 @@ public:
     void setOnFinished(FinishedCallback cb) { onFinished = std::move(cb); }
 
 private:
-    static bool runFfmpegMux(const juce::File& ffmpegExe,
-                             const juce::File& videoInput,
-                             const juce::File& audioInput,
-                             const juce::File& output,
-                             const juce::StringArray& audioCodecArgs,
-                             const std::atomic<bool>& cancelRequested,
-                             juce::String& outError);
-
     class OfflinePreviewRenderer : public VisualiserRenderer
     {
     public:

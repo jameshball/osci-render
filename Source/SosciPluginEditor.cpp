@@ -80,7 +80,6 @@ void SosciPluginEditor::resized() {
         }
 
         auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));
-        visualiserSettings.setSize(settingsArea.getWidth(), VISUALISER_SETTINGS_HEIGHT);
         visualiserSettingsWrapper.setBounds(settingsArea);
 
         if (area.getWidth() < 10) {
