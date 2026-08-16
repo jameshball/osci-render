@@ -55,6 +55,8 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
+    void setPopoutAlwaysOnTop(bool alwaysOnTop);
+    bool isPopoutAlwaysOnTop() const;
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
     void cancelOverlayFadeIn();
@@ -107,6 +109,7 @@ private:
 
     osci::SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton pinButton{"pin", BinaryData::push_pin_svg, osci::Colours::textMuted(), osci::Colours::accentColor()};
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
@@ -157,8 +160,8 @@ private:
 
 class VisualiserWindow : public juce::DocumentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons) {
-        setAlwaysOnTop(true);
+    VisualiserWindow(juce::String name, VisualiserComponent* parent, bool pinned) : juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons), parent(parent), pinned(pinned) {
+        setAlwaysOnTop(pinned);
     }
 
     void closeButtonPressed() override {
@@ -175,7 +178,7 @@ public:
 
     void toggleFullScreen() {
         isFullScreen = !isFullScreen;
-        setAlwaysOnTop(!isFullScreen);
+        setAlwaysOnTop(!isFullScreen && pinned);
 #if JUCE_WINDOWS
         if (isFullScreen) {
             windowedBounds = getBounds();
@@ -196,9 +199,14 @@ public:
     }
 
     bool getIsFullScreen() const { return isFullScreen; }
+    void setPinned(bool shouldBePinned) {
+        pinned = shouldBePinned;
+        setAlwaysOnTop(!isFullScreen && pinned);
+    }
 
 private:
     VisualiserComponent* parent;
     bool isFullScreen = false;
+    bool pinned = true;
     juce::Rectangle<int> windowedBounds;
 };

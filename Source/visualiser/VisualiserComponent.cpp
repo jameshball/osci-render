@@ -86,6 +86,14 @@ VisualiserComponent::VisualiserComponent(
         addAndMakeVisible(popOutButton);
         popOutButton.setTooltip("Opens the oscilloscope in a new window.");
     }
+    if (parent != nullptr) {
+        addAndMakeVisible(pinButton);
+        pinButton.setTooltip("Keep the popout window always on top.");
+        pinButton.setToggleState(parent->isPopoutAlwaysOnTop(), juce::NotificationType::dontSendNotification);
+        pinButton.onClick = [this] {
+            this->parent->setPopoutAlwaysOnTop(pinButton.getToggleState());
+        };
+    }
 #endif
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
@@ -563,6 +571,7 @@ void VisualiserComponent::resized() {
         buttonRow = area.removeFromBottom(0);
         fullScreenButton.setVisible(false);
         popOutButton.setVisible(false);
+        pinButton.setVisible(false);
         settingsButton.setVisible(false);
         audioInputButton.setVisible(false);
         textureOutputButton.setVisible(false);
@@ -582,6 +591,10 @@ void VisualiserComponent::resized() {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
 #if OSCI_PREMIUM
+    if (parent != nullptr) {
+        pinButton.setVisible(true);
+        pinButton.setBounds(buttons.removeFromRight(30));
+    }
     if (child == nullptr && parent == nullptr) {
         popOutButton.setVisible(true);
         popOutButton.setBounds(buttons.removeFromRight(30));
@@ -654,7 +667,8 @@ void VisualiserComponent::popoutWindow() {
     child = visualiser;
     childUpdated();
     visualiser->setSize(350, 350);
-    popout = std::make_unique<VisualiserWindow>("Software Oscilloscope", this);
+    const auto windowTitle = editor.appName == "sosci" ? "sosci Software Oscilloscope" : "Software Oscilloscope";
+    popout = std::make_unique<VisualiserWindow>(windowTitle, this, isPopoutAlwaysOnTop());
     popout->setContentOwned(visualiser, true);
     popout->setUsingNativeTitleBar(true);
     popout->setResizable(true, false);
@@ -690,6 +704,21 @@ void VisualiserComponent::childUpdated() {
             setRecording(false);
         };
     }
+}
+
+void VisualiserComponent::setPopoutAlwaysOnTop(bool alwaysOnTop) {
+    audioProcessor.globalSettings.set("popoutAlwaysOnTop", alwaysOnTop);
+    audioProcessor.globalSettings.save();
+    if (popout != nullptr) {
+        popout->setPinned(alwaysOnTop);
+    }
+    if (child != nullptr) {
+        child->pinButton.setToggleState(alwaysOnTop, juce::NotificationType::dontSendNotification);
+    }
+}
+
+bool VisualiserComponent::isPopoutAlwaysOnTop() const {
+    return audioProcessor.globalSettings.getBool("popoutAlwaysOnTop", true);
 }
 
 void VisualiserComponent::prepareOverlayFadeIn() {
