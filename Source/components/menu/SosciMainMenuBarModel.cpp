@@ -10,7 +10,9 @@ SosciMainMenuBarModel::SosciMainMenuBarModel(SosciPluginEditor& e, SosciAudioPro
 void SosciMainMenuBarModel::resetMenuItems() {
     MainMenuBarModel::resetMenuItems();
 
+    constexpr int CLEAR_RECENT_PROJECTS_ID = 900;
     constexpr int RECENT_BASE_ID = 1000;
+    constexpr int RECENT_RECORDING_BASE_ID = 2000;
 
     addTopLevelMenu("File");
     addTopLevelMenu("Edit");
@@ -35,17 +37,32 @@ void SosciMainMenuBarModel::resetMenuItems() {
     };
 
     // This is a hack - ideally I would improve the MainMenuBarModel class to allow for submenus
-    customMenuLogic = [this, examples](juce::PopupMenu& menu, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
+    customMenuLogic = [this, examples, fileMenu, videoMenu](juce::PopupMenu& menu, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == videoMenu) {
+            juce::PopupMenu recordingsMenu;
+            const int added = processor.createRecentRecordingsPopupMenuItems(recordingsMenu, RECENT_RECORDING_BASE_ID);
+            if (added == 0) {
+                recordingsMenu.addItem(RECENT_RECORDING_BASE_ID, "(No Recent Recordings)", false);
+            }
+            menu.addSubMenu("Recent Recordings", recordingsMenu);
+            menu.addSeparator();
             return;
+        }
+
+        if (topLevelMenuIndex != fileMenu) {
+            return;
+        }
 
         juce::PopupMenu recentMenu;
         const int added = processor.createRecentProjectsPopupMenuItems(recentMenu,
                                                                        RECENT_BASE_ID,
                                                                        true,
                                                                        true);
-        if (added == 0)
+        if (added == 0) {
             recentMenu.addItem(RECENT_BASE_ID, "(No Recent Projects)", false);
+        }
+        recentMenu.addSeparator();
+        recentMenu.addItem(CLEAR_RECENT_PROJECTS_ID, "Clear Recent Projects", added > 0);
 
         menu.addSubMenu("Open Recent", recentMenu);
 
@@ -58,9 +75,23 @@ void SosciMainMenuBarModel::resetMenuItems() {
         menu.addSeparator();
     };
 
-    customMenuSelectedLogic = [this, examples](int menuItemID, int topLevelMenuIndex) {
-        if (topLevelMenuIndex != 0)
+    customMenuSelectedLogic = [this, examples, fileMenu, videoMenu](int menuItemID, int topLevelMenuIndex) {
+        if (topLevelMenuIndex == videoMenu && menuItemID >= RECENT_RECORDING_BASE_ID && menuItemID < RECENT_RECORDING_BASE_ID + 10) {
+            const auto file = processor.getRecentRecordingFile(menuItemID - RECENT_RECORDING_BASE_ID);
+            if (file.existsAsFile()) {
+                file.startAsProcess();
+            }
+            return true;
+        }
+
+        if (topLevelMenuIndex != fileMenu) {
             return false;
+        }
+
+        if (menuItemID == CLEAR_RECENT_PROJECTS_ID) {
+            processor.clearRecentProjectFiles();
+            return true;
+        }
 
         if (menuItemID >= RECENT_BASE_ID) {
             const int index = menuItemID - RECENT_BASE_ID;
@@ -90,11 +121,11 @@ void SosciMainMenuBarModel::resetMenuItems() {
             }
         });
     });
-    addMenuItem(fileMenu, "Open Project", [&]() { editor.openProject(); });
-    addMenuItem(fileMenu, "Save Project", [&]() { editor.saveProject(); });
-    addMenuItem(fileMenu, "Save Project As", [&]() { editor.saveProjectAs(); });
+    addMenuItem(fileMenu, "Open Project", [&]() { editor.openProject(); }, JUCE_MAC ? "Cmd+O" : "Ctrl+O");
+    addMenuItem(fileMenu, "Save Project", [&]() { editor.saveProject(); }, JUCE_MAC ? "Cmd+S" : "Ctrl+S");
+    addMenuItem(fileMenu, "Save Project As", [&]() { editor.saveProjectAs(); }, JUCE_MAC ? "Cmd+Shift+S" : "Ctrl+Shift+S");
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(fileMenu, "Create New Project", [&]() { editor.resetToDefault(); });
+        addMenuItem(fileMenu, "Create New Project", [&]() { editor.resetToDefault(); }, JUCE_MAC ? "Cmd+N" : "Ctrl+N");
     }
 
     addEditMenuItems(editMenu, processor);
@@ -137,12 +168,18 @@ void SosciMainMenuBarModel::resetMenuItems() {
     });
     addDiagnosticsMenuItems(aboutMenu, processor);
 
-    addMenuItem(videoMenu, "Settings...", [this] {
-        editor.openRecordingSettings();
-    });
-
     addMenuItem(videoMenu, "Render Audio File to Video...", [this] {
         editor.renderAudioFileToVideo();
+    });
+    addToggleMenuItem(videoMenu, "Show Video After Export", [this] {
+        const bool enabled = processor.globalSettings.getBool("showVideoAfterExport", false);
+        processor.globalSettings.set("showVideoAfterExport", !enabled);
+        processor.globalSettings.save();
+        resetMenuItems();
+    }, [this] { return processor.globalSettings.getBool("showVideoAfterExport", false); });
+    addMenuSeparator(videoMenu);
+    addMenuItem(videoMenu, "Recording Settings...", [this] {
+        editor.openRecordingSettings();
     });
 
     addMenuItem(audioMenu, "Force Disable Brightness Input", [&]() {
@@ -162,10 +199,18 @@ void SosciMainMenuBarModel::resetMenuItems() {
         menuItemsChanged();
     });
 
+    addToggleMenuItem(audioMenu, "Mute", [this] {
+        processor.muteParameter->setBoolValueNotifyingHost(!processor.muteParameter->getBoolValue());
+    }, [this] { return processor.muteParameter->getBoolValue(); }, JUCE_MAC ? "Cmd+Shift+M" : "Ctrl+Shift+M");
     if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        addMenuSeparator(audioMenu);
         addMenuItem(audioMenu, "Settings...", [&]() { editor.openAudioSettings(); });
     }
 
     // Interface menu
     addListenForSpecialKeysMenuItem(interfaceMenu, processor);
+    if (editor.processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
+        addToggleMenuItem(interfaceMenu, "Full Screen", [this] { editor.toggleFullScreen(); }, [this] { return editor.isFullScreen(); }, "F11");
+        addMenuItem(interfaceMenu, "Reset Window Size and Position", [this] { editor.resetWindowSizeAndPosition(); });
+    }
 }

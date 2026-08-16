@@ -38,6 +38,7 @@ public:
     void openProject(const juce::File& file) override;
     void openProject() override;
     void resetToDefault() override;
+    void resetWindowSizeAndPosition() override;
     void setTextureInputSource(osci::texture::SourceInfo source);
     void stopTextureInput();
     bool isTextureInputActive() const;

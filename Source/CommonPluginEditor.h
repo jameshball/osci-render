@@ -27,6 +27,7 @@ public:
     virtual void openProject();
     void saveProject();
     void saveProjectAs();
+    virtual void resetWindowSizeAndPosition();
     void updateTitle();
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
@@ -53,11 +54,14 @@ public:
     void renderAudioFileToVideo();
     virtual void resetToDefault();
     void toggleFullScreen();
+    bool isFullScreen();
     void resized() override;
     void parentHierarchyChanged() override;
 
 private:
     CommonAudioProcessor& audioProcessor;
+    int defaultEditorWidth = 0;
+    int defaultEditorHeight = 0;
     bool fullScreen = false;
     juce::Rectangle<int> windowedBounds;
 public:

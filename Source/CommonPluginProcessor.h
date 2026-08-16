@@ -37,6 +37,10 @@ public:
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
     void getPortableProjectSnapshot(juce::MemoryBlock& destData);
+    void clearRecentProjectFiles();
+    void recordingExportCompleted(const juce::File& file);
+    juce::File getRecentRecordingFile(int index) const;
+    int createRecentRecordingsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo, int baseItemId);
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override final;
     void releaseResources() override;
@@ -265,6 +269,7 @@ protected:
     std::unique_ptr<juce::FileLogger> fileLogger;
 
     juce::RecentlyOpenedFilesList recentProjectFiles;
+    juce::RecentlyOpenedFilesList recentRecordingFiles;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)
