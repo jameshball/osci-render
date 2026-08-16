@@ -503,7 +503,9 @@ void VisualiserComponent::setRecording(bool recording) {
         audioRecorder.stop();
         juce::String extension = "wav";
 #endif
-        chooser = std::make_unique<juce::FileChooser>("Save recording", audioProcessor.getLastOpenedDirectory(), "*." + extension);
+        const auto timestamp = juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S");
+        const auto suggestedFile = audioProcessor.getLastOpenedDirectory().getChildFile(editor.appName + "_" + timestamp + "." + extension);
+        chooser = std::make_unique<juce::FileChooser>("Save recording", suggestedFile, "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
 
 #if OSCI_PREMIUM
@@ -528,6 +530,7 @@ void VisualiserComponent::setRecording(bool recording) {
                     tempVideoFile->getFile().copyFileTo(file);
                 }
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+                audioProcessor.recordingExportCompleted(file);
             } });
 #else
         chooser->launchAsync(flags, [this, extension](const juce::FileChooser &chooser) {
@@ -540,6 +543,7 @@ void VisualiserComponent::setRecording(bool recording) {
 
                 tempAudioFile->getFile().copyFileTo(file);
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+                audioProcessor.recordingExportCompleted(file);
             } });
 #endif
     }

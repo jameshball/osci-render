@@ -18,7 +18,7 @@ const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 }
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-    : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
+    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType)
 {
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
@@ -320,6 +320,18 @@ bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
         return true;
+    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'N' && juce::JUCEApplicationBase::isStandaloneApp()) {
+        resetToDefault();
+        return true;
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'M') {
+        audioProcessor.muteParameter->setBoolValueNotifyingHost(!audioProcessor.muteParameter->getBoolValue());
+        return true;
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+        toggleFullScreen();
+        return true;
+    } else if (key.isKeyCode(juce::KeyPress::escapeKey) && isFullScreen()) {
+        toggleFullScreen();
+        return true;
     }
     return false;
 }
@@ -332,18 +344,6 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
     // Other special keys gated by user preference
     if (!audioProcessor.getAcceptsKeys()) return false;
 
-    if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
-#if OSCI_PREMIUM
-        toggleFullScreen();
-        return true;
-#endif
-    } else if (key.isKeyCode(juce::KeyPress::escapeKey) && juce::JUCEApplicationBase::isStandaloneApp()) {
-        if (fullScreen) {
-            toggleFullScreen();
-            return true;
-        }
-    }
-
     return false;
 }
 
@@ -355,9 +355,11 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key, juce::Component*)
 void CommonPluginEditor::openProject(const juce::File& file) {
     if (file != juce::File()) {
         auto data = juce::MemoryBlock();
-        if (file.loadFileAsData(data)) {
-            audioProcessor.setStateInformation(data.getData(), data.getSize());
+        if (!file.loadFileAsData(data)) {
+            osci::showOverlayMessage(*this, "Open Project Failed", "Could not read:\n" + file.getFullPathName());
+            return;
         }
+        audioProcessor.setStateInformation(data.getData(), data.getSize());
         audioProcessor.currentProjectFile = file.getFullPathName();
         audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
         audioProcessor.addRecentProjectFile(file);
@@ -384,8 +386,10 @@ void CommonPluginEditor::saveProject() {
         auto data = juce::MemoryBlock();
         audioProcessor.getStateInformation(data);
         auto file = juce::File(audioProcessor.currentProjectFile);
-        file.create();
-        file.replaceWithData(data.getData(), data.getSize());
+        if (!file.replaceWithData(data.getData(), data.getSize())) {
+            osci::showOverlayMessage(*this, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
+            return;
+        }
         updateTitle();
     }
 }
@@ -401,12 +405,28 @@ void CommonPluginEditor::saveProjectAs() {
 
         auto file = chooser.getResult();
         if (file != juce::File()) {
+            if (!file.hasFileExtension(safeThis->projectFileType)) {
+                file = file.withFileExtension(safeThis->projectFileType);
+            }
             safeThis->audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             safeThis->audioProcessor.currentProjectFile = file.getFullPathName();
             safeThis->audioProcessor.addRecentProjectFile(file);
             safeThis->saveProject();
         }
     });
+}
+
+void CommonPluginEditor::resetWindowSizeAndPosition() {
+    auto* standaloneWindow = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    if (standaloneWindow != nullptr) {
+        standaloneWindow->setFullScreen(false);
+    }
+    fullScreen = false;
+    setSize(defaultEditorWidth, defaultEditorHeight);
+    auto* window = getTopLevelComponent();
+    if (window != nullptr && window != this) {
+        window->centreWithSize(window->getWidth(), window->getHeight());
+    }
 }
 
 void CommonPluginEditor::updateTitle() {
@@ -589,7 +609,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
             content->setSize(700, 520);
 
-            content->setOnFinished([safeThis, resultHolder, overlayHolder](OfflineAudioToVideoRendererComponent::Result r) {
+            content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile](OfflineAudioToVideoRendererComponent::Result r) {
                 if (safeThis == nullptr) {
                     offlineRenderLog.cancelled("result delivery because editor closed");
                     return;
@@ -599,6 +619,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
                 if (r.success) {
                     offlineRenderLog.completed();
+                    safeThis->audioProcessor.recordingExportCompleted(outputFile);
                 } else if (r.cancelled) {
                     offlineRenderLog.cancelled("render");
                 } else {
@@ -653,7 +674,7 @@ void CommonPluginEditor::toggleFullScreen() {
 #if JUCE_WINDOWS
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !fullScreen;
+        fullScreen = !window->isFullScreen();
 
         if (fullScreen) {
             // Store the current window bounds before going fullscreen
@@ -679,8 +700,13 @@ void CommonPluginEditor::toggleFullScreen() {
 #else
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !fullScreen;
+        fullScreen = !window->isFullScreen();
         window->setFullScreen(fullScreen);
     }
 #endif
+}
+
+bool CommonPluginEditor::isFullScreen() {
+    auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    return window != nullptr && window->isFullScreen();
 }
