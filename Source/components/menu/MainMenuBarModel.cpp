@@ -3,6 +3,16 @@
 #include "../../CommonPluginEditor.h"
 #include "../../CommonPluginProcessor.h"
 
+namespace {
+juce::String commandShortcut(const juce::String& keys) {
+#if JUCE_MAC
+    return "Cmd+" + keys;
+#else
+    return "Ctrl+" + keys;
+#endif
+}
+}
+
 MainMenuBarModel::MainMenuBarModel() {}
 
 MainMenuBarModel::~MainMenuBarModel() {}
@@ -78,11 +88,11 @@ void MainMenuBarModel::addListenForSpecialKeysMenuItem(int topLevelMenuIndex, Co
 }
 
 void MainMenuBarModel::addProjectMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
-    addMenuItem(topLevelMenuIndex, "Open Project", [&editor] { editor.openProject(); }, JUCE_MAC ? "Cmd+O" : "Ctrl+O");
-    addMenuItem(topLevelMenuIndex, "Save Project", [&editor] { editor.saveProject(); }, JUCE_MAC ? "Cmd+S" : "Ctrl+S");
-    addMenuItem(topLevelMenuIndex, "Save Project As", [&editor] { editor.saveProjectAs(); }, JUCE_MAC ? "Cmd+Shift+S" : "Ctrl+Shift+S");
+    addMenuItem(topLevelMenuIndex, "Open Project", [&editor] { editor.openProject(); }, commandShortcut("O"));
+    addMenuItem(topLevelMenuIndex, "Save Project", [&editor] { editor.saveProject(); }, commandShortcut("S"));
+    addMenuItem(topLevelMenuIndex, "Save Project As", [&editor] { editor.saveProjectAs(); }, commandShortcut("Shift+S"));
     if (processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(topLevelMenuIndex, "Create New Project", [&editor] { editor.resetToDefault(); }, JUCE_MAC ? "Cmd+N" : "Ctrl+N");
+        addMenuItem(topLevelMenuIndex, "Create New Project", [&editor] { editor.resetToDefault(); }, commandShortcut("N"));
     }
 }
 
@@ -147,7 +157,7 @@ void MainMenuBarModel::addRecordingPreferencesMenuItems(int topLevelMenuIndex, C
 void MainMenuBarModel::addMuteMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor) {
     addToggleMenuItem(topLevelMenuIndex, "Mute", [&processor] {
         processor.muteParameter->setBoolValueNotifyingHost(!processor.muteParameter->getBoolValue());
-    }, [&processor] { return processor.muteParameter->getBoolValue(); }, JUCE_MAC ? "Cmd+Shift+M" : "Ctrl+Shift+M");
+    }, [&processor] { return processor.muteParameter->getBoolValue(); }, commandShortcut("Shift+M"));
 }
 
 void MainMenuBarModel::addStandaloneAudioSettingsMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
