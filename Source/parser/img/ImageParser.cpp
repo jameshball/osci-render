@@ -1,7 +1,7 @@
 #include "ImageParser.h"
 #include "../../../modules/gifdec/gifdec.h"
 #include "../../PluginProcessor.h"
-#include "../../CommonPluginEditor.h"
+#include "../../OscilloscopePluginEditorBase.h"
 #include "../../components/OverlayDialogHelpers.h"
 #include "../../video/FFmpegMediaInfo.h"
 #include "../FileFormatRegistry.h"
@@ -400,7 +400,7 @@ ImageParser::~ImageParser() {
 }
 
 void ImageParser::handleError(juce::String message) {
-    juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor()));
+    juce::Component::SafePointer<OscilloscopePluginEditorBase> editor(dynamic_cast<OscilloscopePluginEditorBase*>(audioProcessor.getActiveEditor()));
     juce::MessageManager::callAsync([editor, message] {
         osci::showOverlayMessageOrAlert(editor.getComponent(),
             "Error",

@@ -5,7 +5,7 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.9.4.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;OSCI_STANDALONE_MUTE_INPUT_BY_DEFAULT=0&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -626,10 +626,10 @@
         <FILE id="FbRptH" name="FeedbackReportBuilder.h" compile="0" resource="0"
               file="Source/feedback/FeedbackReportBuilder.h"/>
       </GROUP>
-      <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
-            file="Source/CommonPluginEditor.cpp"/>
-      <FILE id="nKwxzJ" name="CommonPluginEditor.h" compile="0" resource="0"
-            file="Source/CommonPluginEditor.h"/>
+      <FILE id="fWbyS1" name="OscilloscopePluginEditorBase.cpp" compile="1"
+            resource="0" file="Source/OscilloscopePluginEditorBase.cpp"/>
+      <FILE id="nKwxzJ" name="OscilloscopePluginEditorBase.h" compile="0"
+            resource="0" file="Source/OscilloscopePluginEditorBase.h"/>
       <FILE id="fg6MpN" name="CommonPluginProcessor.cpp" compile="1" resource="0"
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
@@ -649,6 +649,12 @@
             file="Source/PluginProcessor.cpp"/>
       <FILE id="G4mTsK" name="PluginProcessor.h" compile="0" resource="0"
             file="Source/PluginProcessor.h"/>
+      <GROUP id="{OSCI_RENDER_LASER}" name="laser">
+        <FILE id="OrLasA" name="OscirenderLaserAdapter.cpp" compile="1" resource="0"
+              file="Source/laser/OscirenderLaserAdapter.cpp"/>
+        <FILE id="OrLasH" name="OscirenderLaserAdapter.h" compile="0" resource="0"
+              file="Source/laser/OscirenderLaserAdapter.h"/>
+      </GROUP>
       <GROUP id="{UTIL}" name="util">
         <FILE id="cFVaxu" name="MathUtil.h" compile="0" resource="0" file="Source/util/MathUtil.h"/>
       </GROUP>
@@ -658,7 +664,7 @@
                JUCE_WEB_BROWSER="0" JUCE_ASIO="1" JUCE_ENABLE_LIVE_CONSTANT_EDITOR="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-render/LinuxMakefile" smallIcon="Jk6VkC"
-                bigIcon="Jk6VkC" externalLibraries="luajit">
+                bigIcon="Jk6VkC" externalLibraries="luajit" extraLinkerFlags="../../../modules/laser_dac_c/artifacts/idn-client/release/liblaser_dac_c.a -ldl -lpthread -lm">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
                        libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
@@ -702,11 +708,13 @@
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_settings" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-render/VisualStudio2022" smallIcon="Jk6VkC"
             bigIcon="Jk6VkC" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
-            extraLinkerFlags="/IGNORE:4006" externalLibraries="luajit51.lib">
+            extraLinkerFlags="/IGNORE:4006 ..\..\..\modules\laser_dac_c\artifacts\idn-client\release\laser_dac_c.lib ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib"
+            externalLibraries="luajit51.lib">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-render" winWarningLevel="2"
                        libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
@@ -755,9 +763,10 @@
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_settings" path="modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
+    <XCODE_MAC targetFolder="Builds/osci-render/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak -Wl,-no_compact_unwind $(PROJECT_DIR)/../../../modules/laser_dac_c/artifacts/idn-client-macos-universal/liblaser_dac_c.a"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="aZXbCi"
                bigIcon="aZXbCi" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
@@ -818,6 +827,7 @@
         <MODULEPATH id="jucewright" path="modules/jucewright"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_settings" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>
@@ -860,6 +870,7 @@
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_settings" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>

@@ -1,17 +1,7 @@
 #include "MainMenuBarModel.h"
 
-#include "../../CommonPluginEditor.h"
+#include "../../OscilloscopePluginEditorBase.h"
 #include "../../CommonPluginProcessor.h"
-
-namespace {
-juce::String commandShortcut(const juce::String& keys) {
-#if JUCE_MAC
-    return "Cmd+" + keys;
-#else
-    return "Ctrl+" + keys;
-#endif
-}
-}
 
 MainMenuBarModel::MainMenuBarModel() {}
 
@@ -63,7 +53,7 @@ void MainMenuBarModel::addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudi
     });
 }
 
-void MainMenuBarModel::addSupportMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
+void MainMenuBarModel::addSupportMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, OscilloscopePluginEditorBase& editor) {
     addMenuItem(topLevelMenuIndex, "License and Updates...", [&editor] { editor.openLicenseAndUpdates(); });
     addMenuItem(topLevelMenuIndex, "Send Feedback...", [&editor] { editor.openFeedback(); });
     addDiagnosticsMenuItems(topLevelMenuIndex, processor);
@@ -87,12 +77,12 @@ void MainMenuBarModel::addListenForSpecialKeysMenuItem(int topLevelMenuIndex, Co
     }, [&processor] { return processor.getAcceptsKeys(); });
 }
 
-void MainMenuBarModel::addProjectMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
-    addMenuItem(topLevelMenuIndex, "Open Project", [&editor] { editor.openProject(); }, commandShortcut("O"));
-    addMenuItem(topLevelMenuIndex, "Save Project", [&editor] { editor.saveProject(); }, commandShortcut("S"));
-    addMenuItem(topLevelMenuIndex, "Save Project As", [&editor] { editor.saveProjectAs(); }, commandShortcut("Shift+S"));
+void MainMenuBarModel::addProjectMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, OscilloscopePluginEditorBase& editor) {
+    addMenuItem(topLevelMenuIndex, "Open Project", [&editor] { editor.openProject(); }, JUCE_MAC ? "Cmd+O" : "Ctrl+O");
+    addMenuItem(topLevelMenuIndex, "Save Project", [&editor] { editor.saveProject(); }, JUCE_MAC ? "Cmd+S" : "Ctrl+S");
+    addMenuItem(topLevelMenuIndex, "Save Project As", [&editor] { editor.saveProjectAs(); }, JUCE_MAC ? "Cmd+Shift+S" : "Ctrl+Shift+S");
     if (processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
-        addMenuItem(topLevelMenuIndex, "Create New Project", [&editor] { editor.resetToDefault(); }, commandShortcut("N"));
+        addMenuItem(topLevelMenuIndex, "Create New Project", [&editor] { editor.resetToDefault(); }, JUCE_MAC ? "Cmd+N" : "Ctrl+N");
     }
 }
 
@@ -107,7 +97,7 @@ void MainMenuBarModel::addRecentProjectsSubmenu(juce::PopupMenu& menu, CommonAud
     menu.addSubMenu("Open Recent", recentMenu);
 }
 
-bool MainMenuBarModel::handleRecentProjectMenuItem(int menuItemId, CommonAudioProcessor& processor, CommonPluginEditor& editor, int recentBaseId, int clearRecentId) {
+bool MainMenuBarModel::handleRecentProjectMenuItem(int menuItemId, CommonAudioProcessor& processor, OscilloscopePluginEditorBase& editor, int recentBaseId, int clearRecentId) {
     if (menuItemId == clearRecentId) {
         processor.clearRecentProjectFiles();
         return true;
@@ -144,7 +134,7 @@ bool MainMenuBarModel::handleRecentRecordingMenuItem(int menuItemId, CommonAudio
     return true;
 }
 
-void MainMenuBarModel::addRecordingPreferencesMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
+void MainMenuBarModel::addRecordingPreferencesMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, OscilloscopePluginEditorBase& editor) {
     addToggleMenuItem(topLevelMenuIndex, "Show Video After Export", [&processor] {
         const bool enabled = processor.globalSettings.getBool("showVideoAfterExport", false);
         processor.globalSettings.set("showVideoAfterExport", !enabled);
@@ -157,17 +147,17 @@ void MainMenuBarModel::addRecordingPreferencesMenuItems(int topLevelMenuIndex, C
 void MainMenuBarModel::addMuteMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor) {
     addToggleMenuItem(topLevelMenuIndex, "Mute", [&processor] {
         processor.muteParameter->setBoolValueNotifyingHost(!processor.muteParameter->getBoolValue());
-    }, [&processor] { return processor.muteParameter->getBoolValue(); }, commandShortcut("Shift+M"));
+    }, [&processor] { return processor.muteParameter->getBoolValue(); }, JUCE_MAC ? "Cmd+Shift+M" : "Ctrl+Shift+M");
 }
 
-void MainMenuBarModel::addStandaloneAudioSettingsMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
+void MainMenuBarModel::addStandaloneAudioSettingsMenuItem(int topLevelMenuIndex, CommonAudioProcessor& processor, OscilloscopePluginEditorBase& editor) {
     if (processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addMenuSeparator(topLevelMenuIndex);
         addMenuItem(topLevelMenuIndex, "Settings...", [&editor] { editor.openAudioSettings(); });
     }
 }
 
-void MainMenuBarModel::addCommonInterfaceMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
+void MainMenuBarModel::addCommonInterfaceMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, OscilloscopePluginEditorBase& editor) {
     addListenForSpecialKeysMenuItem(topLevelMenuIndex, processor);
 #if OSCI_PREMIUM
     addToggleMenuItem(topLevelMenuIndex, "Keep Oscilloscope Window on Top", [&editor] {

@@ -1,7 +1,7 @@
 #include "FileParser.h"
 #include "FileFormatRegistry.h"
 #include <numbers>
-#include "../CommonPluginEditor.h"
+#include "../OscilloscopePluginEditorBase.h"
 #include "../PluginProcessor.h"
 #include "../components/OverlayDialogHelpers.h"
 
@@ -25,7 +25,7 @@ bool looksLikeLottieJson(const juce::String& jsonContent) {
 }
 
 void showLottieLoadError(OscirenderAudioProcessor& processor, juce::String title, juce::String message) {
-	juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(processor.getActiveEditor()));
+	juce::Component::SafePointer<OscilloscopePluginEditorBase> editor(dynamic_cast<OscilloscopePluginEditorBase*>(processor.getActiveEditor()));
 	juce::MessageManager::callAsync([editor, title = std::move(title), message = std::move(message)] {
 		osci::showOverlayMessageOrAlert(editor.getComponent(),
 			title,
@@ -70,7 +70,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may take a long time to open.\n\nWould you like to continue loading it?";
 	
 	juce::MessageManager::callAsync([this, message, callback]() {
-		auto* editor = dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor());
+		auto* editor = dynamic_cast<OscilloscopePluginEditorBase*>(audioProcessor.getActiveEditor());
 		osci::showOverlayConfirmationOrAlert(
 			editor,
 			"Large File",
@@ -189,7 +189,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		wav = std::make_shared<WavParser>([this] { return audioProcessor.currentSampleRate.load(); });
 		if (!wav->parse(std::move(stream))) {
 			juce::MessageManager::callAsync([this, fileName] {
-				auto* editor = dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor());
+				auto* editor = dynamic_cast<OscilloscopePluginEditorBase*>(audioProcessor.getActiveEditor());
 				osci::showOverlayMessageOrAlert(editor,
 					"Error Loading " + fileName,
 					"The audio file '" + fileName + "' could not be loaded.",

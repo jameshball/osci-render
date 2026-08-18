@@ -23,11 +23,11 @@ from .constants import (
     TEXT_EXAMPLES,
 )
 from .controls import ControlDiscoveryMixin
-from .errors import StepError
+from jucewright_browser.errors import StepError
 from .feedback_mock import FeedbackMockServer
-from .platform_support import is_executable
-from .session import BrowserSession
-from .utils import bool_text, slug, walk_tree
+from jucewright_browser.platform_support import is_executable
+from jucewright_browser.session import BrowserSession
+from jucewright_browser.utils import bool_text, slug, walk_tree
 
 
 class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):

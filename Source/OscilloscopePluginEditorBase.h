@@ -9,17 +9,18 @@
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
 #include "components/ProductUpdateConfig.h"
+#include <osci_standalone/osci_standalone.h>
 
 #if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
 #endif
 
-class CommonPluginEditor : public juce::AudioProcessorEditor,
+class OscilloscopePluginEditorBase : public osci::PluginEditorBase,
                            public juce::KeyListener,
                            public osci::OverlayHost {
 public:
-    CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
-    ~CommonPluginEditor() override;
+    OscilloscopePluginEditorBase(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
+    ~OscilloscopePluginEditorBase() override;
 
     void handleCommandLine(const juce::String& commandLine);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
@@ -104,8 +105,6 @@ public:
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
-    juce::SharedResourcePointer<CustomTooltipWindow> tooltipWindow;
-
     osci::UndoRedoComponent undoRedoControls{
         audioProcessor.getUndoManager(),
         juce::String::createStringFromData(BinaryData::undo_svg, BinaryData::undo_svgSize),
@@ -134,5 +133,5 @@ protected:
     std::vector<std::unique_ptr<osci::OverlayComponent>> activeOverlays;
     bool visualiserWasVisibleBeforeOverlay = true;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CommonPluginEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscilloscopePluginEditorBase)
 };

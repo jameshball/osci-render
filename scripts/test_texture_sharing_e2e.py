@@ -17,11 +17,14 @@ from types import SimpleNamespace
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+SHARED_TOOLS = SCRIPT_DIR.parent / "modules" / "osci_standalone" / "tools"
+if str(SHARED_TOOLS) not in sys.path:
+    sys.path.insert(0, str(SHARED_TOOLS))
 
-from jucewright_osci_browser.errors import StepError
-from jucewright_osci_browser.platform_support import is_executable, is_macos, is_windows, user_cache_root
-from jucewright_osci_browser.session import BrowserSession
-from jucewright_osci_browser.utils import slug, walk_tree
+from jucewright_browser.errors import StepError
+from jucewright_browser.platform_support import is_executable, is_macos, is_windows, user_cache_root
+from jucewright_browser.session import BrowserSession
+from jucewright_browser.utils import slug, walk_tree
 
 
 def parse_args() -> argparse.Namespace:

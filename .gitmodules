@@ -27,27 +27,33 @@
 	branch = main
 [submodule "modules/osci_gui"]
 	path = modules/osci_gui
-	url = git@github.com:jameshball/osci_gui.git
+	url = https://github.com/jameshball/osci_gui.git
 	branch = main
 [submodule "modules/jucewright"]
 	path = modules/jucewright
 	url = https://github.com/jameshball/jucewright.git
 [submodule "modules/osci_file_import"]
 	path = modules/osci_file_import
-	url = git@github.com:jameshball/osci_file_import.git
+	url = https://github.com/jameshball/osci_file_import.git
 	branch = main
 [submodule "modules/osci_scripting"]
 	path = modules/osci_scripting
-	url = git@github.com:jameshball/osci_scripting.git
+	url = https://github.com/jameshball/osci_scripting.git
 	branch = main
 [submodule "modules/osci_audio_devices"]
 	path = modules/osci_audio_devices
-	url = git@github.com:jameshball/osci_audio_devices.git
+	url = https://github.com/jameshball/osci_audio_devices.git
 	branch = main
 [submodule "modules/osci_texture_interop"]
 	path = modules/osci_texture_interop
-	url = git@github.com:jameshball/osci_texture_interop.git
+	url = https://github.com/jameshball/osci_texture_interop.git
 	branch = main
 [submodule "modules/osci_standalone"]
 	path = modules/osci_standalone
-	url = git@github.com:jameshball/osci_standalone.git
+	url = https://github.com/jameshball/osci_standalone.git
+[submodule "modules/laser_dac_c"]
+	path = modules/laser_dac_c
+	url = https://github.com/jameshball/laser-dac-c.git
+[submodule "modules/osci_settings"]
+	path = modules/osci_settings
+	url = https://github.com/jameshball/osci_settings.git

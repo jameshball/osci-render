@@ -179,6 +179,7 @@
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_settings" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
   <EXPORTFORMATS>
@@ -213,6 +214,7 @@
         <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
+        <MODULEPATH id="osci_settings" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/Test/VisualStudio2022" extraCompilerFlags="/arch:AVX"
@@ -245,6 +247,7 @@
         <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
+        <MODULEPATH id="osci_settings" path="modules"/>
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/Test/MacOSX" externalLibraries="luajit">
@@ -276,6 +279,7 @@
         <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
         <MODULEPATH id="juce_animation" path="../JUCE/modules"/>
         <MODULEPATH id="melatonin_blur" path="modules"/>
+        <MODULEPATH id="osci_settings" path="modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
   </EXPORTFORMATS>

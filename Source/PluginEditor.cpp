@@ -9,6 +9,9 @@
 #include "parser/FileParser.h"
 #include "components/effects/EffectComponent.h"
 #include "components/OverlayDialogHelpers.h"
+#if OSCI_PREMIUM
+#include "components/ExternalLaserLinkComponent.h"
+#endif
 
 namespace {
     constexpr double kDefaultCodeEditorMainPanelSize = -0.7;
@@ -44,7 +47,7 @@ void OscirenderAudioProcessorEditor::registerFileRemovedCallback() {
     });
 }
 
-OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : CommonPluginEditor(p, "osci-render", "osci", 1100, 770), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
+OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioProcessor& p) : OscilloscopePluginEditorBase(p, "osci-render", "osci", 1100, 770), audioProcessor(p), collapseButton("Collapse", juce::Colours::white, juce::Colours::white, juce::Colours::white) {
     // Create timeline controllers for osci-render
     animationTimelineController = std::make_shared<AnimationTimelineController>(audioProcessor);
     audioTimelineController = std::make_shared<OscirenderAudioTimelineController>(audioProcessor);
@@ -127,6 +130,12 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
     visualiser.closeSettings = [this] {
         visualiserSettingsWindow.setVisible(false);
     };
+
+#if OSCI_PREMIUM
+    visualiser.openLaserWorkspace = [this] {
+        openLaserWorkspace();
+    };
+#endif
 
 #if !OSCI_PREMIUM
     visualiserSettings.onUpgradeRequested = [this] {
@@ -231,16 +240,16 @@ void OscirenderAudioProcessorEditor::openProject(const juce::File& file) {
         stopTextureInput();
     }
 
-    CommonPluginEditor::openProject(file);
+    OscilloscopePluginEditorBase::openProject(file);
 }
 
 void OscirenderAudioProcessorEditor::openProject() {
-    CommonPluginEditor::openProject();
+    OscilloscopePluginEditorBase::openProject();
 }
 
 void OscirenderAudioProcessorEditor::resetToDefault() {
     stopTextureInput();
-    CommonPluginEditor::resetToDefault();
+    OscilloscopePluginEditorBase::resetToDefault();
 }
 
 void OscirenderAudioProcessorEditor::stopTextureInput() {
@@ -443,7 +452,7 @@ void OscirenderAudioProcessorEditor::paint(juce::Graphics& g) {
 }
 
 void OscirenderAudioProcessorEditor::resized() {
-    CommonPluginEditor::resized();
+    OscilloscopePluginEditorBase::resized();
 
     auto area = getLocalBounds();
 
@@ -716,7 +725,7 @@ void OscirenderAudioProcessorEditor::refreshFileUi(juce::String fileName, bool s
 
 // FileController::lock must be held.
 void OscirenderAudioProcessorEditor::refreshFileUiLocked(const juce::String& fileName, bool shouldOpenEditor) {
-    CommonPluginEditor::fileUpdated(fileName);
+    OscilloscopePluginEditorBase::fileUpdated(fileName);
     settings.fileUpdated(fileName);
     updateCodeEditor(isBinaryFile(fileName), shouldOpenEditor);
 }
@@ -766,7 +775,7 @@ void OscirenderAudioProcessorEditor::toggleLayout(juce::StretchableLayoutManager
 }
 
 void OscirenderAudioProcessorEditor::resetWindowSizeAndPosition() {
-    CommonPluginEditor::resetWindowSizeAndPosition();
+    OscilloscopePluginEditorBase::resetWindowSizeAndPosition();
 
     layout.setItemLayout(0, -0.3, -1.0, kDefaultCodeEditorMainPanelSize);
     layout.setItemLayout(1, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE, RESIZER_BAR_SIZE);
@@ -872,7 +881,7 @@ bool OscirenderAudioProcessorEditor::keyPressed(const juce::KeyPress& key) {
         files.selectFile(targetFile);
     }
 
-    if (CommonPluginEditor::keyPressed(key))
+    if (OscilloscopePluginEditorBase::keyPressed(key))
         return true;
 
     return consumeKey;
@@ -898,9 +907,25 @@ void OscirenderAudioProcessorEditor::openVisualiserSettings() {
     visualiserSettingsWindow.toFront(true);
 }
 
+#if OSCI_PREMIUM
+void OscirenderAudioProcessorEditor::openLaserWorkspace() {
+    if (laserWorkspaceOverlay != nullptr) {
+        laserWorkspaceOverlay->toFront(true);
+        return;
+    }
+    std::unique_ptr<juce::Component> workspace = std::make_unique<ExternalLaserLinkComponent>(audioProcessor.getLaserAdapter());
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(workspace), "External Laser Output", juce::Point<int> {680, 390}, true);
+    laserWorkspaceOverlay = overlay.get();
+    overlay->onDismissRequested = [this] {
+        laserWorkspaceOverlay = nullptr;
+    };
+    showOverlay(std::move(overlay));
+}
+#endif
+
 void OscirenderAudioProcessorEditor::openRecordingSettings() {
 #if OSCI_PREMIUM
-    CommonPluginEditor::openRecordingSettings();
+    OscilloscopePluginEditorBase::openRecordingSettings();
 #else
     showPremiumSplashScreen();
 #endif

@@ -1,6 +1,6 @@
 #include "VisualiserComponent.h"
 
-#include "../CommonPluginEditor.h"
+#include "../OscilloscopePluginEditorBase.h"
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../components/OverlayDialogHelpers.h"
@@ -21,7 +21,7 @@ void VisualiserComponent::FadeCoverComponent::paint(juce::Graphics& g) {
 
 VisualiserComponent::VisualiserComponent(
     CommonAudioProcessor &processor,
-    CommonPluginEditor &pluginEditor,
+    OscilloscopePluginEditorBase &pluginEditor,
     juce::File ffmpegFile,
     VisualiserSettings &settings,
     RecordingSettings &recordingSettings,
@@ -89,6 +89,18 @@ VisualiserComponent::VisualiserComponent(
 #endif
     addAndMakeVisible(settingsButton);
     settingsButton.setTooltip("Opens the visualiser settings window.");
+
+#if OSCI_PREMIUM && !defined(SOSCI)
+    if (parent == nullptr) {
+        addAndMakeVisible(laserOutputButton);
+        laserOutputButton.setTooltip("Streams XYRGB to the separately installed osci-laser application.");
+        laserOutputButton.onClick = [this] {
+            if (openLaserWorkspace != nullptr) {
+                openLaserWorkspace();
+            }
+        };
+    }
+#endif
 
     addAndMakeVisible(textureOutputButton);
     textureOutputButton.setClickingTogglesState(false);
@@ -575,6 +587,9 @@ void VisualiserComponent::resized() {
         settingsButton.setVisible(false);
         audioInputButton.setVisible(false);
         textureOutputButton.setVisible(false);
+#if OSCI_PREMIUM && !defined(SOSCI)
+        laserOutputButton.setVisible(false);
+#endif
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
@@ -610,6 +625,14 @@ void VisualiserComponent::resized() {
 
     textureOutputButton.setVisible(true);
     textureOutputButton.setBounds(buttons.removeFromRight(30));
+
+#if OSCI_PREMIUM && !defined(SOSCI)
+    const bool showLaserOutput = parent == nullptr && openLaserWorkspace != nullptr;
+    laserOutputButton.setVisible(showLaserOutput);
+    if (showLaserOutput) {
+        laserOutputButton.setBounds(buttons.removeFromRight(30));
+    }
+#endif
 
     record.setVisible(true);
     record.setBounds(buttons.removeFromRight(25));

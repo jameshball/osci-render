@@ -13,10 +13,31 @@
 
 namespace osci::installer {
 
+    juce::Image externalLaserPlaceholderIcon() {
+        juce::Image image(juce::Image::ARGB, 256, 256, true);
+        juce::Graphics graphics(image);
+        graphics.fillAll(osci::Colours::surfaceRaised());
+        graphics.setColour(osci::Colours::outline());
+        graphics.drawRoundedRectangle(image.getBounds().toFloat().reduced(8.0f), 32.0f, 6.0f);
+        graphics.setColour(osci::Colours::accentColor());
+        juce::Path beam;
+        beam.startNewSubPath(54.0f, 188.0f);
+        beam.lineTo(128.0f, 68.0f);
+        beam.lineTo(202.0f, 188.0f);
+        graphics.strokePath(beam, juce::PathStrokeType(14.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        return image;
+    }
+
 #if JUCE_LINUX
     juce::MemoryBlock productIconPng (juce::StringRef product) {
-        if (juce::String (product) == "sosci") {
+        const auto slug = juce::String(product);
+        if (slug == "sosci") {
             return { BinaryData::sosci_mac_saturated_png, static_cast<size_t> (BinaryData::sosci_mac_saturated_pngSize) };
+        }
+        if (slug == "osci-laser") {
+            juce::MemoryOutputStream output;
+            juce::PNGImageFormat().writeImageToStream(externalLaserPlaceholderIcon(), output);
+            return output.getMemoryBlock();
         }
 
         return { BinaryData::osci_mac_png, static_cast<size_t> (BinaryData::osci_mac_pngSize) };
@@ -27,6 +48,7 @@ namespace osci::installer {
         None,
         OsciRender,
         Sosci,
+        OsciLaser,
     };
 
     enum class InstallPath {
@@ -34,6 +56,7 @@ namespace osci::installer {
         OsciRenderFree,
         OsciRenderPremium,
         SosciPremium,
+        OsciLaserPremium,
     };
 
     struct InstallRequest {
@@ -54,7 +77,21 @@ namespace osci::installer {
     }
 
     juce::String productSlug (ProductChoice product) {
-        return product == ProductChoice::Sosci ? "sosci" : "osci-render";
+        switch (product) {
+            case ProductChoice::Sosci: return "sosci";
+            case ProductChoice::OsciLaser: return "osci-laser";
+            case ProductChoice::OsciRender:
+            case ProductChoice::None: return "osci-render";
+        }
+        jassertfalse;
+        return {};
+    }
+
+    juce::URL purchaseUrl(ProductChoice product) {
+        if (product == ProductChoice::OsciLaser) {
+            return juce::URL("https://osci-render.com/osci-laser#purchase");
+        }
+        return juce::URL("https://osci-render.com/#purchase");
     }
 
     juce::String errorWithContext (juce::StringRef context, juce::StringRef detail) {
@@ -75,6 +112,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
+          osciLaserTile("osci-laser", externalLaserPlaceholderIcon(), "osci-laser"),
           needLicenseLink ("Need a license key?", juce::URL ("https://osci-render.com/#purchase")),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
@@ -106,6 +144,15 @@ public:
         sosciTile.setLayoutMode (osci::GridItemComponent::LayoutMode::IconTile);
         sosciTile.onItemSelected = [this] (const juce::String&) {
             selectProduct (ProductChoice::Sosci);
+        };
+
+        addAndMakeVisible(osciLaserTile);
+        osciLaserTile.setTitle("osci-laser");
+        osciLaserTile.setWantsKeyboardFocus(true);
+        osciLaserTile.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        osciLaserTile.setLayoutMode(osci::GridItemComponent::LayoutMode::IconTile);
+        osciLaserTile.onItemSelected = [this](const juce::String&) {
+            selectProduct(ProductChoice::OsciLaser);
         };
 
         addAndMakeVisible (panel);
@@ -214,6 +261,7 @@ public:
             headingLabel.setBounds ({});
             osciRenderTile.setBounds ({});
             sosciTile.setBounds ({});
+            osciLaserTile.setBounds({});
             locationsPanel.setBounds ({});
             panel.setBounds ({});
             completionPanel.setBounds (getLocalBounds().reduced (72, 52));
@@ -236,13 +284,15 @@ public:
         constexpr auto tileRowHeight = 228;
 #endif
         auto tilesRow = area.removeFromTop (tileRowHeight);
-        const auto tileWidth = 214;
-        const auto gap = 34;
-        const auto totalWidth = tileWidth * 2 + gap;
+        const auto tileWidth = 184;
+        const auto gap = 20;
+        const auto totalWidth = tileWidth * 3 + gap * 2;
         auto tileArea = tilesRow.withSizeKeepingCentre (totalWidth, tilesRow.getHeight());
         osciRenderTile.setBounds (tileArea.removeFromLeft (tileWidth));
         tileArea.removeFromLeft (gap);
         sosciTile.setBounds (tileArea.removeFromLeft (tileWidth));
+        tileArea.removeFromLeft(gap);
+        osciLaserTile.setBounds(tileArea.removeFromLeft(tileWidth));
 
 #if JUCE_LINUX
         area.removeFromTop (18);
@@ -349,6 +399,7 @@ private:
     juce::Label headingLabel;
     ProductTile osciRenderTile;
     ProductTile sosciTile;
+    ProductTile osciLaserTile;
     juce::Component panel;
     juce::Label choiceLabel;
     juce::TextButton freeChoiceButton;
@@ -438,7 +489,7 @@ private:
     }
 
     juce::String installLocationsTitle (InstallPath path) const {
-        const auto product = path == InstallPath::SosciPremium ? juce::String ("sosci") : "osci-render";
+        const auto product = productNameForPath(path);
         const auto variant = path == InstallPath::OsciRenderFree ? juce::String ("free") : "premium";
         return "Install " + product + " " + variant;
     }
@@ -580,7 +631,14 @@ private:
         }
 
         selectedProduct = product;
-        currentPath = product == ProductChoice::Sosci ? InstallPath::SosciPremium : InstallPath::None;
+        needLicenseLink.setURL(purchaseUrl(product));
+        if (product == ProductChoice::Sosci) {
+            currentPath = InstallPath::SosciPremium;
+        } else if (product == ProductChoice::OsciLaser) {
+            currentPath = InstallPath::OsciLaserPremium;
+        } else {
+            currentPath = InstallPath::None;
+        }
         licenseKeyEditor.clear();
         loadCachedLicenseState();
 #if JUCE_LINUX
@@ -598,7 +656,13 @@ private:
             return;
         }
 
-        currentPath = selectedProduct == ProductChoice::Sosci ? InstallPath::SosciPremium : InstallPath::OsciRenderPremium;
+        if (selectedProduct == ProductChoice::Sosci) {
+            currentPath = InstallPath::SosciPremium;
+        } else if (selectedProduct == ProductChoice::OsciLaser) {
+            currentPath = InstallPath::OsciLaserPremium;
+        } else {
+            currentPath = InstallPath::OsciRenderPremium;
+        }
         loadCachedLicenseState();
         refreshUi();
 #if JUCE_LINUX
@@ -641,6 +705,7 @@ private:
     void refreshUi() {
         const auto selectedOsciRender = selectedProduct == ProductChoice::OsciRender;
         const auto selectedSosci = selectedProduct == ProductChoice::Sosci;
+        const auto selectedOsciLaser = selectedProduct == ProductChoice::OsciLaser;
         const auto premiumPath = isPremiumPath (currentPath);
         const auto showOsciChoice = selectedOsciRender && currentPath == InstallPath::None;
         const auto showPanel = selectedProduct != ProductChoice::None;
@@ -649,8 +714,10 @@ private:
 
         osciRenderTile.setSelected (selectedOsciRender);
         sosciTile.setSelected (selectedSosci);
+        osciLaserTile.setSelected(selectedOsciLaser);
         osciRenderTile.setInteractive(!busy);
         sosciTile.setInteractive(!busy);
+        osciLaserTile.setInteractive(!busy);
 
         panel.setVisible (showPanel);
         choiceLabel.setVisible (showChoiceLabel);
@@ -668,6 +735,7 @@ private:
         helpButton.setVisible (showInstaller);
         osciRenderTile.setVisible (showInstaller);
         sosciTile.setVisible (showInstaller);
+        osciLaserTile.setVisible(showInstaller);
         panel.setVisible (showInstaller && showPanel);
         completionPanel.setVisible (installationComplete);
         locationsPanel.setBusy (busy);
@@ -732,13 +800,24 @@ private:
     }
 
     static bool isPremiumPath (InstallPath path) {
-        return path == InstallPath::OsciRenderPremium || path == InstallPath::SosciPremium;
+        return path == InstallPath::OsciRenderPremium || path == InstallPath::SosciPremium
+            || path == InstallPath::OsciLaserPremium;
+    }
+
+    static juce::String productNameForPath(InstallPath path) {
+        if (path == InstallPath::SosciPremium) {
+            return "sosci";
+        }
+        if (path == InstallPath::OsciLaserPremium) {
+            return "osci-laser";
+        }
+        return "osci-render";
     }
 
     InstallRequest makeRequest (InstallPath path) const {
         InstallRequest request;
-        request.productSlug = path == InstallPath::SosciPremium ? "sosci" : "osci-render";
-        request.productName = path == InstallPath::SosciPremium ? "sosci" : "osci-render";
+        request.productSlug = productNameForPath(path);
+        request.productName = request.productSlug;
         request.variant = path == InstallPath::OsciRenderFree ? "free" : "premium";
         request.licenseKey = licenseKeyEditor.getText().trim();
         request.premium = path != InstallPath::OsciRenderFree;
