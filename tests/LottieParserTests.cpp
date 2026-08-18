@@ -533,6 +533,11 @@ private:
         expect(!osci::files::isCodeEditable("animation.json"));
         expect(osci::files::isCodeEditable("script.lua"));
         expect(osci::files::isAudio("track.WAV"));
+#if JUCE_MAC
+        expect(osci::files::isAudio("track.aac"));
+        expect(osci::files::isAudio("track.m4a"));
+        expect(osci::files::audioWildcard().contains("*.m4a"));
+#endif
         expect(osci::files::isImage("clip.mp4"));
         expect(osci::files::isVideo("clip.mp4"));
         expect(osci::files::sourceWildcard().contains("*.lottie"));

@@ -52,6 +52,10 @@ inline const std::vector<FileFormat>& sourceFormats() {
         FileFormat::define("ogg").audio(),
         FileFormat::define("flac").audio(),
         FileFormat::define("mp3").audio(),
+#if JUCE_MAC
+        FileFormat::define("aac").audio(),
+        FileFormat::define("m4a").audio(),
+#endif
 #if OSCI_PREMIUM
         FileFormat::define("lsystem"),
         FileFormat::define("mp4").image().video().animated(),
@@ -122,6 +126,16 @@ inline juce::String sourceWildcard() {
     juce::StringArray patterns;
     for (const auto& format : sourceFormats()) {
         patterns.add("*." + juce::String(format.extension));
+    }
+    return patterns.joinIntoString(";");
+}
+
+inline juce::String audioWildcard() {
+    juce::StringArray patterns;
+    for (const auto& format : sourceFormats()) {
+        if (format.has(FileCapability::Audio)) {
+            patterns.add("*." + juce::String(format.extension));
+        }
     }
     return patterns.joinIntoString(";");
 }

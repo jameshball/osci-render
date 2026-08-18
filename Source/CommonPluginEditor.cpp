@@ -5,6 +5,7 @@
 #include "components/RecordingSettingsOverlay.h"
 #include "feedback/FeedbackReportBuilder.h"
 #include "logging/WorkflowLogger.h"
+#include "parser/FileFormatRegistry.h"
 #include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
@@ -521,7 +522,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
     chooser = std::make_unique<juce::FileChooser>(
         "Choose an input audio file",
         audioProcessor.getLastOpenedDirectory(),
-        "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
+        osci::files::audioWildcard());
 
     auto openFlags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
