@@ -22,6 +22,7 @@ public:
     ~CommonPluginEditor() override;
 
     void handleCommandLine(const juce::String& commandLine);
+    bool openFile(const juce::File& file);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
     virtual void openProject(const juce::File& file);
     virtual void openProject();
@@ -57,6 +58,9 @@ public:
     bool isFullScreen();
     void resized() override;
     void parentHierarchyChanged() override;
+
+protected:
+    virtual bool openSourceFile(const juce::File& file) = 0;
 
 private:
     CommonAudioProcessor& audioProcessor;

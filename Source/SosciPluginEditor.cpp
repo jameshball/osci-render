@@ -105,13 +105,16 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
     if (files.size() != 1) {
         return;
     }
-    juce::File file(files[0]);
-    
-    if (osci::files::isSosciProject(file)) {
-        openProject(file);
-    } else {
-        audioProcessor.loadAudioFile(file);
+    openFile(juce::File(files[0]));
+}
+
+bool SosciPluginEditor::openSourceFile(const juce::File& file) {
+    if (!osci::files::isAudio(file.getFileExtension())) {
+        return false;
     }
+
+    audioProcessor.loadAudioFile(file);
+    return true;
 }
 
 void SosciPluginEditor::visualiserFullScreenChanged() {

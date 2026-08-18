@@ -26,6 +26,7 @@ public:
     void parserChanged() override;
 
 private:
+    bool openSourceFile(const juce::File& file) override;
     SosciAudioProcessor& audioProcessor;
 
     juce::String getInputDeviceName();
