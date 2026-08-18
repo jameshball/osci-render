@@ -54,6 +54,7 @@ public:
     void editCustomFunction(bool enabled);
 
 private:
+    bool openSourceFile(const juce::File& file) override;
     void initialiseCodeEditors();
     void refreshFileUiLocked(const juce::String& fileName, bool shouldOpenEditor);
     void removeCodeEditor(int index);

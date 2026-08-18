@@ -284,21 +284,24 @@ bool OscirenderAudioProcessorEditor::isInterestedInFileDrag(const juce::StringAr
 }
 
 void OscirenderAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y) {
+    juce::ignoreUnused(x, y);
     if (files.size() != 1) {
         return;
     }
-    juce::File file(files[0]);
+    openFile(juce::File(files[0]));
+}
 
-    if (osci::files::isOsciProject(file)) {
-        openProject(file);
-    } else {
-        stopTextureInput();
-
-        auto& fileController = audioProcessor.getFileController();
-        const int fileIndex = fileController.addFile(file);
-        addCodeEditor(fileIndex);
-        refreshFileUi(fileController.getCurrentFileName());
+bool OscirenderAudioProcessorEditor::openSourceFile(const juce::File& file) {
+    if (!osci::files::isSupportedSource(file)) {
+        return false;
     }
+
+    stopTextureInput();
+    auto& fileController = audioProcessor.getFileController();
+    const int fileIndex = fileController.addFile(file);
+    addCodeEditor(fileIndex);
+    refreshFileUi(fileController.getCurrentFileName());
+    return true;
 }
 
 void OscirenderAudioProcessorEditor::editFile(int index) {
