@@ -8,7 +8,7 @@
 #include <limits>
 
 class OscirenderAudioProcessor;
-class CommonPluginEditor;
+class OscilloscopePluginEditorBase;
 
 class ImageParser {
 public:

@@ -4,8 +4,12 @@
 
 namespace osci {
     inline LinuxInstallManifest linuxInstallManifest (juce::StringRef product) {
-        if (juce::String (product) == "sosci") {
+        const auto slug = juce::String(product);
+        if (slug == "sosci") {
             return { "sosci", "sosci", "sosci", { "sosci.vst3" }, {}, "AudioVideo;Audio;" };
+        }
+        if (slug == "osci-laser") {
+            return { "osci-laser", "osci-laser", "osci-laser", { "osci-laser.vst3" }, {}, "AudioVideo;Audio;" };
         }
 
         return { "osci-render", "osci-render", "osci-render",

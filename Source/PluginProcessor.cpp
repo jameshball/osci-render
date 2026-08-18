@@ -364,6 +364,9 @@ void VoiceBuilder::run() {
 // ---------------------------------------------------------------------------
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
+#if OSCI_PREMIUM
+    laserAdapter.releaseResources();
+#endif
     // Stop the voice builder before tearing down any processor state it references.
     voiceBuilder.reset();
 
@@ -397,6 +400,9 @@ void OscirenderAudioProcessor::prepareToPlayInternal(double sampleRate, int samp
     retriggerMidi = true;
 
     modulationEngine.prepareToPlay(sampleRate, samplesPerBlock);
+#if OSCI_PREMIUM
+    laserAdapter.prepare(sampleRate, samplesPerBlock);
+#endif
     
     // Update sample rate for all effects so they have correct timing
     {
@@ -580,6 +586,9 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     if (isOfflineRenderActive()) {
+#if OSCI_PREMIUM
+        laserAdapter.releaseResources();
+#endif
         midiMessages.clear();
         buffer.clear();
         return;
@@ -883,6 +892,12 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     auto* outputArray = outputBuffer3d.getArrayOfWritePointers();
     
     applyVolumeAndThreshold(outputArray, numSamples);
+
+#if OSCI_PREMIUM
+    const bool laserHostMayOutput = juce::JUCEApplicationBase::isStandaloneApp()
+        || blockDawPosition.isPlaying.load(std::memory_order_relaxed);
+    laserAdapter.processPostEffects(outputBuffer3d, laserHostMayOutput);
+#endif
     
     // Write to thread manager (for visualizers, etc.)
     threadManager.write(outputBuffer3d);
@@ -1172,7 +1187,7 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         if (xml->getBoolAttribute("premiumProject", false)) {
             juce::Logger::writeToLog("setStateInformation: premium project loaded in free build, some features unavailable");
             juce::MessageManager::callAsync([this] {
-                auto* editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+                auto* editor = dynamic_cast<OscilloscopePluginEditorBase*>(getActiveEditor());
                 osci::showOverlayMessageOrAlert(
                     editor,
                     "Premium Project",

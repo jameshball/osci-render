@@ -4,7 +4,7 @@ import struct
 import zlib
 from pathlib import Path
 
-from .errors import StepError
+from jucewright_browser.errors import StepError
 
 
 def check_png_not_blank(file: Path, *, crop_bottom_fraction: float = 0.0) -> None:

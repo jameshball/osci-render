@@ -200,6 +200,15 @@ class InstallerBrowser:
                              "--timeout-ms", "5000")
         self.click("Confirm installation")
         self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
+        self.click("Install another product")
+        self.click("osci-laser")
+        self.snapshot("09_osci_laser_premium")
+        self.screenshot("09_osci_laser_premium")
+        self.fill("Enter your license key", "TEST-LASER-LICENSE-KEY")
+        self.session_command("press", "Enter", "--role", "editableText", "--name", "Enter your license key",
+                             "--timeout-ms", "5000")
+        self.click("Confirm installation")
+        self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
 
     def run_warning_flow(self) -> None:
         self.launch("warning", "warning")
@@ -208,8 +217,8 @@ class InstallerBrowser:
         self.click("Confirm installation")
         self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
         time.sleep(0.5)
-        self.snapshot("09_warning")
-        self.screenshot("09_warning")
+        self.snapshot("10_warning")
+        self.screenshot("10_warning")
 
     def run_failure_flow(self) -> None:
         self.launch("failure", "failure")
@@ -218,17 +227,17 @@ class InstallerBrowser:
         self.click("Confirm installation")
         self.session_command("wait-for-text", "test installation could not write", "--timeout-ms", "10000")
         time.sleep(0.5)
-        self.snapshot("10_failure")
-        self.screenshot("10_failure")
-        if self.component_state("10_failure", "Install failed").get("role") != "dialogWindow":
+        self.snapshot("11_failure")
+        self.screenshot("11_failure")
+        if self.component_state("11_failure", "Install failed").get("role") != "dialogWindow":
             raise RuntimeError("Install failure is not exposed as an accessible dialog")
-        if self.component_state("10_failure", "OK").get("role") != "button":
+        if self.component_state("11_failure", "OK").get("role") != "button":
             raise RuntimeError("Install failure action is not exposed as an accessible button")
         self.session_command("press", "Escape", "--role", "dialogWindow", "--name", "Install failed",
                              "--timeout-ms", "5000")
         time.sleep(0.5)
-        self.snapshot("10_failure_dismissed")
-        if self.component_exists("10_failure_dismissed", "Install failed"):
+        self.snapshot("11_failure_dismissed")
+        if self.component_exists("11_failure_dismissed", "Install failed"):
             raise RuntimeError("Escape did not dismiss the install failure dialog")
 
     def run(self) -> int:

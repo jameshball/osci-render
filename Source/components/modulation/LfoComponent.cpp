@@ -1,7 +1,7 @@
 #include "LfoComponent.h"
 #include "../effects/EffectComponent.h"
 #include "../../PluginProcessor.h"
-#include "../../CommonPluginEditor.h"
+#include "../../OscilloscopePluginEditorBase.h"
 #include "../../LookAndFeel.h"
 
 // ============================================================================
