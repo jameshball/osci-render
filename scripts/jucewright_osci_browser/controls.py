@@ -5,9 +5,9 @@ import os
 from pathlib import Path
 
 from .constants import SKIP_CONTROL_NAMES
-from .errors import StepError
+from jucewright_browser.errors import StepError
 from .png import check_png_not_blank
-from .utils import numeric, slug, walk_tree
+from jucewright_browser.utils import numeric, slug, walk_tree
 
 
 class ControlDiscoveryMixin:

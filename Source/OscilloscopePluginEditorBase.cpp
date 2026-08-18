@@ -1,5 +1,5 @@
 #include "CommonPluginProcessor.h"
-#include "CommonPluginEditor.h"
+#include "OscilloscopePluginEditorBase.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
@@ -17,8 +17,8 @@ const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 #endif
 }
 
-CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType)
+OscilloscopePluginEditorBase::OscilloscopePluginEditorBase(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
+    : PluginEditorBase(p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType)
 {
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
@@ -41,39 +41,19 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     updatePrompt.onLicenseRequired = [this] { openLicenseAndUpdates(); };
     refreshBetaUpdatesButton();
 #if !OSCI_PREMIUM
-    showPremiumSplashScreenGlobal = [safeThis = juce::Component::SafePointer<CommonPluginEditor>(this)]() {
+    showPremiumSplashScreenGlobal = [safeThis = juce::Component::SafePointer<OscilloscopePluginEditorBase>(this)]() {
         if (safeThis) safeThis->showPremiumSplashScreen();
     };
 #endif
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
-            juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
-            juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
-            if (dw != nullptr) {
-                dw->setBackgroundColour(osci::Colours::veryDark());
-                dw->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark());
-                dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
-                dw->setUsingNativeTitleBar(true);
-            }
-        }
-
         juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
         if (standalone != nullptr) {
-            standalone->getMuteInputValue().setValue(false);
-            juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+            juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
             standalone->commandLineCallback = [safeThis](const juce::String& commandLine) {
                 if (safeThis != nullptr) {
                     safeThis->handleCommandLine(commandLine);
                 }
-            };
-            standalone->showAudioSettingsOverlay = [safeThis] {
-                if (safeThis == nullptr) {
-                    return false;
-                }
-
-                safeThis->openAudioSettings();
-                return true;
             };
         }
     }
@@ -96,13 +76,11 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 
-    tooltipWindow->setMillisecondsBeforeTipAppears(500);
-
     updateTitle();
 
     // On startup (especially standalone state restore), the editor may not yet be attached to a
     // top-level window when updateTitle() is first called. Refresh once the message loop runs.
-    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
     juce::MessageManager::callAsync([safeThis] {
         if (safeThis != nullptr)
             safeThis->updateTitle();
@@ -115,8 +93,9 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     updatePrompt.scheduleInitialCheck();
 }
 
-void CommonPluginEditor::parentHierarchyChanged()
+void OscilloscopePluginEditorBase::parentHierarchyChanged()
 {
+    PluginEditorBase::parentHierarchyChanged();
     // Refresh the title when the editor is attached/detached.
     updateTitle();
 
@@ -133,7 +112,7 @@ void CommonPluginEditor::parentHierarchyChanged()
         }
 
         // Grab keyboard focus so that shortcuts are received immediately.
-        juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
         juce::MessageManager::callAsync([safeThis] {
             if (safeThis != nullptr && safeThis->getPeer() != nullptr)
                 safeThis->grabKeyboardFocus();
@@ -141,7 +120,7 @@ void CommonPluginEditor::parentHierarchyChanged()
     }
 }
 
-void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
+void OscilloscopePluginEditorBase::handleCommandLine(const juce::String& commandLine) {
     if (commandLine.trim().isNotEmpty()) {
         // Split the command line into tokens, using space as delimiter
         // and handling quoted arguments as one token.
@@ -166,7 +145,7 @@ void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
     }
 }
 
-void CommonPluginEditor::resized() {
+void OscilloscopePluginEditorBase::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
     refreshBetaUpdatesButton();
@@ -188,11 +167,11 @@ void CommonPluginEditor::resized() {
     }
 }
 
-void CommonPluginEditor::refreshBetaUpdatesButton() {
+void OscilloscopePluginEditorBase::refreshBetaUpdatesButton() {
     betaUpdatesButton.setVisible(osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled());
 }
 
-void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
+void OscilloscopePluginEditorBase::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
     refreshBetaUpdatesButton();
     if (!betaUpdatesButton.isVisible())
         return;
@@ -202,7 +181,7 @@ void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
     betaUpdatesButton.toFront(false);
 }
 
-void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
+void OscilloscopePluginEditorBase::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
     bool anyHeavy = false;
     for (auto& o : activeOverlays) {
         if (!o->lightweight) {
@@ -233,9 +212,9 @@ void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> ove
     resized();
 }
 
-void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
+void OscilloscopePluginEditorBase::dismissOverlay(osci::OverlayComponent* overlay,
                                         std::function<void()> beforeVisualiserRestore) {
-    const juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    const juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
     std::unique_ptr<osci::OverlayComponent> removedOverlay;
     for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
         if (it->get() == overlay) {
@@ -276,19 +255,14 @@ void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
     }
 }
 
-void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
+void OscilloscopePluginEditorBase::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
     menuBar.setModel(&menuBarModel);
 }
 
-CommonPluginEditor::~CommonPluginEditor() {
+OscilloscopePluginEditorBase::~OscilloscopePluginEditorBase() {
 #if !OSCI_PREMIUM
     showPremiumSplashScreenGlobal = nullptr;
 #endif
-    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-    if (standalone != nullptr) {
-        standalone->showAudioSettingsOverlay = nullptr;
-    }
-
     if (topLevelKeyTarget != nullptr)
         topLevelKeyTarget->removeKeyListener(this);
 
@@ -304,7 +278,7 @@ CommonPluginEditor::~CommonPluginEditor() {
 // These always work regardless of getAcceptsKeys() — they are fundamental
 // editor operations, not "special keys" like j/k for file switching.
 
-bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
+bool OscilloscopePluginEditorBase::handleShortcut(const juce::KeyPress& key) {
     if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'Z') {
         undoRedoControls.redo();
         return true;
@@ -336,7 +310,7 @@ bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
     return false;
 }
 
-bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
+bool OscilloscopePluginEditorBase::keyPressed(const juce::KeyPress& key) {
     // Standard OS shortcuts always work (not gated by getAcceptsKeys)
     if (handleShortcut(key))
         return true;
@@ -348,11 +322,11 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
 }
 
 // KeyListener callback — fires on the top-level component when no child has focus
-bool CommonPluginEditor::keyPressed(const juce::KeyPress& key, juce::Component*) {
+bool OscilloscopePluginEditorBase::keyPressed(const juce::KeyPress& key, juce::Component*) {
     return handleShortcut(key);
 }
 
-void CommonPluginEditor::openProject(const juce::File& file) {
+void OscilloscopePluginEditorBase::openProject(const juce::File& file) {
     if (file != juce::File()) {
         auto data = juce::MemoryBlock();
         if (!file.loadFileAsData(data)) {
@@ -367,19 +341,19 @@ void CommonPluginEditor::openProject(const juce::File& file) {
     }
 }
 
-void CommonPluginEditor::openProject() {
+void OscilloscopePluginEditorBase::openProject() {
     chooser = std::make_unique<juce::FileChooser>("Load " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
-    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
     chooser->launchAsync(flags, [safeThis](const juce::FileChooser& chooser) {
         if (safeThis != nullptr)
             safeThis->openProject(chooser.getResult());
     });
 }
 
-void CommonPluginEditor::saveProject() {
+void OscilloscopePluginEditorBase::saveProject() {
     if (audioProcessor.currentProjectFile.isEmpty()) {
         saveProjectAs();
     } else {
@@ -394,11 +368,11 @@ void CommonPluginEditor::saveProject() {
     }
 }
 
-void CommonPluginEditor::saveProjectAs() {
+void OscilloscopePluginEditorBase::saveProjectAs() {
     chooser = std::make_unique<juce::FileChooser>("Save " + appName + " Project", audioProcessor.getLastOpenedDirectory(), "*." + projectFileType);
     auto flags = juce::FileBrowserComponent::saveMode;
 
-    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
     chooser->launchAsync(flags, [safeThis](const juce::FileChooser& chooser) {
         if (safeThis == nullptr)
             return;
@@ -416,7 +390,7 @@ void CommonPluginEditor::saveProjectAs() {
     });
 }
 
-void CommonPluginEditor::resetWindowSizeAndPosition() {
+void OscilloscopePluginEditorBase::resetWindowSizeAndPosition() {
     auto* standaloneWindow = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (standaloneWindow != nullptr) {
         standaloneWindow->setFullScreen(false);
@@ -429,7 +403,7 @@ void CommonPluginEditor::resetWindowSizeAndPosition() {
     }
 }
 
-void CommonPluginEditor::updateTitle() {
+void OscilloscopePluginEditorBase::updateTitle() {
     juce::String title = appName;
     if (!audioProcessor.currentProjectFile.isEmpty()) {
         title += " - " + audioProcessor.currentProjectFile;
@@ -440,16 +414,16 @@ void CommonPluginEditor::updateTitle() {
     getTopLevelComponent()->setName(title);
 }
 
-void CommonPluginEditor::fileUpdated(juce::String fileName) {
+void OscilloscopePluginEditorBase::fileUpdated(juce::String fileName) {
     currentFileName = fileName;
     updateTitle();
 }
 
-void CommonPluginEditor::openAudioSettings() {
-    osci::showStandaloneAudioSettingsOverlay(*this);
+void OscilloscopePluginEditorBase::openAudioSettings() {
+    openStandaloneAudioSettings();
 }
 
-void CommonPluginEditor::openLicenseAndUpdates() {
+void OscilloscopePluginEditorBase::openLicenseAndUpdates() {
     if (findActiveOverlay<osci::LicenseAndUpdatesComponent>() != nullptr)
         return;
 
@@ -461,14 +435,14 @@ void CommonPluginEditor::openLicenseAndUpdates() {
         })));
 }
 
-void CommonPluginEditor::openFeedback() {
+void OscilloscopePluginEditorBase::openFeedback() {
     if (findActiveOverlay<osci::FeedbackOverlay>() != nullptr) {
         return;
     }
     if (!activeOverlays.empty()) {
         auto* overlay = activeOverlays.back().get();
         auto dismissAndContinue = std::move(overlay->onDismissRequested);
-        const juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        const juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
         overlay->onDismissRequested = [safeThis, dismissAndContinue = std::move(dismissAndContinue)]() mutable {
             juce::MessageManager::callAsync([safeThis] {
                 if (safeThis != nullptr) {
@@ -490,7 +464,7 @@ void CommonPluginEditor::openFeedback() {
     showOverlay(std::move(overlay));
 }
 
-void CommonPluginEditor::openRecordingSettings() {
+void OscilloscopePluginEditorBase::openRecordingSettings() {
     if (findActiveOverlay<RecordingSettingsOverlay>() != nullptr) {
         return;
     }
@@ -500,11 +474,11 @@ void CommonPluginEditor::openRecordingSettings() {
     showOverlay(std::make_unique<RecordingSettingsOverlay>(recordingSettings, preferredContentSize));
 }
 
-void CommonPluginEditor::showPremiumSplashScreen() {
+void OscilloscopePluginEditorBase::showPremiumSplashScreen() {
     openLicenseAndUpdates();
 }
 
-void CommonPluginEditor::renderAudioFileToVideo() {
+void OscilloscopePluginEditorBase::renderAudioFileToVideo() {
 #if !OSCI_PREMIUM
     showPremiumSplashScreen();
     return;
@@ -526,7 +500,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
     auto openFlags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
-    juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    juce::Component::SafePointer<OscilloscopePluginEditorBase> safeThis(this);
     offlineRenderLog.event("input selection opened");
     chooser->launchAsync(openFlags, [safeThis](const juce::FileChooser& inputChooser) {
         if (safeThis == nullptr) {
@@ -662,7 +636,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 #endif
 }
 
-void CommonPluginEditor::resetToDefault() {
+void OscilloscopePluginEditorBase::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
         window->resetToDefaultState();
@@ -670,7 +644,7 @@ void CommonPluginEditor::resetToDefault() {
     }
 }
 
-void CommonPluginEditor::toggleFullScreen() {
+void OscilloscopePluginEditorBase::toggleFullScreen() {
 #if JUCE_WINDOWS
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
@@ -706,7 +680,7 @@ void CommonPluginEditor::toggleFullScreen() {
 #endif
 }
 
-bool CommonPluginEditor::isFullScreen() {
+bool OscilloscopePluginEditorBase::isFullScreen() {
     auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     return window != nullptr && window->isFullScreen();
 }

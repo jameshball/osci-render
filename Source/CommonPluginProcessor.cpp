@@ -7,7 +7,7 @@
 */
 
 #include "CommonPluginProcessor.h"
-#include "CommonPluginEditor.h"
+#include "OscilloscopePluginEditorBase.h"
 #include "JucewrightAutomation.h"
 #include "audio/OutputClip.h"
 #include "components/OverlayDialogHelpers.h"
@@ -848,7 +848,7 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
             juce::Logger::writeToLog("FFmpeg binary incompatible — deleting " + ffmpegFile.getFullPathName());
             ffmpegFile.deleteFile();
 
-            auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+            auto editor = dynamic_cast<OscilloscopePluginEditorBase*>(getActiveEditor());
             juce::String message =
                 "The FFmpeg binary is not compatible with your version of macOS.\n\n"
 #if JUCE_MAC && JUCE_ARM
@@ -878,7 +878,7 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
         return true;
     }
 
-    auto editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+    auto editor = dynamic_cast<OscilloscopePluginEditorBase*>(getActiveEditor());
     if (editor == nullptr) {
         return false; // Editor not found
     }
@@ -892,7 +892,7 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
         }
     };
 
-    auto safeEditor = juce::Component::SafePointer<CommonPluginEditor>(editor);
+    auto safeEditor = juce::Component::SafePointer<OscilloscopePluginEditorBase>(editor);
     juce::MessageManager::callAsync([this, onStart, safeEditor] {
         if (safeEditor == nullptr) {
             return;

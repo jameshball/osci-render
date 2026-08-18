@@ -27,7 +27,8 @@ platform_build() {
 
   if [ "$OS" = "mac" ]; then
     cd "$ROOT/Builds/$PLUGIN/MacOSX"
-    xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) || exit 1
+    xcodebuild -configuration Release -parallelizeTargets -jobs $(sysctl -n hw.logicalcpu) \
+      -destination 'generic/platform=macOS' ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO || exit 1
   fi
 
   if [ "$OS" = "linux" ]; then
@@ -63,6 +64,16 @@ fi
 # on GitHub runners.
 if [ "$PLUGIN" = "osci-render" ] && [ "$OS" != "win" ]; then
   "$ROOT/luajit_linux_macos.sh"
+fi
+
+if [ "$PLUGIN" = "osci-render" ]; then
+  if [ "$OS" = "win" ]; then
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ROOT/modules/laser_dac_c/scripts/build.ps1" -Features idn-client -TargetDir "$ROOT/modules/laser_dac_c/artifacts/idn-client"
+  elif [ "$OS" = "mac" ]; then
+    LDC_FEATURES=idn-client LDC_UNIVERSAL_OUTPUT_DIR="$ROOT/modules/laser_dac_c/artifacts/idn-client-macos-universal" "$ROOT/modules/laser_dac_c/scripts/build_macos_universal.sh"
+  else
+    "$ROOT/modules/laser_dac_c/scripts/build_idn_client.sh"
+  fi
 fi
 
 # Resave jucer file

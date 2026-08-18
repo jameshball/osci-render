@@ -24,13 +24,13 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-class CommonPluginEditor;
+class OscilloscopePluginEditorBase;
 class VisualiserWindow;
 class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
-        CommonPluginEditor& editor,
+        OscilloscopePluginEditorBase& editor,
         juce::File ffmpegFile,
         VisualiserSettings& settings,
         RecordingSettings& recordingSettings,
@@ -40,6 +40,9 @@ public:
 
     std::function<void()> openSettings;
     std::function<void()> closeSettings;
+#if OSCI_PREMIUM && !defined(SOSCI)
+    std::function<void()> openLaserWorkspace;
+#endif
 
     void enableFullScreen();
     void setFullScreen(bool fullScreen);
@@ -96,7 +99,7 @@ private:
     std::atomic<bool> active = true;
 
     CommonAudioProcessor& audioProcessor;
-    CommonPluginEditor& editor;
+    OscilloscopePluginEditorBase& editor;
 
     VisualiserSettings& settings;
     RecordingSettings& recordingSettings;
@@ -112,6 +115,9 @@ private:
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+#if OSCI_PREMIUM && !defined(SOSCI)
+    osci::SvgButton laserOutputButton{"laserOutput", BinaryData::link_svg, juce::Colours::white, osci::Colours::accentColor()};
+#endif
     osci::texture::OpenGLTexturePublisher textureOutputPublisher;
 
     int lastMouseX = 0;

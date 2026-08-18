@@ -6,11 +6,19 @@ on:
     paths:
       - .github/workflows/build.yaml
       - ci/**
+      - Source/**
       - osci-render.jucer
       - sosci.jucer
       - osci-installer.jucer
       - packaging/osci-render.iss
       - packaging/sosci.iss
+      - modules/osci_standalone/packaging/**
+      - modules/osci_standalone/tools/**
+      - modules/laser_dac_c/**
+      - modules/osci_settings/**
+      - Source/laser/**
+      - Source/components/ExternalLaserLinkComponent.h
+      - docs/EXTERNAL_LASER_OUTPUT.md
       - packaging/osci-render.pkgproj
       - packaging/sosci.pkgproj
   workflow_dispatch:
@@ -37,10 +45,14 @@ jobs:
         run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
         shell: bash
 
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.ACCESS_TOKEN }}
           submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@master
+        if: matrix.project == 'osci-render'
+        with:
+          toolchain: 1.87.0
 
       - name: Set platform variables
         shell: bash
@@ -491,7 +503,7 @@ jobs:
             exit 1
           fi
 
-          python3 ci/publish_release.py \
+          python3 modules/osci_licensing/tools/publish_release.py \
             --product "${PRODUCT}" \
             --semver "${{ steps.version.outputs.version }}" \
             --platform "${PLATFORM}" \

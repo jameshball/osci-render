@@ -3,7 +3,7 @@
 #include "parser/FileFormatRegistry.h"
 #include <osci_standalone/osci_standalone.h>
 
-SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
+SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : OscilloscopePluginEditorBase(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     // Create timeline controller for audio playback
     audioTimelineController = std::make_shared<AudioTimelineController>(audioProcessor);
     
@@ -61,7 +61,7 @@ void SosciPluginEditor::paint(juce::Graphics& g) {
 }
 
 void SosciPluginEditor::resized() {
-    CommonPluginEditor::resized();
+    OscilloscopePluginEditorBase::resized();
     auto area = getLocalBounds();
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {

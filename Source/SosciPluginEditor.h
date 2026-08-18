@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include "SosciPluginProcessor.h"
-#include "CommonPluginEditor.h"
+#include "OscilloscopePluginEditorBase.h"
 #include "visualiser/VisualiserComponent.h"
 #include "LookAndFeel.h"
 #include "visualiser/VisualiserSettings.h"
@@ -10,7 +10,7 @@
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
 
-class SosciPluginEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener, public AudioPlayerListener {
+class SosciPluginEditor : public OscilloscopePluginEditorBase, public juce::FileDragAndDropTarget, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener, public AudioPlayerListener {
 public:
     SosciPluginEditor(SosciAudioProcessor&);
     ~SosciPluginEditor() override;

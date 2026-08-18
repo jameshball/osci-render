@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 
-#include "CommonPluginEditor.h"
+#include "OscilloscopePluginEditorBase.h"
 #include "LookAndFeel.h"
 #include "components/panels/MidiComponent.h"
 #include "PluginProcessor.h"
@@ -17,7 +17,7 @@
 #include <osci_scripting/osci_scripting.h>
 #include <osci_texture_interop/osci_texture_interop.h>
 
-class OscirenderAudioProcessorEditor : public CommonPluginEditor, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer {
+class OscirenderAudioProcessorEditor : public OscilloscopePluginEditorBase, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer {
 public:
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
@@ -119,6 +119,10 @@ public:
 
 private:
     void showLuaDocumentation();
+#if OSCI_PREMIUM
+    void openLaserWorkspace();
+    juce::Component::SafePointer<osci::OverlayComponent> laserWorkspaceOverlay;
+#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessorEditor)
 };

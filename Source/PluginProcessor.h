@@ -38,6 +38,9 @@
 #include <osci_render_core/osci_render_core.h>
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
+#if OSCI_PREMIUM
+#include "laser/OscirenderLaserAdapter.h"
+#endif
 
 class MidiInputChannelParameter : public osci::IntParameter {
 public:
@@ -110,6 +113,7 @@ public:
 #if OSCI_PREMIUM
     bool isMtsEspConnected() const { return mtsClient.hasMaster(); }
     juce::String getMtsEspScaleName() const { return juce::String(mtsClient.getScaleName()); }
+    OscirenderLaserAdapter& getLaserAdapter() noexcept { return laserAdapter; }
 #endif
 
     // Central 60 Hz broadcaster for modulation display updates.
@@ -336,6 +340,9 @@ public:
         const std::shared_ptr<osci::Effect>& previewEffectInstance);
 
 private:
+#if OSCI_PREMIUM
+    OscirenderLaserAdapter laserAdapter;
+#endif
     osci::FloatParameter* legacyAnimationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30.0f, -1000.0f, 1000.0f);
     std::atomic<bool> legacyAnimationRateActive{false};
 
