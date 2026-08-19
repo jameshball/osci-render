@@ -37,6 +37,16 @@ static ModulationSourceConfig buildRandomConfig(OscirenderAudioProcessor& proc) 
     cfg.broadcaster = &proc.broadcaster;
     cfg.getActiveTab = [&proc]() { return proc.randomParameters.activeTab; };
     cfg.setActiveTab = [&proc](int i) { proc.randomParameters.activeTab = i; };
+#if OSCI_PREMIUM
+    cfg.typeId = "rng";
+    cfg.midiManager = &proc.midiManager;
+    cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
+        return OscirenderAudioProcessor::modDepthCustomId("rng", idx, pid);
+    };
+    cfg.buildModDepthSetter = [&proc](int idx, const juce::String& pid) {
+        return proc.buildModDepthSetter("rng", idx, pid);
+    };
+#endif
     return cfg;
 }
 
@@ -47,7 +57,7 @@ static ModulationRateConfig buildRandomRateConfig(OscirenderAudioProcessor& proc
     cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.randomParameters.setRateMode(i, m); };
     cfg.getTempoDivision = [&proc](int i) { return proc.randomParameters.getTempoDivision(i); };
     cfg.setTempoDivision = [&proc](int i, int d) { proc.randomParameters.setTempoDivision(i, d); };
-    cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
+    cfg.getCurrentBpm = [&proc]() { return proc.dawPosition.bpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_RANDOM_SOURCES;
     return cfg;
 }
@@ -128,6 +138,7 @@ void RandomComponent::timerCallback() {
 
 void RandomComponent::resized() {
     ModulationSourceComponent::resized();
+    if (isCollapsed()) return;
 
     auto bounds = getContentBounds();
 

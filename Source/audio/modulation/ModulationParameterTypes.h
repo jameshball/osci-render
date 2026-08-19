@@ -18,7 +18,8 @@ public:
     }
 
     float getValueForText(const juce::String& text) const override {
-        return getNormalisedValue((int)stringToLfoPreset(text));
+        auto preset = stringToLfoPreset(text);
+        return getNormalisedValue(preset ? (int)*preset : 0);
     }
 };
 

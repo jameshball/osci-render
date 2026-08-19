@@ -3,9 +3,9 @@
 #include <JuceHeader.h>
 #include <melatonin_blur/melatonin_blur.h>
 #include "../../audio/modulation/ModAssignment.h"
-#include "../VerticalTabListComponent.h"
-#include "../ScrollFadeViewport.h"
-#include "../HoverAnimationMixin.h"
+#include <osci_gui/osci_gui.h>
+
+namespace osci { class MidiManager; }
 
 class EffectComponent;
 
@@ -15,6 +15,7 @@ class EffectComponent;
 struct ModulationSourceConfig {
     int sourceCount = 1;
     juce::String dragPrefix;  // "LFO", "ENV", "RNG" — used as "MOD:LFO:0" drag description
+    juce::String typeId;      // "lfo", "env", "rng", "sc" — matches ModulationSource::getTypeId()
 
     std::function<juce::String(int)> getLabel;        // "LFO 1", "ENV 1"
     std::function<juce::Colour(int)> getSourceColour;
@@ -38,6 +39,17 @@ struct ModulationSourceConfig {
 
     // When true, the tab column is shown even with sourceCount == 1.
     bool alwaysShowTabs = false;
+
+    // MIDI CC manager (optional) — enables Learn/Remove MIDI CC on depth indicators.
+    osci::MidiManager* midiManager = nullptr;
+
+    // Builds the custom-target id used by midiManager to map CC → depth for
+    // (sourceIndex, paramId). Usually OscirenderAudioProcessor::modDepthCustomId.
+    std::function<juce::String(int sourceIndex, const juce::String& paramId)> buildModDepthCustomId;
+
+    // Builds a setter that updates the depth of a (sourceIndex, paramId)
+    // assignment when called with a normalised CC value.
+    std::function<std::function<void(float)>(int sourceIndex, const juce::String& paramId)> buildModDepthSetter;
 };
 
 // Generic modulation source panel: vertical tab/drag-handles with per-connection
@@ -66,8 +78,15 @@ public:
 
     int getActiveSourceIndex() const { return activeSourceIndex; }
 
+    // Collapsed mode: tabs shown as floating pills, content hidden.
+    void setCollapsed(bool collapsed);
+    bool isCollapsed() const { return collapsed; }
+
     // Callback invoked when a drag starts/ends from a tab.
     std::function<void(bool isDragging)> onDragActiveChanged;
+
+    // Callback invoked when a tab label is clicked while collapsed, requesting uncollapse.
+    std::function<void()> onUncollapseRequested;
 
     // Force-refresh all depth indicators from current assignments.
     void refreshAllDepthIndicators();
@@ -94,7 +113,7 @@ protected:
 
     // The tab list and viewport (accessible for subclass layout if needed).
     VerticalTabListComponent tabList;
-    ScrollFadeViewport tabViewport;
+    osci::ScrollFadeViewport tabViewport;
 
     // Called when active source changes. Override for subclass-specific logic
     // (e.g. updating graph, preset selector). Base implementation is empty.
@@ -107,19 +126,20 @@ protected:
 
 private:
     ModulationSourceConfig config;
+    bool collapsed = false;
 
     // --- Layout constants ---
-    static constexpr int kTabWidth        = 55;
-    static constexpr int kTabGap          = 1;
-    static constexpr int kSeamShadowWidth = 10;
-    static constexpr int kMinTabHeight    = 40;
+    static constexpr int kTabHeight       = 50;
+    static constexpr int kTabGap          = 3;
+    static constexpr int kSeamShadowHeight = 10;
+    static constexpr int kMinTabWidth     = 55;
 
     juce::Rectangle<int> contentBounds;
     juce::Rectangle<int> outlineBounds;
-    melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {-2, 0}, 0 };
+    melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {0, -2}, 0 };
 
     // DepthIndicator – small arc knob for a single source→param connection.
-    class DepthIndicator : public HoverAnimationMixin {
+    class DepthIndicator : public osci::HoverAnimationMixin {
     public:
         DepthIndicator(ModulationSourceComponent& owner, int sourceIndex,
                        juce::String paramId, float depth, bool bipolar);
@@ -166,10 +186,12 @@ private:
         void refreshDepthIndicators(const std::vector<ModAssignment>& assignments);
 
         void setSourceValue(float value01) {
-            float delta = value01 - sourceValue;
-            sourceDelta = delta;
             sourceValue = value01;
             repaint();
+        }
+
+        void updateSmoothedValue(float current, float decay) {
+            smoothedValue += decay * (current - smoothedValue);
         }
 
         void setSourceActive(bool active) {
@@ -185,14 +207,13 @@ private:
         bool isDragging = false;
         bool isHovering = false;
         float sourceValue = 0.0f;
-        float sourceDelta = 0.0f;
+        float smoothedValue = 0.0f;
         bool sourceActive = false;
 
         juce::OwnedArray<DepthIndicator> depthIndicators;
 
         float hoverProgress = 0.0f;
-        juce::VBlankAnimatorUpdater hoverAnimUpdater { this };
-        std::optional<juce::Animator> hoverAnim;
+        osci::ToggleAnimationController hoverAnimationController { this };
     };
 
     // Non-owning typed pointers into tab handles (tab list owns them).

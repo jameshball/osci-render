@@ -7,6 +7,7 @@ QuickControlsBar::QuickControlsBar(OscirenderAudioProcessor& p, OscirenderAudioP
     addAndMakeVisible(frequencyKnob);
     addAndMakeVisible(perspectiveKnob);
     addAndMakeVisible(fovKnob);
+    addChildComponent(animationSpeedKnob);
 
     // Bind knobs to their EffectParameters
     auto* freqParam = audioProcessor.frequencyEffect->parameters[0];
@@ -20,19 +21,69 @@ QuickControlsBar::QuickControlsBar(OscirenderAudioProcessor& p, OscirenderAudioP
     fovKnob.bindToEffectParam(fovParam, 0.0, 1);
     fovKnob.getKnob().setTextValueSuffix(juce::CharPointer_UTF8("\xc2\xb0")); // degree symbol
 
+    animationSpeedKnob.bindToEffectParam(audioProcessor.animationSpeed->parameters[0], 1.0, 2);
+    animationSpeedKnob.getKnob().setTextValueSuffix("x");
+
     // Wire modulation
     frequencyKnob.wireModulation(audioProcessor);
     perspectiveKnob.wireModulation(audioProcessor);
     fovKnob.wireModulation(audioProcessor);
+    animationSpeedKnob.wireModulation(audioProcessor);
+
+#if !OSCI_PREMIUM
+    addAndMakeVisible(midiSwitch);
+
+    addAndMakeVisible(voicesBar);
+    voicesBar.setVisible(audioProcessor.midiEnabled->getBoolValue());
+#endif
+
+    audioProcessor.midiEnabled->addListener(this);
+    frequencyKnob.setVisible(!audioProcessor.midiEnabled->getBoolValue());
 }
 
-QuickControlsBar::~QuickControlsBar() {}
+QuickControlsBar::~QuickControlsBar() {
+    audioProcessor.midiEnabled->removeListener(this);
+}
+
+void QuickControlsBar::parameterValueChanged(int, float) {
+    triggerAsyncUpdate();
+}
+
+void QuickControlsBar::parameterGestureChanged(int, bool) {}
+
+void QuickControlsBar::handleAsyncUpdate() {
+    bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+    frequencyKnob.setVisible(!midiOn);
+#if !OSCI_PREMIUM
+    voicesBar.setVisible(midiOn);
+#endif
+    resized();
+    repaint();
+}
 
 void QuickControlsBar::resized() {
     auto area = getLocalBounds().reduced(5, 3);
 
     constexpr int gap = 3;
-    constexpr int numCols = 3;
+
+#if !OSCI_PREMIUM
+    // Layout: [MIDI icon+toggle][voices] | [freq][persp][fov]
+    constexpr int toggleW = 36;
+    constexpr int voicesW = 80;
+
+    auto midiArea = area.removeFromLeft(toggleW);
+    midiSwitch.setBounds(midiArea);
+    area.removeFromLeft(gap);
+
+    bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+    if (midiOn) {
+        voicesBar.setBounds(area.removeFromLeft(voicesW).reduced(0, 1));
+        area.removeFromLeft(gap);
+    }
+#endif
+
+    int numCols = frequencyKnob.isVisible() ? 3 : 2;
+    if (animationSpeedKnob.isVisible()) ++numCols;
     int totalGaps = (numCols - 1) * gap;
     int available = area.getWidth() - totalGaps;
     float colWidth = (float)available / (float)numCols;
@@ -51,13 +102,35 @@ void QuickControlsBar::resized() {
         return juce::Rectangle<int>(left, y, right - left, h).reduced(0, vReduce);
     };
 
-    frequencyKnob.setBounds(nextCol(colWidth, 1));
+    if (frequencyKnob.isVisible())
+        frequencyKnob.setBounds(nextCol(colWidth, 1));
     perspectiveKnob.setBounds(nextCol(colWidth, 1));
     fovKnob.setBounds(nextCol(colWidth, 1));
+    if (animationSpeedKnob.isVisible())
+        animationSpeedKnob.setBounds(nextCol(colWidth, 1));
 }
 
 void QuickControlsBar::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
-    g.setColour(Colours::darker());
-    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
+    g.setColour(osci::Colours::darker());
+    g.fillRoundedRectangle(bounds, osci::Colours::kPillRadius);
+}
+
+void QuickControlsBar::setAnimated(bool animated) {
+    if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+        juce::Component::SafePointer<QuickControlsBar> safeThis(this);
+        juce::MessageManager::callAsync([safeThis, animated] {
+            if (safeThis != nullptr) {
+                safeThis->setAnimated(animated);
+            }
+        });
+        return;
+    }
+
+    if (animationSpeedKnob.isVisible() == animated) {
+        return;
+    }
+    animationSpeedKnob.setVisible(animated);
+    resized();
+    repaint();
 }

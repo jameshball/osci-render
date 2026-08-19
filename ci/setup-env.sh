@@ -1,9 +1,9 @@
 #!/bin/bash -e
 
 # linux specific stiff
-if [ $OS = "linux" ]; then
+if [ "$OS" = "linux" ]; then
   sudo apt-get update
-  sudo apt-get install clang git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
+  sudo apt-get install clang cmake git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
 fi
 
 ROOT=$(pwd)
@@ -37,23 +37,32 @@ if [ -z "$JUCE_TAG" ]; then
   JUCE_TAG="8.0.12"
 fi
 echo "Latest JUCE release: $JUCE_TAG"
-curl -f -s -S -L --retry 3 --retry-delay 5 "https://github.com/juce-framework/JUCE/releases/download/$JUCE_TAG/juce-${JUCE_TAG}-$PROJUCER_OS.zip" -o Projucer.zip
-unzip -q Projucer.zip
+if [ "$OS" = "linux" ] && [ "$(uname -m)" = "aarch64" ]; then
+  curl -f -s -S -L --retry 3 --retry-delay 5 "https://github.com/juce-framework/JUCE/archive/refs/tags/$JUCE_TAG.zip" -o JUCE-source.zip
+  unzip -q JUCE-source.zip
+  mv "JUCE-$JUCE_TAG" JUCE
+  cmake -S JUCE -B JUCE/build -DJUCE_BUILD_EXTRAS=ON -DJUCE_BUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=Release
+  cmake --build JUCE/build --target Projucer --parallel "$(nproc)"
+else
+  curl -f -s -S -L --retry 3 --retry-delay 5 "https://github.com/juce-framework/JUCE/releases/download/$JUCE_TAG/juce-${JUCE_TAG}-$PROJUCER_OS.zip" -o Projucer.zip
+  unzip -q Projucer.zip
+fi
 
 # Set Projucer path based on OS
 if [ "$OS" = "mac" ]; then
   PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.app/Contents/MacOS/Projucer"
 elif [ "$OS" = "linux" ]; then
-  PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer"
+  if [ "$(uname -m)" = "aarch64" ]; then
+    PROJUCER_PATH=$(find "$ROOT/ci/bin/JUCE" -type f -name Projucer -perm -111 -print -quit)
+    if [ -z "$PROJUCER_PATH" ]; then
+      echo "Native ARM64 Projucer build was not found"
+      exit 1
+    fi
+  else
+    PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer"
+  fi
 else
   PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.exe"
-fi
-
-# Get the Spout SDK and SpoutLibrary.dll
-if [ "$OS" = "win" ]; then
-  cp "$ROOT/External/spout/SpoutLibrary.dll" /c/Windows/System32
-elif [ "$OS" = "mac" ]; then
-  sudo cp -R "$ROOT/External/syphon/Syphon.framework" "/Library/Frameworks"
 fi
 
 # Set global path

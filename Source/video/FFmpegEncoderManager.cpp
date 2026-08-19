@@ -14,9 +14,8 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile,
-    bool transparent) {
-    // When transparency is requested, always use ProRes 4444 with alpha
-    if (transparent) {
+    bool preserveAlpha) {
+    if (preserveAlpha) {
         return buildProRes4444AlphaEncodingCommand(width, height, frameRate, outputFile);
     }
 
@@ -35,6 +34,58 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
             // Default to H.264 if unknown codec
             return buildH264EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
     }
+}
+
+bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const juce::File& audioInput, const juce::File& output,
+                                            const juce::StringArray& audioCodecArgs, juce::String& error, const std::atomic<bool>* cancelRequested) const {
+    error.clear();
+    if (!ffmpegExecutable.existsAsFile()) {
+        error = "FFmpeg executable not found.";
+        return false;
+    }
+    if (!videoInput.existsAsFile()) {
+        error = "Temporary video file was not created.";
+        return false;
+    }
+    if (!audioInput.existsAsFile()) {
+        error = "Input audio file not found.";
+        return false;
+    }
+    if (output.existsAsFile() && !output.deleteFile()) {
+        error = "Could not replace output file.";
+        return false;
+    }
+
+    juce::StringArray command { ffmpegExecutable.getFullPathName(),
+                                "-hide_banner", "-loglevel", "error",
+                                "-i", videoInput.getFullPathName(),
+                                "-i", audioInput.getFullPathName(),
+                                "-c:v", "copy" };
+    command.addArray(audioCodecArgs);
+    command.addArray({ "-shortest", "-y", output.getFullPathName() });
+
+    juce::ChildProcess process;
+    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+        error = "Failed to start FFmpeg for audio mux.";
+        return false;
+    }
+
+    while (process.isRunning()) {
+        if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()) {
+            process.kill();
+            error = "Cancelled.";
+            return false;
+        }
+        process.waitForProcessToFinish(200);
+    }
+
+    const juce::String processOutput = process.readAllProcessOutput();
+    const bool succeeded = process.getExitCode() == 0 && output.existsAsFile() && output.getSize() > 0;
+    if (!succeeded) {
+        output.deleteFile();
+        error = processOutput.isNotEmpty() ? processOutput : "FFmpeg mux failed.";
+    }
+    return succeeded;
 }
 
 int FFmpegEncoderManager::estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue) {
@@ -226,10 +277,9 @@ juce::String FFmpegEncoderManager::buildBaseEncodingCommand(
     int width,
     int height,
     double frameRate,
-    const juce::File& outputFile,
-    bool transparent) {
+    bool preserveAlpha) {
     juce::String resolution = juce::String(width) + "x" + juce::String(height);
-    juce::String outputPixFmt = transparent ? "yuva444p10le" : "yuv420p";
+    juce::String outputPixFmt = preserveAlpha ? "yuva444p10le" : "yuv420p";
     juce::String cmd = "\"" + ffmpegExecutable.getFullPathName() + "\"" +
                        " -r " + juce::String(frameRate) +
                        " -f rawvideo" +
@@ -322,7 +372,7 @@ juce::String FFmpegEncoderManager::buildH264EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, false);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H264);
 
     // Pass width, height, and frameRate to addH264EncoderSettings
@@ -339,7 +389,7 @@ juce::String FFmpegEncoderManager::buildH265EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, false);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H265);
 
     cmd = addH265EncoderSettings(cmd, bestEncoder, crf, compressionPreset, width, height, frameRate);
@@ -355,7 +405,7 @@ juce::String FFmpegEncoderManager::buildVP9EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, false);
 
     cmd += juce::String(" -c:v libvpx-vp9") +
            " -b:v 0" +
@@ -373,7 +423,7 @@ juce::String FFmpegEncoderManager::buildProResEncodingCommand(
     int height,
     double frameRate,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, false);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::ProRes);
 
     cmd += " -c:v " + bestEncoder +
@@ -390,7 +440,7 @@ juce::String FFmpegEncoderManager::buildProRes4444AlphaEncodingCommand(
     int height,
     double frameRate,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile, true);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, true);
 
     // prores_ks is available cross-platform in FFmpeg
     cmd += " -c:v prores_ks"

@@ -2,9 +2,9 @@
 
 #include <JuceHeader.h>
 #include "../components/effects/EffectComponent.h"
-#include "../components/SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
-#include "../components/SwitchButton.h"
+#include <osci_gui/visualiser/osci_VisualiserGeometry.h>
 
 // Define codec options
 enum class VideoCodec {
@@ -18,15 +18,8 @@ enum class VideoCodec {
 
 class RecordingParameters {
 public:
-    RecordingParameters() {
-        qualityParameter.disableLfo();
-        qualityParameter.disableSidechain();
-        resolution.disableLfo();
-        resolution.disableSidechain();
-        frameRate.disableLfo();
-        frameRate.disableSidechain();
-    }
-    
+    RecordingParameters();
+
 private:
 
 #if OSCI_PREMIUM
@@ -34,7 +27,7 @@ private:
 #else
     const bool sosciFeatures = false;
 #endif
-    
+
 public:
 
     osci::EffectParameter qualityParameter = osci::EffectParameter(
@@ -49,15 +42,25 @@ public:
 
     osci::BooleanParameter recordAudio = osci::BooleanParameter("Record Audio", "recordAudio", VERSION_HINT, true, "Record audio along with the video.");
     osci::BooleanParameter recordVideo = osci::BooleanParameter("Record Video", "recordVideo", VERSION_HINT, sosciFeatures, "Record video output of the visualiser.");
-    
-    osci::EffectParameter resolution = osci::EffectParameter(
-        "Resolution",
-        "The resolution of the recorded video. This only changes when not recording.",
-        "resolution",
-        VERSION_HINT, 1024, 128, 2048, 1.0
+
+    VisualiserCanvasPreset canvasPreset = VisualiserCanvasPreset::Square;
+
+    osci::EffectParameter canvasWidth = osci::EffectParameter(
+        "Canvas Width",
+        "The width of the visualiser canvas and recorded video. This only changes when not recording.",
+        "canvasWidth",
+        VERSION_HINT, 1024, VisualiserGeometry::minCanvasDimension, VisualiserGeometry::maxCanvasDimension, 2.0
     );
-    std::shared_ptr<osci::Effect> resolutionEffect = std::make_shared<osci::SimpleEffect>(&resolution);
-    
+    std::shared_ptr<osci::Effect> canvasWidthEffect = std::make_shared<osci::SimpleEffect>(&canvasWidth);
+
+    osci::EffectParameter canvasHeight = osci::EffectParameter(
+        "Canvas Height",
+        "The height of the visualiser canvas and recorded video. This only changes when not recording.",
+        "canvasHeight",
+        VERSION_HINT, 1024, VisualiserGeometry::minCanvasDimension, VisualiserGeometry::maxCanvasDimension, 2.0
+    );
+    std::shared_ptr<osci::Effect> canvasHeightEffect = std::make_shared<osci::SimpleEffect>(&canvasHeight);
+
     osci::EffectParameter frameRate = osci::EffectParameter(
         "Frame Rate",
         "The frame rate of the recorded video. This only changes when not recording.",
@@ -69,68 +72,20 @@ public:
     juce::String compressionPreset = "fast";
     VideoCodec videoCodec = VideoCodec::H264;
 
-    void save(juce::XmlElement* xml) {
-        auto settingsXml = xml->createNewChildElement("recordingSettings");
-        losslessAudio.save(settingsXml->createNewChildElement("losslessAudio"));
-        losslessVideo.save(settingsXml->createNewChildElement("losslessVideo"));
-        recordAudio.save(settingsXml->createNewChildElement("recordAudio"));
-        recordVideo.save(settingsXml->createNewChildElement("recordVideo"));
-        settingsXml->setAttribute("compressionPreset", compressionPreset);
-        settingsXml->setAttribute("customSharedTextureServerName", customSharedTextureServerName);
-        settingsXml->setAttribute("videoCodec", static_cast<int>(videoCodec));
-        
-        auto qualityXml = settingsXml->createNewChildElement("quality");
-        qualityEffect->save(qualityXml);
-        
-        auto resolutionXml = settingsXml->createNewChildElement("resolution");
-        resolutionEffect->save(resolutionXml);
-
-        auto frameRateXml = settingsXml->createNewChildElement("frameRate");
-        frameRateEffect->save(frameRateXml);
-    }
+    void save(juce::XmlElement* xml);
 
     // opt to not change any values if not found
-    void load(juce::XmlElement* xml) {
-        if (auto* settingsXml = xml->getChildByName("recordingSettings")) {
-            if (auto* losslessAudioXml = settingsXml->getChildByName("losslessAudio")) {
-                losslessAudio.load(losslessAudioXml);
-            }
-            if (auto* losslessVideoXml = settingsXml->getChildByName("losslessVideo")) {
-                losslessVideo.load(losslessVideoXml);
-            }
-            if (auto* recordAudioXml = settingsXml->getChildByName("recordAudio")) {
-                recordAudio.load(recordAudioXml);
-            }
-            if (auto* recordVideoXml = settingsXml->getChildByName("recordVideo")) {
-                recordVideo.load(recordVideoXml);
-            }
-            if (settingsXml->hasAttribute("compressionPreset")) {
-                compressionPreset = settingsXml->getStringAttribute("compressionPreset");
-            }
-            if (settingsXml->hasAttribute("customSharedTextureServerName")) {
-                customSharedTextureServerName = settingsXml->getStringAttribute("customSharedTextureServerName");
-            }
-            if (settingsXml->hasAttribute("videoCodec")) {
-                int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
-                videoCodec = static_cast<VideoCodec>(codecValue);
-            }
-            if (auto* qualityXml = settingsXml->getChildByName("quality")) {
-                qualityEffect->load(qualityXml);
-            }
-            if (auto* resolutionXml = settingsXml->getChildByName("resolution")) {
-                resolutionEffect->load(resolutionXml);
-            }
-            if (auto* frameRateXml = settingsXml->getChildByName("frameRate")) {
-                frameRateEffect->load(frameRateXml);
-            }
-        }
-    }
-   
+    void load(juce::XmlElement* xml);
+
     juce::StringArray compressionPresets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
-    juce::String customSharedTextureServerName = "";
+    juce::String customTextureOutputName = "";
+
+    VisualiserRenderSize getCanvasSize();
+    void setCanvasSize(VisualiserRenderSize size);
+    void sanitiseCanvasParameters();
 };
 
-class RecordingSettings : public juce::Component {
+class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
     RecordingSettings(RecordingParameters&);
     ~RecordingSettings();
@@ -158,18 +113,26 @@ public:
     juce::String getCompressionPreset() {
         return parameters.compressionPreset;
     }
-    
-    juce::String getCustomSharedTextureServerName() {
-        if (parameters.customSharedTextureServerName.isEmpty()) {
-            return "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
+
+    juce::String getCustomTextureOutputName() {
+        if (parameters.customTextureOutputName.isEmpty()) {
+            parameters.customTextureOutputName = "osci-render - " + juce::String(juce::Time::getCurrentTime().toMilliseconds());
         }
-        return parameters.customSharedTextureServerName;
+        return parameters.customTextureOutputName;
     }
-    
-    int getResolution() {
-        return parameters.resolution.getValueUnnormalised();
+
+    VisualiserRenderSize getCanvasSize() {
+        return parameters.getCanvasSize();
     }
-    
+
+    int getCanvasWidth() {
+        return getCanvasSize().width;
+    }
+
+    int getCanvasHeight() {
+        return getCanvasSize().height;
+    }
+
     double getFrameRate() {
         return parameters.frameRate.getValueUnnormalised();
     }
@@ -204,29 +167,37 @@ public:
 
 private:
     EffectComponent quality{*parameters.qualityEffect};
-    EffectComponent resolution{*parameters.resolutionEffect};
+    EffectComponent canvasWidth{*parameters.canvasWidthEffect};
+    EffectComponent canvasHeight{*parameters.canvasHeightEffect};
     EffectComponent frameRate{*parameters.frameRateEffect};
 
     jux::SwitchButton losslessAudio{&parameters.losslessAudio};
     jux::SwitchButton losslessVideo{&parameters.losslessVideo};
     jux::SwitchButton recordAudio{&parameters.recordAudio};
     jux::SwitchButton recordVideo{&parameters.recordVideo};
-    
+
 #if !OSCI_PREMIUM
-    juce::TextEditor recordVideoWarning{"recordVideoWarning"};
+    osci::TextEditor recordVideoWarning{"recordVideoWarning"};
     juce::HyperlinkButton sosciLink{"Purchase here", juce::URL("https://osci-render.com/#purchase")};
 #endif
 
     juce::Label compressionPresetLabel{"Compression Speed", "Compression Speed"};
     juce::ComboBox compressionPreset;
-    
+
+    juce::Label canvasPresetLabel{"Resolution", "Resolution"};
+    juce::ComboBox canvasPresetSelector;
+
     juce::Label videoCodecLabel{"Video Codec", "Video Codec"};
     juce::ComboBox videoCodecSelector;
-    
-    juce::Label customSharedTextureOutputLabel{"Custom Syphon/Spout Name", "Custom Syphon/Spout Name"};
-    juce::TextEditor customSharedTextureOutputEditor{"customSharedTextureOutputEditor"};
+
+    juce::Label customTextureOutputLabel{"Texture Output Name", "Texture Output Name"};
+    osci::TextEditor customTextureOutputEditor{"customTextureOutputEditor"};
 
     void updateLosslessAudioEnabled();
+    void updateCanvasPresetSelector();
+    void updateCanvasControlsVisibility();
+    void parameterValueChanged(int parameterIndex, float newValue) override;
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
 };

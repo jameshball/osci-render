@@ -48,7 +48,7 @@ void NodeGraphComponent::HandleComponent::updateNodeFromPosition() {
 // ============================================================================
 
 NodeGraphComponent::NodeGraphComponent() {
-    setColour(backgroundColourId, Colours::veryDark());
+    setColour(backgroundColourId, osci::Colours::veryDark());
     setColour(gridLineColourId, juce::Colours::white.withAlpha(0.1f));
     setColour(lineColourId, juce::Colour(0xFF00E5FF));
     setColour(fillColourId, juce::Colour(0xFF00E5FF).withAlpha(0.15f));
@@ -1039,6 +1039,14 @@ void NodeGraphComponent::setSnapDivisions(int divisions) {
         snapDivisions = juce::jmax(0, divisions);
         invalidateGrid();
         repaint();
+    }
+}
+
+void NodeGraphComponent::setFirstNodeValue(double value) {
+    if (!nodes.empty()) {
+        nodes.front().value = juce::jlimit(valueMin, valueMax, value);
+        if (!handles.isEmpty())
+            handles.getFirst()->updateFromNode();
     }
 }
 

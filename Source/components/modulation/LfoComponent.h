@@ -8,11 +8,9 @@
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/LfoPresetManager.h"
 #include "ModulationSourceComponent.h"
-#include "../PhaseSliderComponent.h"
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../KnobContainerComponent.h"
 
-#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessor;
 
@@ -37,7 +35,7 @@ public:
 
     static juce::Colour getLfoColour(int lfoIndex);
 
-    // Restrict LFO features when MIDI is disabled (only Free mode available)
+    // Restrict LFO features when MIDI is disabled.
     void setMidiEnabled(bool enabled);
 
     void syncFromProcessorState() override;
@@ -47,7 +45,9 @@ public:
     void presetBrowserUserSelected(const juce::File& file) override;
     void presetBrowserUserDeleted(const juce::File& file) override;
     void presetBrowserSaveRequested(const juce::String& name) override;
-    void presetBrowserImportRequested() override;
+    void presetBrowserSetDefaultFactory(LfoPreset preset) override;
+    void presetBrowserSetDefaultFile(const juce::File& file) override;
+    void presetBrowserClearDefault() override;
 
 protected:
     void onActiveSourceChanged(int newIndex) override;
@@ -59,7 +59,9 @@ private:
     struct LfoData {
         LfoWaveform waveform;
         LfoWaveform customWaveform;
+        LfoWaveform factoryWaveform;  // Cached waveform for current factory preset
         LfoPreset preset = LfoPreset::Triangle;
+        bool isCustom = false;        // True when waveform differs from factory preset
         juce::String userPresetName; // Non-empty when a user preset is loaded
     };
     std::array<LfoData, NUM_LFOS> lfoData;
@@ -100,7 +102,7 @@ private:
     };
 
     PresetSelector presetSelector;
-    SvgButton paintToggle;
+    osci::SvgButton paintToggle;
 
     // Custom S-curve toggle for smooth/straight interpolation mode.
     class SmoothToggle : public juce::Component, public juce::SettableTooltipClient {
@@ -119,11 +121,12 @@ private:
 
     SmoothToggle smoothToggle;
     PaintShapePreview shapePreview;
-    SvgButton copyButton;
-    SvgButton pasteButton;
+    osci::SvgButton copyButton;
+    osci::SvgButton pasteButton;
     LfoPresetManager presetManager;
-    std::unique_ptr<juce::FileChooser> fileChooser;
-    juce::Component::SafePointer<LfoPresetBrowserOverlay> presetBrowserOverlay;
+    LfoPresetBrowserOverlay presetBrowser;
+    bool presetBrowserVisible = false;
+    juce::Rectangle<int> presetBrowserBounds;
     ModulationRateComponent rateControl;
     ModulationModeComponent modeControl;
     PhaseSliderComponent phaseSlider;
@@ -162,13 +165,17 @@ private:
     // that undo works even if the editor is destroyed and recreated.
     void recordLfoUndoableChange(const std::vector<GraphNode>& nodesBefore,
                                  const LfoWaveform& waveformBefore, int lfoIndex);
+    void recordLfoUndoableChangeGuarded(const std::vector<GraphNode>& nodesBefore,
+                                        const LfoWaveform& waveformBefore, int lfoIndex);
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();
-    void importVitalLfo();
     void loadUserPreset(const juce::File& file);
     void copyWaveformToClipboard();
     void pasteWaveformFromClipboard();
+    juce::String getDefaultFactoryName() const;
+    juce::String getDefaultFilePath() const;
+    void refreshPresetBrowserIfVisible();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LfoComponent)
 };

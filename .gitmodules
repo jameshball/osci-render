@@ -1,23 +1,6 @@
-[submodule "modules/chowdsp_utils"]
-	path = modules/chowdsp_utils
-	url = ../../Chowdhury-DSP/chowdsp_utils.git
-[submodule "modules/juce_sharedtexture"]
-	path = modules/juce_sharedtexture
-	url = ../../jameshball/juce_sharedtexture.git
 [submodule "modules/osci_render_core"]
 	path = modules/osci_render_core
 	url = ../../jameshball/osci_render_core.git
-[submodule "modules/melatonin_inspector"]
-	path = modules/melatonin_inspector
-	url = https://github.com/sudara/melatonin_inspector.git
-	branch = main
-[submodule "LuaJIT"]
-	path = modules/LuaJIT
-	url = https://luajit.org/git/luajit.git
-	ignore = untracked
-[submodule "Source/chinese_postman"]
-	path = modules/chinese_postman
-	url = git@github.com:jameshball/chinese-postman.git
 [submodule "modules/melatonin_blur"]
 	path = modules/melatonin_blur
 	url = https://github.com/sudara/melatonin_blur.git
@@ -28,12 +11,43 @@
 [submodule "modules/gifdec"]
 	path = modules/gifdec
 	url = https://github.com/lecram/gifdec
-[submodule "modules/tinyobjloader"]
-	path = modules/tinyobjloader
-	url = https://github.com/jameshball/tinyobjloader
-[submodule "modules/Mathter"]
-	path = modules/Mathter
-	url = https://github.com/petiaccja/Mathter
-[submodule "modules/miniaudio"]
-	path = modules/miniaudio
-	url = https://github.com/mackron/miniaudio
+[submodule "modules/juce_mts_esp"]
+	path = modules/juce_mts_esp
+	url = https://github.com/jameshball/juce_mts_esp.git
+[submodule "modules/thorvg"]
+	path = modules/thorvg
+	url = https://github.com/jameshball/thorvg.git
+	branch = osci-render-trim-getter
+[submodule "modules/Clipper2"]
+	path = modules/Clipper2
+	url = https://github.com/AngusJohnson/Clipper2.git
+[submodule "modules/osci_licensing"]
+	path = modules/osci_licensing
+	url = https://github.com/jameshball/osci_licensing.git
+	branch = main
+[submodule "modules/osci_gui"]
+	path = modules/osci_gui
+	url = git@github.com:jameshball/osci_gui.git
+	branch = main
+[submodule "modules/jucewright"]
+	path = modules/jucewright
+	url = https://github.com/jameshball/jucewright.git
+[submodule "modules/osci_file_import"]
+	path = modules/osci_file_import
+	url = git@github.com:jameshball/osci_file_import.git
+	branch = main
+[submodule "modules/osci_scripting"]
+	path = modules/osci_scripting
+	url = git@github.com:jameshball/osci_scripting.git
+	branch = main
+[submodule "modules/osci_audio_devices"]
+	path = modules/osci_audio_devices
+	url = git@github.com:jameshball/osci_audio_devices.git
+	branch = main
+[submodule "modules/osci_texture_interop"]
+	path = modules/osci_texture_interop
+	url = git@github.com:jameshball/osci_texture_interop.git
+	branch = main
+[submodule "modules/osci_standalone"]
+	path = modules/osci_standalone
+	url = git@github.com:jameshball/osci_standalone.git

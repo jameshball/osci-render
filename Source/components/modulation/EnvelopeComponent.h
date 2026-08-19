@@ -157,7 +157,6 @@ private:
 	void initEnvelopeData(int envIndex);
 	void setupDahdsrConstraints();
 	std::vector<GraphNode> buildDahdsrNodes(const DahdsrParams& p) const;
-
 };
 
 #endif // gpl

@@ -4,6 +4,8 @@
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/OpenGL.h>
 
+namespace {
+
 static void setViewTreeTransparent(NSView* view) {
     if (view.wantsLayer && view.layer) {
         view.layer.opaque = NO;
@@ -14,39 +16,49 @@ static void setViewTreeTransparent(NSView* view) {
     }
 }
 
-void configureNativeWindowTransparency(juce::Component* topLevelWindow) {
-    if (topLevelWindow == nullptr)
-        return;
+} // namespace
 
-    if (auto* peer = topLevelWindow->getPeer()) {
-        NSView* view = (NSView*)peer->getNativeHandle();
-        if (view != nil) {
-            NSWindow* window = [view window];
-            if (window != nil) {
-                [window setOpaque:NO];
-                [window setBackgroundColor:[NSColor clearColor]];
-                [window setHasShadow:NO];
-            }
-            // Also make all views in the tree non-opaque so
-            // layer-backed GL views don't block transparency.
-            setViewTreeTransparent(view);
-            // Round the content view corners
-            NSView* contentView = [view window] ? [[view window] contentView] : view;
-            if (contentView) {
-                contentView.wantsLayer = YES;
-                contentView.layer.cornerRadius = 10.0;
-                contentView.layer.masksToBounds = YES;
-            }
-        }
+void configureNativeWindowTransparency(juce::Component* topLevelWindow) {
+    if (topLevelWindow == nullptr) {
+        return;
+    }
+
+    auto* peer = topLevelWindow->getPeer();
+    if (peer == nullptr) {
+        return;
+    }
+
+    NSView* view = static_cast<NSView*>(peer->getNativeHandle());
+    if (view == nil) {
+        return;
+    }
+
+    NSWindow* window = [view window];
+    if (window != nil) {
+        [window setOpaque:NO];
+        [window setBackgroundColor:[NSColor clearColor]];
+        [window setHasShadow:NO];
+    }
+
+    setViewTreeTransparent(view);
+
+    NSView* contentView = window != nil ? [window contentView] : view;
+    if (contentView != nil) {
+        contentView.wantsLayer = YES;
+        contentView.layer.cornerRadius = 10.0;
+        contentView.layer.masksToBounds = YES;
     }
 }
 
 void configureOpenGLSurfaceTransparency(void* rawGLContext) {
-    if (rawGLContext == nullptr) return;
-    NSOpenGLContext* nsglCtx = (NSOpenGLContext*)rawGLContext;
-    if ([nsglCtx isKindOfClass:[NSOpenGLContext class]]) {
+    if (rawGLContext == nullptr) {
+        return;
+    }
+
+    NSOpenGLContext* context = static_cast<NSOpenGLContext*>(rawGLContext);
+    if ([context isKindOfClass:[NSOpenGLContext class]]) {
         GLint opacity = 0;
-        [nsglCtx setValues:&opacity forParameter:NSOpenGLCPSurfaceOpacity];
+        [context setValues:&opacity forParameter:NSOpenGLCPSurfaceOpacity];
     }
 }
 

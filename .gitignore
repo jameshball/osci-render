@@ -366,3 +366,14 @@ MigrationBackup/
 
 # Vital synth
 vital/
+
+# Local-only research/reference checkouts
+/osci-render-api/
+/osci-render-website/
+/docs/research/
+/docs/proprietary-compatibility-audit.md
+/docs/proprietary-compatibility-file-inventory.tsv
+
+# Local migration secrets and Ed25519 keys (NEVER commit)
+/.migration/
+/.wrangler/

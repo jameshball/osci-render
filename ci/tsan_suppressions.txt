@@ -19,6 +19,14 @@ race:_os_unfair_lock*
 race:AudioToolbox*
 race:CoreAudio*
 
+# ── Known benign races in our code ─────────────────────────────────────
+
+# BufferConsumer double-buffer swap: audio thread writes via write() while
+# background visualiser thread reads via getBuffer(). The worst case is a
+# single frame of stale/torn visual data, which is imperceptible.
+race:osci::BufferConsumer::write
+race:osci::BufferConsumer::getBuffer
+
 # OpenGL driver internals
 race:libGPUSupportMercury*
 race:GLEngine*

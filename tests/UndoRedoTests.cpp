@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "TestCleanup.h"
 #include <unordered_map>
 
 // ============================================================================
@@ -410,6 +411,8 @@ public:
             h.undoManager.redo();
             expectWithinAbsoluteError(param.getValueUnnormalised(), 0.8f, 1e-4f,
                 "Effect.setValue should be redoable");
+
+            testutil::cleanupSubParams(param);
         }
 
         beginTest("Effect enabled toggle undo/redo");
@@ -432,6 +435,10 @@ public:
 
             h.undoManager.redo();
             expect(!effect.enabled->getBoolValue(), "Redo should re-disable");
+
+            delete effect.enabled;
+            effect.enabled = nullptr;
+            testutil::cleanupSubParams(param);
         }
     }
 };
@@ -542,6 +549,10 @@ public:
             undoManager.redo();
             expect(positionOf(e3->getId()) < positionOf(e1->getId()), "Redo should restore E3 before E1");
             expect(positionOf(e1->getId()) < positionOf(e2->getId()), "Redo should restore E1 before E2");
+
+            for (auto* ep : { &p1, &p2, &p3, &p4 }) {
+                testutil::cleanupSubParams(*ep);
+            }
         }
     }
 };

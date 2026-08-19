@@ -1,4 +1,6 @@
 #include <JuceHeader.h>
+#include "TestCleanup.h"
+#include "../Source/audio/modulation/LfoParameters.h"
 #include "../Source/audio/modulation/LfoState.h"
 
 // ============================================================================
@@ -191,7 +193,7 @@ public:
                 Writer(LfoWaveformStore& s, std::atomic<bool>& r, std::atomic<int>& sc, int id)
                     : juce::Thread("WfWriter" + juce::String(id)), store(s), running(r), setCount(sc), writerId(id) {}
                 void run() override {
-                    static const LfoPreset presets[] = { LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square };
+                    static const LfoPreset presets[] = { LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::SawUp, LfoPreset::Square };
                     juce::Random rng(writerId * 54321);
                     while (running.load()) {
                         int lfo = rng.nextInt(NUM_LFOS);
@@ -307,7 +309,7 @@ public:
                 : juce::Thread("GuiSim"), wfStore(ws), running(r) {}
             void run() override {
                 static const LfoPreset presets[] = {
-                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square
+                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::SawUp, LfoPreset::Square
                 };
                 juce::Random rng(99);
                 while (running.load()) {
@@ -503,7 +505,7 @@ public:
                 : juce::Thread("GuiWaveform"), store(s), running(r) {}
             void run() override {
                 static const LfoPreset presets[] = {
-                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::Sawtooth, LfoPreset::Square
+                    LfoPreset::Sine, LfoPreset::Triangle, LfoPreset::SawUp, LfoPreset::Square
                 };
                 juce::Random rng(77);
                 while (running.load()) {
@@ -578,9 +580,9 @@ public:
             expectWithinAbsoluteError(wf.evaluate(1.0f), 0.0f, 0.01f);
         }
 
-        beginTest("Sawtooth preset boundary values");
+        beginTest("Saw Up preset boundary values");
         {
-            auto wf = createLfoPreset(LfoPreset::Sawtooth);
+            auto wf = createLfoPreset(LfoPreset::SawUp);
             expectWithinAbsoluteError(wf.evaluate(0.0f), 0.0f, 0.01f);
             expectWithinAbsoluteError(wf.evaluate(0.5f), 0.5f, 0.01f);
             expectWithinAbsoluteError(wf.evaluate(0.99f), 0.99f, 0.02f);
@@ -616,7 +618,7 @@ public:
         beginTest("LfoAudioState phase wrapping");
         {
             LfoAudioState state;
-            auto wf = createLfoPreset(LfoPreset::Sawtooth);
+            auto wf = createLfoPreset(LfoPreset::SawUp);
             // Advance through many cycles, phase should always stay in [0, 1)
             float val;
             for (int i = 0; i < 100000; ++i) {
@@ -683,6 +685,43 @@ public:
 };
 
 // ============================================================================
+// Test 8: Preview assignments restore the exact pre-preview state
+// ============================================================================
+
+class LfoPreviewAssignmentTest : public juce::UnitTest {
+public:
+    LfoPreviewAssignmentTest() : juce::UnitTest("LFO Preview Assignment Restoration", "LFO") {}
+
+    void runTest() override {
+        beginTest("Stopping preview preserves existing assignments");
+
+        LfoParameters lfoParameters;
+        osci::EffectParameter parameter("Amount", "", "previewAmount", 2, 0.75f, 0.0f, 1.0f, 0.01f,
+                                        osci::LfoType::Sine, 2.0f);
+        auto effect = std::make_shared<osci::SimpleEffect>(&parameter);
+        std::vector<std::shared_ptr<osci::Effect>> effects{effect};
+        const LfoAssignment original{7, parameter.paramID, 0.35f, true};
+        lfoParameters.addAssignment(original);
+
+        lfoParameters.startPreview(effect->getId(), effects);
+        lfoParameters.stopPreview();
+
+        const auto restored = lfoParameters.getAssignments();
+        expectEquals(static_cast<int>(restored.size()), 1);
+        if (restored.size() == 1) {
+            expectEquals(restored[0].sourceIndex, original.sourceIndex);
+            expectEquals(restored[0].paramId, original.paramId);
+            expectWithinAbsoluteError(restored[0].depth, original.depth, 0.0001f);
+            expect(restored[0].bipolar == original.bipolar);
+        }
+        expectWithinAbsoluteError(parameter.getValueUnnormalised(), 0.75f, 0.0001f);
+
+        testutil::cleanupSubParams(parameter);
+        testutil::cleanupLfoParams(lfoParameters);
+    }
+};
+
+// ============================================================================
 // Static registration — JUCE auto-discovers these
 // ============================================================================
 static LfoAssignmentRaceTest lfoAssignmentRaceTest;
@@ -692,3 +731,4 @@ static LfoAssignmentOrderTest lfoAssignmentOrderTest;
 static LfoFullSystemStressTest lfoFullSystemStressTest;
 static LfoWaveformCorrectnessTest lfoWaveformCorrectnessTest;
 static LfoSerializationTest lfoSerializationTest;
+static LfoPreviewAssignmentTest lfoPreviewAssignmentTest;

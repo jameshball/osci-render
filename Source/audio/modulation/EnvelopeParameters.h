@@ -59,12 +59,8 @@ public:
     std::array<std::vector<float>, NUM_ENVELOPES> blockBuffer;
     std::array<float, NUM_ENVELOPES> prevBlockValues = {};
 
-    // Whether to create envelopes 1-4 (advanced mode)
-    bool advancedMode = false;
-
-    // Envelope 0 always uses legacy IDs. Envelopes 1-4 are only created in advanced mode.
-    explicit EnvelopeParameters(bool beginnerMode) {
-        advancedMode = !beginnerMode;
+    // Envelope 0 always uses legacy IDs. Envelopes 1-4 are only created in premium builds.
+    EnvelopeParameters() {
 
         // Envelope 0: legacy parameter IDs for backwards compatibility
         params[0].delayTime    = new osci::FloatParameter("Delay Time",    "delayTime",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
@@ -88,31 +84,31 @@ public:
         floatParameters.push_back(params[0].decayShape);
         floatParameters.push_back(params[0].releaseShape);
 
-        // Envelopes 1-4: indexed parameter IDs (advanced mode only)
-        if (advancedMode) {
-            for (int i = 1; i < NUM_ENVELOPES; ++i) {
-                juce::String idx = juce::String(i + 1);
-                params[i].delayTime    = new osci::FloatParameter("Env " + idx + " Delay",     "env" + idx + "Delay",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].attackTime   = new osci::FloatParameter("Env " + idx + " Attack",    "env" + idx + "Attack",   VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].holdTime     = new osci::FloatParameter("Env " + idx + " Hold",      "env" + idx + "Hold",     VERSION_HINT, 1.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].decayTime    = new osci::FloatParameter("Env " + idx + " Decay",     "env" + idx + "Decay",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].sustainLevel = new osci::FloatParameter("Env " + idx + " Sustain",   "env" + idx + "Sustain",  VERSION_HINT, 1.0f, 0.0f, 1.0f, 0.00001f);
-                params[i].releaseTime  = new osci::FloatParameter("Env " + idx + " Release",   "env" + idx + "Release",  VERSION_HINT, 0.1f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
-                params[i].attackShape  = new osci::FloatParameter("Env " + idx + " Atk Shape", "env" + idx + "AtkShape", VERSION_HINT, 5.0f,  -50.0f, 50.0f, 0.00001f);
-                params[i].decayShape   = new osci::FloatParameter("Env " + idx + " Dec Shape", "env" + idx + "DecShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
-                params[i].releaseShape = new osci::FloatParameter("Env " + idx + " Rel Shape", "env" + idx + "RelShape", VERSION_HINT, -5.0f,  -50.0f, 50.0f, 0.00001f);
+        // Envelopes 1-4: indexed parameter IDs (premium only)
+#if OSCI_PREMIUM
+        for (int i = 1; i < NUM_ENVELOPES; ++i) {
+            juce::String idx = juce::String(i + 1);
+            params[i].delayTime    = new osci::FloatParameter("Env " + idx + " Delay",     "env" + idx + "Delay",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            params[i].attackTime   = new osci::FloatParameter("Env " + idx + " Attack",    "env" + idx + "Attack",   VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            params[i].holdTime     = new osci::FloatParameter("Env " + idx + " Hold",      "env" + idx + "Hold",     VERSION_HINT, 1.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            params[i].decayTime    = new osci::FloatParameter("Env " + idx + " Decay",     "env" + idx + "Decay",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            params[i].sustainLevel = new osci::FloatParameter("Env " + idx + " Sustain",   "env" + idx + "Sustain",  VERSION_HINT, 1.0f, 0.0f, 1.0f, 0.00001f);
+            params[i].releaseTime  = new osci::FloatParameter("Env " + idx + " Release",   "env" + idx + "Release",  VERSION_HINT, 0.1f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+            params[i].attackShape  = new osci::FloatParameter("Env " + idx + " Atk Shape", "env" + idx + "AtkShape", VERSION_HINT, 5.0f,  -50.0f, 50.0f, 0.00001f);
+            params[i].decayShape   = new osci::FloatParameter("Env " + idx + " Dec Shape", "env" + idx + "DecShape", VERSION_HINT, -20.0f, -50.0f, 50.0f, 0.00001f);
+            params[i].releaseShape = new osci::FloatParameter("Env " + idx + " Rel Shape", "env" + idx + "RelShape", VERSION_HINT, -5.0f,  -50.0f, 50.0f, 0.00001f);
 
-                floatParameters.push_back(params[i].delayTime);
-                floatParameters.push_back(params[i].attackTime);
-                floatParameters.push_back(params[i].holdTime);
-                floatParameters.push_back(params[i].decayTime);
-                floatParameters.push_back(params[i].sustainLevel);
-                floatParameters.push_back(params[i].releaseTime);
-                floatParameters.push_back(params[i].attackShape);
-                floatParameters.push_back(params[i].decayShape);
-                floatParameters.push_back(params[i].releaseShape);
-            }
+            floatParameters.push_back(params[i].delayTime);
+            floatParameters.push_back(params[i].attackTime);
+            floatParameters.push_back(params[i].holdTime);
+            floatParameters.push_back(params[i].decayTime);
+            floatParameters.push_back(params[i].sustainLevel);
+            floatParameters.push_back(params[i].releaseTime);
+            floatParameters.push_back(params[i].attackShape);
+            floatParameters.push_back(params[i].decayShape);
+            floatParameters.push_back(params[i].releaseShape);
         }
+#endif
     }
 
     // === DAHDSR param access ===

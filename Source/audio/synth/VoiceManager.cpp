@@ -11,7 +11,7 @@ VoiceManager::VoiceManager() {
 }
 
 void VoiceManager::addVoice(juce::SynthesiserVoice* voice) {
-    juce::ScopedLock sl(lock);
+    juce::SpinLock::ScopedLockType sl(lock);
     auto mv = std::make_unique<ManagedVoice>();
     mv->setJuceVoice(voice);
     mv->setIndex(static_cast<int>(allVoices.size()));
@@ -22,7 +22,7 @@ void VoiceManager::addVoice(juce::SynthesiserVoice* voice) {
 }
 
 void VoiceManager::removeVoice(int index) {
-    juce::ScopedLock sl(lock);
+    juce::SpinLock::ScopedLockType sl(lock);
     if (index < 0 || index >= static_cast<int>(allVoices.size()))
         return;
 
@@ -52,6 +52,7 @@ void VoiceManager::clearSounds() {
 }
 
 void VoiceManager::setPolyphony(int value) {
+    juce::SpinLock::ScopedLockType sl(lock);
     polyphony = juce::jlimit(1, kMaxPolyphony, value);
 
     int numToKill = static_cast<int>(activeVoices.size()) - polyphony;
@@ -66,8 +67,8 @@ void VoiceManager::setPolyphony(int value) {
 }
 
 void VoiceManager::setCurrentPlaybackSampleRate(double rate) {
+    juce::SpinLock::ScopedLockType sl(lock);
     sampleRate = rate;
-    juce::ScopedLock sl(lock);
     for (auto& mv : allVoices) {
         if (mv->getJuceVoice() != nullptr)
             mv->getJuceVoice()->setCurrentPlaybackSampleRate(rate);
@@ -75,14 +76,14 @@ void VoiceManager::setCurrentPlaybackSampleRate(double rate) {
 }
 
 juce::SynthesiserVoice* VoiceManager::getVoice(int index) const {
-    juce::ScopedLock sl(lock);
+    juce::SpinLock::ScopedLockType sl(lock);
     if (index >= 0 && index < static_cast<int>(allVoices.size()))
         return allVoices[index]->getJuceVoice();
     return nullptr;
 }
 
 ManagedVoice* VoiceManager::getManagedVoice(int index) const {
-    juce::ScopedLock sl(lock);
+    juce::SpinLock::ScopedLockType sl(lock);
     if (index >= 0 && index < static_cast<int>(allVoices.size()))
         return allVoices[index].get();
     return nullptr;
@@ -91,7 +92,7 @@ ManagedVoice* VoiceManager::getManagedVoice(int index) const {
 void VoiceManager::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                                     const juce::MidiBuffer& midiMessages,
                                     int startSample, int numSamples) {
-    juce::ScopedLock sl(lock);
+    juce::SpinLock::ScopedLockType sl(lock);
 
     auto midiIterator = midiMessages.findNextSamplePosition(startSample);
     bool firstEvent = true;
@@ -110,7 +111,7 @@ void VoiceManager::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             startSample = samplePos;
         }
 
-        handleMidiEvent(metadata.getMessage());
+        handleMidiEventUnlocked(metadata.getMessage());
         firstEvent = false;
     }
 
@@ -119,6 +120,11 @@ void VoiceManager::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 }
 
 void VoiceManager::handleMidiEvent(const juce::MidiMessage& m) {
+    juce::SpinLock::ScopedLockType sl(lock);
+    handleMidiEventUnlocked(m);
+}
+
+void VoiceManager::handleMidiEventUnlocked(const juce::MidiMessage& m) {
     if (m.isNoteOn()) {
         noteOn(m.getNoteNumber(), m.getFloatVelocity(), m.getChannel() - 1);
     } else if (m.isNoteOff()) {
@@ -168,7 +174,8 @@ void VoiceManager::noteOn(int note, float velocity, int channel) {
     if (lastPlayedNote >= 0.0f)
         prevNote = lastPlayedNote;
     lastPlayedNote = static_cast<float>(note);
-    lastPlayedNoteFreq.store(juce::MidiMessage::getMidiNoteInHertz(note),
+    lastPlayedNoteFreq.store(client ? client->noteToFrequency(note, channel)
+                                    : juce::MidiMessage::getMidiNoteInHertz(note),
                              std::memory_order_relaxed);
 
     int noteValue = combineNoteChannel(note, channel);
@@ -267,7 +274,8 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
 
                     lastPlayedNote = static_cast<float>(oldNote);
                     lastPlayedNoteFreq.store(
-                        juce::MidiMessage::getMidiNoteInHertz(oldNote),
+                        client ? client->noteToFrequency(oldNote, oldChannel)
+                               : juce::MidiMessage::getMidiNoteInHertz(oldNote),
                         std::memory_order_relaxed);
 
                     if (client != nullptr) {

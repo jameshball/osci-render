@@ -14,7 +14,7 @@ SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesPropertie
 
 SosciAudioProcessor::~SosciAudioProcessor() {}
 
-void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
+void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
@@ -29,21 +29,31 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float EPSILON = 0.0001f;
     const int numSamples = input.getNumSamples();
 
+    // Process MIDI CC → parameter mappings before clearing the buffer
+    midiManager.processMidiBuffer(midiMessages);
+
     midiMessages.clear();
 
     // Get source buffer (either from WAV parser or input)
     juce::AudioBuffer<float> sourceBuffer;
-    
-    juce::SpinLock::ScopedLockType lock2(wavParserLock);
-    bool readingFromWav = wavParser.isInitialised();
 
-    if (readingFromWav) {
-        wavBuffer.setSize(6, numSamples, false, true, true);
-        wavBuffer.clear();
-        wavParser.processBlock(wavBuffer);
-        sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
-    } else {
-        sourceBuffer = juce::AudioBuffer<float>(input.getArrayOfWritePointers(), input.getNumChannels(), numSamples);
+    {
+        // Scope the wavParserLock to only the section that accesses wavParser.
+        // This lock must NOT be held during threadManager.write() calls below,
+        // because those can block (wait_enqueue) when the consumer buffer is full,
+        // and the consumer chain depends on the message thread being responsive,
+        // which in turn may need this same lock (via AudioTimelineController::getCurrentPosition).
+        juce::SpinLock::ScopedLockType lock2(wavParserLock);
+        bool readingFromWav = wavParser.isInitialised();
+
+        if (readingFromWav) {
+            wavBuffer.setSize(6, numSamples, false, true, true);
+            wavBuffer.clear();
+            wavParser.processBlock(wavBuffer);
+            sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
+        } else {
+            sourceBuffer = juce::AudioBuffer<float>(input.getArrayOfWritePointers(), input.getNumChannels(), numSamples);
+        }
     }
 
     // Resize working buffer with 6 channels: x, y, z/brightness, r, g, b
@@ -137,21 +147,16 @@ void SosciAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     threadManager.write(workBuffer, "VisualiserRenderer");
 
     if (juce::JUCEApplication::isStandaloneApp()) {
-        // Scale output by volume
-        juce::FloatVectorOperations::multiply(workArray[0], workArray[0], volume.load(), numSamples);
-        juce::FloatVectorOperations::multiply(workArray[1], workArray[1], volume.load(), numSamples);
+        applyVolumeAndThreshold(workArray, numSamples);
+    }
 
-        // Hard clip to threshold
-        float thresholdVal = threshold.load();
-        juce::FloatVectorOperations::clip(workArray[0], workArray[0], -thresholdVal, thresholdVal, numSamples);
-        juce::FloatVectorOperations::clip(workArray[1], workArray[1], -thresholdVal, thresholdVal, numSamples);
+    // Mute the physical output in both standalone and plugin wrappers.
+    if (muteParameter->getBoolValue()) {
+        juce::FloatVectorOperations::clear(workArray[0], numSamples);
+        juce::FloatVectorOperations::clear(workArray[1], numSamples);
+    }
 
-        // apply mute if active
-        if (muteParameter->getBoolValue()) {
-            juce::FloatVectorOperations::clear(workArray[0], numSamples);
-            juce::FloatVectorOperations::clear(workArray[1], numSamples);
-        }
-
+    if (juce::JUCEApplication::isStandaloneApp()) {
         threadManager.write(workBuffer, "VolumeComponent");
     }
 
@@ -174,7 +179,7 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     // there are issues. This is the only place we can do this because there is
     // no callback when closing the standalone app except for this.
     
-    if (haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
+    if (!isCreatingPortableProjectSnapshot() && haltRecording != nullptr && juce::JUCEApplicationBase::isStandaloneApp()) {
         haltRecording();
     }
     
@@ -208,6 +213,8 @@ void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
     }
 
     recordingParameters.save(xml.get());
+
+    midiManager.save(xml.get());
     
     saveProperties(*xml);
 
@@ -280,6 +287,9 @@ void SosciAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         recordingParameters.load(xml.get());
         
         loadProperties(*xml);
+
+        loadMidiCCState(xml.get());
+
         undoManager.clearUndoHistory();
         juce::Logger::writeToLog("setStateInformation: state restore complete");
 }

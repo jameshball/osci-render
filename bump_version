@@ -8,18 +8,22 @@ Versioning scheme here is 4-part: A.B.C.D
 - --minor increments C and resets D to 0.
 - --patch increments D.
 
-By default, both products get a patch bump.
+By default, the installer gets a patch bump whenever the script is run.
 
 Usage:
-    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--message MSG]
+    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--installer {major,minor,patch,none}] [--message MSG] [--skip-validation]
 
 Examples:
-    ./bump_version
+    ./bump_version --osci patch --sosci patch
     ./bump_version --osci minor --sosci patch
     ./bump_version --sosci none
+    ./bump_version --osci patch --sosci patch --installer none
+    ./bump_version --osci patch --sosci none --skip-validation   # low-cost CI run (build only)
 
 Notes:
 - Requires a clean working tree.
+- --skip-validation injects a `[skip-validation]` marker into the commit
+  message, causing the CI `Build` workflow to skip unit tests and pluginval.
 - For Windows, run: python bump_version (or use bump_version.cmd).
 """
 
@@ -36,6 +40,7 @@ from typing import Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent
 CI_TRIGGER_MARKER = "[trigger-ci:bump-version]"
+CI_SKIP_VALIDATION_MARKER = "[skip-validation]"
 
 
 class FatalError(RuntimeError):
@@ -169,7 +174,7 @@ def set_pkgproj_versions(path: Path, new_version: Version) -> bool:
 
 
 def ensure_clean_working_tree() -> None:
-    out = run_git(["status", "--porcelain"])
+    out = run_git(["status", "--porcelain", "--untracked-files=no"])
     if out.strip():
         raise FatalError(
             "Working tree is not clean. Commit or stash changes before running bump_version.\n"
@@ -197,6 +202,13 @@ def add_ci_trigger_marker(message: str) -> str:
     return f"{message}\n\n{CI_TRIGGER_MARKER}"
 
 
+def add_skip_validation_marker(message: str) -> str:
+    message = message.rstrip()
+    if CI_SKIP_VALIDATION_MARKER in message:
+        return message
+    return f"{message}\n{CI_SKIP_VALIDATION_MARKER}"
+
+
 def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(prog="bump_version", add_help=True)
     parser.add_argument(
@@ -211,11 +223,27 @@ def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
         required=True,
         help="Bump kind for sosci",
     )
+    parser.add_argument(
+        "--installer",
+        choices=["major", "minor", "patch", "none"],
+        default="patch",
+        help="Bump kind for osci-installer (default: patch)",
+    )
 
     parser.add_argument(
         "--message",
         default=None,
         help="Commit message override (default: chore: bump versions ...)",
+    )
+
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help=(
+            "Produce a lightweight CI run: skip unit tests (ci/test.sh) and "
+            "pluginval validation. Adds the " + CI_SKIP_VALIDATION_MARKER +
+            " marker to the commit message. CI still builds all artefacts."
+        ),
     )
 
     ns = parser.parse_args(list(argv))
@@ -226,11 +254,13 @@ def main(argv: Sequence[str]) -> int:
     ns, _ = parse_args(list(argv))
     osci_kind = ns.osci
     sosci_kind = ns.sosci
+    installer_kind = ns.installer
 
     ensure_clean_working_tree()
 
     osci_jucer = REPO_ROOT / "osci-render.jucer"
     sosci_jucer = REPO_ROOT / "sosci.jucer"
+    installer_jucer = REPO_ROOT / "osci-installer.jucer"
     osci_iss = REPO_ROOT / "packaging" / "osci-render.iss"
     sosci_iss = REPO_ROOT / "packaging" / "sosci.iss"
     osci_pkgproj = REPO_ROOT / "packaging" / "osci-render.pkgproj"
@@ -238,9 +268,11 @@ def main(argv: Sequence[str]) -> int:
 
     osci_old = get_jucer_version(osci_jucer)
     sosci_old = get_jucer_version(sosci_jucer)
+    installer_old = get_jucer_version(installer_jucer)
 
     osci_new = osci_old.bump(osci_kind)
     sosci_new = sosci_old.bump(sosci_kind)
+    installer_new = installer_old.bump(installer_kind)
 
     changed: list[Path] = []
 
@@ -248,6 +280,8 @@ def main(argv: Sequence[str]) -> int:
         changed.append(osci_jucer)
     if set_jucer_version(sosci_jucer, sosci_new):
         changed.append(sosci_jucer)
+    if set_jucer_version(installer_jucer, installer_new):
+        changed.append(installer_jucer)
 
     if set_iss_version(osci_iss, osci_new):
         changed.append(osci_iss)
@@ -259,16 +293,24 @@ def main(argv: Sequence[str]) -> int:
     if set_pkgproj_versions(sosci_pkgproj, sosci_new):
         changed.append(sosci_pkgproj)
 
-    if osci_new == osci_old and sosci_new == sosci_old:
-        raise FatalError("No version bump requested (both products unchanged).")
+    if osci_new == osci_old and sosci_new == sosci_old and installer_new == installer_old:
+        raise FatalError("No version bump requested (all products unchanged).")
 
     stage_files(changed)
 
     msg = ns.message
     if not msg:
-        msg = f"chore: bump versions (osci-render {osci_old}->{osci_new}, sosci {sosci_old}->{sosci_new})"
+        msg = (
+            f"chore: bump versions (osci-render {osci_old}->{osci_new}, "
+            f"sosci {sosci_old}->{sosci_new}, "
+            f"osci-installer {installer_old}->{installer_new})"
+        )
 
-    commit(add_ci_trigger_marker(msg))
+    msg = add_ci_trigger_marker(msg)
+    if ns.skip_validation:
+        msg = add_skip_validation_marker(msg)
+
+    commit(msg)
 
     return 0
 
