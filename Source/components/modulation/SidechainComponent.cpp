@@ -33,6 +33,16 @@ static ModulationSourceConfig buildSidechainConfig(OscirenderAudioProcessor& pro
     cfg.broadcaster = &proc.broadcaster;
     cfg.getActiveTab = [&proc]() { return proc.sidechainParameters.activeTab; };
     cfg.setActiveTab = [&proc](int i) { proc.sidechainParameters.activeTab = i; };
+#if OSCI_PREMIUM
+    cfg.typeId = "sc";
+    cfg.midiManager = &proc.midiManager;
+    cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
+        return OscirenderAudioProcessor::modDepthCustomId("sc", idx, pid);
+    };
+    cfg.buildModDepthSetter = [&proc](int idx, const juce::String& pid) {
+        return proc.buildModDepthSetter("sc", idx, pid);
+    };
+#endif
     return cfg;
 }
 
@@ -110,15 +120,15 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
 
     addAndMakeVisible(graph);
 
-    // Attack knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    attackKnob.bindToParam(audioProcessor.sidechainParameters.attack, 0.3, 3);
+    // Attack knob (0-2 seconds, default 0.2s, skew centre 0.2)
+    attackKnob.bindToParam(audioProcessor.sidechainParameters.attack, 0.2, 3);
     attackKnob.getKnob().setTextValueSuffix(" s");
     attackKnob.setAccentColour(getSidechainColour(0));
     attackKnob.wireModulation(audioProcessor);
     addAndMakeVisible(attackKnob);
 
-    // Release knob (0-2 seconds, default 0.3s, skew centre 0.3)
-    releaseKnob.bindToParam(audioProcessor.sidechainParameters.release, 0.3, 3);
+    // Release knob (0-2 seconds, default 0.2s, skew centre 0.2)
+    releaseKnob.bindToParam(audioProcessor.sidechainParameters.release, 0.2, 3);
     releaseKnob.getKnob().setTextValueSuffix(" s");
     releaseKnob.setAccentColour(getSidechainColour(0));
     releaseKnob.wireModulation(audioProcessor);
@@ -133,6 +143,13 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
     // Register as listener on sidechain parameters so undo/redo triggers a UI sync
     paramSync.track(audioProcessor.sidechainParameters.attack);
     paramSync.track(audioProcessor.sidechainParameters.release);
+
+    disabledOverlay.setText("NO SIDECHAIN INPUT");
+    disabledOverlay.setSubText("(click to open audio settings)");
+    disabledOverlay.onClick = [this]() {
+        if (onDisabledClicked) onDisabledClicked();
+    };
+    addChildComponent(disabledOverlay);
 
     syncFromProcessorState();
 }
@@ -158,16 +175,12 @@ void SidechainComponent::timerCallback() {
 void SidechainComponent::paint(juce::Graphics& g) {
     ModulationSourceComponent::paint(g);
 
-    // Draw a background panel behind the knob area (below the tab)
-    // Left corners rounded, right corners flat (flush with panel edge)
+    // Draw a background panel behind the knob area (below the graph)
     if (!knobAreaBounds.isEmpty()) {
-        float r = OscirenderLookAndFeel::RECT_RADIUS;
+        float r = osci::LookAndFeel::RECT_RADIUS;
         auto bf = knobAreaBounds.toFloat();
-        juce::Path knobBg;
-        knobBg.addRoundedRectangle(bf.getX(), bf.getY(), bf.getWidth(), bf.getHeight(),
-                                   r, r, true, false, true, false);
-        g.setColour(Colours::darker());
-        g.fillPath(knobBg);
+        g.setColour(osci::Colours::darker());
+        g.fillRoundedRectangle(bf, r);
     }
 }
 
@@ -185,54 +198,29 @@ void SidechainComponent::paintOverChildren(juce::Graphics& g) {
 
 void SidechainComponent::resized() {
     ModulationSourceComponent::resized();
+    if (isCollapsed()) return;
 
-    auto tabColBounds = tabViewport.getBounds(); // full left column from base
-    float totalH = (float)tabColBounds.getHeight();
+    auto content = getContentBounds();
 
-    // Tab: allow up to kMaxTabHeight when there's space
-    int tabH = juce::jmin(kMaxTabHeight, juce::roundToInt(totalH / 3.0f));
-    tabH = juce::jmax(tabH, kMinTabHeight);
-    tabViewport.setBounds(tabColBounds.withHeight(tabH));
-    tabList.setBounds(0, 0, tabColBounds.getWidth(), tabH);
+    // Knob row at the bottom
+    static constexpr int knobRowHeight = 48;
+    auto knobRow = content.removeFromBottom(knobRowHeight);
+    content.removeFromBottom(4);
 
-    // Knob region: below tab, fills to bottom
-    int knobRegionTop = tabColBounds.getY() + tabH + kKnobGap;
-    int knobRegionBottom = tabColBounds.getBottom();
-    int knobRegionH = knobRegionBottom - knobRegionTop;
-    if (knobRegionH < 0) knobRegionH = 0;
+    // Store bounds for knob background painting
+    knobAreaBounds = knobRow;
 
-    // Store bounds for the knob area background — extend rightward to cover the
-    // content inset gap between the tab column and the graph.
-    knobAreaBounds = juce::Rectangle<int>(
-        tabColBounds.getX(), knobRegionTop,
-        tabColBounds.getWidth() + kContentInset, knobRegionH);
+    // Two knobs side by side
+    int knobW = knobRow.getWidth() / 2;
+    attackKnob.setBounds(knobRow.removeFromLeft(knobW));
+    releaseKnob.setBounds(knobRow);
 
-    constexpr int knobOuterPad = 2;
-    int knobLayoutH = juce::jmax(0, knobRegionH - knobOuterPad * 2);
+    // Graph fills the remaining content area
+    graph.setBounds(content);
+    setOutlineBounds(content);
 
-    // Dynamic gap between knobs — grows with available space, capped
-    float knobHf = juce::jmin((float)kKnobSize, ((float)knobLayoutH - (float)kKnobGap) / 2.0f);
-    int knobH = juce::roundToInt(knobHf);
-    int knobGap = juce::jmin(kMaxKnobGap, knobLayoutH - knobH * 2);
-    if (knobGap < kKnobGap) knobGap = kKnobGap;
-
-    // Centre the two knobs + gap vertically in the knob region
-    int totalKnobs = knobH * 2 + knobGap;
-    int topPad = juce::roundToInt(((float)knobLayoutH - (float)totalKnobs) / 2.0f);
-    if (topPad < 0) topPad = 0;
-
-    // Centre knobs within the widened background (accounts for rounded left corners)
-    int knobColWidth = tabColBounds.getWidth() + kContentInset;
-    int knobOffset = (OscirenderLookAndFeel::RECT_RADIUS / 2) - 1;
-    int y = knobRegionTop + knobOuterPad + topPad;
-    attackKnob.setBounds(tabColBounds.getX() + knobOffset, y, knobColWidth - knobOffset, knobH);
-    y += knobH + knobGap;
-    releaseKnob.setBounds(tabColBounds.getX() + knobOffset, y, knobColWidth - knobOffset, knobH);
-
-    // Graph fills the content area (right of tabs)
-    auto graphBounds = getContentBounds();
-    graph.setBounds(graphBounds);
-    setOutlineBounds(graphBounds);
+    // Disabled overlay covers the content area
+    disabledOverlay.setBounds(getContentBounds());
 }
 
 void SidechainComponent::onActiveSourceChanged(int) {
@@ -295,4 +283,8 @@ void SidechainComponent::syncFromProcessorState() {
     attackKnob.getKnob().setValue(audioProcessor.sidechainParameters.getAttack(0), juce::dontSendNotification);
     releaseKnob.setAccentColour(colour);
     releaseKnob.getKnob().setValue(audioProcessor.sidechainParameters.getRelease(0), juce::dontSendNotification);
+}
+
+void SidechainComponent::setSidechainDisabled(bool disabled) {
+    disabledOverlay.setDisabledWithSiblings(disabled, { graph, attackKnob, releaseKnob });
 }

@@ -124,6 +124,9 @@ public:
         auto* sv = cast(source);
         if (tv && sv) tv->onRestoreState(sv->capturedPosition);
     }
+    double noteToFrequency(int note, int channel) override {
+        return juce::MidiMessage::getMidiNoteInHertz(note);
+    }
 
 private:
     static TestVoice* cast(ManagedVoice& mv) {
@@ -137,16 +140,16 @@ private:
 // Helpers
 
 // Create VoiceManager with `polyphony` TestVoices + 1 overlap voice for kill-fade.
-static std::pair<std::unique_ptr<VoiceManager>, TestClient*>
+static std::pair<std::unique_ptr<VoiceManager>, std::unique_ptr<TestClient>>
 createVM(int polyphony) {
-    auto client = new TestClient();
+    auto client = std::make_unique<TestClient>();
     auto vm = std::make_unique<VoiceManager>();
     vm->setCurrentPlaybackSampleRate(44100.0);
     vm->setPolyphony(polyphony);
-    vm->setClient(client);
+    vm->setClient(client.get());
     for (int i = 0; i < polyphony + 1; ++i) // +1 overlap voice for kill-fade
         vm->addVoice(new TestVoice());
-    return { std::move(vm), client };
+    return { std::move(vm), std::move(client) };
 }
 
 static void sendNoteOn(VoiceManager& vm, int note, float vel = 0.8f, int ch = 1) {
@@ -236,6 +239,16 @@ public:
             sendNoteOn(*vm, 60); sendNoteOn(*vm, 64); sendNoteOn(*vm, 67);
             sendAllNotesOff(*vm);
             expectEquals(vm->getNumPressedNotes(), 0);
+        }
+
+        beginTest("allSoundOff clears notes across MIDI channels");
+        {
+            auto [vm, _] = createVM(4);
+            sendNoteOn(*vm, 60, 0.8f, 2);
+            sendNoteOn(*vm, 67, 0.8f, 9);
+            vm->handleMidiEvent(juce::MidiMessage::allSoundOff(1));
+            expectEquals(vm->getNumPressedNotes(), 0);
+            expectEquals(countAudibleVoices(*vm), 0);
         }
 
         beginTest("velocity-0 noteOn treated as noteOff");

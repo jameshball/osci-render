@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "TestCleanup.h"
 
 using namespace osci;
 
@@ -9,9 +10,7 @@ public:
     std::vector<EffectParameter*> initialiseParameters() const override { return {}; }
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
     ~NullEffect() override {
-        // Clean up parameters we created in initParams
-        for (auto* p : parameters) delete p;
-        parameters.clear();
+        testutil::cleanupEffectParams(*this);
     }
 
     void initParams(int numParams, bool enableLfo) {

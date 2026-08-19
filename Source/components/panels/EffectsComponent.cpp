@@ -1,5 +1,5 @@
 #include "EffectsComponent.h"
-#include "../../audio/effects/BitCrushEffect.h"
+#include "../../audio/modulation/ModulationTypes.h"
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/EnvState.h"
 #include "../../PluginEditor.h"
@@ -33,18 +33,23 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	};
 
 	autoLinkButton.setTooltip("Auto-link LFOs to new effects based on their default animation settings.");
-	autoLinkButton.setToggleState(audioProcessor.getGlobalBoolValue("autoLinkLfos", true), juce::dontSendNotification);
+	autoLinkButton.setToggleState(audioProcessor.globalSettings.getBool("autoLinkLfos", true), juce::dontSendNotification);
 	autoLinkButton.onClick = [this] {
-		audioProcessor.setGlobalValue("autoLinkLfos", autoLinkButton.getToggleState());
+		audioProcessor.globalSettings.set("autoLinkLfos", autoLinkButton.getToggleState());
+		audioProcessor.globalSettings.save();
 	};
 	addAndMakeVisible(autoLinkButton);
 
-    {
-        juce::MessageManagerLock lock;
-        audioProcessor.broadcaster.addChangeListener(this);
-    }
+	{
+	    juce::MessageManagerLock lock;
+	    audioProcessor.broadcaster.addChangeListener(this);
+	}
 
-    // Listen to each effect's selected/enabled parameters so undo/redo refreshes the list
+    listBox.setDragSourceFilter([](const juce::DragAndDropTarget::SourceDetails& details) {
+        return !ModDrag::isModDrag(details.description.toString());
+    });
+
+	// Listen to each effect's selected/enabled parameters so undo/redo refreshes the list
     for (auto& effect : audioProcessor.toggleableEffects) {
         paramSync.track(effect->selected);
         paramSync.track(effect->enabled);
@@ -71,43 +76,49 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
         auto& um = audioProcessor.getUndoManager();
         um.beginNewTransaction("Add Effect");
         {
-        CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+            CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
 
-        // Find the chosen effect (read-only under lock)
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            for (auto& eff : audioProcessor.toggleableEffects) {
-                if (eff->getId() == effectId) {
-                    chosen = eff;
-                    break;
+            {
+                juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
+                for (auto& eff : audioProcessor.toggleableEffects) {
+                    if (eff->getId() == effectId) {
+                        chosen = eff;
+                        break;
+                    }
+                }
+
+                if (chosen != nullptr) {
+                    chosen->selected->setBoolValue(true);
+                    chosen->enabled->setBoolValue(true);
+
+                    int idx = 0;
+                    for (auto& effect : itemData.data) {
+                        if (effect != chosen) {
+                            effect->setPrecedence(idx++);
+                        }
+                    }
+                    chosen->setPrecedence(idx);
+                    audioProcessor.updateEffectPrecedence();
                 }
             }
-        }
-        // Set parameters OUTSIDE the SpinLock (they do ValueTree/UndoManager work)
-        if (chosen != nullptr) {
-            chosen->selected->setBoolValueNotifyingHost(true);
-            chosen->enabled->setBoolValueNotifyingHost(true);
-        }
-        // Place chosen effect at the end of the visible (selected) list and update precedence
-        if (chosen != nullptr) {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            int idx = 0;
-            for (auto& e : itemData.data) {
-                if (e != chosen) e->setPrecedence(idx++);
+
+            // Persist and notify outside the audio-thread lock.
+            if (chosen != nullptr) {
+                ParameterSyncHelper::ScopedUpdateSuppression suppressListRefresh(paramSync);
+                chosen->selected->setBoolValueNotifyingHost(true);
+                chosen->enabled->setBoolValueNotifyingHost(true);
             }
-            chosen->setPrecedence(idx++);
-            audioProcessor.updateEffectPrecedence();
+            // Auto-assign LFOs if the toggle is enabled.
+#if OSCI_PREMIUM
+            if (chosen != nullptr && audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
+                audioProcessor.autoAssignLfosForEffect(*chosen);
+            }
+#endif
         }
-        // Promote any preview LFO assignments so hover-end won't remove them
-        audioProcessor.promotePreviewLfoAssignments();
-        // Auto-assign LFOs if the toggle is enabled (always on in beginner mode)
-        if (chosen != nullptr && (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true))) {
-            audioProcessor.autoAssignLfosForEffect(*chosen);
-            audioProcessor.broadcaster.sendChangeMessage();
+        // The chosen effect already has the final precedence and belongs at the end.
+        if (chosen != nullptr) {
+            itemData.data.push_back(chosen);
         }
-        }
-        // Refresh list content to include newly selected
-        itemData.resetData();
         listBox.updateContent();
         showingGrid = false;
         listBox.setVisible(true);
@@ -164,18 +175,20 @@ void EffectsComponent::resized() {
 	randomiseButton.setBounds(titleBar.removeFromLeft(20));
 	titleBar.removeFromLeft(4);
 	autoLinkButton.setBounds(titleBar.removeFromLeft(20));
-    area = area.reduced(20);
+    area.reduce(20, 0);
+    area.removeFromBottom(4);
     if (showingGrid) {
         grid.setBounds(area);
         addEffectButton.setVisible(false);
     } else {
+        area.removeFromTop(10);
         // Reserve space at bottom for the add button
-        auto addBtnHeight = 44;
+        auto addBtnHeight = 36;
         auto listArea = area;
         auto buttonArea = listArea.removeFromBottom(addBtnHeight);
         listBox.setBounds(listArea);
         addEffectButton.setVisible(true);
-        addEffectButton.setBounds(buttonArea.reduced(0, 4));
+        addEffectButton.setBounds(buttonArea.reduced(0, 2));
     }
 }
 

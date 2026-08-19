@@ -1,25 +1,25 @@
 # osci-render Development Guide
 
-## Communication
-
-- **NEVER ask clarifying questions inline in chat.** Always use the `vscode_askQuestions` tool for structured UI with selectable options.
-- After each completed task, **YOU MUST** ask the user if the changes are satisfactory or if further modifications are needed using the `vscode_askQuestions` tool. Do not assume completion until the user confirms.
-
-## Subagents
-
-**Multiple independent subagents MUST be invoked in the same `<function_calls>` block to execute in parallel.** Separate blocks run sequentially.
-
-## Code Reviews
-
-1. Review all unstaged changes (quality, duplication, structure, performance, bugs).
-2. List every issue numbered with file/line.
-3. For each issue, use `vscode_askQuestions` to ask: implement the fix or skip.
-4. Implement all accepted fixes, then build and verify.
-
 ## Guidelines
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
-- **Recommendations/proposals**: Always first write your findings, and then for each finding, present it as a numbered question using `vscode_askQuestions` so the user can approve/reject individually.
+- **README files**: Do not edit `README.md` files unless the user explicitly asks for README changes.
+- **Formatting scope**: Apply the formatting rules below to new code and to lines you are already changing for the task. Do not reformat unrelated code just to satisfy style rules.
+- **Long-running commands**: For builds, tests, deployments, and exhaustive automation runs, prefer one blocking command with a long timeout and wait for completion. Avoid frequent short polling or progress checks unless the user asks for live updates or the command is genuinely interactive.
+- **Visualiser render semaphore logic**: Do not change the `VisualiserRenderer` render semaphore / `triggerRepaint()` / `renderingSemaphore.acquire()` logic unless the user explicitly asks for that specific work. This synchronization is subtle and easy to break.
+- **Brace style**: Use same-line opening braces for functions and control flow, e.g. `void f() {` and `if (condition) {`, not Allman-style braces on the next line.
+- **Else style**: Put `else` on the same line as the preceding closing brace, e.g. `} else {`.
+- **Required braces**: Always use braces for control-flow bodies, even for single-line `if`, `else`, `for`, and `while` bodies.
+- **Control flow clarity**: Avoid initializer statements in `if`/`switch` conditions. Prefer a named local variable before the condition, especially for `juce::Result` values.
+- **Unary operator spacing**: Do not put a space between a unary operator and its operand, e.g. use `!anyHeavy`.
+- **Expression spacing**: Avoid unnecessary spaces inside expressions. For example, use `freeChoiceButton.setEnabled(!busy);`, not `freeChoiceButton.setEnabled (!busy);`, and `static_cast<float>(value)`, not `static_cast<float> (value)`.
+- **Compact signatures and calls**: Do not split function signatures or call arguments across extra lines just because a parameter was added. Keep arguments on the same line when reasonable, and prefer compact wrapping over one-argument-per-line formatting.
+
+## GitHub Actions Monitoring
+
+- **NEVER tight-poll GitHub Actions.** Prefer one watcher: `TERM=dumb gh run watch <run-id> --repo <owner>/<repo> --compact --interval 60 --exit-status`.
+- For a manual check, use exactly one timestamped query: `gh run view <run-id> --repo <owner>/<repo> --json status,conclusion,createdAt,startedAt,updatedAt,jobs`.
+- After a manual check, do not call `gh run view`, `list_workflow_runs`, or `list_workflow_jobs` again until at least the elapsed runtime has passed; use 60 seconds minimum when no duration is known.
 
 ## Project Overview
 
@@ -41,12 +41,12 @@ JUCE-based audio plugin (VST3/AU/Standalone) that renders 2D/3D graphics to audi
 - `Source/lua/` — LuaJIT scripting integration
 - `Source/obj/` — OBJ/Blender 3D object loading
 - `Source/components/` — UI components
-- `Source/video/` — FFmpeg encoding, Syphon/Spout
+- `Source/video/` — FFmpeg encoding and video/OpenGL support
 
 ### Key Modules (`modules/`)
 
 - **osci_render_core** — `osci::Point`, `osci::Shape`, `osci::Effect`, `osci::EffectParameter`, `osci::FloatParameter`, `osci::BooleanParameter`, `osci::IntParameter`
-- **LuaJIT**, **chowdsp_utils**, **juce_sharedtexture**, **pluginval**, **Mathter**, **melatonin_blur**, **tinyobjloader**
+- **LuaJIT**, **chowdsp_utils**, **pluginval**, **Mathter**, **melatonin_blur**, **tinyobjloader**
 
 ### Data Flow
 
@@ -86,6 +86,11 @@ cd /Users/james/osci-render \
              -configuration Debug -arch arm64 build
 ```
 
+### Projucer Resave Order
+`JuceLibraryCode/` is generated, ignored, and shared by both `osci-render.jucer` and `sosci.jucer`. Always resave the exact `.jucer` you are about to build immediately before running `xcodebuild`.
+
+When switching products, do not reuse the previous generated `JuceLibraryCode/JuceHeader.h` or module include files. For example, resaving `osci-render.jucer` can leave `sosci` builds compiling osci-render-only modules such as `osci_scripting`, while resaving `sosci.jucer` can remove generated include files that `osci-render` needs. To validate both products, resave and build one product, then resave and build the other product.
+
 ### Post-build Relaunch
 After a successful macOS standalone build that changes runtime behavior or UI, automatically relaunch:
 ```bash
@@ -104,12 +109,18 @@ See `.github/docs/build-details.md`.
 4-part version `A.B.C.D`. `--major` bumps B, `--minor` bumps C, `--patch` bumps D. Updates both `.jucer` files, `packaging/*.iss` and `packaging/*.pkgproj`. Requires clean working tree.
 ```bash
 ./bump_version --osci minor --sosci patch
+./bump_version --osci patch --sosci patch --skip-validation   # low-cost CI: build only, no tests/pluginval
 ```
 
-### Thread Safety
-- `juce::SpinLock` for audio-thread-safe data (`parsersLock`, `effectsLock`)
+### Thread Safety & Realtime Safety
+**All code on the audio thread MUST be realtime-safe.** This means:
+- **No mutex/CriticalSection locking** — use `juce::SpinLock` only
+- **No heap allocation or deallocation** (no `new`, `delete`, `std::vector::push_back` that grows, `std::string` construction)
+- **No blocking I/O** (no file access, no logging, no system calls)
 - `std::atomic` for simple cross-thread values
-- No allocations in `processBlock()`
+- Pre-allocate containers in constructors with `reserve()` to avoid audio-thread allocations
+
+**Prefer `juce::SpinLock` over `juce::CriticalSection`/`std::mutex` everywhere**, not just on the audio thread. CriticalSection or std::mutex should only be used when there is a clear need (e.g. very long critical sections with high contention, or when using condition variables). For short critical sections protecting data structures, SpinLock is the default choice.
 
 ## Testing
 
@@ -121,29 +132,30 @@ See `.github/docs/build-details.md`.
 
 Tests live in `tests/`, configured by `osci-render-test.jucer`.
 
+### UI Automation
+
+Use the cross-platform Jucewright browser runner for standalone UI coverage:
+```bash
+python3 scripts/browse_osci_render_with_jucewright.py --quick
+python3 scripts/browse_osci_render_with_jucewright.py
+```
+
+The runner discovers platform-specific build outputs and app profile paths automatically. Use `--build-app` to rebuild first, `--jucewright` to point at a specific CLI executable, and `--app` to override the standalone app path.
+
+Do not launch osci-render for Jucewright by calling `jucewright prepare-juce-profile` or `jucewright launch` directly unless the prepared profile has first gone through the runner's `disable_profile_audio_input()` path. On macOS, launching with a preserved input device can leave the microphone permission prompt open indefinitely and block automation.
+
 ### Validation
 
 **pluginval** — run locally only after major changes (effects, parameters, audio processing). Runs in CI automatically.
 ```bash
-ROOT=$(pwd) OS=mac ./ci/pluginval.sh osci-render
+./run_tests.sh --pluginval
+./run_tests.sh --pluginval --plugin sosci
 ```
 
-**Sanitizers (preferred)** — TSan/ASan via pluginval. Catches races and memory errors invisible in Debug builds.
+**Sanitizers (preferred)** — TSan/ASan via pluginval or unit tests. Catches races and memory errors invisible in Debug builds.
 ```bash
-bash run_sanitizers.sh --tsan --plugin osci-render --pluginval --strictness 5
-bash run_sanitizers.sh --asan --plugin osci-render --pluginval --strictness 5
+./run_tests.sh --tsan --pluginval                # TSan + pluginval
+./run_tests.sh --asan --pluginval                # ASan + pluginval
+./run_tests.sh --tsan                            # TSan + unit tests
+./run_tests.sh --tsan --pluginval --tests        # TSan + both
 ```
-
-## Key Files
-
-| Purpose | File |
-|---------|------|
-| Main processor | `Source/PluginProcessor.cpp` |
-| Shared base processor | `Source/CommonPluginProcessor.cpp` |
-| Effect base | `modules/osci_render_core/effect/osci_Effect.h` |
-| Parameter types | `modules/osci_render_core/effect/osci_EffectParameter.h` |
-| Point type | `modules/osci_render_core/shape/osci_Point.h` |
-| Visualizer | `Source/visualiser/VisualiserRenderer.cpp` |
-| Lua integration | `Source/lua/LuaParser.cpp` |
-| Modulation | `Source/audio/modulation/LfoParameters.h`, `EnvelopeParameters.h` |
-| Build config | `osci-render.jucer`, `sosci.jucer` |

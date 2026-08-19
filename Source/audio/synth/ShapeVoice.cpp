@@ -16,8 +16,9 @@ void ShapeVoice::initializeEffectsFromGlobal() {
         if (simpleEffect) {
             auto cloned = simpleEffect->cloneWithSharedParameters();
             // Initialize the effect with current sample rate
-            if (audioProcessor.currentSampleRate > 0) {
-                cloned->prepareToPlay(audioProcessor.currentSampleRate, 512);
+            const double sampleRate = audioProcessor.getEffectiveSampleRate();
+            if (sampleRate > 0) {
+                cloned->prepareToPlay(sampleRate, 512);
             }
             voiceEffectsMap[globalEffect->getId()] = cloned;
         }
@@ -25,15 +26,8 @@ void ShapeVoice::initializeEffectsFromGlobal() {
 }
 
 void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
-    if (effect) {
-        voicePreviewEffect = effect->cloneWithSharedParameters();
-        // Initialize the effect with current sample rate
-        if (audioProcessor.currentSampleRate > 0) {
-            voicePreviewEffect->prepareToPlay(audioProcessor.currentSampleRate, 512);
-        }
-    } else {
-        voicePreviewEffect = nullptr;
-    }
+    auto existingEffect = effect != nullptr ? voiceEffectsMap.find(effect->getId()) : voiceEffectsMap.end();
+    voicePreviewEffect = existingEffect != voiceEffectsMap.end() ? existingEffect->second : nullptr;
 }
 
 void ShapeVoice::clearPreviewEffect() {
@@ -44,10 +38,6 @@ void ShapeVoice::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Update sample rate for all voice effects
     for (auto& pair : voiceEffectsMap) {
         pair.second->prepareToPlay(sampleRate, samplesPerBlock);
-    }
-    // Update sample rate for preview effect if set
-    if (voicePreviewEffect) {
-        voicePreviewEffect->prepareToPlay(sampleRate, samplesPerBlock);
     }
 }
 
@@ -135,7 +125,8 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
     killFadeGain = 1.0f;
 
     if (audioProcessor.midiEnabled->getBoolValue()) {
-        double newFreq = juce::MidiMessage::getMidiNoteInHertz(vs.midiNote) + osci_audio::kMacFrequencyEpsilonHz;
+        double newFreq = audioProcessor.noteToFrequency(vs.midiNote, vs.channel) + osci_audio::kMacFrequencyEpsilonHz;
+#if OSCI_PREMIUM
         double glideTimeSec = audioProcessor.glideTime->getValueUnnormalised();
 
         // Determine glide source and whether to glide.
@@ -153,7 +144,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
             hasDifferentSource = (std::abs(glideSource - newFreq) > 0.01);
         } else {
             // Fresh noteOn: glide from the previously played note.
-            glideSource = juce::MidiMessage::getMidiNoteInHertz(static_cast<int>(vs.lastNote));
+            glideSource = audioProcessor.noteToFrequency(static_cast<int>(vs.lastNote), vs.channel);
             hasDifferentSource = (static_cast<int>(vs.lastNote) != vs.midiNote);
         }
 
@@ -179,6 +170,10 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
             frequency = newFreq;
             glideActive = false;
         }
+#else
+        frequency = newFreq;
+        glideActive = false;
+#endif
     }
 }
 
@@ -253,13 +248,19 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     // Recompute pitch wheel adjustment using current bend range parameter
     pitchWheelMoved(rawPitchWheelValue);
 
+    // Per-sample frequency animated buffer pointer for non-MIDI mode
+    const float* freqAnimBuf = (!audioProcessor.midiEnabled->getBoolValue())
+        ? audioProcessor.frequencyEffect->getAnimatedValuesReadPointer(0, numSamples) : nullptr;
+
     if (audioProcessor.midiEnabled->getBoolValue()) {
         // Glide is advanced per-sample below; set initial frequency here
         if (!glideActive) {
             actualFrequency = frequency * pitchWheelAdjustment;
         }
     } else {
-        actualFrequency = audioProcessor.frequency.load();
+        // Non-MIDI: initial frequency from animated buffer (first sample).
+        // Per-sample updates happen inside the rendering loop below.
+        actualFrequency = freqAnimBuf ? (double)freqAnimBuf[0] + 0.000001 : audioProcessor.frequencyEffect->getValue() + 0.000001;
     }
 
     // Prepare working buffers for effect processing
@@ -271,15 +272,17 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     frameSyncBuffer.clear();
 
     const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
-    const double dt = 1.0 / audioProcessor.currentSampleRate;
+    const double sampleRate = audioProcessor.getEffectiveSampleRate();
+    const double dt = 1.0 / sampleRate;
 
     // Snapshot DAW transport once per block (constant within a processBlock call)
-    const double blockBpm = audioProcessor.luaBpm.load(std::memory_order_relaxed);
-    const double blockPlayTime = audioProcessor.luaPlayTime.load(std::memory_order_relaxed);
-    const double blockPlayTimeBeats = audioProcessor.luaPlayTimeBeats.load(std::memory_order_relaxed);
-    const bool blockIsPlaying = audioProcessor.luaIsPlaying.load(std::memory_order_relaxed);
-    const int blockTimeSigNum = audioProcessor.luaTimeSigNum.load(std::memory_order_relaxed);
-    const int blockTimeSigDen = audioProcessor.luaTimeSigDen.load(std::memory_order_relaxed);
+    const auto& dawPosition = audioProcessor.dawPosition;
+    const double blockBpm = dawPosition.bpm.load(std::memory_order_relaxed);
+    const double blockPlayTime = dawPosition.seconds.load(std::memory_order_relaxed);
+    const double blockPlayTimeBeats = dawPosition.beats.load(std::memory_order_relaxed);
+    const bool blockIsPlaying = dawPosition.isPlaying.load(std::memory_order_relaxed);
+    const int blockTimeSigNum = dawPosition.timeSigNumerator.load(std::memory_order_relaxed);
+    const int blockTimeSigDen = dawPosition.timeSigDenominator.load(std::memory_order_relaxed);
 
     // Snapshot the sound pointer once per block.  The underlying ShapeSound
     // is ref-counted so it stays alive even if another thread swaps it out.
@@ -322,8 +325,13 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             actualFrequency = frequency * pitchWheelAdjustment;
         }
 
+        // Per-sample frequency update from animated buffer in non-MIDI mode
+        if (freqAnimBuf) {
+            actualFrequency = (double)freqAnimBuf[i] + 0.000001;
+        }
+
         int sample = startSample + i;
-        lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+        lengthIncrement = juce::jmax(frameLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         osci::Point channels;
 
@@ -331,7 +339,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             auto parser = currentSound->parser;
 
             if (renderingSample) {
-                vars.sampleRate = audioProcessor.currentSampleRate;
+                vars.sampleRate = sampleRate;
                 vars.frequency = actualFrequency;
                 vars.ext_x = 0;
                 vars.ext_y = 0;
@@ -353,6 +361,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 // Envelope
                 vars.envelope = envState.getCurrentValue();
                 vars.envelopeStage = static_cast<int>(envState.getStage());
+
+                // Block-relative sample index for per-sample parameter reads
+                vars.blockSampleIndex = i;
                 
                 if (externalAudio.getNumSamples() >= 1) {
                     double sampleIndex = sample % externalAudio.getNumSamples();
@@ -364,7 +375,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                         vars.ext_y = externalAudio.getSample(1, sampleIndex);
                     }
                 }
-                std::copy(std::begin(audioProcessor.luaValues), std::end(audioProcessor.luaValues), std::begin(vars.sliders));
+                // Read Lua slider values per-sample from animated buffers
+                for (int s = 0; s < 26 && s < (int)audioProcessor.luaEffects.size(); ++s) {
+                    vars.sliders[s] = audioProcessor.luaEffects[s]->getAnimatedValue(0, static_cast<size_t>(i));
+                }
 
                 channels = parser->nextSample(L, vars);
             } else if (currentShape < frame.size()) {
@@ -460,7 +474,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     // Kill-fade: per-sample linear ramp from 1→0 over kKillFadeTimeSec.
     const float killFadeDecPerSample = killFading
-        ? static_cast<float>(1.0 / (kKillFadeTimeSec * audioProcessor.currentSampleRate))
+        ? static_cast<float>(1.0 / (kKillFadeTimeSec * sampleRate))
         : 0.0f;
 
     for (int i = 0; i < numSamples; ++i) {
@@ -543,8 +557,11 @@ void ShapeVoice::noteStopped() {
 
 void ShapeVoice::pitchWheelMoved(int newPitchWheelValue) {
     rawPitchWheelValue = newPitchWheelValue;
-    // Bend range in semitones from parameter; convert to frequency ratio
+#if OSCI_PREMIUM
     int bendSemitones = audioProcessor.pitchBendRange->getValueUnnormalised();
+#else
+    int bendSemitones = 2; // Free version: fixed 2-semitone bend range
+#endif
     double bendNorm = (newPitchWheelValue - 8192.0) / 8192.0; // -1..+1
     double bendInSemitones = bendNorm * bendSemitones;
     pitchWheelAdjustment = std::pow(2.0, bendInSemitones / 12.0);

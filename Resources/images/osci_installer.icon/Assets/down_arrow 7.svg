@@ -1,0 +1,32 @@
+<?xml version="1.0" standalone="no"?>
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="1280pt" height="1280pt" viewBox="0 0 1350 1350"
+ preserveAspectRatio="xMidYMid meet">
+  <g transform="translate(140,1250) scale(0.092,-0.092)"
+     fill="none"
+     stroke="#00ff00"
+     stroke-width="800"
+     stroke-linejoin="miter"
+     stroke-linecap="butt"
+     stroke-miterlimit="50">
+    <path d="M4062 8810
+L4060 4820
+L2028 6847
+L0 8875
+L0 7110
+L0 5345
+L2673 2672
+L5345 0
+L8018 2673
+L10691 5346
+L10697 7115
+L10702 8885
+L8681 6865
+L6660 4845
+L6660 8822
+L6660 12800
+L5360 12800
+L4060 12800
+Z"/>
+  </g>
+</svg>

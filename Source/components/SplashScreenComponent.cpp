@@ -3,10 +3,8 @@
 #include <array>
 
 SplashScreenComponent::SplashScreenComponent() {
-    const auto headingFont = juce::Font(26.0f, juce::Font::bold);
+    setOverlayTitle("Upgrade to osci-render Premium");
     const auto subtitleFont = juce::Font(17.0f, juce::Font::plain);
-    configureLabel(titleLabel, headingFont, juce::Justification::centred);
-    titleLabel.setText("Upgrade to osci-render Premium", juce::NotificationType::dontSendNotification);
 
     configureLabel(subtitleLabel, subtitleFont, juce::Justification::centred);
     subtitleLabel.setText("Unlock new features, and more creative firepower.", juce::NotificationType::dontSendNotification);
@@ -15,13 +13,13 @@ SplashScreenComponent::SplashScreenComponent() {
     benefitsGrid.setUseCenteringPlaceholders(true);
     benefitsGrid.setItemsInteractive(false);
     benefitsGrid.setItemHeight(120);
-    benefitsGrid.setColour(ColourIds::scrollFadeOverlayBackgroundColourId, Colours::veryDark());
-    addAndMakeVisible(benefitsGrid);
+    benefitsGrid.setColour(osci::scrollFadeOverlayBackgroundColourId, osci::Colours::veryDark());
+    addPanelContentAndMakeVisible(benefitsGrid);
 
     configureLabel(supportLabel, juce::Font(14.5f, juce::Font::italic), juce::Justification::centred);
-    supportLabel.setColour(juce::Label::textColourId, Colours::accentColor().brighter(0.2f));
+    supportLabel.setColour(juce::Label::textColourId, osci::Colours::accentColor().brighter(0.2f));
     supportLabel.setText("Purchasing premium directly supports ongoing development. Thank you!", juce::NotificationType::dontSendNotification);
-    addAndMakeVisible(supportLabel);
+    addPanelContentAndMakeVisible(supportLabel);
 
     buildBenefitTiles();
 
@@ -36,26 +34,25 @@ SplashScreenComponent::SplashScreenComponent() {
         dismiss();
     };
 
-    upgradeButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
-    upgradeButton.setColour(juce::TextButton::textColourOffId, Colours::veryDark());
-    upgradeButton.setColour(juce::TextButton::textColourOnId, Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
+    upgradeButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
+    upgradeButton.setColour(juce::TextButton::textColourOnId, osci::Colours::veryDark());
 
-    continueButton.setColour(juce::TextButton::buttonColourId, Colours::darker().withAlpha(0.8f));
+    continueButton.setColour(juce::TextButton::buttonColourId, osci::Colours::darker().withAlpha(0.8f));
     continueButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     continueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
 
-    addAndMakeVisible(titleLabel);
-    addAndMakeVisible(subtitleLabel);
-    addAndMakeVisible(upgradeButton);
-    addAndMakeVisible(continueButton);
+    addPanelContentAndMakeVisible(subtitleLabel);
+    addPanelContentAndMakeVisible(upgradeButton);
+    addPanelContentAndMakeVisible(continueButton);
+}
+
+juce::Point<int> SplashScreenComponent::getPreferredPanelSize() const {
+    return getPanelSizeForContentSize({ 680, 540 });
 }
 
 void SplashScreenComponent::resizeContent(juce::Rectangle<int> contentArea) {
 
-    auto titleArea = contentArea.removeFromTop(40);
-    titleLabel.setBounds(titleArea);
-
-    contentArea.removeFromTop(12);
     auto subtitleArea = contentArea.removeFromTop(32);
     subtitleLabel.setBounds(subtitleArea);
 
@@ -105,21 +102,23 @@ void SplashScreenComponent::buildBenefitTiles()
         int iconSize;
     };
 
-    static const std::array<BenefitEntry, 8> benefits{{
-        { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
-        { "Live Video Input", "Perform live via Syphon or Spout feeds.", BinaryData::spout_svg, BinaryData::spout_svgSize },
-        { "Enhanced Simulation", "More realistic analogue oscilloscope simulation.", BinaryData::oscilloscope_svg, BinaryData::oscilloscope_svgSize },
-        { "Advanced Controls", "Set custom framerate, resolution, and quality.", BinaryData::cog_svg, BinaryData::cog_svgSize },
-        { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
-        { "Enhanced Text", "Improved text rendering quality.", BinaryData::greek_svg, BinaryData::greek_svgSize },
+    static const std::array<BenefitEntry, 10> benefits{{
         { "New Effects", "Twist, Kaleidoscope, Vortex, Multiplex, and more.", BinaryData::distort_svg, BinaryData::distort_svgSize },
+        { "Video Support", "Turn MP4 or MOV footage into oscilloscope audio.", BinaryData::desktop_svg, BinaryData::desktop_svgSize },
+        { "Recording", "Export your visuals directly to MP4.", BinaryData::record_svg, BinaryData::record_svgSize },
+        { "System Audio Capture", "Capture system audio on macOS and Windows.", BinaryData::microphone_svg, BinaryData::microphone_svgSize },
+        { "Fractals", "Koch Snowflake, Sierpinski Triangle, and custom fractals.", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize },
+        { "Synth Engine", "Rewritten synth with polyphony, glide, legato, and microtonal tuning.", BinaryData::waves_svg, BinaryData::waves_svgSize },
+        { "Modulation", "8 LFOs, 4 envelopes, random sources, and sidechain modulation.", BinaryData::graph_svg, BinaryData::graph_svgSize },
+        { "MIDI CC Learning", "Map hardware MIDI controllers to any parameter.", BinaryData::link_svg, BinaryData::link_svgSize },
+        { "And Many More", "Enhanced simulation, advanced controls, popout visualiser, and more.", BinaryData::plus_svg, BinaryData::plus_svgSize },
         { "Support the Project", "Your upgrade funds ongoing releases and support.", BinaryData::cash_svg, BinaryData::cash_svgSize }
     }};
 
     for (const auto& benefit : benefits)
     {
         auto iconSvg = juce::String::createStringFromData(benefit.iconData, benefit.iconSize);
-        auto* tile = new GridItemComponent(benefit.title, iconSvg, benefit.title, Colours::accentColor());
+        auto* tile = new osci::GridItemComponent(benefit.title, iconSvg, benefit.title, osci::Colours::accentColor());
         tile->setDescription(benefit.description);
         tile->setInteractive(false);
         benefitsGrid.addItem(tile);

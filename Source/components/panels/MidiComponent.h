@@ -2,11 +2,9 @@
 
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
-#include "../SwitchButton.h"
-#include "../ParameterBarComponent.h"
 #include "../KnobContainerComponent.h"
-#include "../ToggleLabelComponent.h"
 #include "../SlopeGraphComponent.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 class MidiComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {
@@ -20,15 +18,14 @@ public:
 
 	void resized() override;
 	void paint(juce::Graphics& g) override;
-	void paintOverChildren(juce::Graphics& g) override;
 private:
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 
-    jux::SwitchButton midiToggle{audioProcessor.midiEnabled};
+    SvgSwitchButton midiSwitch{"midi", juce::String(BinaryData::midi_svg), audioProcessor.midiEnabled};
 	ParameterBarComponent voicesBar{audioProcessor.voices, "VOICES"};
+#if OSCI_PREMIUM
 	ParameterBarComponent bendBar{audioProcessor.pitchBendRange, "BEND"};
-
 	KnobContainerComponent velTrkKnob{"VELOCITY"};
 	KnobContainerComponent glideKnob{"GLIDE"};
 
@@ -37,8 +34,9 @@ private:
 	ToggleLabelComponent alwaysGlideToggle{audioProcessor.alwaysGlide};
 	ToggleLabelComponent legatoToggle{audioProcessor.legato};
 	ToggleLabelComponent octaveScaleToggle{audioProcessor.octaveScale};
-
 	ParameterBarComponent tempoBar{audioProcessor.standaloneBpm, "BPM"};
+	DisabledOverlay disabledOverlay;
+#endif
 
 	void updateEnabledState();
 

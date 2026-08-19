@@ -1,10 +1,12 @@
 #pragma once
 
+#if OSCI_PREMIUM
+
 #include <JuceHeader.h>
 #include "../PluginProcessor.h"
-#include "../parser/fractal/FractalParser.h"
-#include "effects/EffectComponent.h"
-#include "ScrollFadeViewport.h"
+#include "KnobContainerComponent.h"
+#include <osci_gui/osci_gui.h>
+#include <osci_file_import/osci_file_import.h>
 
 class OscirenderAudioProcessorEditor;
 
@@ -32,13 +34,11 @@ private:
     juce::GroupComponent group{{}, "L-System Fractal"};
 
     juce::Label axiomLabel{{}, "Axiom"};
-    juce::TextEditor axiomEditor;
+    osci::TextEditor axiomEditor;
 
-    juce::Label angleLabel{{}, juce::String (juce::CharPointer_UTF8 ("Angle (\xC2\xB0)"))};
-    juce::TextEditor angleEditor;
-
-    // Effect sliders
-    EffectComponent depthSlider{*audioProcessor.fractalIterationsEffect};
+    juce::Label angleLabel{{}, juce::String(juce::CharPointer_UTF8("Angle (\xC2\xB0)"))};
+    osci::TextEditor angleEditor;
+    KnobContainerComponent depthKnob{"DEPTH"};
 
     // Rules section — scrollable panel with dark background
     struct RulesPanel : public juce::Component {
@@ -46,9 +46,9 @@ private:
     };
 
     struct RuleRow : public juce::Component {
-        juce::TextEditor variableEditor;
+        osci::TextEditor variableEditor;
         juce::Label arrowLabel{{}, juce::String (juce::CharPointer_UTF8 ("\xE2\x86\x92"))};
-        juce::TextEditor replacementEditor;
+        osci::TextEditor replacementEditor;
         juce::TextButton removeButton{"X"};
 
         RuleRow() {
@@ -75,7 +75,7 @@ private:
     };
 
     juce::Label rulesLabel{{}, "Rules"};
-    ScrollFadeViewport rulesViewport;
+    osci::ScrollFadeViewport rulesViewport;
     RulesPanel rulesContent;
     juce::OwnedArray<RuleRow> ruleRows;
     juce::TextButton addRuleButton{"+ Add Rule"};
@@ -89,3 +89,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FractalComponent)
 };
+
+#endif // OSCI_PREMIUM

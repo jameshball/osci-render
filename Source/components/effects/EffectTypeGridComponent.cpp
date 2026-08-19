@@ -1,8 +1,7 @@
 #include "EffectTypeGridComponent.h"
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
-#include "../GridComponent.h"
-#include "../GridItemComponent.h"
+#include <osci_gui/osci_gui.h>
 #include "../../PluginEditor.h"
 #include <unordered_set>
 #include <algorithm>
@@ -58,7 +57,7 @@ void EffectTypeGridComponent::setupEffectItems()
         juce::String effectName = effect->getName();
 
         // Create new generic item component
-        auto* item = new GridItemComponent(effectName, effect->getIcon(), effect->getId());
+        auto* item = new osci::GridItemComponent(effectName, effect->getIcon(), effect->getId());
 
         const bool isLockedPremium =
 #if !OSCI_PREMIUM
@@ -83,22 +82,34 @@ void EffectTypeGridComponent::setupEffectItems()
                     onEffectSelected(effectId);
             };
             item->onHoverStart = [this](const juce::String& effectId) {
-                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                if (!audioProcessor.globalSettings.getBool("previewEffectOnHover", true)) {
+                    return;
+                }
+
+                {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.setPreviewEffectId(effectId);
                 }
-                if (audioProcessor.isBeginnerMode() || audioProcessor.getGlobalBoolValue("autoLinkLfos", true)) {
+                hoverPreviewActive = true;
+#if OSCI_PREMIUM
+                if (audioProcessor.globalSettings.getBool("autoLinkLfos", true)) {
                     audioProcessor.autoAssignLfosForPreview(effectId);
-                    audioProcessor.broadcaster.sendChangeMessage();
                 }
+#endif
             };
             item->onHoverEnd = [this]() {
-                if (audioProcessor.getGlobalBoolValue("previewEffectOnHover", true)) {
+                if (!hoverPreviewActive) {
+                    return;
+                }
+                hoverPreviewActive = false;
+
+                {
                     juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
                     audioProcessor.clearPreviewEffect();
                 }
+#if OSCI_PREMIUM
                 audioProcessor.clearPreviewLfoAssignments();
-                audioProcessor.broadcaster.sendChangeMessage();
+#endif
             };
         }
 

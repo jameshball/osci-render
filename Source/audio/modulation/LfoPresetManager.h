@@ -10,6 +10,7 @@ public:
     struct PresetEntry {
         juce::String name;
         juce::File file;
+        juce::String category; // Vital subfolder name (e.g. "User", "Third Party")
     };
 
     explicit LfoPresetManager(const juce::File& presetsDirectory);
@@ -28,9 +29,15 @@ public:
     // Delete a preset file. Returns true on success.
     bool deletePreset(const juce::File& file);
 
-    // Import a .vitallfo file (validate and copy to presets directory).
-    // Returns the destination file on success, or an invalid File on failure.
-    juce::File importPreset(const juce::File& sourceFile);
+    // List .vitallfo files from all Vital synth LFO directories (*/LFOs, excluding Factory).
+    // Caches the result; call invalidateVitalCache() to force a re-scan.
+    const std::vector<PresetEntry>& getVitalUserPresets() const;
+
+    // Force re-scan of Vital LFO directories on next access.
+    void invalidateVitalCache() { vitalCacheValid = false; }
+
+    // Returns the Vital base directory for this platform (e.g. ~/Music/Vital on macOS).
+    static juce::File getVitalBaseDirectory();
 
     // Convert an internal LfoWaveform to Vital's JSON representation.
     static juce::var waveformToVitalJson(const LfoWaveform& waveform, const juce::String& name);
@@ -40,6 +47,8 @@ public:
 
 private:
     juce::File presetsDir;
+    mutable std::vector<PresetEntry> vitalPresetsCache;
+    mutable bool vitalCacheValid = false;
 
     static juce::String sanitizeFilename(const juce::String& name);
 };

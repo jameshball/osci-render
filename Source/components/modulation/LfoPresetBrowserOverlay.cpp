@@ -6,7 +6,7 @@
 
 LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, Listener* listener)
     : presetManager(manager), browserListener(listener) {
-    lightweight = true;
+    setOpaque(false);
 
     addAndMakeVisible(browserPanel);
 
@@ -18,7 +18,7 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
 
     saveEditor.setFont(juce::Font(13.0f));
     saveEditor.setTextToShowWhenEmpty("Preset name...", juce::Colours::white.withAlpha(0.3f));
-    saveEditor.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark());
+    saveEditor.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
     saveEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::textColourId, juce::Colours::white);
@@ -32,75 +32,40 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
     saveButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     saveButton.onClick = [this]() { doSave(); };
     browserPanel.addAndMakeVisible(saveButton);
-
-    importButton.setButtonText("Import .vitallfo");
-    importButton.setColour(juce::TextButton::buttonColourId, Colours::veryDark().brighter(0.15f));
-    importButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white.withAlpha(0.8f));
-    importButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.8f));
-    importButton.onClick = [this]() {
-        if (browserListener) browserListener->presetBrowserImportRequested();
-    };
-    browserPanel.addAndMakeVisible(importButton);
 }
 
-void LfoPresetBrowserOverlay::showAt(juce::Component& anchor, LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
+void LfoPresetBrowserOverlay::show(LfoPreset currentFactoryPreset, const juce::String& currentUserName,
+                                    const juce::String& defaultFactoryName, const juce::String& defaultFileName) {
     activeFactoryPreset = currentFactoryPreset;
     activeUserName = currentUserName;
-    anchorComponent = &anchor;
+    defaultFactoryPresetName = defaultFactoryName;
+    defaultPresetFilePath = defaultFileName;
 
     rebuildContent();
-    repositionPanel();
+    resized();
+    // Re-layout after resized() so viewport dimensions are valid on first open
+    layoutRows();
+    browserPanel.resized();
     grabKeyboardFocus();
 }
 
 void LfoPresetBrowserOverlay::resized() {
-    // Don't call OverlayComponent::resized() — we position the panel ourselves.
-    repositionPanel();
+    browserPanel.setBounds(getLocalBounds());
 }
 
-void LfoPresetBrowserOverlay::repositionPanel() {
-    if (anchorComponent == nullptr || getWidth() <= 0) return;
-
-    auto anchorBounds = getLocalArea(anchorComponent, anchorComponent->getLocalBounds());
-
-    int tooltipW = kTooltipWidth;
-    int tooltipH = juce::jmin(kMaxTooltipHeight, contentHeight + kBottomBarHeight + kImportBarHeight + 16);
-
-    // Centre horizontally below the anchor
-    int x = anchorBounds.getCentreX() - tooltipW / 2;
-    int y = anchorBounds.getBottom() + 4;
-
-    // Clamp to overlay edges
-    if (x + tooltipW > getWidth() - 4)
-        x = getWidth() - tooltipW - 4;
-    if (x < 4) x = 4;
-    if (y + tooltipH > getHeight())
-        y = anchorBounds.getY() - tooltipH - 4;
-
-    // Expand component bounds to accommodate shadow rendering outside the visual panel
-    constexpr int shadowMargin = 14;
-    browserPanel.setBounds(x - shadowMargin, y - shadowMargin,
-                           tooltipW + shadowMargin * 2, tooltipH + shadowMargin * 2);
-    panelBounds = juce::Rectangle<int>(x, y, tooltipW, tooltipH);
-}
-
-void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName) {
+void LfoPresetBrowserOverlay::refresh(LfoPreset currentFactoryPreset, const juce::String& currentUserName,
+                                       const juce::String& defaultFactoryName, const juce::String& defaultFileName) {
     activeFactoryPreset = currentFactoryPreset;
     activeUserName = currentUserName;
+    defaultFactoryPresetName = defaultFactoryName;
+    defaultPresetFilePath = defaultFileName;
     rebuildContent();
-}
-
-void LfoPresetBrowserOverlay::paint(juce::Graphics& g) {
-    // lightweight — no backdrop dimming; base class paint is skipped.
-}
-
-void LfoPresetBrowserOverlay::mouseDown(const juce::MouseEvent& e) {
-    OverlayComponent::mouseDown(e);
 }
 
 bool LfoPresetBrowserOverlay::keyPressed(const juce::KeyPress& key) {
     if (key == juce::KeyPress::escapeKey) {
-        dismiss();
+        if (onDismissRequested)
+            onDismissRequested();
         return true;
     }
     return false;
@@ -111,32 +76,21 @@ bool LfoPresetBrowserOverlay::keyPressed(const juce::KeyPress& key) {
 // ============================================================================
 
 void LfoPresetBrowserOverlay::BrowserPanel::paint(juce::Graphics& g) {
-    constexpr int shadowMargin = 14;
-    auto bounds = getLocalBounds().reduced(shadowMargin).toFloat();
+    auto bounds = getLocalBounds().toFloat();
     constexpr float radius = 6.0f;
 
-    juce::Path panelPath;
-    panelPath.addRoundedRectangle(bounds, radius);
-
-    shadow.render(g, panelPath);
-
-    g.setColour(Colours::veryDark().brighter(0.08f));
-    g.fillPath(panelPath);
+    g.setColour(osci::Colours::veryDark().brighter(0.08f));
+    g.fillRoundedRectangle(bounds, radius);
 }
 
 void LfoPresetBrowserOverlay::BrowserPanel::resized() {
-    constexpr int shadowMargin = 14;
-    auto inner = getLocalBounds().reduced(shadowMargin).reduced(6);
+    auto inner = getLocalBounds().reduced(6);
 
     auto bottomBar = inner.removeFromBottom(26);
     saveButton.setBounds(bottomBar.removeFromRight(48));
     bottomBar.removeFromRight(4);
     saveEditor.setBounds(bottomBar);
 
-    inner.removeFromBottom(4);
-
-    auto importBar = inner.removeFromBottom(22);
-    importButton.setBounds(importBar);
     inner.removeFromBottom(4);
 
     viewport.setBounds(inner);
@@ -167,10 +121,29 @@ void LfoPresetBrowserOverlay::PresetRow::paint(juce::Graphics& g) {
 
     g.setColour(isActive ? juce::Colours::white : juce::Colours::white.withAlpha(0.75f));
     g.setFont(juce::Font(12.5f));
-    g.drawText(name, textBounds, juce::Justification::centredLeft);
+
+    juce::String displayName = name;
+    if (isDefault)
+        displayName += " (default)";
+    g.drawText(displayName, textBounds, juce::Justification::centredLeft);
 }
 
 void LfoPresetBrowserOverlay::PresetRow::mouseDown(const juce::MouseEvent& e) {
+    if (e.mods.isRightButtonDown()) {
+        juce::PopupMenu menu;
+        if (isDefault) {
+            menu.addItem("Clear Default", [this]() { if (onClearDefault) onClearDefault(); });
+        } else {
+            menu.addItem("Set as Default", [this]() { if (onSetDefault) onSetDefault(); });
+        }
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+            { e.getScreenX(), e.getScreenY(), 1, 1 }));
+    }
+}
+
+void LfoPresetBrowserOverlay::PresetRow::mouseUp(const juce::MouseEvent& e) {
+    if (e.mods.isRightButtonDown()) return;
+
     auto bounds = getLocalBounds();
     if (isUserPreset) {
         auto deleteArea = bounds.removeFromRight(kDeleteButtonSize + 8);
@@ -241,10 +214,17 @@ void LfoPresetBrowserOverlay::rebuildContent() {
         auto* row = new PresetRow();
         row->name = registry[i].name;
         row->isActive = (registry[i].preset == activeFactoryPreset) && activeUserName.isEmpty();
+        row->isDefault = (defaultPresetFilePath.isEmpty() && defaultFactoryPresetName == registry[i].name);
         row->isUserPreset = false;
         auto preset = registry[i].preset;
         row->onSelect = [this, preset]() {
             if (browserListener) browserListener->presetBrowserFactorySelected(preset);
+        };
+        row->onSetDefault = [this, preset]() {
+            if (browserListener) browserListener->presetBrowserSetDefaultFactory(preset);
+        };
+        row->onClearDefault = [this]() {
+            if (browserListener) browserListener->presetBrowserClearDefault();
         };
         rows.add(row);
         content.addAndMakeVisible(row);
@@ -267,6 +247,7 @@ void LfoPresetBrowserOverlay::rebuildContent() {
             auto* row = new PresetRow();
             row->name = userPresets[i].name;
             row->isActive = (activeUserName == userPresets[i].name);
+            row->isDefault = (userPresets[i].file.getFullPathName() == defaultPresetFilePath);
             row->isUserPreset = true;
             row->file = userPresets[i].file;
             auto file = userPresets[i].file;
@@ -275,6 +256,53 @@ void LfoPresetBrowserOverlay::rebuildContent() {
             };
             row->onDelete = [this, file]() {
                 if (browserListener) browserListener->presetBrowserUserDeleted(file);
+            };
+            row->onSetDefault = [this, file]() {
+                if (browserListener) browserListener->presetBrowserSetDefaultFile(file);
+            };
+            row->onClearDefault = [this]() {
+                if (browserListener) browserListener->presetBrowserClearDefault();
+            };
+            rows.add(row);
+            content.addAndMakeVisible(row);
+            y += kRowHeight;
+        }
+    }
+
+    // Vital LFOs sections — grouped by category folder
+    auto vitalPresets = presetManager.getVitalUserPresets();
+    numVitalPresets = (int)vitalPresets.size();
+    numVitalHeaders = 0;
+
+    if (!vitalPresets.empty()) {
+        juce::String currentCategory;
+
+        for (int i = 0; i < (int)vitalPresets.size(); ++i) {
+            if (vitalPresets[i].category != currentCategory) {
+                currentCategory = vitalPresets[i].category;
+                y += 4;
+                auto* catHeader = new SectionHeader();
+                catHeader->title = currentCategory.toUpperCase() + " (VITAL)";
+                rows.add(catHeader);
+                content.addAndMakeVisible(catHeader);
+                y += kSectionHeaderHeight;
+                numVitalHeaders++;
+            }
+
+            auto* row = new PresetRow();
+            row->name = vitalPresets[i].name;
+            row->isActive = (activeUserName == vitalPresets[i].name);
+            row->isDefault = (vitalPresets[i].file.getFullPathName() == defaultPresetFilePath);
+            row->isUserPreset = false;
+            auto file = vitalPresets[i].file;
+            row->onSelect = [this, file]() {
+                if (browserListener) browserListener->presetBrowserUserSelected(file);
+            };
+            row->onSetDefault = [this, file]() {
+                if (browserListener) browserListener->presetBrowserSetDefaultFile(file);
+            };
+            row->onClearDefault = [this]() {
+                if (browserListener) browserListener->presetBrowserClearDefault();
             };
             rows.add(row);
             content.addAndMakeVisible(row);
@@ -290,7 +318,7 @@ void LfoPresetBrowserOverlay::rebuildContent() {
 
 void LfoPresetBrowserOverlay::layoutRows() {
     int w = viewport.getWidth();
-    if (w <= 0) w = kTooltipWidth - 12;
+    if (w <= 0) w = getWidth();
     int scrollBarW = (contentHeight > viewport.getHeight()) ? 8 : 0;
     int rowW = w - scrollBarW;
 
@@ -322,6 +350,23 @@ void LfoPresetBrowserOverlay::layoutRows() {
             rows[rowIdx]->setBounds(0, y, rowW, kRowHeight);
             y += kRowHeight;
         }
+    }
+
+    // Vital presets — multiple category headers interleaved with preset rows
+    int vitalItemsRemaining = numVitalPresets + numVitalHeaders;
+    while (vitalItemsRemaining > 0 && rowIdx < rows.size()) {
+        // Determine if this is a header or a preset row
+        auto* asHeader = dynamic_cast<SectionHeader*>(rows[rowIdx]);
+        if (asHeader != nullptr) {
+            y += 4;
+            rows[rowIdx]->setBounds(0, y, rowW, kSectionHeaderHeight);
+            y += kSectionHeaderHeight;
+        } else {
+            rows[rowIdx]->setBounds(0, y, rowW, kRowHeight);
+            y += kRowHeight;
+        }
+        rowIdx++;
+        vitalItemsRemaining--;
     }
 
     content.setSize(rowW, juce::jmax(viewport.getHeight(), contentHeight));

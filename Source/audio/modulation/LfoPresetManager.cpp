@@ -55,33 +55,71 @@ bool LfoPresetManager::deletePreset(const juce::File& file) {
     return file.deleteFile();
 }
 
-juce::File LfoPresetManager::importPreset(const juce::File& sourceFile) {
-    if (!sourceFile.existsAsFile()) return {};
+juce::File LfoPresetManager::getVitalBaseDirectory() {
+#if JUCE_MAC
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+        .getChildFile("Music/Vital");
+#elif JUCE_WINDOWS
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+        .getChildFile("Vital");
+#else
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+        .getChildFile(".local/share/vital");
+#endif
+}
 
-    auto text = sourceFile.loadFileAsString();
-    auto parsed = juce::JSON::parse(text);
-    if (!parsed.isObject()) return {};
+const std::vector<LfoPresetManager::PresetEntry>& LfoPresetManager::getVitalUserPresets() const {
+    if (vitalCacheValid)
+        return vitalPresetsCache;
 
-    LfoWaveform waveform;
-    juce::String name;
-    if (!vitalJsonToWaveform(parsed, waveform, name)) return {};
+    vitalPresetsCache.clear();
 
-    if (name.isEmpty())
-        name = sourceFile.getFileNameWithoutExtension();
-
-    auto destFile = presetsDir.getChildFile(sanitizeFilename(name) + ".vitallfo");
-
-    int counter = 2;
-    while (destFile.existsAsFile()) {
-        destFile = presetsDir.getChildFile(sanitizeFilename(name) + " " + juce::String(counter) + ".vitallfo");
-        counter++;
+    auto vitalBase = getVitalBaseDirectory();
+    if (!vitalBase.isDirectory()) {
+        vitalCacheValid = true;
+        return vitalPresetsCache;
     }
 
-    auto json = waveformToVitalJson(waveform, name);
-    if (destFile.replaceWithText(juce::JSON::toString(json)))
-        return destFile;
+    // Scan all Vital/*/LFOs directories, excluding Factory
+    for (const auto& subDir : vitalBase.findChildFiles(juce::File::findDirectories, false)) {
+        if (subDir.getFileName().equalsIgnoreCase("Factory"))
+            continue;
 
-    return {};
+        auto lfosDir = subDir.getChildFile("LFOs");
+        if (!lfosDir.isDirectory())
+            continue;
+
+        juce::String folderName = subDir.getFileName();
+
+        for (const auto& file : lfosDir.findChildFiles(juce::File::findFiles, false, "*.vitallfo")) {
+            PresetEntry entry;
+            entry.file = file;
+            entry.category = folderName;
+
+            auto text = file.loadFileAsString();
+            auto parsed = juce::JSON::parse(text);
+            if (parsed.isObject()) {
+                auto* obj = parsed.getDynamicObject();
+                if (obj && obj->hasProperty("name"))
+                    entry.name = obj->getProperty("name").toString();
+            }
+
+            if (entry.name.isEmpty())
+                entry.name = file.getFileNameWithoutExtension();
+
+            vitalPresetsCache.push_back(entry);
+        }
+    }
+
+    std::sort(vitalPresetsCache.begin(), vitalPresetsCache.end(),
+              [](const PresetEntry& a, const PresetEntry& b) {
+                  int catCmp = a.category.compareIgnoreCase(b.category);
+                  if (catCmp != 0) return catCmp < 0;
+                  return a.name.compareIgnoreCase(b.name) < 0;
+              });
+
+    vitalCacheValid = true;
+    return vitalPresetsCache;
 }
 
 juce::var LfoPresetManager::waveformToVitalJson(const LfoWaveform& waveform, const juce::String& name) {

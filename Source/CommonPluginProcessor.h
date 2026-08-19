@@ -11,17 +11,18 @@
 
 #include <JuceHeader.h>
 #include <any>
-#include "audio/platform/SampleRateManager.h"
+#include <osci_file_import/osci_file_import.h>
+
+#include "audio/platform/InternalSampleRateController.h"
 #include "visualiser/VisualiserSettings.h"
 #include "visualiser/RecordingSettings.h"
-#include "audio/wav/WavParser.h"
 
 class AudioPlayerListener {
 public:
     virtual void parserChanged() = 0;
 };
 
-class CommonAudioProcessor  : public juce::AudioProcessor, public SampleRateManager, public juce::Timer,
+class CommonAudioProcessor  : public juce::AudioProcessor, public juce::Timer,
                               public juce::ValueTree::Listener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
@@ -34,16 +35,26 @@ public:
     void addAllParameters();
 
     juce::UndoManager& getUndoManager() { return undoManager; }
+    juce::String getProductSlug() const;
+    void getPortableProjectSnapshot(juce::MemoryBlock& destData);
+    void clearRecentProjectFiles();
+    void recordingExportCompleted(const juce::File& file);
+    juce::File getRecentRecordingFile(int index) const;
+    int createRecentRecordingsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo, int baseItemId);
 
-    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override final;
     void releaseResources() override;
 
    #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
    #endif
 
-    virtual void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
-    virtual juce::AudioProcessorEditor* createEditor() = 0;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
+    virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
+    virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
+    virtual bool supportsInternalSampleRateOverride() const { return false; }
+
+    juce::AudioProcessorEditor* createEditor() override = 0;
 
     bool hasEditor() const override;
 
@@ -58,7 +69,11 @@ public:
     void setCurrentProgram(int index) override;
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
-    double getSampleRate() override;
+    double getSampleRate();
+    double getEffectiveSampleRate();
+    double getInternalSampleRateRatio() const { return internalSampleRate.getRatio(); }
+    bool canSetInternalSampleRateRatio(double ratio) const;
+    void setInternalSampleRateRatio(double ratio);
     void loadAudioFile(const juce::File& file);
     void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
     void stopAudioFile();
@@ -79,15 +94,10 @@ public:
     static juce::String getFFmpegURL();
 #endif
     
-    // Global settings methods
-    bool getGlobalBoolValue(const juce::String& keyName, bool defaultValue = false) const;
-    int getGlobalIntValue(const juce::String& keyName, int defaultValue = 0) const;
-    double getGlobalDoubleValue(const juce::String& keyName, double defaultValue = 0.0) const;
-    juce::String getGlobalStringValue(const juce::String& keyName, const juce::String& defaultValue = "") const;
-    void setGlobalValue(const juce::String& keyName, const juce::var& value);
-    void removeGlobalValue(const juce::String& keyName);
-    void saveGlobalSettings();
-    void reloadGlobalSettings();
+    // Path to the standalone app's settings file (written by CustomStandaloneFilterApp).
+    // The file only exists when running as a standalone; when hosted in a DAW
+    // this returns the would-be path (which will not exist on disk).
+    static juce::File getAppSettingsFile();
     
     bool hasSetSessionStartTime = false;
     bool programCrashedAndUserWantsToReset();
@@ -95,15 +105,12 @@ public:
     juce::SpinLock audioPlayerListenersLock;
     std::vector<AudioPlayerListener*> audioPlayerListeners;
 
-    std::atomic<double> volume = 1.0;
-    std::atomic<double> threshold = 1.0;
     osci::BooleanParameter* muteParameter = nullptr;
 
+    osci::MidiManager midiManager;
+
     std::shared_ptr<osci::Effect> volumeEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            volume = values[0].load();
-            return input;
-        }, new osci::EffectParameter(
+        new osci::EffectParameter(
             "Volume",
             "Controls the volume of the output audio.",
             "volume",
@@ -112,10 +119,7 @@ public:
     );
 
     std::shared_ptr<osci::Effect> thresholdEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            threshold = values[0].load();
-            return input;
-        }, new osci::EffectParameter(
+        new osci::EffectParameter(
             "Threshold",
             "Clips the audio to a maximum value. Applying a harsher threshold results in a more distorted sound.",
             "threshold",
@@ -123,10 +127,14 @@ public:
         )
     );
 
-    juce::SpinLock wavParserLock;
-    WavParser wavParser{ *this };
-
     std::atomic<double> currentSampleRate = 0.0;
+    juce::SpinLock wavParserLock;
+    WavParser wavParser{ [this] { return currentSampleRate.load(); } };
+
+    // Apply per-sample volume scaling and optional threshold clipping to a stereo buffer.
+    // A threshold at the top of the range leaves the scaled output unclipped.
+    void applyVolumeAndThreshold(float* const* channels, int numSamples);
+
     juce::SpinLock effectsLock;
     VisualiserParameters visualiserParameters;
     RecordingParameters recordingParameters;
@@ -176,14 +184,20 @@ public:
 #else
         "ffmpeg";
 #endif
+
+    osci::LicenseManager licenseManager;
+    osci::SettingsStore globalSettings;
+
     void setAcceptsKeys(bool shouldAcceptKeys) {
-        setGlobalValue("acceptsAllKeys", shouldAcceptKeys);
+        globalSettings.set("acceptsAllKeys", shouldAcceptKeys);
+        globalSettings.save();
     }
     bool getAcceptsKeys() {
-        return getGlobalBoolValue("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp());
+        return globalSettings.getBool("acceptsAllKeys", juce::JUCEApplicationBase::isStandaloneApp());
     }
     
 protected:
+    bool isCreatingPortableProjectSnapshot() const;
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;
@@ -238,6 +252,8 @@ protected:
     osci::BooleanParameter* getBooleanParameter(juce::String id);
     osci::FloatParameter* getFloatParameter(juce::String id);
     osci::IntParameter* getIntParameter(juce::String id);
+
+    void loadMidiCCState(const juce::XmlElement* xml);
     
     void saveProperties(juce::XmlElement& xml);
     void loadProperties(juce::XmlElement& xml);
@@ -249,23 +265,31 @@ protected:
     juce::SpinLock propertiesLock;
     std::unordered_map<std::string, std::any> properties;
     
-    // Global settings that persist across plugin instances
-    std::unique_ptr<juce::PropertiesFile> globalSettings;
-
     // File logger for writing diagnostics to the application data folder
     std::unique_ptr<juce::FileLogger> fileLogger;
 
     juce::RecentlyOpenedFilesList recentProjectFiles;
+    juce::RecentlyOpenedFilesList recentRecordingFiles;
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CommonAudioProcessor)
 
 private:
+    InternalSampleRateController internalSampleRate;
+    inline static thread_local bool creatingPortableProjectSnapshot = false;
+
     void startHeartbeat();
     void stopHeartbeat();
     void timerCallback() override;
 
     bool heartbeatActive = false;
+
+#if OSCI_PREMIUM
+    // Verify the downloaded ffmpeg binary actually runs on this system.
+    // Returns true if ffmpeg -version exits successfully. Result is cached.
+    bool validateFFmpegBinary();
+    bool ffmpegValidated = false;
+#endif
 
     // Maps paramID → AudioProcessorParameter* for O(1) lookup in valueTreePropertyChanged
     std::unordered_map<juce::String, juce::AudioProcessorParameter*> paramIdMap;

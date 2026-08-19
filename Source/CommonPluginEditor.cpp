@@ -1,13 +1,25 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
-#include "standalone/CustomStandaloneFilterWindow.h"
+#include "components/OfflineRenderOverlay.h"
+#include "components/OverlayDialogHelpers.h"
+#include "components/RecordingSettingsOverlay.h"
+#include "feedback/FeedbackReportBuilder.h"
+#include "logging/WorkflowLogger.h"
+#include "parser/FileFormatRegistry.h"
+#include <osci_standalone/osci_standalone.h>
 
 #if OSCI_PREMIUM
 #include "visualiser/OfflineAudioToVideoRenderer.h"
 #endif
 
+namespace {
+#if OSCI_PREMIUM
+const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
+#endif
+}
+
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-    : AudioProcessorEditor(&p), audioProcessor(p), appName(appName), projectFileType(projectFileType)
+    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType)
 {
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
@@ -17,32 +29,31 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setLookAndFeel(&lookAndFeel);
 
     addAndMakeVisible(menuBar);
-    addAndMakeVisible(undoButton);
-    addAndMakeVisible(redoButton);
-    addAndMakeVisible(undoLabel);
-    undoLabel.setJustificationType(juce::Justification::centredRight);
-    undoLabel.setFont(juce::Font(12.0f));
-    undoLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.7f));
-    redoButton.setTooltip("Redo");
-    undoButton.setEnabled(false);
-    redoButton.setEnabled(false);
-    undoButton.onClick = [this] {
-        audioProcessor.getUndoManager().undo();
-        updateUndoRedoState();
+    addAndMakeVisible(undoRedoControls);
+    addAndMakeVisible(betaUpdatesButton);
+    addAndMakeVisible(updatePrompt);
+    updatePrompt.setVisible(false);
+    betaUpdatesButton.setColour(juce::TextButton::buttonColourId, juce::Colour::fromRGB(0xf2, 0xc9, 0x4c));
+    betaUpdatesButton.setColour(juce::TextButton::buttonOnColourId, juce::Colour::fromRGB(0xff, 0xd9, 0x68));
+    betaUpdatesButton.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
+    betaUpdatesButton.setColour(juce::TextButton::textColourOnId, osci::Colours::veryDark());
+    betaUpdatesButton.setTooltip("Beta updates are enabled. Click to manage.");
+    betaUpdatesButton.onClick = [this] { openLicenseAndUpdates(); };
+    updatePrompt.onLicenseRequired = [this] { openLicenseAndUpdates(); };
+    refreshBetaUpdatesButton();
+#if !OSCI_PREMIUM
+    showPremiumSplashScreenGlobal = [safeThis = juce::Component::SafePointer<CommonPluginEditor>(this)]() {
+        if (safeThis) safeThis->showPremiumSplashScreen();
     };
-    redoButton.onClick = [this] {
-        audioProcessor.getUndoManager().redo();
-        updateUndoRedoState();
-    };
-    startTimer(100);
+#endif
 
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (juce::TopLevelWindow::getNumTopLevelWindows() > 0) {
             juce::TopLevelWindow* w = juce::TopLevelWindow::getTopLevelWindow(0);
             juce::DocumentWindow* dw = dynamic_cast<juce::DocumentWindow*>(w);
             if (dw != nullptr) {
-                dw->setBackgroundColour(Colours::veryDark());
-                dw->setColour(juce::ResizableWindow::backgroundColourId, Colours::veryDark());
+                dw->setBackgroundColour(osci::Colours::veryDark());
+                dw->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark());
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
             }
@@ -53,33 +64,40 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             standalone->getMuteInputValue().setValue(false);
             juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
             standalone->commandLineCallback = [safeThis](const juce::String& commandLine) {
-                if (safeThis != nullptr)
+                if (safeThis != nullptr) {
                     safeThis->handleCommandLine(commandLine);
+                }
+            };
+            const auto initialCommandLine = standalone->commandLine;
+            if (initialCommandLine.isNotEmpty()) {
+                juce::MessageManager::callAsync([safeThis, initialCommandLine] {
+                    if (safeThis != nullptr) {
+                        safeThis->handleCommandLine(initialCommandLine);
+                    }
+                });
+            }
+            standalone->showAudioSettingsOverlay = [safeThis] {
+                if (safeThis == nullptr) {
+                    return false;
+                }
+
+                safeThis->openAudioSettings();
+                return true;
             };
         }
     }
-    
+
     addAndMakeVisible(visualiser);
-    
+
     int width = std::any_cast<int>(audioProcessor.getProperty("appWidth", defaultWidth));
     int height = std::any_cast<int>(audioProcessor.getProperty("appHeight", defaultHeight));
 
     visualiserSettings.setLookAndFeel(&getLookAndFeel());
-    visualiserSettings.setSize(550, VISUALISER_SETTINGS_HEIGHT);
-    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, Colours::dark());
+    visualiserSettings.setSizeToFitWidth(550);
+    visualiserSettings.setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::dark());
 
     recordingSettings.setLookAndFeel(&getLookAndFeel());
-    recordingSettings.setSize(300, 330);
-#if JUCE_WINDOWS
-    // if not standalone, use native title bar for compatibility with DAWs
-    recordingSettingsWindow.setUsingNativeTitleBar(processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone);
-#elif JUCE_MAC
-    recordingSettingsWindow.setUsingNativeTitleBar(true);
-#endif
-    
-    // Register as KeyListener on settings windows so undo/redo shortcuts
-    // work when those separate top-level windows have focus.
-    recordingSettingsWindow.addKeyListener(this);
+    recordingSettings.setSize(430, 430);
 
     menuBar.toFront(true);
 
@@ -87,8 +105,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizable(true, true);
     setResizeLimits(250, 250, 999999, 999999);
 
-    tooltipWindow->setMillisecondsBeforeTipAppears(100);
-    
+    tooltipWindow->setMillisecondsBeforeTipAppears(500);
+
     updateTitle();
 
     // On startup (especially standalone state restore), the editor may not yet be attached to a
@@ -99,12 +117,11 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             safeThis->updateTitle();
     });
 
-#if OSCI_PREMIUM
-    sharedTextureManager.initGL();
-#endif
-
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
+
+    updatePrompt.showPendingInstallStatusIfNeeded();
+    updatePrompt.scheduleInitialCheck();
 }
 
 void CommonPluginEditor::parentHierarchyChanged()
@@ -134,54 +151,88 @@ void CommonPluginEditor::parentHierarchyChanged()
 }
 
 void CommonPluginEditor::handleCommandLine(const juce::String& commandLine) {
-    if (commandLine.trim().isNotEmpty()) {
-        // Split the command line into tokens, using space as delimiter
-        // and handling quoted arguments as one token.
-        juce::StringArray tokens = juce::StringArray::fromTokens(commandLine, " ", "\"");
-        
-        if (tokens.size() > 0) {
-            // Use the first token as the file path and trim any extra whitespace.
-            juce::String filePath = tokens[0].trim();
-            filePath = filePath.unquoted();
-            juce::File file = juce::File::createFileWithoutCheckingPath(filePath);
-            
-            if (file.existsAsFile()) {
-                if (file.getFileExtension().toLowerCase() == "." + projectFileType.toLowerCase()) {
-                    openProject(file);
-                } else {
-                    juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "Invalid file type: " + file.getFullPathName());
-                }
-            } else {
-                juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon, "Invalid Command Line", "File not found: " + filePath);
-            }
+    juce::Logger::writeToLog("External file open request: " + commandLine);
+    auto paths = juce::StringArray::fromTokens(commandLine, " ", "\"");
+    paths.removeEmptyStrings();
+    for (auto path : paths) {
+        path = path.trim().unquoted();
+        const auto file = juce::File::createFileWithoutCheckingPath(path);
+        if (!file.existsAsFile()) {
+            osci::showOverlayMessage(*this, "Invalid Command Line", "File not found: " + path);
+        } else if (!openFile(file)) {
+            osci::showOverlayMessage(*this, "Invalid Command Line", "Invalid file type: " + file.getFullPathName());
         }
     }
+}
+
+bool CommonPluginEditor::openFile(const juce::File& file) {
+    if (file.hasFileExtension(projectFileType)) {
+        openProject(file);
+        return true;
+    }
+    return openSourceFile(file);
 }
 
 void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
+    refreshBetaUpdatesButton();
+
+    const int promptWidth = juce::jmin(updatePrompt.getPreferredWidth(), getWidth() - 28);
+    if (promptWidth > 340) {
+        updatePrompt.setBounds(getWidth() - promptWidth - 14, 42, promptWidth, updatePrompt.getPreferredHeight());
+    } else {
+        updatePrompt.setBounds({});
+    }
 
     if (!activeOverlays.empty()) {
         for (auto& overlay : activeOverlays) {
             overlay->setBounds(getLocalBounds());
             overlay->toFront(false);
         }
+    } else {
+        updatePrompt.toFront(false);
     }
 }
 
-void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) {
+void CommonPluginEditor::refreshBetaUpdatesButton() {
+    betaUpdatesButton.setVisible(osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled());
+}
+
+void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
+    refreshBetaUpdatesButton();
+    if (!betaUpdatesButton.isVisible())
+        return;
+
+    const auto width = juce::jmin(118, topBar.getWidth());
+    betaUpdatesButton.setBounds(topBar.removeFromRight(width).reduced(2, 2));
+    betaUpdatesButton.toFront(false);
+}
+
+void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
     bool anyHeavy = false;
-    for (auto& o : activeOverlays)
-        if (!o->lightweight) anyHeavy = true;
+    for (auto& o : activeOverlays) {
+        if (!o->lightweight) {
+            anyHeavy = true;
+            break;
+        }
+    }
 
     if (!anyHeavy && !overlay->lightweight) {
+        visualiser.cancelOverlayFadeIn();
         visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
         visualiser.setVisible(false);
     }
 
+    if (!overlay->lightweight && !overlay->hasCapturedBackdrop()) {
+        overlay->captureBackdropFrom(*this);
+    }
+
     auto* ptr = overlay.get();
-    overlay->onDismissRequested = [this, ptr] { dismissOverlay(ptr); };
+    auto previousDismissCallback = std::move(overlay->onDismissRequested);
+    overlay->onDismissRequested = [this, ptr, previousDismissCallback = std::move(previousDismissCallback)]() mutable {
+        dismissOverlay(ptr, std::move(previousDismissCallback));
+    };
     overlay->setBounds(getLocalBounds());
     addAndMakeVisible(*overlay);
     overlay->toFront(true);
@@ -189,23 +240,47 @@ void CommonPluginEditor::showOverlay(std::unique_ptr<OverlayComponent> overlay) 
     resized();
 }
 
-void CommonPluginEditor::dismissOverlay(OverlayComponent* overlay) {
+void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
+                                        std::function<void()> beforeVisualiserRestore) {
+    const juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    std::unique_ptr<osci::OverlayComponent> removedOverlay;
     for (auto it = activeOverlays.begin(); it != activeOverlays.end(); ++it) {
         if (it->get() == overlay) {
             removeChildComponent(overlay);
+            removedOverlay = std::move(*it);
             activeOverlays.erase(it);
             break;
         }
     }
 
     bool anyHeavy = false;
-    for (auto& o : activeOverlays)
-        if (!o->lightweight) anyHeavy = true;
-
-    if (!anyHeavy) {
-        visualiser.setVisible(visualiserWasVisibleBeforeOverlay);
+    for (auto& o : activeOverlays) {
+        if (!o->lightweight) {
+            anyHeavy = true;
+            break;
+        }
     }
+
+    if (beforeVisualiserRestore != nullptr) {
+        beforeVisualiserRestore();
+    }
+
+    removedOverlay.reset();
+
+    if (safeThis == nullptr) {
+        return;
+    }
+
+    if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
+        visualiser.prepareOverlayFadeIn();
+        visualiser.setVisible(true);
+    }
+
     resized();
+
+    if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
+        visualiser.fadeInAfterOverlay();
+    }
 }
 
 void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
@@ -213,23 +288,20 @@ void CommonPluginEditor::initialiseMenuBar(juce::MenuBarModel& menuBarModel) {
 }
 
 CommonPluginEditor::~CommonPluginEditor() {
-    stopTimer();
-    recordingSettingsWindow.removeKeyListener(this);
+#if !OSCI_PREMIUM
+    showPremiumSplashScreenGlobal = nullptr;
+#endif
+    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
+    if (standalone != nullptr) {
+        standalone->showAudioSettingsOverlay = nullptr;
+    }
+
     if (topLevelKeyTarget != nullptr)
         topLevelKeyTarget->removeKeyListener(this);
 
     if (audioProcessor.haltRecording != nullptr) {
         audioProcessor.haltRecording();
     }
-
-#if OSCI_PREMIUM
-    if (offlineRenderDialog != nullptr)
-    {
-        // Dismiss any active modal dialog so it can auto-delete.
-        offlineRenderDialog->exitModalState(0);
-        offlineRenderDialog = nullptr;
-    }
-#endif
 
     setLookAndFeel(nullptr);
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
@@ -239,28 +311,12 @@ CommonPluginEditor::~CommonPluginEditor() {
 // These always work regardless of getAcceptsKeys() — they are fundamental
 // editor operations, not "special keys" like j/k for file switching.
 
-void CommonPluginEditor::updateUndoRedoState() {
-    auto& um = audioProcessor.getUndoManager();
-
-    undoButton.setEnabled(um.canUndo());
-    redoButton.setEnabled(um.canRedo());
-
-    auto undoDesc = um.getUndoDescription();
-    undoLabel.setText(undoDesc.isNotEmpty() ? "Undo " + undoDesc : "",
-                      juce::dontSendNotification);
-
-    auto redoDesc = um.getRedoDescription();
-    redoButton.setTooltip(redoDesc.isNotEmpty() ? "Redo " + redoDesc : "Redo");
-}
-
 bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
     if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'Z') {
-        audioProcessor.getUndoManager().redo();
-        updateUndoRedoState();
+        undoRedoControls.redo();
         return true;
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'Z') {
-        audioProcessor.getUndoManager().undo();
-        updateUndoRedoState();
+        undoRedoControls.undo();
         return true;
     } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'S') {
         saveProjectAs();
@@ -270,6 +326,18 @@ bool CommonPluginEditor::handleShortcut(const juce::KeyPress& key) {
         return true;
     } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'O') {
         openProject();
+        return true;
+    } else if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'N' && juce::JUCEApplicationBase::isStandaloneApp()) {
+        resetToDefault();
+        return true;
+    } else if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && key.getKeyCode() == 'M') {
+        audioProcessor.muteParameter->setBoolValueNotifyingHost(!audioProcessor.muteParameter->getBoolValue());
+        return true;
+    } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
+        toggleFullScreen();
+        return true;
+    } else if (key.isKeyCode(juce::KeyPress::escapeKey) && isFullScreen()) {
+        toggleFullScreen();
         return true;
     }
     return false;
@@ -283,18 +351,6 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key) {
     // Other special keys gated by user preference
     if (!audioProcessor.getAcceptsKeys()) return false;
 
-    if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
-#if OSCI_PREMIUM
-        toggleFullScreen();
-        return true;
-#endif
-    } else if (key.isKeyCode(juce::KeyPress::escapeKey) && juce::JUCEApplicationBase::isStandaloneApp()) {
-        if (fullScreen) {
-            toggleFullScreen();
-            return true;
-        }
-    }
-
     return false;
 }
 
@@ -306,9 +362,11 @@ bool CommonPluginEditor::keyPressed(const juce::KeyPress& key, juce::Component*)
 void CommonPluginEditor::openProject(const juce::File& file) {
     if (file != juce::File()) {
         auto data = juce::MemoryBlock();
-        if (file.loadFileAsData(data)) {
-            audioProcessor.setStateInformation(data.getData(), data.getSize());
+        if (!file.loadFileAsData(data)) {
+            osci::showOverlayMessage(*this, "Open Project Failed", "Could not read:\n" + file.getFullPathName());
+            return;
         }
+        audioProcessor.setStateInformation(data.getData(), data.getSize());
         audioProcessor.currentProjectFile = file.getFullPathName();
         audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
         audioProcessor.addRecentProjectFile(file);
@@ -335,8 +393,10 @@ void CommonPluginEditor::saveProject() {
         auto data = juce::MemoryBlock();
         audioProcessor.getStateInformation(data);
         auto file = juce::File(audioProcessor.currentProjectFile);
-        file.create();
-        file.replaceWithData(data.getData(), data.getSize());
+        if (!file.replaceWithData(data.getData(), data.getSize())) {
+            osci::showOverlayMessage(*this, "Save Project Failed", "Could not write:\n" + file.getFullPathName());
+            return;
+        }
         updateTitle();
     }
 }
@@ -352,12 +412,28 @@ void CommonPluginEditor::saveProjectAs() {
 
         auto file = chooser.getResult();
         if (file != juce::File()) {
+            if (!file.hasFileExtension(safeThis->projectFileType)) {
+                file = file.withFileExtension(safeThis->projectFileType);
+            }
             safeThis->audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
             safeThis->audioProcessor.currentProjectFile = file.getFullPathName();
             safeThis->audioProcessor.addRecentProjectFile(file);
             safeThis->saveProject();
         }
     });
+}
+
+void CommonPluginEditor::resetWindowSizeAndPosition() {
+    auto* standaloneWindow = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    if (standaloneWindow != nullptr) {
+        standaloneWindow->setFullScreen(false);
+    }
+    fullScreen = false;
+    setSize(defaultEditorWidth, defaultEditorHeight);
+    auto* window = getTopLevelComponent();
+    if (window != nullptr && window != this) {
+        window->centreWithSize(window->getWidth(), window->getHeight());
+    }
 }
 
 void CommonPluginEditor::updateTitle() {
@@ -377,19 +453,62 @@ void CommonPluginEditor::fileUpdated(juce::String fileName) {
 }
 
 void CommonPluginEditor::openAudioSettings() {
-    juce::StandalonePluginHolder* standalone = juce::StandalonePluginHolder::getInstance();
-    standalone->showAudioSettingsDialog();
+    osci::showStandaloneAudioSettingsOverlay(*this);
+}
+
+void CommonPluginEditor::openLicenseAndUpdates() {
+    if (findActiveOverlay<osci::LicenseAndUpdatesComponent>() != nullptr)
+        return;
+
+    showOverlay(std::make_unique<osci::LicenseAndUpdatesComponent>(
+        audioProcessor.licenseManager,
+        osci::makeProductUpdateConfig ([this] {
+            refreshBetaUpdatesButton();
+            resized();
+        })));
+}
+
+void CommonPluginEditor::openFeedback() {
+    if (findActiveOverlay<osci::FeedbackOverlay>() != nullptr) {
+        return;
+    }
+    if (!activeOverlays.empty()) {
+        auto* overlay = activeOverlays.back().get();
+        auto dismissAndContinue = std::move(overlay->onDismissRequested);
+        const juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+        overlay->onDismissRequested = [safeThis, dismissAndContinue = std::move(dismissAndContinue)]() mutable {
+            juce::MessageManager::callAsync([safeThis] {
+                if (safeThis != nullptr) {
+                    safeThis->openFeedback();
+                }
+            });
+            if (dismissAndContinue != nullptr) {
+                dismissAndContinue();
+            }
+        };
+        overlay->requestDismiss();
+        return;
+    }
+
+    auto feedback = FeedbackReportBuilder::create(audioProcessor, *this, projectFileType);
+    const auto screenshot = feedback.automaticScreenshotPreview;
+    auto overlay = std::make_unique<osci::FeedbackOverlay>(std::move(feedback));
+    overlay->captureBackdropFrom(screenshot);
+    showOverlay(std::move(overlay));
 }
 
 void CommonPluginEditor::openRecordingSettings() {
-    recordingSettingsWindow.setVisible(true);
+    if (findActiveOverlay<RecordingSettingsOverlay>() != nullptr) {
+        return;
+    }
+
+    const juce::Point<int> preferredContentSize { 430, 430 };
+    recordingSettings.setSize(preferredContentSize.x, preferredContentSize.y);
+    showOverlay(std::make_unique<RecordingSettingsOverlay>(recordingSettings, preferredContentSize));
 }
 
 void CommonPluginEditor::showPremiumSplashScreen() {
-    juce::AlertWindow::showMessageBoxAsync(
-        juce::AlertWindow::InfoIcon,
-        "Premium Feature",
-        "This feature is available in the premium version.");
+    openLicenseAndUpdates();
 }
 
 void CommonPluginEditor::renderAudioFileToVideo() {
@@ -397,33 +516,44 @@ void CommonPluginEditor::renderAudioFileToVideo() {
     showPremiumSplashScreen();
     return;
 #else
-    if (offlineRenderDialog != nullptr) {
-        offlineRenderDialog->toFront(true);
+    if (auto* existing = findActiveOverlay<OfflineRenderOverlay>()) {
+        offlineRenderLog.event("existing render brought to front");
+        existing->toFront(true);
         return;
     }
+
+    offlineRenderLog.started();
 
     // Step 1: choose input audio file
     chooser = std::make_unique<juce::FileChooser>(
         "Choose an input audio file",
         audioProcessor.getLastOpenedDirectory(),
-        "*.wav;*.aiff;*.flac;*.ogg;*.mp3");
+        osci::files::audioWildcard());
 
     auto openFlags = juce::FileBrowserComponent::openMode |
         juce::FileBrowserComponent::canSelectFiles;
 
     juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
+    offlineRenderLog.event("input selection opened");
     chooser->launchAsync(openFlags, [safeThis](const juce::FileChooser& inputChooser) {
-        if (safeThis == nullptr)
+        if (safeThis == nullptr) {
+            offlineRenderLog.cancelled("input selection because editor closed");
             return;
+        }
 
         const auto inputFile = inputChooser.getResult();
-        if (inputFile == juce::File())
+        if (inputFile == juce::File()) {
+            offlineRenderLog.cancelled("input selection");
             return;
+        }
+
+        offlineRenderLog.event("input selected", "file=" + inputFile.getFileName());
 
         safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
 
         // Step 2: choose output video file (default: inputName + codec extension)
-        const auto ext = safeThis->recordingSettings.getFileExtensionForCodec();
+        const bool preserveAlpha = safeThis->audioProcessor.visualiserParameters.screenOverlay->isTransparent();
+        const auto ext = preserveAlpha ? juce::String("mov") : safeThis->recordingSettings.getFileExtensionForCodec();
         const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
             inputFile.getFileNameWithoutExtension() + "." + ext);
 
@@ -435,23 +565,33 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         auto saveFlags = juce::FileBrowserComponent::saveMode |
             juce::FileBrowserComponent::canSelectFiles;
 
-        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext](const juce::FileChooser& outputChooser) {
-            if (safeThis == nullptr)
+        offlineRenderLog.event("output selection opened");
+        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, preserveAlpha](const juce::FileChooser& outputChooser) {
+            if (safeThis == nullptr) {
+                offlineRenderLog.cancelled("output selection because editor closed");
                 return;
+            }
 
             auto outputFile = outputChooser.getResult();
-            if (outputFile == juce::File())
+            if (outputFile == juce::File()) {
+                offlineRenderLog.cancelled("output selection");
                 return;
+            }
 
             // Ensure the file extension matches the codec container by default.
             if (outputFile.getFileExtension().isEmpty())
                 outputFile = outputFile.withFileExtension(ext);
 
+            offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
             safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
 
             // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
-            if (!safeThis->audioProcessor.ensureFFmpegExists())
+            if (!safeThis->audioProcessor.ensureFFmpegExists()) {
+                offlineRenderLog.event("render deferred", "FFmpeg unavailable");
                 return;
+            }
+
+            offlineRenderLog.event("FFmpeg ready");
 
             // Stop any live recording and pause the main visualiser.
             if (safeThis->audioProcessor.haltRecording != nullptr)
@@ -463,9 +603,8 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             // Make the plugin output silent and skip heavy processing during offline render.
             safeThis->audioProcessor.setOfflineRenderActive(true);
 
-            safeThis->visualiser.setPaused(true);
-
             auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
+            auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
 
             auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
                 safeThis->audioProcessor,
@@ -474,65 +613,58 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 safeThis->recordingSettings,
                 inputFile,
                 outputFile,
-                safeThis->visualiser.getRenderMode());
+                safeThis->visualiser.getRenderMode(),
+                preserveAlpha);
 
             content->setSize(700, 520);
 
-            // When the render finishes, store the result and dismiss the modal dialog.
-            content->setOnFinished([safeThis, resultHolder](OfflineAudioToVideoRendererComponent::Result r) {
-                if (safeThis == nullptr)
+            content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile](OfflineAudioToVideoRendererComponent::Result r) {
+                if (safeThis == nullptr) {
+                    offlineRenderLog.cancelled("result delivery because editor closed");
                     return;
+                }
 
                 *resultHolder = r;
 
-                if (auto* dw = safeThis->offlineRenderDialog.getComponent())
-                    dw->exitModalState(1);
+                if (r.success) {
+                    offlineRenderLog.completed();
+                    safeThis->audioProcessor.recordingExportCompleted(outputFile);
+                } else if (r.cancelled) {
+                    offlineRenderLog.cancelled("render");
+                } else {
+                    offlineRenderLog.failed("render", r.errorMessage);
+                }
+
+                if (auto* overlay = overlayHolder->getComponent()) {
+                    overlay->requestDismiss();
+                }
             });
 
             auto* contentPtr = content.get();
+            const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
+            auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
+            *overlayHolder = overlay.get();
 
-            juce::DialogWindow::LaunchOptions options;
-            options.dialogTitle = "Render Audio File to Video";
-            options.dialogBackgroundColour = Colours::dark();
-            options.content.setOwned(content.release());
-            options.componentToCentreAround = safeThis.getComponent();
-            options.escapeKeyTriggersCloseButton = true;
-            options.useNativeTitleBar = true;
-            options.resizable = true;
-            options.useBottomRightCornerResizer = true;
+            overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
+                if (safeThis == nullptr) {
+                    return;
+                }
 
-            // Create the dialog and enter modal state with a callback so we restore state
-            // regardless of how the dialog is dismissed. The window will auto-delete.
-            auto* window = options.create();
-            safeThis->offlineRenderDialog = window;
+                safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
+                safeThis->visualiser.setPaused(wasVisualiserPaused, false);
 
-            // Ensure this dialog doesn't float above other apps.
-            window->setAlwaysOnTop(false);
-
-            window->enterModalState(
-                true,
-                juce::ModalCallbackFunction::create([safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder](int) {
-                    if (safeThis == nullptr)
-                        return;
-
-                    safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
-                    safeThis->visualiser.setPaused(wasVisualiserPaused);
-                    safeThis->offlineRenderDialog = nullptr;
-
-                    if (resultHolder != nullptr && resultHolder->has_value())
-                    {
-                        const auto& r = resultHolder->value();
-                        if (!r.success && !r.cancelled)
-                        {
-                            juce::AlertWindow::showMessageBoxAsync(
-                                juce::AlertWindow::WarningIcon,
-                                "Render Failed",
-                                r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
-                        }
+                if (resultHolder != nullptr && resultHolder->has_value()) {
+                    const auto& r = resultHolder->value();
+                    if (!r.success && !r.cancelled) {
+                        osci::showOverlayMessage(*safeThis.getComponent(),
+                                                 "Render Failed",
+                                                 r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
                     }
-                }),
-                true);
+                }
+            };
 
+            safeThis->showOverlay(std::move(overlay));
+            offlineRenderLog.event("render UI opened");
             contentPtr->start();
         });
     });
@@ -551,16 +683,16 @@ void CommonPluginEditor::toggleFullScreen() {
 #if JUCE_WINDOWS
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !fullScreen;
-        
+        fullScreen = !window->isFullScreen();
+
         if (fullScreen) {
             // Store the current window bounds before going fullscreen
             windowedBounds = window->getBounds();
-            
+
             // Get the display that contains the window
             auto& displays = juce::Desktop::getInstance().getDisplays();
             auto* display = displays.getDisplayForRect(window->getBounds());
-            
+
             if (display != nullptr) {
                 // Set window to cover the entire screen
                 window->setFullScreen(true);
@@ -577,8 +709,13 @@ void CommonPluginEditor::toggleFullScreen() {
 #else
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
     if (window != nullptr) {
-        fullScreen = !fullScreen;
+        fullScreen = !window->isFullScreen();
         window->setFullScreen(fullScreen);
     }
 #endif
+}
+
+bool CommonPluginEditor::isFullScreen() {
+    auto* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();
+    return window != nullptr && window->isFullScreen();
 }

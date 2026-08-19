@@ -9,18 +9,18 @@
 #pragma once
 
 #include <JuceHeader.h>
+#if OSCI_PREMIUM
+#include <juce_mts_esp/juce_mts_esp.h>
+#endif
 
 #include <limits>
 #include <numbers>
+#include <cstdint>
 #include <unordered_map>
 
 #include "CommonPluginProcessor.h"
-#include "audio/effects/CustomEffect.h"
-#include "audio/effects/DelayEffect.h"
-#include "audio/modulation/LuaEffectState.h"
-#include "audio/effects/PerspectiveEffect.h"
+#include "FileController.h"
 #include "audio/synth/VoiceManager.h"
-#include "audio/platform/SampleRateManager.h"
 #include "audio/synth/ShapeSound.h"
 #include "audio/synth/ShapeVoice.h"
 #include "audio/synth/VoiceBuilder.h"
@@ -35,15 +35,24 @@
 #include "audio/modulation/SidechainParameters.h"
 #include "audio/modulation/ModulationEngine.h"
 #include "audio/modulation/ModulationTypes.h"
-#include "obj/ObjectServer.h"
+#include <osci_render_core/osci_render_core.h>
+#include <osci_file_import/osci_file_import.h>
+#include <osci_scripting/osci_scripting.h>
 
-class FileParser;
+class MidiInputChannelParameter : public osci::IntParameter {
+public:
+    MidiInputChannelParameter() : osci::IntParameter("MIDI Input Channel", "midiInputChannel", VERSION_HINT, 0, 0, 16) {}
 
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-#include "parser/img/ImageParser.h"
-#include "../modules/juce_sharedtexture/SharedTexture.h"
-#include "video/SyphonFrameGrabber.h"
-#endif
+    juce::String getText(float value, int maximumStringLength) const override {
+        const int channel = (int)getUnnormalisedValue(value);
+        const juce::String text = channel == 0 ? "Omni" : "Channel " + juce::String(channel);
+        return text.substring(0, maximumStringLength);
+    }
+
+    float getValueForText(const juce::String& text) const override {
+        return getNormalisedValue(text.equalsIgnoreCase("Omni") ? 0 : text.getTrailingIntValue());
+    }
+};
 
 //==============================================================================
 
@@ -97,19 +106,21 @@ public:
     double getVoiceFrequency(const ManagedVoice& mv) const override;
     void captureDrawingState(ManagedVoice& mv) override;
     void restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) override;
-
-    // Beginner mode: per-parameter LFO dropdowns, mic icon, single amplitude envelope, simplified layout.
-    // Advanced mode: drag-and-drop LFO/ENV module panels, full layout.
-    // Set once at construction from OSCI_PREMIUM; persisted in state XML.
-    // Changing mode requires a plugin reload (parameter tree is fixed at construction).
-    bool isBeginnerMode() const { return beginnerMode; }
+    double noteToFrequency(int note, int channel) override;
+#if OSCI_PREMIUM
+    bool isMtsEspConnected() const { return mtsClient.hasMaster(); }
+    juce::String getMtsEspScaleName() const { return juce::String(mtsClient.getScaleName()); }
+#endif
 
     // Central 60 Hz broadcaster for modulation display updates.
     // EffectComponents register/unregister via wireModulation / destructor.
     ModulationUpdateBroadcaster modulationUpdateBroadcaster;
 
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) override;
+    void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    bool supportsInternalSampleRateOverride() const override {
+        return OSCI_PREMIUM && wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone;
+    }
 
     juce::AudioProcessorEditor* createEditor() override;
 
@@ -119,6 +130,27 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+
+    // --- Modulation-depth MIDI CC helpers ---
+
+    // Builds the MidiManager custom-target id for a (typeId, sourceIndex, paramId)
+    // modulation assignment. Stable across sessions — used both at learn time and at load.
+    static juce::String modDepthCustomId(const juce::String& typeId,
+                                          int sourceIndex,
+                                          const juce::String& paramId);
+
+    // Returns a setter function that, given a normalised CC value in [0,1],
+    // updates the depth of the matching modulation assignment (preserving its
+    // bipolar flag). Safe to call from the message thread. Returns an empty
+    // function if no modulation source of |typeId| is registered.
+    std::function<void(float)> buildModDepthSetter(const juce::String& typeId,
+                                                    int sourceIndex,
+                                                    const juce::String& paramId);
+
+    // Call this after mod assignments have been (re)loaded to re-attach live
+    // setters to any custom-target CC mappings that were restored inert by
+    // MidiManager::load().
+    void rebindAllModDepthCCMappings();
     DahdsrParams getCurrentDahdsrParams() const;
     DahdsrParams getCurrentDahdsrParams(int envIndex) const;
 
@@ -136,14 +168,8 @@ public:
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
     // Temporary preview effect applied while hovering effects in the grid (guarded by effectsLock)
     std::shared_ptr<osci::Effect> previewEffect;
-    std::atomic<double> luaValues[26] = {0.0};
 
     std::shared_ptr<osci::Effect> frequencyEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float freq) {
-            // Update the global frequency from the slider value
-            frequency = values[0].load() + 0.000001; // epsilon prevents a weird bug on mac
-            return input;
-        },
         new osci::EffectParameter(
             "Frequency",
             "Controls how many times per second the image is drawn, thereby controlling the pitch of the sound. Lower frequencies result in more-accurately drawn images, but more flickering, and vice versa.",
@@ -157,48 +183,24 @@ public:
     std::function<void(int, juce::String, juce::String)> errorCallback = [this](int lineNum, juce::String fileName, juce::String error) { notifyErrorListeners(lineNum, fileName, error); };
     std::unique_ptr<LuaEffectState> luaEffectState = std::make_unique<LuaEffectState>(LuaEffectState::UNIQUE_ID, "return { x, y, z }", errorCallback);
     std::shared_ptr<osci::Effect> custom = std::make_shared<osci::SimpleEffect>(
-        std::make_shared<CustomEffect>(*luaEffectState, luaValues),
+        std::make_shared<CustomEffect>(*luaEffectState, luaEffects),
         new osci::EffectParameter("Lua Effect", "Controls the strength of the custom Lua effect applied. You can write your own custom effect using Lua by pressing the edit button on the right.", "customEffectStrength", VERSION_HINT, 1.0, 0.0, 1.0));
 
     std::shared_ptr<osci::Effect> perspective = PerspectiveEffect().build();
 
     osci::BooleanParameter* midiEnabled = new osci::BooleanParameter("MIDI Enabled", "midiEnabled", VERSION_HINT, false, "Enable MIDI input for the synth. If disabled, the synth will play a constant tone, as controlled by the frequency slider.");
     osci::BooleanParameter* inputEnabled = new osci::BooleanParameter("Audio Input Enabled", "inputEnabled", VERSION_HINT, false, "Enable to use input audio, instead of the generated audio.");
-    std::atomic<double> frequency = 220.0;
 
-    // DAW transport state (updated in processBlock, read by voices for Lua)
-    std::atomic<double> luaBpm = 120.0;
-    std::atomic<double> luaPlayTime = 0.0;
-    std::atomic<double> luaPlayTimeBeats = 0.0;
-    std::atomic<bool> luaIsPlaying = false;
-    std::atomic<int> luaTimeSigNum = 4;
-    std::atomic<int> luaTimeSigDen = 4;
-
-    juce::SpinLock parsersLock;
-    std::vector<std::shared_ptr<FileParser>> parsers;
-    std::vector<ShapeSound::Ptr> sounds;
-    std::vector<std::shared_ptr<juce::MemoryBlock>> fileBlocks;
-    std::vector<juce::String> fileNames;
-    int currentFileId = 0;
-    std::vector<int> fileIds;
-    std::atomic<int> currentFile = -1;
+    // Updated on the audio thread; read by audio-thread voices and message-thread UI.
+    osci::DawPosition dawPosition;
 
     juce::ChangeBroadcaster broadcaster;
-    std::atomic<bool> objectServerRendering = false;
-    juce::ChangeBroadcaster fileChangeBroadcaster;
-
-    // Beginner/advanced mode flag — read from global settings at construction, immutable after.
-    // Free builds are always beginner; premium reads the persisted preference.
-    bool beginnerMode = true;
 
     // === Envelope modulation state ===
     EnvelopeParameters envelopeParameters;
 
     // Look up human-readable name for any parameter by ID (searches all effects).
     juce::String getParamDisplayName(const juce::String& paramId) const;
-
-    // DAW or standalone BPM – updated every processBlock
-    std::atomic<double> currentBpm{120.0};
 
     // Standalone-only BPM parameter (automatable)
     osci::FloatParameter* standaloneBpm = new osci::FloatParameter("Tempo", "standaloneBpm", VERSION_HINT, 120.0f, 20.0f, 300.0f, 0.1f);
@@ -215,7 +217,11 @@ public:
     void autoAssignLfosForEffect(osci::Effect& effect);
     void autoAssignLfosForPreview(const juce::String& effectId);
     void clearPreviewLfoAssignments();
-    void promotePreviewLfoAssignments();
+
+#if OSCI_PREMIUM
+    // Convert per-parameter LFOs from a free project into global LFO assignments
+    void convertFreeProjectLfos(const juce::XmlElement* effectsXml);
+#endif
 
     // Returns all modulation source bindings for generic wiring in EffectComponent.
     std::vector<ModulationSourceBinding> getModulationSourceBindings();
@@ -223,102 +229,86 @@ public:
     juce::MidiKeyboardState keyboardState;
 
     osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);
+    MidiInputChannelParameter* midiInputChannel = new MidiInputChannelParameter();
 
     // 1..100 maps to file index with a 1-based offset (1 = first file, 2 = second, ...). Intended for DAW automation.
     osci::IntParameter* fileSelect = new osci::IntParameter("File Select", "fileSelect", VERSION_HINT, 1, 1, 100);
 
     // --- Note settings ---
+#if OSCI_PREMIUM
     osci::IntParameter* pitchBendRange = new osci::IntParameter("Bend", "pitchBendRange", VERSION_HINT, 2, 0, 48);
+#endif
     osci::FloatParameter* velocityTracking = new osci::FloatParameter("Velocity", "velocityTracking", VERSION_HINT, 1.0f, -1.0f, 1.0f, 0.01f);
+#if OSCI_PREMIUM
     osci::FloatParameter* glideTime = new osci::FloatParameter("Glide", "glideTime", VERSION_HINT, 0.0f, 0.0f, 16.0f, 0.001f);
     osci::FloatParameter* glideSlope = new osci::FloatParameter("Slope", "glideSlope", VERSION_HINT, 0.0f, -8.0f, 8.0f, 0.01f);
     osci::BooleanParameter* alwaysGlide = new osci::BooleanParameter("Always Glide", "alwaysGlide", VERSION_HINT, false, "When enabled, glide is always active, even when notes are played staccato.");
     osci::BooleanParameter* legato = new osci::BooleanParameter("Legato", "legato", VERSION_HINT, false, "When enabled with mono voice, successive notes do not retrigger the envelope.");
     osci::BooleanParameter* octaveScale = new osci::BooleanParameter("Octave Scale", "octaveScale", VERSION_HINT, false, "When enabled, the glide time scales with the pitch interval between notes.");
+#endif
 
     // Number of MIDI notes currently held. Audio-thread only.
     int getNumPressedNotes() const;
+    void sendMidiPanic(bool immediate);
 
     // Frequency of the globally-last-played note (before the current noteOn).
     // Used as glide source so any voice can portamento from the last note.
     double getLastPlayedNoteFreq() const;
 
-    // Audio-thread readable pointer to the currently selected sound.
-    // Lifetime is owned by defaultSound/objectServerSound/sounds[].
-    ShapeSound* getActiveShapeSound() const { return activeShapeSound.load(std::memory_order_acquire); }
+    ShapeSound* getActiveShapeSound() const { return fileController.getActiveSound(); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
     osci::BooleanParameter* animationSyncBPM = new osci::BooleanParameter("Sync To BPM", "animationSyncBPM", VERSION_HINT, false, "Synchronises the animation's framerate with the BPM of your DAW.");
-    osci::FloatParameter* animationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30, -1000, 1000);
+    std::shared_ptr<osci::Effect> animationSpeed = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter(
+            "Animation Speed",
+            "Scalar multiplier of the file's intrinsic frame rate. Negative values play the animation in reverse. Right-click to edit the range.",
+            "animationSpeed",
+            VERSION_HINT, 1.0f, -4.0f, 4.0f, 0.01f));
     osci::FloatParameter* animationOffset = new osci::FloatParameter("Animation Offset", "animationOffset", VERSION_HINT, 0, -10000, 10000);
 
     osci::BooleanParameter* invertImage = new osci::BooleanParameter("Invert Image", "invertImage", VERSION_HINT, false, "Inverts the image so that dark pixels become light, and vice versa.");
+    osci::BooleanParameter* swapXYOutput = new osci::BooleanParameter("Swap X/Y Output", "swapXYOutput", VERSION_HINT, false, "Swaps the physical X and Y audio output channels.");
+    osci::BooleanParameter* invertXOutput = new osci::BooleanParameter("Invert X Output", "invertXOutput", VERSION_HINT, false, "Inverts the polarity of the physical X audio output.");
+    osci::BooleanParameter* invertYOutput = new osci::BooleanParameter("Invert Y Output", "invertYOutput", VERSION_HINT, false, "Inverts the polarity of the physical Y audio output.");
     std::shared_ptr<osci::Effect> imageThreshold = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            return input;
-        },
         new osci::EffectParameter(
             "Image Threshold",
             "Controls the probability of visiting a dark pixel versus a light pixel. Darker pixels are less likely to be visited, so turning the threshold to a lower value makes it more likely to visit dark pixels.",
             "imageThreshold",
             VERSION_HINT, 0.5, 0, 1));
     std::shared_ptr<osci::Effect> imageStride = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            return input;
-        },
         new osci::EffectParameter(
             "Image Stride",
             "Controls the spacing between pixels when drawing an image. Larger values mean more of the image can be drawn, but at a lower fidelity.",
             "imageStride",
             VERSION_HINT, 4, 1, 50, 1));
 
+#if OSCI_PREMIUM
     // Fractal L-system parameters
-    std::atomic<int> fractalIterations{3};
-
-    std::shared_ptr<osci::Effect> fractalIterationsEffect = std::make_shared<osci::SimpleEffect>(
-        [this](int index, osci::Point input, const std::vector<std::atomic<float>>& values, float sampleRate, float frequency) {
-            fractalIterations.store(juce::roundToInt(values[0].load()), std::memory_order_relaxed);
-            return input;
-        },
+    std::shared_ptr<osci::Effect> fractalDepthEffect = std::make_shared<osci::SimpleEffect>(
         new osci::EffectParameter(
             "Fractal Depth",
             "Controls the recursion depth of the L-system fractal. Higher values produce more detail but require more processing.",
-            "fractalIterations",
+            "fractalDepth",
             VERSION_HINT, 3.0, 0.0, 15.0, 1.0));
+#endif
 
     std::atomic<double> animationFrame = 0.f;
 
     const double FONT_SIZE = 1.0f;
     juce::Font font = juce::Font(juce::Font::getDefaultMonospacedFontName(), FONT_SIZE, juce::Font::plain);
 
-    ShapeSound::Ptr objectServerSound = new ShapeSound();
-
     std::function<void()> haltRecording;
-
-    // Add a callback to notify the editor when a file is removed
-    std::function<void(int)> fileRemovedCallback;
 
     void addLuaSlider();
     void updateEffectPrecedence();
     // Apply a saved effect ordering by ID.  Used by undo/redo — safe to call
     // even if the editor has been destroyed and recreated.
     void applyEffectOrder(const std::vector<juce::String>& order);
-    void updateFileBlock(int index, std::shared_ptr<juce::MemoryBlock> block);
-    void addFile(juce::File file);
-    void addFile(juce::String fileName, const char* data, const int size);
-    void addFile(juce::String fileName, std::shared_ptr<juce::MemoryBlock> data);
-    void removeFile(int index);
-    int numFiles();
-    void changeCurrentFile(int index);
-    void openFile(int index);
-    int getCurrentFileIndex();
-    std::shared_ptr<FileParser> getCurrentFileParser();
-    juce::String getCurrentFileName();
-    juce::String getFileName(int index);
-    juce::String getFileId(int index);
-    std::shared_ptr<juce::MemoryBlock> getFileBlock(int index);
-    void setObjectServerRendering(bool enabled);
+    FileController& getFileController() { return fileController; }
+    const FileController& getFileController() const { return fileController; }
     void setObjectServerPort(int port);
     void addErrorListener(ErrorListener* listener);
     void removeErrorListener(ErrorListener* listener);
@@ -345,38 +335,15 @@ public:
         const std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>* perVoiceEffects,
         const std::shared_ptr<osci::Effect>& previewEffectInstance);
 
-    // Setter for the callback
-    void setFileRemovedCallback(std::function<void(int)> callback);
-
-    // Added declaration for the new `removeParser` method.
-    void removeParser(FileParser* parser);
-
-    const std::vector<juce::String> FILE_EXTENSIONS = {
-        "obj",
-        "svg",
-        "lua",
-        "txt",
-        "gpla",
-        "gif",
-        "png",
-        "jpg",
-        "jpeg",
-        "wav",
-        "aiff",
-        "ogg",
-        "flac",
-        "mp3",
-        "lsystem",
-#if OSCI_PREMIUM
-        "mp4",
-        "mov",
-#endif
-    };
-
 private:
+    osci::FloatParameter* legacyAnimationRate = new osci::FloatParameter("Animation Rate", "animationRate", VERSION_HINT, 30.0f, -1000.0f, 1000.0f);
+    std::atomic<bool> legacyAnimationRateActive{false};
+
     juce::AudioBuffer<float> inputBuffer;
     juce::AudioBuffer<float> inputFrequencyBuffer;
     juce::AudioBuffer<float> outputBuffer3d;
+    juce::MidiBuffer filteredMidiMessages;
+    int previousMidiInputChannel = 0;
 
     std::atomic<bool> prevMidiEnabled = !midiEnabled->getBoolValue();
 
@@ -386,24 +353,27 @@ private:
     juce::SpinLock errorListenersLock;
     std::vector<ErrorListener*> errorListeners;
 
-    ShapeSound::Ptr defaultSound;
     VoiceManager synth;
+    FileController fileController;
+#if OSCI_PREMIUM
+    mts_esp::Client mtsClient;
+#endif
     bool retriggerMidi = true;
 
     std::unique_ptr<VoiceBuilder> voiceBuilder;
 
-    ObjectServer objectServer{*this};
+    ObjectServer objectServer;
 
     // Peak-rectified input audio: per-sample max(|L|, |R|), no smoothing.
-    // Fed into envelope followers (sidechain, beginner-mode per-parameter sidechain).
+    // Fed into envelope followers (sidechain, free-version per-parameter sidechain).
     juce::AudioBuffer<float> rectifiedInputBuffer;
 
-    // Default envelope follower for beginner-mode per-parameter sidechain.
-    // Uses fixed attack/release so beginner-mode effects respond to input level.
+    // Default envelope follower for free-version per-parameter sidechain.
+    // Uses fixed attack/release so free-version effects respond to input level.
     static constexpr float kDefaultEnvelopeAttack  = 0.1f;
     static constexpr float kDefaultEnvelopeRelease = 0.1f;
     // Linear identity curve: input [0,1] → output [0,1] unchanged.
-    // Used by the default envelope follower for beginner-mode sidechain.
+    // Used by the default envelope follower for free-version sidechain.
     const std::vector<GraphNode> kIdentityCurve = { { 0.0, 0.0, 0.0f }, { 1.0, 1.0, 0.0f } };
     SidechainAudioState defaultEnvelopeState;
     juce::AudioBuffer<float> currentVolumeBuffer;
@@ -411,21 +381,7 @@ private:
     std::pair<std::shared_ptr<osci::Effect>, osci::EffectParameter*> effectFromLegacyId(const juce::String& id, bool updatePrecedence = false);
     osci::LfoType lfoTypeFromLegacyAnimationType(const juce::String& type);
     double valueFromLegacy(double value, const juce::String& id);
-    void changeSound(ShapeSound::Ptr sound);
-
-    // parsersLock AND effectsLock must be held when calling this
-    void applyFileSelectLocked();
-
-    std::atomic<ShapeSound*> activeShapeSound { nullptr };
-
-    struct FileSelectionAsyncNotifier : public juce::AsyncUpdater {
-        explicit FileSelectionAsyncNotifier(OscirenderAudioProcessor& p) : processor(p) {}
-        void handleAsyncUpdate() override { processor.fileChangeBroadcaster.sendChangeMessage(); }
-        OscirenderAudioProcessor& processor;
-    };
-
-    std::unique_ptr<FileSelectionAsyncNotifier> fileSelectionNotifier;
-
+    void migrateLegacyAnimationRate(juce::XmlElement& legacyParameterXml);
     void parseVersion(int result[3], const juce::String& input) {
         std::istringstream parser(input.toStdString());
         parser >> result[0];
@@ -452,14 +408,6 @@ private:
     // Modulation engine: operates on all sources via common ModulationSource interface.
     // Must be declared after paramLocationMap (it holds a reference to it).
     ModulationEngine modulationEngine{paramLocationMap};
-
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-public:
-    std::atomic<bool> syphonInputActive = false;
-
-    ImageParser syphonImageParser = ImageParser(*this);
-#endif
-
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscirenderAudioProcessor)

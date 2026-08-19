@@ -1,27 +1,39 @@
 #pragma once
 #include <JuceHeader.h>
 
-#include "../svg/SvgParser.h"
+#include <osci_file_import/osci_file_import.h>
+
+#include <atomic>
+#include <cstdint>
+#include <limits>
 
 class OscirenderAudioProcessor;
 class CommonPluginEditor;
 
 class ImageParser {
 public:
-    ImageParser(OscirenderAudioProcessor& p, juce::String fileName, juce::MemoryBlock image);
-    // Constructor for live Syphon/Spout input
-    ImageParser(OscirenderAudioProcessor& p);
+    ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image);
+    ImageParser(OscirenderAudioProcessor& p, int initialWidth, int initialHeight);
     ~ImageParser();
 
-    // Update the live frame (for Syphon/Spout)
-    void updateLiveFrame(const juce::Image& newImage);
-
     void setFrame(int index);
-    osci::Point getSample();
-    int getNumFrames() { return frames.size(); }
-    int getCurrentFrame() const { return frameIndex; }
+    void setSingleFrameFromRgba(const std::vector<std::uint8_t>& rgba, int sourceWidth, int sourceHeight, bool verticallyFlipped);
+    osci::Point getSample(int blockSampleIndex = 0);
+    int getNumFrames();
+    int getCurrentFrame() const;
+    double getFrameRate() const { return frameRate.load(std::memory_order_relaxed); }
 
 private:
+    static constexpr int liveInputMaxDimension = 512;
+    static constexpr size_t liveInputMaxPixels = (size_t)liveInputMaxDimension * (size_t)liveInputMaxDimension;
+    static constexpr int noPendingFrameRequest = std::numeric_limits<int>::min();
+
+    void initialiseLiveFrame(int initialWidth, int initialHeight);
+    void publishLiveFrame(std::vector<std::uint8_t> pixels, int frameWidth, int frameHeight);
+    void consumePendingLiveFrame();
+    void applyPendingFrameRequest();
+    int normaliseFrameIndex(int index) const;
+    void resetTraversalState();
     void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
     void resetPosition();
     float getPixelValue(int x, int y, bool invert);
@@ -41,14 +53,24 @@ private:
     const juce::String ALGORITHM = "HILLIGOSS";
 
     OscirenderAudioProcessor& audioProcessor;
+    juce::SpinLock pendingLiveFrameLock;
     juce::Random rng;
     int frameIndex = 0;
+    std::atomic<int> requestedFrameIndex = noPendingFrameRequest;
+    std::atomic<int> reportedFrameIndex = 0;
     std::vector<std::vector<uint8_t>> frames;
     std::vector<bool> visited;
+    std::vector<std::uint8_t> pendingLivePixels;
+    int pendingLiveWidth = 0;
+    int pendingLiveHeight = 0;
+    bool pendingLiveFrameAvailable = false;
+    bool liveInput = false;
+    bool waitingForFFmpeg = false;
     int currentX, currentY;
     int width = -1;
     int height = -1;
     int count = 0;
+    std::atomic<double> frameRate{30.0};
 
     juce::TemporaryFile temp{".temp"};
 
@@ -65,8 +87,4 @@ private:
     double scanY = 1;
     int scanCount = 0;
 
-    // Live image support
-    juce::SpinLock liveImageLock;
-    bool usingLiveImage = false;
-    juce::Image liveImage;
 };

@@ -1,6 +1,7 @@
 #include "SosciPluginProcessor.h"
 #include "SosciPluginEditor.h"
-#include "standalone/CustomStandaloneFilterWindow.h"
+#include "parser/FileFormatRegistry.h"
+#include <osci_standalone/osci_standalone.h>
 
 SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEditor(p, "sosci", "sosci", 1180, 750), audioProcessor(p) {
     // Create timeline controller for audio playback
@@ -56,7 +57,7 @@ SosciPluginEditor::~SosciPluginEditor() {
 }
 
 void SosciPluginEditor::paint(juce::Graphics& g) {
-    g.fillAll(Colours::veryDark());
+    g.fillAll(osci::Colours::veryDark());
 }
 
 void SosciPluginEditor::resized() {
@@ -65,15 +66,13 @@ void SosciPluginEditor::resized() {
 
     if (audioProcessor.visualiserParameters.visualiserFullScreen->getBoolValue()) {
         visualiser.setBounds(area);
+        betaUpdatesButton.setVisible(false);
     } else {
         auto topBar = area.removeFromTop(25);
+        layoutBetaUpdatesButton(topBar);
+        undoRedoControls.setBounds(topBar.removeFromRight(juce::jmin(undoRedoControls.getPreferredWidth(), topBar.getWidth())));
         menuBar.setBounds(topBar);
-        redoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
-        undoButton.setBounds(topBar.removeFromRight(25).reduced(2, 2));
-        undoLabel.setBounds(topBar.removeFromRight(juce::jmin(150, topBar.getWidth())).reduced(2, 2));
-        undoLabel.toFront(false);
-        undoButton.toFront(false);
-        redoButton.toFront(false);
+        undoRedoControls.toFront(false);
 
         if (juce::JUCEApplication::isStandaloneApp()) {
             auto volumeArea = area.removeFromLeft(35);
@@ -81,7 +80,6 @@ void SosciPluginEditor::resized() {
         }
 
         auto settingsArea = area.removeFromRight(juce::jmax(juce::jmin(0.4 * getWidth(), 550.0), 350.0));
-        visualiserSettings.setSize(settingsArea.getWidth(), VISUALISER_SETTINGS_HEIGHT);
         visualiserSettingsWrapper.setBounds(settingsArea);
 
         if (area.getWidth() < 10) {
@@ -99,12 +97,7 @@ bool SosciPluginEditor::isInterestedInFileDrag(const juce::StringArray& files) {
         return false;
     }
     juce::File file(files[0]);
-    return file.hasFileExtension("wav") ||
-           file.hasFileExtension("mp3") ||
-           file.hasFileExtension("aiff") ||
-           file.hasFileExtension("flac") ||
-           file.hasFileExtension("ogg") ||
-           file.hasFileExtension("sosci");
+    return osci::files::isAudio(file.getFileExtension()) || osci::files::isSosciProject(file);
 }
 
 void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int y) {
@@ -112,13 +105,16 @@ void SosciPluginEditor::filesDropped(const juce::StringArray& files, int x, int 
     if (files.size() != 1) {
         return;
     }
-    juce::File file(files[0]);
-    
-    if (file.hasFileExtension("sosci")) {
-        openProject(file);
-    } else {
-        audioProcessor.loadAudioFile(file);
+    openFile(juce::File(files[0]));
+}
+
+bool SosciPluginEditor::openSourceFile(const juce::File& file) {
+    if (!osci::files::isAudio(file.getFileExtension())) {
+        return false;
     }
+
+    audioProcessor.loadAudioFile(file);
+    return true;
 }
 
 void SosciPluginEditor::visualiserFullScreenChanged() {
@@ -131,8 +127,7 @@ void SosciPluginEditor::visualiserFullScreenChanged() {
     }
     visualiserSettingsWrapper.setVisible(!fullScreen);
     menuBar.setVisible(!fullScreen);
-    undoButton.setVisible(!fullScreen);
-    redoButton.setVisible(!fullScreen);
+    undoRedoControls.setVisible(!fullScreen);
     resized();
     repaint();
 }

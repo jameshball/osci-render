@@ -6,8 +6,9 @@ static constexpr int kToggleSectionWidth = 36;
 
 MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), pluginEditor(editor) {
 
-    addAndMakeVisible(midiToggle);
+    addAndMakeVisible(midiSwitch);
     addAndMakeVisible(voicesBar);
+#if OSCI_PREMIUM
     addAndMakeVisible(bendBar);
     addAndMakeVisible(velTrkKnob);
     addAndMakeVisible(glideKnob);
@@ -15,7 +16,9 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
     addAndMakeVisible(alwaysGlideToggle);
     addAndMakeVisible(legatoToggle);
     addAndMakeVisible(octaveScaleToggle);
+#endif
 
+#if OSCI_PREMIUM
     velTrkKnob.bindToParam(audioProcessor.velocityTracking);
     glideKnob.bindToParam(audioProcessor.glideTime, 1.0);
 
@@ -30,8 +33,10 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
 
     // Glide: show as seconds
     glideKnob.getKnob().setTextValueSuffix(" s");
+#endif
 
     audioProcessor.midiEnabled->addListener(this);
+#if OSCI_PREMIUM
     audioProcessor.velocityTracking->addListener(this);
     audioProcessor.glideTime->addListener(this);
 
@@ -39,13 +44,23 @@ MidiComponent::MidiComponent(OscirenderAudioProcessor& p, OscirenderAudioProcess
         addAndMakeVisible(tempoBar);
     }
 
+    disabledOverlay.setText("MIDI DISABLED");
+    disabledOverlay.setSubText("(click to enable)");
+    disabledOverlay.onClick = [this] {
+        audioProcessor.midiEnabled->setBoolValueNotifyingHost(true);
+    };
+    addChildComponent(disabledOverlay);
+#endif
+
     handleAsyncUpdate();
 }
 
 MidiComponent::~MidiComponent() {
     audioProcessor.midiEnabled->removeListener(this);
+#if OSCI_PREMIUM
     audioProcessor.velocityTracking->removeListener(this);
     audioProcessor.glideTime->removeListener(this);
+#endif
 }
 
 void MidiComponent::parameterValueChanged(int parameterIndex, float newValue) {
@@ -62,51 +77,63 @@ void MidiComponent::handleAsyncUpdate() {
 void MidiComponent::updateEnabledState() {
     const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
     voicesBar.setEnabled(midiOn);
-    bendBar.setEnabled(midiOn);
-    velTrkKnob.setEnabled(midiOn);
-    glideKnob.setEnabled(midiOn);
-    slopeGraph.setEnabled(midiOn);
-    alwaysGlideToggle.setEnabled(midiOn);
-    legatoToggle.setEnabled(midiOn);
-    octaveScaleToggle.setEnabled(midiOn);
-    tempoBar.setEnabled(midiOn);
-
     float alpha = midiOn ? 1.0f : 0.4f;
     voicesBar.setAlpha(alpha);
-    bendBar.setAlpha(alpha);
-    velTrkKnob.setAlpha(alpha);
-    glideKnob.setAlpha(alpha);
-    slopeGraph.setAlpha(alpha);
-    alwaysGlideToggle.setAlpha(alpha);
-    legatoToggle.setAlpha(alpha);
-    octaveScaleToggle.setAlpha(alpha);
-    tempoBar.setAlpha(alpha);
+#if OSCI_PREMIUM
+    disabledOverlay.setDisabledWithSiblings(!midiOn,
+        { velTrkKnob, bendBar, glideKnob, slopeGraph,
+          alwaysGlideToggle, legatoToggle, octaveScaleToggle, tempoBar });
+#endif
 }
 
 void MidiComponent::resized() {
     auto area = getLocalBounds();
 
+#if !OSCI_PREMIUM
+    // Free mode: MIDI icon + toggle + voices bar, no backgrounds
+    {
+        auto row = area.reduced(4, 0);
+        midiSwitch.setBounds(row.removeFromLeft(kToggleSectionWidth));
+        row.removeFromLeft(4);
+
+        bool midiOn = audioProcessor.midiEnabled->getBoolValue();
+        voicesBar.setVisible(midiOn);
+        if (midiOn) {
+            row.removeFromLeft(4);
+            constexpr int kMaxVoicesWidth = 120;
+            auto voicesBounds = row.withWidth(juce::jmin(row.getWidth(), kMaxVoicesWidth));
+            voicesBar.setBounds(voicesBounds);
+        }
+    }
+    return;
+#endif
+
     // Toggle section on the left
     auto toggleSection = area.removeFromLeft(kToggleSectionWidth);
-    midiToggle.setBounds(toggleSection.withSizeKeepingCentre(30, 20));
+    midiSwitch.setBounds(toggleSection);
 
     // Settings section — cumulative boundary layout to avoid jitter
     auto settingsArea = area.reduced(5, 3);
 
     constexpr int gap = 3;
+#if OSCI_PREMIUM
     static constexpr int kMinToggleColWidth = 80;
     bool hasTempo = tempoBar.isVisible();
-
     int numCols = hasTempo ? 7 : 6;
+#else
+    int numCols = 1;
+#endif
     int totalGaps = (numCols - 1) * gap;
     int available = settingsArea.getWidth() - totalGaps;
 
     float colWidth = (float)available / (float)numCols;
+#if OSCI_PREMIUM
     float toggleColWidth = colWidth;
     if (colWidth < (float)kMinToggleColWidth) {
         toggleColWidth = (float)kMinToggleColWidth;
         colWidth = ((float)available - toggleColWidth) / (float)(numCols - 1);
     }
+#endif
 
     // Cumulative float widths → integer boundaries (gaps are exact integers)
     int startX = settingsArea.getX();
@@ -124,6 +151,7 @@ void MidiComponent::resized() {
     };
 
     voicesBar.setBounds(nextCol(colWidth, 2));
+#if OSCI_PREMIUM
     bendBar.setBounds(nextCol(colWidth, 2));
     velTrkKnob.setBounds(nextCol(colWidth, 1));
     glideKnob.setBounds(nextCol(colWidth, 1));
@@ -153,9 +181,14 @@ void MidiComponent::resized() {
 
     if (hasTempo)
         tempoBar.setBounds(nextCol(colWidth, 2));
+
+    // Overlay covers the settings section (right of toggle)
+    disabledOverlay.setBounds(area);
+#endif
 }
 
 void MidiComponent::paint(juce::Graphics& g) {
+#if OSCI_PREMIUM
     auto area = getLocalBounds();
 
     auto toggleSection = area.removeFromLeft(kToggleSectionWidth).toFloat();
@@ -165,39 +198,18 @@ void MidiComponent::paint(juce::Graphics& g) {
     juce::Path togglePath;
     togglePath.addRoundedRectangle(toggleSection.getX(), toggleSection.getY(),
                                    toggleSection.getWidth(), toggleSection.getHeight(),
-                                   Colours::kPillRadius, Colours::kPillRadius,
+                                   osci::Colours::kPillRadius, osci::Colours::kPillRadius,
                                    true, false, true, false);
-    g.setColour(Colours::veryDark());
+    g.setColour(osci::Colours::veryDark());
     g.fillPath(togglePath);
 
     // Settings section: rounded on right, flat on left
     juce::Path settingsPath;
     settingsPath.addRoundedRectangle(settingsSection.getX(), settingsSection.getY(),
                                      settingsSection.getWidth(), settingsSection.getHeight(),
-                                     Colours::kPillRadius, Colours::kPillRadius,
+                                     osci::Colours::kPillRadius, osci::Colours::kPillRadius,
                                      false, true, false, true);
-    g.setColour(Colours::darker());
+    g.setColour(osci::Colours::darker());
     g.fillPath(settingsPath);
-}
-
-void MidiComponent::paintOverChildren(juce::Graphics& g) {
-    if (!audioProcessor.midiEnabled->getBoolValue()) {
-        auto area = getLocalBounds();
-        area.removeFromLeft(kToggleSectionWidth);
-        auto settingsSection = area.toFloat();
-
-        auto centre = settingsSection.getCentre();
-        float rx = settingsSection.getWidth() * 0.4f;
-        float ry = settingsSection.getHeight();
-
-        juce::ColourGradient gradient(
-            Colours::darker(), centre.x, centre.y,
-            Colours::darker().withAlpha(0.0f), centre.x + rx, centre.y, true);
-        g.setGradientFill(gradient);
-        g.fillEllipse(centre.x - rx, centre.y - ry, rx * 2.0f, ry * 2.0f);
-
-        g.setColour(juce::Colours::white.withAlpha(0.7f));
-        g.setFont(juce::Font(13.0f).boldened());
-        g.drawText("MIDI DISABLED", settingsSection, juce::Justification::centred, false);
-    }
+#endif
 }

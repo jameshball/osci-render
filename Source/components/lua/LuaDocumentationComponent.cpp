@@ -1,29 +1,18 @@
 #include "LuaDocumentationComponent.h"
 
 LuaDocumentationComponent::LuaDocumentationComponent() {
-    configureLabel(titleLabel, juce::Font(22.0f, juce::Font::bold), juce::Justification::centred);
-    titleLabel.setText("Lua Scripting Reference", juce::NotificationType::dontSendNotification);
-    addAndMakeVisible(titleLabel);
-
-    closeButton = std::make_unique<SvgButton>("close", BinaryData::close_svg, juce::Colours::white);
-    closeButton->onClick = [this] { dismiss(); };
-    addAndMakeVisible(*closeButton);
+    setOverlayTitle("Lua Scripting Reference");
 
     viewport.setViewedComponent(&contentComponent, false);
     viewport.setScrollBarsShown(true, false);
-    viewport.setColour(juce::ScrollBar::thumbColourId, Colours::grey());
+    viewport.setColour(juce::ScrollBar::thumbColourId, osci::Colours::grey());
     viewport.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
-    addAndMakeVisible(viewport);
+    addPanelContentAndMakeVisible(viewport);
 
     buildDocumentation();
 }
 
 void LuaDocumentationComponent::resizeContent(juce::Rectangle<int> contentArea) {
-    auto titleArea = contentArea.removeFromTop(32);
-    closeButton->setBounds(titleArea.removeFromRight(32).reduced(4));
-    titleLabel.setBounds(titleArea);
-    contentArea.removeFromTop(4);
-
     viewport.setBounds(contentArea);
     layoutContent(contentArea.getWidth() - viewport.getScrollBarThickness() - 4);
 }
@@ -74,7 +63,7 @@ void LuaDocumentationComponent::addCode(const juce::String& code) {
 void LuaDocumentationComponent::addLink(const juce::String& text, const juce::URL& url) {
     auto* link = new juce::HyperlinkButton(text, url);
     link->setFont(juce::Font(13.5f), false);
-    link->setColour(juce::HyperlinkButton::textColourId, Colours::accentColor());
+    link->setColour(juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
     link->setJustificationType(juce::Justification::centredLeft);
     elements.add(link);
     contentComponent.addAndMakeVisible(link);

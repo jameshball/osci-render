@@ -3,21 +3,21 @@
 #include <JuceHeader.h>
 
 #include <algorithm>
+#include <cstdint>
 
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../audio/AudioRecorder.h"
-#include "../components/DownloaderComponent.h"
-#include "../components/StopwatchComponent.h"
-#include "../components/SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../components/timeline/TimelineComponent.h"
 #include "../components/timeline/TimelineController.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../audio/wav/WavParser.h"
+#include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
-#include "VisualiserSettings.h"
-#include "VisualiserRenderer.h"
 #include "TransparentWindow.h"
+#include "VisualiserSettings.h"
+#include <osci_gui/visualiser/osci_VisualiserRenderer.h>
+#include <osci_texture_interop/osci_texture_interop.h>
 
 enum class FullScreenMode {
     TOGGLE,
@@ -25,66 +25,28 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-// Semi-transparent floating toolbar for the popout window.
-// Covers the full component area but only intercepts clicks in the toolbar zone.
+#if JUCE_MAC
 class PopoutToolbar : public juce::Component {
 public:
+    PopoutToolbar();
+
     std::function<void()> onClose;
     std::function<void()> onFullScreen;
 
-    PopoutToolbar() : closeButton("close", BinaryData::close_svg, juce::Colours::white),
-                      fullscreenButton("fullscreen", BinaryData::fullscreen_svg, juce::Colours::white) {
-        addAndMakeVisible(closeButton);
-        addAndMakeVisible(fullscreenButton);
-        closeButton.onClick = [this] { if (onClose) onClose(); };
-        fullscreenButton.onClick = [this] { if (onFullScreen) onFullScreen(); };
-        setInterceptsMouseClicks(true, true);
-    }
-
-    bool hitTest(int x, int y) override {
-        if (y < toolbarHeight)
-            return true;
-        // Allow child buttons to get events even outside toolbar area
-        for (auto* child : getChildren())
-            if (child->getBounds().contains(x, y))
-                return true;
-        return false;
-    }
-
-    void paint(juce::Graphics& g) override {
-        auto toolbarColour = juce::Colour((juce::uint8) 30, (juce::uint8) 30, (juce::uint8) 30, (juce::uint8) 255);
-
-        // Toolbar bar at the top — full width, no rounding
-        auto bar = getLocalBounds().removeFromTop(toolbarHeight).toFloat();
-        g.setColour(toolbarColour);
-        g.fillRect(bar);
-
-        // Border outline around the entire component (inset to match window corner clip)
-        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.25f), 8.75f, 2.5f);
-    }
-
-    void resized() override {
-        auto bar = getLocalBounds().removeFromTop(toolbarHeight);
-        closeButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
-        fullscreenButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
-    }
-
-    void mouseDown(const juce::MouseEvent& e) override {
-        dragger.startDraggingComponent(getTopLevelComponent(),
-            e.getEventRelativeTo(getTopLevelComponent()));
-    }
-
-    void mouseDrag(const juce::MouseEvent& e) override {
-        dragger.dragComponent(getTopLevelComponent(),
-            e.getEventRelativeTo(getTopLevelComponent()), nullptr);
-    }
+    bool hitTest(int x, int y) override;
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+    void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDrag(const juce::MouseEvent& event) override;
 
 private:
     static constexpr int toolbarHeight = 24;
-    SvgButton closeButton;
-    SvgButton fullscreenButton;
+
+    osci::CloseButton closeButton;
+    osci::SvgButton fullscreenButton{"fullscreen", BinaryData::fullscreen_svg, juce::Colours::white};
     juce::ComponentDragger dragger;
 };
+#endif
 
 class CommonPluginEditor;
 class VisualiserWindow;
@@ -93,9 +55,6 @@ public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
         CommonPluginEditor& editor,
-#if OSCI_PREMIUM
-        SharedTextureManager& sharedTextureManager,
-#endif
         juce::File ffmpegFile,
         VisualiserSettings& settings,
         RecordingSettings& recordingSettings,
@@ -120,23 +79,24 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
+    void setPopoutAlwaysOnTop(bool alwaysOnTop);
+    bool isPopoutAlwaysOnTop() const;
+    void prepareOverlayFadeIn();
+    void fadeInAfterOverlay();
+    void cancelOverlayFadeIn();
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+#if JUCE_MAC
+    void setPopoutToolbarVisible(bool visible);
+    void refreshOpenGLSurfaceTransparency();
+#endif
 
     VisualiserComponent* parent = nullptr;
     VisualiserComponent* child = nullptr;
     std::unique_ptr<VisualiserWindow> popout = nullptr;
-
-    void setPopoutToolbarVisible(bool visible) {
-        if (popoutToolbar) {
-            popoutToolbar->setVisible(visible);
-            // Only pay the componentPainting cost when the toolbar is visible
-            openGLContext.setComponentPaintingEnabled(visible);
-        }
-    }
 
     enum ColourIds
     {
@@ -144,8 +104,22 @@ public:
     };
 
 private:
+    class FadeCoverComponent : public juce::Component {
+    public:
+        FadeCoverComponent();
+        void paint(juce::Graphics& g) override;
+    };
+
+    static constexpr int overlayFadeDurationMs = 225;
+
     void updatePausedState();
     bool isPrimaryVisualiser() const;
+    void setOverlayFadeProgress(float progress);
+    void refreshTextureOutputButton();
+    void setTextureOutputEnabled(bool enabled);
+    void requestTextureOutputService();
+    void serviceTextureOutputFrame();
+    void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
 
     std::atomic<bool> active = true;
 
@@ -156,21 +130,17 @@ private:
     RecordingSettings& recordingSettings;
 
     bool visualiserOnly;
-    
+
     // Timeline for controlling playback (audio, video, gif, gpla)
     // Controller is set by parent component based on file type
     TimelineComponent timeline;
 
-    SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
-    SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::red};
-    SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
-    SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
-    SvgButton sharedTextureButton{"sharedTexture", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
-
-#if OSCI_PREMIUM
-    SharedTextureManager& sharedTextureManager;
-    SharedTextureSender* sharedTextureSender = nullptr;
-#endif
+    osci::SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
+    osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
+    osci::texture::OpenGLTexturePublisher textureOutputPublisher;
 
     int lastMouseX = 0;
     int lastMouseY = 0;
@@ -178,17 +148,23 @@ private:
     int renderModeTimerId = 0;
     bool hideButtonRow = false;
     bool fullScreen = false;
+#if JUCE_MAC
     std::unique_ptr<PopoutToolbar> popoutToolbar;
+#endif
     std::function<void(FullScreenMode)> fullScreenCallback;
+    osci::ToggleAnimationController overlayFadeController { this };
+    FadeCoverComponent overlayFadeCover;
 
     juce::File ffmpegFile;
     bool recordingAudio = true;
 
 #if OSCI_PREMIUM
     bool recordingVideo = true;
+    bool recordingTransparency = false;
     bool downloading = false;
 
     long numFrames = 0;
+    VisualiserRenderSize recordingRenderSize;
     std::vector<unsigned char> framePixels;
     osci::WriteProcess ffmpegProcess;
     std::unique_ptr<juce::TemporaryFile> tempVideoFile;
@@ -196,7 +172,7 @@ private:
 #endif
 
     StopwatchComponent stopwatch;
-    SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
+    osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::TemporaryFile> tempAudioFile;
@@ -205,109 +181,51 @@ private:
     juce::Rectangle<int> buttonRow;
 
     void popoutWindow();
+    void newOpenGLContextCreated() override;
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
     void stopTask() override;
-
-#if OSCI_PREMIUM
-    void initialiseSharedTexture();
-    void closeSharedTexture();
-#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
     JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)
 };
 
-class VisualiserWindow : public juce::DocumentWindow, private juce::Timer {
-public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent) : parent(parent), juce::DocumentWindow(name, juce::Colours::transparentBlack, 0) {
-        setAlwaysOnTop(true);
-        setTitleBarHeight(0);
-        startTimerHz(4);
-    }
-
-    ~VisualiserWindow() override {
-        stopTimer();
-    }
-
-    bool keyPressed(const juce::KeyPress& key) override {
-        if (key == juce::KeyPress::escapeKey) {
-            closeButtonPressed();
-            return true;
-        }
-        return juce::DocumentWindow::keyPressed(key);
-    }
-
-    void closeButtonPressed() override {
-        if (isFullScreen)
-            toggleFullScreen();
-        // local copy of parent so that we can safely delete the child
-        VisualiserComponent* parent = this->parent;
-        parent->setHasMirrorConsumer(false);
-        parent->child = nullptr;
-        parent->popout.reset();
-        parent->childUpdated();
-        parent->resized();
-    }
-
-    void toggleFullScreen() {
-        isFullScreen = !isFullScreen;
-        setAlwaysOnTop(!isFullScreen);
-#if JUCE_WINDOWS
-        if (isFullScreen) {
-            windowedBounds = getBounds();
-            auto& displays = juce::Desktop::getInstance().getDisplays();
-            auto* display = displays.getDisplayForRect(getBounds());
-            if (display != nullptr) {
-                setFullScreen(true);
-                setBounds(display->totalArea);
-            }
-        } else {
-            setFullScreen(false);
-            if (!windowedBounds.isEmpty())
-                setBounds(windowedBounds);
-        }
-#else
-        setFullScreen(isFullScreen);
+class VisualiserWindow : public juce::DocumentWindow
+#if JUCE_MAC
+    , private juce::Timer
 #endif
-        // Reapply transparent window config after fullscreen changes
-        // (macOS may reset NSWindow properties during the transition).
-        if (!isFullScreen) {
-            configureNativeWindowTransparency(this);
-            if (parent && parent->child)
-                parent->child->resetGLSurfaceTransparency();
-        }
-    }
+{
+public:
+    VisualiserWindow(juce::String name, VisualiserComponent* parent, bool pinned);
+    ~VisualiserWindow() override;
+
+    bool keyPressed(const juce::KeyPress& key) override;
+    void closeButtonPressed() override;
+    void toggleFullScreen();
 
     bool getIsFullScreen() const { return isFullScreen; }
-
-    void showToolbar(bool show) {
-        if (toolbarVisible != show) {
-            toolbarVisible = show;
-            if (parent && parent->child)
-                parent->child->setPopoutToolbarVisible(show);
-        }
+    void setPinned(bool shouldBePinned) {
+        pinned = shouldBePinned;
+        setAlwaysOnTop(!isFullScreen && pinned);
     }
 
-    void moved() override { lastResizeTime = juce::Time::getMillisecondCounter(); }
-    void resized() override {
-        lastResizeTime = juce::Time::getMillisecondCounter();
-        ResizableWindow::resized();
-    }
+#if JUCE_MAC
+    void showToolbar(bool show);
+    void moved() override;
+    void resized() override;
+#endif
 
 private:
-    void timerCallback() override {
-        auto mouseScreenPos = juce::Desktop::getMousePosition();
-        auto localPos = getLocalPoint(nullptr, mouseScreenPos);
-        bool mouseInWindow = getLocalBounds().contains(localPos);
-        // Keep toolbar visible during active resize/move (native drag doesn't report mouse state to JUCE)
-        bool recentlyResized = (juce::Time::getMillisecondCounter() - lastResizeTime) < 500;
-        showToolbar(mouseInWindow || recentlyResized);
-    }
+#if JUCE_MAC
+    void timerCallback() override;
+#endif
 
     VisualiserComponent* parent;
     bool isFullScreen = false;
+    bool pinned = true;
+    juce::Rectangle<int> windowedBounds;
+#if JUCE_MAC
     bool toolbarVisible = false;
     juce::uint32 lastResizeTime = 0;
-    juce::Rectangle<int> windowedBounds;
+#endif
 };

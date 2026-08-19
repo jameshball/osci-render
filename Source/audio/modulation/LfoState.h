@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <vector>
 #include <cmath>
+#include <optional>
 #include "../GraphNode.h"
 #include "ModAssignment.h"
 
@@ -56,25 +57,23 @@ struct LfoWaveform {
 
 // Preset LFO waveform shapes.
 enum class LfoPreset {
+    // Basic
     Sine,
     Triangle,
-    Sawtooth,
-    ReverseSawtooth,
+    SawUp,
+    SawDown,
     Square,
-    // Creative presets
-    Exponential,
-    Logarithmic,
-    Pulse,
-    Staircase,
-    SmoothRandom,
-    Bounce,
-    Elastic,
-    WarmSaw,
-    Shark,
-    PulseTrain,
-    Sidechain,
+    StaircaseDown,
+    // Pattern
+    GrowingOscillations,
+    NervousGroove,
+    PulseSeries,
+    RandomPulses,
+    ShuffleGate,
+    SideChain1,
+    SideChain2,
+    SplitGate,
     TranceGate,
-    Custom
 };
 
 // Canonical preset registry: maps enum values to display strings.
@@ -86,24 +85,21 @@ struct LfoPresetEntry {
 
 inline const std::vector<LfoPresetEntry>& getLfoPresetRegistry() {
     static const std::vector<LfoPresetEntry> registry = {
-        { LfoPreset::Sine,            "Sine" },
-        { LfoPreset::Triangle,        "Triangle" },
-        { LfoPreset::Sawtooth,        "Sawtooth" },
-        { LfoPreset::ReverseSawtooth, "Reverse Sawtooth" },
-        { LfoPreset::Square,          "Square" },
-        { LfoPreset::Exponential,     "Exponential" },
-        { LfoPreset::Logarithmic,     "Logarithmic" },
-        { LfoPreset::Pulse,           "Pulse" },
-        { LfoPreset::Staircase,       "Staircase" },
-        { LfoPreset::SmoothRandom,    "Smooth Random" },
-        { LfoPreset::Bounce,          "Bounce" },
-        { LfoPreset::Elastic,         "Elastic" },
-        { LfoPreset::WarmSaw,         "Warm Saw" },
-        { LfoPreset::Shark,           "Shark" },
-        { LfoPreset::PulseTrain,      "Pulse Train" },
-        { LfoPreset::Sidechain,       "Sidechain" },
-        { LfoPreset::TranceGate,      "Trance Gate" },
-        { LfoPreset::Custom,          "Custom" },
+        { LfoPreset::Sine,                 "Sine" },
+        { LfoPreset::Triangle,             "Triangle" },
+        { LfoPreset::SawUp,               "Saw Up" },
+        { LfoPreset::SawDown,             "Saw Down" },
+        { LfoPreset::Square,              "Square" },
+        { LfoPreset::StaircaseDown,       "Staircase Down" },
+        { LfoPreset::GrowingOscillations, "Growing Oscillations" },
+        { LfoPreset::NervousGroove,       "Nervous Groove" },
+        { LfoPreset::PulseSeries,         "Pulse Series" },
+        { LfoPreset::RandomPulses,        "Random Pulses" },
+        { LfoPreset::ShuffleGate,         "Shuffle Gate" },
+        { LfoPreset::SideChain1,          "Side Chain 1" },
+        { LfoPreset::SideChain2,          "Side Chain 2" },
+        { LfoPreset::SplitGate,           "Split Gate" },
+        { LfoPreset::TranceGate,          "Trance Gate" },
     };
     return registry;
 }
@@ -114,18 +110,29 @@ inline juce::String lfoPresetToString(LfoPreset preset) {
     return "Custom";
 }
 
-inline LfoPreset stringToLfoPreset(const juce::String& s) {
+inline std::optional<LfoPreset> stringToLfoPreset(const juce::String& s) {
     for (auto& entry : getLfoPresetRegistry())
         if (s == entry.name) return entry.preset;
-    // Legacy aliases for renamed/removed presets
-    if (s == "Rounded Square") return LfoPreset::WarmSaw;
-    return LfoPreset::Custom;
+    return std::nullopt;
 }
 
 // Generate preset waveform node sets (defined in LfoState.cpp).
 LfoWaveform createLfoPreset(LfoPreset preset);
 
-// Map beginner-mode per-parameter LfoType to global LfoPreset.
+// Parse a string (as stored in XML) into an LfoType enum.
+// Uses the same string mapping as LfoTypeParameter::getText / getValueForText.
+inline osci::LfoType stringToLfoType(const juce::String& str) {
+    if (str == "Sine")              return osci::LfoType::Sine;
+    if (str == "Square")            return osci::LfoType::Square;
+    if (str == "Seesaw")            return osci::LfoType::Seesaw;
+    if (str == "Triangle")          return osci::LfoType::Triangle;
+    if (str == "Sawtooth")          return osci::LfoType::Sawtooth;
+    if (str == "Reverse Sawtooth")  return osci::LfoType::ReverseSawtooth;
+    if (str == "Noise")             return osci::LfoType::Noise;
+    return osci::LfoType::Static;
+}
+
+// Map free-version per-parameter LfoType to global LfoPreset.
 // Returns {preset, negateDepth}.  negateDepth is true for ReverseSawtooth
 // (modelled as a Sawtooth with negative depth in the global system, unless
 // we now have a native ReverseSawtooth preset).
@@ -133,8 +140,8 @@ inline LfoPreset lfoTypeToLfoPreset(osci::LfoType type) {
     switch (type) {
         case osci::LfoType::Sine:            return LfoPreset::Sine;
         case osci::LfoType::Triangle:        return LfoPreset::Triangle;
-        case osci::LfoType::Sawtooth:        return LfoPreset::Sawtooth;
-        case osci::LfoType::ReverseSawtooth: return LfoPreset::ReverseSawtooth;
+        case osci::LfoType::Sawtooth:        return LfoPreset::SawUp;
+        case osci::LfoType::ReverseSawtooth: return LfoPreset::SawDown;
         case osci::LfoType::Square:          return LfoPreset::Square;
         case osci::LfoType::Seesaw:          return LfoPreset::Triangle; // closest match
         default:                             return LfoPreset::Sine;
@@ -214,6 +221,10 @@ struct LfoAudioState {
 
         switch (mode) {
             case LfoMode::Free:
+                for (int s = 0; s < numSamples; ++s)
+                    output[s] = advanceFreeOrSync(phaseInc, waveform);
+                return;
+
             case LfoMode::Sync:
                 for (int s = 0; s < numSamples; ++s)
                     output[s] = advanceFreeOrSync(phaseInc, waveform);

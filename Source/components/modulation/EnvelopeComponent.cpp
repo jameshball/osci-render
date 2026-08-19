@@ -94,25 +94,32 @@ juce::Colour EnvelopeComponent::getEnvColour(int envIndex) {
 
 static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     ModulationSourceConfig cfg;
-    const bool beginner = proc.isBeginnerMode();
-    cfg.sourceCount = beginner ? 1 : NUM_ENVELOPES;
+    cfg.sourceCount = NUM_ACTIVE_ENVELOPES;
     cfg.getSourceColour = &EnvelopeComponent::getEnvColour;
     cfg.getCurrentValue = [&proc](int i) { return proc.envelopeParameters.getCurrentValue(i); };
     cfg.isSourceActive = [&proc](int i) { return proc.envelopeParameters.isActive(i); };
     cfg.getLabel = [](int i) { return "ENV " + juce::String(i + 1); };
 
-    if (!beginner) {
-        cfg.dragPrefix = "ENV";
-        cfg.getAssignments = [&proc]() { return proc.envelopeParameters.getAssignments(); };
-        cfg.addAssignment = [&proc](const ModAssignment& a) { proc.envelopeParameters.addAssignment(a); };
-        cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.envelopeParameters.removeAssignment(idx, pid); };
-        cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
-            return proc.getParamDisplayName(pid);
-        };
-        cfg.broadcaster = &proc.broadcaster;
-        cfg.getActiveTab = [&proc]() { return proc.envelopeParameters.activeTab; };
-        cfg.setActiveTab = [&proc](int i) { proc.envelopeParameters.activeTab = i; };
-    }
+    cfg.dragPrefix = "ENV";
+    cfg.getAssignments = [&proc]() { return proc.envelopeParameters.getAssignments(); };
+    cfg.addAssignment = [&proc](const ModAssignment& a) { proc.envelopeParameters.addAssignment(a); };
+    cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.envelopeParameters.removeAssignment(idx, pid); };
+    cfg.getParamDisplayName = [&proc](const juce::String& pid) -> juce::String {
+        return proc.getParamDisplayName(pid);
+    };
+    cfg.broadcaster = &proc.broadcaster;
+    cfg.getActiveTab = [&proc]() { return proc.envelopeParameters.activeTab; };
+    cfg.setActiveTab = [&proc](int i) { proc.envelopeParameters.activeTab = i; };
+#if OSCI_PREMIUM
+    cfg.typeId = "env";
+    cfg.midiManager = &proc.midiManager;
+    cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
+        return OscirenderAudioProcessor::modDepthCustomId("env", idx, pid);
+    };
+    cfg.buildModDepthSetter = [&proc](int idx, const juce::String& pid) {
+        return proc.buildModDepthSetter("env", idx, pid);
+    };
+#endif
     return cfg;
 }
 
@@ -126,13 +133,15 @@ EnvelopeComponent::EnvelopeComponent(OscirenderAudioProcessor& processorToUse)
     addAndMakeVisible(graph);
     setupDahdsrConstraints();
 
-    // Add knobs
+    // Add knobs (premium only — free version uses graph-only editing)
+#if OSCI_PREMIUM
     addAndMakeVisible(delayKnob);
     addAndMakeVisible(attackKnob);
     addAndMakeVisible(holdKnob);
     addAndMakeVisible(decayKnob);
     addAndMakeVisible(sustainKnob);
     addAndMakeVisible(releaseKnob);
+#endif
 
     syncFromProcessorState();
 }
@@ -194,8 +203,7 @@ void EnvelopeComponent::initEnvelopeData(int envIndex) {
     envData[envIndex].nodes = buildDahdsrNodes(audioProcessor.getCurrentDahdsrParams(envIndex));
 }
 
-void EnvelopeComponent::onActiveSourceChanged(int index) {
-    envData[activeSourceIndex].nodes = graph.getNodes();
+void EnvelopeComponent::onActiveSourceChanged(int) {
     syncGraphToActiveEnv();
     syncKnobsToActiveEnv();
     graph.resetFlowTrail();
@@ -445,10 +453,11 @@ void EnvelopeComponent::syncKnobsToActiveEnv() {
 
 void EnvelopeComponent::resized() {
     ModulationSourceComponent::resized();
+    if (isCollapsed()) return;
 
     auto bounds = getContentBounds();
-    bounds.reduce(4, 4); // content inset
 
+#if OSCI_PREMIUM
     // Bottom row: DAHDSR knobs
     auto bottomRow = bounds.removeFromBottom(kKnobRowHeight);
     bounds.removeFromBottom(kKnobGap);
@@ -477,6 +486,7 @@ void EnvelopeComponent::resized() {
             if (i < numKnobs - 1) gapsSoFar += kKnobGap;
         }
     }
+#endif
 
     graph.setBounds(bounds);
     setOutlineBounds(graph.getBounds());

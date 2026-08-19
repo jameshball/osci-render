@@ -1,5 +1,6 @@
 #include "OpenFileComponent.h"
-#include "GridItemComponent.h"
+#include "../parser/FileFormatRegistry.h"
+#include <osci_gui/osci_gui.h>
 #include "../../JuceLibraryCode/BinaryData.h"
 
 OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
@@ -10,7 +11,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
 
     addAndMakeVisible(startImportButton);
     startImportButton.onClick = [this]() { openFileChooser(); };
-    startImportButton.setColour(juce::TextButton::buttonColourId, Colours::accentColor());
+    startImportButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
     startImportButton.setColour(juce::TextButton::textColourOffId, juce::Colours::black);
 
     addAndMakeVisible(chooseExampleLabel);
@@ -25,7 +26,7 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     closeButton.onClick = [this]() { if (onClosed) onClosed(); };
 
     auto addCat = [this](CategoryViews& cat) {
-        cat.group.setColour(groupComponentBackgroundColourId, Colours::darker().darker(0.2));
+        cat.group.setColour(osci::groupComponentBackgroundColourId, osci::Colours::darker().darker(0.2));
         content.addAndMakeVisible(cat.group);
         content.addAndMakeVisible(cat.grid);
         cat.grid.setUseViewport(false);
@@ -35,7 +36,10 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     addCat(luaCat);
     addCat(modelsCat);
     addCat(svgsCat);
+#if OSCI_PREMIUM
     addCat(fractalCat);
+    addCat(lottieCat);
+#endif
 
     populate();
 }
@@ -69,13 +73,15 @@ void OpenFileComponent::resized()
     int y = 0;
 
     auto layCat = [&](CategoryViews& cat) {
-        const int gridHeight = cat.grid.calculateRequiredHeight(contentArea.getWidth());
         const int headerHeight = 20;
         const int padding = 10;
+        const int horizontalInset = 10;
+        const int gridWidth = juce::jmax(1, contentArea.getWidth() - 2 * horizontalInset);
+        const int gridHeight = cat.grid.calculateRequiredHeight(gridWidth);
 
         auto categoryBounds = juce::Rectangle<int>(contentArea.getX(), contentArea.getY() + y, contentArea.getWidth(), gridHeight + headerHeight + 3 * padding);
         y += categoryBounds.getHeight();
-        categoryBounds.reduce(10, padding);
+        categoryBounds.reduce(horizontalInset, padding);
 
         cat.group.setBounds(categoryBounds);
         cat.grid.setBounds(categoryBounds.removeFromBottom(gridHeight));    
@@ -83,7 +89,10 @@ void OpenFileComponent::resized()
     layCat(modelsCat);
     layCat(luaCat);
     layCat(svgsCat);
+#if OSCI_PREMIUM
     layCat(fractalCat);
+    layCat(lottieCat);
+#endif
     layCat(textCat);
 
     content.setSize(contentArea.getWidth(), y);
@@ -97,7 +106,6 @@ static void initialiseShapeGeneratorLuaSliders(OscirenderAudioProcessor& process
         auto setParam = [&](int idx, float value) {
             if (processor.luaEffects[idx]->parameters.size() > 0)
                 processor.luaEffects[idx]->parameters[0]->setValueNotifyingHost(value);
-            processor.luaValues[idx].store(value);
         };
         setParam(0, 0.0f);
         setParam(1, 1.0f);
@@ -112,11 +120,10 @@ void OpenFileComponent::addExample(CategoryViews& cat, const juce::String& fileN
         iconData = BinaryData::random_svg;
         iconSize = BinaryData::random_svgSize;
     }
-    auto* item = new GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
+    auto* item = new osci::GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
     item->onItemSelected = [this, fileName, data, size](const juce::String&) {
-        juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
-        audioProcessor.addFile(fileName, data, size);
-        int fileIndex = audioProcessor.numFiles() - 1;
+        auto& files = audioProcessor.getFileController();
+        const int fileIndex = files.addFile(fileName, data, size);
         if (fileName.equalsIgnoreCase("shape_generator.lua"))
             initialiseShapeGeneratorLuaSliders(audioProcessor);
         const bool openEditor = fileName.endsWithIgnoreCase(".lua") || fileName.endsWithIgnoreCase(".txt");
@@ -171,26 +178,36 @@ void OpenFileComponent::populate()
     addExample(svgsCat, "snowflake.svg", "Snowflake", BinaryData::snowflake_svg, BinaryData::snowflake_svgSize, BinaryData::snowflake_svg, BinaryData::snowflake_svgSize);
     addExample(svgsCat, "yinyang.svg", "Yin Yang", BinaryData::yinyang_svg, BinaryData::yinyang_svgSize, BinaryData::yinyang_svg, BinaryData::yinyang_svgSize);
 
+#if OSCI_PREMIUM
     addExample(fractalCat, "koch_snowflake.lsystem", "Koch Snowflake", BinaryData::koch_snowflake_lsystem, BinaryData::koch_snowflake_lsystemSize, BinaryData::snowflake_svg, BinaryData::snowflake_svgSize);
     addExample(fractalCat, "sierpinski_triangle.lsystem", "Sierpinski Triangle", BinaryData::sierpinski_triangle_lsystem, BinaryData::sierpinski_triangle_lsystemSize, BinaryData::sierpinski_triangle_svg, BinaryData::sierpinski_triangle_svgSize);
     addExample(fractalCat, "dragon_curve.lsystem", "Dragon Curve", BinaryData::dragon_curve_lsystem, BinaryData::dragon_curve_lsystemSize, BinaryData::dragon_curve_svg, BinaryData::dragon_curve_svgSize);
     addExample(fractalCat, "binary_tree.lsystem", "Binary Tree", BinaryData::binary_tree_lsystem, BinaryData::binary_tree_lsystemSize, BinaryData::binary_tree_svg, BinaryData::binary_tree_svgSize);
     addExample(fractalCat, "hilbert_curve.lsystem", "Hilbert Curve", BinaryData::hilbert_curve_lsystem, BinaryData::hilbert_curve_lsystemSize, BinaryData::hilbert_curve_svg, BinaryData::hilbert_curve_svgSize);
+
+    addExample(lottieCat, "android_wave.lottie", "Android Wave", BinaryData::android_wave_lottie, BinaryData::android_wave_lottieSize, BinaryData::lottie_android_svg, BinaryData::lottie_android_svgSize);
+    addExample(lottieCat, "switch.lottie", "Switch", BinaryData::switch_lottie, BinaryData::switch_lottieSize, BinaryData::lottie_switch_svg, BinaryData::lottie_switch_svgSize);
+    addExample(lottieCat, "heart.lottie", "Heart", BinaryData::heart_lottie, BinaryData::heart_lottieSize, BinaryData::lottie_heart_svg, BinaryData::lottie_heart_svgSize);
+    addExample(lottieCat, "cat.lottie", "Cat", BinaryData::cat_lottie, BinaryData::cat_lottieSize, BinaryData::lottie_cat_svg, BinaryData::lottie_cat_svgSize);
+    addExample(lottieCat, "dice.lottie", "Dice", BinaryData::dice_lottie, BinaryData::dice_lottieSize, BinaryData::lottie_dice_svg, BinaryData::lottie_dice_svgSize);
+    addExample(lottieCat, "pin_jump.lottie", "Pin Jump", BinaryData::pin_jump_lottie, BinaryData::pin_jump_lottieSize, BinaryData::lottie_pin_svg, BinaryData::lottie_pin_svgSize);
+    addExample(lottieCat, "lottie_logo_1.lottie", "Lottie Logo 1", BinaryData::lottie_logo_1_lottie, BinaryData::lottie_logo_1_lottieSize, BinaryData::lottie_logo1_svg, BinaryData::lottie_logo1_svgSize);
+    addExample(lottieCat, "lottie_logo_2.lottie", "Lottie Logo 2", BinaryData::lottie_logo_2_lottie, BinaryData::lottie_logo_2_lottieSize, BinaryData::lottie_logo2_svg, BinaryData::lottie_logo2_svgSize);
+    addExample(lottieCat, "hello.lottie", "Hello", BinaryData::hello_lottie, BinaryData::hello_lottieSize, BinaryData::lottie_hello_svg, BinaryData::lottie_hello_svgSize);
+    addExample(lottieCat, "spinning_squares.lottie", "Spinning Squares", BinaryData::spinning_squares_lottie, BinaryData::spinning_squares_lottieSize, BinaryData::lottie_grid_svg, BinaryData::lottie_grid_svgSize);
+    addExample(lottieCat, "wave.lottie", "Wave", BinaryData::wave_lottie, BinaryData::wave_lottieSize, BinaryData::lottie_wave_svg, BinaryData::lottie_wave_svgSize);
+    addExample(lottieCat, "blinking_eye.lottie", "Blinking Eye", BinaryData::blinking_eye_lottie, BinaryData::blinking_eye_lottieSize, BinaryData::lottie_eye_svg, BinaryData::lottie_eye_svgSize);
+#endif
 }
 
 void OpenFileComponent::openFileChooser()
 {
-    juce::String fileFormats;
-    for (auto& ext : audioProcessor.FILE_EXTENSIONS) {
-        fileFormats += "*." + ext + ";";
-    }
-    chooser = std::make_unique<juce::FileChooser>("Open", audioProcessor.getLastOpenedDirectory(), fileFormats);
+    chooser = std::make_unique<juce::FileChooser>("Open", audioProcessor.getLastOpenedDirectory(), osci::files::sourceWildcard());
     auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectMultipleItems |
                  juce::FileBrowserComponent::canSelectFiles;
 
     chooser->launchAsync(flags, [this](const juce::FileChooser& chooserRef) {
-        juce::SpinLock::ScopedLockType parsersLock(audioProcessor.parsersLock);
-        
+        auto& files = audioProcessor.getFileController();
         auto results = chooserRef.getResults();
         if (results.isEmpty()) return;
         
@@ -199,8 +216,7 @@ void OpenFileComponent::openFileChooser()
         for (auto& file : results) {
             if (file != juce::File()) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-                audioProcessor.addFile(file);
-                int fileIndex = audioProcessor.numFiles() - 1;
+                const int fileIndex = files.addFile(file);
                 juce::String fileName = file.getFileName();
                 if (fileName.equalsIgnoreCase("shape_generator.lua"))
                     initialiseShapeGeneratorLuaSliders(audioProcessor);

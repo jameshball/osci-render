@@ -130,6 +130,7 @@ public:
     virtual double getVoiceFrequency(const ManagedVoice& mv) const = 0;
     virtual void captureDrawingState(ManagedVoice& mv) = 0;
     virtual void restoreDrawingState(ManagedVoice& target, const ManagedVoice& source) = 0;
+    virtual double noteToFrequency(int note, int channel) = 0;
 };
 
 class VoiceManager {
@@ -157,7 +158,10 @@ public:
     double getLastPlayedNoteFreq() const { return lastPlayedNoteFreq.load(std::memory_order_relaxed); }
     int getNumActiveVoices() const { return static_cast<int>(activeVoices.size()); }
 
-    int getNumVoices() const { return static_cast<int>(allVoices.size()); }
+    int getNumVoices() const {
+        juce::SpinLock::ScopedLockType sl(lock);
+        return static_cast<int>(allVoices.size());
+    }
     juce::SynthesiserVoice* getVoice(int index) const;
     ManagedVoice* getManagedVoice(int index) const;
 
@@ -168,6 +172,7 @@ public:
     void handleMidiEvent(const juce::MidiMessage& m);
 
 private:
+    void handleMidiEventUnlocked(const juce::MidiMessage& m);
     void noteOn(int note, float velocity, int channel);
     void noteOff(int note, float lift, int channel);
     void sustainOn(int channel);
@@ -196,8 +201,8 @@ private:
 
     VoiceManagerClient* client = nullptr;
     double sampleRate = 44100.0;
-    int polyphony = 1;
-    bool legato = false;
+    std::atomic<int> polyphony{1};
+    std::atomic<bool> legato{false};
 
     std::atomic<double> lastPlayedNoteFreq { 0.0 };
     float lastPlayedNote = -1.0f;
@@ -216,5 +221,5 @@ private:
 
     juce::ReferenceCountedArray<juce::SynthesiserSound> sounds;
 
-    juce::CriticalSection lock;
+    juce::SpinLock lock;
 };

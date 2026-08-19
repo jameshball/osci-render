@@ -25,7 +25,10 @@ public:
         double frameRate,
         const juce::String& compressionPreset,
         const juce::File& outputFile,
-        bool transparent = false);
+        bool preserveAlpha);
+
+    bool muxAudioAndVideo(const juce::File& videoInput, const juce::File& audioInput, const juce::File& output,
+                          const juce::StringArray& audioCodecArgs, juce::String& error, const std::atomic<bool>* cancelRequested = nullptr) const;
 
     // Get available encoders for a given codec
     juce::Array<EncoderDetails> getAvailableEncodersForCodec(VideoCodec codec);
@@ -57,8 +60,7 @@ private:
         int width,
         int height,
         double frameRate,
-        const juce::File& outputFile,
-        bool transparent = false);
+        bool preserveAlpha);
 
     // H.264 encoder settings helper
     juce::String addH264EncoderSettings(
@@ -116,7 +118,6 @@ private:
         const juce::File& outputFile);
 #endif
 
-    // Build ProRes 4444 encoding command with alpha channel (cross-platform)
     juce::String buildProRes4444AlphaEncodingCommand(
         int width,
         int height,
