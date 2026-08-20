@@ -5,16 +5,8 @@
 #include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
 #include <osci_gui/visualiser/osci_VisualiserGeometry.h>
-
-// Define codec options
-enum class VideoCodec {
-    H264,
-    H265,
-    VP9,
-#if JUCE_MAC
-    ProRes,
-#endif
-};
+#include <osci_gui/visualiser/osci_VisualiserParameters.h>
+#include "../video/VideoEncodingConstants.h"
 
 class RecordingParameters {
 public:
@@ -87,7 +79,7 @@ public:
 
 class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
 public:
-    RecordingSettings(RecordingParameters&);
+    RecordingSettings(RecordingParameters&, VisualiserParameters&);
     ~RecordingSettings();
 
     void resized() override;
@@ -137,16 +129,18 @@ public:
         return parameters.frameRate.getValueUnnormalised();
     }
 
-    VideoCodec getVideoCodec() {
+    VideoCodec getVideoCodec() const {
+        if (visualiserParameters.isTransparentBackgroundEnabled()) {
+            return VideoCodec::ProRes4444;
+        }
         return parameters.videoCodec;
     }
 
     juce::String getFileExtensionForCodec() {
-        switch (parameters.videoCodec) {
-#if JUCE_MAC
+        switch (getVideoCodec()) {
             case VideoCodec::ProRes:
+            case VideoCodec::ProRes4444:
                 return "mov";
-#endif
             case VideoCodec::H264:
             case VideoCodec::H265:
                 return parameters.losslessAudio.getBoolValue() ? "mov" : "mp4";
@@ -157,13 +151,14 @@ public:
     }
 
     juce::StringArray getAudioCodecArgs() const {
-        if (parameters.losslessAudio.getBoolValue() && parameters.videoCodec != VideoCodec::VP9) {
+        if (parameters.losslessAudio.getBoolValue() && getVideoCodec() != VideoCodec::VP9) {
             return {"-c:a", "pcm_s16le"};
         }
         return {"-c:a", "aac", "-b:a", "384k"};
     }
 
     RecordingParameters& parameters;
+    VisualiserParameters& visualiserParameters;
 
 private:
     EffectComponent quality{*parameters.qualityEffect};
@@ -194,6 +189,7 @@ private:
     osci::TextEditor customTextureOutputEditor{"customTextureOutputEditor"};
 
     void updateLosslessAudioEnabled();
+    void updateVideoEncodingControls();
     void updateCanvasPresetSelector();
     void updateCanvasControlsVisibility();
     void parameterValueChanged(int parameterIndex, float newValue) override;

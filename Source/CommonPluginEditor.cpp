@@ -552,8 +552,8 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
 
         // Step 2: choose output video file (default: inputName + codec extension)
-        const bool preserveAlpha = safeThis->audioProcessor.visualiserParameters.screenOverlay->isTransparent();
-        const auto ext = preserveAlpha ? juce::String("mov") : safeThis->recordingSettings.getFileExtensionForCodec();
+        const bool preserveAlpha = safeThis->audioProcessor.visualiserParameters.isTransparentBackgroundEnabled();
+        const auto ext = safeThis->recordingSettings.getFileExtensionForCodec();
         const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
             inputFile.getFileNameWithoutExtension() + "." + ext);
 
@@ -578,9 +578,11 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 return;
             }
 
-            // Ensure the file extension matches the codec container by default.
-            if (outputFile.getFileExtension().isEmpty())
+            if (preserveAlpha) {
+                outputFile = outputFile.withFileExtension("mov");
+            } else if (outputFile.getFileExtension().isEmpty()) {
                 outputFile = outputFile.withFileExtension(ext);
+            }
 
             offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
             safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());

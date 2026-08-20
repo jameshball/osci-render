@@ -8,6 +8,10 @@
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
+      <GROUP id="{F3A16E09-874D-45F4-A045-20839A1CDB88}" name="video">
+        <FILE id="FfEncC" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
+              file="Source/video/FFmpegEncoderManager.cpp"/>
+      </GROUP>
       <GROUP id="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" name="audio">
         <FILE id="OutCl3" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <GROUP id="{D2E3F4A5-B6C7-8901-ABCD-EF2345678901}" name="modulation">
@@ -122,6 +126,10 @@
             file="tests/LuaCorrectnessTests.cpp"/>
       <FILE id="FfMedI" name="FFmpegMediaInfoTests.cpp" compile="1" resource="0"
             file="tests/FFmpegMediaInfoTests.cpp"/>
+      <FILE id="TrVidE" name="TransparentVideoEncodingTests.cpp" compile="1"
+            resource="0" file="tests/TransparentVideoEncodingTests.cpp"/>
+      <FILE id="PopInt" name="PopoutInteractionTests.cpp" compile="1" resource="0"
+            file="tests/PopoutInteractionTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"
             file="tests/LottieParserTests.cpp"/>
       <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"

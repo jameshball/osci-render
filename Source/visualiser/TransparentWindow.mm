@@ -50,6 +50,23 @@ void configureNativeWindowTransparency(juce::Component* topLevelWindow) {
     }
 }
 
+void setNativeWindowIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
+    if (topLevelWindow == nullptr) {
+        return;
+    }
+
+    auto* peer = topLevelWindow->getPeer();
+    if (peer == nullptr) {
+        return;
+    }
+
+    NSView* view = static_cast<NSView*>(peer->getNativeHandle());
+    NSWindow* window = view != nil ? [view window] : nil;
+    if (window != nil) {
+        [window setIgnoresMouseEvents:ignoresMouseEvents ? YES : NO];
+    }
+}
+
 void configureOpenGLSurfaceTransparency(void* rawGLContext) {
     if (rawGLContext == nullptr) {
         return;
@@ -64,5 +81,6 @@ void configureOpenGLSurfaceTransparency(void* rawGLContext) {
 
 #else
 void configureNativeWindowTransparency(juce::Component*) {}
+void setNativeWindowIgnoresMouseEvents(juce::Component*, bool) {}
 void configureOpenGLSurfaceTransparency(void*) {}
 #endif

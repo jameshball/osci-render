@@ -13,6 +13,7 @@
 PopoutToolbar::PopoutToolbar() {
     addAndMakeVisible(closeButton);
     addAndMakeVisible(fullscreenButton);
+    addAndMakeVisible(frameButton);
     closeButton.setIconColours(juce::Colours::white, juce::Colours::white.withAlpha(0.8f));
     closeButton.onClick = [this] {
         if (onClose != nullptr) {
@@ -24,10 +25,35 @@ PopoutToolbar::PopoutToolbar() {
             onFullScreen();
         }
     };
+    frameButton.setClickingTogglesState(false);
+    frameButton.onClick = [this] {
+        if (onToggleFrame != nullptr) {
+            onToggleFrame();
+        }
+    };
+    setFrameVisible(true, true);
     setInterceptsMouseClicks(true, true);
 }
 
+void PopoutToolbar::setFrameVisible(bool visible, bool requestedVisible) {
+    frameVisible = visible;
+    closeButton.setVisible(visible);
+    fullscreenButton.setVisible(visible);
+    frameButton.setVisible(visible);
+    frameButton.setToggleState(!requestedVisible, juce::NotificationType::dontSendNotification);
+    frameButton.setTooltip(requestedVisible ? "Hide Window Frame." : "Show Window Frame.");
+    repaint();
+}
+
+void PopoutToolbar::setHintVisible(bool visible) {
+    hintVisible = visible;
+    repaint();
+}
+
 bool PopoutToolbar::hitTest(int x, int y) {
+    if (!frameVisible) {
+        return false;
+    }
     if (y < toolbarHeight) {
         return true;
     }
@@ -40,25 +66,57 @@ bool PopoutToolbar::hitTest(int x, int y) {
 }
 
 void PopoutToolbar::paint(juce::Graphics& g) {
-    auto bounds = getLocalBounds();
-    g.setColour(osci::Colours::veryDark());
-    g.fillRect(bounds.removeFromTop(toolbarHeight));
-    g.setColour(juce::Colours::white.withAlpha(0.5f));
-    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 9.0f, 1.0f);
+    if (frameVisible) {
+        auto bounds = getLocalBounds();
+        g.setColour(osci::Colours::veryDark());
+        g.fillRect(bounds.removeFromTop(toolbarHeight));
+        g.setColour(juce::Colours::white.withAlpha(0.5f));
+        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 9.0f, 1.0f);
+    }
+
+    if (hintVisible) {
+        const int hintWidth = juce::jmax(1, juce::jmin(520, getWidth() - 24));
+        const auto hintBounds = getLocalBounds().withSizeKeepingCentre(hintWidth, 44).toFloat();
+        g.setColour(osci::Colours::veryDark().withAlpha(0.94f));
+        g.fillRoundedRectangle(hintBounds, 8.0f);
+        g.setColour(juce::Colours::white);
+        g.setFont(14.0f);
+        g.drawFittedText("Frame hidden. Right-click the image for options. Hold Command to show the frame.",
+                         hintBounds.toNearestInt().reduced(12, 6), juce::Justification::centred, 2);
+    }
 }
 
 void PopoutToolbar::resized() {
     auto bar = getLocalBounds().removeFromTop(toolbarHeight);
     closeButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(3));
     fullscreenButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
+    frameButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
 }
 
 void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
+    if (event.mods.isPopupMenu()) {
+        if (onShowContextMenu != nullptr) {
+            onShowContextMenu();
+        }
+        return;
+    }
+    if (!event.mods.isLeftButtonDown()) {
+        return;
+    }
+    if (onGestureChanged != nullptr) {
+        onGestureChanged(true);
+    }
     dragger.startDraggingComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()));
 }
 
 void PopoutToolbar::mouseDrag(const juce::MouseEvent& event) {
     dragger.dragComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()), nullptr);
+}
+
+void PopoutToolbar::mouseUp(const juce::MouseEvent&) {
+    if (onGestureChanged != nullptr) {
+        onGestureChanged(false);
+    }
 }
 #endif
 
@@ -73,13 +131,13 @@ VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent* paren
     setAlwaysOnTop(pinned);
 #if JUCE_MAC
     setTitleBarHeight(0);
-    startTimerHz(4);
 #endif
 }
 
 VisualiserWindow::~VisualiserWindow() {
 #if JUCE_MAC
     stopTimer();
+    setNativeWindowIgnoresMouseEvents(this, false);
 #endif
 }
 
@@ -141,30 +199,131 @@ void VisualiserWindow::toggleFullScreen() {
 }
 
 #if JUCE_MAC
-void VisualiserWindow::showToolbar(bool show) {
-    if (toolbarVisible == show) {
-        return;
+void VisualiserWindow::setRequestedFrameVisible(bool visible) {
+    presentationState.requestedFrameVisible = visible;
+    const bool hintEnabled = parent != nullptr && parent->shouldShowPopoutPresentationHint();
+    if (!visible && presentationState.consumePresentationHint(hintEnabled)) {
+        hintVisible = true;
+        hintEndTime = juce::Time::getMillisecondCounter() + 5000;
     }
-    toolbarVisible = show;
-    if (parent != nullptr && parent->child != nullptr) {
-        parent->child->setPopoutToolbarVisible(show);
-    }
+    updatePresentationState();
+}
+
+void VisualiserWindow::showContextMenu() {
+    presentationState.menuOpen = true;
+    updatePresentationState();
+
+    enum MenuItemIds {
+        showFrame = 1,
+        alwaysOnTop,
+        fullScreen,
+        closePopout,
+    };
+    juce::PopupMenu menu;
+    menu.addItem(showFrame, "Show Window Frame", !presentationState.requestedFrameVisible);
+    menu.addItem(alwaysOnTop, "Always on Top", true, pinned);
+    menu.addItem(fullScreen, isFullScreen ? "Exit Fullscreen" : "Fullscreen");
+    menu.addSeparator();
+    menu.addItem(closePopout, "Close Popout");
+
+    juce::Component::SafePointer<VisualiserWindow> safeThis(this);
+    const auto menuPosition = juce::Desktop::getMousePosition();
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea({menuPosition.x, menuPosition.y, 1, 1}), [safeThis](int result) {
+        if (safeThis == nullptr) {
+            return;
+        }
+        safeThis->presentationState.menuOpen = false;
+        if (result == showFrame) {
+            safeThis->setRequestedFrameVisible(true);
+        } else if (result == alwaysOnTop) {
+            safeThis->parent->setPopoutAlwaysOnTop(!safeThis->pinned);
+        } else if (result == fullScreen) {
+            safeThis->toggleFullScreen();
+        } else if (result == closePopout) {
+            safeThis->closeButtonPressed();
+            return;
+        }
+        safeThis->updatePresentationState();
+    });
+}
+
+void VisualiserWindow::setGestureActive(bool active) {
+    presentationState.gestureActive = active;
+    updatePresentationState();
+}
+
+void VisualiserWindow::setCanvasDragActive(bool active) {
+    canvasDragActive = active;
+    updatePresentationState();
 }
 
 void VisualiserWindow::moved() {
-    lastResizeTime = juce::Time::getMillisecondCounter();
+    if (canvasDragActive) {
+        return;
+    }
+    resizeGestureEndTime = juce::Time::getMillisecondCounter() + PopoutPresentationState::interactionHoldMs;
+    presentationState.gestureActive = true;
 }
 
 void VisualiserWindow::resized() {
-    lastResizeTime = juce::Time::getMillisecondCounter();
+    resizeGestureEndTime = juce::Time::getMillisecondCounter() + PopoutPresentationState::interactionHoldMs;
+    presentationState.gestureActive = true;
     juce::ResizableWindow::resized();
 }
 
 void VisualiserWindow::timerCallback() {
-    auto localPosition = getLocalPoint(nullptr, juce::Desktop::getMousePosition());
-    bool mouseInWindow = getLocalBounds().contains(localPosition);
-    bool recentlyResized = juce::Time::getMillisecondCounter() - lastResizeTime < 500;
-    showToolbar(mouseInWindow || recentlyResized);
+    updatePresentationState();
+}
+
+void VisualiserWindow::updatePresentationState() {
+    const auto now = juce::Time::getMillisecondCounter();
+    presentationState.paused = parent != nullptr && parent->isPaused();
+    presentationState.recoveryModifierDown = juce::ModifierKeys::getCurrentModifiersRealtime().isCommandDown();
+    if (presentationState.gestureActive && static_cast<std::int32_t>(now - resizeGestureEndTime) >= 0) {
+        presentationState.gestureActive = false;
+    }
+    if (hintVisible && static_cast<std::int32_t>(now - hintEndTime) >= 0) {
+        hintVisible = false;
+    }
+
+    const bool frameVisible = presentationState.isFrameVisible();
+    if (parent != nullptr && parent->child != nullptr) {
+        parent->child->setPopoutPresentationOverlay(frameVisible, presentationState.requestedFrameVisible, hintVisible);
+    }
+    if (frameVisible || canvasDragActive) {
+        applyNativeInteraction(false);
+    } else {
+        bool alphaHit = false;
+        if (parent != nullptr && parent->child != nullptr) {
+            const auto frameSize = parent->getCapturedFrameSize();
+            const auto cursor = parent->child->getLocalPoint(nullptr, juce::Desktop::getMousePosition());
+            const float scale = getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f;
+            const auto query = makePopoutAlphaQuery(parent->child->getLocalBounds(), frameSize, cursor,
+                                                     8.0f / juce::jmax(1.0f, scale));
+            if (query.valid) {
+                alphaHit = parent->capturedFrameHasAlphaNear(query.normalisedPoint, query.normalisedRadius,
+                                                             popoutInteractionAlphaThreshold);
+            }
+        }
+        if (alphaHit) {
+            presentationState.registerAlphaHit(now);
+        }
+        applyNativeInteraction(!presentationState.isAlphaInteractionHeld(now));
+    }
+
+    if (presentationState.requestedFrameVisible) {
+        stopTimer();
+    } else if (!isTimerRunning()) {
+        startTimerHz(60);
+    }
+}
+
+void VisualiserWindow::applyNativeInteraction(bool ignoresMouseEvents) {
+    if (nativeIgnoresMouseEvents == ignoresMouseEvents) {
+        return;
+    }
+    nativeIgnoresMouseEvents = ignoresMouseEvents;
+    setNativeWindowIgnoresMouseEvents(this, ignoresMouseEvents);
 }
 #endif
 
@@ -197,6 +356,7 @@ VisualiserComponent::VisualiserComponent(
                            parent(parent),
                            editor(pluginEditor) {
     setAssets(createVisualiserTextureAssets());
+    setNativeTransparencySupported(isNativeWindowTransparencySupported());
 
     // Sync active state with the parameter for the primary visualiser
     if (isPrimaryVisualiser()) {
@@ -243,7 +403,8 @@ VisualiserComponent::VisualiserComponent(
 #if OSCI_PREMIUM
     if (child == nullptr && parent == nullptr) {
         addAndMakeVisible(popOutButton);
-        popOutButton.setTooltip("Opens the oscilloscope in a new window.");
+        popOutButton.setClickingTogglesState(false);
+        popOutButton.setTooltip("Open Visualiser Popout.");
     }
 #endif
     addAndMakeVisible(settingsButton);
@@ -281,7 +442,11 @@ VisualiserComponent::VisualiserComponent(
 
 #if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
-        popoutWindow();
+        if (popout != nullptr) {
+            popout->closeButtonPressed();
+        } else {
+            popoutWindow();
+        }
     };
 #endif
 
@@ -458,8 +623,21 @@ void VisualiserComponent::parameterGestureChanged(int parameterIndex, bool gestu
     // Not needed for this parameter
 }
 
-void VisualiserComponent::mouseDrag(const juce::MouseEvent &event) {
+void VisualiserComponent::mouseDrag(const juce::MouseEvent& event) {
     timerId = -1;
+    if (event.getDistanceFromDragStart() > 4) {
+        pauseOnMouseUp = false;
+#if JUCE_MAC && OSCI_PREMIUM
+        if (parent != nullptr && event.mods.isLeftButtonDown()) {
+            auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
+            if (window != nullptr && !window->getIsFullScreen()) {
+                popoutDragActive = true;
+                window->setCanvasDragActive(true);
+                popoutDragger.dragComponent(window, event.getEventRelativeTo(window), nullptr);
+            }
+        }
+#endif
+    }
 }
 
 void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
@@ -501,15 +679,52 @@ void VisualiserComponent::mouseMove(const juce::MouseEvent &event) {
     }
 }
 
-void VisualiserComponent::mouseDown(const juce::MouseEvent &event) {
+void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
+    pauseOnMouseUp = false;
     if (event.originalComponent == this) {
-        if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
-            if (isMirrorMode() && parent != nullptr) {
-                parent->setPaused(parent->active);
-            } else {
-                setPaused(active);
+#if JUCE_MAC && OSCI_PREMIUM
+        if (event.mods.isPopupMenu() && parent != nullptr) {
+            auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
+            if (window != nullptr) {
+                window->showContextMenu();
+                return;
             }
         }
+#endif
+        if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
+            pauseOnMouseUp = true;
+#if JUCE_MAC && OSCI_PREMIUM
+            if (parent != nullptr) {
+                auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
+                if (window != nullptr && !window->getIsFullScreen()) {
+                    popoutDragger.startDraggingComponent(window, event.getEventRelativeTo(window));
+                }
+            }
+#endif
+        }
+    }
+}
+
+void VisualiserComponent::mouseUp(const juce::MouseEvent& event) {
+#if JUCE_MAC && OSCI_PREMIUM
+    if (popoutDragActive) {
+        auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
+        if (window != nullptr) {
+            window->setCanvasDragActive(false);
+        }
+        popoutDragActive = false;
+    }
+#endif
+    const bool shouldTogglePause = pauseOnMouseUp && event.getDistanceFromDragStart() <= 4;
+    pauseOnMouseUp = false;
+    if (!shouldTogglePause || record.getToggleState()) {
+        return;
+    }
+
+    if (isMirrorMode() && parent != nullptr) {
+        parent->setPaused(parent->active);
+    } else {
+        setPaused(active);
     }
 }
 
@@ -571,7 +786,7 @@ void VisualiserComponent::setRecording(bool recording) {
 #if OSCI_PREMIUM
         recordingVideo = recordingSettings.recordingVideo();
         recordingAudio = recordingSettings.recordingAudio();
-        recordingTransparency = recordingVideo && settings.parameters.screenOverlay->isTransparent();
+        recordingTransparency = recordingVideo && settings.parameters.isTransparentBackgroundEnabled();
         if (!recordingVideo && !recordingAudio) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             return;
@@ -600,6 +815,19 @@ void VisualiserComponent::setRecording(bool recording) {
                 return;
             }
 
+            ffmpegEncoderManager.refreshAvailableEncoders();
+            const auto codec = recordingSettings.getVideoCodec();
+            if (!ffmpegEncoderManager.supportsVideoCodec(codec)) {
+                record.setToggleState(false, juce::NotificationType::dontSendNotification);
+                const auto errorMessage = recordingTransparency
+                    ? "This FFmpeg installation does not include the ProRes 4444 encoder required for transparent video."
+                    : "This FFmpeg installation does not include an encoder for the selected video codec.";
+                osci::showOverlayMessage(*this,
+                                         "Recording Error",
+                                         errorMessage);
+                return;
+            }
+
             const auto canvasSize = recordingSettings.getCanvasSize();
             recordingRenderSize = canvasSize;
             setRenderSize(canvasSize);
@@ -608,7 +836,6 @@ void VisualiserComponent::setRecording(bool recording) {
             juce::String fileExtension = recordingTransparency ? "mov" : recordingSettings.getFileExtensionForCodec();
             tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
 
-            VideoCodec codec = recordingSettings.getVideoCodec();
             juce::String cmd = ffmpegEncoderManager.buildVideoEncodingCommand(
                 codec,
                 recordingSettings.getCRF(),
@@ -619,7 +846,7 @@ void VisualiserComponent::setRecording(bool recording) {
                 tempVideoFile->getFile(),
                 recordingTransparency);
 
-            if (!ffmpegProcess.start(cmd)) {
+            if (cmd.isEmpty() || !ffmpegProcess.start(cmd)) {
                 juce::Logger::writeToLog("Recording: ffmpegProcess.start() failed for command: " + cmd);
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 juce::Component::SafePointer<VisualiserComponent> safeThis(this);
@@ -759,7 +986,7 @@ void VisualiserComponent::resized() {
         fullScreenButton.setBounds(buttons.removeFromRight(30));
     }
 #if OSCI_PREMIUM
-    if (child == nullptr && parent == nullptr) {
+    if (parent == nullptr) {
         popOutButton.setVisible(true);
         popOutButton.setBounds(buttons.removeFromRight(30));
     }
@@ -853,8 +1080,17 @@ void VisualiserComponent::popoutWindow() {
     visualiser->popoutToolbar->onFullScreen = [this] {
         popout->toggleFullScreen();
     };
+    visualiser->popoutToolbar->onToggleFrame = [this] {
+        popout->setRequestedFrameVisible(!popout->isFrameRequestedVisible());
+    };
+    visualiser->popoutToolbar->onShowContextMenu = [this] {
+        popout->showContextMenu();
+    };
+    visualiser->popoutToolbar->onGestureChanged = [this](bool active) {
+        popout->setGestureActive(active);
+    };
     visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-    visualiser->popoutToolbar->setVisible(false);
+    visualiser->setPopoutPresentationOverlay(true, true, false);
 #endif
     // Hide all buttons on the popout and set up mirror mode
     visualiser->hideButtonRow = true;
@@ -868,7 +1104,9 @@ void VisualiserComponent::popoutWindow() {
 
 void VisualiserComponent::childUpdated() {
 #if OSCI_PREMIUM
-    popOutButton.setVisible(child == nullptr);
+    popOutButton.setVisible(parent == nullptr);
+    popOutButton.setToggleState(child != nullptr, juce::NotificationType::dontSendNotification);
+    popOutButton.setTooltip(child != nullptr ? "Close Visualiser Popout." : "Open Visualiser Popout.");
 #endif
 #if OSCI_PREMIUM
     editor.ffmpegDownloader.setVisible(child == nullptr);
@@ -1101,12 +1339,18 @@ void VisualiserComponent::newOpenGLContextCreated() {
 }
 
 #if JUCE_MAC
-void VisualiserComponent::setPopoutToolbarVisible(bool visible) {
+void VisualiserComponent::setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool hintVisible) {
     if (popoutToolbar == nullptr) {
         return;
     }
-    popoutToolbar->setVisible(visible);
-    openGLContext.setComponentPaintingEnabled(visible);
+    popoutToolbar->setFrameVisible(frameVisible, requestedFrameVisible);
+    popoutToolbar->setHintVisible(hintVisible);
+    popoutToolbar->setVisible(frameVisible || hintVisible);
+    openGLContext.setComponentPaintingEnabled(frameVisible || hintVisible);
+}
+
+bool VisualiserComponent::shouldShowPopoutPresentationHint() const {
+    return audioProcessor.globalSettings.getBool("showPopoutPresentationHint", true);
 }
 
 void VisualiserComponent::refreshOpenGLSurfaceTransparency() {

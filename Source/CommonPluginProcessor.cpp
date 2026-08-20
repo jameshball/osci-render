@@ -278,6 +278,11 @@ void CommonAudioProcessor::addAllParameters() {
     }
 
     for (auto parameter : booleanParameters) {
+#if OSCI_PREMIUM
+        if (parameter == visualiserParameters.transparentBackground) {
+            continue;
+        }
+#endif
         addParameter(parameter);
     }
 
@@ -288,6 +293,12 @@ void CommonAudioProcessor::addAllParameters() {
     for (auto parameter : intParameters) {
         addParameter(parameter);
     }
+
+#if OSCI_PREMIUM
+    // New parameters are appended after all existing parameter groups so host parameter
+    // indices remain stable for sessions created before transparency was added.
+    addParameter(visualiserParameters.transparentBackground);
+#endif
 
     // Bind all parameters to the ValueTree for undo/redo support
     stateTree.addListener(this);

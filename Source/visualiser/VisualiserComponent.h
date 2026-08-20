@@ -14,6 +14,8 @@
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
+#include "PopoutInteractionGeometry.h"
+#include "PopoutPresentationState.h"
 #include "TransparentWindow.h"
 #include "VisualiserSettings.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
@@ -32,19 +34,30 @@ public:
 
     std::function<void()> onClose;
     std::function<void()> onFullScreen;
+    std::function<void()> onToggleFrame;
+    std::function<void()> onShowContextMenu;
+    std::function<void(bool)> onGestureChanged;
+
+    void setFrameVisible(bool visible, bool requestedVisible);
+    void setHintVisible(bool visible);
 
     bool hitTest(int x, int y) override;
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
+    void mouseUp(const juce::MouseEvent& event) override;
 
 private:
     static constexpr int toolbarHeight = 24;
 
     osci::CloseButton closeButton;
     osci::SvgButton fullscreenButton{"fullscreen", BinaryData::fullscreen_svg, juce::Colours::white};
+    osci::SvgButton frameButton{"popoutFrame", BinaryData::eye_svg, juce::Colours::white, juce::Colours::white,
+                                nullptr, BinaryData::eyeoff_svg};
     juce::ComponentDragger dragger;
+    bool frameVisible = true;
+    bool hintVisible = false;
 };
 #endif
 
@@ -76,6 +89,7 @@ public:
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
+    void mouseUp(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
     void childUpdated();
@@ -90,8 +104,9 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 #if JUCE_MAC
-    void setPopoutToolbarVisible(bool visible);
+    void setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool hintVisible);
     void refreshOpenGLSurfaceTransparency();
+    bool shouldShowPopoutPresentationHint() const;
 #endif
 
     VisualiserComponent* parent = nullptr;
@@ -122,6 +137,11 @@ private:
     void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
 
     std::atomic<bool> active = true;
+    bool pauseOnMouseUp = false;
+#if JUCE_MAC && OSCI_PREMIUM
+    juce::ComponentDragger popoutDragger;
+    bool popoutDragActive = false;
+#endif
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
@@ -136,7 +156,7 @@ private:
     TimelineComponent timeline;
 
     osci::SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};
-    osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::white};
+    osci::SvgButton popOutButton{"popOut", BinaryData::open_in_new_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
@@ -210,7 +230,11 @@ public:
     }
 
 #if JUCE_MAC
-    void showToolbar(bool show);
+    void setRequestedFrameVisible(bool visible);
+    bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
+    void showContextMenu();
+    void setGestureActive(bool active);
+    void setCanvasDragActive(bool active);
     void moved() override;
     void resized() override;
 #endif
@@ -218,6 +242,8 @@ public:
 private:
 #if JUCE_MAC
     void timerCallback() override;
+    void updatePresentationState();
+    void applyNativeInteraction(bool ignoresMouseEvents);
 #endif
 
     VisualiserComponent* parent;
@@ -225,7 +251,11 @@ private:
     bool pinned = true;
     juce::Rectangle<int> windowedBounds;
 #if JUCE_MAC
-    bool toolbarVisible = false;
-    juce::uint32 lastResizeTime = 0;
+    PopoutPresentationState presentationState;
+    bool nativeIgnoresMouseEvents = false;
+    bool canvasDragActive = false;
+    bool hintVisible = false;
+    juce::uint32 hintEndTime = 0;
+    juce::uint32 resizeGestureEndTime = 0;
 #endif
 };

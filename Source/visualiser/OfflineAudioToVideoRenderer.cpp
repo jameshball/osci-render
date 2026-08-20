@@ -32,10 +32,10 @@ juce::String videoCodecToString(VideoCodec codec) {
             return "H265";
         case VideoCodec::VP9:
             return "VP9";
-#if JUCE_MAC
         case VideoCodec::ProRes:
-            return "ProRes";
-#endif
+            return "ProRes 422 HQ";
+        case VideoCodec::ProRes4444:
+            return "ProRes 4444";
         default:
             return "unknown";
     }
@@ -367,6 +367,14 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
     FFmpegEncoderManager ffmpegEncoderManager(ffmpegFile);
 
+    if (!ffmpegEncoderManager.supportsVideoCodec(codec)) {
+        offlineRenderLog.event("render failed: selected video encoder unavailable");
+        result.errorMessage = preserveAlpha
+            ? "This FFmpeg installation does not include the ProRes 4444 encoder required for transparent video."
+            : "This FFmpeg installation does not include an encoder for the selected video codec.";
+        return result;
+    }
+
     juce::TemporaryFile tempVideo(preserveAlpha ? ".mov" : "." + recordingSettings.getFileExtensionForCodec());
     const auto tempVideoFile = tempVideo.getFile();
 
@@ -388,7 +396,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         + ", preset=" + preset
         + ", tempVideo=" + tempVideoFile.getFileName());
 
-    if (!ffmpegProcess.start(encodeCmd))
+    if (encodeCmd.isEmpty() || !ffmpegProcess.start(encodeCmd))
     {
         offlineRenderLog.event("render failed: FFmpeg video encoder did not start; command=" + encodeCmd);
         result.errorMessage = "Failed to start FFmpeg video encoder.";
