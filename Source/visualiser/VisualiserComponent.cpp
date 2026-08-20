@@ -138,6 +138,11 @@ VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent* paren
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     setTitleBarHeight(0);
     setOpaque(false);
+#if JUCE_WINDOWS
+    // JUCE implements non-native shadows as four separate windows. They remain visible and
+    // interactive after the popout frame is hidden, so transparent popouts must not use them.
+    setDropShadowEnabled(false);
+#endif
 #endif
 }
 
