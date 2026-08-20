@@ -64,6 +64,22 @@ void configureGpuTransparency(HWND window) {
     enableRedirectionBitmapAlpha(window);
 }
 
+void setWindowIgnoresMouseEvents(HWND window, bool ignoresMouseEvents, bool useLayeredHitTesting) {
+    if (window == nullptr) {
+        return;
+    }
+    const auto style = ::GetWindowLongPtrW(window, GWL_EXSTYLE);
+    auto updatedStyle = ignoresMouseEvents ? style | WS_EX_TRANSPARENT : style & ~WS_EX_TRANSPARENT;
+    if (useLayeredHitTesting) {
+        // The layered top-level style makes WS_EX_TRANSPARENT apply across processes even though
+        // the OpenGL child continues to render normally. No software layered-window rendering is used.
+        updatedStyle = ignoresMouseEvents ? updatedStyle | WS_EX_LAYERED : updatedStyle & ~WS_EX_LAYERED;
+    }
+    if (updatedStyle != style) {
+        updateExtendedStyle(window, updatedStyle);
+    }
+}
+
 } // namespace
 
 namespace osci::windowing {
@@ -82,10 +98,13 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     if (window == nullptr) {
         return;
     }
-    const auto style = ::GetWindowLongPtrW(window, GWL_EXSTYLE);
-    const auto updatedStyle = ignoresMouseEvents ? style | WS_EX_TRANSPARENT : style & ~WS_EX_TRANSPARENT;
-    if (updatedStyle != style) {
-        updateExtendedStyle(window, updatedStyle);
+    setWindowIgnoresMouseEvents(window, ignoresMouseEvents, true);
+    ::EnumChildWindows(window, [](HWND child, LPARAM parameter) -> BOOL {
+        setWindowIgnoresMouseEvents(child, parameter != 0, false);
+        return TRUE;
+    }, ignoresMouseEvents ? 1 : 0);
+    if (!ignoresMouseEvents) {
+        configureGpuTransparency(window);
     }
 }
 
