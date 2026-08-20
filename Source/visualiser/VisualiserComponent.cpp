@@ -33,6 +33,9 @@ PopoutToolbar::PopoutToolbar() {
     };
     setFrameVisible(true, true);
     setInterceptsMouseClicks(true, true);
+#if JUCE_WINDOWS
+    startTimerHz(60);
+#endif
 }
 
 void PopoutToolbar::setFrameVisible(bool visible, bool requestedVisible) {
@@ -130,6 +133,10 @@ void PopoutToolbar::mouseUp(const juce::MouseEvent&) {
     if (onGestureChanged != nullptr) {
         onGestureChanged(false);
     }
+}
+
+void PopoutToolbar::timerCallback() {
+    repaint();
 }
 #endif
 
