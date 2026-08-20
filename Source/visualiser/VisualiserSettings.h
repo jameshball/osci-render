@@ -172,6 +172,7 @@ private:
     jux::SwitchButton sweepToggle{parameters.sweepEnabled, true, false};
 
 #if OSCI_PREMIUM
+    ToggleLabelComponent transparentBackgroundToggle{parameters.transparentBackground, {}, false};
     GroupedSettings scale{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 0),

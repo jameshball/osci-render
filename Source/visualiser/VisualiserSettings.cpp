@@ -72,6 +72,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels,
     addAndMakeVisible(scale);
     addAndMakeVisible(position);
     addAndMakeVisible(screenColour);
+    optionToggleGrid.addItem(transparentBackgroundToggle);
     optionToggleGrid.addItem(flipVerticalToggle);
     optionToggleGrid.addItem(flipHorizontalToggle);
     optionToggleGrid.addItem(goniometerToggle);

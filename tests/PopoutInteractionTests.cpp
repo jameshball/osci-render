@@ -1,0 +1,80 @@
+#include <JuceHeader.h>
+
+#include <array>
+
+#include "../Source/visualiser/PopoutInteractionGeometry.h"
+#include "../Source/visualiser/PopoutPresentationState.h"
+#include "../modules/osci_gui/visualiser/osci_PopoutAlphaHitTest.h"
+
+class PopoutInteractionTest : public juce::UnitTest {
+public:
+    PopoutInteractionTest() : juce::UnitTest("Popout interaction", "Visualiser") {}
+
+    void runTest() override {
+        beginTest("Alpha threshold and OpenGL Y inversion");
+        std::array<unsigned char, 4 * 4 * 4> pixels{};
+        pixels[(0 * 4 + 1) * 4 + 3] = popoutInteractionAlphaThreshold;
+        expect(osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
+                                        popoutInteractionAlphaThreshold));
+        expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.125f, 0.0f, 0.0f,
+                                         popoutInteractionAlphaThreshold));
+        pixels[(0 * 4 + 1) * 4 + 3] = popoutInteractionAlphaThreshold - 1;
+        expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
+                                         popoutInteractionAlphaThreshold));
+
+        beginTest("Padding includes nearby alpha");
+        pixels.fill(0);
+        pixels[(2 * 4 + 2) * 4 + 3] = 255;
+        expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.0f, 0.0f,
+                                         popoutInteractionAlphaThreshold));
+        expect(osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.5f, 0.0f,
+                                        popoutInteractionAlphaThreshold));
+
+        beginTest("Empty frames do not hit");
+        expect(!osci::popoutAlphaHitTest(nullptr, 0, 0, 0.5f, 0.5f, 0.0f, 0.0f,
+                                         popoutInteractionAlphaThreshold));
+
+        beginTest("Aspect-fit mapping rejects letterboxing");
+        const auto outside = makePopoutAlphaQuery({0, 0, 200, 100}, {100, 100}, {25, 50}, 8.0f);
+        expect(!outside.valid);
+        const auto centre = makePopoutAlphaQuery({0, 0, 200, 100}, {100, 100}, {100, 50}, 8.0f);
+        expect(centre.valid);
+        expectWithinAbsoluteError(centre.normalisedPoint.x, 0.5f, 0.001f);
+        expectWithinAbsoluteError(centre.normalisedPoint.y, 0.5f, 0.001f);
+        expectWithinAbsoluteError(centre.normalisedRadius.x, 0.08f, 0.001f);
+
+        beginTest("Alpha interaction remains active for 250 ms");
+        PopoutPresentationState holdState;
+        holdState.registerAlphaHit(1000);
+        expect(holdState.isAlphaInteractionHeld(1250));
+        expect(!holdState.isAlphaInteractionHeld(1251));
+
+        beginTest("Frame visibility overrides and restoration");
+        PopoutPresentationState state;
+        expect(state.isFrameVisible());
+        state.requestedFrameVisible = false;
+        expect(!state.isFrameVisible());
+        state.recoveryModifierDown = true;
+        expect(state.isFrameVisible());
+        state.recoveryModifierDown = false;
+        state.paused = true;
+        expect(state.isFrameVisible());
+        state.paused = false;
+        expect(!state.isFrameVisible());
+        state.menuOpen = true;
+        expect(state.isFrameVisible());
+        state.menuOpen = false;
+        state.gestureActive = true;
+        expect(state.isFrameVisible());
+        expect(PopoutPresentationState().isFrameVisible());
+
+        beginTest("Presentation hint appears once per popout when enabled");
+        PopoutPresentationState hintState;
+        expect(hintState.consumePresentationHint(true));
+        expect(!hintState.consumePresentationHint(true));
+        expect(!PopoutPresentationState().consumePresentationHint(false));
+        expect(PopoutPresentationState().consumePresentationHint(true));
+    }
+};
+
+static PopoutInteractionTest popoutInteractionTest;
