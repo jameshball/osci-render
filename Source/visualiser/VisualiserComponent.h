@@ -28,7 +28,7 @@ enum class FullScreenMode {
 };
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-class PopoutToolbar : public juce::Component, private juce::Timer {
+class PopoutToolbar : public juce::Component {
 public:
     PopoutToolbar();
 
@@ -49,8 +49,6 @@ public:
     void mouseUp(const juce::MouseEvent& event) override;
 
 private:
-    void timerCallback() override;
-
     static constexpr int toolbarHeight = 24;
 
     osci::CloseButton closeButton;

@@ -33,9 +33,6 @@ PopoutToolbar::PopoutToolbar() {
     };
     setFrameVisible(true, true);
     setInterceptsMouseClicks(true, true);
-#if JUCE_WINDOWS
-    startTimerHz(60);
-#endif
 }
 
 void PopoutToolbar::setFrameVisible(bool visible, bool requestedVisible) {
@@ -69,13 +66,6 @@ bool PopoutToolbar::hitTest(int x, int y) {
 }
 
 void PopoutToolbar::paint(juce::Graphics& g) {
-#if JUCE_WINDOWS
-    auto* visualiser = dynamic_cast<VisualiserComponent*>(getParentComponent());
-    if (visualiser != nullptr && visualiser->isSoftwareMirrorEnabled()) {
-        visualiser->paintSoftwareMirrorFrame(g, getLocalBounds());
-    }
-#endif
-
     if (frameVisible) {
         const auto alphaFloor = osci::windowing::getInteractiveAlphaFloor();
         if (alphaFloor > 0.0f) {
@@ -135,14 +125,13 @@ void PopoutToolbar::mouseUp(const juce::MouseEvent&) {
     }
 }
 
-void PopoutToolbar::timerCallback() {
-    repaint();
-}
 #endif
 
 VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent* parent, bool pinned)
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    : juce::DocumentWindow(name, juce::Colours::transparentBlack, 0),
+    : juce::DocumentWindow(name,
+                           osci::windowing::isTransparencySupported() ? juce::Colours::transparentBlack : juce::Colours::black,
+                           osci::windowing::isTransparencySupported() ? 0 : juce::DocumentWindow::TitleBarButtons::allButtons),
 #else
     : juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons),
 #endif
@@ -150,12 +139,17 @@ VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent* paren
       pinned(pinned) {
     setAlwaysOnTop(pinned);
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    setTitleBarHeight(0);
-    setOpaque(false);
+    const bool transparencySupported = osci::windowing::isTransparencySupported();
+    if (transparencySupported) {
+        setTitleBarHeight(0);
+    }
+    setOpaque(!transparencySupported);
 #if JUCE_WINDOWS
-    // JUCE implements non-native shadows as four separate windows. They remain visible and
-    // interactive after the popout frame is hidden, so transparent popouts must not use them.
-    setDropShadowEnabled(false);
+    if (transparencySupported) {
+        // JUCE implements non-native shadows as four separate windows. They remain visible and
+        // interactive after the popout frame is hidden, so transparent popouts must not use them.
+        setDropShadowEnabled(false);
+    }
 #endif
 #endif
 }
@@ -180,7 +174,6 @@ void VisualiserWindow::closeButtonPressed() {
         toggleFullScreen();
     }
     VisualiserComponent* parent = this->parent;
-    parent->setHasMirrorConsumer(false);
     parent->child = nullptr;
     parent->popout.reset();
     parent->childUpdated();
@@ -316,6 +309,7 @@ void VisualiserWindow::updatePresentationState() {
 
     const bool frameVisible = presentationState.isFrameVisible();
     if (parent != nullptr && parent->child != nullptr) {
+        parent->child->setAlphaMaskCaptureEnabled(!frameVisible);
         parent->child->setPopoutPresentationOverlay(frameVisible, presentationState.requestedFrameVisible, hintVisible);
     }
     if (frameVisible || canvasDragActive) {
@@ -323,14 +317,14 @@ void VisualiserWindow::updatePresentationState() {
     } else {
         bool alphaHit = false;
         if (parent != nullptr && parent->child != nullptr) {
-            const auto frameSize = parent->getCapturedFrameSize();
+            const auto frameSize = parent->child->getAlphaMaskSize();
             const auto cursor = parent->child->getLocalPoint(nullptr, juce::Desktop::getMousePosition());
             const float scale = getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f;
             const auto query = makePopoutAlphaQuery(parent->child->getLocalBounds(), frameSize, cursor,
                                                      8.0f / juce::jmax(1.0f, scale));
             if (query.valid) {
-                alphaHit = parent->capturedFrameHasAlphaNear(query.normalisedPoint, query.normalisedRadius,
-                                                             popoutInteractionAlphaThreshold);
+                alphaHit = parent->child->alphaMaskHasAlphaNear(query.normalisedPoint, query.normalisedRadius,
+                                                                popoutInteractionAlphaThreshold);
             }
         }
         if (alphaHit) {
@@ -1088,12 +1082,9 @@ void VisualiserComponent::popoutWindow() {
     visualiser->setSize(350, 350);
     const auto windowTitle = editor.appName + " - Software Oscilloscope";
     popout = std::make_unique<VisualiserWindow>(windowTitle, this, isPopoutAlwaysOnTop());
-#if JUCE_WINDOWS
-    visualiser->setSoftwareMirrorEnabled(true);
-#endif
     popout->setContentOwned(visualiser, true);
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    popout->setUsingNativeTitleBar(false);
+    popout->setUsingNativeTitleBar(!osci::windowing::isTransparencySupported());
 #else
     popout->setUsingNativeTitleBar(true);
 #endif
@@ -1103,32 +1094,33 @@ void VisualiserComponent::popoutWindow() {
     popout->setVisible(true);
     popout->centreWithSize(350, 350);
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    osci::windowing::configureTransparency(popout.get());
-    visualiser->popoutToolbar = std::make_unique<PopoutToolbar>();
-    visualiser->popoutToolbar->onClose = [this] {
-        popout->closeButtonPressed();
-    };
-    visualiser->popoutToolbar->onFullScreen = [this] {
-        popout->toggleFullScreen();
-    };
-    visualiser->popoutToolbar->onToggleFrame = [this] {
-        popout->setRequestedFrameVisible(!popout->isFrameRequestedVisible());
-    };
-    visualiser->popoutToolbar->onShowContextMenu = [this] {
-        popout->showContextMenu();
-    };
-    visualiser->popoutToolbar->onGestureChanged = [this](bool active) {
-        popout->setGestureActive(active);
-    };
-    visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-    visualiser->setPopoutPresentationOverlay(true, true, false);
+    if (osci::windowing::isTransparencySupported()) {
+        osci::windowing::configureTransparency(popout.get());
+        visualiser->popoutToolbar = std::make_unique<PopoutToolbar>();
+        visualiser->popoutToolbar->onClose = [this] {
+            popout->closeButtonPressed();
+        };
+        visualiser->popoutToolbar->onFullScreen = [this] {
+            popout->toggleFullScreen();
+        };
+        visualiser->popoutToolbar->onToggleFrame = [this] {
+            popout->setRequestedFrameVisible(!popout->isFrameRequestedVisible());
+        };
+        visualiser->popoutToolbar->onShowContextMenu = [this] {
+            popout->showContextMenu();
+        };
+        visualiser->popoutToolbar->onGestureChanged = [this](bool active) {
+            popout->setGestureActive(active);
+        };
+        visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
+        visualiser->setPopoutPresentationOverlay(true, true, false);
+    }
 #endif
     // Hide all buttons on the popout and set up mirror mode
     visualiser->hideButtonRow = true;
     visualiser->resized();
     // Set up mirror mode AFTER the window is visible so the GL context is active
     visualiser->setMirrorSource(this);
-    setHasMirrorConsumer(true);
     resized();
 #endif
 }
@@ -1364,7 +1356,7 @@ void VisualiserComponent::openGLContextClosing() {
 
 void VisualiserComponent::newOpenGLContextCreated() {
     VisualiserRenderer::newOpenGLContextCreated();
-#if OSCI_PREMIUM && JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     osci::windowing::configureOpenGLSurface(openGLContext.getRawContext());
 #endif
 }
@@ -1426,9 +1418,6 @@ void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineControll
 void VisualiserComponent::paint(juce::Graphics &g) {
     // Mirror mode: draw paused overlay over GL content
     if (isMirrorMode()) {
-        if (isSoftwareMirrorEnabled()) {
-            paintSoftwareMirrorFrame(g, getLocalBounds());
-        }
         if (parent != nullptr && parent->isPaused()) {
             g.setColour(juce::Colours::black.withAlpha(0.5f));
             g.fillRect(getLocalBounds());
