@@ -1356,8 +1356,12 @@ void VisualiserComponent::openGLContextClosing() {
 
 void VisualiserComponent::newOpenGLContextCreated() {
     VisualiserRenderer::newOpenGLContextCreated();
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_PREMIUM && JUCE_MAC
     osci::windowing::configureOpenGLSurface(openGLContext.getRawContext());
+#elif OSCI_PREMIUM && JUCE_WINDOWS
+    if (parent != nullptr) {
+        osci::windowing::configureOpenGLSurface(openGLContext.getRawContext());
+    }
 #endif
 }
 
