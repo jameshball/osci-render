@@ -66,6 +66,13 @@ bool PopoutToolbar::hitTest(int x, int y) {
 }
 
 void PopoutToolbar::paint(juce::Graphics& g) {
+#if JUCE_WINDOWS
+    auto* visualiser = dynamic_cast<VisualiserComponent*>(getParentComponent());
+    if (visualiser != nullptr && visualiser->isSoftwareMirrorEnabled()) {
+        visualiser->paintSoftwareMirrorFrame(g, getLocalBounds());
+    }
+#endif
+
     if (frameVisible) {
         const auto alphaFloor = osci::windowing::getInteractiveAlphaFloor();
         if (alphaFloor > 0.0f) {
