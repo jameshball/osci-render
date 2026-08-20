@@ -214,8 +214,12 @@
               file="Source/visualiser/PopoutPresentationState.h"/>
         <FILE id="sW1nDo" name="TransparentWindow.h" compile="0" resource="0"
               file="Source/visualiser/TransparentWindow.h"/>
-        <FILE id="sW2nDo" name="TransparentWindow.mm" compile="1" resource="0"
-              file="Source/visualiser/TransparentWindow.mm"/>
+        <FILE id="sW2Mac" name="TransparentWindow_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow_mac.mm"/>
+        <FILE id="sW2Win" name="TransparentWindow_windows.cpp" compile="1"
+              resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
+        <FILE id="sW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
+              resource="0" file="Source/visualiser/TransparentWindow_fallback.cpp"/>
         <FILE id="VTA002" name="VisualiserTextureAssets.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserTextureAssets.h"/>
         <FILE id="wdZb9U" name="VisualiserSettings.cpp" compile="1" resource="0"

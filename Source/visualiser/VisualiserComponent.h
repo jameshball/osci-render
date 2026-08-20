@@ -27,7 +27,7 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 class PopoutToolbar : public juce::Component {
 public:
     PopoutToolbar();
@@ -103,10 +103,12 @@ public:
     void parserChanged() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool hintVisible);
-    void refreshOpenGLSurfaceTransparency();
     bool shouldShowPopoutPresentationHint() const;
+#endif
+#if OSCI_PREMIUM && JUCE_MAC
+    void refreshOpenGLSurfaceTransparency();
 #endif
 
     VisualiserComponent* parent = nullptr;
@@ -138,7 +140,7 @@ private:
 
     std::atomic<bool> active = true;
     bool pauseOnMouseUp = false;
-#if JUCE_MAC && OSCI_PREMIUM
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     juce::ComponentDragger popoutDragger;
     bool popoutDragActive = false;
 #endif
@@ -168,7 +170,7 @@ private:
     int renderModeTimerId = 0;
     bool hideButtonRow = false;
     bool fullScreen = false;
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     std::unique_ptr<PopoutToolbar> popoutToolbar;
 #endif
     std::function<void(FullScreenMode)> fullScreenCallback;
@@ -211,7 +213,7 @@ private:
 };
 
 class VisualiserWindow : public juce::DocumentWindow
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     , private juce::Timer
 #endif
 {
@@ -229,7 +231,7 @@ public:
         setAlwaysOnTop(!isFullScreen && pinned);
     }
 
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void setRequestedFrameVisible(bool visible);
     bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
     void showContextMenu();
@@ -240,7 +242,7 @@ public:
 #endif
 
 private:
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void timerCallback() override;
     void updatePresentationState();
     void applyNativeInteraction(bool ignoresMouseEvents);
@@ -250,7 +252,7 @@ private:
     bool isFullScreen = false;
     bool pinned = true;
     juce::Rectangle<int> windowedBounds;
-#if JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     PopoutPresentationState presentationState;
     bool nativeIgnoresMouseEvents = false;
     bool canvasDragActive = false;

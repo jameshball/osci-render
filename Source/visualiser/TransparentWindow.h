@@ -2,19 +2,21 @@
 
 #include <JuceHeader.h>
 
-inline constexpr bool isNativeWindowTransparencySupported() {
-#if JUCE_MAC
-    return true;
-#else
-    return false;
-#endif
-}
+namespace osci::windowing {
+
+bool isTransparencySupported();
 
 // Must be called after the window is visible and has a native peer.
-void configureNativeWindowTransparency(juce::Component* topLevelWindow);
+void configureTransparency(juce::Component* topLevelWindow);
 
 // Must be called on the message thread after the window has a native peer.
-void setNativeWindowIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents);
+void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents);
+
+bool isRecoveryModifierDown();
+juce::String getRecoveryModifierName();
+float getInteractiveAlphaFloor();
 
 // Must be called on the OpenGL thread.
-void configureOpenGLSurfaceTransparency(void* rawGLContext);
+void configureOpenGLSurface(void* rawGLContext);
+
+} // namespace osci::windowing
