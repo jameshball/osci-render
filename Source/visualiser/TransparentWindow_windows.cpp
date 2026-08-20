@@ -32,6 +32,15 @@ bool isTransparencySupported() {
 }
 
 void configureTransparency(juce::Component* topLevelWindow) {
+    if (topLevelWindow != nullptr) {
+        auto* peer = topLevelWindow->getPeer();
+        if (peer != nullptr) {
+            const auto softwareRenderer = peer->getAvailableRenderingEngines().indexOf("Software Renderer");
+            if (softwareRenderer >= 0) {
+                peer->setCurrentRenderingEngine(softwareRenderer);
+            }
+        }
+    }
     auto* window = getWindowHandle(topLevelWindow);
     if (window == nullptr) {
         return;
