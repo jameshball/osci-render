@@ -88,13 +88,6 @@ bool PopoutToolbar::hitTest(int x, int y) {
 void PopoutToolbar::paint(juce::Graphics& g) {
     if (frameVisible) {
         constexpr float cornerRadius = 11.0f;
-        if (!fullScreen) {
-            const auto windowBounds = getLocalBounds().toFloat();
-            juce::Path windowShape;
-            windowShape.addRoundedRectangle(windowBounds, cornerRadius);
-            g.saveState();
-            g.reduceClipRegion(windowShape);
-        }
         const auto alphaFloor = osci::windowing::getInteractiveAlphaFloor();
         if (alphaFloor > 0.0f) {
             g.fillAll(juce::Colours::black.withAlpha(alphaFloor));
@@ -103,7 +96,6 @@ void PopoutToolbar::paint(juce::Graphics& g) {
         g.setColour(osci::Colours::veryDark());
         g.fillRect(bounds.removeFromTop(toolbarHeight));
         if (!fullScreen) {
-            g.restoreState();
             g.setColour(juce::Colours::white.withAlpha(0.5f));
             g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), cornerRadius - 0.5f, 1.0f);
         }
@@ -296,6 +288,7 @@ void VisualiserWindow::updatePresentationState() {
         osci::windowing::configureTransparency(this);
 #if JUCE_WINDOWS
         if (parent != nullptr && parent->child != nullptr) {
+            parent->child->refreshOpenGLSurfaceTransparency();
             presentationRefreshGeneration = parent->child->getAlphaMaskGeneration();
             presentationRefreshActive = true;
         }
@@ -1405,7 +1398,7 @@ void VisualiserComponent::setPopoutPresentationOverlay(bool frameVisible, bool r
 }
 #endif
 
-#if OSCI_PREMIUM && JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 void VisualiserComponent::refreshOpenGLSurfaceTransparency() {
     openGLContext.executeOnGLThread([](juce::OpenGLContext& context) {
         osci::windowing::configureOpenGLSurface(context.getRawContext());

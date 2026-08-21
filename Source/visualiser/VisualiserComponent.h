@@ -111,7 +111,7 @@ public:
                                       bool fullScreen, bool allMouseEventsPassThrough, bool paused,
                                       bool clickThroughHintVisible);
 #endif
-#if OSCI_PREMIUM && JUCE_MAC
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void refreshOpenGLSurfaceTransparency();
 #endif
 
