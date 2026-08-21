@@ -70,6 +70,7 @@
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="Q2mSgZ" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="LockS1" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
+        <FILE id="MouseS" name="mouse.svg" compile="0" resource="1" file="Resources/svg/mouse.svg"/>
         <FILE id="e19TQV" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
@@ -79,6 +80,7 @@
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="PushPS" name="push-pin.svg" compile="0" resource="1" file="Resources/svg/push-pin.svg"/>
         <FILE id="Tf7MT4" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
