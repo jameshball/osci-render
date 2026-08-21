@@ -35,11 +35,9 @@ public:
     std::function<void()> onClose;
     std::function<void()> onFullScreen;
     std::function<void()> onToggleFrame;
-    std::function<void()> onShowContextMenu;
-    std::function<void(bool)> onGestureChanged;
+    std::function<void()> onToggleAlwaysOnTop;
 
-    void setFrameVisible(bool visible, bool requestedVisible);
-    void setHintVisible(bool visible);
+    void setState(bool visible, bool requestedVisible, bool alwaysOnTop, bool fullScreen);
 
     bool hitTest(int x, int y) override;
     void paint(juce::Graphics& g) override;
@@ -55,9 +53,10 @@ private:
     osci::SvgButton fullscreenButton{"fullscreen", BinaryData::fullscreen_svg, juce::Colours::white};
     osci::SvgButton frameButton{"popoutFrame", BinaryData::eye_svg, juce::Colours::white, juce::Colours::white,
                                 nullptr, BinaryData::eyeoff_svg};
+    osci::SvgButton alwaysOnTopButton{"alwaysOnTop", BinaryData::lock_svg, juce::Colours::white, juce::Colours::green};
     juce::ComponentDragger dragger;
     bool frameVisible = true;
-    bool hintVisible = false;
+    bool fullScreen = false;
 };
 #endif
 
@@ -104,8 +103,7 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    void setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool hintVisible);
-    bool shouldShowPopoutPresentationHint() const;
+    void setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool alwaysOnTop, bool fullScreen);
 #endif
 #if OSCI_PREMIUM && JUCE_MAC
     void refreshOpenGLSurfaceTransparency();
@@ -140,10 +138,6 @@ private:
 
     std::atomic<bool> active = true;
     bool pauseOnMouseUp = false;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    juce::ComponentDragger popoutDragger;
-    bool popoutDragActive = false;
-#endif
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
@@ -225,20 +219,14 @@ public:
     void closeButtonPressed() override;
     void toggleFullScreen();
 
-    bool getIsFullScreen() const { return isFullScreen; }
-    void setPinned(bool shouldBePinned) {
-        pinned = shouldBePinned;
-        setAlwaysOnTop(!isFullScreen && pinned);
-    }
+    bool getIsFullScreen() const { return fullScreenRequested; }
+    bool isPinned() const { return pinned; }
+    void setPinned(bool shouldBePinned);
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void setRequestedFrameVisible(bool visible);
     bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
-    void primeInitialPresentation();
-    void showContextMenu();
-    void setGestureActive(bool active);
-    void setCanvasDragActive(bool active);
-    void moved() override;
+    void refreshNativePresentation();
     void resized() override;
 #endif
 
@@ -251,16 +239,15 @@ private:
 #endif
 
     VisualiserComponent* parent;
-    bool isFullScreen = false;
+    bool fullScreenRequested = false;
+    bool fullScreenTransitionPending = false;
     bool pinned = true;
-    juce::Rectangle<int> windowedBounds;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     PopoutPresentationState presentationState;
     bool nativeIgnoresMouseEvents = false;
-    bool canvasDragActive = false;
-    bool hintVisible = false;
-    bool initialPresentationPriming = false;
-    juce::uint32 hintEndTime = 0;
-    juce::uint32 resizeGestureEndTime = 0;
+    bool presentationRefreshActive = false;
+    bool windowCornersConfigured = false;
+    bool windowCornersRounded = false;
+    std::uint64_t presentationRefreshGeneration = 0;
 #endif
 };

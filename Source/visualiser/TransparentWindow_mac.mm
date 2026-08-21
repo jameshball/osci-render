@@ -50,8 +50,6 @@ void configureTransparency(juce::Component* topLevelWindow) {
     setViewTreeTransparent(contentView);
     if (contentView != nil) {
         contentView.wantsLayer = YES;
-        contentView.layer.cornerRadius = 10.0;
-        contentView.layer.masksToBounds = YES;
     }
 }
 
@@ -62,14 +60,15 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
-void setRoundedWindowRegion(juce::Component*, float) {}
-
-bool isRecoveryModifierDown() {
-    return juce::ModifierKeys::getCurrentModifiersRealtime().isCommandDown();
-}
-
-juce::String getRecoveryModifierName() {
-    return "Command";
+void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
+    NSWindow* window = getWindow(topLevelWindow);
+    NSView* contentView = window != nil ? [window contentView] : nil;
+    if (contentView == nil) {
+        return;
+    }
+    contentView.wantsLayer = YES;
+    contentView.layer.cornerRadius = cornerRadius;
+    contentView.layer.masksToBounds = cornerRadius > 0.0f ? YES : NO;
 }
 
 float getInteractiveAlphaFloor() {

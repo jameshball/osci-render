@@ -116,30 +116,16 @@ void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius)
     if (window == nullptr) {
         return;
     }
-    if (cornerRadius <= 0.0f) {
-        ::SetWindowRgn(window, nullptr, TRUE);
-        return;
-    }
 
-    RECT bounds{};
-    if (::GetClientRect(window, &bounds) == FALSE) {
-        return;
-    }
-    const float scale = topLevelWindow->getPeer() != nullptr
-                      ? static_cast<float>(topLevelWindow->getPeer()->getPlatformScaleFactor()) : 1.0f;
-    const int diameter = juce::jmax(1, juce::roundToInt(cornerRadius * 2.0f * scale));
-    auto* region = ::CreateRoundRectRgn(0, 0, bounds.right + 1, bounds.bottom + 1, diameter, diameter);
-    if (region != nullptr && ::SetWindowRgn(window, region, TRUE) == 0) {
-        ::DeleteObject(region);
-    }
-}
-
-bool isRecoveryModifierDown() {
-    return juce::ModifierKeys::getCurrentModifiersRealtime().isCtrlDown();
-}
-
-juce::String getRecoveryModifierName() {
-    return "Control";
+    // A window region is integer-scaled and clips against window rather than client bounds,
+    // which produces cropped edges while a resizable peer is changing size. Let DWM own the
+    // non-client corner treatment instead.
+    ::SetWindowRgn(window, nullptr, TRUE);
+    constexpr auto windowCornerPreference = static_cast<DWMWINDOWATTRIBUTE>(33);
+    constexpr DWORD doNotRound = 1;
+    constexpr DWORD round = 2;
+    const DWORD preference = cornerRadius > 0.0f ? round : doNotRound;
+    ::DwmSetWindowAttribute(window, windowCornerPreference, &preference, sizeof(preference));
 }
 
 float getInteractiveAlphaFloor() {

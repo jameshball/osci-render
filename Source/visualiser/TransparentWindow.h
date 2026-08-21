@@ -15,8 +15,6 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
 // Updates the native window shape after a borderless popout is created or resized.
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius);
 
-bool isRecoveryModifierDown();
-juce::String getRecoveryModifierName();
 float getInteractiveAlphaFloor();
 
 // Must be called on the OpenGL thread.
