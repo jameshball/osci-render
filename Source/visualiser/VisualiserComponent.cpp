@@ -290,6 +290,7 @@ void VisualiserWindow::resized() {
     resizeGestureEndTime = juce::Time::getMillisecondCounter() + PopoutPresentationState::interactionHoldMs;
     presentationState.gestureActive = true;
     juce::ResizableWindow::resized();
+    osci::windowing::setRoundedWindowRegion(this, isFullScreen ? 0.0f : 10.0f);
 }
 
 void VisualiserWindow::timerCallback() {
@@ -1096,6 +1097,7 @@ void VisualiserComponent::popoutWindow() {
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     if (osci::windowing::isTransparencySupported()) {
         osci::windowing::configureTransparency(popout.get());
+        osci::windowing::setRoundedWindowRegion(popout.get(), 10.0f);
         visualiser->popoutToolbar = std::make_unique<PopoutToolbar>();
         visualiser->popoutToolbar->onClose = [this] {
             popout->closeButtonPressed();
@@ -1113,7 +1115,7 @@ void VisualiserComponent::popoutWindow() {
             popout->setGestureActive(active);
         };
         visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-        visualiser->setPopoutPresentationOverlay(true, true, false);
+        visualiser->setPopoutPresentationOverlay(false, true, false);
     }
 #endif
     // Hide all buttons on the popout and set up mirror mode
@@ -1121,6 +1123,22 @@ void VisualiserComponent::popoutWindow() {
     visualiser->resized();
     // Set up mirror mode AFTER the window is visible so the GL context is active
     visualiser->setMirrorSource(this);
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+    if (osci::windowing::isTransparencySupported()) {
+#if JUCE_WINDOWS
+        juce::Component::SafePointer<VisualiserComponent> safeVisualiser(visualiser);
+        juce::Timer::callAfterDelay(100, [safeVisualiser] {
+            if (safeVisualiser != nullptr && safeVisualiser->parent != nullptr
+                && safeVisualiser->parent->popout != nullptr
+                && safeVisualiser->parent->popout->isFrameRequestedVisible()) {
+                safeVisualiser->setPopoutPresentationOverlay(true, true, false);
+            }
+        });
+#else
+        visualiser->setPopoutPresentationOverlay(true, true, false);
+#endif
+    }
+#endif
     resized();
 #endif
 }
