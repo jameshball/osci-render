@@ -15,6 +15,7 @@ PopoutToolbar::PopoutToolbar() {
     addAndMakeVisible(fullscreenButton);
     addAndMakeVisible(frameButton);
     addAndMakeVisible(alwaysOnTopButton);
+    addAndMakeVisible(mouseInteractionButton);
     closeButton.setIconColours(juce::Colours::white, juce::Colours::white.withAlpha(0.8f));
     closeButton.onClick = [this] {
         if (onClose != nullptr) {
@@ -38,22 +39,35 @@ PopoutToolbar::PopoutToolbar() {
             onToggleAlwaysOnTop();
         }
     };
-    setState(true, true, true, false);
+    mouseInteractionButton.setClickingTogglesState(false);
+    mouseInteractionButton.onClick = [this] {
+        if (onToggleMouseInteraction != nullptr) {
+            onToggleMouseInteraction();
+        }
+    };
+    setState(true, true, true, false, false, false, false);
     setInterceptsMouseClicks(true, true);
 }
 
-void PopoutToolbar::setState(bool visible, bool requestedVisible, bool alwaysOnTop, bool isFullScreen) {
+void PopoutToolbar::setState(bool visible, bool requestedVisible, bool alwaysOnTop, bool isFullScreen,
+                             bool allMouseEventsPassThrough, bool paused, bool showClickThroughHint) {
     frameVisible = visible;
     fullScreen = isFullScreen;
     closeButton.setVisible(visible);
     fullscreenButton.setVisible(visible);
     frameButton.setVisible(visible);
     alwaysOnTopButton.setVisible(visible);
+    mouseInteractionButton.setVisible(visible);
     frameButton.setToggleState(!requestedVisible, juce::NotificationType::dontSendNotification);
     frameButton.setTooltip(requestedVisible ? "Hide Window Frame." : "Show Window Frame.");
     alwaysOnTopButton.setToggleState(alwaysOnTop, juce::NotificationType::dontSendNotification);
     alwaysOnTopButton.setTooltip(alwaysOnTop ? "Disable Always on Top." : "Enable Always on Top.");
+    mouseInteractionButton.setToggleState(allMouseEventsPassThrough, juce::NotificationType::dontSendNotification);
+    mouseInteractionButton.setEnabled(!paused);
+    mouseInteractionButton.setTooltip(paused ? "Resume before passing all mouse events through."
+                                             : "Pass All Mouse Events Through.");
     fullscreenButton.setTooltip(fullScreen ? "Exit Fullscreen." : "Enter Fullscreen.");
+    clickThroughHintVisible = showClickThroughHint;
     repaint();
 }
 
@@ -74,10 +88,11 @@ bool PopoutToolbar::hitTest(int x, int y) {
 
 void PopoutToolbar::paint(juce::Graphics& g) {
     if (frameVisible) {
+        constexpr float cornerRadius = 11.0f;
         if (!fullScreen) {
             const auto windowBounds = getLocalBounds().toFloat();
             juce::Path windowShape;
-            windowShape.addRoundedRectangle(windowBounds, 10.0f);
+            windowShape.addRoundedRectangle(windowBounds, cornerRadius);
             g.saveState();
             g.reduceClipRegion(windowShape);
         }
@@ -91,8 +106,19 @@ void PopoutToolbar::paint(juce::Graphics& g) {
         if (!fullScreen) {
             g.restoreState();
             g.setColour(juce::Colours::white.withAlpha(0.5f));
-            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 9.0f, 1.0f);
+            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), cornerRadius - 0.5f, 1.0f);
         }
+    }
+    if (clickThroughHintVisible) {
+        const auto hintWidth = juce::jmax(1, juce::jmin(620, getWidth() - 24));
+        const auto hintBounds = getLocalBounds().withSizeKeepingCentre(hintWidth, 58).toFloat();
+        g.setColour(osci::Colours::veryDark().withAlpha(0.94f));
+        g.fillRoundedRectangle(hintBounds, 8.0f);
+        g.setColour(juce::Colours::white);
+        g.setFont(14.0f);
+        g.drawFittedText("Mouse interaction disabled. Pause from the main visualiser to restore controls, "
+                         "or close and reopen the popout.",
+                         hintBounds.reduced(14.0f).toNearestInt(), juce::Justification::centred, 2);
     }
 }
 
@@ -101,6 +127,7 @@ void PopoutToolbar::resized() {
     closeButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(3));
     fullscreenButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
     frameButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
+    mouseInteractionButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
     alwaysOnTopButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
 }
 
@@ -189,6 +216,12 @@ void VisualiserWindow::setPinned(bool shouldBePinned) {
     pinned = shouldBePinned;
     setAlwaysOnTop(pinned);
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if JUCE_WINDOWS
+    if (osci::windowing::isTransparencySupported()) {
+        refreshNativePresentation();
+        return;
+    }
+#endif
     updatePresentationState();
 #endif
 }
@@ -196,6 +229,21 @@ void VisualiserWindow::setPinned(bool shouldBePinned) {
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 void VisualiserWindow::setRequestedFrameVisible(bool visible) {
     presentationState.requestedFrameVisible = visible;
+    updatePresentationState();
+}
+
+void VisualiserWindow::setAllMouseEventsPassThrough(bool shouldPassThrough) {
+    if (shouldPassThrough && parent != nullptr && parent->isPaused()) {
+        return;
+    }
+    allMouseEventsPassThrough = shouldPassThrough;
+    if (shouldPassThrough) {
+        presentationState.requestedFrameVisible = false;
+        clickThroughHintVisible = true;
+        clickThroughHintEndTime = juce::Time::getMillisecondCounter() + 5000;
+    } else {
+        clickThroughHintVisible = false;
+    }
     updatePresentationState();
 }
 
@@ -221,6 +269,13 @@ void VisualiserWindow::timerCallback() {
 void VisualiserWindow::updatePresentationState() {
     const auto now = juce::Time::getMillisecondCounter();
     presentationState.paused = parent != nullptr && parent->isPaused();
+    if (allMouseEventsPassThrough && presentationState.paused) {
+        allMouseEventsPassThrough = false;
+        clickThroughHintVisible = false;
+    }
+    if (clickThroughHintVisible && static_cast<std::int32_t>(now - clickThroughHintEndTime) >= 0) {
+        clickThroughHintVisible = false;
+    }
 
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
     if (fullScreenTransitionPending && nativeFullScreen == fullScreenRequested) {
@@ -246,21 +301,24 @@ void VisualiserWindow::updatePresentationState() {
         setAlwaysOnTop(pinned);
     }
 
-    const bool frameVisible = presentationState.isFrameVisible() && !presentationRefreshActive;
+    const bool frameVisible = presentationState.isFrameVisible()
+                           && !presentationRefreshActive
+                           && !allMouseEventsPassThrough;
     const bool fullScreenActive = fullScreenRequested || nativeFullScreen;
     const bool framedWindow = frameVisible && !fullScreenActive;
     updateResizeBorderVisibility(framedWindow);
     if (!windowCornersConfigured || windowCornersRounded != framedWindow) {
-        osci::windowing::setRoundedWindowRegion(this, framedWindow ? 10.0f : 0.0f);
+        osci::windowing::setRoundedWindowRegion(this, framedWindow ? 11.0f : 0.0f);
         windowCornersConfigured = true;
         windowCornersRounded = framedWindow;
     }
     if (parent != nullptr && parent->child != nullptr) {
         parent->child->setAlphaMaskCaptureEnabled(!frameVisible || presentationRefreshActive);
         parent->child->setPopoutPresentationOverlay(frameVisible, presentationState.requestedFrameVisible,
-                                                     pinned, fullScreenActive);
+                                                     pinned, fullScreenActive, allMouseEventsPassThrough,
+                                                     presentationState.paused, clickThroughHintVisible);
     }
-    if (presentationRefreshActive) {
+    if (presentationRefreshActive || allMouseEventsPassThrough) {
         applyNativeInteraction(true);
     } else if (frameVisible) {
         applyNativeInteraction(false);
@@ -285,7 +343,9 @@ void VisualiserWindow::updatePresentationState() {
 
     const bool needsTimer = !presentationState.requestedFrameVisible
                          || fullScreenTransitionPending
-                         || presentationRefreshActive;
+                         || presentationRefreshActive
+                         || allMouseEventsPassThrough
+                         || clickThroughHintVisible;
     if (needsTimer && !isTimerRunning()) {
         startTimerHz(60);
     } else if (!needsTimer) {
@@ -612,6 +672,14 @@ void VisualiserComponent::mouseDrag(const juce::MouseEvent& event) {
     timerId = -1;
     if (event.getDistanceFromDragStart() > 4) {
         pauseOnMouseUp = false;
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+        if (parent != nullptr && event.mods.isLeftButtonDown()) {
+            auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
+            if (window != nullptr && !window->getIsFullScreen()) {
+                popoutDragger.dragComponent(window, event.getEventRelativeTo(window), nullptr);
+            }
+        }
+#endif
     }
 }
 
@@ -659,6 +727,14 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
     if (event.originalComponent == this) {
         if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
             pauseOnMouseUp = true;
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+            if (parent != nullptr) {
+                auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
+                if (window != nullptr && !window->getIsFullScreen()) {
+                    popoutDragger.startDraggingComponent(window, event.getEventRelativeTo(window));
+                }
+            }
+#endif
         }
     }
 }
@@ -1036,8 +1112,11 @@ void VisualiserComponent::popoutWindow() {
         visualiser->popoutToolbar->onToggleAlwaysOnTop = [this] {
             setPopoutAlwaysOnTop(!popout->isPinned());
         };
+        visualiser->popoutToolbar->onToggleMouseInteraction = [this] {
+            popout->setAllMouseEventsPassThrough(!popout->getAllMouseEventsPassThrough());
+        };
         visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-        visualiser->setPopoutPresentationOverlay(true, true, popout->isPinned(), false);
+        visualiser->setPopoutPresentationOverlay(true, true, popout->isPinned(), false, false, false, false);
     }
 #endif
     // Hide all buttons on the popout and set up mirror mode
@@ -1301,13 +1380,16 @@ void VisualiserComponent::newOpenGLContextCreated() {
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 void VisualiserComponent::setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible,
-                                                        bool alwaysOnTop, bool fullScreen) {
+                                                        bool alwaysOnTop, bool fullScreen,
+                                                        bool allMouseEventsPassThrough, bool paused,
+                                                        bool clickThroughHintVisible) {
     if (popoutToolbar == nullptr) {
         return;
     }
-    popoutToolbar->setState(frameVisible, requestedFrameVisible, alwaysOnTop, fullScreen);
-    popoutToolbar->setVisible(frameVisible);
-    openGLContext.setComponentPaintingEnabled(frameVisible);
+    popoutToolbar->setState(frameVisible, requestedFrameVisible, alwaysOnTop, fullScreen,
+                            allMouseEventsPassThrough, paused, clickThroughHintVisible);
+    popoutToolbar->setVisible(frameVisible || clickThroughHintVisible);
+    openGLContext.setComponentPaintingEnabled(frameVisible || clickThroughHintVisible);
 }
 #endif
 
