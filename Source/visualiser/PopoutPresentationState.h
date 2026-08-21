@@ -7,21 +7,9 @@ struct PopoutPresentationState {
 
     bool requestedFrameVisible = true;
     bool paused = false;
-    bool recoveryModifierDown = false;
-    bool menuOpen = false;
-    bool gestureActive = false;
-    bool presentationHintShown = false;
 
     bool isFrameVisible() const {
-        return requestedFrameVisible || paused || recoveryModifierDown || menuOpen || gestureActive;
-    }
-
-    bool consumePresentationHint(bool enabled) {
-        if (!enabled || presentationHintShown) {
-            return false;
-        }
-        presentationHintShown = true;
-        return true;
+        return requestedFrameVisible || paused;
     }
 
     void registerAlphaHit(std::uint32_t now) {

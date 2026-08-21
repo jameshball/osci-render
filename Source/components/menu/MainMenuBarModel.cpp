@@ -173,13 +173,6 @@ void MainMenuBarModel::addCommonInterfaceMenuItems(int topLevelMenuIndex, Common
     addToggleMenuItem(topLevelMenuIndex, "Keep Oscilloscope Window on Top", [&editor] {
         editor.visualiser.setPopoutAlwaysOnTop(!editor.visualiser.isPopoutAlwaysOnTop());
     }, [&editor] { return editor.visualiser.isPopoutAlwaysOnTop(); });
-#if JUCE_MAC
-    addToggleMenuItem(topLevelMenuIndex, "Show Transparent Popout Instructions", [&processor] {
-        const bool enabled = processor.globalSettings.getBool("showPopoutPresentationHint", true);
-        processor.globalSettings.set("showPopoutPresentationHint", !enabled);
-        processor.globalSettings.save();
-    }, [&processor] { return processor.globalSettings.getBool("showPopoutPresentationHint", true); });
-#endif
 #endif
     if (processor.wrapperType == juce::AudioProcessor::WrapperType::wrapperType_Standalone) {
         addToggleMenuItem(topLevelMenuIndex, "Full Screen", [&editor] { editor.toggleFullScreen(); }, [&editor] { return editor.isFullScreen(); }, "F11");

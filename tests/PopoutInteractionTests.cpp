@@ -54,26 +54,11 @@ public:
         expect(state.isFrameVisible());
         state.requestedFrameVisible = false;
         expect(!state.isFrameVisible());
-        state.recoveryModifierDown = true;
-        expect(state.isFrameVisible());
-        state.recoveryModifierDown = false;
         state.paused = true;
         expect(state.isFrameVisible());
         state.paused = false;
         expect(!state.isFrameVisible());
-        state.menuOpen = true;
-        expect(state.isFrameVisible());
-        state.menuOpen = false;
-        state.gestureActive = true;
-        expect(state.isFrameVisible());
         expect(PopoutPresentationState().isFrameVisible());
-
-        beginTest("Presentation hint appears once per popout when enabled");
-        PopoutPresentationState hintState;
-        expect(hintState.consumePresentationHint(true));
-        expect(!hintState.consumePresentationHint(true));
-        expect(!PopoutPresentationState().consumePresentationHint(false));
-        expect(PopoutPresentationState().consumePresentationHint(true));
     }
 };
 
