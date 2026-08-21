@@ -63,9 +63,8 @@ void PopoutToolbar::setState(bool visible, bool requestedVisible, bool alwaysOnT
     alwaysOnTopButton.setToggleState(alwaysOnTop, juce::NotificationType::dontSendNotification);
     alwaysOnTopButton.setTooltip(alwaysOnTop ? "Disable Always on Top." : "Enable Always on Top.");
     mouseInteractionButton.setToggleState(allMouseEventsPassThrough, juce::NotificationType::dontSendNotification);
-    mouseInteractionButton.setEnabled(!paused);
-    mouseInteractionButton.setTooltip(paused ? "Resume before passing all mouse events through."
-                                             : "Pass All Mouse Events Through.");
+    mouseInteractionButton.setTooltip(paused ? "Resume and Let Clicks Pass Through."
+                                             : "Let Clicks Pass Through.");
     fullscreenButton.setTooltip(fullScreen ? "Exit Fullscreen." : "Enter Fullscreen.");
     clickThroughHintVisible = showClickThroughHint;
     repaint();
@@ -116,19 +115,27 @@ void PopoutToolbar::paint(juce::Graphics& g) {
         g.fillRoundedRectangle(hintBounds, 8.0f);
         g.setColour(juce::Colours::white);
         g.setFont(14.0f);
-        g.drawFittedText("Mouse interaction disabled. Pause from the main visualiser to restore controls, "
-                         "or close and reopen the popout.",
+        g.drawFittedText("Clicks now pass through this window. Pause the main visualiser to bring the controls "
+                         "back, or close and reopen the popout.",
                          hintBounds.reduced(14.0f).toNearestInt(), juce::Justification::centred, 2);
     }
 }
 
 void PopoutToolbar::resized() {
     auto bar = getLocalBounds().removeFromTop(toolbarHeight);
+#if JUCE_WINDOWS || JUCE_LINUX
+    closeButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(3));
+    fullscreenButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
+    frameButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
+    mouseInteractionButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
+    alwaysOnTopButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
+#else
     closeButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(3));
     fullscreenButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
     frameButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
     mouseInteractionButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
     alwaysOnTopButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
+#endif
 }
 
 void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
@@ -234,7 +241,7 @@ void VisualiserWindow::setRequestedFrameVisible(bool visible) {
 
 void VisualiserWindow::setAllMouseEventsPassThrough(bool shouldPassThrough) {
     if (shouldPassThrough && parent != nullptr && parent->isPaused()) {
-        return;
+        parent->setPaused(false);
     }
     allMouseEventsPassThrough = shouldPassThrough;
     if (shouldPassThrough) {
@@ -258,6 +265,11 @@ void VisualiserWindow::refreshNativePresentation() {
 
 void VisualiserWindow::resized() {
     juce::ResizableWindow::resized();
+#if JUCE_MAC || JUCE_WINDOWS
+    if (osci::windowing::isTransparencySupported() && getContentComponent() != nullptr) {
+        getContentComponent()->setBounds(getLocalBounds());
+    }
+#endif
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
     updateResizeBorderVisibility(presentationState.isFrameVisible() && !fullScreenRequested && !nativeFullScreen);
 }
@@ -982,6 +994,11 @@ void VisualiserComponent::setRecording(bool recording) {
 
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+    if (popoutToolbar != nullptr) {
+        popoutToolbar->setBounds(getLocalBounds());
+    }
+#endif
     // Apply hideButtonRow logic to both fullscreen and pop-out modes
     if ((fullScreen || parent != nullptr) && hideButtonRow) {
         buttonRow = area.removeFromBottom(0);
@@ -993,11 +1010,6 @@ void VisualiserComponent::resized() {
         record.setVisible(false);
         stopwatch.setVisible(false);
         timeline.setVisible(false);
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-        if (popoutToolbar != nullptr) {
-            popoutToolbar->setBounds(getLocalBounds());
-        }
-#endif
         overlayFadeCover.setBounds(getLocalBounds());
         overlayFadeCover.toFront(false);
         setViewportArea(area);
@@ -1085,7 +1097,7 @@ void VisualiserComponent::popoutWindow() {
     visualiser->setSize(350, 350);
     const auto windowTitle = editor.appName + " - Software Oscilloscope";
     popout = std::make_unique<VisualiserWindow>(windowTitle, this, isPopoutAlwaysOnTop());
-    popout->setContentOwned(visualiser, true);
+    popout->setContentOwned(visualiser, false);
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     popout->setUsingNativeTitleBar(!osci::windowing::isTransparencySupported());
 #else

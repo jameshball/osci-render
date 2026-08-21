@@ -122,10 +122,13 @@ void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius)
     // non-client corner treatment instead.
     ::SetWindowRgn(window, nullptr, TRUE);
     constexpr auto windowCornerPreference = static_cast<DWMWINDOWATTRIBUTE>(33);
+    constexpr auto windowBorderColour = static_cast<DWMWINDOWATTRIBUTE>(34);
     constexpr DWORD doNotRound = 1;
     constexpr DWORD round = 2;
+    constexpr COLORREF noBorder = 0xfffffffe;
     const DWORD preference = cornerRadius > 0.0f ? round : doNotRound;
     ::DwmSetWindowAttribute(window, windowCornerPreference, &preference, sizeof(preference));
+    ::DwmSetWindowAttribute(window, windowBorderColour, &noBorder, sizeof(noBorder));
 }
 
 float getInteractiveAlphaFloor() {
