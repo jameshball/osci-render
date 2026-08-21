@@ -143,7 +143,14 @@ void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
 
 void PopoutToolbar::mouseDoubleClick(const juce::MouseEvent& event) {
 #if JUCE_WINDOWS
-    if (event.mods.isLeftButtonDown() && !fullScreen) {
+    if (!event.mods.isLeftButtonDown()) {
+        return;
+    }
+    if (fullScreen) {
+        if (onFullScreen != nullptr) {
+            onFullScreen();
+        }
+    } else {
         osci::windowing::toggleWindowMaximised(getTopLevelComponent());
     }
 #else
@@ -390,7 +397,11 @@ void VisualiserWindow::updatePresentationState() {
                                                      pinned, fullScreenActive, allMouseEventsPassThrough,
                                                      presentationState.paused, clickThroughHintVisible);
     }
-    if (presentationRefreshActive || fullPassThroughActive) {
+    if (fullScreenActive) {
+        // WS_EX_LAYERED is required for cross-process click-through, but it makes a fullscreen
+        // OpenGL window composite as opaque black. Keep fullscreen on the GPU transparency path.
+        applyNativeInteraction(false);
+    } else if (presentationRefreshActive || fullPassThroughActive) {
         applyNativeInteraction(true);
     } else if (frameVisible) {
         applyNativeInteraction(false);
