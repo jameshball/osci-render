@@ -246,6 +246,7 @@ private:
     void timerCallback() override;
     void updatePresentationState();
     void applyNativeInteraction(bool ignoresMouseEvents);
+    void updateResizeBorderVisibility(bool visible);
 #endif
 
     VisualiserComponent* parent;
