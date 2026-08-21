@@ -67,6 +67,11 @@ bool PopoutToolbar::hitTest(int x, int y) {
 
 void PopoutToolbar::paint(juce::Graphics& g) {
     if (frameVisible) {
+        const auto windowBounds = getLocalBounds().toFloat();
+        juce::Path windowShape;
+        windowShape.addRoundedRectangle(windowBounds, 10.0f);
+        g.saveState();
+        g.reduceClipRegion(windowShape);
         const auto alphaFloor = osci::windowing::getInteractiveAlphaFloor();
         if (alphaFloor > 0.0f) {
             g.fillAll(juce::Colours::black.withAlpha(alphaFloor));
@@ -74,6 +79,7 @@ void PopoutToolbar::paint(juce::Graphics& g) {
         auto bounds = getLocalBounds();
         g.setColour(osci::Colours::veryDark());
         g.fillRect(bounds.removeFromTop(toolbarHeight));
+        g.restoreState();
         g.setColour(juce::Colours::white.withAlpha(0.5f));
         g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 9.0f, 1.0f);
     }
@@ -221,12 +227,19 @@ void VisualiserWindow::toggleFullScreen() {
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 void VisualiserWindow::setRequestedFrameVisible(bool visible) {
+    initialPresentationPriming = false;
     presentationState.requestedFrameVisible = visible;
     const bool hintEnabled = parent != nullptr && parent->shouldShowPopoutPresentationHint();
     if (!visible && presentationState.consumePresentationHint(hintEnabled)) {
         hintVisible = true;
         hintEndTime = juce::Time::getMillisecondCounter() + 5000;
     }
+    updatePresentationState();
+}
+
+void VisualiserWindow::primeInitialPresentation() {
+    initialPresentationPriming = true;
+    presentationState.requestedFrameVisible = false;
     updatePresentationState();
 }
 
@@ -306,6 +319,14 @@ void VisualiserWindow::updatePresentationState() {
     }
     if (hintVisible && static_cast<std::int32_t>(now - hintEndTime) >= 0) {
         hintVisible = false;
+    }
+
+    if (initialPresentationPriming && parent != nullptr && parent->child != nullptr) {
+        const auto alphaMaskSize = parent->child->getAlphaMaskSize();
+        if (alphaMaskSize.width > 0 && alphaMaskSize.height > 0) {
+            initialPresentationPriming = false;
+            presentationState.requestedFrameVisible = true;
+        }
     }
 
     const bool frameVisible = presentationState.isFrameVisible();
@@ -1137,18 +1158,7 @@ void VisualiserComponent::popoutWindow() {
     visualiser->setMirrorSource(this);
 #if OSCI_PREMIUM && JUCE_WINDOWS
     if (osci::windowing::isTransparencySupported()) {
-        juce::Component::SafePointer<VisualiserWindow> safeWindow(popout.get());
-        juce::Timer::callAfterDelay(50, [safeWindow] {
-            if (safeWindow == nullptr || !safeWindow->isFrameRequestedVisible()) {
-                return;
-            }
-            osci::windowing::setIgnoresMouseEvents(safeWindow.getComponent(), true);
-            juce::Timer::callAfterDelay(50, [safeWindow] {
-                if (safeWindow != nullptr && safeWindow->isFrameRequestedVisible()) {
-                    osci::windowing::setIgnoresMouseEvents(safeWindow.getComponent(), false);
-                }
-            });
-        });
+        popout->primeInitialPresentation();
     }
 #endif
     resized();

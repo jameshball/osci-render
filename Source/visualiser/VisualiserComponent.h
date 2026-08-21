@@ -234,6 +234,7 @@ public:
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void setRequestedFrameVisible(bool visible);
     bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
+    void primeInitialPresentation();
     void showContextMenu();
     void setGestureActive(bool active);
     void setCanvasDragActive(bool active);
@@ -258,6 +259,7 @@ private:
     bool nativeIgnoresMouseEvents = false;
     bool canvasDragActive = false;
     bool hintVisible = false;
+    bool initialPresentationPriming = false;
     juce::uint32 hintEndTime = 0;
     juce::uint32 resizeGestureEndTime = 0;
 #endif
