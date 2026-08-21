@@ -130,6 +130,7 @@
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="WdfE7J" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
         <FILE id="WnBZf0" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
+        <FILE id="Mouse1" name="mouse.svg" compile="0" resource="1" file="Resources/svg/mouse.svg"/>
         <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
@@ -142,6 +143,7 @@
         <FILE id="rotjUT" name="oscilloscope.svg" compile="0" resource="1"
               file="Resources/svg/oscilloscope.svg"/>
         <FILE id="pStSvg" name="paste.svg" compile="0" resource="1" file="Resources/svg/paste.svg"/>
+        <FILE id="PushPn" name="push-pin.svg" compile="0" resource="1" file="Resources/svg/push-pin.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
         <FILE id="zFdUYi" name="planet.svg" compile="0" resource="1" file="Resources/svg/planet.svg"/>
