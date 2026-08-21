@@ -233,7 +233,9 @@ void VisualiserWindow::toggleFullScreen() {
             boundsBeforeFullScreen = getBounds();
             auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(boundsBeforeFullScreen);
             if (display != nullptr) {
-                setBounds(display->totalArea);
+                // An exact monitor-sized window can be promoted out of desktop composition on Windows,
+                // which loses per-pixel alpha. A one-pixel inset keeps the same window composited.
+                setBounds(display->totalArea.reduced(1));
             }
         } else {
             juce::ResizableWindow::setFullScreen(true);
