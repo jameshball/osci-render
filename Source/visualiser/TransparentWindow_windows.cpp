@@ -52,6 +52,16 @@ void enableRedirectionBitmapAlpha(HWND window) {
     ::DwmSetWindowAttribute(window, redirectionBitmapAlpha, &enabled, sizeof(enabled));
 }
 
+void enableDwmAlphaComposition(HWND window) {
+    if (window == nullptr || ::GetAncestor(window, GA_ROOT) != window) {
+        return;
+    }
+    DWM_BLURBEHIND blurBehind{};
+    blurBehind.dwFlags = DWM_BB_ENABLE;
+    blurBehind.fEnable = TRUE;
+    ::DwmEnableBlurBehindWindow(window, &blurBehind);
+}
+
 void configureGpuTransparency(HWND window) {
     if (window == nullptr || !supportsRedirectionBitmapAlpha()) {
         return;
@@ -62,6 +72,7 @@ void configureGpuTransparency(HWND window) {
         updateExtendedStyle(window, style & ~WS_EX_LAYERED);
     }
     enableRedirectionBitmapAlpha(window);
+    enableDwmAlphaComposition(window);
 }
 
 void setWindowIgnoresMouseEvents(HWND window, bool ignoresMouseEvents, bool useLayeredHitTesting) {
@@ -109,15 +120,6 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     if (!ignoresMouseEvents) {
         configureGpuTransparency(window);
     }
-}
-
-void beginWindowMove(juce::Component* topLevelWindow) {
-    auto* window = getWindowHandle(topLevelWindow);
-    if (window == nullptr) {
-        return;
-    }
-    ::ReleaseCapture();
-    ::SendMessageW(window, WM_NCLBUTTONDOWN, HTCAPTION, 0);
 }
 
 void toggleWindowMaximised(juce::Component* topLevelWindow) {

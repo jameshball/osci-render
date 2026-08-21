@@ -10,8 +10,6 @@ bool isTransparencySupported() {
 void configureTransparency(juce::Component*) {}
 void setIgnoresMouseEvents(juce::Component*, bool) {}
 
-void beginWindowMove(juce::Component*) {}
-
 void toggleWindowMaximised(juce::Component*) {}
 void setRoundedWindowRegion(juce::Component*, float) {}
 float getInteractiveAlphaFloor() { return 0.0f; }

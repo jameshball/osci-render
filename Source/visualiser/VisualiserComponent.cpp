@@ -138,13 +138,7 @@ void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
     if (!event.mods.isLeftButtonDown() || fullScreen) {
         return;
     }
-#if JUCE_WINDOWS
-    if (event.getNumberOfClicks() == 1) {
-        osci::windowing::beginWindowMove(getTopLevelComponent());
-    }
-#else
     dragger.startDraggingComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()));
-#endif
 }
 
 void PopoutToolbar::mouseDoubleClick(const juce::MouseEvent& event) {
@@ -158,13 +152,9 @@ void PopoutToolbar::mouseDoubleClick(const juce::MouseEvent& event) {
 }
 
 void PopoutToolbar::mouseDrag(const juce::MouseEvent& event) {
-#if JUCE_WINDOWS
-    juce::ignoreUnused(event);
-#else
     if (!fullScreen) {
         dragger.dragComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()), nullptr);
     }
-#endif
 }
 
 void PopoutToolbar::mouseUp(const juce::MouseEvent&) {}
