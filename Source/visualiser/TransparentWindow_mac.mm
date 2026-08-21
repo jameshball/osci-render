@@ -62,6 +62,8 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
+void setRoundedWindowRegion(juce::Component*, float) {}
+
 bool isRecoveryModifierDown() {
     return juce::ModifierKeys::getCurrentModifiersRealtime().isCommandDown();
 }

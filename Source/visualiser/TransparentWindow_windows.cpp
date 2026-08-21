@@ -78,6 +78,9 @@ void setWindowIgnoresMouseEvents(HWND window, bool ignoresMouseEvents, bool useL
     if (updatedStyle != style) {
         updateExtendedStyle(window, updatedStyle);
     }
+    if (useLayeredHitTesting && ignoresMouseEvents) {
+        ::SetLayeredWindowAttributes(window, 0, 255, LWA_ALPHA);
+    }
 }
 
 } // namespace
@@ -105,6 +108,29 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }, ignoresMouseEvents ? 1 : 0);
     if (!ignoresMouseEvents) {
         configureGpuTransparency(window);
+    }
+}
+
+void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
+    auto* window = getWindowHandle(topLevelWindow);
+    if (window == nullptr) {
+        return;
+    }
+    if (cornerRadius <= 0.0f) {
+        ::SetWindowRgn(window, nullptr, TRUE);
+        return;
+    }
+
+    RECT bounds{};
+    if (::GetClientRect(window, &bounds) == FALSE) {
+        return;
+    }
+    const float scale = topLevelWindow->getPeer() != nullptr
+                      ? static_cast<float>(topLevelWindow->getPeer()->getPlatformScaleFactor()) : 1.0f;
+    const int diameter = juce::jmax(1, juce::roundToInt(cornerRadius * 2.0f * scale));
+    auto* region = ::CreateRoundRectRgn(0, 0, bounds.right + 1, bounds.bottom + 1, diameter, diameter);
+    if (region != nullptr && ::SetWindowRgn(window, region, TRUE) == 0) {
+        ::DeleteObject(region);
     }
 }
 
