@@ -12,9 +12,6 @@ void configureTransparency(juce::Component* topLevelWindow);
 // Must be called on the message thread after the window has a native peer.
 void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents);
 
-// Starts the platform's normal window move interaction, including native snap behaviour.
-void beginWindowMove(juce::Component* topLevelWindow);
-
 // Uses the platform's normal maximise/restore behaviour.
 void toggleWindowMaximised(juce::Component* topLevelWindow);
 
