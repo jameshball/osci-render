@@ -60,6 +60,10 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
+void beginWindowMove(juce::Component*) {}
+
+void toggleWindowMaximised(juce::Component*) {}
+
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
     NSWindow* window = getWindow(topLevelWindow);
     NSView* contentView = window != nil ? [window contentView] : nil;
