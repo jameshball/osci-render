@@ -111,6 +111,24 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
+void beginWindowMove(juce::Component* topLevelWindow) {
+    auto* window = getWindowHandle(topLevelWindow);
+    if (window == nullptr) {
+        return;
+    }
+    ::ReleaseCapture();
+    ::SendMessageW(window, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+}
+
+void toggleWindowMaximised(juce::Component* topLevelWindow) {
+    auto* window = getWindowHandle(topLevelWindow);
+    if (window == nullptr) {
+        return;
+    }
+    ::ShowWindow(window, ::IsZoomed(window) ? SW_RESTORE : SW_MAXIMIZE);
+    configureGpuTransparency(window);
+}
+
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
     auto* window = getWindowHandle(topLevelWindow);
     if (window == nullptr) {

@@ -45,6 +45,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
 
@@ -89,6 +90,7 @@ public:
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
     bool isPaused() const;
+    bool isTransparentBackgroundEnabled() const;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseMove(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
@@ -238,6 +240,7 @@ public:
     void setAllMouseEventsPassThrough(bool shouldPassThrough);
     bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
     void refreshNativePresentation();
+    void transparencyModeChanged();
     void resized() override;
 #endif
 
@@ -252,6 +255,11 @@ private:
     VisualiserComponent* parent;
     bool fullScreenRequested = false;
     bool fullScreenTransitionPending = false;
+#if JUCE_WINDOWS
+    juce::Rectangle<int> boundsBeforeFullScreen;
+    bool transparentFullScreen = false;
+    bool reenterFullScreenAfterTransition = false;
+#endif
     bool pinned = true;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     PopoutPresentationState presentationState;
