@@ -71,6 +71,9 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
         // JUCE's peer tracking area is active even when its window is not. Leaving it installed
         // allows the ignored popout to overwrite JUCE's single component-under-mouse state after
         // AppKit has correctly routed the pointer to the window beneath it.
+        // Flush any tracking-area update queued while the new native peer was being laid out before
+        // removing the area, otherwise JUCE can recreate it immediately after the popout opens.
+        [view updateTrackingAreas];
         removeMouseTrackingAreas(view);
         [window setAcceptsMouseMovedEvents:NO];
         [window setIgnoresMouseEvents:YES];
@@ -79,6 +82,23 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
         [window setAcceptsMouseMovedEvents:YES];
         [view updateTrackingAreas];
     }
+}
+
+bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
+    auto* peer = topLevelWindow != nullptr ? topLevelWindow->getPeer() : nullptr;
+    NSView* view = peer != nullptr ? static_cast<NSView*>(peer->getNativeHandle()) : nil;
+    NSWindow* window = view != nil ? [view window] : nil;
+    if (window == nil) {
+        return false;
+    }
+
+    const bool windowIgnoresMouse = [window ignoresMouseEvents] == YES;
+    const bool acceptsMouseMovedEvents = [window acceptsMouseMovedEvents] == YES;
+    const bool hasTrackingAreas = [[view trackingAreas] count] != 0;
+    if (ignoresMouseEvents) {
+        return windowIgnoresMouse && !acceptsMouseMovedEvents && !hasTrackingAreas;
+    }
+    return !windowIgnoresMouse && acceptsMouseMovedEvents && hasTrackingAreas;
 }
 
 void toggleWindowMaximised(juce::Component*) {}

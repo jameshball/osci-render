@@ -9,6 +9,7 @@ bool isTransparencySupported() {
 
 void configureTransparency(juce::Component*) {}
 void setIgnoresMouseEvents(juce::Component*, bool) {}
+bool isMouseInteractionStateApplied(juce::Component*, bool) { return true; }
 
 void toggleWindowMaximised(juce::Component*) {}
 void setMovesToActiveSpace(juce::Component*, bool) {}

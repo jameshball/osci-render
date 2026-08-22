@@ -111,6 +111,17 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
+bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
+    auto* window = getWindowHandle(topLevelWindow);
+    if (window == nullptr) {
+        return false;
+    }
+    const auto style = ::GetWindowLongPtrW(window, GWL_EXSTYLE);
+    const bool ignoresMouse = (style & WS_EX_TRANSPARENT) != 0;
+    const bool layered = (style & WS_EX_LAYERED) != 0;
+    return ignoresMouseEvents ? ignoresMouse && layered : !ignoresMouse && !layered;
+}
+
 void toggleWindowMaximised(juce::Component* topLevelWindow) {
     auto* window = getWindowHandle(topLevelWindow);
     if (window == nullptr) {
