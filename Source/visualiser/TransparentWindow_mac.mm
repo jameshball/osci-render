@@ -28,16 +28,10 @@ NSWindow* getWindow(juce::Component* topLevelWindow) {
     return view != nil ? [view window] : nil;
 }
 
-void updateMouseMovedEventRouting(NSWindow* transparentWindow, bool ignoresMouseEvents) {
-    for (NSWindow* window in [NSApp windows]) {
-        [window setAcceptsMouseMovedEvents:YES];
+void removeMouseTrackingAreas(NSView* view) {
+    for (NSTrackingArea* trackingArea in [view trackingAreas]) {
+        [view removeTrackingArea:trackingArea];
     }
-
-    // JUCE installs active tracking areas on every peer. If both an ignored overlay and the
-    // window beneath it process the same movement, JUCE alternates mouse-enter/exit targets and
-    // hover states flicker. Keep movement enabled beneath the overlay, but disable it on the
-    // ignored window itself.
-    [transparentWindow setAcceptsMouseMovedEvents:ignoresMouseEvents ? NO : YES];
 }
 
 } // namespace
@@ -54,7 +48,6 @@ void configureTransparency(juce::Component* topLevelWindow) {
         return;
     }
 
-    updateMouseMovedEventRouting(window, false);
     [window setOpaque:NO];
     [window setBackgroundColor:[NSColor clearColor]];
     [window setHasShadow:NO];
@@ -67,10 +60,24 @@ void configureTransparency(juce::Component* topLevelWindow) {
 }
 
 void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
-    NSWindow* window = getWindow(topLevelWindow);
-    if (window != nil) {
-        updateMouseMovedEventRouting(window, ignoresMouseEvents);
-        [window setIgnoresMouseEvents:ignoresMouseEvents ? YES : NO];
+    auto* peer = topLevelWindow != nullptr ? topLevelWindow->getPeer() : nullptr;
+    NSView* view = peer != nullptr ? static_cast<NSView*>(peer->getNativeHandle()) : nil;
+    NSWindow* window = view != nil ? [view window] : nil;
+    if (window == nil) {
+        return;
+    }
+
+    if (ignoresMouseEvents) {
+        // JUCE's peer tracking area is active even when its window is not. Leaving it installed
+        // allows the ignored popout to overwrite JUCE's single component-under-mouse state after
+        // AppKit has correctly routed the pointer to the window beneath it.
+        removeMouseTrackingAreas(view);
+        [window setAcceptsMouseMovedEvents:NO];
+        [window setIgnoresMouseEvents:YES];
+    } else {
+        [window setIgnoresMouseEvents:NO];
+        [window setAcceptsMouseMovedEvents:YES];
+        [view updateTrackingAreas];
     }
 }
 
