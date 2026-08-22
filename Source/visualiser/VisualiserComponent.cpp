@@ -240,10 +240,12 @@ void VisualiserWindow::toggleFullScreen() {
 #if JUCE_WINDOWS
                 // An exact monitor-sized window can be promoted out of desktop composition on Windows,
                 // which loses per-pixel alpha. A one-pixel inset keeps the same window composited.
-                setBounds(display->totalArea.reduced(1));
+                transparentFullScreenBounds = display->totalArea.reduced(1);
 #else
-                setBounds(display->totalArea);
+                transparentFullScreenBounds = display->totalArea;
 #endif
+                const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
+                setBounds(transparentFullScreenBounds);
             }
         } else {
 #if JUCE_MAC
@@ -253,10 +255,12 @@ void VisualiserWindow::toggleFullScreen() {
         }
     } else {
         if (transparentFullScreen && !boundsBeforeFullScreen.isEmpty()) {
+            const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
             setBounds(boundsBeforeFullScreen);
         } else {
             juce::ResizableWindow::setFullScreen(false);
         }
+        transparentFullScreenBounds = {};
     }
 #else
     juce::ResizableWindow::setFullScreen(fullScreenRequested);
@@ -338,9 +342,26 @@ void VisualiserWindow::resized() {
     if (osci::windowing::isTransparencySupported() && getContentComponent() != nullptr) {
         getContentComponent()->setBounds(getLocalBounds());
     }
+    if (fullScreenRequested && transparentFullScreen && !settingTransparentFullScreenBounds
+        && !transparentFullScreenBounds.isEmpty() && getBounds() != transparentFullScreenBounds) {
+        leaveTransparentFullScreenAfterResize();
+    }
 #endif
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
     updateResizeBorderVisibility(presentationState.isFrameVisible() && !fullScreenRequested && !nativeFullScreen);
+}
+
+void VisualiserWindow::leaveTransparentFullScreenAfterResize() {
+    fullScreenRequested = false;
+    fullScreenTransitionPending = false;
+    transparentFullScreen = false;
+    transparentFullScreenBounds = {};
+    reenterFullScreenAfterTransition = false;
+#if JUCE_MAC
+    osci::windowing::setMovesToActiveSpace(this, false);
+#endif
+    setAlwaysOnTop(pinned);
+    updatePresentationState();
 }
 
 void VisualiserWindow::timerCallback() {
