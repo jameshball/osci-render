@@ -255,7 +255,7 @@ private:
     VisualiserComponent* parent;
     bool fullScreenRequested = false;
     bool fullScreenTransitionPending = false;
-#if JUCE_WINDOWS
+#if JUCE_WINDOWS || JUCE_MAC
     juce::Rectangle<int> boundsBeforeFullScreen;
     bool transparentFullScreen = false;
     bool reenterFullScreenAfterTransition = false;
