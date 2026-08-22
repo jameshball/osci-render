@@ -328,6 +328,10 @@ void VisualiserWindow::transparencyModeChanged() {
     }
 }
 
+void VisualiserWindow::pauseStateChanged() {
+    updatePresentationState();
+}
+
 void VisualiserWindow::resized() {
     juce::ResizableWindow::resized();
 #if JUCE_MAC || JUCE_WINDOWS
@@ -754,6 +758,11 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
         if (currentParamValue != paused) {
             audioProcessor.visualiserParameters.visualiserPaused->setBoolValueNotifyingHost(paused);
         }
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+        if (popout != nullptr) {
+            popout->pauseStateChanged();
+        }
+#endif
     }
 
     repaint();
