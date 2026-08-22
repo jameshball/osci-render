@@ -303,6 +303,9 @@ void VisualiserWindow::refreshNativePresentation() {
     if (parent == nullptr || parent->child == nullptr) {
         return;
     }
+#if JUCE_MAC
+    applyNativeInteraction(false);
+#endif
     presentationRefreshGeneration = parent->child->getAlphaMaskGeneration();
     presentationRefreshActive = true;
     updatePresentationState();
@@ -450,13 +453,6 @@ void VisualiserWindow::updatePresentationState() {
         presentationRefreshActive = false;
         osci::windowing::configureTransparency(this);
         setAlwaysOnTop(pinned);
-#if JUCE_MAC
-        if (nativeIgnoresMouseEvents) {
-            // AppKit may rebuild JUCE's tracking area while the initial OpenGL surface settles.
-            // Remove it again once the first mirrored alpha frame confirms setup is complete.
-            osci::windowing::setIgnoresMouseEvents(this, true);
-        }
-#endif
     }
 
     const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !presentationState.paused;
@@ -494,7 +490,16 @@ void VisualiserWindow::updatePresentationState() {
         // WS_EX_LAYERED is required for cross-process click-through, but it makes a fullscreen
         // OpenGL window composite as opaque black. Keep fullscreen on the GPU transparency path.
         applyNativeInteraction(false);
-    } else if (presentationRefreshActive || fullPassThroughActive) {
+    } else if (presentationRefreshActive) {
+#if JUCE_MAC
+        // Match the proven pause/resume lifecycle during initial setup: restore JUCE's tracking
+        // area while the native view settles, then apply the requested interaction mode below
+        // after the first mirrored alpha frame completes.
+        applyNativeInteraction(false);
+#else
+        applyNativeInteraction(true);
+#endif
+    } else if (fullPassThroughActive) {
         applyNativeInteraction(true);
     } else if (frameVisible) {
         applyNativeInteraction(false);
