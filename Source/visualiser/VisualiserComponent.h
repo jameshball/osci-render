@@ -252,6 +252,7 @@ private:
     void updatePresentationState();
     void applyNativeInteraction(bool ignoresMouseEvents);
     void updateResizeBorderVisibility(bool visible);
+    void leaveTransparentFullScreenAfterResize();
 #endif
 
     VisualiserComponent* parent;
@@ -259,7 +260,9 @@ private:
     bool fullScreenTransitionPending = false;
 #if JUCE_WINDOWS || JUCE_MAC
     juce::Rectangle<int> boundsBeforeFullScreen;
+    juce::Rectangle<int> transparentFullScreenBounds;
     bool transparentFullScreen = false;
+    bool settingTransparentFullScreenBounds = false;
     bool reenterFullScreenAfterTransition = false;
 #endif
     bool pinned = true;
