@@ -49,6 +49,17 @@ public:
         expect(holdState.isAlphaInteractionHeld(1250));
         expect(!holdState.isAlphaInteractionHeld(1251));
 
+        beginTest("Stationary rendered content does not reclaim ignored mouse events");
+        PopoutPresentationState hoverState;
+        hoverState.updateAlphaHit(true, true, false, 1000);
+        expect(!hoverState.isAlphaInteractionHeld(1000));
+        hoverState.updateAlphaHit(true, true, true, 1001);
+        expect(hoverState.isAlphaInteractionHeld(1001));
+        hoverState.updateAlphaHit(true, false, false, 1100);
+        expect(hoverState.isAlphaInteractionHeld(1100));
+        hoverState.resetAlphaInteraction();
+        expect(!hoverState.isAlphaInteractionHeld(1100));
+
         beginTest("Frame visibility overrides and restoration");
         PopoutPresentationState state;
         expect(state.isFrameVisible());

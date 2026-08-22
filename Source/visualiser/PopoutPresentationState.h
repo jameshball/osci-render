@@ -17,6 +17,16 @@ struct PopoutPresentationState {
         hasAlphaHit = true;
     }
 
+    void updateAlphaHit(bool alphaHit, bool mouseEventsIgnored, bool movedBeyondPadding, std::uint32_t now) {
+        if (alphaHit && (!mouseEventsIgnored || movedBeyondPadding)) {
+            registerAlphaHit(now);
+        }
+    }
+
+    void resetAlphaInteraction() {
+        hasAlphaHit = false;
+    }
+
     bool isAlphaInteractionHeld(std::uint32_t now) const {
         return hasAlphaHit && now - lastAlphaHitTime <= interactionHoldMs;
     }

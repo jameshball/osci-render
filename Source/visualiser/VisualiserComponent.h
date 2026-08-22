@@ -39,7 +39,8 @@ public:
     std::function<void()> onToggleMouseInteraction;
 
     void setState(bool visible, bool requestedVisible, bool alwaysOnTop, bool fullScreen,
-                  bool allMouseEventsPassThrough, bool paused, bool clickThroughHintVisible);
+                  bool allMouseEventsPassThrough, bool paused, bool clickThroughHintVisible,
+                  bool transparencyEnabled = true);
 
     bool hitTest(int x, int y) override;
     void paint(juce::Graphics& g) override;
@@ -111,7 +112,7 @@ public:
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool alwaysOnTop,
                                       bool fullScreen, bool allMouseEventsPassThrough, bool paused,
-                                      bool clickThroughHintVisible);
+                                      bool clickThroughHintVisible, bool transparencyEnabled = true);
 #endif
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void refreshOpenGLSurfaceTransparency();
@@ -269,6 +270,8 @@ private:
     bool presentationRefreshActive = false;
     bool windowCornersConfigured = false;
     bool windowCornersRounded = false;
+    bool hasAlphaPassThroughAnchor = false;
+    juce::Point<int> alphaPassThroughAnchor;
     std::uint64_t presentationRefreshGeneration = 0;
     juce::uint32 clickThroughHintEndTime = 0;
 #endif

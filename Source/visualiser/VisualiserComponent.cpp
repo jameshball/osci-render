@@ -50,14 +50,15 @@ PopoutToolbar::PopoutToolbar() {
 }
 
 void PopoutToolbar::setState(bool visible, bool requestedVisible, bool alwaysOnTop, bool isFullScreen,
-                             bool allMouseEventsPassThrough, bool paused, bool showClickThroughHint) {
+                             bool allMouseEventsPassThrough, bool paused, bool showClickThroughHint,
+                             bool transparencyEnabled) {
     frameVisible = visible;
     fullScreen = isFullScreen;
     closeButton.setVisible(visible);
     fullscreenButton.setVisible(visible);
     frameButton.setVisible(visible);
     alwaysOnTopButton.setVisible(visible);
-    mouseInteractionButton.setVisible(visible);
+    mouseInteractionButton.setVisible(visible && transparencyEnabled);
     frameButton.setToggleState(!requestedVisible, juce::NotificationType::dontSendNotification);
     frameButton.setTooltip(requestedVisible ? "Hide Window Frame." : "Show Window Frame.");
     alwaysOnTopButton.setToggleState(alwaysOnTop, juce::NotificationType::dontSendNotification);
@@ -290,7 +291,8 @@ void VisualiserWindow::setAllMouseEventsPassThrough(bool shouldPassThrough) {
     if (shouldPassThrough) {
         presentationState.requestedFrameVisible = false;
         const bool paused = parent != nullptr && parent->isPaused();
-        clickThroughHintVisible = !paused;
+        const bool transparencyEnabled = parent != nullptr && parent->isTransparentBackgroundEnabled();
+        clickThroughHintVisible = transparencyEnabled && !paused;
         if (clickThroughHintVisible) {
             clickThroughHintEndTime = juce::Time::getMillisecondCounter() + 5000;
         }
@@ -318,7 +320,12 @@ void VisualiserWindow::transparencyModeChanged() {
     if (reenterFullScreenAfterTransition) {
         return;
     }
-    refreshNativePresentation();
+    if (parent != nullptr && parent->isTransparentBackgroundEnabled()) {
+        refreshNativePresentation();
+    } else {
+        presentationRefreshActive = false;
+        updatePresentationState();
+    }
 }
 
 void VisualiserWindow::resized() {
@@ -338,12 +345,19 @@ void VisualiserWindow::timerCallback() {
 
 void VisualiserWindow::updatePresentationState() {
     const auto now = juce::Time::getMillisecondCounter();
+    const bool transparencyEnabled = parent != nullptr && parent->isTransparentBackgroundEnabled();
     presentationState.paused = parent != nullptr && parent->isPaused();
     if (presentationState.paused) {
         clickThroughHintVisible = false;
     }
     if (clickThroughHintVisible && static_cast<std::int32_t>(now - clickThroughHintEndTime) >= 0) {
         clickThroughHintVisible = false;
+    }
+    if (!transparencyEnabled) {
+        presentationRefreshActive = false;
+        clickThroughHintVisible = false;
+        presentationState.resetAlphaInteraction();
+        hasAlphaPassThroughAnchor = false;
     }
 
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
@@ -378,7 +392,11 @@ void VisualiserWindow::updatePresentationState() {
         setAlwaysOnTop(pinned);
     }
 
-    const bool fullPassThroughActive = allMouseEventsPassThrough && !presentationState.paused;
+    const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !presentationState.paused;
+    if (fullPassThroughActive) {
+        presentationState.resetAlphaInteraction();
+        hasAlphaPassThroughAnchor = false;
+    }
     const bool frameVisible = presentationState.isFrameVisible()
                            && !presentationRefreshActive
                            && !fullPassThroughActive;
@@ -391,17 +409,21 @@ void VisualiserWindow::updatePresentationState() {
         windowCornersRounded = framedWindow;
     }
     if (parent != nullptr && parent->child != nullptr) {
-        parent->child->setAlphaMaskCaptureEnabled(!frameVisible || presentationRefreshActive);
+        const bool alphaMaskNeeded = transparencyEnabled && !fullPassThroughActive
+                                  && (!frameVisible || presentationRefreshActive);
+        parent->child->setAlphaMaskCaptureEnabled(alphaMaskNeeded);
         parent->child->setPopoutPresentationOverlay(frameVisible, presentationState.requestedFrameVisible,
-                                                     pinned, fullScreenActive, allMouseEventsPassThrough,
-                                                     presentationState.paused, clickThroughHintVisible);
+                                                     pinned, fullScreenActive,
+                                                     transparencyEnabled && allMouseEventsPassThrough,
+                                                     presentationState.paused, clickThroughHintVisible,
+                                                     transparencyEnabled);
     }
 #if JUCE_WINDOWS
     const bool forceFullScreenInteraction = fullScreenActive;
 #else
     const bool forceFullScreenInteraction = false;
 #endif
-    if (forceFullScreenInteraction) {
+    if (!transparencyEnabled || forceFullScreenInteraction) {
         // WS_EX_LAYERED is required for cross-process click-through, but it makes a fullscreen
         // OpenGL window composite as opaque black. Keep fullscreen on the GPU transparency path.
         applyNativeInteraction(false);
@@ -411,9 +433,10 @@ void VisualiserWindow::updatePresentationState() {
         applyNativeInteraction(false);
     } else {
         bool alphaHit = false;
+        const auto screenCursor = juce::Desktop::getMousePosition();
         if (parent != nullptr && parent->child != nullptr) {
             const auto frameSize = parent->child->getAlphaMaskSize();
-            const auto cursor = parent->child->getLocalPoint(nullptr, juce::Desktop::getMousePosition());
+            const auto cursor = parent->child->getLocalPoint(nullptr, screenCursor);
             const float scale = getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f;
             const auto query = makePopoutAlphaQuery(parent->child->getLocalBounds(), frameSize, cursor,
                                                      8.0f / juce::jmax(1.0f, scale));
@@ -422,20 +445,24 @@ void VisualiserWindow::updatePresentationState() {
                                                                 popoutInteractionAlphaThreshold);
             }
         }
-        if (alphaHit) {
-            presentationState.registerAlphaHit(now);
+        if (nativeIgnoresMouseEvents && !alphaHit) {
+            alphaPassThroughAnchor = screenCursor;
+            hasAlphaPassThroughAnchor = true;
         }
+        const bool movedBeyondPadding = !hasAlphaPassThroughAnchor
+                                     || alphaPassThroughAnchor.getDistanceFrom(screenCursor) > 8.0;
+        presentationState.updateAlphaHit(alphaHit, nativeIgnoresMouseEvents, movedBeyondPadding, now);
         applyNativeInteraction(!presentationState.isAlphaInteractionHeld(now));
     }
 
-    const bool needsTimer = !presentationState.requestedFrameVisible
+    const bool needsTimer = (transparencyEnabled && !presentationState.requestedFrameVisible)
                          || fullScreenTransitionPending
 #if JUCE_WINDOWS
                          || reenterFullScreenAfterTransition
 #endif
-                         || presentationRefreshActive
-                         || allMouseEventsPassThrough
-                         || clickThroughHintVisible;
+                         || (transparencyEnabled && presentationRefreshActive)
+                         || (transparencyEnabled && allMouseEventsPassThrough)
+                         || (transparencyEnabled && clickThroughHintVisible);
     if (needsTimer && !isTimerRunning()) {
         startTimerHz(60);
     } else if (!needsTimer) {
@@ -446,6 +473,12 @@ void VisualiserWindow::updatePresentationState() {
 void VisualiserWindow::applyNativeInteraction(bool ignoresMouseEvents) {
     if (nativeIgnoresMouseEvents == ignoresMouseEvents) {
         return;
+    }
+    if (ignoresMouseEvents) {
+        alphaPassThroughAnchor = juce::Desktop::getMousePosition();
+        hasAlphaPassThroughAnchor = true;
+    } else {
+        hasAlphaPassThroughAnchor = false;
     }
     nativeIgnoresMouseEvents = ignoresMouseEvents;
     osci::windowing::setIgnoresMouseEvents(this, ignoresMouseEvents);
@@ -1487,12 +1520,14 @@ void VisualiserComponent::newOpenGLContextCreated() {
 void VisualiserComponent::setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible,
                                                         bool alwaysOnTop, bool fullScreen,
                                                         bool allMouseEventsPassThrough, bool paused,
-                                                        bool clickThroughHintVisible) {
+                                                        bool clickThroughHintVisible,
+                                                        bool transparencyEnabled) {
     if (popoutToolbar == nullptr) {
         return;
     }
     popoutToolbar->setState(frameVisible, requestedFrameVisible, alwaysOnTop, fullScreen,
-                            allMouseEventsPassThrough, paused, clickThroughHintVisible);
+                            allMouseEventsPassThrough, paused, clickThroughHintVisible,
+                            transparencyEnabled);
     popoutToolbar->setVisible(frameVisible || clickThroughHintVisible);
     openGLContext.setComponentPaintingEnabled(frameVisible || clickThroughHintVisible);
 }
