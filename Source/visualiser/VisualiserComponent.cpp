@@ -217,6 +217,7 @@ bool VisualiserWindow::keyPressed(const juce::KeyPress& key) {
 
 void VisualiserWindow::closeButtonPressed() {
     VisualiserComponent* parent = this->parent;
+    saveWindowState();
     parent->child = nullptr;
     parent->popout.reset();
     parent->childUpdated();
@@ -275,6 +276,18 @@ void VisualiserWindow::setPinned(bool shouldBePinned) {
 #endif
     updatePresentationState();
 #endif
+}
+
+void VisualiserWindow::saveWindowState() {
+    auto normalBounds = getBounds();
+#if JUCE_WINDOWS || JUCE_MAC
+    if (fullScreenRequested && !boundsBeforeFullScreen.isEmpty()) {
+        normalBounds = boundsBeforeFullScreen;
+    }
+#endif
+    if (parent != nullptr) {
+        parent->savePopoutWindowState(normalBounds, fullScreenRequested);
+    }
 }
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
@@ -743,6 +756,9 @@ VisualiserComponent::VisualiserComponent(
 }
 
 VisualiserComponent::~VisualiserComponent() {
+    if (popout != nullptr) {
+        popout->saveWindowState();
+    }
     // Stop the background thread while VisualiserComponent's vtable is still live.
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
@@ -1296,8 +1312,13 @@ void VisualiserComponent::popoutWindow() {
     popout->setResizable(true, false);
     // Register editor as KeyListener so undo/redo shortcuts work in the popout window
     popout->addKeyListener(&editor);
+    const auto savedBounds = getSavedPopoutBounds();
+    if (savedBounds.isEmpty()) {
+        popout->centreWithSize(350, 350);
+    } else {
+        popout->setBounds(savedBounds);
+    }
     popout->setVisible(true);
-    popout->centreWithSize(350, 350);
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     if (osci::windowing::isTransparencySupported()) {
         osci::windowing::configureTransparency(popout.get());
@@ -1337,6 +1358,9 @@ void VisualiserComponent::popoutWindow() {
         popout->refreshNativePresentation();
     }
 #endif
+    if (wasPopoutFullScreen()) {
+        popout->toggleFullScreen();
+    }
     resized();
 #endif
 }
@@ -1401,6 +1425,39 @@ void VisualiserComponent::setPopoutClicksPassThrough(bool clicksPassThrough) {
 
 bool VisualiserComponent::doPopoutClicksPassThrough() const {
     return audioProcessor.globalSettings.getBool("popoutClicksPassThrough", false);
+}
+
+void VisualiserComponent::savePopoutWindowState(juce::Rectangle<int> bounds, bool fullScreen) {
+    if (!bounds.isEmpty()) {
+        audioProcessor.globalSettings.set("popoutWindowBounds", bounds.toString());
+    }
+    audioProcessor.globalSettings.set("popoutFullScreen", fullScreen);
+    audioProcessor.globalSettings.save();
+}
+
+juce::Rectangle<int> VisualiserComponent::getSavedPopoutBounds() const {
+    auto bounds = juce::Rectangle<int>::fromString(audioProcessor.globalSettings.getString("popoutWindowBounds"));
+    if (bounds.getWidth() < 100 || bounds.getHeight() < 100) {
+        return {};
+    }
+
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    auto* display = displays.getDisplayForRect(bounds);
+    if (display == nullptr) {
+        display = displays.getPrimaryDisplay();
+    }
+    if (display == nullptr) {
+        return bounds;
+    }
+
+    const auto available = display->userArea;
+    bounds.setSize(juce::jmin(bounds.getWidth(), available.getWidth()),
+                   juce::jmin(bounds.getHeight(), available.getHeight()));
+    return bounds.constrainedWithin(available);
+}
+
+bool VisualiserComponent::wasPopoutFullScreen() const {
+    return audioProcessor.globalSettings.getBool("popoutFullScreen", false);
 }
 
 void VisualiserComponent::prepareOverlayFadeIn() {
