@@ -72,6 +72,7 @@ void PopoutToolbar::setState(bool visible, bool requestedVisible, bool alwaysOnT
     }
     fullscreenButton.setTooltip(fullScreen ? "Exit Fullscreen." : "Enter Fullscreen.");
     clickThroughHintVisible = showClickThroughHint;
+    resized();
     repaint();
 }
 
@@ -120,18 +121,26 @@ void PopoutToolbar::paint(juce::Graphics& g) {
 
 void PopoutToolbar::resized() {
     auto bar = getLocalBounds().removeFromTop(toolbarHeight);
+    const auto placeFromLeft = [&bar](juce::Component& component, int inset) {
+        component.setBounds(component.isVisible() ? bar.removeFromLeft(toolbarHeight).reduced(inset)
+                                                  : juce::Rectangle<int>());
+    };
+    const auto placeFromRight = [&bar](juce::Component& component, int inset) {
+        component.setBounds(component.isVisible() ? bar.removeFromRight(toolbarHeight).reduced(inset)
+                                                  : juce::Rectangle<int>());
+    };
 #if JUCE_WINDOWS || JUCE_LINUX
-    closeButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(3));
-    fullscreenButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
-    frameButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
-    mouseInteractionButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
-    alwaysOnTopButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(4));
+    placeFromRight(closeButton, 3);
+    placeFromLeft(fullscreenButton, 4);
+    placeFromLeft(frameButton, 4);
+    placeFromLeft(mouseInteractionButton, 4);
+    placeFromLeft(alwaysOnTopButton, 4);
 #else
-    closeButton.setBounds(bar.removeFromLeft(toolbarHeight).reduced(3));
-    fullscreenButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
-    frameButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
-    mouseInteractionButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
-    alwaysOnTopButton.setBounds(bar.removeFromRight(toolbarHeight).reduced(4));
+    placeFromLeft(closeButton, 3);
+    placeFromRight(fullscreenButton, 4);
+    placeFromRight(frameButton, 4);
+    placeFromRight(mouseInteractionButton, 4);
+    placeFromRight(alwaysOnTopButton, 4);
 #endif
 }
 
