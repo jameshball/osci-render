@@ -106,6 +106,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipWindow->setMillisecondsBeforeTipAppears(500);
+    tooltipWindow->setLookAndFeel(&lookAndFeel);
 
     updateTitle();
 
@@ -301,6 +302,10 @@ CommonPluginEditor::~CommonPluginEditor() {
 
     if (audioProcessor.haltRecording != nullptr) {
         audioProcessor.haltRecording();
+    }
+
+    if (&tooltipWindow->getLookAndFeel() == &lookAndFeel) {
+        tooltipWindow->setLookAndFeel(nullptr);
     }
 
     setLookAndFeel(nullptr);
