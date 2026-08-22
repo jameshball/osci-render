@@ -450,6 +450,13 @@ void VisualiserWindow::updatePresentationState() {
         presentationRefreshActive = false;
         osci::windowing::configureTransparency(this);
         setAlwaysOnTop(pinned);
+#if JUCE_MAC
+        if (nativeIgnoresMouseEvents) {
+            // AppKit may rebuild JUCE's tracking area while the initial OpenGL surface settles.
+            // Remove it again once the first mirrored alpha frame confirms setup is complete.
+            osci::windowing::setIgnoresMouseEvents(this, true);
+        }
+#endif
     }
 
     const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !presentationState.paused;
@@ -1331,7 +1338,7 @@ void VisualiserComponent::popoutWindow() {
         popout->setRequestedFrameVisible(isPopoutFrameVisible());
     }
 #endif
-#if OSCI_PREMIUM && JUCE_WINDOWS
+#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     if (osci::windowing::isTransparencySupported()) {
         popout->refreshNativePresentation();
     }
