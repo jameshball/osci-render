@@ -144,15 +144,8 @@ void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
 
 void PopoutToolbar::mouseDoubleClick(const juce::MouseEvent& event) {
 #if JUCE_WINDOWS
-    if (!event.mods.isLeftButtonDown()) {
-        return;
-    }
-    if (fullScreen) {
-        if (onFullScreen != nullptr) {
-            onFullScreen();
-        }
-    } else {
-        osci::windowing::toggleWindowMaximised(getTopLevelComponent());
+    if (event.mods.isLeftButtonDown() && onFullScreen != nullptr) {
+        onFullScreen();
     }
 #else
     juce::ignoreUnused(event);

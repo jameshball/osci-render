@@ -101,8 +101,6 @@ bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignore
     return !windowIgnoresMouse && acceptsMouseMovedEvents && hasTrackingAreas;
 }
 
-void toggleWindowMaximised(juce::Component*) {}
-
 void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove) {
     NSWindow* window = getWindow(topLevelWindow);
     if (window == nil) {

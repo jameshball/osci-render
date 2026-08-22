@@ -122,15 +122,6 @@ bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignore
     return ignoresMouseEvents ? ignoresMouse && layered : !ignoresMouse && !layered;
 }
 
-void toggleWindowMaximised(juce::Component* topLevelWindow) {
-    auto* window = getWindowHandle(topLevelWindow);
-    if (window == nullptr) {
-        return;
-    }
-    ::ShowWindow(window, ::IsZoomed(window) ? SW_RESTORE : SW_MAXIMIZE);
-    configureGpuTransparency(window);
-}
-
 void setMovesToActiveSpace(juce::Component*, bool) {}
 
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
