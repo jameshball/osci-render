@@ -1354,6 +1354,10 @@ void VisualiserComponent::popoutWindow() {
     if (wasPopoutFullScreen()) {
         popout->toggleFullScreen();
     }
+    // A plugin host can allow JUCE's first OpenGL component paint before the popout peer has
+    // its final display scale. Repaint once after the peer, bounds, mirror context, and
+    // presentation overlay are configured so JUCE rebuilds that layer at the physical scale.
+    visualiser->repaint();
     resized();
 #endif
 }
