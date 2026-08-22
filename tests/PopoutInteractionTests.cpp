@@ -70,6 +70,36 @@ public:
         state.paused = false;
         expect(!state.isFrameVisible());
         expect(PopoutPresentationState().isFrameVisible());
+
+        beginTest("Pass-through suppresses controls without changing their preference");
+        state.requestedFrameVisible = true;
+        auto presentation = state.derive(true, true, false, true, false, false, true);
+        expect(!presentation.frameVisible);
+        expect(state.requestedFrameVisible);
+        presentation = state.derive(true, true, false, false, false, false, true);
+        expect(presentation.frameVisible);
+
+        beginTest("Paused presentation restores interaction but preserves pass-through intent");
+        state.paused = true;
+        presentation = state.derive(true, true, false, true, false, false, true);
+        expect(presentation.frameVisible);
+        expect(presentation.allMouseEventsPassThrough);
+        expect(presentation.interactionMode == PopoutInteractionMode::interactive);
+
+        beginTest("Opaque presentation never captures alpha or passes events through");
+        state.paused = false;
+        state.requestedFrameVisible = false;
+        presentation = state.derive(false, true, false, true, false, false, true);
+        expect(presentation.interactionMode == PopoutInteractionMode::interactive);
+        expect(!presentation.alphaCaptureRequired);
+
+        beginTest("Transparent fullscreen honours platform interaction capability");
+        const auto capable = state.derive(true, true, true, false, false, false, true);
+        const auto limited = state.derive(true, true, true, false, false, false, false);
+        expect(capable.interactionMode == PopoutInteractionMode::alphaAware);
+        expect(limited.interactionMode == PopoutInteractionMode::interactive);
+        expect(capable.clickThroughAvailable);
+        expect(!limited.clickThroughAvailable);
     }
 };
 

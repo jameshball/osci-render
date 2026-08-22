@@ -34,7 +34,6 @@ public:
     juce::Array<EncoderDetails> getAvailableEncodersForCodec(VideoCodec codec);
     bool supportsVideoCodec(VideoCodec codec) const;
     bool supportsTransparentVideoEncoding() const;
-    void refreshAvailableEncoders();
 
     // Check if a hardware encoder is available
     bool isHardwareEncoderAvailable(const juce::String& encoderName);

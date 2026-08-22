@@ -175,6 +175,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps, VisualiserParamete
     parameters.canvasWidth.addListener(this);
     parameters.canvasHeight.addListener(this);
     visualiserParameters.transparentBackground->addListener(this);
+    startTimerHz(30);
 
     updateLosslessAudioEnabled();
     recordAudio.onClick = [this] {
@@ -237,6 +238,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps, VisualiserParamete
 }
 
 RecordingSettings::~RecordingSettings() {
+    stopTimer();
     parameters.canvasWidth.removeListener(this);
     parameters.canvasHeight.removeListener(this);
 #if OSCI_PREMIUM
@@ -288,17 +290,28 @@ void RecordingSettings::updateCanvasControlsVisibility() {
 }
 
 void RecordingSettings::parameterValueChanged(int parameterIndex, float newValue) {
-    juce::ignoreUnused(parameterIndex, newValue);
-    juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<RecordingSettings>(this)] {
-        if (safeThis == nullptr) {
-            return;
-        }
-        safeThis->updateVideoEncodingControls();
-        safeThis->parameters.sanitiseCanvasParameters();
-        safeThis->parameters.canvasPreset = VisualiserGeometry::getPresetForRenderSize(safeThis->parameters.getCanvasSize());
-        safeThis->updateCanvasPresetSelector();
-        safeThis->updateCanvasControlsVisibility();
-    });
+    juce::ignoreUnused(newValue);
+#if OSCI_PREMIUM
+    const bool transparencyChanged = parameterIndex == visualiserParameters.transparentBackground->getParameterIndex();
+#else
+    const bool transparencyChanged = false;
+    juce::ignoreUnused(parameterIndex);
+#endif
+    pendingParameterUpdates.fetch_or(transparencyChanged ? 2u : 1u, std::memory_order_release);
+}
+
+void RecordingSettings::timerCallback() {
+    const auto updates = pendingParameterUpdates.exchange(0, std::memory_order_acquire);
+    if (updates == 0) {
+        return;
+    }
+    updateVideoEncodingControls();
+    if ((updates & 1u) != 0) {
+        parameters.sanitiseCanvasParameters();
+        parameters.canvasPreset = VisualiserGeometry::getPresetForRenderSize(parameters.getCanvasSize());
+        updateCanvasPresetSelector();
+        updateCanvasControlsVisibility();
+    }
 }
 
 void RecordingSettings::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {
