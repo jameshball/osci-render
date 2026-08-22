@@ -101,6 +101,10 @@ public:
     void childUpdated();
     void setPopoutAlwaysOnTop(bool alwaysOnTop);
     bool isPopoutAlwaysOnTop() const;
+    void setPopoutFrameVisible(bool visible);
+    bool isPopoutFrameVisible() const;
+    void setPopoutClicksPassThrough(bool clicksPassThrough);
+    bool doPopoutClicksPassThrough() const;
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
     void cancelOverlayFadeIn();
@@ -238,7 +242,7 @@ public:
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     bool getAllMouseEventsPassThrough() const { return allMouseEventsPassThrough; }
     void setRequestedFrameVisible(bool visible);
-    void setAllMouseEventsPassThrough(bool shouldPassThrough);
+    void setAllMouseEventsPassThrough(bool shouldPassThrough, bool showHint = true);
     bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
     void refreshNativePresentation();
     void transparencyModeChanged();
@@ -253,6 +257,7 @@ private:
     void applyNativeInteraction(bool ignoresMouseEvents);
     void updateResizeBorderVisibility(bool visible);
     void leaveTransparentFullScreenAfterResize();
+    void enterTransparentFullScreen();
 #endif
 
     VisualiserComponent* parent;
