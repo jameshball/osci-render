@@ -15,6 +15,9 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
 // Uses the platform's normal maximise/restore behaviour.
 void toggleWindowMaximised(juce::Component* topLevelWindow);
 
+// Controls whether activating the window moves it to the currently active desktop space.
+void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove);
+
 // Updates the native window shape after a borderless popout is created or resized.
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius);
 

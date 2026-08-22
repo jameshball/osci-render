@@ -120,6 +120,8 @@ void toggleWindowMaximised(juce::Component* topLevelWindow) {
     configureGpuTransparency(window);
 }
 
+void setMovesToActiveSpace(juce::Component*, bool) {}
+
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
     auto* window = getWindowHandle(topLevelWindow);
     if (window == nullptr) {
