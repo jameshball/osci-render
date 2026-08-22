@@ -242,6 +242,7 @@ public:
     bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
     void refreshNativePresentation();
     void transparencyModeChanged();
+    void pauseStateChanged();
     void resized() override;
 #endif
 
