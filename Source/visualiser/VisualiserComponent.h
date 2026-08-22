@@ -105,6 +105,9 @@ public:
     bool isPopoutFrameVisible() const;
     void setPopoutClicksPassThrough(bool clicksPassThrough);
     bool doPopoutClicksPassThrough() const;
+    void savePopoutWindowState(juce::Rectangle<int> bounds, bool fullScreen);
+    juce::Rectangle<int> getSavedPopoutBounds() const;
+    bool wasPopoutFullScreen() const;
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
     void cancelOverlayFadeIn();
@@ -238,6 +241,7 @@ public:
     bool getIsFullScreen() const { return fullScreenRequested; }
     bool isPinned() const { return pinned; }
     void setPinned(bool shouldBePinned);
+    void saveWindowState();
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     bool getAllMouseEventsPassThrough() const { return allMouseEventsPassThrough; }
