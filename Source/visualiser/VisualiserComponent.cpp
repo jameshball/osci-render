@@ -303,9 +303,6 @@ void VisualiserWindow::refreshNativePresentation() {
     if (parent == nullptr || parent->child == nullptr) {
         return;
     }
-#if JUCE_MAC
-    applyNativeInteraction(false);
-#endif
     presentationRefreshGeneration = parent->child->getAlphaMaskGeneration();
     presentationRefreshActive = true;
     updatePresentationState();
@@ -490,16 +487,7 @@ void VisualiserWindow::updatePresentationState() {
         // WS_EX_LAYERED is required for cross-process click-through, but it makes a fullscreen
         // OpenGL window composite as opaque black. Keep fullscreen on the GPU transparency path.
         applyNativeInteraction(false);
-    } else if (presentationRefreshActive) {
-#if JUCE_MAC
-        // Match the proven pause/resume lifecycle during initial setup: restore JUCE's tracking
-        // area while the native view settles, then apply the requested interaction mode below
-        // after the first mirrored alpha frame completes.
-        applyNativeInteraction(false);
-#else
-        applyNativeInteraction(true);
-#endif
-    } else if (fullPassThroughActive) {
+    } else if (presentationRefreshActive || fullPassThroughActive) {
         applyNativeInteraction(true);
     } else if (frameVisible) {
         applyNativeInteraction(false);
@@ -541,7 +529,8 @@ void VisualiserWindow::updatePresentationState() {
 }
 
 void VisualiserWindow::applyNativeInteraction(bool ignoresMouseEvents) {
-    if (nativeIgnoresMouseEvents == ignoresMouseEvents) {
+    if (nativeIgnoresMouseEvents == ignoresMouseEvents
+        && osci::windowing::isMouseInteractionStateApplied(this, ignoresMouseEvents)) {
         return;
     }
     if (ignoresMouseEvents) {
@@ -1343,7 +1332,7 @@ void VisualiserComponent::popoutWindow() {
         popout->setRequestedFrameVisible(isPopoutFrameVisible());
     }
 #endif
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+#if OSCI_PREMIUM && JUCE_WINDOWS
     if (osci::windowing::isTransparencySupported()) {
         popout->refreshNativePresentation();
     }

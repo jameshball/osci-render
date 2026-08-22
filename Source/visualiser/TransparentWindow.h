@@ -12,6 +12,9 @@ void configureTransparency(juce::Component* topLevelWindow);
 // Must be called on the message thread after the window has a native peer.
 void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents);
 
+// Checks the native window rather than relying on cached presentation state.
+bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignoresMouseEvents);
+
 // Uses the platform's normal maximise/restore behaviour.
 void toggleWindowMaximised(juce::Component* topLevelWindow);
 
