@@ -62,6 +62,24 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
 
 void toggleWindowMaximised(juce::Component*) {}
 
+void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove) {
+    NSWindow* window = getWindow(topLevelWindow);
+    if (window == nil) {
+        return;
+    }
+
+    auto behaviour = [window collectionBehavior];
+    if (shouldMove) {
+        behaviour |= NSWindowCollectionBehaviorMoveToActiveSpace;
+    } else {
+        behaviour &= ~NSWindowCollectionBehaviorMoveToActiveSpace;
+    }
+    [window setCollectionBehavior:behaviour];
+    if (shouldMove) {
+        [window makeKeyAndOrderFront:nil];
+    }
+}
+
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
     NSWindow* window = getWindow(topLevelWindow);
     NSView* contentView = window != nil ? [window contentView] : nil;

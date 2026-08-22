@@ -230,6 +230,9 @@ void VisualiserWindow::toggleFullScreen() {
     if (fullScreenRequested) {
         transparentFullScreen = parent != nullptr && parent->isTransparentBackgroundEnabled();
         if (transparentFullScreen) {
+#if JUCE_MAC
+            osci::windowing::setMovesToActiveSpace(this, true);
+#endif
             boundsBeforeFullScreen = getBounds();
             auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(boundsBeforeFullScreen);
             if (display != nullptr) {
@@ -242,6 +245,9 @@ void VisualiserWindow::toggleFullScreen() {
 #endif
             }
         } else {
+#if JUCE_MAC
+            osci::windowing::setMovesToActiveSpace(this, false);
+#endif
             juce::ResizableWindow::setFullScreen(true);
         }
     } else {
@@ -390,7 +396,12 @@ void VisualiserWindow::updatePresentationState() {
                                                      pinned, fullScreenActive, allMouseEventsPassThrough,
                                                      presentationState.paused, clickThroughHintVisible);
     }
-    if (fullScreenActive) {
+#if JUCE_WINDOWS
+    const bool forceFullScreenInteraction = fullScreenActive;
+#else
+    const bool forceFullScreenInteraction = false;
+#endif
+    if (forceFullScreenInteraction) {
         // WS_EX_LAYERED is required for cross-process click-through, but it makes a fullscreen
         // OpenGL window composite as opaque black. Keep fullscreen on the GPU transparency path.
         applyNativeInteraction(false);
