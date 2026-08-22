@@ -221,7 +221,16 @@ void VisualiserWindow::closeButtonPressed() {
     VisualiserComponent* parent = this->parent;
     saveWindowState();
     parent->child = nullptr;
+#if JUCE_LINUX
+    // JUCE's Linux OpenGL backend calls eglTerminate when any OpenGLContext is
+    // detached. The EGL display is process-wide, so destroying this mirror
+    // context also invalidates the primary editor's live GPU surfaces. JUCE
+    // deliberately keeps OpenGL attached to minimised peers, allowing this
+    // window to be restored without rebuilding either GPU context.
+    setMinimised(true);
+#else
     parent->popout.reset();
+#endif
     parent->childUpdated();
     parent->resized();
 }
@@ -685,7 +694,7 @@ VisualiserComponent::VisualiserComponent(
 
 #if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
-        if (popout != nullptr) {
+        if (child != nullptr) {
             popout->closeButtonPressed();
         } else {
             popoutWindow();
@@ -1287,6 +1296,18 @@ void VisualiserComponent::popoutWindow() {
 
     // Release renderingSemaphore to prevent deadlock when creating a child visualizer
     renderingSemaphore.release();
+
+#if JUCE_LINUX
+    if (popout != nullptr) {
+        auto* visualiser = dynamic_cast<VisualiserComponent*>(popout->getContentComponent());
+        child = visualiser;
+        popout->setMinimised(false);
+        popout->toFront(true);
+        childUpdated();
+        resized();
+        return;
+    }
+#endif
 
     auto visualiser = new VisualiserComponent(
         audioProcessor,
