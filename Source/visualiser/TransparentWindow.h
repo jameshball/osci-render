@@ -15,9 +15,6 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
 // Checks the native window rather than relying on cached presentation state.
 bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignoresMouseEvents);
 
-// Uses the platform's normal maximise/restore behaviour.
-void toggleWindowMaximised(juce::Component* topLevelWindow);
-
 // Controls whether activating the window moves it to the currently active desktop space.
 void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove);
 
