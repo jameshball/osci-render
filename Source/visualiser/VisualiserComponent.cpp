@@ -586,7 +586,7 @@ VisualiserComponent::VisualiserComponent(
     VisualiserSettings &settings,
     RecordingSettings &recordingSettings,
     VisualiserComponent *parent,
-    bool visualiserOnly) : VisualiserRenderer(settings.parameters, processor.threadManager),
+    bool visualiserOnly) : VisualiserRenderer(settings.parameters, processor.threadManager, {1024, 1024}, 60.0, "", parent == nullptr),
                            settings(settings),
                            audioProcessor(processor),
                            ffmpegFile(ffmpegFile),
