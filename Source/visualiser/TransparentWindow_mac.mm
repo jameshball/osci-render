@@ -28,10 +28,16 @@ NSWindow* getWindow(juce::Component* topLevelWindow) {
     return view != nil ? [view window] : nil;
 }
 
-void enableMouseMovedEventsForApplicationWindows() {
+void updateMouseMovedEventRouting(NSWindow* transparentWindow, bool ignoresMouseEvents) {
     for (NSWindow* window in [NSApp windows]) {
         [window setAcceptsMouseMovedEvents:YES];
     }
+
+    // JUCE installs active tracking areas on every peer. If both an ignored overlay and the
+    // window beneath it process the same movement, JUCE alternates mouse-enter/exit targets and
+    // hover states flicker. Keep movement enabled beneath the overlay, but disable it on the
+    // ignored window itself.
+    [transparentWindow setAcceptsMouseMovedEvents:ignoresMouseEvents ? NO : YES];
 }
 
 } // namespace
@@ -48,9 +54,7 @@ void configureTransparency(juce::Component* topLevelWindow) {
         return;
     }
 
-    // AppKit disables mouse-moved delivery by default. Ensure windows behind an ignored transparent
-    // popout still receive the movement needed for JUCE hover tracking.
-    enableMouseMovedEventsForApplicationWindows();
+    updateMouseMovedEventRouting(window, false);
     [window setOpaque:NO];
     [window setBackgroundColor:[NSColor clearColor]];
     [window setHasShadow:NO];
@@ -65,7 +69,7 @@ void configureTransparency(juce::Component* topLevelWindow) {
 void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
     NSWindow* window = getWindow(topLevelWindow);
     if (window != nil) {
-        enableMouseMovedEventsForApplicationWindows();
+        updateMouseMovedEventRouting(window, ignoresMouseEvents);
         [window setIgnoresMouseEvents:ignoresMouseEvents ? YES : NO];
     }
 }
