@@ -28,6 +28,12 @@ NSWindow* getWindow(juce::Component* topLevelWindow) {
     return view != nil ? [view window] : nil;
 }
 
+void enableMouseMovedEventsForApplicationWindows() {
+    for (NSWindow* window in [NSApp windows]) {
+        [window setAcceptsMouseMovedEvents:YES];
+    }
+}
+
 } // namespace
 
 namespace osci::windowing {
@@ -42,6 +48,9 @@ void configureTransparency(juce::Component* topLevelWindow) {
         return;
     }
 
+    // AppKit disables mouse-moved delivery by default. Ensure windows behind an ignored transparent
+    // popout still receive the movement needed for JUCE hover tracking.
+    enableMouseMovedEventsForApplicationWindows();
     [window setOpaque:NO];
     [window setBackgroundColor:[NSColor clearColor]];
     [window setHasShadow:NO];
@@ -56,6 +65,7 @@ void configureTransparency(juce::Component* topLevelWindow) {
 void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
     NSWindow* window = getWindow(topLevelWindow);
     if (window != nil) {
+        enableMouseMovedEventsForApplicationWindows();
         [window setIgnoresMouseEvents:ignoresMouseEvents ? YES : NO];
     }
 }
