@@ -42,6 +42,14 @@ bool isTransparencySupported() {
     return true;
 }
 
+bool supportsClickThroughInTransparentFullScreen() {
+    return true;
+}
+
+juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
+    return displayBounds;
+}
+
 void configureTransparency(juce::Component* topLevelWindow) {
     NSWindow* window = getWindow(topLevelWindow);
     if (window == nil) {
@@ -128,10 +136,6 @@ void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius)
     contentView.wantsLayer = YES;
     contentView.layer.cornerRadius = cornerRadius;
     contentView.layer.masksToBounds = cornerRadius > 0.0f ? YES : NO;
-}
-
-float getInteractiveAlphaFloor() {
-    return 0.0f;
 }
 
 void configureOpenGLSurface(void* rawGLContext) {

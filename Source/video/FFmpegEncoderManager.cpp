@@ -146,10 +146,6 @@ bool FFmpegEncoderManager::supportsTransparentVideoEncoding() const {
     return supportsVideoCodec(VideoCodec::ProRes4444);
 }
 
-void FFmpegEncoderManager::refreshAvailableEncoders() {
-    queryAvailableEncoders();
-}
-
 bool FFmpegEncoderManager::isHardwareEncoderAvailable(const juce::String& encoderName) {
     // Check if the encoder is available and supported
     for (auto& pair : availableEncoders) {

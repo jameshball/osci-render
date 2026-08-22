@@ -17,6 +17,7 @@
 #include "PopoutInteractionGeometry.h"
 #include "PopoutPresentationState.h"
 #include "TransparentWindow.h"
+#include "VisualiserPopout.h"
 #include "VisualiserSettings.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 #include <osci_texture_interop/osci_texture_interop.h>
@@ -27,48 +28,8 @@ enum class FullScreenMode {
     MAIN_COMPONENT,
 };
 
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-class PopoutToolbar : public juce::Component {
-public:
-    PopoutToolbar();
-
-    std::function<void()> onClose;
-    std::function<void()> onFullScreen;
-    std::function<void()> onToggleFrame;
-    std::function<void()> onToggleAlwaysOnTop;
-    std::function<void()> onToggleMouseInteraction;
-
-    void setState(bool visible, bool requestedVisible, bool alwaysOnTop, bool fullScreen,
-                  bool allMouseEventsPassThrough, bool paused, bool clickThroughHintVisible,
-                  bool transparencyEnabled = true);
-
-    bool hitTest(int x, int y) override;
-    void paint(juce::Graphics& g) override;
-    void resized() override;
-    void mouseDown(const juce::MouseEvent& event) override;
-    void mouseDoubleClick(const juce::MouseEvent& event) override;
-    void mouseDrag(const juce::MouseEvent& event) override;
-    void mouseUp(const juce::MouseEvent& event) override;
-
-private:
-    static constexpr int toolbarHeight = 24;
-
-    osci::CloseButton closeButton;
-    osci::SvgButton fullscreenButton{"fullscreen", BinaryData::fullscreen_svg, juce::Colours::white};
-    osci::SvgButton frameButton{"popoutFrame", BinaryData::eye_svg, juce::Colours::white, juce::Colours::white,
-                                nullptr, BinaryData::eyeoff_svg};
-    osci::SvgButton alwaysOnTopButton{"alwaysOnTop", BinaryData::pushpin_svg, juce::Colours::white, juce::Colours::green};
-    osci::SvgButton mouseInteractionButton{"mouseInteraction", BinaryData::mouse_svg, juce::Colours::white, juce::Colours::red};
-    juce::ComponentDragger dragger;
-    bool frameVisible = true;
-    bool fullScreen = false;
-    bool clickThroughHintVisible = false;
-};
-#endif
-
 class CommonPluginEditor;
-class VisualiserWindow;
-class VisualiserComponent : public VisualiserRenderer, public juce::MouseListener, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener {
+class VisualiserComponent : public VisualiserRenderer, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener, private juce::Timer {
 public:
     VisualiserComponent(
         CommonAudioProcessor& processor,
@@ -117,17 +78,11 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    void setPopoutPresentationOverlay(bool frameVisible, bool requestedFrameVisible, bool alwaysOnTop,
-                                      bool fullScreen, bool allMouseEventsPassThrough, bool paused,
-                                      bool clickThroughHintVisible, bool transparencyEnabled = true);
+    void setPopoutPresentationOverlay(const PopoutPresentation& presentation);
 #endif
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void refreshOpenGLSurfaceTransparency();
 #endif
-
-    VisualiserComponent* parent = nullptr;
-    VisualiserComponent* child = nullptr;
-    std::unique_ptr<VisualiserWindow> popout = nullptr;
 
     enum ColourIds
     {
@@ -135,6 +90,8 @@ public:
     };
 
 private:
+    friend class VisualiserWindow;
+
     class FadeCoverComponent : public juce::Component {
     public:
         FadeCoverComponent();
@@ -151,8 +108,10 @@ private:
     void requestTextureOutputService();
     void serviceTextureOutputFrame();
     void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
+    void timerCallback() override;
 
     std::atomic<bool> active = true;
+    std::atomic<unsigned int> pendingParameterUpdates { 0 };
     bool pauseOnMouseUp = false;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     juce::ComponentDragger popoutDragger;
@@ -160,6 +119,9 @@ private:
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
+    VisualiserComponent* parent = nullptr;
+    VisualiserComponent* child = nullptr;
+    std::unique_ptr<VisualiserWindow> popout;
 
     VisualiserSettings& settings;
     RecordingSettings& recordingSettings;
@@ -223,69 +185,4 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserComponent)
     JUCE_DECLARE_WEAK_REFERENCEABLE(VisualiserComponent)
-};
-
-class VisualiserWindow : public juce::DocumentWindow
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    , private juce::Timer
-#endif
-{
-public:
-    VisualiserWindow(juce::String name, VisualiserComponent* parent, bool pinned);
-    ~VisualiserWindow() override;
-
-    bool keyPressed(const juce::KeyPress& key) override;
-    void closeButtonPressed() override;
-    void toggleFullScreen();
-
-    bool getIsFullScreen() const { return fullScreenRequested; }
-    bool isPinned() const { return pinned; }
-    void setPinned(bool shouldBePinned);
-    void saveWindowState();
-
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    bool getAllMouseEventsPassThrough() const { return allMouseEventsPassThrough; }
-    void setRequestedFrameVisible(bool visible);
-    void setAllMouseEventsPassThrough(bool shouldPassThrough, bool showHint = true);
-    bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
-    void refreshNativePresentation();
-    void transparencyModeChanged();
-    void pauseStateChanged();
-    void resized() override;
-#endif
-
-private:
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    void timerCallback() override;
-    void updatePresentationState();
-    void applyNativeInteraction(bool ignoresMouseEvents);
-    void updateResizeBorderVisibility(bool visible);
-    void leaveTransparentFullScreenAfterResize();
-    void enterTransparentFullScreen();
-#endif
-
-    VisualiserComponent* parent;
-    bool fullScreenRequested = false;
-    bool fullScreenTransitionPending = false;
-#if JUCE_WINDOWS || JUCE_MAC
-    juce::Rectangle<int> boundsBeforeFullScreen;
-    juce::Rectangle<int> transparentFullScreenBounds;
-    bool transparentFullScreen = false;
-    bool settingTransparentFullScreenBounds = false;
-    bool reenterFullScreenAfterTransition = false;
-#endif
-    bool pinned = true;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    PopoutPresentationState presentationState;
-    bool nativeIgnoresMouseEvents = false;
-    bool allMouseEventsPassThrough = false;
-    bool clickThroughHintVisible = false;
-    bool presentationRefreshActive = false;
-    bool windowCornersConfigured = false;
-    bool windowCornersRounded = false;
-    bool hasAlphaPassThroughAnchor = false;
-    juce::Point<int> alphaPassThroughAnchor;
-    std::uint64_t presentationRefreshGeneration = 0;
-    juce::uint32 clickThroughHintEndTime = 0;
-#endif
 };

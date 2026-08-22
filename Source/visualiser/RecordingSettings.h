@@ -77,7 +77,7 @@ public:
     void sanitiseCanvasParameters();
 };
 
-class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
+class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
 public:
     RecordingSettings(RecordingParameters&, VisualiserParameters&);
     ~RecordingSettings();
@@ -194,6 +194,9 @@ private:
     void updateCanvasControlsVisibility();
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    void timerCallback() override;
+
+    std::atomic<unsigned int> pendingParameterUpdates { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
 };

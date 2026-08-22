@@ -5,6 +5,8 @@
 namespace osci::windowing {
 
 bool isTransparencySupported();
+bool supportsClickThroughInTransparentFullScreen();
+juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds);
 
 // Must be called after the window is visible and has a native peer.
 void configureTransparency(juce::Component* topLevelWindow);
@@ -20,8 +22,6 @@ void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove);
 
 // Updates the native window shape after a borderless popout is created or resized.
 void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius);
-
-float getInteractiveAlphaFloor();
 
 // Must be called on the OpenGL thread.
 void configureOpenGLSurface(void* rawGLContext);

@@ -1,6 +1,7 @@
 #include "TransparentWindow.h"
 
 #if JUCE_WINDOWS
+#include <atomic>
 #include <windows.h>
 #include <dwmapi.h>
 
@@ -9,19 +10,22 @@ namespace {
 constexpr DWORD minimumRedirectionBitmapAlphaBuild = 26100;
 
 bool supportsRedirectionBitmapAlpha() {
-    using RtlGetVersionFunction = LONG (WINAPI*)(OSVERSIONINFOW*);
-    const auto ntdll = ::GetModuleHandleW(L"ntdll.dll");
-    if (ntdll == nullptr) {
-        return false;
-    }
-    const auto getVersion = reinterpret_cast<RtlGetVersionFunction>(::GetProcAddress(ntdll, "RtlGetVersion"));
-    if (getVersion == nullptr) {
-        return false;
-    }
+    static const bool supported = [] {
+        using RtlGetVersionFunction = LONG (WINAPI*)(OSVERSIONINFOW*);
+        const auto ntdll = ::GetModuleHandleW(L"ntdll.dll");
+        if (ntdll == nullptr) {
+            return false;
+        }
+        const auto getVersion = reinterpret_cast<RtlGetVersionFunction>(::GetProcAddress(ntdll, "RtlGetVersion"));
+        if (getVersion == nullptr) {
+            return false;
+        }
 
-    OSVERSIONINFOW version{};
-    version.dwOSVersionInfoSize = sizeof(version);
-    return getVersion(&version) == 0 && version.dwBuildNumber >= minimumRedirectionBitmapAlphaBuild;
+        OSVERSIONINFOW version{};
+        version.dwOSVersionInfoSize = sizeof(version);
+        return getVersion(&version) == 0 && version.dwBuildNumber >= minimumRedirectionBitmapAlphaBuild;
+    }();
+    return supported;
 }
 
 HWND getWindowHandle(juce::Component* topLevelWindow) {
@@ -42,14 +46,23 @@ void updateExtendedStyle(HWND window, LONG_PTR style) {
                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
-void enableRedirectionBitmapAlpha(HWND window) {
+bool enableRedirectionBitmapAlpha(HWND window) {
     if (window == nullptr) {
-        return;
+        return false;
     }
 
     constexpr auto redirectionBitmapAlpha = static_cast<DWMWINDOWATTRIBUTE>(39);
     const BOOL enabled = TRUE;
-    ::DwmSetWindowAttribute(window, redirectionBitmapAlpha, &enabled, sizeof(enabled));
+    const auto result = ::DwmSetWindowAttribute(window, redirectionBitmapAlpha, &enabled, sizeof(enabled));
+    if (FAILED(result)) {
+        static std::atomic<bool> failureLogged { false };
+        if (!failureLogged.exchange(true)) {
+            juce::Logger::writeToLog("Transparent popout: DWM redirection alpha is unavailable (HRESULT "
+                                     + juce::String(static_cast<juce::int64>(result)) + ").");
+        }
+        return false;
+    }
+    return true;
 }
 
 void configureGpuTransparency(HWND window) {
@@ -89,6 +102,15 @@ namespace osci::windowing {
 
 bool isTransparencySupported() {
     return supportsRedirectionBitmapAlpha();
+}
+
+bool supportsClickThroughInTransparentFullScreen() {
+    return false;
+}
+
+juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
+    // An exact monitor-sized window can be promoted out of desktop composition on Windows.
+    return displayBounds.reduced(1);
 }
 
 void configureTransparency(juce::Component* topLevelWindow) {
@@ -142,10 +164,6 @@ void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius)
     const DWORD preference = cornerRadius > 0.0f ? round : doNotRound;
     ::DwmSetWindowAttribute(window, windowCornerPreference, &preference, sizeof(preference));
     ::DwmSetWindowAttribute(window, windowBorderColour, &noBorder, sizeof(noBorder));
-}
-
-float getInteractiveAlphaFloor() {
-    return 1.0f / 255.0f;
 }
 
 void configureOpenGLSurface(void*) {
