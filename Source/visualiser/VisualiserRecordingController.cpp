@@ -13,18 +13,52 @@ VisualiserRecordingController::VisualiserRecordingController(const juce::File& f
 #endif
 }
 
-LiveRecordingResult VisualiserRecordingController::start(const VisualiserRecordingConfiguration& configuration) {
-    renderSize = configuration.renderSize;
-    const auto outputExtension = configuration.captureVideo
-        ? (configuration.preserveAlpha ? "mov" : VideoEncodingConstants::getVideoCodecInfo(configuration.codec).defaultFileExtension)
+bool VisualiserRecordingController::wantsVideo(RecordingSettings& settings) const {
+#if OSCI_PREMIUM
+    return settings.recordingVideo();
+#else
+    juce::ignoreUnused(settings);
+    return false;
+#endif
+}
+
+LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& settings,
+                                                          double sampleRate) {
+#if OSCI_PREMIUM
+    const bool captureVideo = settings.recordingVideo();
+    const bool captureAudio = settings.recordingAudio();
+    const bool preserveAlpha = captureVideo && settings.visualiserParameters.isTransparentBackgroundEnabled();
+    const auto codec = settings.getVideoCodec();
+    renderSize = settings.getCanvasSize();
+    const auto crf = settings.getCRF();
+    const auto frameRate = settings.getFrameRate();
+    const auto compressionPreset = settings.getCompressionPreset();
+#else
+    juce::ignoreUnused(settings);
+    const bool captureVideo = false;
+    const bool captureAudio = true;
+    const bool preserveAlpha = false;
+    const auto codec = VideoCodec::H264;
+    renderSize = {};
+    const auto crf = 0;
+    const auto frameRate = 0.0;
+    const juce::String compressionPreset;
+#endif
+
+    if (!captureVideo && !captureAudio) {
+        return { false, "Recording must capture video, audio, or both." };
+    }
+
+    const auto outputExtension = captureVideo
+        ? (preserveAlpha ? "mov" : VideoEncodingConstants::getVideoCodecInfo(codec).defaultFileExtension)
         : "wav";
 
-    if (configuration.captureVideo) {
-        const auto requiredCodec = configuration.preserveAlpha ? VideoCodec::ProRes4444 : configuration.codec;
+    if (captureVideo) {
+        const auto requiredCodec = preserveAlpha ? VideoCodec::ProRes4444 : codec;
         if (encoderManager == nullptr || !encoderManager->supportsVideoCodec(requiredCodec)) {
             return {
                 false,
-                configuration.preserveAlpha
+                preserveAlpha
                     ? "This FFmpeg installation does not include the ProRes 4444 encoder required for transparent video."
                     : "This FFmpeg installation does not include an encoder for the selected video codec.",
             };
@@ -32,26 +66,68 @@ LiveRecordingResult VisualiserRecordingController::start(const VisualiserRecordi
     }
 
     LiveRecordingConfiguration sessionConfiguration {
-        .captureVideo = configuration.captureVideo,
-        .captureAudio = configuration.captureAudio,
-        .videoWidth = configuration.renderSize.width,
-        .videoHeight = configuration.renderSize.height,
-        .sampleRate = configuration.sampleRate,
+        .captureVideo = captureVideo,
+        .captureAudio = captureAudio,
+        .videoWidth = renderSize.width,
+        .videoHeight = renderSize.height,
+        .sampleRate = sampleRate,
         .videoFileExtension = outputExtension,
-        .audioCodecArgs = configuration.audioCodecArgs,
+        .audioCodecArgs = settings.getAudioCodecArgs(),
     };
-    sessionConfiguration.buildVideoCommand = [this, configuration](const juce::File& outputFile) {
+    sessionConfiguration.buildVideoCommand = [this, codec, crf, frameRate, compressionPreset, preserveAlpha](const juce::File& outputFile) {
         return encoderManager->buildVideoEncodingCommand(
-            configuration.codec,
-            configuration.crf,
-            configuration.renderSize.width,
-            configuration.renderSize.height,
-            configuration.frameRate,
-            configuration.compressionPreset,
+            codec,
+            crf,
+            renderSize.width,
+            renderSize.height,
+            frameRate,
+            compressionPreset,
             outputFile,
-            configuration.preserveAlpha);
+            preserveAlpha);
     };
     return session.start(sessionConfiguration);
+}
+
+LiveRecordingResult VisualiserRecordingController::stopAndChooseExport(const juce::File& destinationDirectory,
+                                                                        const juce::String& fileNamePrefix,
+                                                                        ExportCompletion completion) {
+    if (!session.isRecording()) {
+        return { false, "There is no active recording to stop." };
+    }
+
+    jassert(completion != nullptr);
+    const bool failed = session.hasFailed();
+    const auto failureMessage = session.getFailureMessage();
+    auto artifacts = std::make_shared<LiveRecordingArtifacts>(session.finish());
+    if (failed) {
+        return { false, failureMessage };
+    }
+
+    const auto extension = artifacts->fileExtension;
+    const auto timestamp = juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S");
+    const auto suggestedFile = destinationDirectory.getChildFile(fileNamePrefix + "_" + timestamp + "." + extension);
+    chooser = std::make_unique<juce::FileChooser>("Save recording", suggestedFile, "*." + extension);
+    const auto flags = juce::FileBrowserComponent::saveMode
+                     | juce::FileBrowserComponent::canSelectFiles
+                     | juce::FileBrowserComponent::warnAboutOverwriting;
+    chooser->launchAsync(flags, [this, artifacts, extension, completion = std::move(completion)](const juce::FileChooser& fileChooser) {
+        auto destination = fileChooser.getResult();
+        if (destination == juce::File()) {
+            return;
+        }
+        if (!destination.hasFileExtension(extension)) {
+            destination = destination.withFileExtension(extension);
+        }
+        auto result = exporter.exportRecording(*artifacts, destination);
+        if (completion != nullptr) {
+            completion(std::move(result), std::move(destination));
+        }
+    });
+    return {};
+}
+
+void VisualiserRecordingController::discard() {
+    session.finish();
 }
 
 LiveRecordingSession::VideoFrame VisualiserRecordingController::acquireVideoFrame(VisualiserRenderSize renderedSize) {
@@ -63,13 +139,4 @@ LiveRecordingSession::VideoFrame VisualiserRecordingController::acquireVideoFram
 
 void VisualiserRecordingController::writeAudioBlock(const juce::AudioBuffer<float>& buffer) {
     session.writeAudioBlock(buffer);
-}
-
-LiveRecordingArtifacts VisualiserRecordingController::finish() {
-    return session.finish();
-}
-
-RecordingExportResult VisualiserRecordingController::exportRecording(const LiveRecordingArtifacts& artifacts,
-                                                                      const juce::File& destination) const {
-    return exporter.exportRecording(artifacts, destination);
 }
