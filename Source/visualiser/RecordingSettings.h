@@ -137,21 +137,16 @@ public:
     }
 
     juce::String getFileExtensionForCodec() {
-        switch (getVideoCodec()) {
-            case VideoCodec::ProRes:
-            case VideoCodec::ProRes4444:
-                return "mov";
-            case VideoCodec::H264:
-            case VideoCodec::H265:
-                return parameters.losslessAudio.getBoolValue() ? "mov" : "mp4";
-            case VideoCodec::VP9:
-            default:
-                return "mp4";
+        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(getVideoCodec());
+        if (parameters.losslessAudio.getBoolValue() && codecInfo.supportsLosslessAudio) {
+            return "mov";
         }
+        return codecInfo.defaultFileExtension;
     }
 
     juce::StringArray getAudioCodecArgs() const {
-        if (parameters.losslessAudio.getBoolValue() && getVideoCodec() != VideoCodec::VP9) {
+        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(getVideoCodec());
+        if (parameters.losslessAudio.getBoolValue() && codecInfo.supportsLosslessAudio) {
             return {"-c:a", "pcm_s16le"};
         }
         return {"-c:a", "aac", "-b:a", "384k"};

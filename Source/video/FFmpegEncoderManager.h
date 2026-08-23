@@ -62,7 +62,7 @@ private:
         int width,
         int height,
         double frameRate,
-        const juce::String& outputPixelFormat);
+        VideoCodec codec);
 
     // H.264 encoder settings helper
     juce::String addH264EncoderSettings(
