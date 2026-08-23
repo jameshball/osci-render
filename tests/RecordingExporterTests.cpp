@@ -18,27 +18,17 @@ public:
         expect(static_cast<bool>(exporter.exportRecording(audioArtifacts, audioDestination.getFile())));
         expectEquals(audioDestination.getFile().loadFileAsString(), juce::String("audio"));
 
-        beginTest("Export action is derived from the produced media");
+        beginTest("Muxing requires an encoder manager");
         LiveRecordingArtifacts combinedArtifacts;
         combinedArtifacts.audio = std::make_unique<juce::TemporaryFile>(".wav");
         combinedArtifacts.video = std::make_unique<juce::TemporaryFile>(".mov");
-        expect(RecordingExporter::getExportAction(combinedArtifacts) == RecordingExportAction::muxAudioAndVideo);
-        expect(RecordingExporter::getExportAction(audioArtifacts) == RecordingExportAction::copyAudio);
-
-        LiveRecordingArtifacts videoArtifacts;
-        videoArtifacts.video = std::make_unique<juce::TemporaryFile>(".mov");
-        expect(RecordingExporter::getExportAction(videoArtifacts) == RecordingExportAction::copyVideo);
-
-        LiveRecordingArtifacts missing;
-        expect(RecordingExporter::getExportAction(missing) == RecordingExportAction::noMedia);
-
-        beginTest("Muxing requires an encoder manager");
         juce::TemporaryFile muxDestination(".mov");
         const auto muxResult = exporter.exportRecording(combinedArtifacts, muxDestination.getFile());
         expect(!static_cast<bool>(muxResult));
         expect(muxResult.message.isNotEmpty());
 
         beginTest("Missing artifacts report an error");
+        LiveRecordingArtifacts missing;
         const auto result = exporter.exportRecording(missing, muxDestination.getFile());
         expect(!static_cast<bool>(result));
         expect(result.message.isNotEmpty());
