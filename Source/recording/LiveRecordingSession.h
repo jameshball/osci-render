@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 
-#include <array>
 #include <atomic>
 #include <cstdint>
 #include <functional>
@@ -110,8 +109,6 @@ public:
 private:
     class WriterThread;
 
-    static constexpr int frameQueueCapacity = 3;
-
     void reset();
     void fail(juce::String message);
     void releaseVideoFrame(bool submitFrame);
@@ -119,13 +116,12 @@ private:
     std::unique_ptr<VideoRecordingBackend> videoBackend;
     std::unique_ptr<AudioRecordingBackend> audioBackend;
     std::unique_ptr<WriterThread> writerThread;
-    std::array<std::vector<std::uint8_t>, frameQueueCapacity> videoFrames;
-    juce::WaitableEvent writerWakeEvent;
-    std::atomic<std::uint64_t> queuedFrameWrite { 0 };
-    std::atomic<std::uint64_t> queuedFrameRead { 0 };
+    std::vector<std::uint8_t> videoFrame;
+    juce::WaitableEvent videoFrameReady;
+    juce::WaitableEvent videoFrameConsumed;
+    std::atomic<bool> videoFramePending { false };
     std::atomic<int> activeVideoCaptures { 0 };
     juce::WaitableEvent videoCaptureFinished;
-    int pendingWriteSlot = -1;
     std::atomic<bool> recordingVideo { false };
     std::atomic<bool> recordingAudio { false };
     std::atomic<bool> writerFailed { false };

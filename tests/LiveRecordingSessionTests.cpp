@@ -118,7 +118,7 @@ public:
         finishThread.join();
         expect(finishReturned.load());
 
-        beginTest("A full bounded queue stops an encoder that cannot keep up");
+        beginTest("A pending video frame applies backpressure without dropping frames");
         videoState = std::make_shared<VideoBackendState>();
         videoState->blockWrites = true;
         audioState = std::make_shared<AudioBackendState>();
@@ -130,16 +130,55 @@ public:
         expect(firstFrame.isValid());
         firstFrame.submit();
         expect(videoState->writeEntered.wait(1000));
-        auto secondFrame = slowSession.acquireVideoFrame();
-        expect(secondFrame.isValid());
-        secondFrame.submit();
-        auto thirdFrame = slowSession.acquireVideoFrame();
-        expect(thirdFrame.isValid());
-        thirdFrame.submit();
-        expect(!slowSession.acquireVideoFrame().isValid());
-        expect(slowSession.hasFailed());
+
+        std::atomic<bool> acquireReturned { false };
+        std::thread acquireThread([&] {
+            auto secondFrame = slowSession.acquireVideoFrame();
+            acquireReturned.store(true);
+            if (secondFrame.isValid()) {
+                secondFrame.submit();
+            }
+        });
+        juce::Thread::sleep(20);
+        expect(!acquireReturned.load());
         videoState->allowWrite.signal();
+        acquireThread.join();
+        expect(acquireReturned.load());
+        expect(!slowSession.hasFailed());
         slowSession.finish();
+        expectEquals(videoState->writes.load(), 2);
+
+        beginTest("Stopping wakes a renderer waiting for the video buffer");
+        videoState = std::make_shared<VideoBackendState>();
+        videoState->blockWrites = true;
+        LiveRecordingSession stoppingSession(std::make_unique<FakeVideoRecordingBackend>(videoState),
+                                             std::make_unique<FakeAudioRecordingBackend>(std::make_shared<AudioBackendState>()));
+        expect(static_cast<bool>(stoppingSession.start(configuration)));
+        auto pendingFrame = stoppingSession.acquireVideoFrame();
+        expect(pendingFrame.isValid());
+        pendingFrame.submit();
+        expect(videoState->writeEntered.wait(1000));
+
+        std::atomic<bool> waitingAcquireReturned { false };
+        std::atomic<bool> waitingAcquireWasValid { true };
+        std::thread waitingAcquireThread([&] {
+            auto frame = stoppingSession.acquireVideoFrame();
+            waitingAcquireWasValid.store(frame.isValid());
+            waitingAcquireReturned.store(true);
+        });
+        juce::Thread::sleep(20);
+        expect(!waitingAcquireReturned.load());
+
+        std::thread finishWhileBlockedThread([&] { stoppingSession.finish(); });
+        for (int attempt = 0; attempt < 100 && !waitingAcquireReturned.load(); ++attempt) {
+            juce::Thread::sleep(1);
+        }
+        expect(waitingAcquireReturned.load());
+        expect(!waitingAcquireWasValid.load());
+        videoState->allowWrite.signal();
+        waitingAcquireThread.join();
+        finishWhileBlockedThread.join();
+        expectEquals(videoState->writes.load(), 1);
 
         beginTest("Invalid configurations fail without starting a backend");
         LiveRecordingSession invalidSession(std::make_unique<FakeVideoRecordingBackend>(std::make_shared<VideoBackendState>()),

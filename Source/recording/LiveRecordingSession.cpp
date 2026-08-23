@@ -1,6 +1,7 @@
 #include "LiveRecordingSession.h"
 
 #include "../audio/AudioRecorder.h"
+#include "../video/VideoEncodingConstants.h"
 #include <osci_render_core/concurrency/osci_WriteProcess.h>
 
 namespace {
@@ -12,7 +13,8 @@ public:
     }
 
     bool write(std::span<const std::uint8_t> frame) override {
-        return process.write(const_cast<std::uint8_t*>(frame.data()), frame.size()) != 0;
+        return process.write(const_cast<std::uint8_t*>(frame.data()), frame.size(),
+                             VideoEncodingConstants::frameWriteTimeoutMs) != 0;
     }
 
     void finish() override {
@@ -62,23 +64,20 @@ public:
         : juce::Thread("Video Recording Writer"), owner(owner) {}
 
     void run() override {
-        while (!threadShouldExit()
-               || owner.queuedFrameRead.load(std::memory_order_relaxed)
-                    < owner.queuedFrameWrite.load(std::memory_order_acquire)) {
-            const auto read = owner.queuedFrameRead.load(std::memory_order_relaxed);
-            if (read >= owner.queuedFrameWrite.load(std::memory_order_acquire)) {
-                owner.writerWakeEvent.wait(100);
+        while (!threadShouldExit() || owner.videoFramePending.load(std::memory_order_acquire)) {
+            if (!owner.videoFramePending.load(std::memory_order_acquire)) {
+                owner.videoFrameReady.wait(100);
                 continue;
             }
 
-            const auto slot = static_cast<std::size_t>(read % LiveRecordingSession::frameQueueCapacity);
-            const auto& frame = owner.videoFrames[slot];
-            if (!owner.videoBackend->write(std::span<const std::uint8_t>(frame))) {
-                owner.queuedFrameRead.store(read + 1, std::memory_order_release);
+            if (!owner.videoBackend->write(owner.videoFrame)) {
+                owner.videoFramePending.store(false, std::memory_order_release);
+                owner.videoFrameConsumed.signal();
                 owner.fail("An error occurred while writing a video frame to FFmpeg.");
                 return;
             }
-            owner.queuedFrameRead.store(read + 1, std::memory_order_release);
+            owner.videoFramePending.store(false, std::memory_order_release);
+            owner.videoFrameConsumed.signal();
         }
     }
 
@@ -163,9 +162,7 @@ LiveRecordingResult LiveRecordingSession::start(const LiveRecordingConfiguration
 
         const auto frameBytes = static_cast<std::size_t>(configuration.videoWidth)
                               * static_cast<std::size_t>(configuration.videoHeight) * 4;
-        for (auto& frame : videoFrames) {
-            frame.resize(frameBytes);
-        }
+        videoFrame.resize(frameBytes);
         recordingVideo = true;
         writerThread->startThread();
     }
@@ -188,35 +185,33 @@ LiveRecordingSession::VideoFrame LiveRecordingSession::acquireVideoFrame() {
         return {};
     }
 
-    activeVideoCaptures.fetch_add(1, std::memory_order_acq_rel);
+    const auto previousCaptureCount = activeVideoCaptures.fetch_add(1, std::memory_order_acq_rel);
+    jassert(previousCaptureCount == 0);
+    if (previousCaptureCount != 0) {
+        activeVideoCaptures.fetch_sub(1, std::memory_order_acq_rel);
+        return {};
+    }
     if (!recordingVideo.load(std::memory_order_acquire) || hasFailed()) {
         releaseVideoFrame(false);
         return {};
     }
 
-    jassert(pendingWriteSlot < 0);
-    if (pendingWriteSlot >= 0) {
-        releaseVideoFrame(false);
-        return {};
+    while (videoFramePending.load(std::memory_order_acquire)) {
+        videoFrameConsumed.wait(100);
+        if (!recordingVideo.load(std::memory_order_acquire) || hasFailed()) {
+            releaseVideoFrame(false);
+            return {};
+        }
     }
 
-    const auto write = queuedFrameWrite.load(std::memory_order_relaxed);
-    const auto read = queuedFrameRead.load(std::memory_order_acquire);
-    if (write - read >= frameQueueCapacity) {
-        fail("The video encoder could not keep up with the rendered frames.");
-        releaseVideoFrame(false);
-        return {};
-    }
-    pendingWriteSlot = static_cast<int>(write % frameQueueCapacity);
-    return VideoFrame(*this, videoFrames[static_cast<std::size_t>(pendingWriteSlot)]);
+    return VideoFrame(*this, videoFrame);
 }
 
 void LiveRecordingSession::releaseVideoFrame(bool submitFrame) {
-    if (submitFrame && pendingWriteSlot >= 0) {
-        queuedFrameWrite.fetch_add(1, std::memory_order_release);
-        writerWakeEvent.signal();
+    if (submitFrame) {
+        videoFramePending.store(true, std::memory_order_release);
+        videoFrameReady.signal();
     }
-    pendingWriteSlot = -1;
     if (activeVideoCaptures.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         videoCaptureFinished.signal();
     }
@@ -231,13 +226,14 @@ void LiveRecordingSession::writeAudioBlock(const juce::AudioBuffer<float>& buffe
 LiveRecordingArtifacts LiveRecordingSession::finish() {
     const bool wasRecordingVideo = recordingVideo.exchange(false, std::memory_order_acq_rel);
     const bool wasRecordingAudio = recordingAudio.exchange(false, std::memory_order_acq_rel);
+    videoFrameConsumed.signal();
     while (activeVideoCaptures.load(std::memory_order_acquire) > 0) {
         videoCaptureFinished.wait(100);
     }
     if (writerThread->isThreadRunning()) {
         writerThread->signalThreadShouldExit();
-        writerWakeEvent.signal();
-        writerThread->stopThread(10000);
+        videoFrameReady.signal();
+        writerThread->stopThread(VideoEncodingConstants::frameWriteTimeoutMs + 1000);
     }
     if (wasRecordingVideo || videoBackend->isRunning()) {
         videoBackend->finish();
@@ -245,11 +241,8 @@ LiveRecordingArtifacts LiveRecordingSession::finish() {
     if (wasRecordingAudio || audioBackend->isRunning()) {
         audioBackend->finish();
     }
-    queuedFrameWrite.store(0, std::memory_order_release);
-    queuedFrameRead.store(0, std::memory_order_release);
-    for (auto& frame : videoFrames) {
-        frame.clear();
-    }
+    videoFramePending.store(false, std::memory_order_release);
+    videoFrame.clear();
     return std::move(artifacts);
 }
 
@@ -265,15 +258,13 @@ juce::String LiveRecordingSession::getFailureMessage() const {
 void LiveRecordingSession::reset() {
     recordingVideo.store(false, std::memory_order_release);
     recordingAudio.store(false, std::memory_order_release);
-    pendingWriteSlot = -1;
     activeVideoCaptures.store(0, std::memory_order_release);
     writerFailed.store(false, std::memory_order_release);
     {
         const juce::SpinLock::ScopedLockType lock(failureLock);
         failureMessage.clear();
     }
-    queuedFrameWrite.store(0, std::memory_order_release);
-    queuedFrameRead.store(0, std::memory_order_release);
+    videoFramePending.store(false, std::memory_order_release);
     artifacts = {};
 }
 
@@ -283,4 +274,5 @@ void LiveRecordingSession::fail(juce::String message) {
         failureMessage = std::move(message);
     }
     writerFailed.store(true, std::memory_order_release);
+    videoFrameConsumed.signal();
 }
