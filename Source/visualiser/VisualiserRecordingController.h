@@ -14,9 +14,7 @@ public:
 
     [[nodiscard]] bool wantsVideo(RecordingSettings& settings) const;
     LiveRecordingResult start(RecordingSettings& settings, double sampleRate);
-    LiveRecordingResult stopAndChooseExport(const juce::File& destinationDirectory,
-                                            const juce::String& fileNamePrefix,
-                                            ExportCompletion completion);
+    LiveRecordingResult stopAndChooseExport(const juce::File& destinationDirectory, const juce::String& fileNamePrefix, ExportCompletion completion);
     void discard();
 
     LiveRecordingSession::VideoFrame acquireVideoFrame(VisualiserRenderSize renderedSize);
