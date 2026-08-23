@@ -33,7 +33,6 @@ public:
         juce::File ffmpegFile,
         VisualiserSettings& settings,
         RecordingSettings& recordingSettings,
-        VisualiserComponent* parent = nullptr,
         bool visualiserOnly = false);
     ~VisualiserComponent() override;
 
@@ -55,7 +54,7 @@ public:
     void mouseUp(const juce::MouseEvent& event) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void setRecording(bool recording);
-    void childUpdated();
+    void popoutUpdated();
     void setPopoutAlwaysOnTop(bool alwaysOnTop);
     bool isPopoutAlwaysOnTop() const;
     void prepareOverlayFadeIn();
@@ -66,9 +65,6 @@ public:
     void parserChanged() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    void refreshOpenGLSurfaceTransparency();
-#endif
 
     enum ColourIds
     {
@@ -88,7 +84,6 @@ private:
 
     void updatePausedState();
     void closePopout();
-    bool isPrimaryVisualiser() const;
     void setOverlayFadeProgress(float progress);
     void refreshTextureOutputButton();
     void setTextureOutputEnabled(bool enabled);
@@ -110,17 +105,15 @@ private:
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
-    VisualiserComponent* parent = nullptr;
-    VisualiserComponent* child = nullptr;
     std::unique_ptr<VisualiserWindow> popout;
+    bool popoutVisible = false;
 
     VisualiserSettings& settings;
     RecordingSettings& recordingSettings;
 
     bool visualiserOnly;
 
-    // Timeline for controlling playback (audio, video, gif, gpla)
-    // Controller is set by parent component based on file type
+    // Timeline for controlling playback (audio, video, gif, gpla).
     TimelineComponent timeline;
 
     osci::SvgButton fullScreenButton{"fullScreen", BinaryData::fullscreen_svg, juce::Colours::white, juce::Colours::white};

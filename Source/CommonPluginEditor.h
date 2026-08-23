@@ -87,7 +87,6 @@ public:
         audioProcessor.applicationFolder.getChildFile(audioProcessor.ffmpegFileName),
         visualiserSettings,
         recordingSettings,
-        nullptr,
         appName == "sosci"
     };
 

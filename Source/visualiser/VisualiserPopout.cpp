@@ -13,16 +13,57 @@ constexpr auto fullScreenKey = "popoutFullScreen";
 
 }
 
-VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner,
-                                   std::unique_ptr<VisualiserComponent> content, osci::SettingsStore& settings)
+VisualiserPresentationView::VisualiserPresentationView(VisualiserComponent& owner)
+    : OpenGLTextureView(owner.getFrameMirror()), owner(owner) {
+    setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    setCheckerColours(osci::Colours::surface(), osci::Colours::darker());
+    const auto themeBase = osci::Colours::surfaceSunken();
+    setOpaqueBackground(themeBase.interpolatedWith(osci::Colours::shadow(), osci::Theme::isDark() ? 0.86f : 0.38f));
+    setContextCreatedCallback([](void* context) { TransparentWindow::configureOpenGLSurface(context); });
+}
+
+void VisualiserPresentationView::setPaused(bool shouldBePaused) {
+    paused = shouldBePaused;
+    repaint();
+}
+
+void VisualiserPresentationView::paint(juce::Graphics& g) {
+    if (!paused) {
+        return;
+    }
+    g.setColour(juce::Colours::black.withAlpha(0.5f));
+    g.fillRect(getLocalBounds());
+    g.setColour(juce::Colours::white);
+    g.setFont(30.0f);
+    g.drawText("Paused", getLocalBounds(), juce::Justification::centred);
+}
+
+void VisualiserPresentationView::mouseDown(const juce::MouseEvent& event) {
+    pauseOnMouseUp = event.mods.isLeftButtonDown();
+}
+
+void VisualiserPresentationView::mouseDrag(const juce::MouseEvent& event) {
+    if (event.getDistanceFromDragStart() > 4) {
+        pauseOnMouseUp = false;
+    }
+}
+
+void VisualiserPresentationView::mouseUp(const juce::MouseEvent& event) {
+    const bool shouldTogglePause = pauseOnMouseUp && event.getDistanceFromDragStart() <= 4;
+    pauseOnMouseUp = false;
+    if (shouldTogglePause) {
+        owner.setPaused(!owner.isPaused());
+    }
+}
+
+VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner, osci::SettingsStore& settings)
     : TransparentWindow(std::move(name), loadWindowState(settings)),
       owner(owner),
-      visualiser(content.get()),
       settings(settings) {
+    auto content = std::make_unique<VisualiserPresentationView>(owner);
+    visualiser = content.get();
     setContent(std::move(content));
     addKeyListener(&owner.editor);
-    visualiser->hideButtonRow = true;
-    visualiser->resized();
     if (getBounds().isEmpty()) {
         centreWithSize(350, 350);
     }
@@ -33,8 +74,7 @@ VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner
 void VisualiserWindow::showPresentation() {
     setVisible(true);
     setMinimised(false);
-    visualiser->setMirrorSource(&owner);
-    visualiser->setMirrorPresentationActive(true);
+    visualiser->setActive(true);
 #if JUCE_WINDOWS
     if (isTransparencySupported()) {
         refreshPresentationSurface();
@@ -46,8 +86,23 @@ void VisualiserWindow::showPresentation() {
 }
 
 void VisualiserWindow::suspendPresentation() {
-    visualiser->setMirrorPresentationActive(false);
+    visualiser->setActive(false);
     setMinimised(true);
+}
+
+void VisualiserWindow::setPresentationPaused(bool paused) {
+    TransparentWindow::setPresentationPaused(paused);
+    visualiser->setPaused(paused);
+}
+
+void VisualiserWindow::setTransparencyEnabled(bool enabled) {
+    TransparentWindow::setTransparencyEnabled(enabled);
+    visualiser->setTransparent(enabled);
+    visualiser->setNativeTransparencySupported(isTransparencySupported());
+}
+
+void VisualiserWindow::setPresentationFadeAlpha(float alpha) {
+    visualiser->setFadeAlpha(alpha);
 }
 
 bool VisualiserWindow::getAlwaysOnTopPreference(const osci::SettingsStore& settings) {
@@ -79,8 +134,7 @@ juce::Component* VisualiserWindow::getAlphaHitTestComponent() {
 }
 
 juce::Point<int> VisualiserWindow::getAlphaMaskSize() const {
-    const auto size = visualiser->getAlphaMaskSize();
-    return { size.width, size.height };
+    return visualiser->getAlphaMaskSize();
 }
 
 std::uint64_t VisualiserWindow::getAlphaMaskGeneration() const {
@@ -102,7 +156,9 @@ void VisualiserWindow::requestAlphaMaskRefresh() {
 
 void VisualiserWindow::refreshOpenGLSurfaceTransparency() {
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    visualiser->refreshOpenGLSurfaceTransparency();
+    visualiser->executeOnGLThread([](juce::OpenGLContext& context) {
+        TransparentWindow::configureOpenGLSurface(context.getRawContext());
+    });
 #endif
 }
 
