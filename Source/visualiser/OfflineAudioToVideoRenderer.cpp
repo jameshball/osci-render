@@ -25,20 +25,7 @@ juce::String renderModeToString(VisualiserRenderer::RenderMode mode) {
 }
 
 juce::String videoCodecToString(VideoCodec codec) {
-    switch (codec) {
-        case VideoCodec::H264:
-            return "H264";
-        case VideoCodec::H265:
-            return "H265";
-        case VideoCodec::VP9:
-            return "VP9";
-        case VideoCodec::ProRes:
-            return "ProRes 422 HQ";
-        case VideoCodec::ProRes4444:
-            return "ProRes 4444";
-        default:
-            return "unknown";
-    }
+    return VideoEncodingConstants::getVideoCodecInfo(codec).logName;
 }
 
 juce::String yesNo(bool value) {

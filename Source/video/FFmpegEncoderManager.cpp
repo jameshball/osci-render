@@ -295,7 +295,8 @@ juce::String FFmpegEncoderManager::buildBaseEncodingCommand(
     int width,
     int height,
     double frameRate,
-    const juce::String& outputPixelFormat) {
+    VideoCodec codec) {
+    const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(codec);
     juce::String resolution = juce::String(width) + "x" + juce::String(height);
     juce::String cmd = "\"" + ffmpegExecutable.getFullPathName() + "\"" +
                        " -r " + juce::String(frameRate) +
@@ -305,7 +306,7 @@ juce::String FFmpegEncoderManager::buildBaseEncodingCommand(
                        " -i -" +
                        " -threads 4" +
                        " -y" +
-                       " -pix_fmt " + outputPixelFormat +
+                       " -pix_fmt " + codecInfo.outputPixelFormat +
                        " -vf vflip";
 
     return cmd;
@@ -389,7 +390,7 @@ juce::String FFmpegEncoderManager::buildH264EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoEncodingConstants::PixelFormat::yuv4208Bit);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::H264);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H264);
 
     // Pass width, height, and frameRate to addH264EncoderSettings
@@ -406,7 +407,7 @@ juce::String FFmpegEncoderManager::buildH265EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoEncodingConstants::PixelFormat::yuv4208Bit);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::H265);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H265);
 
     cmd = addH265EncoderSettings(cmd, bestEncoder, crf, compressionPreset, width, height, frameRate);
@@ -422,7 +423,7 @@ juce::String FFmpegEncoderManager::buildVP9EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoEncodingConstants::PixelFormat::yuv4208Bit);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::VP9);
 
     cmd += juce::String(" -c:v libvpx-vp9") +
            " -b:v 0" +
@@ -439,7 +440,7 @@ juce::String FFmpegEncoderManager::buildProResEncodingCommand(
     int height,
     double frameRate,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoEncodingConstants::PixelFormat::yuv42210BitLittleEndian);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::ProRes);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::ProRes);
 
     cmd += " -c:v " + bestEncoder +
@@ -455,7 +456,7 @@ juce::String FFmpegEncoderManager::buildProRes4444AlphaEncodingCommand(
     int height,
     double frameRate,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoEncodingConstants::PixelFormat::yuva44410BitLittleEndian);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::ProRes4444);
 
     // prores_ks is available cross-platform in FFmpeg
     cmd += " -c:v prores_ks"

@@ -71,8 +71,8 @@ void RecordingParameters::load(juce::XmlElement* xml) {
     }
 
     if (settingsXml->hasAttribute("videoCodec")) {
-        int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
-        videoCodec = static_cast<VideoCodec>(juce::jlimit(static_cast<int>(VideoCodec::H264), static_cast<int>(VideoCodec::ProRes4444), codecValue));
+        const int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
+        videoCodec = VideoEncodingConstants::videoCodecFromSerializedValue(codecValue);
     }
 
     auto* qualityXml = settingsXml->getChildByName("quality");
@@ -200,15 +200,14 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps, VisualiserParamete
     compressionPresetLabel.setTooltip("The compression preset to use when recording video. Slower presets will produce smaller files at the expense of encoding time.");
 
     // Setup the codec selector
-    videoCodecSelector.addItem("H.264", static_cast<int>(VideoCodec::H264) + 1);
-    videoCodecSelector.addItem("H.265/HEVC", static_cast<int>(VideoCodec::H265) + 1);
-    videoCodecSelector.addItem("VP9", static_cast<int>(VideoCodec::VP9) + 1);
-    videoCodecSelector.addItem("ProRes 422 HQ", static_cast<int>(VideoCodec::ProRes) + 1);
-    videoCodecSelector.addItem("ProRes 4444", static_cast<int>(VideoCodec::ProRes4444) + 1);
+    for (const auto& codec : VideoEncodingConstants::videoCodecs) {
+        videoCodecSelector.addItem(codec.displayName, static_cast<int>(codec.codec) + 1);
+    }
     videoCodecSelector.setSelectedId(static_cast<int>(parameters.videoCodec) + 1);
     videoCodecSelector.onChange = [this] {
-        parameters.videoCodec = static_cast<VideoCodec>(videoCodecSelector.getSelectedId() - 1);
-        if (parameters.videoCodec == VideoCodec::VP9) {
+        parameters.videoCodec = VideoEncodingConstants::videoCodecFromSerializedValue(videoCodecSelector.getSelectedId() - 1);
+        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(parameters.videoCodec);
+        if (!codecInfo.supportsLosslessAudio) {
             losslessAudio.setToggleState(false, juce::NotificationType::sendNotification);
         }
         updateLosslessAudioEnabled();
@@ -247,23 +246,23 @@ RecordingSettings::~RecordingSettings() {
 }
 
 void RecordingSettings::updateLosslessAudioEnabled() {
-    losslessAudio.setEnabled(recordAudio.getToggleState()
-                             && getVideoCodec() != VideoCodec::VP9);
+    const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(getVideoCodec());
+    losslessAudio.setEnabled(recordAudio.getToggleState() && codecInfo.supportsLosslessAudio);
 }
 
 void RecordingSettings::updateVideoEncodingControls() {
 #if OSCI_PREMIUM
     const bool transparencyRequired = visualiserParameters.isTransparentBackgroundEnabled();
     const auto effectiveCodec = getVideoCodec();
-    const bool proRes = effectiveCodec == VideoCodec::ProRes || effectiveCodec == VideoCodec::ProRes4444;
+    const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(effectiveCodec);
 
     videoCodecSelector.setSelectedId(static_cast<int>(effectiveCodec) + 1, juce::dontSendNotification);
     videoCodecSelector.setEnabled(!transparencyRequired);
     videoCodecLabel.setText(transparencyRequired ? "Video Codec (required for transparency)" : "Video Codec", juce::dontSendNotification);
-    losslessVideo.setEnabled(!proRes);
-    quality.setEnabled(!proRes && !losslessVideo.getToggleState());
-    compressionPreset.setEnabled(!proRes);
-    compressionPresetLabel.setEnabled(!proRes);
+    losslessVideo.setEnabled(!codecInfo.proRes);
+    quality.setEnabled(!codecInfo.proRes && !losslessVideo.getToggleState());
+    compressionPreset.setEnabled(!codecInfo.proRes);
+    compressionPresetLabel.setEnabled(!codecInfo.proRes);
     updateLosslessAudioEnabled();
 #endif
 }
