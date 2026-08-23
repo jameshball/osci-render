@@ -134,7 +134,7 @@ VisualiserComponent::VisualiserComponent(
 #if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
         if (child != nullptr) {
-            popout->closeButtonPressed();
+            closePopout();
         } else {
             popoutWindow();
         }
@@ -796,7 +796,7 @@ void VisualiserComponent::popoutWindow() {
         osci::windowing::configureTransparency(popout.get());
         visualiser->popoutToolbar = std::make_unique<PopoutToolbar>();
         visualiser->popoutToolbar->onClose = [this] {
-            popout->closeButtonPressed();
+            closePopout();
         };
         visualiser->popoutToolbar->onFullScreen = [this] {
             popout->toggleFullScreen();
@@ -811,7 +811,10 @@ void VisualiserComponent::popoutWindow() {
             setPopoutClicksPassThrough(!popout->getAllMouseEventsPassThrough());
         };
         visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-        visualiser->setPopoutPresentationOverlay({true, true, popout->isPinned(), false, false, false, false, true});
+        PopoutPresentationState initialState;
+        visualiser->setPopoutPresentationOverlay(initialState.derive(
+            isTransparentBackgroundEnabled(), popout->isPinned(), false, false, false, false,
+            osci::windowing::supportsClickThroughInTransparentFullScreen()));
     }
 #endif
     // Hide all buttons on the popout and set up mirror mode
@@ -838,6 +841,36 @@ void VisualiserComponent::popoutWindow() {
     // presentation overlay are configured so JUCE rebuilds that layer at the physical scale.
     visualiser->repaint();
     resized();
+#endif
+}
+
+void VisualiserComponent::closePopout() {
+#if OSCI_PREMIUM
+    if (popout == nullptr) {
+        return;
+    }
+    popout->saveWindowState();
+#if JUCE_LINUX
+    auto* visualiser = dynamic_cast<VisualiserComponent*>(popout->getContentComponent());
+    if (visualiser != nullptr) {
+        visualiser->setMirrorPresentationActive(false);
+    }
+    child = nullptr;
+    popout->setMinimised(true);
+    childUpdated();
+    resized();
+#else
+    const juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis == nullptr || safeThis->popout == nullptr) {
+            return;
+        }
+        safeThis->child = nullptr;
+        safeThis->popout.reset();
+        safeThis->childUpdated();
+        safeThis->resized();
+    });
+#endif
 #endif
 }
 

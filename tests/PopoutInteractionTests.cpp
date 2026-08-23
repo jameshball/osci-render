@@ -79,8 +79,16 @@ public:
         presentation = state.derive(true, true, false, false, false, false, true);
         expect(presentation.frameVisible);
 
-        beginTest("Paused presentation restores interaction but preserves pass-through intent");
+        beginTest("Surface refresh does not hide framed or paused controls");
+        presentation = state.derive(true, true, false, false, false, true, true);
+        expect(presentation.frameVisible);
+        expect(presentation.interactionMode == PopoutInteractionMode::interactive);
         state.paused = true;
+        presentation = state.derive(true, true, false, false, false, true, true);
+        expect(presentation.frameVisible);
+        expect(presentation.interactionMode == PopoutInteractionMode::interactive);
+
+        beginTest("Paused presentation restores interaction but preserves pass-through intent");
         presentation = state.derive(true, true, false, true, false, false, true);
         expect(presentation.frameVisible);
         expect(presentation.allMouseEventsPassThrough);

@@ -113,8 +113,7 @@ void PopoutToolbar::paint(juce::Graphics& g) {
         g.fillRoundedRectangle(hintBounds, 8.0f);
         g.setColour(juce::Colours::white);
         g.setFont(14.0f);
-        g.drawFittedText("Clicks now pass through this window. Pause the main visualiser to bring the controls "
-                         "back, or close and reopen the popout.",
+        g.drawFittedText("Clicks now pass through this window. Pause the main visualiser to bring the controls back.",
                          hintBounds.reduced(14.0f).toNearestInt(), juce::Justification::centred, 2);
     }
 }
@@ -218,25 +217,9 @@ bool VisualiserWindow::keyPressed(const juce::KeyPress& key) {
 }
 
 void VisualiserWindow::closeButtonPressed() {
-    VisualiserComponent* parent = this->parent;
-    saveWindowState();
-    parent->child = nullptr;
-#if JUCE_LINUX
-    // JUCE's Linux OpenGL backend calls eglTerminate when any OpenGLContext is
-    // detached. The EGL display is process-wide, so destroying this mirror
-    // context also invalidates the primary editor's live GPU surfaces. JUCE
-    // deliberately keeps OpenGL attached to minimised peers, allowing this
-    // window to be restored without rebuilding either GPU context.
-    auto* visualiser = dynamic_cast<VisualiserComponent*>(getContentComponent());
-    if (visualiser != nullptr) {
-        visualiser->setMirrorPresentationActive(false);
+    if (parent != nullptr) {
+        parent->closePopout();
     }
-    setMinimised(true);
-#else
-    parent->popout.reset();
-#endif
-    parent->childUpdated();
-    parent->resized();
 }
 
 void VisualiserWindow::toggleFullScreen() {
@@ -246,9 +229,9 @@ void VisualiserWindow::toggleFullScreen() {
     reenterFullScreenAfterTransition = false;
     setAlwaysOnTop(pinned);
     if (fullScreenRequested) {
+        boundsBeforeFullScreen = getBounds();
         transparentFullScreen = parent != nullptr && parent->isTransparentBackgroundEnabled();
         if (transparentFullScreen) {
-            boundsBeforeFullScreen = getBounds();
             enterTransparentFullScreen();
         } else {
 #if JUCE_MAC
@@ -474,7 +457,6 @@ void VisualiserWindow::updatePresentationState() {
 #if JUCE_WINDOWS || JUCE_MAC
     if (reenterFullScreenAfterTransition && !nativeFullScreen) {
         reenterFullScreenAfterTransition = false;
-        boundsBeforeFullScreen = getBounds();
         enterTransparentFullScreen();
     }
     const bool fullScreenTransitionComplete = !reenterFullScreenAfterTransition
@@ -568,11 +550,10 @@ void VisualiserWindow::updatePresentationState() {
         applyNativeInteraction(!presentationState.isAlphaInteractionHeld(now));
     }
 
-    const bool needsTimer = (transparencyEnabled && !presentationState.requestedFrameVisible)
+    const bool needsTimer = presentation.interactionMode == PopoutInteractionMode::alphaAware
                          || fullScreenTransitionPending
                          || reenterFullScreenAfterTransition
                          || (transparencyEnabled && presentationRefreshActive)
-                         || (transparencyEnabled && allMouseEventsPassThrough)
                          || (transparencyEnabled && clickThroughHintVisible);
     if (needsTimer && !isTimerRunning()) {
         startTimerHz(60);
