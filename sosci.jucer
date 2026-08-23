@@ -123,6 +123,16 @@
         <FILE id="oKPzgR" name="FFmpegEncoderManager.h" compile="0" resource="0"
               file="Source/video/FFmpegEncoderManager.h"/>
       </GROUP>
+      <GROUP id="{B082C1E5-36BA-4625-9BAF-E8A0C83EB660}" name="recording">
+        <FILE id="SLvRcC" name="LiveRecordingSession.cpp" compile="1" resource="0"
+              file="Source/recording/LiveRecordingSession.cpp"/>
+        <FILE id="SLvRcH" name="LiveRecordingSession.h" compile="0" resource="0"
+              file="Source/recording/LiveRecordingSession.h"/>
+        <FILE id="SRcExC" name="RecordingExporter.cpp" compile="1" resource="0"
+              file="Source/recording/RecordingExporter.cpp"/>
+        <FILE id="SRcExH" name="RecordingExporter.h" compile="0" resource="0"
+              file="Source/recording/RecordingExporter.h"/>
+      </GROUP>
       <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
       <FILE id="ANZRtQ" name="CommonPluginEditor.h" compile="0" resource="0"
@@ -211,6 +221,14 @@
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="SViRcC" name="VisualiserRecordingController.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserRecordingController.cpp"/>
+        <FILE id="SViRcH" name="VisualiserRecordingController.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserRecordingController.h"/>
+        <FILE id="SViTxC" name="VisualiserTextureOutputController.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserTextureOutputController.cpp"/>
+        <FILE id="SViTxH" name="VisualiserTextureOutputController.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserTextureOutputController.h"/>
         <FILE id="SosPopC" name="VisualiserPopout.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserPopout.cpp"/>
         <FILE id="SosPopH" name="VisualiserPopout.h" compile="0" resource="0"

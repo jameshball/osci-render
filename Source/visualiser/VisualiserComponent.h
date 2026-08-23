@@ -7,16 +7,15 @@
 
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
-#include "../audio/AudioRecorder.h"
 #include <osci_gui/osci_gui.h>
 #include "../components/timeline/TimelineComponent.h"
 #include "../components/timeline/TimelineController.h"
-#include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
+#include "VisualiserRecordingController.h"
 #include "VisualiserSettings.h"
+#include "VisualiserTextureOutputController.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
-#include <osci_texture_interop/osci_texture_interop.h>
 
 enum class FullScreenMode {
     TOGGLE,
@@ -96,6 +95,7 @@ private:
     void requestTextureOutputService();
     void serviceTextureOutputFrame();
     void handleTextureOutputServiceResult(osci::texture::ServiceResult result);
+    void requestRecordingStop();
     void timerCallback() override;
 
     std::atomic<bool> active = true;
@@ -122,7 +122,7 @@ private:
     osci::SvgButton settingsButton{"settings", BinaryData::cog_svg, juce::Colours::white, juce::Colours::white};
     osci::SvgButton audioInputButton{"audioInput", BinaryData::microphone_svg, juce::Colours::white, juce::Colours::red};
     osci::SvgButton textureOutputButton{"textureOutput", BinaryData::spout_svg, juce::Colours::white, juce::Colours::red};
-    osci::texture::OpenGLTexturePublisher textureOutputPublisher;
+    VisualiserTextureOutputController textureOutputController;
 
     int lastMouseX = 0;
     int lastMouseY = 0;
@@ -135,27 +135,19 @@ private:
     FadeCoverComponent overlayFadeCover;
 
     juce::File ffmpegFile;
-    bool recordingAudio = true;
+    VisualiserRecordingController recordingController;
+    double recordingSampleRate = 0.0;
+    std::atomic<bool> recordingFailurePending { false };
+    std::atomic<bool> recordingStopPending { false };
 
 #if OSCI_PREMIUM
-    bool recordingVideo = true;
-    bool recordingTransparency = false;
     bool downloading = false;
-
-    long numFrames = 0;
-    VisualiserRenderSize recordingRenderSize;
-    std::vector<unsigned char> framePixels;
-    osci::WriteProcess ffmpegProcess;
-    std::unique_ptr<juce::TemporaryFile> tempVideoFile;
-    FFmpegEncoderManager ffmpegEncoderManager;
 #endif
 
     StopwatchComponent stopwatch;
     osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     std::unique_ptr<juce::FileChooser> chooser;
-    std::unique_ptr<juce::TemporaryFile> tempAudioFile;
-    AudioRecorder audioRecorder;
 
     juce::Rectangle<int> buttonRow;
 

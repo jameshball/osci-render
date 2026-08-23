@@ -4,7 +4,6 @@
 #include "../CommonPluginProcessor.h"
 #include "../LookAndFeel.h"
 #include "../components/OverlayDialogHelpers.h"
-#include "../video/VideoEncodingConstants.h"
 #include "VisualiserPopout.h"
 #include "VisualiserTextureAssets.h"
 
@@ -28,16 +27,14 @@ VisualiserComponent::VisualiserComponent(
     RecordingSettings &recordingSettings,
     VisualiserComponent *parent,
     bool visualiserOnly) : VisualiserRenderer(settings.parameters, processor.threadManager, {1024, 1024}, 60.0, "", parent == nullptr),
-                           settings(settings),
                            audioProcessor(processor),
-                           ffmpegFile(ffmpegFile),
-#if OSCI_PREMIUM
-                           ffmpegEncoderManager(ffmpegFile),
-#endif
+                           editor(pluginEditor),
+                           parent(parent),
+                           settings(settings),
                            recordingSettings(recordingSettings),
                            visualiserOnly(visualiserOnly),
-                           parent(parent),
-                           editor(pluginEditor) {
+                           ffmpegFile(ffmpegFile),
+                           recordingController(ffmpegFile) {
     setAssets(createVisualiserTextureAssets());
     setNativeTransparencySupported(parent != nullptr && TransparentWindow::isTransparencySupported());
     if (parent != nullptr) {
@@ -107,7 +104,7 @@ VisualiserComponent::VisualiserComponent(
     textureOutputButton.setToggleState(false, juce::NotificationType::dontSendNotification);
     textureOutputButton.onClick = [this] {
 #if OSCI_PREMIUM
-        const bool currentlyRequestedOrRunning = this->settings.parameters.textureOutputEnabled->getBoolValue() || textureOutputPublisher.isRunning();
+        const bool currentlyRequestedOrRunning = this->settings.parameters.textureOutputEnabled->getBoolValue() || textureOutputController.isRunning();
         setTextureOutputEnabled(!currentlyRequestedOrRunning);
 #else
         editor.showPremiumSplashScreen();
@@ -172,34 +169,29 @@ VisualiserComponent::VisualiserComponent(
     postRenderCallback = [this] {
         serviceTextureOutputFrame();
 
-        if (record.getToggleState()) {
-#if OSCI_PREMIUM
-            if (recordingVideo) {
-                // draw frame to ffmpeg
-                Texture renderTexture = getRenderTexture();
-                if (renderTexture.width != recordingRenderSize.width || renderTexture.height != recordingRenderSize.height) {
-                    return;
-                }
-                if (framePixels.size() != static_cast<size_t>(renderTexture.width * renderTexture.height * 4)) {
-                    framePixels.resize(renderTexture.width * renderTexture.height * 4);
-                }
-                getFrame(framePixels);
-                if (ffmpegProcess.write(framePixels.data(), 4 * renderTexture.width * renderTexture.height, VideoEncodingConstants::frameWriteTimeoutMs) == 0) {
-                    record.setToggleState(false, juce::NotificationType::dontSendNotification);
-
-                    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-                    juce::MessageManager::callAsync([safeThis] {
-                        if (safeThis != nullptr) {
-                            osci::showOverlayMessage(*safeThis.getComponent(),
-                                                     "Recording Error",
-                                                     "An error occurred while writing the video frame to the ffmpeg process. Recording has been stopped.");
-                        }
-                    });
+        if (recordingController.isRecording()) {
+            if (recordingController.capturesVideo()) {
+                const Texture renderTexture = getRenderTexture();
+                auto frame = recordingController.acquireVideoFrame({ renderTexture.width, renderTexture.height });
+                if (frame.isValid()) {
+                    getFrame(frame.getBytes());
+                    frame.submit();
                 }
             }
-#endif
-            if (recordingAudio) {
-                audioRecorder.audioThreadCallback(audioOutputBuffer);
+            if (recordingController.capturesAudio()) {
+                recordingController.writeAudioBlock(audioOutputBuffer);
+            }
+
+            if (recordingController.hasFailed() && !recordingFailurePending.exchange(true)) {
+                juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+                juce::MessageManager::callAsync([safeThis] {
+                    if (safeThis == nullptr) {
+                        return;
+                    }
+                    const auto message = safeThis->recordingController.getFailureMessage();
+                    safeThis->setRecording(false);
+                    osci::showOverlayMessage(*safeThis.getComponent(), "Recording Error", message);
+                });
             }
         }
 
@@ -216,8 +208,10 @@ VisualiserComponent::~VisualiserComponent() {
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
-    textureOutputPublisher.stop();
-    setRecording(false);
+    // Detach while the derived renderer is still alive so OpenGL-owned services
+    // are stopped by openGLContextClosing() on the context thread.
+    openGLContext.detach();
+    recordingController.finish();
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
         audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
@@ -261,14 +255,29 @@ void VisualiserComponent::mouseDoubleClick(const juce::MouseEvent &event) {
 
 int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     int desiredBufferSize = VisualiserRenderer::prepareTask(sampleRate, bufferSize);
-    audioRecorder.setSampleRate(sampleRate);
+    recordingSampleRate = sampleRate;
 
     return desiredBufferSize;
 }
 
 void VisualiserComponent::stopTask() {
-    setRecording(false);
+    requestRecordingStop();
     VisualiserRenderer::stopTask();
+}
+
+void VisualiserComponent::requestRecordingStop() {
+    if (!recordingController.isRecording() || recordingStopPending.exchange(true)) {
+        return;
+    }
+
+    juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+    juce::MessageManager::callAsync([safeThis] {
+        if (safeThis == nullptr) {
+            return;
+        }
+        safeThis->recordingStopPending.store(false);
+        safeThis->setRecording(false);
+    });
 }
 
 void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
@@ -460,29 +469,35 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
 }
 
 void VisualiserComponent::setRecording(bool recording) {
+    jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
+    recordingStopPending.store(false);
     stopwatch.stop();
     stopwatch.reset();
-
-#if OSCI_PREMIUM
-    bool stillRecording = ffmpegProcess.isRunning() || audioRecorder.isRecording();
-#else
-    bool stillRecording = audioRecorder.isRecording();
-#endif
+    const bool stillRecording = recordingController.isRecording();
 
     // Release renderingSemaphore to prevent deadlock
     renderingSemaphore.release();
 
     if (recording) {
+        VisualiserRecordingConfiguration configuration;
+        configuration.sampleRate = recordingSampleRate;
 #if OSCI_PREMIUM
-        recordingVideo = recordingSettings.recordingVideo();
-        recordingAudio = recordingSettings.recordingAudio();
-        recordingTransparency = recordingVideo && settings.parameters.isTransparentBackgroundEnabled();
-        if (!recordingVideo && !recordingAudio) {
+        configuration.captureVideo = recordingSettings.recordingVideo();
+        configuration.captureAudio = recordingSettings.recordingAudio();
+        configuration.preserveAlpha = configuration.captureVideo && settings.parameters.isTransparentBackgroundEnabled();
+        configuration.codec = recordingSettings.getVideoCodec();
+        configuration.renderSize = recordingSettings.getCanvasSize();
+        configuration.frameRate = recordingSettings.getFrameRate();
+        configuration.crf = recordingSettings.getCRF();
+        configuration.compressionPreset = recordingSettings.getCompressionPreset();
+        configuration.audioCodecArgs = recordingSettings.getAudioCodecArgs();
+
+        if (!configuration.captureVideo && !configuration.captureAudio) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             return;
         }
 
-        if (recordingVideo) {
+        if (configuration.captureVideo) {
             auto onDownloadSuccess = [this] {
                 juce::MessageManager::callAsync([this] {
                     record.setEnabled(true);
@@ -504,143 +519,65 @@ void VisualiserComponent::setRecording(bool recording) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 return;
             }
-
-            const auto codec = recordingSettings.getVideoCodec();
-            if (!ffmpegEncoderManager.supportsVideoCodec(codec)) {
-                record.setToggleState(false, juce::NotificationType::dontSendNotification);
-                const auto errorMessage = recordingTransparency
-                    ? "This FFmpeg installation does not include the ProRes 4444 encoder required for transparent video."
-                    : "This FFmpeg installation does not include an encoder for the selected video codec.";
-                osci::showOverlayMessage(*this,
-                                         "Recording Error",
-                                         errorMessage);
-                return;
-            }
-
-            const auto canvasSize = recordingSettings.getCanvasSize();
-            recordingRenderSize = canvasSize;
-            setRenderSize(canvasSize);
-
-            // Get the appropriate file extension based on codec
-            juce::String fileExtension = recordingTransparency ? "mov" : recordingSettings.getFileExtensionForCodec();
-            tempVideoFile = std::make_unique<juce::TemporaryFile>("." + fileExtension);
-
-            juce::String cmd = ffmpegEncoderManager.buildVideoEncodingCommand(
-                codec,
-                recordingSettings.getCRF(),
-                canvasSize.width,
-                canvasSize.height,
-                recordingSettings.getFrameRate(),
-                recordingSettings.getCompressionPreset(),
-                tempVideoFile->getFile(),
-                recordingTransparency);
-
-            if (cmd.isEmpty() || !ffmpegProcess.start(cmd)) {
-                juce::Logger::writeToLog("Recording: ffmpegProcess.start() failed for command: " + cmd);
-                record.setToggleState(false, juce::NotificationType::dontSendNotification);
-                juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-                juce::MessageManager::callAsync([safeThis] {
-                    if (safeThis != nullptr) {
-                        osci::showOverlayMessage(*safeThis.getComponent(),
-                                                 "Recording Error",
-                                                 "Failed to start the FFmpeg video encoder.\n\n"
-                                                 "Please check that FFmpeg is compatible with your system.");
-                    }
-                });
-                return;
-            }
-            framePixels.resize(canvasSize.width * canvasSize.height * 4);
-        }
-
-        if (recordingAudio) {
-            tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
-            audioRecorder.startRecording(tempAudioFile->getFile());
+            setRenderSize(configuration.renderSize);
         }
 #else
-        // audio only recording
-        tempAudioFile = std::make_unique<juce::TemporaryFile>(".wav");
-        audioRecorder.startRecording(tempAudioFile->getFile());
+        configuration.captureAudio = true;
 #endif
+
+        recordingFailurePending.store(false);
+        const auto result = recordingController.start(configuration);
+        if (!result) {
+            record.setToggleState(false, juce::NotificationType::dontSendNotification);
+            osci::showOverlayMessage(*this, "Recording Error", result.message);
+            return;
+        }
 
         setPaused(false);
         stopwatch.start();
     } else if (stillRecording) {
-#if OSCI_PREMIUM
-        bool wasRecordingAudio = recordingAudio;
-        bool wasRecordingVideo = recordingVideo;
-        bool wasRecordingTransparency = recordingTransparency;
-        recordingAudio = false;
-        recordingVideo = false;
-        recordingTransparency = false;
+        const bool failed = recordingController.hasFailed();
+        auto artifacts = std::make_shared<LiveRecordingArtifacts>(recordingController.finish());
+        recordingFailurePending.store(false);
+        if (failed) {
+            record.setToggleState(false, juce::NotificationType::dontSendNotification);
+            setBlockOnAudioThread(false);
+            resized();
+            return;
+        }
 
-        juce::String extension = wasRecordingVideo ? (wasRecordingTransparency ? "mov" : recordingSettings.getFileExtensionForCodec()) : "wav";
-        if (wasRecordingAudio) {
-            audioRecorder.stop();
-        }
-        if (wasRecordingVideo) {
-            ffmpegProcess.close();
-        }
-#else
-        audioRecorder.stop();
-        juce::String extension = "wav";
-#endif
+        const auto extension = artifacts->fileExtension;
         const auto timestamp = juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S");
         const auto suggestedFile = audioProcessor.getLastOpenedDirectory().getChildFile(editor.appName + "_" + timestamp + "." + extension);
         chooser = std::make_unique<juce::FileChooser>("Save recording", suggestedFile, "*." + extension);
         auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
-
-#if OSCI_PREMIUM
-        chooser->launchAsync(flags, [this, wasRecordingAudio, wasRecordingVideo, extension](const juce::FileChooser &chooser) {
+        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+        chooser->launchAsync(flags, [safeThis, artifacts, extension](const juce::FileChooser& chooser) {
+            if (safeThis == nullptr) {
+                return;
+            }
             auto file = chooser.getResult();
             if (file != juce::File()) {
-                // Ensure the file has the correct extension
                 if (!file.hasFileExtension(extension)) {
                     file = file.withFileExtension(extension);
                 }
-
-                bool saved = false;
-                if (wasRecordingAudio && wasRecordingVideo) {
-                    juce::String muxError;
-                    saved = ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile->getFile(), tempAudioFile->getFile(), file, recordingSettings.getAudioCodecArgs(), muxError);
-                    if (!saved && muxError.isNotEmpty()) {
-                        juce::Logger::writeToLog("Recording mux failed: " + muxError.substring(0, 500));
+                const auto result = safeThis->recordingController.exportRecording(*artifacts, file);
+                if (!result) {
+                    if (result.message.isNotEmpty()) {
+                        juce::Logger::writeToLog("Recording export failed: " + result.message.substring(0, 500));
                     }
-                } else if (wasRecordingAudio) {
-                    saved = tempAudioFile->getFile().copyFileTo(file);
-                } else if (wasRecordingVideo) {
-                    saved = tempVideoFile->getFile().copyFileTo(file);
-                }
-                if (!saved) {
-                    osci::showOverlayMessage(*this, "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
+                    osci::showOverlayMessage(*safeThis.getComponent(), "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
                     return;
                 }
-                audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-                audioProcessor.recordingExportCompleted(file);
-            } });
-#else
-        chooser->launchAsync(flags, [this, extension](const juce::FileChooser &chooser) {
-            auto file = chooser.getResult();
-            if (file != juce::File()) {
-                // Ensure the file has the correct extension
-                if (!file.hasFileExtension(extension)) {
-                    file = file.withFileExtension(extension);
-                }
-
-                if (!tempAudioFile->getFile().copyFileTo(file)) {
-                    osci::showOverlayMessage(*this, "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
-                    return;
-                }
-                audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-                audioProcessor.recordingExportCompleted(file);
-            } });
-#endif
+                safeThis->audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
+                safeThis->audioProcessor.recordingExportCompleted(file);
+            }
+        });
     }
 
-    setBlockOnAudioThread(recording);
-#if OSCI_PREMIUM
-    numFrames = 0;
-#endif
-    record.setToggleState(recording, juce::NotificationType::dontSendNotification);
+    const bool nowRecording = recordingController.isRecording();
+    setBlockOnAudioThread(nowRecording);
+    record.setToggleState(nowRecording, juce::NotificationType::dontSendNotification);
     resized();
 }
 
@@ -845,7 +782,7 @@ void VisualiserComponent::setOverlayFadeProgress(float progress) {
 
 void VisualiserComponent::refreshTextureOutputButton() {
     const bool wanted = settings.parameters.textureOutputEnabled->getBoolValue();
-    const bool running = textureOutputPublisher.isRunning();
+    const bool running = textureOutputController.isRunning();
 
 #if !OSCI_PREMIUM
     textureOutputButton.setEnabled(true);
@@ -888,6 +825,7 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
     }
 
     if (!enabled) {
+        textureOutputController.setRequested(false);
         settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(false);
         refreshTextureOutputButton();
         requestTextureOutputService();
@@ -915,7 +853,8 @@ void VisualiserComponent::setTextureOutputEnabled(bool enabled) {
         return;
     }
 
-    textureOutputPublisher.setSourceName(recordingSettings.getCustomTextureOutputName());
+    textureOutputController.setSourceName(recordingSettings.getCustomTextureOutputName());
+    textureOutputController.setRequested(true);
     settings.parameters.textureOutputEnabled->setBoolValueNotifyingHost(true);
     refreshTextureOutputButton();
     requestTextureOutputService();
@@ -927,7 +866,8 @@ void VisualiserComponent::requestTextureOutputService() {
 
 void VisualiserComponent::serviceTextureOutputFrame() {
 #if !OSCI_PREMIUM
-    textureOutputPublisher.stop();
+    textureOutputController.setRequested(false);
+    textureOutputController.stop();
 
     if (settings.parameters.textureOutputEnabled->getBoolValue()) {
         settings.parameters.textureOutputEnabled->setBoolValue(false);
@@ -946,15 +886,15 @@ void VisualiserComponent::serviceTextureOutputFrame() {
     }
 
     const bool shouldRun = settings.parameters.textureOutputEnabled->getBoolValue();
-    if (shouldRun && !textureOutputPublisher.isRunning()) {
-        textureOutputPublisher.setSourceName(recordingSettings.getCustomTextureOutputName());
+    textureOutputController.setRequested(shouldRun);
+    if (shouldRun && !textureOutputController.isRunning()) {
+        textureOutputController.setSourceName(recordingSettings.getCustomTextureOutputName());
     }
 
     const Texture renderTexture = getRenderTexture();
-    handleTextureOutputServiceResult(textureOutputPublisher.serviceTexture2D(shouldRun,
-                                                                             static_cast<std::uint32_t>(renderTexture.id),
-                                                                             renderTexture.width,
-                                                                             renderTexture.height));
+    handleTextureOutputServiceResult(textureOutputController.serviceTexture2D(static_cast<std::uint32_t>(renderTexture.id),
+                                                                               renderTexture.width,
+                                                                               renderTexture.height));
 #endif
 }
 
@@ -1011,7 +951,7 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
 }
 
 void VisualiserComponent::openGLContextClosing() {
-    textureOutputPublisher.stop();
+    textureOutputController.stop();
 
     VisualiserRenderer::openGLContextClosing();
 }
