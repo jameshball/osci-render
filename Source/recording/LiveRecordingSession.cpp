@@ -169,10 +169,8 @@ LiveRecordingSession::VideoFrame LiveRecordingSession::acquireVideoFrame() {
         return {};
     }
 
-    const auto previousCaptureCount = activeVideoCaptures.fetch_add(1, std::memory_order_acq_rel);
-    jassert(previousCaptureCount == 0);
-    if (previousCaptureCount != 0) {
-        activeVideoCaptures.fetch_sub(1, std::memory_order_acq_rel);
+    if (videoFrameAcquired.exchange(true, std::memory_order_acq_rel)) {
+        jassertfalse;
         return {};
     }
     if (!recordingVideo.load(std::memory_order_acquire) || hasFailed()) {
@@ -196,9 +194,8 @@ void LiveRecordingSession::releaseVideoFrame(bool submitFrame) {
         videoFramePending.store(true, std::memory_order_release);
         videoFrameReady.signal();
     }
-    if (activeVideoCaptures.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        videoCaptureFinished.signal();
-    }
+    videoFrameAcquired.store(false, std::memory_order_release);
+    videoCaptureFinished.signal();
 }
 
 void LiveRecordingSession::writeAudioBlock(const juce::AudioBuffer<float>& buffer) {
@@ -211,7 +208,7 @@ LiveRecordingArtifacts LiveRecordingSession::finish() {
     recordingVideo.store(false, std::memory_order_release);
     recordingAudio.store(false, std::memory_order_release);
     videoFrameConsumed.signal();
-    while (activeVideoCaptures.load(std::memory_order_acquire) > 0) {
+    while (videoFrameAcquired.load(std::memory_order_acquire)) {
         videoCaptureFinished.wait(100);
     }
     if (writerThread->isThreadRunning()) {
@@ -238,7 +235,7 @@ juce::String LiveRecordingSession::getFailureMessage() const {
 void LiveRecordingSession::reset() {
     recordingVideo.store(false, std::memory_order_release);
     recordingAudio.store(false, std::memory_order_release);
-    activeVideoCaptures.store(0, std::memory_order_release);
+    videoFrameAcquired.store(false, std::memory_order_release);
     writerFailed.store(false, std::memory_order_release);
     {
         const juce::SpinLock::ScopedLockType lock(failureLock);
