@@ -2,7 +2,7 @@
 
 #include "LiveRecordingSession.h"
 
-#include <functional>
+class FFmpegEncoderManager;
 
 struct RecordingExportResult {
     bool succeeded = true;
@@ -11,18 +11,22 @@ struct RecordingExportResult {
     explicit operator bool() const { return succeeded; }
 };
 
+enum class RecordingExportAction {
+    noMedia,
+    copyAudio,
+    copyVideo,
+    muxAudioAndVideo,
+};
+
 class RecordingExporter final {
 public:
-    using MuxAudioAndVideo = std::function<bool(const juce::File& video, const juce::File& audio,
-                                                const juce::File& destination,
-                                                const juce::StringArray& audioCodecArgs,
-                                                juce::String& error)>;
-
-    explicit RecordingExporter(MuxAudioAndVideo muxAudioAndVideo);
+    RecordingExporter() = default;
+    explicit RecordingExporter(FFmpegEncoderManager& encoderManager);
 
     RecordingExportResult exportRecording(const LiveRecordingArtifacts& artifacts,
                                             const juce::File& destination) const;
+    static RecordingExportAction getExportAction(const LiveRecordingArtifacts& artifacts);
 
 private:
-    MuxAudioAndVideo muxAudioAndVideo;
+    FFmpegEncoderManager* encoderManager = nullptr;
 };

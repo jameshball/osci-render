@@ -1,14 +1,11 @@
 #include "VisualiserRecordingController.h"
 
 VisualiserRecordingController::VisualiserRecordingController(const juce::File& ffmpegExecutable)
-    : exporter([this](const juce::File& video, const juce::File& audio, const juce::File& destination,
-                      const juce::StringArray& audioCodecArgs, juce::String& error) {
-          return encoderManager != nullptr
-              && encoderManager->muxAudioAndVideo(video, audio, destination, audioCodecArgs, error);
-      }) {
 #if OSCI_PREMIUM
-    encoderManager = std::make_unique<FFmpegEncoderManager>(ffmpegExecutable);
+    : encoderManager(std::make_unique<FFmpegEncoderManager>(ffmpegExecutable)),
+      exporter(*encoderManager) {
 #else
+    {
     juce::ignoreUnused(ffmpegExecutable);
 #endif
 }
