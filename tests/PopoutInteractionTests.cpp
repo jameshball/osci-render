@@ -3,7 +3,7 @@
 #include <array>
 
 #include "../Source/visualiser/TransparentWindowInteraction.h"
-#include "../modules/osci_gui/visualiser/osci_PopoutAlphaHitTest.h"
+#include "../modules/osci_gui/visualiser/osci_AlphaHitTest.h"
 
 class PopoutInteractionTest : public juce::UnitTest {
 public:
@@ -13,24 +13,24 @@ public:
         beginTest("Alpha threshold and OpenGL Y inversion");
         std::array<unsigned char, 4 * 4 * 4> pixels{};
         pixels[(0 * 4 + 1) * 4 + 3] = transparentWindowAlphaThreshold;
-        expect(osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
+        expect(osci::alphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
                                         transparentWindowAlphaThreshold));
-        expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.125f, 0.0f, 0.0f,
+        expect(!osci::alphaHitTest(pixels.data(), 4, 4, 0.375f, 0.125f, 0.0f, 0.0f,
                                          transparentWindowAlphaThreshold));
         pixels[(0 * 4 + 1) * 4 + 3] = transparentWindowAlphaThreshold - 1;
-        expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
+        expect(!osci::alphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
                                          transparentWindowAlphaThreshold));
 
         beginTest("Padding includes nearby alpha");
         pixels.fill(0);
         pixels[(2 * 4 + 2) * 4 + 3] = 255;
-        expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.0f, 0.0f,
+        expect(!osci::alphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.0f, 0.0f,
                                          transparentWindowAlphaThreshold));
-        expect(osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.5f, 0.0f,
+        expect(osci::alphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.5f, 0.0f,
                                         transparentWindowAlphaThreshold));
 
         beginTest("Empty frames do not hit");
-        expect(!osci::popoutAlphaHitTest(nullptr, 0, 0, 0.5f, 0.5f, 0.0f, 0.0f,
+        expect(!osci::alphaHitTest(nullptr, 0, 0, 0.5f, 0.5f, 0.0f, 0.0f,
                                          transparentWindowAlphaThreshold));
 
         beginTest("Aspect-fit mapping rejects letterboxing");

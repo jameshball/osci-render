@@ -4,14 +4,31 @@
 
 class VisualiserComponent;
 
+class VisualiserPresentationView final : public osci::OpenGLTextureView {
+public:
+    explicit VisualiserPresentationView(VisualiserComponent& owner);
+
+    void setPaused(bool paused);
+    void paint(juce::Graphics& g) override;
+    void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDrag(const juce::MouseEvent& event) override;
+    void mouseUp(const juce::MouseEvent& event) override;
+
+private:
+    VisualiserComponent& owner;
+    bool paused = false;
+    bool pauseOnMouseUp = false;
+};
+
 class VisualiserWindow final : public TransparentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent& owner,
-                     std::unique_ptr<VisualiserComponent> visualiser, osci::SettingsStore& settings);
+    VisualiserWindow(juce::String name, VisualiserComponent& owner, osci::SettingsStore& settings);
 
-    VisualiserComponent& getVisualiser() const { return *visualiser; }
     void showPresentation();
     void suspendPresentation();
+    void setPresentationPaused(bool paused);
+    void setTransparencyEnabled(bool enabled);
+    void setPresentationFadeAlpha(float alpha);
     static bool getAlwaysOnTopPreference(const osci::SettingsStore& settings);
     static void setAlwaysOnTopPreference(osci::SettingsStore& settings, bool alwaysOnTop);
 
@@ -32,7 +49,7 @@ private:
     static juce::Rectangle<int> constrainSavedBounds(juce::Rectangle<int> bounds);
 
     VisualiserComponent& owner;
-    VisualiserComponent* visualiser = nullptr;
+    VisualiserPresentationView* visualiser = nullptr;
     osci::SettingsStore& settings;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VisualiserWindow)
