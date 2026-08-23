@@ -47,41 +47,38 @@ PopoutToolbar::PopoutToolbar() {
     setInterceptsMouseClicks(true, true);
 }
 
-void PopoutToolbar::setState(const PopoutPresentation& state) {
-    if (hasPresentation && presentation == state) {
+void PopoutToolbar::setState(const PopoutToolbarState& newState) {
+    if (hasState && state == newState) {
         return;
     }
-    presentation = state;
-    hasPresentation = true;
-    frameVisible = state.frameVisible;
-    fullScreen = state.fullScreen;
+    state = newState;
+    hasState = true;
     closeButton.setVisible(state.frameVisible);
     fullscreenButton.setVisible(state.frameVisible);
     frameButton.setVisible(state.frameVisible);
     alwaysOnTopButton.setVisible(state.frameVisible);
     mouseInteractionButton.setVisible(state.frameVisible && state.transparencyEnabled);
-    mouseInteractionButton.setEnabled(state.clickThroughAvailable);
-    frameButton.setToggleState(!state.requestedFrameVisible, juce::NotificationType::dontSendNotification);
-    frameButton.setTooltip(state.requestedFrameVisible ? "Hide Window Frame." : "Show Window Frame.");
+    mouseInteractionButton.setEnabled(state.passThroughAvailable);
+    frameButton.setToggleState(!state.frameRequestedVisible, juce::NotificationType::dontSendNotification);
+    frameButton.setTooltip(state.frameRequestedVisible ? "Hide Window Frame." : "Show Window Frame.");
     alwaysOnTopButton.setToggleState(state.alwaysOnTop, juce::NotificationType::dontSendNotification);
     alwaysOnTopButton.setTooltip(state.alwaysOnTop ? "Disable Always on Top." : "Enable Always on Top.");
-    mouseInteractionButton.setToggleState(state.allMouseEventsPassThrough, juce::NotificationType::dontSendNotification);
-    if (!state.clickThroughAvailable) {
+    mouseInteractionButton.setToggleState(state.passThroughRequested, juce::NotificationType::dontSendNotification);
+    if (!state.passThroughAvailable) {
         mouseInteractionButton.setTooltip("Click-through is unavailable in fullscreen on this system.");
-    } else if (state.allMouseEventsPassThrough) {
+    } else if (state.passThroughRequested) {
         mouseInteractionButton.setTooltip("Keep This Window Interactive.");
     } else {
         mouseInteractionButton.setTooltip(state.paused ? "Let Clicks Pass Through After Resuming."
                                                        : "Let Clicks Pass Through.");
     }
     fullscreenButton.setTooltip(state.fullScreen ? "Exit Fullscreen." : "Enter Fullscreen.");
-    clickThroughHintVisible = state.clickThroughHintVisible;
     resized();
     repaint();
 }
 
 bool PopoutToolbar::hitTest(int x, int y) {
-    if (!frameVisible) {
+    if (!state.frameVisible) {
         return false;
     }
     if (y < toolbarHeight) {
@@ -96,17 +93,17 @@ bool PopoutToolbar::hitTest(int x, int y) {
 }
 
 void PopoutToolbar::paint(juce::Graphics& g) {
-    if (frameVisible) {
+    if (state.frameVisible) {
         constexpr float cornerRadius = 11.0f;
         auto bounds = getLocalBounds();
         g.setColour(osci::Colours::veryDark());
         g.fillRect(bounds.removeFromTop(toolbarHeight));
-        if (!fullScreen) {
+        if (!state.fullScreen) {
             g.setColour(juce::Colours::white.withAlpha(0.5f));
             g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), cornerRadius - 0.5f, 1.0f);
         }
     }
-    if (clickThroughHintVisible) {
+    if (state.clickThroughHintVisible) {
         const auto hintWidth = juce::jmax(1, juce::jmin(620, getWidth() - 24));
         const auto hintBounds = getLocalBounds().withSizeKeepingCentre(hintWidth, 58).toFloat();
         g.setColour(osci::Colours::veryDark().withAlpha(0.94f));
@@ -144,7 +141,7 @@ void PopoutToolbar::resized() {
 }
 
 void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
-    if (!event.mods.isLeftButtonDown() || fullScreen) {
+    if (!event.mods.isLeftButtonDown() || state.fullScreen) {
         return;
     }
     dragger.startDraggingComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()));
@@ -161,7 +158,7 @@ void PopoutToolbar::mouseDoubleClick(const juce::MouseEvent& event) {
 }
 
 void PopoutToolbar::mouseDrag(const juce::MouseEvent& event) {
-    if (!fullScreen) {
+    if (!state.fullScreen) {
         dragger.dragComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()), nullptr);
     }
 }
@@ -293,7 +290,7 @@ void VisualiserWindow::saveWindowState() {
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 void VisualiserWindow::setRequestedFrameVisible(bool visible) {
-    presentationState.requestedFrameVisible = visible;
+    frameRequestedVisible = visible;
     updatePresentationState();
 }
 
@@ -379,7 +376,8 @@ void VisualiserWindow::resized() {
     }
 #endif
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
-    updateResizeBorderVisibility(presentationState.isFrameVisible() && !fullScreenRequested && !nativeFullScreen);
+    const bool frameVisible = hasAppliedInteractionPolicy ? appliedInteractionPolicy.frameVisible : frameRequestedVisible;
+    updateResizeBorderVisibility(frameVisible && !fullScreenRequested && !nativeFullScreen);
 }
 
 void VisualiserWindow::leaveTransparentFullScreenAfterResize() {
@@ -439,8 +437,8 @@ void VisualiserWindow::timerCallback() {
 void VisualiserWindow::updatePresentationState() {
     const auto now = juce::Time::getMillisecondCounter();
     const bool transparencyEnabled = parent != nullptr && parent->isTransparentBackgroundEnabled();
-    presentationState.paused = parent != nullptr && parent->isPaused();
-    if (presentationState.paused) {
+    const bool paused = parent != nullptr && parent->isPaused();
+    if (paused) {
         clickThroughHintVisible = false;
     }
     if (clickThroughHintVisible && static_cast<std::int32_t>(now - clickThroughHintEndTime) >= 0) {
@@ -449,7 +447,7 @@ void VisualiserWindow::updatePresentationState() {
     if (!transparencyEnabled) {
         presentationRefreshActive = false;
         clickThroughHintVisible = false;
-        presentationState.resetAlphaInteraction();
+        alphaInteractionHold.reset();
         hasAlphaPassThroughAnchor = false;
     }
 
@@ -493,21 +491,24 @@ void VisualiserWindow::updatePresentationState() {
         setAlwaysOnTop(pinned);
     }
 
-    const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !presentationState.paused;
+    const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !paused;
     if (fullPassThroughActive) {
-        presentationState.resetAlphaInteraction();
+        alphaInteractionHold.reset();
         hasAlphaPassThroughAnchor = false;
     }
     const bool fullScreenActive = fullScreenRequested || nativeFullScreen;
-    const auto presentation = presentationState.derive(
-        transparencyEnabled,
-        pinned,
-        fullScreenActive,
-        allMouseEventsPassThrough,
-        clickThroughHintVisible,
-        presentationRefreshActive,
-        osci::windowing::supportsClickThroughInTransparentFullScreen());
-    const bool framedWindow = presentation.frameVisible && !fullScreenActive;
+    const bool alphaClickThroughAllowed = !fullScreenActive
+                                       || osci::windowing::supportsClickThroughInTransparentFullScreen();
+    const PopoutInteractionContext interactionContext {
+        .transparencyEnabled = transparencyEnabled,
+        .frameRequestedVisible = frameRequestedVisible,
+        .paused = paused,
+        .allMouseEventsPassThroughRequested = allMouseEventsPassThrough,
+        .waitingForSurface = presentationRefreshActive,
+        .alphaClickThroughAllowed = alphaClickThroughAllowed,
+    };
+    const auto interactionPolicy = derivePopoutInteractionPolicy(interactionContext);
+    const bool framedWindow = interactionPolicy.frameVisible && !fullScreenActive;
     updateResizeBorderVisibility(framedWindow);
     if (!windowCornersConfigured || windowCornersRounded != framedWindow) {
         osci::windowing::setRoundedWindowRegion(this, framedWindow ? 11.0f : 0.0f);
@@ -515,16 +516,27 @@ void VisualiserWindow::updatePresentationState() {
         windowCornersRounded = framedWindow;
     }
     if (parent != nullptr && parent->child != nullptr) {
-        if (!hasAppliedPresentation || appliedPresentation != presentation) {
-            parent->child->setAlphaMaskCaptureEnabled(presentation.alphaCaptureRequired);
-            parent->child->setPopoutPresentationOverlay(presentation);
-            appliedPresentation = presentation;
-            hasAppliedPresentation = true;
+        if (!hasAppliedInteractionPolicy || appliedInteractionPolicy != interactionPolicy) {
+            parent->child->setAlphaMaskCaptureEnabled(interactionPolicy.alphaCaptureRequired);
+            appliedInteractionPolicy = interactionPolicy;
+            hasAppliedInteractionPolicy = true;
         }
+        const PopoutToolbarState toolbarState {
+            .frameVisible = interactionPolicy.frameVisible,
+            .frameRequestedVisible = frameRequestedVisible,
+            .alwaysOnTop = pinned,
+            .fullScreen = fullScreenActive,
+            .transparencyEnabled = transparencyEnabled,
+            .passThroughRequested = transparencyEnabled && allMouseEventsPassThrough,
+            .passThroughAvailable = transparencyEnabled && alphaClickThroughAllowed,
+            .paused = paused,
+            .clickThroughHintVisible = clickThroughHintVisible,
+        };
+        parent->child->setPopoutToolbarState(toolbarState);
     }
-    if (presentation.interactionMode == PopoutInteractionMode::interactive) {
+    if (interactionPolicy.mode == PopoutInteractionMode::interactive) {
         applyNativeInteraction(false);
-    } else if (presentation.interactionMode == PopoutInteractionMode::passAll) {
+    } else if (interactionPolicy.mode == PopoutInteractionMode::passAll) {
         applyNativeInteraction(true);
     } else {
         bool alphaHit = false;
@@ -546,11 +558,11 @@ void VisualiserWindow::updatePresentationState() {
         }
         const bool movedBeyondPadding = !hasAlphaPassThroughAnchor
                                      || alphaPassThroughAnchor.getDistanceFrom(screenCursor) > 8.0;
-        presentationState.updateAlphaHit(alphaHit, nativeIgnoresMouseEvents, movedBeyondPadding, now);
-        applyNativeInteraction(!presentationState.isAlphaInteractionHeld(now));
+        alphaInteractionHold.update(alphaHit, nativeIgnoresMouseEvents, movedBeyondPadding, now);
+        applyNativeInteraction(!alphaInteractionHold.isActive(now));
     }
 
-    const bool needsTimer = presentation.interactionMode == PopoutInteractionMode::alphaAware
+    const bool needsTimer = interactionPolicy.mode == PopoutInteractionMode::alphaAware
                          || fullScreenTransitionPending
                          || reenterFullScreenAfterTransition
                          || (transparencyEnabled && presentationRefreshActive)

@@ -3,11 +3,25 @@
 #include <JuceHeader.h>
 #include <osci_gui/osci_gui.h>
 
-#include "PopoutPresentationState.h"
+#include "PopoutInteractionPolicy.h"
 
 class VisualiserComponent;
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
+struct PopoutToolbarState {
+    bool frameVisible = true;
+    bool frameRequestedVisible = true;
+    bool alwaysOnTop = true;
+    bool fullScreen = false;
+    bool transparencyEnabled = false;
+    bool passThroughRequested = false;
+    bool passThroughAvailable = false;
+    bool paused = false;
+    bool clickThroughHintVisible = false;
+
+    bool operator==(const PopoutToolbarState&) const = default;
+};
+
 class PopoutToolbar : public juce::Component {
 public:
     PopoutToolbar();
@@ -18,7 +32,7 @@ public:
     std::function<void()> onToggleAlwaysOnTop;
     std::function<void()> onToggleMouseInteraction;
 
-    void setState(const PopoutPresentation& state);
+    void setState(const PopoutToolbarState& state);
     bool hitTest(int x, int y) override;
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -37,11 +51,8 @@ private:
     osci::SvgButton alwaysOnTopButton { "alwaysOnTop", BinaryData::pushpin_svg, juce::Colours::white, juce::Colours::green };
     osci::SvgButton mouseInteractionButton { "mouseInteraction", BinaryData::mouse_svg, juce::Colours::white, juce::Colours::red };
     juce::ComponentDragger dragger;
-    PopoutPresentation presentation;
-    bool hasPresentation = false;
-    bool frameVisible = true;
-    bool fullScreen = false;
-    bool clickThroughHintVisible = false;
+    PopoutToolbarState state;
+    bool hasState = false;
 };
 #endif
 
@@ -67,7 +78,7 @@ public:
     bool getAllMouseEventsPassThrough() const { return allMouseEventsPassThrough; }
     void setRequestedFrameVisible(bool visible);
     void setAllMouseEventsPassThrough(bool shouldPassThrough, bool showHint = true);
-    bool isFrameRequestedVisible() const { return presentationState.requestedFrameVisible; }
+    bool isFrameRequestedVisible() const { return frameRequestedVisible; }
     void refreshNativePresentation();
     void transparencyModeChanged();
     void pauseStateChanged();
@@ -100,7 +111,8 @@ private:
 #endif
     bool pinned = true;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    PopoutPresentationState presentationState;
+    bool frameRequestedVisible = true;
+    AlphaInteractionHold alphaInteractionHold;
     bool nativeIgnoresMouseEvents = false;
     bool allMouseEventsPassThrough = false;
     bool clickThroughHintVisible = false;
@@ -114,7 +126,7 @@ private:
     juce::uint32 clickThroughHintEndTime = 0;
     bool resizeBorderVisible = false;
     bool resizeBorderVisibilityInitialised = false;
-    PopoutPresentation appliedPresentation;
-    bool hasAppliedPresentation = false;
+    PopoutInteractionPolicy appliedInteractionPolicy;
+    bool hasAppliedInteractionPolicy = false;
 #endif
 };

@@ -14,7 +14,6 @@
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
-#include "PopoutPresentationState.h"
 #include "TransparentWindow.h"
 #include "VisualiserPopout.h"
 #include "VisualiserSettings.h"
@@ -77,7 +76,7 @@ public:
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    void setPopoutPresentationOverlay(const PopoutPresentation& presentation);
+    void setPopoutToolbarState(const PopoutToolbarState& state);
 #endif
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void refreshOpenGLSurfaceTransparency();
