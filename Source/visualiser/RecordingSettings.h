@@ -191,6 +191,11 @@ private:
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void timerCallback() override;
 
+    enum PendingParameterUpdate : unsigned int {
+        videoEncodingControlsUpdate = 1u << 0,
+        canvasControlsUpdate = 1u << 1,
+    };
+
     std::atomic<unsigned int> pendingParameterUpdates { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
