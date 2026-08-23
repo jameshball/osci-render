@@ -472,6 +472,7 @@ void VisualiserComponent::setRecording(bool recording) {
             });
         if (!result) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
+            settings.setTransparencyControlEnabled(true);
             setBlockOnAudioThread(false);
             resized();
             return;
@@ -479,6 +480,7 @@ void VisualiserComponent::setRecording(bool recording) {
     }
 
     const bool nowRecording = recordingController.isRecording();
+    settings.setTransparencyControlEnabled(!nowRecording || !recordingController.capturesVideo());
     setBlockOnAudioThread(nowRecording);
     record.setToggleState(nowRecording, juce::NotificationType::dontSendNotification);
     resized();

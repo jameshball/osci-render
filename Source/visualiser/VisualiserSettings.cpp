@@ -150,6 +150,10 @@ void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
 }
 #endif
 
+void VisualiserSettings::setTransparencyControlEnabled(bool enabled) {
+    transparentBackgroundToggle.setEnabled(enabled);
+}
+
 void VisualiserSettings::paint(juce::Graphics& g) {
     g.fillAll(osci::Colours::darker());
 }
