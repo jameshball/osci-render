@@ -109,7 +109,7 @@ private:
     juce::WaitableEvent videoFrameReady;
     juce::WaitableEvent videoFrameConsumed;
     std::atomic<bool> videoFramePending { false };
-    std::atomic<int> activeVideoCaptures { 0 };
+    std::atomic<bool> videoFrameAcquired { false };
     juce::WaitableEvent videoCaptureFinished;
     std::atomic<bool> recordingVideo { false };
     std::atomic<bool> recordingAudio { false };
