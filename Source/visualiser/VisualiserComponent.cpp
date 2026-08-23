@@ -329,13 +329,19 @@ void VisualiserComponent::updatePausedState() {
 
 void VisualiserComponent::parameterValueChanged(int parameterIndex, float newValue) {
     juce::ignoreUnused(newValue);
+    unsigned int updates = 0;
+    if (parameterIndex == audioProcessor.visualiserParameters.visualiserPaused->getParameterIndex()) {
+        updates |= pausedStateUpdate;
+    }
+    if (parameterIndex == audioProcessor.visualiserParameters.textureOutputEnabled->getParameterIndex()) {
+        updates |= textureOutputUpdate;
+    }
 #if OSCI_PREMIUM
-    const bool transparencyChanged = parameterIndex == audioProcessor.visualiserParameters.transparentBackground->getParameterIndex();
-#else
-    const bool transparencyChanged = false;
-    juce::ignoreUnused(parameterIndex);
+    if (parameterIndex == audioProcessor.visualiserParameters.transparentBackground->getParameterIndex()) {
+        updates |= popoutTransparencyUpdate;
+    }
 #endif
-    pendingParameterUpdates.fetch_or(transparencyChanged ? 2u : 1u, std::memory_order_release);
+    pendingParameterUpdates.fetch_or(updates, std::memory_order_release);
 }
 
 void VisualiserComponent::timerCallback() {
@@ -343,11 +349,15 @@ void VisualiserComponent::timerCallback() {
     if (updates == 0) {
         return;
     }
-    updatePausedState();
-    refreshTextureOutputButton();
-    requestTextureOutputService();
+    if ((updates & pausedStateUpdate) != 0) {
+        updatePausedState();
+    }
+    if ((updates & textureOutputUpdate) != 0) {
+        refreshTextureOutputButton();
+        requestTextureOutputService();
+    }
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    if ((updates & 2u) != 0 && popout != nullptr) {
+    if ((updates & popoutTransparencyUpdate) != 0 && popout != nullptr) {
         popout->setTransparencyEnabled(isTransparentBackgroundEnabled());
     }
 #endif
