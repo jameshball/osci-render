@@ -98,6 +98,12 @@ private:
     void requestRecordingStop();
     void timerCallback() override;
 
+    enum PendingParameterUpdate : unsigned int {
+        pausedStateUpdate = 1u << 0,
+        textureOutputUpdate = 1u << 1,
+        popoutTransparencyUpdate = 1u << 2,
+    };
+
     std::atomic<bool> active = true;
     std::atomic<unsigned int> pendingParameterUpdates { 0 };
     bool pauseOnMouseUp = false;
