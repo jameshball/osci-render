@@ -74,6 +74,7 @@ public:
 #ifndef SOSCI
     void wireModulation(OscirenderAudioProcessor& processor);
 #endif
+    void setTransparencyControlEnabled(bool enabled);
 
     void paint(juce::Graphics& g) override;
     void resized() override;
