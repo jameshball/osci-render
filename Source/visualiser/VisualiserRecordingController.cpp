@@ -19,8 +19,7 @@ bool VisualiserRecordingController::wantsVideo(RecordingSettings& settings) cons
 #endif
 }
 
-LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& settings,
-                                                          double sampleRate) {
+LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& settings, double sampleRate) {
 #if OSCI_PREMIUM
     const bool captureVideo = settings.recordingVideo();
     const bool captureAudio = settings.recordingAudio();
@@ -85,9 +84,7 @@ LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& sett
     return session.start(sessionConfiguration);
 }
 
-LiveRecordingResult VisualiserRecordingController::stopAndChooseExport(const juce::File& destinationDirectory,
-                                                                        const juce::String& fileNamePrefix,
-                                                                        ExportCompletion completion) {
+LiveRecordingResult VisualiserRecordingController::stopAndChooseExport(const juce::File& destinationDirectory, const juce::String& fileNamePrefix, ExportCompletion completion) {
     if (!session.isRecording()) {
         return { false, "There is no active recording to stop." };
     }
