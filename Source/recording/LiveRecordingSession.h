@@ -30,12 +30,16 @@ struct LiveRecordingResult {
 };
 
 struct LiveRecordingArtifacts {
-    bool hasVideo = false;
-    bool hasAudio = false;
-    juce::String fileExtension;
     juce::StringArray audioCodecArgs;
     std::unique_ptr<juce::TemporaryFile> video;
     std::unique_ptr<juce::TemporaryFile> audio;
+
+    [[nodiscard]] bool hasVideo() const { return video != nullptr; }
+    [[nodiscard]] bool hasAudio() const { return audio != nullptr; }
+    [[nodiscard]] juce::String getOutputFileExtension() const {
+        const auto* output = hasVideo() ? video.get() : audio.get();
+        return output != nullptr ? output->getFile().getFileExtension().trimCharactersAtStart(".") : juce::String {};
+    }
 
     LiveRecordingArtifacts() = default;
     LiveRecordingArtifacts(LiveRecordingArtifacts&&) noexcept = default;

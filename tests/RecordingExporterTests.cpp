@@ -11,7 +11,6 @@ public:
     void runTest() override {
         beginTest("Single media artifacts are copied directly");
         LiveRecordingArtifacts audioArtifacts;
-        audioArtifacts.hasAudio = true;
         audioArtifacts.audio = std::make_unique<juce::TemporaryFile>(".wav");
         expect(audioArtifacts.audio->getFile().replaceWithText("audio"));
         juce::TemporaryFile audioDestination(".wav");
@@ -21,8 +20,6 @@ public:
 
         beginTest("Combined artifacts use the injected muxer");
         LiveRecordingArtifacts combinedArtifacts;
-        combinedArtifacts.hasAudio = true;
-        combinedArtifacts.hasVideo = true;
         combinedArtifacts.audio = std::make_unique<juce::TemporaryFile>(".wav");
         combinedArtifacts.video = std::make_unique<juce::TemporaryFile>(".mov");
         bool muxCalled = false;
@@ -38,7 +35,6 @@ public:
 
         beginTest("Missing artifacts report an error");
         LiveRecordingArtifacts missing;
-        missing.hasVideo = true;
         const auto result = exporter.exportRecording(missing, muxDestination.getFile());
         expect(!static_cast<bool>(result));
         expect(result.message.isNotEmpty());
