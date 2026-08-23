@@ -32,6 +32,7 @@ private:
     std::unique_ptr<FFmpegEncoderManager> encoderManager;
     LiveRecordingSession session;
     RecordingExporter exporter;
+    juce::ThreadPool exportThreadPool { juce::ThreadPool::Options().withNumberOfThreads(1).withThreadName("Recording Export") };
     VisualiserRenderSize renderSize;
     std::unique_ptr<juce::FileChooser> chooser;
 };

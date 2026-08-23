@@ -118,10 +118,14 @@ LiveRecordingResult VisualiserRecordingController::stopAndChooseExport(const juc
         if (!destination.hasFileExtension(extension)) {
             destination = destination.withFileExtension(extension);
         }
-        auto result = exporter.exportRecording(*artifacts, destination);
-        if (completion != nullptr) {
-            completion(std::move(result), std::move(destination));
-        }
+        exportThreadPool.addJob([this, artifacts, destination, completion = std::move(completion)] {
+            auto result = exporter.exportRecording(*artifacts, destination);
+            juce::MessageManager::callAsync([result = std::move(result), destination, completion = std::move(completion)]() mutable {
+                if (completion != nullptr) {
+                    completion(std::move(result), std::move(destination));
+                }
+            });
+        });
     });
     return {};
 }
