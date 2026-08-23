@@ -28,7 +28,7 @@ bool supportsRedirectionBitmapAlpha() {
     return supported;
 }
 
-HWND getWindowHandle(juce::Component* topLevelWindow) {
+HWND getNativeWindowHandle(juce::Component* topLevelWindow) {
     if (topLevelWindow == nullptr) {
         return nullptr;
     }
@@ -112,12 +112,12 @@ juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rec
 }
 
 void TransparentWindow::configureNativeTransparency() {
-    auto* window = getWindowHandle(this);
+    auto* window = getNativeWindowHandle(this);
     configureGpuTransparency(window);
 }
 
 void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
-    auto* window = getWindowHandle(this);
+    auto* window = getNativeWindowHandle(this);
     if (window == nullptr) {
         return;
     }
@@ -132,7 +132,7 @@ void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
 }
 
 bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const {
-    auto* window = getWindowHandle(const_cast<TransparentWindow*>(this));
+    auto* window = getNativeWindowHandle(const_cast<TransparentWindow*>(this));
     if (window == nullptr) {
         return false;
     }
@@ -145,7 +145,7 @@ bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEv
 void TransparentWindow::setMovesToActiveSpace(bool) {}
 
 void TransparentWindow::setNativeRoundedWindowRegion(float cornerRadius) {
-    auto* window = getWindowHandle(this);
+    auto* window = getNativeWindowHandle(this);
     if (window == nullptr) {
         return;
     }
