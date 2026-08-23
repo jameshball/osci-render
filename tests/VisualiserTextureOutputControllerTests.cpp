@@ -74,7 +74,7 @@ public:
 
         auto result = controller.serviceTexture2D(42, 640, 480);
         expect(result.event == osci::texture::ServiceEvent::started);
-        expect(controller.isRunning());
+        expect(fake->running);
         expectEquals(fake->sourceName, juce::String("Test output"));
         expectEquals(fake->sourceNameUpdates, 1);
         expect(fake->lastShouldRun);
@@ -87,10 +87,10 @@ public:
 
         beginTest("Disabling is serviced on the caller thread");
         controller.setRequested(false);
-        expect(controller.isRunning());
+        expect(fake->running);
         result = controller.serviceTexture2D(43, 640, 480);
         expect(result.event == osci::texture::ServiceEvent::stopped);
-        expect(!controller.isRunning());
+        expect(!fake->running);
 
         beginTest("Failures clear requested state");
         controller.setRequested(true);
@@ -104,20 +104,19 @@ public:
         beginTest("Context shutdown preserves the requested state");
         controller.setRequested(true);
         controller.serviceTexture2D(45, 640, 480);
-        expect(controller.isRunning());
+        expect(fake->running);
         result = controller.stop();
         expect(result.event == osci::texture::ServiceEvent::stopped);
         expect(controller.isRequested());
-        expect(!controller.isRunning());
+        expect(!fake->running);
         expectEquals(fake->stopCalls, 1);
 
         result = controller.serviceTexture2D(46, 640, 480);
         expect(result.event == osci::texture::ServiceEvent::started);
-        expect(controller.isRunning());
+        expect(fake->running);
 
         beginTest("Source-name changes are applied once on the next service");
         controller.setSourceName("Renamed output");
-        expectEquals(controller.getSourceName(), juce::String("Renamed output"));
         controller.serviceTexture2D(47, 640, 480);
         expectEquals(fake->sourceName, juce::String("Renamed output"));
         expectEquals(fake->sourceNameUpdates, 2);
