@@ -71,8 +71,8 @@ void RecordingParameters::load(juce::XmlElement* xml) {
     }
 
     if (settingsXml->hasAttribute("videoCodec")) {
-        int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
-        videoCodec = static_cast<VideoCodec>(codecValue);
+        const int codecValue = settingsXml->getIntAttribute("videoCodec", 0);
+        videoCodec = VideoEncodingConstants::videoCodecFromSerializedValue(codecValue);
     }
 
     auto* qualityXml = settingsXml->getChildByName("quality");
@@ -131,7 +131,8 @@ void RecordingParameters::sanitiseCanvasParameters() {
     }
 }
 
-RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
+RecordingSettings::RecordingSettings(RecordingParameters& ps, VisualiserParameters& visualiserParameters)
+    : parameters(ps), visualiserParameters(visualiserParameters) {
 #if OSCI_PREMIUM
     addAndMakeVisible(quality);
     addAndMakeVisible(canvasPresetSelector);
@@ -173,6 +174,8 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 
     parameters.canvasWidth.addListener(this);
     parameters.canvasHeight.addListener(this);
+    visualiserParameters.transparentBackground->addListener(this);
+    startTimerHz(30);
 
     updateLosslessAudioEnabled();
     recordAudio.onClick = [this] {
@@ -186,9 +189,8 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
             recordAudio.setToggleState(true, juce::NotificationType::sendNotification);
         }
     };
-    quality.setEnabled(!losslessVideo.getToggleState());
     losslessVideo.onClick = [this] {
-        quality.setEnabled(!losslessVideo.getToggleState());
+        updateVideoEncodingControls();
     };
     compressionPreset.onChange = [this] {
         parameters.compressionPreset = parameters.compressionPresets[compressionPreset.getSelectedId() - 1];
@@ -198,19 +200,18 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     compressionPresetLabel.setTooltip("The compression preset to use when recording video. Slower presets will produce smaller files at the expense of encoding time.");
 
     // Setup the codec selector
-    videoCodecSelector.addItem("H.264", static_cast<int>(VideoCodec::H264) + 1);
-    videoCodecSelector.addItem("H.265/HEVC", static_cast<int>(VideoCodec::H265) + 1);
-    videoCodecSelector.addItem("VP9", static_cast<int>(VideoCodec::VP9) + 1);
-#if JUCE_MAC
-    videoCodecSelector.addItem("ProRes", static_cast<int>(VideoCodec::ProRes) + 1);
-#endif
+    for (const auto& codec : VideoEncodingConstants::videoCodecs) {
+        videoCodecSelector.addItem(codec.displayName, static_cast<int>(codec.codec) + 1);
+    }
     videoCodecSelector.setSelectedId(static_cast<int>(parameters.videoCodec) + 1);
     videoCodecSelector.onChange = [this] {
-        parameters.videoCodec = static_cast<VideoCodec>(videoCodecSelector.getSelectedId() - 1);
-        if (parameters.videoCodec == VideoCodec::VP9) {
+        parameters.videoCodec = VideoEncodingConstants::videoCodecFromSerializedValue(videoCodecSelector.getSelectedId() - 1);
+        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(parameters.videoCodec);
+        if (!codecInfo.supportsLosslessAudio) {
             losslessAudio.setToggleState(false, juce::NotificationType::sendNotification);
         }
         updateLosslessAudioEnabled();
+        updateVideoEncodingControls();
     };
     videoCodecLabel.setTooltip("The video codec to use when recording. Different codecs offer different trade-offs between quality, file size, and compatibility.");
 
@@ -219,6 +220,7 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
     customTextureOutputEditor.onTextChange = [this] {
         parameters.customTextureOutputName = customTextureOutputEditor.getText();
     };
+    updateVideoEncodingControls();
 #else
     addAndMakeVisible(recordVideoWarning);
     addAndMakeVisible(sosciLink);
@@ -235,13 +237,34 @@ RecordingSettings::RecordingSettings(RecordingParameters& ps) : parameters(ps) {
 }
 
 RecordingSettings::~RecordingSettings() {
+    stopTimer();
     parameters.canvasWidth.removeListener(this);
     parameters.canvasHeight.removeListener(this);
+#if OSCI_PREMIUM
+    visualiserParameters.transparentBackground->removeListener(this);
+#endif
 }
 
 void RecordingSettings::updateLosslessAudioEnabled() {
-    losslessAudio.setEnabled(recordAudio.getToggleState()
-                             && parameters.videoCodec != VideoCodec::VP9);
+    const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(getVideoCodec());
+    losslessAudio.setEnabled(recordAudio.getToggleState() && codecInfo.supportsLosslessAudio);
+}
+
+void RecordingSettings::updateVideoEncodingControls() {
+#if OSCI_PREMIUM
+    const bool transparencyRequired = visualiserParameters.isTransparentBackgroundEnabled();
+    const auto effectiveCodec = getVideoCodec();
+    const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(effectiveCodec);
+
+    videoCodecSelector.setSelectedId(static_cast<int>(effectiveCodec) + 1, juce::dontSendNotification);
+    videoCodecSelector.setEnabled(!transparencyRequired);
+    videoCodecLabel.setText(transparencyRequired ? "Video Codec (required for transparency)" : "Video Codec", juce::dontSendNotification);
+    losslessVideo.setEnabled(!codecInfo.proRes);
+    quality.setEnabled(!codecInfo.proRes && !losslessVideo.getToggleState());
+    compressionPreset.setEnabled(!codecInfo.proRes);
+    compressionPresetLabel.setEnabled(!codecInfo.proRes);
+    updateLosslessAudioEnabled();
+#endif
 }
 
 void RecordingSettings::updateCanvasPresetSelector() {
@@ -266,16 +289,34 @@ void RecordingSettings::updateCanvasControlsVisibility() {
 }
 
 void RecordingSettings::parameterValueChanged(int parameterIndex, float newValue) {
-    juce::ignoreUnused(parameterIndex, newValue);
-    juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<RecordingSettings>(this)] {
-        if (safeThis == nullptr) {
-            return;
-        }
-        safeThis->parameters.sanitiseCanvasParameters();
-        safeThis->parameters.canvasPreset = VisualiserGeometry::getPresetForRenderSize(safeThis->parameters.getCanvasSize());
-        safeThis->updateCanvasPresetSelector();
-        safeThis->updateCanvasControlsVisibility();
-    });
+    juce::ignoreUnused(newValue);
+#if OSCI_PREMIUM
+    const bool transparencyChanged = parameterIndex == visualiserParameters.transparentBackground->getParameterIndex();
+#else
+    const bool transparencyChanged = false;
+    juce::ignoreUnused(parameterIndex);
+#endif
+    auto updates = static_cast<unsigned int>(videoEncodingControlsUpdate);
+    if (!transparencyChanged) {
+        updates |= canvasControlsUpdate;
+    }
+    pendingParameterUpdates.fetch_or(updates, std::memory_order_release);
+}
+
+void RecordingSettings::timerCallback() {
+    const auto updates = pendingParameterUpdates.exchange(0, std::memory_order_acquire);
+    if (updates == 0) {
+        return;
+    }
+    if ((updates & videoEncodingControlsUpdate) != 0) {
+        updateVideoEncodingControls();
+    }
+    if ((updates & canvasControlsUpdate) != 0) {
+        parameters.sanitiseCanvasParameters();
+        parameters.canvasPreset = VisualiserGeometry::getPresetForRenderSize(parameters.getCanvasSize());
+        updateCanvasPresetSelector();
+        updateCanvasControlsVisibility();
+    }
 }
 
 void RecordingSettings::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {

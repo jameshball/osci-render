@@ -2,11 +2,11 @@
 
 #include <JuceHeader.h>
 
-#include "../visualiser/RecordingSettings.h"
+#include "VideoEncodingConstants.h"
 
 class FFmpegEncoderManager {
 public:
-    FFmpegEncoderManager(juce::File& ffmpegExecutable);
+    explicit FFmpegEncoderManager(const juce::File& ffmpegExecutable);
     ~FFmpegEncoderManager() = default;
 
     struct EncoderDetails {
@@ -24,13 +24,16 @@ public:
         int height,
         double frameRate,
         const juce::String& compressionPreset,
-        const juce::File& outputFile);
+        const juce::File& outputFile,
+        bool preserveAlpha);
 
     bool muxAudioAndVideo(const juce::File& videoInput, const juce::File& audioInput, const juce::File& output,
                           const juce::StringArray& audioCodecArgs, juce::String& error, const std::atomic<bool>* cancelRequested = nullptr) const;
 
     // Get available encoders for a given codec
     juce::Array<EncoderDetails> getAvailableEncodersForCodec(VideoCodec codec);
+    bool supportsVideoCodec(VideoCodec codec) const;
+    bool supportsTransparentVideoEncoding() const;
 
     // Check if a hardware encoder is available
     bool isHardwareEncoderAvailable(const juce::String& encoderName);
@@ -59,7 +62,7 @@ private:
         int width,
         int height,
         double frameRate,
-        const juce::File& outputFile);
+        VideoCodec codec);
 
     // H.264 encoder settings helper
     juce::String addH264EncoderSettings(
@@ -108,14 +111,18 @@ private:
         const juce::String& compressionPreset,
         const juce::File& outputFile);
 
-#if JUCE_MAC
     // Build ProRes encoding command
     juce::String buildProResEncodingCommand(
         int width,
         int height,
         double frameRate,
         const juce::File& outputFile);
-#endif
+
+    juce::String buildProRes4444AlphaEncodingCommand(
+        int width,
+        int height,
+        double frameRate,
+        const juce::File& outputFile);
 
     // Estimate bitrate for videotoolbox encoders based on resolution, frame rate, and CRF
     int estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue);

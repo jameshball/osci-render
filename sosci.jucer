@@ -69,6 +69,8 @@
         <FILE id="help02" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
         <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
         <FILE id="Q2mSgZ" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
+        <FILE id="LockS1" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
+        <FILE id="MouseS" name="mouse.svg" compile="0" resource="1" file="Resources/svg/mouse.svg"/>
         <FILE id="e19TQV" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
         <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
@@ -78,6 +80,7 @@
         <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
         <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
         <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="PushPS" name="push-pin.svg" compile="0" resource="1" file="Resources/svg/push-pin.svg"/>
         <FILE id="Tf7MT4" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
         <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
         <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
@@ -119,6 +122,16 @@
               file="Source/video/FFmpegEncoderManager.cpp"/>
         <FILE id="oKPzgR" name="FFmpegEncoderManager.h" compile="0" resource="0"
               file="Source/video/FFmpegEncoderManager.h"/>
+      </GROUP>
+      <GROUP id="{B082C1E5-36BA-4625-9BAF-E8A0C83EB660}" name="recording">
+        <FILE id="SLvRcC" name="LiveRecordingSession.cpp" compile="1" resource="0"
+              file="Source/recording/LiveRecordingSession.cpp"/>
+        <FILE id="SLvRcH" name="LiveRecordingSession.h" compile="0" resource="0"
+              file="Source/recording/LiveRecordingSession.h"/>
+        <FILE id="SRcExC" name="RecordingExporter.cpp" compile="1" resource="0"
+              file="Source/recording/RecordingExporter.cpp"/>
+        <FILE id="SRcExH" name="RecordingExporter.h" compile="0" resource="0"
+              file="Source/recording/RecordingExporter.h"/>
       </GROUP>
       <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
@@ -208,6 +221,30 @@
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="SViRcC" name="VisualiserRecordingController.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserRecordingController.cpp"/>
+        <FILE id="SViRcH" name="VisualiserRecordingController.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserRecordingController.h"/>
+        <FILE id="SViTxC" name="VisualiserTextureOutputController.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserTextureOutputController.cpp"/>
+        <FILE id="SViTxH" name="VisualiserTextureOutputController.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserTextureOutputController.h"/>
+        <FILE id="SosPopC" name="VisualiserPopout.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserPopout.cpp"/>
+        <FILE id="SosPopH" name="VisualiserPopout.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserPopout.h"/>
+        <FILE id="TrWinInt2" name="TransparentWindowInteraction.h" compile="0" resource="0"
+              file="Source/visualiser/TransparentWindowInteraction.h"/>
+        <FILE id="sW1nDo" name="TransparentWindow.h" compile="0" resource="0"
+              file="Source/visualiser/TransparentWindow.h"/>
+        <FILE id="sW1Cpp" name="TransparentWindow.cpp" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow.cpp"/>
+        <FILE id="sW2Mac" name="TransparentWindow_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow_mac.mm"/>
+        <FILE id="sW2Win" name="TransparentWindow_windows.cpp" compile="1"
+              resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
+        <FILE id="sW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
+              resource="0" file="Source/visualiser/TransparentWindow_fallback.cpp"/>
         <FILE id="VTA002" name="VisualiserTextureAssets.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserTextureAssets.h"/>
         <FILE id="wdZb9U" name="VisualiserSettings.cpp" compile="1" resource="0"

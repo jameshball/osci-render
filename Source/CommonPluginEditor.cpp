@@ -106,6 +106,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setResizeLimits(250, 250, 999999, 999999);
 
     tooltipWindow->setMillisecondsBeforeTipAppears(500);
+    tooltipWindow->setLookAndFeel(&lookAndFeel);
 
     updateTitle();
 
@@ -301,6 +302,10 @@ CommonPluginEditor::~CommonPluginEditor() {
 
     if (audioProcessor.haltRecording != nullptr) {
         audioProcessor.haltRecording();
+    }
+
+    if (&tooltipWindow->getLookAndFeel() == &lookAndFeel) {
+        tooltipWindow->setLookAndFeel(nullptr);
     }
 
     setLookAndFeel(nullptr);
@@ -552,7 +557,8 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
 
         // Step 2: choose output video file (default: inputName + codec extension)
-        const auto ext = safeThis->recordingSettings.getFileExtensionForCodec();
+        const auto encodingConfiguration = safeThis->recordingSettings.createVideoEncodingConfiguration();
+        const auto& ext = encodingConfiguration.fileExtension;
         const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
             inputFile.getFileNameWithoutExtension() + "." + ext);
 
@@ -565,7 +571,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             juce::FileBrowserComponent::canSelectFiles;
 
         offlineRenderLog.event("output selection opened");
-        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext](const juce::FileChooser& outputChooser) {
+        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, encodingConfiguration](const juce::FileChooser& outputChooser) {
             if (safeThis == nullptr) {
                 offlineRenderLog.cancelled("output selection because editor closed");
                 return;
@@ -577,9 +583,11 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 return;
             }
 
-            // Ensure the file extension matches the codec container by default.
-            if (outputFile.getFileExtension().isEmpty())
+            if (encodingConfiguration.preserveAlpha) {
+                outputFile = outputFile.withFileExtension("mov");
+            } else if (outputFile.getFileExtension().isEmpty()) {
                 outputFile = outputFile.withFileExtension(ext);
+            }
 
             offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
             safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
@@ -609,10 +617,10 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 safeThis->audioProcessor,
                 safeThis->audioProcessor.visualiserParameters,
                 safeThis->audioProcessor.threadManager,
-                safeThis->recordingSettings,
                 inputFile,
                 outputFile,
-                safeThis->visualiser.getRenderMode());
+                safeThis->visualiser.getRenderMode(),
+                encodingConfiguration);
 
             content->setSize(700, 520);
 

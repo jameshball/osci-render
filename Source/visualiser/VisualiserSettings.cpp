@@ -72,6 +72,7 @@ VisualiserSettings::VisualiserSettings(VisualiserParameters& p, int numChannels,
     addAndMakeVisible(scale);
     addAndMakeVisible(position);
     addAndMakeVisible(screenColour);
+    optionToggleGrid.addItem(transparentBackgroundToggle);
     optionToggleGrid.addItem(flipVerticalToggle);
     optionToggleGrid.addItem(flipHorizontalToggle);
     optionToggleGrid.addItem(goniometerToggle);
@@ -148,6 +149,10 @@ void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
 #endif
 }
 #endif
+
+void VisualiserSettings::setTransparencyControlEnabled(bool enabled) {
+    transparentBackgroundToggle.setEnabled(enabled);
+}
 
 void VisualiserSettings::paint(juce::Graphics& g) {
     g.fillAll(osci::Colours::darker());

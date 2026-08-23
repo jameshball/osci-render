@@ -28,10 +28,10 @@ public:
     OfflineAudioToVideoRendererComponent(CommonAudioProcessor& processor,
                                         VisualiserParameters& visualiserParameters,
                                         osci::AudioBackgroundThreadManager& threadManager,
-                                        RecordingSettings& recordingSettings,
                                         const juce::File& inputAudioFile,
                                         const juce::File& outputVideoFile,
-                                        VisualiserRenderer::RenderMode initialRenderMode);
+                                        VisualiserRenderer::RenderMode initialRenderMode,
+                                        VideoEncodingConfiguration encodingConfiguration);
 
     ~OfflineAudioToVideoRendererComponent() override;
 
@@ -76,7 +76,7 @@ private:
     void finishAsync(Result r);
 
     CommonAudioProcessor& processor;
-    RecordingSettings& recordingSettings;
+    const VideoEncodingConfiguration encodingConfiguration;
 
     const juce::File inputAudioFile;
     const juce::File outputVideoFile;
