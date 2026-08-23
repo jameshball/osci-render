@@ -296,7 +296,11 @@ void RecordingSettings::parameterValueChanged(int parameterIndex, float newValue
     const bool transparencyChanged = false;
     juce::ignoreUnused(parameterIndex);
 #endif
-    pendingParameterUpdates.fetch_or(transparencyChanged ? 2u : 1u, std::memory_order_release);
+    auto updates = static_cast<unsigned int>(videoEncodingControlsUpdate);
+    if (!transparencyChanged) {
+        updates |= canvasControlsUpdate;
+    }
+    pendingParameterUpdates.fetch_or(updates, std::memory_order_release);
 }
 
 void RecordingSettings::timerCallback() {
@@ -304,8 +308,10 @@ void RecordingSettings::timerCallback() {
     if (updates == 0) {
         return;
     }
-    updateVideoEncodingControls();
-    if ((updates & 1u) != 0) {
+    if ((updates & videoEncodingControlsUpdate) != 0) {
+        updateVideoEncodingControls();
+    }
+    if ((updates & canvasControlsUpdate) != 0) {
         parameters.sanitiseCanvasParameters();
         parameters.canvasPreset = VisualiserGeometry::getPresetForRenderSize(parameters.getCanvasSize());
         updateCanvasPresetSelector();
