@@ -19,27 +19,16 @@ public:
     virtual osci::texture::ServiceResult service(bool shouldRun, osci::texture::OpenGLTextureFrame frame) = 0;
 };
 
-class OpenGLTextureOutputPublisher final : public TextureOutputPublisher {
-public:
-    void setSourceName(juce::String sourceName) override;
-    [[nodiscard]] bool isRunning() const override;
-    void stop() override;
-    osci::texture::ServiceResult service(bool shouldRun, osci::texture::OpenGLTextureFrame frame) override;
-
-private:
-    osci::texture::OpenGLTexturePublisher publisher;
-};
-
 class VisualiserTextureOutputController final {
 public:
-    explicit VisualiserTextureOutputController(std::unique_ptr<TextureOutputPublisher> publisher = std::make_unique<OpenGLTextureOutputPublisher>());
+    VisualiserTextureOutputController();
+    explicit VisualiserTextureOutputController(std::unique_ptr<TextureOutputPublisher> publisher);
 
     void setRequested(bool shouldRun) noexcept;
     [[nodiscard]] bool isRequested() const noexcept;
     [[nodiscard]] bool isRunning() const;
 
     void setSourceName(juce::String sourceName);
-    [[nodiscard]] juce::String getSourceName() const;
 
     osci::texture::ServiceResult serviceFrame(osci::texture::OpenGLTextureFrame frame);
     osci::texture::ServiceResult serviceTexture2D(std::uint32_t textureId, int width, int height);

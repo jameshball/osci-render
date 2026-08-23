@@ -21,21 +21,14 @@ public:
         process.close();
     }
 
-    bool isRunning() override {
-        return process.isRunning();
-    }
-
 private:
     osci::WriteProcess process;
 };
 
 class WavAudioRecordingBackend final : public AudioRecordingBackend {
 public:
-    void setSampleRate(double sampleRate) override {
+    bool start(const juce::File& file, double sampleRate) override {
         recorder.setSampleRate(sampleRate);
-    }
-
-    bool start(const juce::File& file) override {
         recorder.startRecording(file);
         return recorder.isRecording();
     }
@@ -46,10 +39,6 @@ public:
 
     void finish() override {
         recorder.stop();
-    }
-
-    bool isRunning() const override {
-        return recorder.isRecording();
     }
 
 private:
@@ -85,14 +74,6 @@ private:
     LiveRecordingSession& owner;
 };
 
-std::unique_ptr<VideoRecordingBackend> createVideoRecordingBackend() {
-    return std::make_unique<ProcessVideoRecordingBackend>();
-}
-
-std::unique_ptr<AudioRecordingBackend> createAudioRecordingBackend() {
-    return std::make_unique<WavAudioRecordingBackend>();
-}
-
 LiveRecordingSession::VideoFrame::VideoFrame(LiveRecordingSession& newOwner, std::span<std::uint8_t> newBytes)
     : owner(&newOwner), bytes(newBytes) {}
 
@@ -123,6 +104,10 @@ void LiveRecordingSession::VideoFrame::release(bool submitFrame) {
         bytes = {};
     }
 }
+
+LiveRecordingSession::LiveRecordingSession()
+    : LiveRecordingSession(std::make_unique<ProcessVideoRecordingBackend>(),
+                           std::make_unique<WavAudioRecordingBackend>()) {}
 
 LiveRecordingSession::LiveRecordingSession(std::unique_ptr<VideoRecordingBackend> videoBackend,
                                            std::unique_ptr<AudioRecordingBackend> audioBackend)
@@ -169,8 +154,7 @@ LiveRecordingResult LiveRecordingSession::start(const LiveRecordingConfiguration
 
     if (configuration.captureAudio) {
         artifacts.audio = std::make_unique<juce::TemporaryFile>(".wav");
-        audioBackend->setSampleRate(configuration.sampleRate);
-        if (!audioBackend->start(artifacts.audio->getFile())) {
+        if (!audioBackend->start(artifacts.audio->getFile(), configuration.sampleRate)) {
             finish();
             return { false, "Failed to start the audio recorder." };
         }
@@ -224,8 +208,8 @@ void LiveRecordingSession::writeAudioBlock(const juce::AudioBuffer<float>& buffe
 }
 
 LiveRecordingArtifacts LiveRecordingSession::finish() {
-    const bool wasRecordingVideo = recordingVideo.exchange(false, std::memory_order_acq_rel);
-    const bool wasRecordingAudio = recordingAudio.exchange(false, std::memory_order_acq_rel);
+    recordingVideo.store(false, std::memory_order_release);
+    recordingAudio.store(false, std::memory_order_release);
     videoFrameConsumed.signal();
     while (activeVideoCaptures.load(std::memory_order_acquire) > 0) {
         videoCaptureFinished.wait(100);
@@ -235,12 +219,8 @@ LiveRecordingArtifacts LiveRecordingSession::finish() {
         videoFrameReady.signal();
         writerThread->stopThread(VideoEncodingConstants::frameWriteTimeoutMs + 1000);
     }
-    if (wasRecordingVideo || videoBackend->isRunning()) {
-        videoBackend->finish();
-    }
-    if (wasRecordingAudio || audioBackend->isRunning()) {
-        audioBackend->finish();
-    }
+    videoBackend->finish();
+    audioBackend->finish();
     videoFramePending.store(false, std::memory_order_release);
     videoFrame.clear();
     return std::move(artifacts);

@@ -1,20 +1,33 @@
 #include "VisualiserTextureOutputController.h"
 
-void OpenGLTextureOutputPublisher::setSourceName(juce::String sourceName) {
-    publisher.setSourceName(std::move(sourceName));
+namespace {
+
+class OpenGLTextureOutputPublisher final : public TextureOutputPublisher {
+public:
+    void setSourceName(juce::String sourceName) override {
+        publisher.setSourceName(std::move(sourceName));
+    }
+
+    bool isRunning() const override {
+        return publisher.isRunning();
+    }
+
+    void stop() override {
+        publisher.stop();
+    }
+
+    osci::texture::ServiceResult service(bool shouldRun, osci::texture::OpenGLTextureFrame frame) override {
+        return publisher.service(shouldRun, frame);
+    }
+
+private:
+    osci::texture::OpenGLTexturePublisher publisher;
+};
+
 }
 
-bool OpenGLTextureOutputPublisher::isRunning() const {
-    return publisher.isRunning();
-}
-
-void OpenGLTextureOutputPublisher::stop() {
-    publisher.stop();
-}
-
-osci::texture::ServiceResult OpenGLTextureOutputPublisher::service(bool shouldRun, osci::texture::OpenGLTextureFrame frame) {
-    return publisher.service(shouldRun, frame);
-}
+VisualiserTextureOutputController::VisualiserTextureOutputController()
+    : VisualiserTextureOutputController(std::make_unique<OpenGLTextureOutputPublisher>()) {}
 
 VisualiserTextureOutputController::VisualiserTextureOutputController(std::unique_ptr<TextureOutputPublisher> newPublisher)
     : publisher(std::move(newPublisher)) {
@@ -39,11 +52,6 @@ void VisualiserTextureOutputController::setSourceName(juce::String newSourceName
         sourceName = std::move(newSourceName);
     }
     sourceNameGeneration.fetch_add(1, std::memory_order_release);
-}
-
-juce::String VisualiserTextureOutputController::getSourceName() const {
-    juce::SpinLock::ScopedLockType lock(sourceNameLock);
-    return sourceName;
 }
 
 osci::texture::ServiceResult VisualiserTextureOutputController::serviceFrame(osci::texture::OpenGLTextureFrame frame) {

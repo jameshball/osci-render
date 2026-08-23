@@ -39,12 +39,6 @@ struct LiveRecordingArtifacts {
         const auto* output = hasVideo() ? video.get() : audio.get();
         return output != nullptr ? output->getFile().getFileExtension().trimCharactersAtStart(".") : juce::String {};
     }
-
-    LiveRecordingArtifacts() = default;
-    LiveRecordingArtifacts(LiveRecordingArtifacts&&) noexcept = default;
-    LiveRecordingArtifacts& operator=(LiveRecordingArtifacts&&) noexcept = default;
-    LiveRecordingArtifacts(const LiveRecordingArtifacts&) = delete;
-    LiveRecordingArtifacts& operator=(const LiveRecordingArtifacts&) = delete;
 };
 
 class VideoRecordingBackend {
@@ -53,21 +47,15 @@ public:
     virtual bool start(const juce::String& command) = 0;
     virtual bool write(std::span<const std::uint8_t> frame) = 0;
     virtual void finish() = 0;
-    virtual bool isRunning() = 0;
 };
 
 class AudioRecordingBackend {
 public:
     virtual ~AudioRecordingBackend() = default;
-    virtual void setSampleRate(double sampleRate) = 0;
-    virtual bool start(const juce::File& file) = 0;
+    virtual bool start(const juce::File& file, double sampleRate) = 0;
     virtual void write(const juce::AudioBuffer<float>& buffer) = 0;
     virtual void finish() = 0;
-    virtual bool isRunning() const = 0;
 };
-
-std::unique_ptr<VideoRecordingBackend> createVideoRecordingBackend();
-std::unique_ptr<AudioRecordingBackend> createAudioRecordingBackend();
 
 class LiveRecordingSession {
 public:
@@ -91,8 +79,9 @@ public:
         std::span<std::uint8_t> bytes;
     };
 
-    explicit LiveRecordingSession(std::unique_ptr<VideoRecordingBackend> videoBackend = createVideoRecordingBackend(),
-                                  std::unique_ptr<AudioRecordingBackend> audioBackend = createAudioRecordingBackend());
+    LiveRecordingSession();
+    LiveRecordingSession(std::unique_ptr<VideoRecordingBackend> videoBackend,
+                         std::unique_ptr<AudioRecordingBackend> audioBackend);
     ~LiveRecordingSession();
 
     LiveRecordingResult start(const LiveRecordingConfiguration& configuration);

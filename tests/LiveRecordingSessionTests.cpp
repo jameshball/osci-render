@@ -36,7 +36,6 @@ public:
     }
 
     void finish() override { state->running = false; }
-    bool isRunning() override { return state->running; }
 
 private:
     std::shared_ptr<VideoBackendState> state;
@@ -51,18 +50,15 @@ class FakeAudioRecordingBackend final : public AudioRecordingBackend {
 public:
     explicit FakeAudioRecordingBackend(std::shared_ptr<AudioBackendState> state) : state(std::move(state)) {}
 
-    void setSampleRate(double newSampleRate) override { sampleRate = newSampleRate; }
-    bool start(const juce::File&) override {
+    bool start(const juce::File&, double sampleRate) override {
         state->running = sampleRate > 0.0;
         return state->running;
     }
     void write(const juce::AudioBuffer<float>&) override { ++state->writes; }
     void finish() override { state->running = false; }
-    bool isRunning() const override { return state->running; }
 
 private:
     std::shared_ptr<AudioBackendState> state;
-    double sampleRate = 0.0;
 };
 
 class LiveRecordingSessionTest final : public juce::UnitTest {
