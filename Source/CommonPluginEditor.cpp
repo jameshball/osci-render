@@ -557,8 +557,8 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
 
         // Step 2: choose output video file (default: inputName + codec extension)
-        const bool preserveAlpha = safeThis->audioProcessor.visualiserParameters.isTransparentBackgroundEnabled();
-        const auto ext = safeThis->recordingSettings.getFileExtensionForCodec();
+        const auto encodingConfiguration = safeThis->recordingSettings.createVideoEncodingConfiguration();
+        const auto& ext = encodingConfiguration.fileExtension;
         const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
             inputFile.getFileNameWithoutExtension() + "." + ext);
 
@@ -571,7 +571,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             juce::FileBrowserComponent::canSelectFiles;
 
         offlineRenderLog.event("output selection opened");
-        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, preserveAlpha](const juce::FileChooser& outputChooser) {
+        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, encodingConfiguration](const juce::FileChooser& outputChooser) {
             if (safeThis == nullptr) {
                 offlineRenderLog.cancelled("output selection because editor closed");
                 return;
@@ -583,7 +583,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 return;
             }
 
-            if (preserveAlpha) {
+            if (encodingConfiguration.preserveAlpha) {
                 outputFile = outputFile.withFileExtension("mov");
             } else if (outputFile.getFileExtension().isEmpty()) {
                 outputFile = outputFile.withFileExtension(ext);
@@ -617,11 +617,10 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 safeThis->audioProcessor,
                 safeThis->audioProcessor.visualiserParameters,
                 safeThis->audioProcessor.threadManager,
-                safeThis->recordingSettings,
                 inputFile,
                 outputFile,
                 safeThis->visualiser.getRenderMode(),
-                preserveAlpha);
+                encodingConfiguration);
 
             content->setSize(700, 520);
 

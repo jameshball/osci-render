@@ -28,11 +28,10 @@ public:
     OfflineAudioToVideoRendererComponent(CommonAudioProcessor& processor,
                                         VisualiserParameters& visualiserParameters,
                                         osci::AudioBackgroundThreadManager& threadManager,
-                                        RecordingSettings& recordingSettings,
                                         const juce::File& inputAudioFile,
                                         const juce::File& outputVideoFile,
                                         VisualiserRenderer::RenderMode initialRenderMode,
-                                        bool preserveAlpha);
+                                        VideoEncodingConfiguration encodingConfiguration);
 
     ~OfflineAudioToVideoRendererComponent() override;
 
@@ -77,7 +76,7 @@ private:
     void finishAsync(Result r);
 
     CommonAudioProcessor& processor;
-    RecordingSettings& recordingSettings;
+    const VideoEncodingConfiguration encodingConfiguration;
 
     const juce::File inputAudioFile;
     const juce::File outputVideoFile;
@@ -90,7 +89,6 @@ private:
     juce::TextButton cancelButton { "Cancel" };
 
     const VisualiserRenderer::RenderMode initialRenderMode;
-    const bool preserveAlpha;
 
     std::atomic<bool> cancelRequested { false };
     std::unique_ptr<WorkerThread> worker;

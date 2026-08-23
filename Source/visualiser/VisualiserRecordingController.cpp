@@ -22,36 +22,27 @@ bool VisualiserRecordingController::wantsVideo(RecordingSettings& settings) cons
 LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& settings, double sampleRate) {
 #if OSCI_PREMIUM
     const bool captureVideo = settings.recordingVideo();
-    const bool captureAudio = settings.recordingAudio();
-    const bool preserveAlpha = captureVideo && settings.visualiserParameters.isTransparentBackgroundEnabled();
-    const auto codec = settings.getVideoCodec();
-    renderSize = settings.getCanvasSize();
-    const auto crf = settings.getCRF();
-    const auto frameRate = settings.getFrameRate();
-    const auto compressionPreset = settings.getCompressionPreset();
+    const auto encodingConfiguration = settings.createVideoEncodingConfiguration();
+    const bool captureAudio = encodingConfiguration.includeAudio;
+    const bool preserveAlpha = captureVideo && encodingConfiguration.preserveAlpha;
+    renderSize = encodingConfiguration.renderSize;
 #else
     juce::ignoreUnused(settings);
+    const VideoEncodingConfiguration encodingConfiguration;
     const bool captureVideo = false;
     const bool captureAudio = true;
     const bool preserveAlpha = false;
-    const auto codec = VideoCodec::H264;
     renderSize = {};
-    const auto crf = 0;
-    const auto frameRate = 0.0;
-    const juce::String compressionPreset;
 #endif
 
     if (!captureVideo && !captureAudio) {
         return { false, "Recording must capture video, audio, or both." };
     }
 
-    const auto outputExtension = captureVideo
-        ? (preserveAlpha ? "mov" : VideoEncodingConstants::getVideoCodecInfo(codec).defaultFileExtension)
-        : "wav";
+    const auto outputExtension = captureVideo ? encodingConfiguration.fileExtension : "wav";
 
     if (captureVideo) {
-        const auto requiredCodec = preserveAlpha ? VideoCodec::ProRes4444 : codec;
-        if (encoderManager == nullptr || !encoderManager->supportsVideoCodec(requiredCodec)) {
+        if (encoderManager == nullptr || !encoderManager->supportsVideoCodec(encodingConfiguration.codec)) {
             return {
                 false,
                 preserveAlpha
@@ -68,16 +59,16 @@ LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& sett
         .videoHeight = renderSize.height,
         .sampleRate = sampleRate,
         .videoFileExtension = outputExtension,
-        .audioCodecArgs = settings.getAudioCodecArgs(),
+        .audioCodecArgs = encodingConfiguration.audioCodecArgs,
     };
-    sessionConfiguration.buildVideoCommand = [this, codec, crf, frameRate, compressionPreset, preserveAlpha](const juce::File& outputFile) {
+    sessionConfiguration.buildVideoCommand = [this, encodingConfiguration, preserveAlpha](const juce::File& outputFile) {
         return encoderManager->buildVideoEncodingCommand(
-            codec,
-            crf,
+            encodingConfiguration.codec,
+            encodingConfiguration.crf,
             renderSize.width,
             renderSize.height,
-            frameRate,
-            compressionPreset,
+            encodingConfiguration.frameRate,
+            encodingConfiguration.compressionPreset,
             outputFile,
             preserveAlpha);
     };
