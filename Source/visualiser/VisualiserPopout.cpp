@@ -1,606 +1,138 @@
 #include "VisualiserPopout.h"
 
+#include "../CommonPluginEditor.h"
 #include "VisualiserComponent.h"
-#include "../LookAndFeel.h"
-#include "PopoutInteractionGeometry.h"
-#include "TransparentWindow.h"
 
-#include <cstdint>
+namespace {
 
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-PopoutToolbar::PopoutToolbar() {
-    addAndMakeVisible(closeButton);
-    addAndMakeVisible(fullscreenButton);
-    addAndMakeVisible(frameButton);
-    addAndMakeVisible(alwaysOnTopButton);
-    addAndMakeVisible(mouseInteractionButton);
-    closeButton.setIconColours(juce::Colours::white, juce::Colours::white.withAlpha(0.8f));
-    closeButton.onClick = [this] {
-        if (onClose != nullptr) {
-            onClose();
-        }
-    };
-    fullscreenButton.onClick = [this] {
-        if (onFullScreen != nullptr) {
-            onFullScreen();
-        }
-    };
-    frameButton.setClickingTogglesState(false);
-    frameButton.onClick = [this] {
-        if (onToggleFrame != nullptr) {
-            onToggleFrame();
-        }
-    };
-    alwaysOnTopButton.setClickingTogglesState(false);
-    alwaysOnTopButton.onClick = [this] {
-        if (onToggleAlwaysOnTop != nullptr) {
-            onToggleAlwaysOnTop();
-        }
-    };
-    mouseInteractionButton.setClickingTogglesState(false);
-    mouseInteractionButton.onClick = [this] {
-        if (onToggleMouseInteraction != nullptr) {
-            onToggleMouseInteraction();
-        }
-    };
-    setState({});
-    setInterceptsMouseClicks(true, true);
+constexpr auto alwaysOnTopKey = "popoutAlwaysOnTop";
+constexpr auto frameVisibleKey = "popoutFrameVisible";
+constexpr auto clicksPassThroughKey = "popoutClicksPassThrough";
+constexpr auto windowBoundsKey = "popoutWindowBounds";
+constexpr auto fullScreenKey = "popoutFullScreen";
+
 }
 
-void PopoutToolbar::setState(const PopoutToolbarState& newState) {
-    if (hasState && state == newState) {
-        return;
+VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner,
+                                   std::unique_ptr<VisualiserComponent> content, osci::SettingsStore& settings)
+    : TransparentWindow(std::move(name), loadWindowState(settings)),
+      owner(owner),
+      visualiser(content.get()),
+      settings(settings) {
+    setContent(std::move(content));
+    addKeyListener(&owner.editor);
+    visualiser->hideButtonRow = true;
+    visualiser->resized();
+    if (getBounds().isEmpty()) {
+        centreWithSize(350, 350);
     }
-    state = newState;
-    hasState = true;
-    closeButton.setVisible(state.frameVisible);
-    fullscreenButton.setVisible(state.frameVisible);
-    frameButton.setVisible(state.frameVisible);
-    alwaysOnTopButton.setVisible(state.frameVisible);
-    mouseInteractionButton.setVisible(state.frameVisible && state.transparencyEnabled);
-    mouseInteractionButton.setEnabled(state.passThroughAvailable);
-    frameButton.setToggleState(!state.frameRequestedVisible, juce::NotificationType::dontSendNotification);
-    frameButton.setTooltip(state.frameRequestedVisible ? "Hide Window Frame." : "Show Window Frame.");
-    alwaysOnTopButton.setToggleState(state.alwaysOnTop, juce::NotificationType::dontSendNotification);
-    alwaysOnTopButton.setTooltip(state.alwaysOnTop ? "Disable Always on Top." : "Enable Always on Top.");
-    mouseInteractionButton.setToggleState(state.passThroughRequested, juce::NotificationType::dontSendNotification);
-    if (!state.passThroughAvailable) {
-        mouseInteractionButton.setTooltip("Click-through is unavailable in fullscreen on this system.");
-    } else if (state.passThroughRequested) {
-        mouseInteractionButton.setTooltip("Keep This Window Interactive.");
-    } else {
-        mouseInteractionButton.setTooltip(state.paused ? "Let Clicks Pass Through After Resuming."
-                                                       : "Let Clicks Pass Through.");
-    }
-    fullscreenButton.setTooltip(state.fullScreen ? "Exit Fullscreen." : "Enter Fullscreen.");
-    resized();
-    repaint();
+    setTransparencyEnabled(owner.isTransparentBackgroundEnabled());
+    setPresentationPaused(owner.isPaused());
 }
 
-bool PopoutToolbar::hitTest(int x, int y) {
-    if (!state.frameVisible) {
-        return false;
-    }
-    if (y < toolbarHeight) {
-        return true;
-    }
-    for (auto* child : getChildren()) {
-        if (child->getBounds().contains(x, y)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void PopoutToolbar::paint(juce::Graphics& g) {
-    if (state.frameVisible) {
-        constexpr float cornerRadius = 11.0f;
-        auto bounds = getLocalBounds();
-        g.setColour(osci::Colours::veryDark());
-        g.fillRect(bounds.removeFromTop(toolbarHeight));
-        if (!state.fullScreen) {
-            g.setColour(juce::Colours::white.withAlpha(0.5f));
-            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), cornerRadius - 0.5f, 1.0f);
-        }
-    }
-    if (state.clickThroughHintVisible) {
-        const auto hintWidth = juce::jmax(1, juce::jmin(620, getWidth() - 24));
-        const auto hintBounds = getLocalBounds().withSizeKeepingCentre(hintWidth, 58).toFloat();
-        g.setColour(osci::Colours::veryDark().withAlpha(0.94f));
-        g.fillRoundedRectangle(hintBounds, 8.0f);
-        g.setColour(juce::Colours::white);
-        g.setFont(14.0f);
-        g.drawFittedText("Clicks now pass through this window. Pause the main visualiser to bring the controls back.",
-                         hintBounds.reduced(14.0f).toNearestInt(), juce::Justification::centred, 2);
-    }
-}
-
-void PopoutToolbar::resized() {
-    auto bar = getLocalBounds().removeFromTop(toolbarHeight);
-    const auto placeFromLeft = [&bar](juce::Component& component, int inset) {
-        component.setBounds(component.isVisible() ? bar.removeFromLeft(toolbarHeight).reduced(inset)
-                                                  : juce::Rectangle<int>());
-    };
-    const auto placeFromRight = [&bar](juce::Component& component, int inset) {
-        component.setBounds(component.isVisible() ? bar.removeFromRight(toolbarHeight).reduced(inset)
-                                                  : juce::Rectangle<int>());
-    };
-#if JUCE_WINDOWS || JUCE_LINUX
-    placeFromRight(closeButton, 3);
-    placeFromLeft(fullscreenButton, 4);
-    placeFromLeft(frameButton, 4);
-    placeFromLeft(mouseInteractionButton, 4);
-    placeFromLeft(alwaysOnTopButton, 4);
-#else
-    placeFromLeft(closeButton, 3);
-    placeFromRight(fullscreenButton, 4);
-    placeFromRight(frameButton, 4);
-    placeFromRight(mouseInteractionButton, 4);
-    placeFromRight(alwaysOnTopButton, 4);
-#endif
-}
-
-void PopoutToolbar::mouseDown(const juce::MouseEvent& event) {
-    if (!event.mods.isLeftButtonDown() || state.fullScreen) {
-        return;
-    }
-    dragger.startDraggingComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()));
-}
-
-void PopoutToolbar::mouseDoubleClick(const juce::MouseEvent& event) {
+void VisualiserWindow::showPresentation() {
+    setVisible(true);
+    setMinimised(false);
+    visualiser->setMirrorSource(&owner);
+    visualiser->setMirrorPresentationActive(true);
 #if JUCE_WINDOWS
-    if (event.mods.isLeftButtonDown() && onFullScreen != nullptr) {
-        onFullScreen();
+    if (isTransparencySupported()) {
+        refreshPresentationSurface();
     }
-#else
-    juce::ignoreUnused(event);
 #endif
+    restoreSavedFullScreen();
+    visualiser->repaint();
+    toFront(true);
 }
 
-void PopoutToolbar::mouseDrag(const juce::MouseEvent& event) {
-    if (!state.fullScreen) {
-        dragger.dragComponent(getTopLevelComponent(), event.getEventRelativeTo(getTopLevelComponent()), nullptr);
-    }
+void VisualiserWindow::suspendPresentation() {
+    visualiser->setMirrorPresentationActive(false);
+    setMinimised(true);
 }
 
-void PopoutToolbar::mouseUp(const juce::MouseEvent&) {}
+bool VisualiserWindow::getAlwaysOnTopPreference(const osci::SettingsStore& settings) {
+    return settings.getBool(alwaysOnTopKey, true);
+}
 
-#endif
+void VisualiserWindow::setAlwaysOnTopPreference(osci::SettingsStore& settings, bool alwaysOnTop) {
+    settings.set(alwaysOnTopKey, alwaysOnTop);
+    settings.save();
+}
 
-VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent* parent, bool pinned)
+void VisualiserWindow::closeRequested() {
+    owner.closePopout();
+}
+
+void VisualiserWindow::stateChanged(const TransparentWindowState& state) {
+    if (!state.normalBounds.isEmpty()) {
+        settings.set(windowBoundsKey, state.normalBounds.toString());
+    }
+    settings.set(fullScreenKey, state.fullScreen);
+    settings.set(frameVisibleKey, state.frameVisible);
+    settings.set(alwaysOnTopKey, state.alwaysOnTop);
+    settings.set(clicksPassThroughKey, state.mouseEventsPassThrough);
+    settings.save();
+}
+
+juce::Component* VisualiserWindow::getAlphaHitTestComponent() {
+    return visualiser;
+}
+
+juce::Point<int> VisualiserWindow::getAlphaMaskSize() const {
+    const auto size = visualiser->getAlphaMaskSize();
+    return { size.width, size.height };
+}
+
+std::uint64_t VisualiserWindow::getAlphaMaskGeneration() const {
+    return visualiser->getAlphaMaskGeneration();
+}
+
+bool VisualiserWindow::alphaMaskHasAlphaNear(juce::Point<float> point, juce::Point<float> radius,
+                                              std::uint8_t threshold) const {
+    return visualiser->alphaMaskHasAlphaNear(point, radius, threshold);
+}
+
+void VisualiserWindow::setAlphaMaskCaptureEnabled(bool enabled) {
+    visualiser->setAlphaMaskCaptureEnabled(enabled);
+}
+
+void VisualiserWindow::requestAlphaMaskRefresh() {
+    visualiser->requestAlphaMaskRefresh();
+}
+
+void VisualiserWindow::refreshOpenGLSurfaceTransparency() {
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    : juce::DocumentWindow(name,
-                           osci::windowing::isTransparencySupported() ? juce::Colours::transparentBlack : juce::Colours::black,
-                           osci::windowing::isTransparencySupported() ? 0 : juce::DocumentWindow::TitleBarButtons::allButtons),
-#else
-    : juce::DocumentWindow(name, juce::Colours::black, juce::DocumentWindow::TitleBarButtons::allButtons),
-#endif
-      parent(parent),
-      pinned(pinned) {
-    setAlwaysOnTop(pinned);
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    const bool transparencySupported = osci::windowing::isTransparencySupported();
-    if (transparencySupported) {
-        setTitleBarHeight(0);
-    }
-    setOpaque(!transparencySupported);
-#if JUCE_WINDOWS
-    if (transparencySupported) {
-        // JUCE implements non-native shadows as four separate windows. They remain visible and
-        // interactive after the popout frame is hidden, so transparent popouts must not use them.
-        setDropShadowEnabled(false);
-    }
-#endif
+    visualiser->refreshOpenGLSurfaceTransparency();
 #endif
 }
 
-VisualiserWindow::~VisualiserWindow() {
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    stopTimer();
-    osci::windowing::setIgnoresMouseEvents(this, false);
-#endif
-}
-
-bool VisualiserWindow::keyPressed(const juce::KeyPress& key) {
-    if (key == juce::KeyPress::escapeKey) {
-        if (fullScreenRequested) {
-            toggleFullScreen();
-        } else {
-            closeButtonPressed();
-        }
-        return true;
-    }
-    return juce::DocumentWindow::keyPressed(key);
-}
-
-void VisualiserWindow::closeButtonPressed() {
-    if (parent != nullptr) {
-        parent->closePopout();
-    }
-}
-
-void VisualiserWindow::toggleFullScreen() {
-    fullScreenRequested = !fullScreenRequested;
-    fullScreenTransitionPending = true;
-#if OSCI_PREMIUM && (JUCE_WINDOWS || JUCE_MAC)
-    reenterFullScreenAfterTransition = false;
-    setAlwaysOnTop(pinned);
-    if (fullScreenRequested) {
-        boundsBeforeFullScreen = getBounds();
-        transparentFullScreen = parent != nullptr && parent->isTransparentBackgroundEnabled();
-        if (transparentFullScreen) {
-            enterTransparentFullScreen();
-        } else {
-#if JUCE_MAC
-            osci::windowing::setMovesToActiveSpace(this, false);
-#endif
-            juce::ResizableWindow::setFullScreen(true);
-#if JUCE_WINDOWS
-            scheduleNativeFullScreenBoundsSync();
-#endif
-        }
-    } else {
-        if (transparentFullScreen) {
-            if (!boundsBeforeFullScreen.isEmpty()) {
-                const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
-                setBounds(boundsBeforeFullScreen);
-            }
-            transparentFullScreen = false;
-#if JUCE_MAC
-            osci::windowing::setMovesToActiveSpace(this, false);
-#endif
-        } else {
-            juce::ResizableWindow::setFullScreen(false);
-        }
-        transparentFullScreenBounds = {};
-    }
-#else
-    juce::ResizableWindow::setFullScreen(fullScreenRequested);
-#endif
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    updatePresentationState();
-#endif
-}
-
-void VisualiserWindow::setPinned(bool shouldBePinned) {
-    pinned = shouldBePinned;
-    setAlwaysOnTop(pinned);
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-#if JUCE_WINDOWS
-    if (osci::windowing::isTransparencySupported()) {
-        refreshNativePresentation();
-        return;
-    }
-#endif
-    updatePresentationState();
-#endif
-}
-
-void VisualiserWindow::saveWindowState() {
-    auto normalBounds = getBounds();
-#if JUCE_WINDOWS || JUCE_MAC
-    if (fullScreenRequested && !boundsBeforeFullScreen.isEmpty()) {
-        normalBounds = boundsBeforeFullScreen;
-    }
-#endif
-    if (parent != nullptr) {
-        parent->savePopoutWindowState(normalBounds, fullScreenRequested);
-    }
-}
-
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-void VisualiserWindow::setRequestedFrameVisible(bool visible) {
-    frameRequestedVisible = visible;
-    updatePresentationState();
-}
-
-void VisualiserWindow::setAllMouseEventsPassThrough(bool shouldPassThrough, bool showHint) {
-    allMouseEventsPassThrough = shouldPassThrough;
-    if (shouldPassThrough) {
-        const bool paused = parent != nullptr && parent->isPaused();
-        const bool transparencyEnabled = parent != nullptr && parent->isTransparentBackgroundEnabled();
-        clickThroughHintVisible = showHint && transparencyEnabled && !paused;
-        if (clickThroughHintVisible) {
-            clickThroughHintEndTime = juce::Time::getMillisecondCounter() + 5000;
-        }
-    } else {
-        clickThroughHintVisible = false;
-    }
-    updatePresentationState();
-}
-
-void VisualiserWindow::refreshNativePresentation() {
-    if (parent == nullptr || parent->child == nullptr) {
-        return;
-    }
-    presentationRefreshGeneration = parent->child->getAlphaMaskGeneration();
-    presentationRefreshDeadline = juce::Time::getMillisecondCounter() + 1000;
-    presentationRefreshActive = true;
-    parent->child->requestAlphaMaskRefresh();
-    updatePresentationState();
-}
-
-void VisualiserWindow::transparencyModeChanged() {
-    if (fullScreenRequested) {
-        const bool shouldUseTransparentFullScreen = parent != nullptr && parent->isTransparentBackgroundEnabled();
-        if (shouldUseTransparentFullScreen && !transparentFullScreen) {
-            reenterFullScreenAfterTransition = true;
-            fullScreenTransitionPending = true;
-            juce::ResizableWindow::setFullScreen(false);
-        } else if (!shouldUseTransparentFullScreen) {
-            reenterFullScreenAfterTransition = false;
-            if (transparentFullScreen) {
-                transparentFullScreen = false;
-                transparentFullScreenBounds = {};
-                if (!boundsBeforeFullScreen.isEmpty()) {
-                    const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
-                    setBounds(boundsBeforeFullScreen);
-                }
-#if JUCE_MAC
-                osci::windowing::setMovesToActiveSpace(this, false);
-#endif
-            }
-            fullScreenTransitionPending = true;
-            juce::ResizableWindow::setFullScreen(true);
-#if JUCE_WINDOWS
-            scheduleNativeFullScreenBoundsSync();
-#endif
-        }
-        updatePresentationState();
-        return;
-    }
-    if (reenterFullScreenAfterTransition) {
-        return;
-    }
-    if (parent != nullptr && parent->isTransparentBackgroundEnabled()) {
-        refreshNativePresentation();
-    } else {
-        presentationRefreshActive = false;
-        updatePresentationState();
-    }
-}
-
-void VisualiserWindow::pauseStateChanged() {
-    updatePresentationState();
-}
-
-void VisualiserWindow::resized() {
-    juce::DocumentWindow::resized();
-#if JUCE_MAC || JUCE_WINDOWS
-    if (osci::windowing::isTransparencySupported() && getContentComponent() != nullptr) {
-        getContentComponent()->setBounds(getLocalBounds());
-    }
-    if (fullScreenRequested && transparentFullScreen && !settingTransparentFullScreenBounds
-        && !transparentFullScreenBounds.isEmpty() && getBounds() != transparentFullScreenBounds) {
-        leaveTransparentFullScreenAfterResize();
-    }
-#endif
-    const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
-    const bool frameVisible = hasAppliedInteractionPolicy ? appliedInteractionPolicy.frameVisible : frameRequestedVisible;
-    updateResizeBorderVisibility(frameVisible && !fullScreenRequested && !nativeFullScreen);
-}
-
-void VisualiserWindow::leaveTransparentFullScreenAfterResize() {
-    fullScreenRequested = false;
-    fullScreenTransitionPending = false;
-    transparentFullScreen = false;
-    transparentFullScreenBounds = {};
-    reenterFullScreenAfterTransition = false;
-#if JUCE_MAC
-    osci::windowing::setMovesToActiveSpace(this, false);
-#endif
-    setAlwaysOnTop(pinned);
-    updatePresentationState();
-}
-
-void VisualiserWindow::enterTransparentFullScreen() {
-    transparentFullScreen = true;
-#if JUCE_MAC
-    osci::windowing::setMovesToActiveSpace(this, true);
-#endif
-    const auto displayBounds = boundsBeforeFullScreen.isEmpty() ? getBounds() : boundsBeforeFullScreen;
-    auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(displayBounds);
-    if (display != nullptr) {
-        transparentFullScreenBounds = osci::windowing::getTransparentFullScreenBounds(display->logicalBounds.toNearestInt());
-        const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
-        setBounds(transparentFullScreenBounds);
-    }
-    fullScreenTransitionPending = true;
-}
-
-#if JUCE_WINDOWS
-void VisualiserWindow::scheduleNativeFullScreenBoundsSync() {
-    const juce::Component::SafePointer<VisualiserWindow> safeWindow(this);
-    juce::Timer::callAfterDelay(50, [safeWindow] {
-        if (safeWindow != nullptr && safeWindow->fullScreenRequested && safeWindow->isFullScreen()) {
-            safeWindow->synchroniseNativeFullScreenBounds();
-        }
-    });
-}
-
-void VisualiserWindow::synchroniseNativeFullScreenBounds() {
-    const auto referenceBounds = boundsBeforeFullScreen.isEmpty() ? getBounds() : boundsBeforeFullScreen;
-    auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(referenceBounds);
-    if (display != nullptr) {
-        // Windows may maximise the native peer without updating JUCE's Component bounds for a
-        // transparent-capable window with a custom title bar. Keep the component tree and hit
-        // testing in sync with the peer; the peer ignores this bounds update while maximised.
-        setBounds(display->logicalBounds.toNearestInt());
-    }
-}
-#endif
-
-void VisualiserWindow::timerCallback() {
-    updatePresentationState();
-}
-
-void VisualiserWindow::updatePresentationState() {
-    const auto now = juce::Time::getMillisecondCounter();
-    const bool transparencyEnabled = parent != nullptr && parent->isTransparentBackgroundEnabled();
-    const bool paused = parent != nullptr && parent->isPaused();
-    if (paused) {
-        clickThroughHintVisible = false;
-    }
-    if (clickThroughHintVisible && static_cast<std::int32_t>(now - clickThroughHintEndTime) >= 0) {
-        clickThroughHintVisible = false;
-    }
-    if (!transparencyEnabled) {
-        presentationRefreshActive = false;
-        clickThroughHintVisible = false;
-        alphaInteractionHold.reset();
-        hasAlphaPassThroughAnchor = false;
-    }
-
-    const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
-#if JUCE_WINDOWS || JUCE_MAC
-    if (reenterFullScreenAfterTransition && !nativeFullScreen) {
-        reenterFullScreenAfterTransition = false;
-        enterTransparentFullScreen();
-    }
-    const bool fullScreenTransitionComplete = !reenterFullScreenAfterTransition
-                                           && (transparentFullScreen || nativeFullScreen == fullScreenRequested);
-    if (fullScreenTransitionPending && fullScreenTransitionComplete) {
-        fullScreenTransitionPending = false;
-        osci::windowing::configureTransparency(this);
-        setAlwaysOnTop(pinned);
-        if (parent != nullptr && parent->child != nullptr) {
-            parent->child->refreshOpenGLSurfaceTransparency();
-#if JUCE_WINDOWS
-            presentationRefreshGeneration = parent->child->getAlphaMaskGeneration();
-            presentationRefreshDeadline = now + 1000;
-            presentationRefreshActive = true;
-            parent->child->requestAlphaMaskRefresh();
-#endif
-        }
-        if (!fullScreenRequested) {
-            transparentFullScreen = false;
-        }
-    }
-#endif
-
-    if (presentationRefreshActive && parent != nullptr && parent->child != nullptr
-        && parent->child->getAlphaMaskGeneration() != presentationRefreshGeneration) {
-        presentationRefreshActive = false;
-        osci::windowing::configureTransparency(this);
-        setAlwaysOnTop(pinned);
-    }
-    if (presentationRefreshActive
-        && static_cast<std::int32_t>(now - presentationRefreshDeadline) >= 0) {
-        presentationRefreshActive = false;
-        osci::windowing::configureTransparency(this);
-        setAlwaysOnTop(pinned);
-    }
-
-    const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !paused;
-    if (fullPassThroughActive) {
-        alphaInteractionHold.reset();
-        hasAlphaPassThroughAnchor = false;
-    }
-    const bool fullScreenActive = fullScreenRequested || nativeFullScreen;
-    const bool alphaClickThroughAllowed = !fullScreenActive
-                                       || osci::windowing::supportsClickThroughInTransparentFullScreen();
-    const PopoutInteractionContext interactionContext {
-        .transparencyEnabled = transparencyEnabled,
-        .frameRequestedVisible = frameRequestedVisible,
-        .paused = paused,
-        .allMouseEventsPassThroughRequested = allMouseEventsPassThrough,
-        .waitingForSurface = presentationRefreshActive,
-        .alphaClickThroughAllowed = alphaClickThroughAllowed,
+TransparentWindowState VisualiserWindow::loadWindowState(const osci::SettingsStore& settings) {
+    return {
+        .normalBounds = constrainSavedBounds(
+            juce::Rectangle<int>::fromString(settings.getString(windowBoundsKey))),
+        .fullScreen = settings.getBool(fullScreenKey, false),
+        .frameVisible = settings.getBool(frameVisibleKey, true),
+        .alwaysOnTop = settings.getBool(alwaysOnTopKey, true),
+        .mouseEventsPassThrough = settings.getBool(clicksPassThroughKey, false),
     };
-    const auto interactionPolicy = derivePopoutInteractionPolicy(interactionContext);
-    const bool framedWindow = interactionPolicy.frameVisible && !fullScreenActive;
-    updateResizeBorderVisibility(framedWindow);
-    if (!windowCornersConfigured || windowCornersRounded != framedWindow) {
-        osci::windowing::setRoundedWindowRegion(this, framedWindow ? 11.0f : 0.0f);
-        windowCornersConfigured = true;
-        windowCornersRounded = framedWindow;
-    }
-    if (parent != nullptr && parent->child != nullptr) {
-        if (!hasAppliedInteractionPolicy || appliedInteractionPolicy != interactionPolicy) {
-            parent->child->setAlphaMaskCaptureEnabled(interactionPolicy.alphaCaptureRequired);
-            appliedInteractionPolicy = interactionPolicy;
-            hasAppliedInteractionPolicy = true;
-        }
-        const PopoutToolbarState toolbarState {
-            .frameVisible = interactionPolicy.frameVisible,
-            .frameRequestedVisible = frameRequestedVisible,
-            .alwaysOnTop = pinned,
-            .fullScreen = fullScreenActive,
-            .transparencyEnabled = transparencyEnabled,
-            .passThroughRequested = transparencyEnabled && allMouseEventsPassThrough,
-            .passThroughAvailable = transparencyEnabled && alphaClickThroughAllowed,
-            .paused = paused,
-            .clickThroughHintVisible = clickThroughHintVisible,
-        };
-        parent->child->setPopoutToolbarState(toolbarState);
-    }
-    if (interactionPolicy.mode == PopoutInteractionMode::interactive) {
-        applyNativeInteraction(false);
-    } else if (interactionPolicy.mode == PopoutInteractionMode::passAll) {
-        applyNativeInteraction(true);
-    } else {
-        bool alphaHit = false;
-        const auto screenCursor = juce::Desktop::getMousePosition();
-        if (parent != nullptr && parent->child != nullptr) {
-            const auto frameSize = parent->child->getAlphaMaskSize();
-            const auto cursor = parent->child->getLocalPoint(nullptr, screenCursor);
-            const float scale = getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f;
-            const auto query = makePopoutAlphaQuery(parent->child->getLocalBounds(), frameSize, cursor,
-                                                     8.0f / juce::jmax(1.0f, scale));
-            if (query.valid) {
-                alphaHit = parent->child->alphaMaskHasAlphaNear(query.normalisedPoint, query.normalisedRadius,
-                                                                popoutInteractionAlphaThreshold);
-            }
-        }
-        if (nativeIgnoresMouseEvents && !alphaHit) {
-            alphaPassThroughAnchor = screenCursor;
-            hasAlphaPassThroughAnchor = true;
-        }
-        const bool movedBeyondPadding = !hasAlphaPassThroughAnchor
-                                     || alphaPassThroughAnchor.getDistanceFrom(screenCursor) > 8.0;
-        alphaInteractionHold.update(alphaHit, nativeIgnoresMouseEvents, movedBeyondPadding, now);
-        applyNativeInteraction(!alphaInteractionHold.isActive(now));
-    }
-
-    const bool needsTimer = interactionPolicy.mode == PopoutInteractionMode::alphaAware
-                         || fullScreenTransitionPending
-                         || reenterFullScreenAfterTransition
-                         || (transparencyEnabled && presentationRefreshActive)
-                         || (transparencyEnabled && clickThroughHintVisible);
-    if (needsTimer && !isTimerRunning()) {
-        startTimerHz(60);
-    } else if (!needsTimer) {
-        stopTimer();
-    }
 }
 
-void VisualiserWindow::applyNativeInteraction(bool ignoresMouseEvents) {
-    if (nativeIgnoresMouseEvents == ignoresMouseEvents
-        && osci::windowing::isMouseInteractionStateApplied(this, ignoresMouseEvents)) {
-        return;
+juce::Rectangle<int> VisualiserWindow::constrainSavedBounds(juce::Rectangle<int> bounds) {
+    if (bounds.getWidth() < 100 || bounds.getHeight() < 100) {
+        return {};
     }
-    if (ignoresMouseEvents) {
-        alphaPassThroughAnchor = juce::Desktop::getMousePosition();
-        hasAlphaPassThroughAnchor = true;
-    } else {
-        hasAlphaPassThroughAnchor = false;
-    }
-    nativeIgnoresMouseEvents = ignoresMouseEvents;
-    osci::windowing::setIgnoresMouseEvents(this, ignoresMouseEvents);
-}
 
-void VisualiserWindow::updateResizeBorderVisibility(bool visible) {
-    if (resizeBorderVisibilityInitialised && resizeBorderVisible == visible) {
-        return;
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    auto* display = displays.getDisplayForRect(bounds);
+    if (display == nullptr) {
+        display = displays.getPrimaryDisplay();
     }
-    resizeBorderVisibilityInitialised = true;
-    resizeBorderVisible = visible;
-    for (auto* component : getChildren()) {
-        auto* resizeBorder = dynamic_cast<juce::ResizableBorderComponent*>(component);
-        if (resizeBorder != nullptr) {
-            resizeBorder->setAlpha(0.0f);
-            resizeBorder->setVisible(visible);
-        }
+    if (display == nullptr) {
+        return bounds;
     }
+
+    const auto available = display->userBounds.toNearestInt();
+    bounds.setSize(juce::jmin(bounds.getWidth(), available.getWidth()),
+                   juce::jmin(bounds.getHeight(), available.getHeight()));
+    return bounds.constrainedWithin(available);
 }
-#endif

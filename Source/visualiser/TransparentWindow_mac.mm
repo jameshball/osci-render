@@ -36,22 +36,20 @@ void removeMouseTrackingAreas(NSView* view) {
 
 } // namespace
 
-namespace osci::windowing {
-
-bool isTransparencySupported() {
+bool TransparentWindow::isTransparencySupported() {
     return true;
 }
 
-bool supportsClickThroughInTransparentFullScreen() {
+bool TransparentWindow::supportsClickThroughInTransparentFullScreen() {
     return true;
 }
 
-juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
+juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
     return displayBounds;
 }
 
-void configureTransparency(juce::Component* topLevelWindow) {
-    NSWindow* window = getWindow(topLevelWindow);
+void TransparentWindow::configureNativeTransparency() {
+    NSWindow* window = getWindow(this);
     if (window == nil) {
         return;
     }
@@ -67,8 +65,8 @@ void configureTransparency(juce::Component* topLevelWindow) {
     }
 }
 
-void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
-    auto* peer = topLevelWindow != nullptr ? topLevelWindow->getPeer() : nullptr;
+void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
+    auto* peer = getPeer();
     NSView* view = peer != nullptr ? static_cast<NSView*>(peer->getNativeHandle()) : nil;
     NSWindow* window = view != nil ? [view window] : nil;
     if (window == nil) {
@@ -92,8 +90,8 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
-bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
-    auto* peer = topLevelWindow != nullptr ? topLevelWindow->getPeer() : nullptr;
+bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const {
+    auto* peer = getPeer();
     NSView* view = peer != nullptr ? static_cast<NSView*>(peer->getNativeHandle()) : nil;
     NSWindow* window = view != nil ? [view window] : nil;
     if (window == nil) {
@@ -109,8 +107,8 @@ bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignore
     return !windowIgnoresMouse && acceptsMouseMovedEvents && hasTrackingAreas;
 }
 
-void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove) {
-    NSWindow* window = getWindow(topLevelWindow);
+void TransparentWindow::setMovesToActiveSpace(bool shouldMove) {
+    NSWindow* window = getWindow(this);
     if (window == nil) {
         return;
     }
@@ -127,8 +125,8 @@ void setMovesToActiveSpace(juce::Component* topLevelWindow, bool shouldMove) {
     }
 }
 
-void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
-    NSWindow* window = getWindow(topLevelWindow);
+void TransparentWindow::setNativeRoundedWindowRegion(float cornerRadius) {
+    NSWindow* window = getWindow(this);
     NSView* contentView = window != nil ? [window contentView] : nil;
     if (contentView == nil) {
         return;
@@ -138,7 +136,7 @@ void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius)
     contentView.layer.masksToBounds = cornerRadius > 0.0f ? YES : NO;
 }
 
-void configureOpenGLSurface(void* rawGLContext) {
+void TransparentWindow::configureOpenGLSurface(void* rawGLContext) {
     if (rawGLContext == nullptr) {
         return;
     }
@@ -148,6 +146,4 @@ void configureOpenGLSurface(void* rawGLContext) {
         [context setValues:&opacity forParameter:NSOpenGLCPSurfaceOpacity];
     }
 }
-
-} // namespace osci::windowing
 #endif

@@ -2,8 +2,7 @@
 
 #include <array>
 
-#include "../Source/visualiser/PopoutInteractionGeometry.h"
-#include "../Source/visualiser/PopoutInteractionPolicy.h"
+#include "../Source/visualiser/TransparentWindowInteraction.h"
 #include "../modules/osci_gui/visualiser/osci_PopoutAlphaHitTest.h"
 
 class PopoutInteractionTest : public juce::UnitTest {
@@ -13,31 +12,31 @@ public:
     void runTest() override {
         beginTest("Alpha threshold and OpenGL Y inversion");
         std::array<unsigned char, 4 * 4 * 4> pixels{};
-        pixels[(0 * 4 + 1) * 4 + 3] = popoutInteractionAlphaThreshold;
+        pixels[(0 * 4 + 1) * 4 + 3] = transparentWindowAlphaThreshold;
         expect(osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
-                                        popoutInteractionAlphaThreshold));
+                                        transparentWindowAlphaThreshold));
         expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.125f, 0.0f, 0.0f,
-                                         popoutInteractionAlphaThreshold));
-        pixels[(0 * 4 + 1) * 4 + 3] = popoutInteractionAlphaThreshold - 1;
+                                         transparentWindowAlphaThreshold));
+        pixels[(0 * 4 + 1) * 4 + 3] = transparentWindowAlphaThreshold - 1;
         expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.375f, 0.875f, 0.0f, 0.0f,
-                                         popoutInteractionAlphaThreshold));
+                                         transparentWindowAlphaThreshold));
 
         beginTest("Padding includes nearby alpha");
         pixels.fill(0);
         pixels[(2 * 4 + 2) * 4 + 3] = 255;
         expect(!osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.0f, 0.0f,
-                                         popoutInteractionAlphaThreshold));
+                                         transparentWindowAlphaThreshold));
         expect(osci::popoutAlphaHitTest(pixels.data(), 4, 4, 0.125f, 0.375f, 0.5f, 0.0f,
-                                        popoutInteractionAlphaThreshold));
+                                        transparentWindowAlphaThreshold));
 
         beginTest("Empty frames do not hit");
         expect(!osci::popoutAlphaHitTest(nullptr, 0, 0, 0.5f, 0.5f, 0.0f, 0.0f,
-                                         popoutInteractionAlphaThreshold));
+                                         transparentWindowAlphaThreshold));
 
         beginTest("Aspect-fit mapping rejects letterboxing");
-        const auto outside = makePopoutAlphaQuery({0, 0, 200, 100}, {100, 100}, {25, 50}, 8.0f);
+        const auto outside = makeTransparentWindowAlphaQuery({0, 0, 200, 100}, {100, 100}, {25, 50}, 8.0f);
         expect(!outside.valid);
-        const auto centre = makePopoutAlphaQuery({0, 0, 200, 100}, {100, 100}, {100, 50}, 8.0f);
+        const auto centre = makeTransparentWindowAlphaQuery({0, 0, 200, 100}, {100, 100}, {100, 50}, 8.0f);
         expect(centre.valid);
         expectWithinAbsoluteError(centre.normalisedPoint.x, 0.5f, 0.001f);
         expectWithinAbsoluteError(centre.normalisedPoint.y, 0.5f, 0.001f);
@@ -61,61 +60,61 @@ public:
         expect(!hoverHold.isActive(1100));
 
         beginTest("Frame visibility overrides and restoration");
-        PopoutInteractionContext context;
-        expect(derivePopoutInteractionPolicy(context).frameVisible);
+        TransparentWindowInteractionContext context;
+        expect(deriveTransparentWindowInteractionPolicy(context).frameVisible);
         context.frameRequestedVisible = false;
-        expect(!derivePopoutInteractionPolicy(context).frameVisible);
+        expect(!deriveTransparentWindowInteractionPolicy(context).frameVisible);
         context.paused = true;
-        expect(derivePopoutInteractionPolicy(context).frameVisible);
+        expect(deriveTransparentWindowInteractionPolicy(context).frameVisible);
         context.paused = false;
-        expect(!derivePopoutInteractionPolicy(context).frameVisible);
+        expect(!deriveTransparentWindowInteractionPolicy(context).frameVisible);
 
         beginTest("Pass-through suppresses controls without changing their preference");
         context.transparencyEnabled = true;
         context.frameRequestedVisible = true;
-        context.allMouseEventsPassThroughRequested = true;
-        auto policy = derivePopoutInteractionPolicy(context);
+        context.passThroughRequested = true;
+        auto policy = deriveTransparentWindowInteractionPolicy(context);
         expect(!policy.frameVisible);
         expect(context.frameRequestedVisible);
-        context.allMouseEventsPassThroughRequested = false;
-        policy = derivePopoutInteractionPolicy(context);
+        context.passThroughRequested = false;
+        policy = deriveTransparentWindowInteractionPolicy(context);
         expect(policy.frameVisible);
 
         beginTest("Surface refresh does not hide framed or paused controls");
         context.waitingForSurface = true;
-        policy = derivePopoutInteractionPolicy(context);
+        policy = deriveTransparentWindowInteractionPolicy(context);
         expect(policy.frameVisible);
-        expect(policy.mode == PopoutInteractionMode::interactive);
+        expect(policy.mode == TransparentWindowInteractionMode::interactive);
         context.paused = true;
-        policy = derivePopoutInteractionPolicy(context);
+        policy = deriveTransparentWindowInteractionPolicy(context);
         expect(policy.frameVisible);
-        expect(policy.mode == PopoutInteractionMode::interactive);
+        expect(policy.mode == TransparentWindowInteractionMode::interactive);
 
         beginTest("Paused presentation restores interaction but preserves pass-through intent");
-        context.allMouseEventsPassThroughRequested = true;
+        context.passThroughRequested = true;
         context.waitingForSurface = false;
-        policy = derivePopoutInteractionPolicy(context);
+        policy = deriveTransparentWindowInteractionPolicy(context);
         expect(policy.frameVisible);
-        expect(context.allMouseEventsPassThroughRequested);
-        expect(policy.mode == PopoutInteractionMode::interactive);
+        expect(context.passThroughRequested);
+        expect(policy.mode == TransparentWindowInteractionMode::interactive);
 
         beginTest("Opaque presentation never captures alpha or passes events through");
         context.transparencyEnabled = false;
         context.frameRequestedVisible = false;
         context.paused = false;
-        policy = derivePopoutInteractionPolicy(context);
-        expect(policy.mode == PopoutInteractionMode::interactive);
+        policy = deriveTransparentWindowInteractionPolicy(context);
+        expect(policy.mode == TransparentWindowInteractionMode::interactive);
         expect(!policy.alphaCaptureRequired);
 
         beginTest("Transparent fullscreen honours platform interaction capability");
         context.transparencyEnabled = true;
-        context.allMouseEventsPassThroughRequested = false;
+        context.passThroughRequested = false;
         context.alphaClickThroughAllowed = true;
-        const auto capable = derivePopoutInteractionPolicy(context);
+        const auto capable = deriveTransparentWindowInteractionPolicy(context);
         context.alphaClickThroughAllowed = false;
-        const auto limited = derivePopoutInteractionPolicy(context);
-        expect(capable.mode == PopoutInteractionMode::alphaAware);
-        expect(limited.mode == PopoutInteractionMode::interactive);
+        const auto limited = deriveTransparentWindowInteractionPolicy(context);
+        expect(capable.mode == TransparentWindowInteractionMode::alphaAware);
+        expect(limited.mode == TransparentWindowInteractionMode::interactive);
     }
 };
 

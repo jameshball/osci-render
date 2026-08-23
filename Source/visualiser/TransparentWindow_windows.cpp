@@ -98,28 +98,26 @@ void setWindowIgnoresMouseEvents(HWND window, bool ignoresMouseEvents, bool useL
 
 } // namespace
 
-namespace osci::windowing {
-
-bool isTransparencySupported() {
+bool TransparentWindow::isTransparencySupported() {
     return supportsRedirectionBitmapAlpha();
 }
 
-bool supportsClickThroughInTransparentFullScreen() {
+bool TransparentWindow::supportsClickThroughInTransparentFullScreen() {
     return false;
 }
 
-juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
+juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
     // An exact monitor-sized window can be promoted out of desktop composition on Windows.
     return displayBounds.reduced(1);
 }
 
-void configureTransparency(juce::Component* topLevelWindow) {
-    auto* window = getWindowHandle(topLevelWindow);
+void TransparentWindow::configureNativeTransparency() {
+    auto* window = getWindowHandle(this);
     configureGpuTransparency(window);
 }
 
-void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
-    auto* window = getWindowHandle(topLevelWindow);
+void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
+    auto* window = getWindowHandle(this);
     if (window == nullptr) {
         return;
     }
@@ -133,8 +131,8 @@ void setIgnoresMouseEvents(juce::Component* topLevelWindow, bool ignoresMouseEve
     }
 }
 
-bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignoresMouseEvents) {
-    auto* window = getWindowHandle(topLevelWindow);
+bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const {
+    auto* window = getWindowHandle(const_cast<TransparentWindow*>(this));
     if (window == nullptr) {
         return false;
     }
@@ -144,10 +142,10 @@ bool isMouseInteractionStateApplied(juce::Component* topLevelWindow, bool ignore
     return ignoresMouseEvents ? ignoresMouse && layered : !ignoresMouse && !layered;
 }
 
-void setMovesToActiveSpace(juce::Component*, bool) {}
+void TransparentWindow::setMovesToActiveSpace(bool) {}
 
-void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius) {
-    auto* window = getWindowHandle(topLevelWindow);
+void TransparentWindow::setNativeRoundedWindowRegion(float cornerRadius) {
+    auto* window = getWindowHandle(this);
     if (window == nullptr) {
         return;
     }
@@ -166,7 +164,7 @@ void setRoundedWindowRegion(juce::Component* topLevelWindow, float cornerRadius)
     ::DwmSetWindowAttribute(window, windowBorderColour, &noBorder, sizeof(noBorder));
 }
 
-void configureOpenGLSurface(void*) {
+void TransparentWindow::configureOpenGLSurface(void*) {
     auto* deviceContext = ::wglGetCurrentDC();
     if (deviceContext == nullptr) {
         return;
@@ -176,6 +174,4 @@ void configureOpenGLSurface(void*) {
     configureGpuTransparency(surfaceWindow);
     configureGpuTransparency(::GetAncestor(surfaceWindow, GA_ROOT));
 }
-
-} // namespace osci::windowing
 #endif

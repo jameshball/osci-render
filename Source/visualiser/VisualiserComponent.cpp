@@ -5,6 +5,7 @@
 #include "../LookAndFeel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include "../video/VideoEncodingConstants.h"
+#include "VisualiserPopout.h"
 #include "VisualiserTextureAssets.h"
 
 #include <cstdint>
@@ -38,7 +39,7 @@ VisualiserComponent::VisualiserComponent(
                            parent(parent),
                            editor(pluginEditor) {
     setAssets(createVisualiserTextureAssets());
-    setNativeTransparencySupported(parent != nullptr && osci::windowing::isTransparencySupported());
+    setNativeTransparencySupported(parent != nullptr && TransparentWindow::isTransparencySupported());
     if (parent != nullptr) {
         openGLContext.setComponentPaintingEnabled(true);
     }
@@ -117,8 +118,9 @@ VisualiserComponent::VisualiserComponent(
     fullScreenButton.onClick = [this]() {
         if (this->parent != nullptr) {
 #if OSCI_PREMIUM
-            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+            if (auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent())) {
                 window->toggleFullScreen();
+            }
 #endif
         } else {
             enableFullScreen();
@@ -284,7 +286,7 @@ void VisualiserComponent::setPaused(bool paused, bool affectAudio) {
         }
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
         if (popout != nullptr) {
-            popout->pauseStateChanged();
+            popout->setPresentationPaused(paused);
         }
 #endif
     }
@@ -337,7 +339,7 @@ void VisualiserComponent::timerCallback() {
     requestTextureOutputService();
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     if ((updates & 2u) != 0 && popout != nullptr) {
-        popout->transparencyModeChanged();
+        popout->setTransparencyEnabled(isTransparentBackgroundEnabled());
     }
 #endif
 }
@@ -350,14 +352,6 @@ void VisualiserComponent::mouseDrag(const juce::MouseEvent& event) {
     timerId = -1;
     if (event.getDistanceFromDragStart() > 4) {
         pauseOnMouseUp = false;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-        if (parent != nullptr && event.mods.isLeftButtonDown()) {
-            auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
-            if (window != nullptr && !window->getIsFullScreen()) {
-                popoutDragger.dragComponent(window, event.getEventRelativeTo(window), nullptr);
-            }
-        }
-#endif
     }
 }
 
@@ -405,14 +399,6 @@ void VisualiserComponent::mouseDown(const juce::MouseEvent& event) {
     if (event.originalComponent == this) {
         if (event.mods.isLeftButtonDown() && !record.getToggleState()) {
             pauseOnMouseUp = true;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-            if (parent != nullptr) {
-                auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent());
-                if (window != nullptr && !window->getIsFullScreen()) {
-                    popoutDragger.startDraggingComponent(window, event.getEventRelativeTo(window));
-                }
-            }
-#endif
         }
     }
 }
@@ -439,8 +425,8 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
         // In popout mode, exit popout fullscreen first
         if (parent != nullptr) {
 #if OSCI_PREMIUM
-            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent())) {
-                if (window->getIsFullScreen()) {
+            if (auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent())) {
+                if (window->isFullScreenRequested()) {
                     window->toggleFullScreen();
                     return true;
                 }
@@ -453,8 +439,9 @@ bool VisualiserComponent::keyPressed(const juce::KeyPress &key) {
     } else if (key.isKeyCode(juce::KeyPress::F11Key) && juce::JUCEApplicationBase::isStandaloneApp()) {
 #if OSCI_PREMIUM
         if (parent != nullptr) {
-            if (auto* window = dynamic_cast<VisualiserWindow*>(getTopLevelComponent()))
+            if (auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent())) {
                 window->toggleFullScreen();
+            }
         } else {
             enableFullScreen();
         }
@@ -659,11 +646,6 @@ void VisualiserComponent::setRecording(bool recording) {
 
 void VisualiserComponent::resized() {
     auto area = getLocalBounds();
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    if (popoutToolbar != nullptr) {
-        popoutToolbar->setBounds(getLocalBounds());
-    }
-#endif
     // Apply hideButtonRow logic to both fullscreen and pop-out modes
     if ((fullScreen || parent != nullptr) && hideButtonRow) {
         buttonRow = area.removeFromBottom(0);
@@ -747,18 +729,16 @@ void VisualiserComponent::popoutWindow() {
 
 #if JUCE_LINUX
     if (popout != nullptr) {
-        auto* visualiser = dynamic_cast<VisualiserComponent*>(popout->getContentComponent());
-        child = visualiser;
-        visualiser->setMirrorPresentationActive(true);
-        popout->setMinimised(false);
-        popout->toFront(true);
+        auto& visualiser = popout->getVisualiser();
+        child = &visualiser;
+        popout->showPresentation();
         childUpdated();
         resized();
         return;
     }
 #endif
 
-    auto visualiser = new VisualiserComponent(
+    auto visualiser = std::make_unique<VisualiserComponent>(
         audioProcessor,
         editor,
         ffmpegFile,
@@ -770,72 +750,13 @@ void VisualiserComponent::popoutWindow() {
     visualiser->openSettings = openSettings;
     visualiser->closeSettings = closeSettings;
     // Pop-out visualiser is created with parent set to this component
-    child = visualiser;
+    child = visualiser.get();
     childUpdated();
     visualiser->setSize(350, 350);
     const auto windowTitle = editor.appName + " - Software Oscilloscope";
-    popout = std::make_unique<VisualiserWindow>(windowTitle, this, isPopoutAlwaysOnTop());
-    popout->setContentOwned(visualiser, false);
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    popout->setUsingNativeTitleBar(!osci::windowing::isTransparencySupported());
-#else
-    popout->setUsingNativeTitleBar(true);
-#endif
-    popout->setResizable(true, false);
-    // Register editor as KeyListener so undo/redo shortcuts work in the popout window
-    popout->addKeyListener(&editor);
-    const auto savedBounds = getSavedPopoutBounds();
-    if (savedBounds.isEmpty()) {
-        popout->centreWithSize(350, 350);
-    } else {
-        popout->setBounds(savedBounds);
-    }
-    popout->setVisible(true);
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    if (osci::windowing::isTransparencySupported()) {
-        osci::windowing::configureTransparency(popout.get());
-        visualiser->popoutToolbar = std::make_unique<PopoutToolbar>();
-        visualiser->popoutToolbar->onClose = [this] {
-            closePopout();
-        };
-        visualiser->popoutToolbar->onFullScreen = [this] {
-            popout->toggleFullScreen();
-        };
-        visualiser->popoutToolbar->onToggleFrame = [this] {
-            setPopoutFrameVisible(!popout->isFrameRequestedVisible());
-        };
-        visualiser->popoutToolbar->onToggleAlwaysOnTop = [this] {
-            setPopoutAlwaysOnTop(!popout->isPinned());
-        };
-        visualiser->popoutToolbar->onToggleMouseInteraction = [this] {
-            setPopoutClicksPassThrough(!popout->getAllMouseEventsPassThrough());
-        };
-        visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-    }
-#endif
-    // Hide all buttons on the popout and set up mirror mode
-    visualiser->hideButtonRow = true;
-    visualiser->resized();
-    // Set up mirror mode AFTER the window is visible so the GL context is active
-    visualiser->setMirrorSource(this);
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    if (osci::windowing::isTransparencySupported()) {
-        popout->setAllMouseEventsPassThrough(doPopoutClicksPassThrough(), false);
-        popout->setRequestedFrameVisible(isPopoutFrameVisible());
-    }
-#endif
-#if OSCI_PREMIUM && JUCE_WINDOWS
-    if (osci::windowing::isTransparencySupported()) {
-        popout->refreshNativePresentation();
-    }
-#endif
-    if (wasPopoutFullScreen()) {
-        popout->toggleFullScreen();
-    }
-    // A plugin host can allow JUCE's first OpenGL component paint before the popout peer has
-    // its final display scale. Repaint once after the peer, bounds, mirror context, and
-    // presentation overlay are configured so JUCE rebuilds that layer at the physical scale.
-    visualiser->repaint();
+    popout = std::make_unique<VisualiserWindow>(windowTitle, *this, std::move(visualiser),
+                                                audioProcessor.globalSettings);
+    popout->showPresentation();
     resized();
 #endif
 }
@@ -847,12 +768,8 @@ void VisualiserComponent::closePopout() {
     }
     popout->saveWindowState();
 #if JUCE_LINUX
-    auto* visualiser = dynamic_cast<VisualiserComponent*>(popout->getContentComponent());
-    if (visualiser != nullptr) {
-        visualiser->setMirrorPresentationActive(false);
-    }
+    popout->suspendPresentation();
     child = nullptr;
-    popout->setMinimised(true);
     childUpdated();
     resized();
 #else
@@ -893,76 +810,15 @@ void VisualiserComponent::childUpdated() {
 }
 
 void VisualiserComponent::setPopoutAlwaysOnTop(bool alwaysOnTop) {
-    audioProcessor.globalSettings.set("popoutAlwaysOnTop", alwaysOnTop);
-    audioProcessor.globalSettings.save();
     if (popout != nullptr) {
         popout->setPinned(alwaysOnTop);
+    } else {
+        VisualiserWindow::setAlwaysOnTopPreference(audioProcessor.globalSettings, alwaysOnTop);
     }
 }
 
 bool VisualiserComponent::isPopoutAlwaysOnTop() const {
-    return audioProcessor.globalSettings.getBool("popoutAlwaysOnTop", true);
-}
-
-void VisualiserComponent::setPopoutFrameVisible(bool visible) {
-    audioProcessor.globalSettings.set("popoutFrameVisible", visible);
-    audioProcessor.globalSettings.save();
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    if (popout != nullptr) {
-        popout->setRequestedFrameVisible(visible);
-    }
-#endif
-}
-
-bool VisualiserComponent::isPopoutFrameVisible() const {
-    return audioProcessor.globalSettings.getBool("popoutFrameVisible", true);
-}
-
-void VisualiserComponent::setPopoutClicksPassThrough(bool clicksPassThrough) {
-    audioProcessor.globalSettings.set("popoutClicksPassThrough", clicksPassThrough);
-    audioProcessor.globalSettings.save();
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    if (popout != nullptr) {
-        popout->setAllMouseEventsPassThrough(clicksPassThrough);
-    }
-#endif
-}
-
-bool VisualiserComponent::doPopoutClicksPassThrough() const {
-    return audioProcessor.globalSettings.getBool("popoutClicksPassThrough", false);
-}
-
-void VisualiserComponent::savePopoutWindowState(juce::Rectangle<int> bounds, bool fullScreen) {
-    if (!bounds.isEmpty()) {
-        audioProcessor.globalSettings.set("popoutWindowBounds", bounds.toString());
-    }
-    audioProcessor.globalSettings.set("popoutFullScreen", fullScreen);
-    audioProcessor.globalSettings.save();
-}
-
-juce::Rectangle<int> VisualiserComponent::getSavedPopoutBounds() const {
-    auto bounds = juce::Rectangle<int>::fromString(audioProcessor.globalSettings.getString("popoutWindowBounds"));
-    if (bounds.getWidth() < 100 || bounds.getHeight() < 100) {
-        return {};
-    }
-
-    const auto& displays = juce::Desktop::getInstance().getDisplays();
-    auto* display = displays.getDisplayForRect(bounds);
-    if (display == nullptr) {
-        display = displays.getPrimaryDisplay();
-    }
-    if (display == nullptr) {
-        return bounds;
-    }
-
-    const auto available = display->userArea;
-    bounds.setSize(juce::jmin(bounds.getWidth(), available.getWidth()),
-                   juce::jmin(bounds.getHeight(), available.getHeight()));
-    return bounds.constrainedWithin(available);
-}
-
-bool VisualiserComponent::wasPopoutFullScreen() const {
-    return audioProcessor.globalSettings.getBool("popoutFullScreen", false);
+    return VisualiserWindow::getAlwaysOnTopPreference(audioProcessor.globalSettings);
 }
 
 void VisualiserComponent::prepareOverlayFadeIn() {
@@ -1163,28 +1019,18 @@ void VisualiserComponent::openGLContextClosing() {
 void VisualiserComponent::newOpenGLContextCreated() {
     VisualiserRenderer::newOpenGLContextCreated();
 #if OSCI_PREMIUM && JUCE_MAC
-    osci::windowing::configureOpenGLSurface(openGLContext.getRawContext());
+    TransparentWindow::configureOpenGLSurface(openGLContext.getRawContext());
 #elif OSCI_PREMIUM && JUCE_WINDOWS
     if (parent != nullptr) {
-        osci::windowing::configureOpenGLSurface(openGLContext.getRawContext());
+        TransparentWindow::configureOpenGLSurface(openGLContext.getRawContext());
     }
 #endif
 }
-
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-void VisualiserComponent::setPopoutToolbarState(const PopoutToolbarState& state) {
-    if (popoutToolbar == nullptr) {
-        return;
-    }
-    popoutToolbar->setState(state);
-    popoutToolbar->setVisible(state.frameVisible || state.clickThroughHintVisible);
-}
-#endif
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
 void VisualiserComponent::refreshOpenGLSurfaceTransparency() {
     openGLContext.executeOnGLThread([](juce::OpenGLContext& context) {
-        osci::windowing::configureOpenGLSurface(context.getRawContext());
+        TransparentWindow::configureOpenGLSurface(context.getRawContext());
     }, false);
 }
 #endif
