@@ -14,7 +14,6 @@
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
-#include "PopoutInteractionGeometry.h"
 #include "PopoutPresentationState.h"
 #include "TransparentWindow.h"
 #include "VisualiserPopout.h"
