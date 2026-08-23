@@ -101,6 +101,7 @@ private:
     static constexpr int overlayFadeDurationMs = 225;
 
     void updatePausedState();
+    void closePopout();
     bool isPrimaryVisualiser() const;
     void setOverlayFadeProgress(float progress);
     void refreshTextureOutputButton();

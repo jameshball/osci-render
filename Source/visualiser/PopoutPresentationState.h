@@ -53,7 +53,7 @@ struct PopoutPresentationState {
                               bool waitingForSurface, bool fullScreenClickThroughSupported) const {
         const bool passAll = transparencyEnabled && passAllRequested && !paused;
         PopoutPresentation result;
-        result.frameVisible = isFrameVisible() && !waitingForSurface && !passAll;
+        result.frameVisible = isFrameVisible() && !passAll;
         result.requestedFrameVisible = requestedFrameVisible;
         result.alwaysOnTop = alwaysOnTop;
         result.fullScreen = fullScreen;
