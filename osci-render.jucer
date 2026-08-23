@@ -621,8 +621,8 @@
               file="Source/visualiser/VisualiserPopout.h"/>
         <FILE id="PopIG1" name="PopoutInteractionGeometry.h" compile="0" resource="0"
               file="Source/visualiser/PopoutInteractionGeometry.h"/>
-        <FILE id="PopPS1" name="PopoutPresentationState.h" compile="0" resource="0"
-              file="Source/visualiser/PopoutPresentationState.h"/>
+        <FILE id="PopPS1" name="PopoutInteractionPolicy.h" compile="0" resource="0"
+              file="Source/visualiser/PopoutInteractionPolicy.h"/>
         <FILE id="tW1nDo" name="TransparentWindow.h" compile="0" resource="0"
               file="Source/visualiser/TransparentWindow.h"/>
         <FILE id="tW2Mac" name="TransparentWindow_mac.mm" compile="1" resource="0"

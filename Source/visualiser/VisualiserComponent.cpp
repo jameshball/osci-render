@@ -811,10 +811,6 @@ void VisualiserComponent::popoutWindow() {
             setPopoutClicksPassThrough(!popout->getAllMouseEventsPassThrough());
         };
         visualiser->addAndMakeVisible(*visualiser->popoutToolbar);
-        PopoutPresentationState initialState;
-        visualiser->setPopoutPresentationOverlay(initialState.derive(
-            isTransparentBackgroundEnabled(), popout->isPinned(), false, false, false, false,
-            osci::windowing::supportsClickThroughInTransparentFullScreen()));
     }
 #endif
     // Hide all buttons on the popout and set up mirror mode
@@ -1176,12 +1172,12 @@ void VisualiserComponent::newOpenGLContextCreated() {
 }
 
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-void VisualiserComponent::setPopoutPresentationOverlay(const PopoutPresentation& presentation) {
+void VisualiserComponent::setPopoutToolbarState(const PopoutToolbarState& state) {
     if (popoutToolbar == nullptr) {
         return;
     }
-    popoutToolbar->setState(presentation);
-    popoutToolbar->setVisible(presentation.frameVisible || presentation.clickThroughHintVisible);
+    popoutToolbar->setState(state);
+    popoutToolbar->setVisible(state.frameVisible || state.clickThroughHintVisible);
 }
 #endif
 
