@@ -1,22 +1,19 @@
 #include "TransparentWindow.h"
 
 #if !JUCE_MAC && !JUCE_WINDOWS
-namespace osci::windowing {
-
-bool isTransparencySupported() {
+bool TransparentWindow::isTransparencySupported() {
     return false;
 }
 
-bool supportsClickThroughInTransparentFullScreen() { return false; }
-juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) { return displayBounds; }
+bool TransparentWindow::supportsClickThroughInTransparentFullScreen() { return false; }
+juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) { return displayBounds; }
 
-void configureTransparency(juce::Component*) {}
-void setIgnoresMouseEvents(juce::Component*, bool) {}
-bool isMouseInteractionStateApplied(juce::Component*, bool) { return true; }
+void TransparentWindow::configureNativeTransparency() {}
+void TransparentWindow::setNativeIgnoresMouseEvents(bool) {}
+bool TransparentWindow::isNativeMouseInteractionStateApplied(bool) const { return true; }
 
-void setMovesToActiveSpace(juce::Component*, bool) {}
-void setRoundedWindowRegion(juce::Component*, float) {}
-void configureOpenGLSurface(void*) {}
+void TransparentWindow::setMovesToActiveSpace(bool) {}
+void TransparentWindow::setNativeRoundedWindowRegion(float) {}
+void TransparentWindow::configureOpenGLSurface(void*) {}
 
-} // namespace osci::windowing
 #endif

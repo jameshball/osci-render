@@ -215,12 +215,12 @@
               file="Source/visualiser/VisualiserPopout.cpp"/>
         <FILE id="SosPopH" name="VisualiserPopout.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserPopout.h"/>
-        <FILE id="PopIG2" name="PopoutInteractionGeometry.h" compile="0" resource="0"
-              file="Source/visualiser/PopoutInteractionGeometry.h"/>
-        <FILE id="PopPS2" name="PopoutInteractionPolicy.h" compile="0" resource="0"
-              file="Source/visualiser/PopoutInteractionPolicy.h"/>
+        <FILE id="TrWinInt2" name="TransparentWindowInteraction.h" compile="0" resource="0"
+              file="Source/visualiser/TransparentWindowInteraction.h"/>
         <FILE id="sW1nDo" name="TransparentWindow.h" compile="0" resource="0"
               file="Source/visualiser/TransparentWindow.h"/>
+        <FILE id="sW1Cpp" name="TransparentWindow.cpp" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow.cpp"/>
         <FILE id="sW2Mac" name="TransparentWindow_mac.mm" compile="1" resource="0"
               file="Source/visualiser/TransparentWindow_mac.mm"/>
         <FILE id="sW2Win" name="TransparentWindow_windows.cpp" compile="1"

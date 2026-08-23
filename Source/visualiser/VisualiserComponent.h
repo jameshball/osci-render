@@ -14,8 +14,6 @@
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 #include "RecordingSettings.h"
-#include "TransparentWindow.h"
-#include "VisualiserPopout.h"
 #include "VisualiserSettings.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 #include <osci_texture_interop/osci_texture_interop.h>
@@ -27,6 +25,7 @@ enum class FullScreenMode {
 };
 
 class CommonPluginEditor;
+class VisualiserWindow;
 class VisualiserComponent : public VisualiserRenderer, public AudioPlayerListener, public juce::AudioProcessorParameter::Listener, private juce::Timer {
 public:
     VisualiserComponent(
@@ -60,13 +59,6 @@ public:
     void childUpdated();
     void setPopoutAlwaysOnTop(bool alwaysOnTop);
     bool isPopoutAlwaysOnTop() const;
-    void setPopoutFrameVisible(bool visible);
-    bool isPopoutFrameVisible() const;
-    void setPopoutClicksPassThrough(bool clicksPassThrough);
-    bool doPopoutClicksPassThrough() const;
-    void savePopoutWindowState(juce::Rectangle<int> bounds, bool fullScreen);
-    juce::Rectangle<int> getSavedPopoutBounds() const;
-    bool wasPopoutFullScreen() const;
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
     void cancelOverlayFadeIn();
@@ -75,9 +67,6 @@ public:
     void parserChanged() override;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    void setPopoutToolbarState(const PopoutToolbarState& state);
-#endif
 #if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
     void refreshOpenGLSurfaceTransparency();
 #endif
@@ -112,9 +101,6 @@ private:
     std::atomic<bool> active = true;
     std::atomic<unsigned int> pendingParameterUpdates { 0 };
     bool pauseOnMouseUp = false;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    juce::ComponentDragger popoutDragger;
-#endif
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
@@ -144,9 +130,6 @@ private:
     int renderModeTimerId = 0;
     bool hideButtonRow = false;
     bool fullScreen = false;
-#if OSCI_PREMIUM && (JUCE_MAC || JUCE_WINDOWS)
-    std::unique_ptr<PopoutToolbar> popoutToolbar;
-#endif
     std::function<void(FullScreenMode)> fullScreenCallback;
     osci::ToggleAnimationController overlayFadeController { this };
     FadeCoverComponent overlayFadeCover;
