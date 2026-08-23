@@ -82,6 +82,10 @@ private:
     void updateResizeBorderVisibility(bool visible);
     void leaveTransparentFullScreenAfterResize();
     void enterTransparentFullScreen();
+#if JUCE_WINDOWS
+    void scheduleNativeFullScreenBoundsSync();
+    void synchroniseNativeFullScreenBounds();
+#endif
 #endif
 
     VisualiserComponent* parent;

@@ -255,6 +255,9 @@ void VisualiserWindow::toggleFullScreen() {
             osci::windowing::setMovesToActiveSpace(this, false);
 #endif
             juce::ResizableWindow::setFullScreen(true);
+#if JUCE_WINDOWS
+            scheduleNativeFullScreenBoundsSync();
+#endif
         }
     } else {
         if (transparentFullScreen) {
@@ -359,6 +362,9 @@ void VisualiserWindow::transparencyModeChanged() {
             }
             fullScreenTransitionPending = true;
             juce::ResizableWindow::setFullScreen(true);
+#if JUCE_WINDOWS
+            scheduleNativeFullScreenBoundsSync();
+#endif
         }
         updatePresentationState();
         return;
@@ -379,7 +385,7 @@ void VisualiserWindow::pauseStateChanged() {
 }
 
 void VisualiserWindow::resized() {
-    juce::ResizableWindow::resized();
+    juce::DocumentWindow::resized();
 #if JUCE_MAC || JUCE_WINDOWS
     if (osci::windowing::isTransparencySupported() && getContentComponent() != nullptr) {
         getContentComponent()->setBounds(getLocalBounds());
@@ -414,12 +420,34 @@ void VisualiserWindow::enterTransparentFullScreen() {
     const auto displayBounds = boundsBeforeFullScreen.isEmpty() ? getBounds() : boundsBeforeFullScreen;
     auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(displayBounds);
     if (display != nullptr) {
-        transparentFullScreenBounds = osci::windowing::getTransparentFullScreenBounds(display->totalArea);
+        transparentFullScreenBounds = osci::windowing::getTransparentFullScreenBounds(display->logicalBounds.toNearestInt());
         const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
         setBounds(transparentFullScreenBounds);
     }
     fullScreenTransitionPending = true;
 }
+
+#if JUCE_WINDOWS
+void VisualiserWindow::scheduleNativeFullScreenBoundsSync() {
+    const juce::Component::SafePointer<VisualiserWindow> safeWindow(this);
+    juce::Timer::callAfterDelay(50, [safeWindow] {
+        if (safeWindow != nullptr && safeWindow->fullScreenRequested && safeWindow->isFullScreen()) {
+            safeWindow->synchroniseNativeFullScreenBounds();
+        }
+    });
+}
+
+void VisualiserWindow::synchroniseNativeFullScreenBounds() {
+    const auto referenceBounds = boundsBeforeFullScreen.isEmpty() ? getBounds() : boundsBeforeFullScreen;
+    auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(referenceBounds);
+    if (display != nullptr) {
+        // Windows may maximise the native peer without updating JUCE's Component bounds for a
+        // transparent-capable window with a custom title bar. Keep the component tree and hit
+        // testing in sync with the peer; the peer ignores this bounds update while maximised.
+        setBounds(display->logicalBounds.toNearestInt());
+    }
+}
+#endif
 
 void VisualiserWindow::timerCallback() {
     updatePresentationState();
