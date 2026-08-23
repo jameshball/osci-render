@@ -103,7 +103,7 @@ LiveRecordingResult VisualiserRecordingController::stopAndChooseExport(const juc
         return { false, failureMessage };
     }
 
-    const auto extension = artifacts->fileExtension;
+    const auto extension = artifacts->getOutputFileExtension();
     const auto timestamp = juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S");
     const auto suggestedFile = destinationDirectory.getChildFile(fileNamePrefix + "_" + timestamp + "." + extension);
     chooser = std::make_unique<juce::FileChooser>("Save recording", suggestedFile, "*." + extension);

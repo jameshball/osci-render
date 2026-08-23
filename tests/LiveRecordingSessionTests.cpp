@@ -94,9 +94,9 @@ public:
         auto artifacts = session.finish();
         expectEquals(videoState->writes.load(), 1);
         expectEquals(audioState->writes, 1);
-        expect(artifacts.hasVideo);
-        expect(artifacts.hasAudio);
-        expectEquals(artifacts.fileExtension, juce::String("mov"));
+        expect(artifacts.hasVideo());
+        expect(artifacts.hasAudio());
+        expectEquals(artifacts.getOutputFileExtension(), juce::String("mov"));
 
         beginTest("Finishing waits for an acquired frame to be released");
         videoState = std::make_shared<VideoBackendState>();

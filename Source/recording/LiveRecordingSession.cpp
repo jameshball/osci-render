@@ -151,9 +151,6 @@ LiveRecordingResult LiveRecordingSession::start(const LiveRecordingConfiguration
         return { false, "The audio recording sample rate is invalid." };
     }
 
-    artifacts.hasVideo = configuration.captureVideo;
-    artifacts.hasAudio = configuration.captureAudio;
-    artifacts.fileExtension = configuration.captureVideo ? configuration.videoFileExtension : "wav";
     artifacts.audioCodecArgs = configuration.audioCodecArgs;
 
     if (configuration.captureVideo) {
