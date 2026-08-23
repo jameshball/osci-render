@@ -77,6 +77,18 @@ public:
     void sanitiseCanvasParameters();
 };
 
+struct VideoEncodingConfiguration {
+    VideoCodec codec = VideoCodec::H264;
+    VisualiserRenderSize renderSize;
+    double frameRate = 60.0;
+    int crf = 1;
+    juce::String compressionPreset;
+    juce::String fileExtension;
+    juce::StringArray audioCodecArgs;
+    bool includeAudio = true;
+    bool preserveAlpha = false;
+};
+
 class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
 public:
     RecordingSettings(RecordingParameters&, VisualiserParameters&);
@@ -136,20 +148,22 @@ public:
         return parameters.videoCodec;
     }
 
-    juce::String getFileExtensionForCodec() {
-        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(getVideoCodec());
-        if (parameters.losslessAudio.getBoolValue() && codecInfo.supportsLosslessAudio) {
-            return "mov";
-        }
-        return codecInfo.defaultFileExtension;
-    }
-
-    juce::StringArray getAudioCodecArgs() const {
-        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(getVideoCodec());
-        if (parameters.losslessAudio.getBoolValue() && codecInfo.supportsLosslessAudio) {
-            return {"-c:a", "pcm_s16le"};
-        }
-        return {"-c:a", "aac", "-b:a", "384k"};
+    VideoEncodingConfiguration createVideoEncodingConfiguration() {
+        const auto codec = getVideoCodec();
+        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(codec);
+        const bool losslessAudio = parameters.losslessAudio.getBoolValue() && codecInfo.supportsLosslessAudio;
+        return {
+            .codec = codec,
+            .renderSize = getCanvasSize(),
+            .frameRate = getFrameRate(),
+            .crf = getCRF(),
+            .compressionPreset = getCompressionPreset(),
+            .fileExtension = losslessAudio ? "mov" : codecInfo.defaultFileExtension,
+            .audioCodecArgs = losslessAudio ? juce::StringArray{"-c:a", "pcm_s16le"}
+                                            : juce::StringArray{"-c:a", "aac", "-b:a", "384k"},
+            .includeAudio = recordingAudio(),
+            .preserveAlpha = visualiserParameters.isTransparentBackgroundEnabled(),
+        };
     }
 
     RecordingParameters& parameters;
