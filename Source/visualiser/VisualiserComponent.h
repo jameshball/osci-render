@@ -147,8 +147,6 @@ private:
     StopwatchComponent stopwatch;
     osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
-    std::unique_ptr<juce::FileChooser> chooser;
-
     juce::Rectangle<int> buttonRow;
 
     void popoutWindow();

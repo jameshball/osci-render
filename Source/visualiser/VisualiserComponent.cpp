@@ -211,7 +211,7 @@ VisualiserComponent::~VisualiserComponent() {
     // Detach while the derived renderer is still alive so OpenGL-owned services
     // are stopped by openGLContextClosing() on the context thread.
     openGLContext.detach();
-    recordingController.finish();
+    recordingController.discard();
     audioProcessor.removeAudioPlayerListener(this);
     if (isPrimaryVisualiser()) {
         audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
@@ -479,25 +479,8 @@ void VisualiserComponent::setRecording(bool recording) {
     renderingSemaphore.release();
 
     if (recording) {
-        VisualiserRecordingConfiguration configuration;
-        configuration.sampleRate = recordingSampleRate;
 #if OSCI_PREMIUM
-        configuration.captureVideo = recordingSettings.recordingVideo();
-        configuration.captureAudio = recordingSettings.recordingAudio();
-        configuration.preserveAlpha = configuration.captureVideo && settings.parameters.isTransparentBackgroundEnabled();
-        configuration.codec = recordingSettings.getVideoCodec();
-        configuration.renderSize = recordingSettings.getCanvasSize();
-        configuration.frameRate = recordingSettings.getFrameRate();
-        configuration.crf = recordingSettings.getCRF();
-        configuration.compressionPreset = recordingSettings.getCompressionPreset();
-        configuration.audioCodecArgs = recordingSettings.getAudioCodecArgs();
-
-        if (!configuration.captureVideo && !configuration.captureAudio) {
-            record.setToggleState(false, juce::NotificationType::dontSendNotification);
-            return;
-        }
-
-        if (configuration.captureVideo) {
+        if (recordingController.wantsVideo(recordingSettings)) {
             auto onDownloadSuccess = [this] {
                 juce::MessageManager::callAsync([this] {
                     record.setEnabled(true);
@@ -519,14 +502,12 @@ void VisualiserComponent::setRecording(bool recording) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
                 return;
             }
-            setRenderSize(configuration.renderSize);
+            setRenderSize(recordingSettings.getCanvasSize());
         }
-#else
-        configuration.captureAudio = true;
 #endif
 
         recordingFailurePending.store(false);
-        const auto result = recordingController.start(configuration);
+        const auto result = recordingController.start(recordingSettings, recordingSampleRate);
         if (!result) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             osci::showOverlayMessage(*this, "Recording Error", result.message);
@@ -536,43 +517,32 @@ void VisualiserComponent::setRecording(bool recording) {
         setPaused(false);
         stopwatch.start();
     } else if (stillRecording) {
-        const bool failed = recordingController.hasFailed();
-        auto artifacts = std::make_shared<LiveRecordingArtifacts>(recordingController.finish());
         recordingFailurePending.store(false);
-        if (failed) {
+        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
+        const auto result = recordingController.stopAndChooseExport(
+            audioProcessor.getLastOpenedDirectory(), editor.appName,
+            [safeThis](RecordingExportResult exportResult, juce::File destination) {
+                if (safeThis == nullptr) {
+                    return;
+                }
+                if (!exportResult) {
+                    if (exportResult.message.isNotEmpty()) {
+                        juce::Logger::writeToLog("Recording export failed: " + exportResult.message.substring(0, 500));
+                    }
+                    osci::showOverlayMessage(*safeThis.getComponent(),
+                                             "Save Recording Failed",
+                                             "Could not write:\n" + destination.getFullPathName());
+                    return;
+                }
+                safeThis->audioProcessor.setLastOpenedDirectory(destination.getParentDirectory());
+                safeThis->audioProcessor.recordingExportCompleted(destination);
+            });
+        if (!result) {
             record.setToggleState(false, juce::NotificationType::dontSendNotification);
             setBlockOnAudioThread(false);
             resized();
             return;
         }
-
-        const auto extension = artifacts->fileExtension;
-        const auto timestamp = juce::Time::getCurrentTime().formatted("%Y-%m-%d_%H-%M-%S");
-        const auto suggestedFile = audioProcessor.getLastOpenedDirectory().getChildFile(editor.appName + "_" + timestamp + "." + extension);
-        chooser = std::make_unique<juce::FileChooser>("Save recording", suggestedFile, "*." + extension);
-        auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting;
-        juce::Component::SafePointer<VisualiserComponent> safeThis(this);
-        chooser->launchAsync(flags, [safeThis, artifacts, extension](const juce::FileChooser& chooser) {
-            if (safeThis == nullptr) {
-                return;
-            }
-            auto file = chooser.getResult();
-            if (file != juce::File()) {
-                if (!file.hasFileExtension(extension)) {
-                    file = file.withFileExtension(extension);
-                }
-                const auto result = safeThis->recordingController.exportRecording(*artifacts, file);
-                if (!result) {
-                    if (result.message.isNotEmpty()) {
-                        juce::Logger::writeToLog("Recording export failed: " + result.message.substring(0, 500));
-                    }
-                    osci::showOverlayMessage(*safeThis.getComponent(), "Save Recording Failed", "Could not write:\n" + file.getFullPathName());
-                    return;
-                }
-                safeThis->audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-                safeThis->audioProcessor.recordingExportCompleted(file);
-            }
-        });
     }
 
     const bool nowRecording = recordingController.isRecording();
