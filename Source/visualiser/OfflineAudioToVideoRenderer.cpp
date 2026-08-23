@@ -25,20 +25,7 @@ juce::String renderModeToString(VisualiserRenderer::RenderMode mode) {
 }
 
 juce::String videoCodecToString(VideoCodec codec) {
-    switch (codec) {
-        case VideoCodec::H264:
-            return "H264";
-        case VideoCodec::H265:
-            return "H265";
-        case VideoCodec::VP9:
-            return "VP9";
-#if JUCE_MAC
-        case VideoCodec::ProRes:
-            return "ProRes";
-#endif
-        default:
-            return "unknown";
-    }
+    return VideoEncodingConstants::getVideoCodecInfo(codec).logName;
 }
 
 juce::String yesNo(bool value) {
@@ -86,12 +73,12 @@ void OfflineAudioToVideoRendererComponent::WorkerThread::run()
 OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(CommonAudioProcessor& processor,
                                                                           VisualiserParameters& visualiserParameters,
                                                                           osci::AudioBackgroundThreadManager& threadManager,
-                                                                          RecordingSettings& recordingSettings,
                                                                           const juce::File& inputAudioFile,
                                                                           const juce::File& outputVideoFile,
-                                                                          VisualiserRenderer::RenderMode initialRenderMode)
+                                                                          VisualiserRenderer::RenderMode initialRenderMode,
+                                                                          VideoEncodingConfiguration encodingConfiguration)
     : processor(processor),
-      recordingSettings(recordingSettings),
+      encodingConfiguration(std::move(encodingConfiguration)),
       inputAudioFile(inputAudioFile),
       outputVideoFile(outputVideoFile),
       preview(visualiserParameters, threadManager, glReadyEvent),
@@ -232,12 +219,11 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         return result;
     }
 
-    const double fps = recordingSettings.getFrameRate();
-    const auto renderSize = recordingSettings.getCanvasSize();
-    const auto codec = recordingSettings.getVideoCodec();
-    const int crf = recordingSettings.getCRF();
-    const auto preset = recordingSettings.getCompressionPreset();
-    const bool includeAudio = recordingSettings.recordingAudio();
+    const auto fps = encodingConfiguration.frameRate;
+    const auto renderSize = encodingConfiguration.renderSize;
+    const auto codec = encodingConfiguration.codec;
+    const auto crf = encodingConfiguration.crf;
+    const auto& preset = encodingConfiguration.compressionPreset;
 
     offlineRenderLog.event(
         "render starting: input=" + fileSummary(inputAudioFile)
@@ -247,7 +233,8 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         + ", codec=" + videoCodecToString(codec)
         + ", crf=" + juce::String(crf)
         + ", preset=" + preset
-        + ", includeAudio=" + yesNo(includeAudio)
+        + ", includeAudio=" + yesNo(encodingConfiguration.includeAudio)
+        + ", preserveAlpha=" + yesNo(encodingConfiguration.preserveAlpha)
         + ", initialMode=" + renderModeToString(initialRenderMode));
 
     // Wait for OpenGL to be ready so runTask() doesn't stall indefinitely.
@@ -364,7 +351,15 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
     FFmpegEncoderManager ffmpegEncoderManager(ffmpegFile);
 
-    juce::TemporaryFile tempVideo("." + recordingSettings.getFileExtensionForCodec());
+    if (!ffmpegEncoderManager.supportsVideoCodec(codec)) {
+        offlineRenderLog.event("render failed: selected video encoder unavailable");
+        result.errorMessage = encodingConfiguration.preserveAlpha
+            ? "This FFmpeg installation does not include the ProRes 4444 encoder required for transparent video."
+            : "This FFmpeg installation does not include an encoder for the selected video codec.";
+        return result;
+    }
+
+    juce::TemporaryFile tempVideo("." + encodingConfiguration.fileExtension);
     const auto tempVideoFile = tempVideo.getFile();
 
     osci::WriteProcess ffmpegProcess;
@@ -376,7 +371,8 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         renderSize.height,
         fps,
         preset,
-        tempVideoFile);
+        tempVideoFile,
+        encodingConfiguration.preserveAlpha);
 
     offlineRenderLog.event(
         "starting FFmpeg video encoder: codec=" + videoCodecToString(codec)
@@ -384,7 +380,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         + ", preset=" + preset
         + ", tempVideo=" + tempVideoFile.getFileName());
 
-    if (!ffmpegProcess.start(encodeCmd))
+    if (encodeCmd.isEmpty() || !ffmpegProcess.start(encodeCmd))
     {
         offlineRenderLog.event("render failed: FFmpeg video encoder did not start; command=" + encodeCmd);
         result.errorMessage = "Failed to start FFmpeg video encoder.";
@@ -605,10 +601,10 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     // Write final output via a TemporaryFile tied to the chosen output path
     juce::TemporaryFile tempFinal(outputVideoFile);
 
-    if (recordingSettings.recordingAudio())
+    if (encodingConfiguration.includeAudio)
     {
         juce::String muxError;
-        const auto audioCodecArgs = recordingSettings.getAudioCodecArgs();
+        const auto& audioCodecArgs = encodingConfiguration.audioCodecArgs;
         offlineRenderLog.event("muxing audio into final video: audioCodecArgs=" + audioCodecArgs.joinIntoString(" "));
         if (!ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile, inputAudioFile, tempFinal.getFile(), audioCodecArgs, muxError, &cancelRequested))
         {

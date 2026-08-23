@@ -80,14 +80,13 @@ public:
 #endif
 
     VisualiserSettings visualiserSettings = VisualiserSettings(audioProcessor.visualiserParameters, 3, audioProcessor.recordingParameters);
-    RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters);
+    RecordingSettings recordingSettings = RecordingSettings(audioProcessor.recordingParameters, audioProcessor.visualiserParameters);
     VisualiserComponent visualiser{
         audioProcessor,
         *this,
         audioProcessor.applicationFolder.getChildFile(audioProcessor.ffmpegFileName),
         visualiserSettings,
         recordingSettings,
-        nullptr,
         appName == "sosci"
     };
 

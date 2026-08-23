@@ -8,6 +8,20 @@
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
+      <GROUP id="{F3A16E09-874D-45F4-A045-20839A1CDB88}" name="video">
+        <FILE id="FfEncC" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
+              file="Source/video/FFmpegEncoderManager.cpp"/>
+      </GROUP>
+      <GROUP id="{E9BA7142-0741-4B3E-9C9F-A15F149397C2}" name="recording">
+        <FILE id="TLvRcC" name="LiveRecordingSession.cpp" compile="1" resource="0"
+              file="Source/recording/LiveRecordingSession.cpp"/>
+        <FILE id="TRcExC" name="RecordingExporter.cpp" compile="1" resource="0"
+              file="Source/recording/RecordingExporter.cpp"/>
+      </GROUP>
+      <GROUP id="{BEB252E3-FD86-48E2-A811-F9D593133DAB}" name="visualiser">
+        <FILE id="TViTxC" name="VisualiserTextureOutputController.cpp" compile="1"
+              resource="0" file="Source/visualiser/VisualiserTextureOutputController.cpp"/>
+      </GROUP>
       <GROUP id="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}" name="audio">
         <FILE id="OutCl3" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
         <GROUP id="{D2E3F4A5-B6C7-8901-ABCD-EF2345678901}" name="modulation">
@@ -122,6 +136,16 @@
             file="tests/LuaCorrectnessTests.cpp"/>
       <FILE id="FfMedI" name="FFmpegMediaInfoTests.cpp" compile="1" resource="0"
             file="tests/FFmpegMediaInfoTests.cpp"/>
+      <FILE id="TrVidE" name="TransparentVideoEncodingTests.cpp" compile="1"
+            resource="0" file="tests/TransparentVideoEncodingTests.cpp"/>
+      <FILE id="PopInt" name="PopoutInteractionTests.cpp" compile="1" resource="0"
+            file="tests/PopoutInteractionTests.cpp"/>
+      <FILE id="LivRecT" name="LiveRecordingSessionTests.cpp" compile="1"
+            resource="0" file="tests/LiveRecordingSessionTests.cpp"/>
+      <FILE id="RecExpT" name="RecordingExporterTests.cpp" compile="1" resource="0"
+            file="tests/RecordingExporterTests.cpp"/>
+      <FILE id="VisTexT" name="VisualiserTextureOutputControllerTests.cpp"
+            compile="1" resource="0" file="tests/VisualiserTextureOutputControllerTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"
             file="tests/LottieParserTests.cpp"/>
       <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"
@@ -174,11 +198,13 @@
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_mts_esp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
   <EXPORTFORMATS>
@@ -198,12 +224,14 @@
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
@@ -230,12 +258,14 @@
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
@@ -261,12 +291,14 @@
         <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
         <MODULEPATH id="osci_render_core" path="modules"/>
         <MODULEPATH id="osci_scripting" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
         <MODULEPATH id="osci_licensing" path="modules"/>
         <MODULEPATH id="juce_mts_esp" path="modules"/>
         <MODULEPATH id="juce_audio_processors" path="../JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_graphics" path="../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_basics" path="../JUCE/modules"/>
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>

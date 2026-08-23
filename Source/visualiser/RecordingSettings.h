@@ -5,16 +5,8 @@
 #include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
 #include <osci_gui/visualiser/osci_VisualiserGeometry.h>
-
-// Define codec options
-enum class VideoCodec {
-    H264,
-    H265,
-    VP9,
-#if JUCE_MAC
-    ProRes,
-#endif
-};
+#include <osci_gui/visualiser/osci_VisualiserParameters.h>
+#include "../video/VideoEncodingConstants.h"
 
 class RecordingParameters {
 public:
@@ -85,9 +77,21 @@ public:
     void sanitiseCanvasParameters();
 };
 
-class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener {
+struct VideoEncodingConfiguration {
+    VideoCodec codec = VideoCodec::H264;
+    VisualiserRenderSize renderSize;
+    double frameRate = 60.0;
+    int crf = 1;
+    juce::String compressionPreset;
+    juce::String fileExtension;
+    juce::StringArray audioCodecArgs;
+    bool includeAudio = true;
+    bool preserveAlpha = false;
+};
+
+class RecordingSettings : public juce::Component, public juce::AudioProcessorParameter::Listener, private juce::Timer {
 public:
-    RecordingSettings(RecordingParameters&);
+    RecordingSettings(RecordingParameters&, VisualiserParameters&);
     ~RecordingSettings();
 
     void resized() override;
@@ -137,33 +141,33 @@ public:
         return parameters.frameRate.getValueUnnormalised();
     }
 
-    VideoCodec getVideoCodec() {
+    VideoCodec getVideoCodec() const {
+        if (visualiserParameters.isTransparentBackgroundEnabled()) {
+            return VideoCodec::ProRes4444;
+        }
         return parameters.videoCodec;
     }
 
-    juce::String getFileExtensionForCodec() {
-        switch (parameters.videoCodec) {
-#if JUCE_MAC
-            case VideoCodec::ProRes:
-                return "mov";
-#endif
-            case VideoCodec::H264:
-            case VideoCodec::H265:
-                return parameters.losslessAudio.getBoolValue() ? "mov" : "mp4";
-            case VideoCodec::VP9:
-            default:
-                return "mp4";
-        }
-    }
-
-    juce::StringArray getAudioCodecArgs() const {
-        if (parameters.losslessAudio.getBoolValue() && parameters.videoCodec != VideoCodec::VP9) {
-            return {"-c:a", "pcm_s16le"};
-        }
-        return {"-c:a", "aac", "-b:a", "384k"};
+    VideoEncodingConfiguration createVideoEncodingConfiguration() {
+        const auto codec = getVideoCodec();
+        const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(codec);
+        const bool losslessAudio = parameters.losslessAudio.getBoolValue() && codecInfo.supportsLosslessAudio;
+        return {
+            .codec = codec,
+            .renderSize = getCanvasSize(),
+            .frameRate = getFrameRate(),
+            .crf = getCRF(),
+            .compressionPreset = getCompressionPreset(),
+            .fileExtension = losslessAudio ? "mov" : codecInfo.defaultFileExtension,
+            .audioCodecArgs = losslessAudio ? juce::StringArray{"-c:a", "pcm_s16le"}
+                                            : juce::StringArray{"-c:a", "aac", "-b:a", "384k"},
+            .includeAudio = recordingAudio(),
+            .preserveAlpha = visualiserParameters.isTransparentBackgroundEnabled(),
+        };
     }
 
     RecordingParameters& parameters;
+    VisualiserParameters& visualiserParameters;
 
 private:
     EffectComponent quality{*parameters.qualityEffect};
@@ -194,10 +198,19 @@ private:
     osci::TextEditor customTextureOutputEditor{"customTextureOutputEditor"};
 
     void updateLosslessAudioEnabled();
+    void updateVideoEncodingControls();
     void updateCanvasPresetSelector();
     void updateCanvasControlsVisibility();
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
+    void timerCallback() override;
+
+    enum PendingParameterUpdate : unsigned int {
+        videoEncodingControlsUpdate = 1u << 0,
+        canvasControlsUpdate = 1u << 1,
+    };
+
+    std::atomic<unsigned int> pendingParameterUpdates { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RecordingSettings)
 };

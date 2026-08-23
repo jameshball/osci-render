@@ -74,6 +74,7 @@ public:
 #ifndef SOSCI
     void wireModulation(OscirenderAudioProcessor& processor);
 #endif
+    void setTransparencyControlEnabled(bool enabled);
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -172,6 +173,7 @@ private:
     jux::SwitchButton sweepToggle{parameters.sweepEnabled, true, false};
 
 #if OSCI_PREMIUM
+    ToggleLabelComponent transparentBackgroundToggle{parameters.transparentBackground, {}, false};
     GroupedSettings scale{
         std::vector<std::shared_ptr<EffectComponent>>{
             std::make_shared<EffectComponent>(*parameters.scaleEffect, 0),
