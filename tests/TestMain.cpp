@@ -2,6 +2,7 @@
 #include "../Source/audio/OutputClip.h"
 #include "../Source/visualiser/RecordingStateMigration.h"
 #include "../modules/osci_gui/visualiser/osci_VisualiserGeometry.h"
+#include "../modules/osci_render_core/geometry/osci_PerspectiveProjector.h"
 
 class ProducerThread : public juce::Thread {
 public:
@@ -98,6 +99,28 @@ public:
 };
 
 static OutputClipTest outputClipTest;
+
+class PerspectiveProjectorTest : public juce::UnitTest {
+public:
+    PerspectiveProjectorTest() : juce::UnitTest("Perspective Projector", "Audio") {}
+
+    void runTest() override {
+        beginTest("Projection preserves coordinates outside the view bounds");
+        osci::PerspectiveProjector projector;
+        projector.setCameraPosition({0.0f, 0.0f, 0.0f});
+        projector.setFieldOfViewRadians(juce::MathConstants<float>::halfPi);
+
+        const auto projected = projector.project({2.0f, -1.5f, 1.0f});
+        expectWithinAbsoluteError(projected.x, 2.0f, 0.0001f);
+        expectWithinAbsoluteError(projected.y, -1.5f, 0.0001f);
+
+        beginTest("Projection still protects its depth range");
+        const auto nearProjected = projector.project({0.002f, 0.0f, 0.0f});
+        expectWithinAbsoluteError(nearProjected.x, 2.0f, 0.0001f);
+    }
+};
+
+static PerspectiveProjectorTest perspectiveProjectorTest;
 
 class VisualiserCanvasGeometryTest : public juce::UnitTest {
 public:
