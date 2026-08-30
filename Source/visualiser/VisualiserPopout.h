@@ -22,7 +22,8 @@ private:
 
 class VisualiserWindow final : public TransparentWindow {
 public:
-    VisualiserWindow(juce::String name, VisualiserComponent& owner, osci::SettingsStore& settings);
+    VisualiserWindow(juce::String name, VisualiserComponent& owner, osci::SettingsStore& settings,
+                     bool useSosciStandaloneDefaults);
 
     void showPresentation();
     void suspendPresentation();
@@ -31,6 +32,8 @@ public:
     void setPresentationFadeAlpha(float alpha);
     static bool getAlwaysOnTopPreference(const osci::SettingsStore& settings);
     static void setAlwaysOnTopPreference(osci::SettingsStore& settings, bool alwaysOnTop);
+    static bool getOpenPreference(const osci::SettingsStore& settings, bool defaultValue);
+    static void setOpenPreference(osci::SettingsStore& settings, bool open);
 
 protected:
     void closeRequested() override;
@@ -45,7 +48,10 @@ protected:
     void refreshOpenGLSurfaceTransparency() override;
 
 private:
-    static TransparentWindowState loadWindowState(const osci::SettingsStore& settings);
+    static TransparentWindowState loadWindowState(const osci::SettingsStore& settings,
+                                                   const TransparentWindowState& defaults);
+    static TransparentWindowState makeDefaultState(const juce::Component& owner,
+                                                   bool useSosciStandaloneDefaults);
     static juce::Rectangle<int> constrainSavedBounds(juce::Rectangle<int> bounds);
 
     VisualiserComponent& owner;

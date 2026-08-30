@@ -31,6 +31,10 @@ SosciPluginEditor::SosciPluginEditor(SosciAudioProcessor& p) : CommonPluginEdito
         visualiserFullScreenChanged();
     });
 
+    visualiser.setPopoutShownCallback([this] {
+        audioProcessor.startStartupDemo();
+    });
+
     resized();
     visualiserFullScreen->addListener(this);
 
@@ -147,9 +151,10 @@ void SosciPluginEditor::changeListenerCallback(juce::ChangeBroadcaster* source) 
         juce::String inputDevice = getInputDeviceName();
         if (inputDevice != currentInputDevice) {
             currentInputDevice = inputDevice;
-            // switch to getting audio from input if the user changes the input device
-            // because we assume they are debugging and want to hear the audio from mic
-            audioProcessor.stopAudioFile();
+            // A capture device becoming ready must not interrupt the introduction.
+            if (!audioProcessor.isStartupDemoActive()) {
+                audioProcessor.stopAudioFile();
+            }
         }
     }
 }

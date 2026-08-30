@@ -46,6 +46,7 @@ VisualiserComponent::VisualiserComponent(
     setShouldBeRunning(active);
 
 #if OSCI_PREMIUM
+    restorePopoutPending = true;
     addAndMakeVisible(editor.ffmpegDownloader);
 #endif
 
@@ -211,6 +212,10 @@ void VisualiserComponent::setFullScreenCallback(std::function<void(FullScreenMod
     fullScreenCallback = callback;
 }
 
+void VisualiserComponent::setPopoutShownCallback(std::function<void()> callback) {
+    popoutShownCallback = std::move(callback);
+}
+
 void VisualiserComponent::enableFullScreen() {
     if (fullScreenCallback) {
         fullScreenCallback(FullScreenMode::TOGGLE);
@@ -305,6 +310,20 @@ void VisualiserComponent::parameterValueChanged(int parameterIndex, float newVal
 }
 
 void VisualiserComponent::timerCallback() {
+    audioProcessor.serviceDeferredAudioSourceChanges();
+#if OSCI_PREMIUM
+    if (restorePopoutPending && isShowing() && getPeer() != nullptr) {
+        restorePopoutPending = false;
+        audioProcessor.globalSettings.save();
+        audioProcessor.globalSettings.reload();
+        const bool defaultOpen = visualiserOnly && juce::JUCEApplicationBase::isStandaloneApp()
+                                 && TransparentWindow::isTransparencySupported();
+        if (VisualiserWindow::getOpenPreference(audioProcessor.globalSettings, defaultOpen)) {
+            popoutWindow(false);
+        }
+    }
+#endif
+
     const auto updates = pendingParameterUpdates.exchange(0, std::memory_order_acquire);
     if (updates == 0) {
         return;
@@ -519,9 +538,11 @@ void VisualiserComponent::resized() {
         settingsButton.setVisible(false);
     }
 
-    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp() && !popoutVisible) {
+    if (visualiserOnly && juce::JUCEApplication::isStandaloneApp()) {
         audioInputButton.setVisible(true);
         audioInputButton.setBounds(buttons.removeFromRight(30));
+    } else {
+        audioInputButton.setVisible(false);
     }
 
     textureOutputButton.setVisible(true);
@@ -557,8 +578,14 @@ void VisualiserComponent::resized() {
     setViewportArea(area);
 }
 
-void VisualiserComponent::popoutWindow() {
+void VisualiserComponent::popoutWindow(bool saveOpenPreference) {
 #if OSCI_PREMIUM
+    restorePopoutPending = false;
+    audioProcessor.globalSettings.save();
+    audioProcessor.globalSettings.reload();
+    if (saveOpenPreference) {
+        VisualiserWindow::setOpenPreference(audioProcessor.globalSettings, true);
+    }
     setRecording(false);
 
     // Ensure any blocked render completes before changing presentation state.
@@ -569,22 +596,31 @@ void VisualiserComponent::popoutWindow() {
         popout->showPresentation();
         popoutVisible = true;
         popoutUpdated();
+        if (popoutShownCallback != nullptr) {
+            popoutShownCallback();
+        }
         resized();
         return;
     }
 #endif
 
     const auto windowTitle = editor.appName + " - Software Oscilloscope";
-    popout = std::make_unique<VisualiserWindow>(windowTitle, *this, audioProcessor.globalSettings);
+    const bool useSosciStandaloneDefaults = visualiserOnly && juce::JUCEApplicationBase::isStandaloneApp();
+    popout = std::make_unique<VisualiserWindow>(windowTitle, *this, audioProcessor.globalSettings, useSosciStandaloneDefaults);
     popoutVisible = true;
     popoutUpdated();
     popout->showPresentation();
+    if (popoutShownCallback != nullptr) {
+        popoutShownCallback();
+    }
     resized();
 #endif
 }
 
 void VisualiserComponent::closePopout() {
 #if OSCI_PREMIUM
+    restorePopoutPending = false;
+    VisualiserWindow::setOpenPreference(audioProcessor.globalSettings, false);
     if (popout == nullptr) {
         return;
     }
