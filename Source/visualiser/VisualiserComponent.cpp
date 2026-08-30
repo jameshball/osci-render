@@ -581,8 +581,6 @@ void VisualiserComponent::resized() {
 void VisualiserComponent::popoutWindow(bool saveOpenPreference) {
 #if OSCI_PREMIUM
     restorePopoutPending = false;
-    audioProcessor.globalSettings.save();
-    audioProcessor.globalSettings.reload();
     if (saveOpenPreference) {
         VisualiserWindow::setOpenPreference(audioProcessor.globalSettings, true);
     }
