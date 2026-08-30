@@ -11,12 +11,11 @@
 #include <JuceHeader.h>
 #include "CommonPluginProcessor.h"
 #include "visualiser/VisualiserSettings.h"
-#include <osci_standalone/osci_standalone.h>
 
 //==============================================================================
 /**
 */
-class SosciAudioProcessor  : public CommonAudioProcessor, public juce::SystemAudioCapture::OutputMuteHandler
+class SosciAudioProcessor  : public CommonAudioProcessor
 {
 public:
     SosciAudioProcessor();
@@ -30,7 +29,6 @@ public:
     void serviceDeferredAudioSourceChanges() override;
     void startStartupDemo();
     bool isStartupDemoActive() const { return startupDemoActive.load(std::memory_order_acquire); }
-    bool setSystemAudioOutputMuted(bool muted) override;
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
@@ -44,7 +42,6 @@ private:
     std::atomic<bool> startupDemoActive { false };
     std::atomic<bool> startupDemoFinished { false };
     bool startupDemoStarted = false;
-    std::atomic<bool> muteAfterStartupDemo { false };
 
     void cancelStartupDemo();
 
