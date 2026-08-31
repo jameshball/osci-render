@@ -68,6 +68,12 @@ static bool pumpUntil(std::function<bool()> condition, int timeoutMs = 2000) {
     return condition();
 }
 
+static bool learnCC(osci::MidiManager& manager, osci::MidiManager::Param* parameter, int cc, int channel = 1) {
+    manager.startLearning(parameter);
+    manager.processMidiBuffer(makeCCBuffer(cc, 64, channel));
+    return pumpUntil([&] { return manager.getAssignedCC(parameter) == cc; });
+}
+
 // RAII helper to ensure MessageManager is initialized and the current thread
 // is registered as the message thread. Required for Timer and ChangeBroadcaster.
 // Created once per process; intentionally leaks at exit since the test runner
@@ -290,19 +296,17 @@ private:
         osci::MidiManager mgr;
         auto param = makeFloat("testFloat", 0.0f, 0.0f, 10.0f);
 
-        mgr.startLearning(param.get());
-        mgr.processMidiBuffer(makeCCBuffer(7, 64));
-        pumpMessageLoop(200);
+        expect(learnCC(mgr, param.get(), 7), "CC learning timed out");
 
         // Send CC 7 = 127 (max)
         mgr.processMidiBuffer(makeCCBuffer(7, 127));
-        pumpMessageLoop(200);
+        expect(pumpUntil([&] { return param->getValueUnnormalised() > 9.85f; }), "Maximum CC value timed out");
         // Normalised value should be close to 1.0 → unnormalised close to 10.0
         expectWithinAbsoluteError(param->getValueUnnormalised(), 10.0f, 0.15f);
 
         // Send CC 7 = 0 (min)
         mgr.processMidiBuffer(makeCCBuffer(7, 0));
-        pumpMessageLoop(200);
+        expect(pumpUntil([&] { return param->getValueUnnormalised() < 0.15f; }), "Minimum CC value timed out");
         expectWithinAbsoluteError(param->getValueUnnormalised(), 0.0f, 0.15f);
     }
 
@@ -312,18 +316,16 @@ private:
         osci::MidiManager mgr;
         auto param = makeBool("testBool", false);
 
-        mgr.startLearning(param.get());
-        mgr.processMidiBuffer(makeCCBuffer(11, 64));
-        pumpMessageLoop(200);
+        expect(learnCC(mgr, param.get(), 11), "CC learning timed out");
 
         // CC = 127 → true
         mgr.processMidiBuffer(makeCCBuffer(11, 127));
-        pumpMessageLoop(200);
+        expect(pumpUntil([&] { return param->getBoolValue(); }), "Maximum CC value timed out");
         expect(param->getBoolValue(), "CC 127 should set bool to true");
 
         // CC = 0 → false
         mgr.processMidiBuffer(makeCCBuffer(11, 0));
-        pumpMessageLoop(200);
+        expect(pumpUntil([&] { return !param->getBoolValue(); }), "Minimum CC value timed out");
         expect(!param->getBoolValue(), "CC 0 should set bool to false");
     }
 
@@ -333,18 +335,16 @@ private:
         osci::MidiManager mgr;
         auto param = makeInt("testInt", 0, 0, 10);
 
-        mgr.startLearning(param.get());
-        mgr.processMidiBuffer(makeCCBuffer(12, 64));
-        pumpMessageLoop(200);
+        expect(learnCC(mgr, param.get(), 12), "CC learning timed out");
 
         // CC = 127 → max (10)
         mgr.processMidiBuffer(makeCCBuffer(12, 127));
-        pumpMessageLoop(200);
+        expect(pumpUntil([&] { return param->getValueUnnormalised() == 10; }), "Maximum CC value timed out");
         expectEquals(param->getValueUnnormalised(), 10);
 
         // CC = 0 → min (0)
         mgr.processMidiBuffer(makeCCBuffer(12, 0));
-        pumpMessageLoop(200);
+        expect(pumpUntil([&] { return param->getValueUnnormalised() == 0; }), "Minimum CC value timed out");
         expectEquals(param->getValueUnnormalised(), 0);
     }
 
