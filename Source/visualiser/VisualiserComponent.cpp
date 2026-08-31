@@ -312,6 +312,8 @@ void VisualiserComponent::parameterValueChanged(int parameterIndex, float newVal
 void VisualiserComponent::timerCallback() {
     audioProcessor.serviceDeferredAudioSourceChanges();
 #if OSCI_PREMIUM
+    // Restore the saved popout visibility once the editor has a visible native window.
+    // Without a saved preference, only SOSCI (visualiserOnly) standalone defaults to open, where transparency is supported.
     if (restorePopoutPending && isShowing() && getPeer() != nullptr) {
         restorePopoutPending = false;
         audioProcessor.globalSettings.save();
