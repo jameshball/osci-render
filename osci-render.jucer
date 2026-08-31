@@ -274,6 +274,8 @@
                 file="Source/audio/modulation/ModulationAssignmentStore.h"/>
           <FILE id="MdSrH1" name="ModulationSource.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationSource.h"/>
+          <FILE id="MdDsH1" name="ModulationDisplayBuffer.h" compile="0" resource="0"
+                file="Source/audio/modulation/ModulationDisplayBuffer.h"/>
           <FILE id="MdUaH1" name="ModulationUndoActions.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationUndoActions.h"/>
           <FILE id="MdEnH1" name="ModulationEngine.h" compile="0" resource="0"
