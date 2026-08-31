@@ -34,6 +34,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -101,18 +102,29 @@ def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 300.
 def http_put_file(url: str, path: Path, *, content_type: str = 'application/octet-stream', timeout: float = 600.0) -> int:
     """Stream-upload a file to a presigned URL."""
     size = path.stat().st_size
-    with path.open('rb') as f:
-        req = urllib.request.Request(
-            url,
-            data=f,
-            headers={'Content-Type': content_type, 'Content-Length': str(size)},
-            method='PUT',
-        )
+    for attempt in range(3):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return resp.status
+            # Reopen on every attempt: a failed upload may already have read the file.
+            with path.open('rb') as f:
+                req = urllib.request.Request(
+                    url,
+                    data=f,
+                    headers={'Content-Type': content_type, 'Content-Length': str(size)},
+                    method='PUT',
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.status
         except urllib.error.HTTPError as e:
-            raise SystemExit(f'PUT presigned URL failed: HTTP {e.code}: {e.read().decode("utf-8", errors="replace")}')
+            message = f'HTTP {e.code}: {e.read().decode("utf-8", errors="replace")}'
+            e.close()
+            if e.code not in (408, 429, 500, 502, 503, 504):
+                raise SystemExit(f'PUT presigned URL failed: {message}')
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            message = 'connection interrupted or timed out'
+        if attempt == 2:
+            raise SystemExit(f'PUT presigned URL failed after 3 attempts: {message}')
+        print(f'Upload attempt {attempt + 1} failed ({message}); retrying...', flush=True)
+        time.sleep(2 ** (attempt + 1))
 
 
 def main(argv: list[str]) -> int:
