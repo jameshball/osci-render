@@ -137,7 +137,11 @@ public:
     void applyVolumeAndThreshold(float* const* channels, int numSamples);
 
     juce::SpinLock effectsLock;
+#if SOSCI
+    VisualiserParameters visualiserParameters { juce::JUCEApplicationBase::isStandaloneApp() };
+#else
     VisualiserParameters visualiserParameters;
+#endif
     RecordingParameters recordingParameters;
     
     osci::AudioBackgroundThreadManager threadManager;
