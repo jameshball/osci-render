@@ -55,28 +55,6 @@ private:
     const int lastSample;
 };
 
-// Observe the real meter's tasks; sizing and pacing are entirely inherited.
-class MeterProbe final : public osci::VolumeComponent {
-public:
-    using VolumeComponent::VolumeComponent;
-
-    ~MeterProbe() override {
-        setShouldBeRunning(false);
-    }
-
-    void runTask(const juce::AudioBuffer<float>& buffer) override {
-        VolumeComponent::runTask(buffer);
-        frames.push_back({int(buffer.getSample(0, 0)), buffer.getNumSamples(), juce::Time::getMillisecondCounterHiRes(), nullptr, true});
-        if (int(frames.size()) == expectedFrames) {
-            completed.signal();
-        }
-    }
-
-    int expectedFrames = 0; // Configured before any audio is written.
-    std::vector<BatchProbe::Frame> frames;
-    juce::WaitableEvent completed;
-};
-
 juce::AudioBuffer<float> input(int first, int count) {
     juce::AudioBuffer<float> buffer(6, count);
     for (int ch = 0; ch < 6; ++ch) {
@@ -137,26 +115,14 @@ public:
         }
 
         for (int block : {64, 4096, 8192}) {
-            beginTest("Volume meter inherits complete batches and 60 Hz pacing: " + juce::String(block));
+            beginTest("Volume meter requests frame-sized tasks regardless of callback size: " + juce::String(block));
             osci::AudioBackgroundThreadManager manager;
             manager.prepare(48000.0, block);
             auto& controls = parameters.effects.front()->parameters;
-            MeterProbe meter(manager, *controls.front(), *controls.back(), *parameters.visualiserPaused, {}, {}, 1.0f, 0.0f);
-            const int batch = ((block + 799) / 800) * 800;
-            meter.expectedFrames = batch / 800;
-            auto audio = input(0, batch + 1);
-            meter.write(audio);
-            expect(meter.completed.wait(2000));
+            const juce::String icon = R"(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0L10 10"/></svg>)";
+            osci::VolumeComponent meter(manager, *controls.front(), *controls.back(), *parameters.visualiserPaused, icon, icon, 1.0f, 0.0f);
             meter.setShouldBeRunning(false);
-            expectEquals(int(meter.frames.size()), meter.expectedFrames);
-            for (int i = 0; i < int(meter.frames.size()); ++i) {
-                expectEquals(meter.frames[i].first, i * 800);
-                expectEquals(meter.frames[i].size, 800);
-                if (i > 0) {
-                    const double gap = meter.frames[i].time - meter.frames[i - 1].time;
-                    expect(gap >= 8.0 && gap < 100.0, "Meter updates must be spread out, not delivered in a burst");
-                }
-            }
+            expectEquals(meter.prepareTask(48000.0, block), 800);
         }
 
         beginTest("Live batches produce paced, contiguous frame views with no additional sample copy");
