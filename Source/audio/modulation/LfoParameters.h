@@ -7,6 +7,7 @@
 #include "LfoState.h"
 #include "ModulationParameterTypes.h"
 #include "ModulationSource.h"
+#include "ModulationDisplayBuffer.h"
 #include <osci_render_core/transport/osci_DawPosition.h>
 
 // Encapsulates all DAW-automatable LFO parameters, waveform data, assignments,
@@ -41,9 +42,8 @@ public:
 
     // Thread-safe snapshots for UI
     std::atomic<float> currentValues[NUM_LFOS] = {};
-    std::atomic<float> currentPhases[NUM_LFOS] = {};
+    ModulationDisplayBuffer displayBuffers[NUM_LFOS];
     std::atomic<bool> active[NUM_LFOS] = {};
-    std::atomic<bool> retriggered[NUM_LFOS] = {};
     std::atomic<bool> customState[NUM_LFOS] = {};  // true when LFO waveform is user-modified
 
     LfoParameters() {
@@ -81,9 +81,11 @@ public:
     int getSourceCount() const override { return NUM_LFOS; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
-    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
-        for (int l = 0; l < NUM_LFOS; ++l)
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
+        for (int l = 0; l < NUM_LFOS; ++l) {
             blockBuffer[l].resize(samplesPerBlock);
+            displayBuffers[l].prepare(sampleRate, samplesPerBlock);
+        }
     }
 
     // === Waveform access ===
@@ -217,19 +219,9 @@ public:
         return currentValues[i].load(std::memory_order_relaxed);
     }
 
-    float getCurrentPhase(int i) const {
-        if (i < 0 || i >= NUM_LFOS) return 0.0f;
-        return currentPhases[i].load(std::memory_order_relaxed);
-    }
-
     bool isActive(int i) const override {
         if (i < 0 || i >= NUM_LFOS) return false;
         return active[i].load(std::memory_order_relaxed);
-    }
-
-    bool consumeRetriggered(int i) {
-        if (i < 0 || i >= NUM_LFOS) return false;
-        return retriggered[i].exchange(false, std::memory_order_relaxed);
     }
 
     // === Audio-thread reset ===
@@ -259,8 +251,7 @@ public:
                     if (!mode[l]) continue;
                     LfoMode m = (LfoMode)mode[l]->getValueUnnormalised();
                     if (m != LfoMode::Free && m != LfoMode::Sync) {
-                        if (!audioStates[l].finished)
-                            retriggered[l].store(true, std::memory_order_relaxed);
+                        displayBuffers[l].resetMarker();
                         float phaseOff = phaseOffset[l] ? phaseOffset[l]->getValueUnnormalised() : 0.0f;
                         audioStates[l].noteOn(m, phaseOff);
                         delayElapsed[l] = 0.0f;
@@ -342,53 +333,48 @@ public:
                     delayElapsed[l] = elapsed + blockTimeSec;
                 }
 
-                int advanceSamples = numSamples - delaySkipSamples;
-                if (advanceSamples > 0) {
-                    if (md == LfoMode::Sync && dawPosition.hasSyncPosition.load(std::memory_order_relaxed)) {
-                        auto* out = blockBuffer[l].data() + delaySkipSamples;
-                        const double syncStartSeconds = dawPosition.syncSeconds.load(std::memory_order_relaxed);
-                        const double syncSecondsPerSample = dawPosition.syncSecondsPerSample.load(std::memory_order_relaxed);
-                        for (int s = 0; s < advanceSamples; ++s) {
-                            const int blockSample = delaySkipSamples + s;
-                            const double syncSeconds = syncStartSeconds + (double)blockSample * syncSecondsPerSample;
-                            const double phase = syncSeconds * (double)r + (double)phaseOff;
-                            const float wrappedPhase = (float)(phase - std::floor(phase));
-                            audioStates[l].phase = wrappedPhase;
-                            out[s] = waveforms[l].evaluate(wrappedPhase);
-                        }
-                    } else {
-                        audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples,
-                                                    r, sr, waveforms[l], md, phaseOff);
-                    }
-                }
-                if (md == LfoMode::Sync && !effectiveVoiceActive) {
-                    for (int s = 0; s < numSamples; ++s)
-                        blockBuffer[l][s] = 0.0f;
-                }
-
+                const bool syncPosition = md == LfoMode::Sync && dawPosition.hasSyncPosition.load(std::memory_order_relaxed);
+                const double syncStartSeconds = dawPosition.syncSeconds.load(std::memory_order_relaxed);
+                const double syncSecondsPerSample = dawPosition.syncSecondsPerSample.load(std::memory_order_relaxed);
                 const bool syncHeldByTransport = md == LfoMode::Sync
                     && dawPosition.hasSyncPosition.load(std::memory_order_relaxed)
                     && !dawPosition.isPlaying.load(std::memory_order_relaxed);
                 float smoothSecs = smoothAmount[l] ? smoothAmount[l]->getValueUnnormalised() : 0.005f;
-                if (syncHeldByTransport) {
-                    smoothedOutput[l] = blockBuffer[l][numSamples - 1];
-                } else if (smoothSecs > 1e-6f) {
-                    float alpha = 1.0f - std::exp(-1.0f / (smoothSecs * sr));
-                    float prev = smoothedOutput[l];
-                    for (int s = 0; s < numSamples; ++s) {
-                        prev += alpha * (blockBuffer[l][s] - prev);
-                        blockBuffer[l][s] = prev;
+                const float alpha = smoothSecs > 1e-6f ? 1.0f - std::exp(-1.0f / (smoothSecs * sr)) : 1.0f;
+                displayBuffers[l].process(numSamples, [&](int offset, int count) {
+                    const int end = offset + count;
+                    const int start = juce::jmax(offset, delaySkipSamples);
+                    if (start < end) {
+                        if (syncPosition) {
+                            for (int s = start; s < end; ++s) {
+                                const double syncSeconds = syncStartSeconds + (double)s * syncSecondsPerSample;
+                                const double phase = syncSeconds * (double)r + (double)phaseOff;
+                                const float wrappedPhase = (float)(phase - std::floor(phase));
+                                audioStates[l].phase = wrappedPhase;
+                                blockBuffer[l][s] = waveforms[l].evaluate(wrappedPhase);
+                            }
+                        } else {
+                            audioStates[l].advanceBlock(blockBuffer[l].data() + start, end - start, r, sr, waveforms[l], md, phaseOff);
+                        }
                     }
-                    smoothedOutput[l] = prev;
-                } else {
-                    smoothedOutput[l] = blockBuffer[l][numSamples - 1];
-                }
+                    if (md == LfoMode::Sync && !effectiveVoiceActive) {
+                        std::fill(blockBuffer[l].begin() + offset, blockBuffer[l].begin() + end, 0.0f);
+                    }
+                    if (!syncHeldByTransport && smoothSecs > 1e-6f) {
+                        float prev = smoothedOutput[l];
+                        for (int s = offset; s < end; ++s) {
+                            prev += alpha * (blockBuffer[l][s] - prev);
+                            blockBuffer[l][s] = prev;
+                        }
+                    }
+                    smoothedOutput[l] = blockBuffer[l][end - 1];
+                    return ModulationDisplayBuffer::Sample { smoothedOutput[l], audioStates[l].phase, isActive };
+                });
 
                 if (!effectiveVoiceActive && prevAnyVoiceActive)
                     audioStates[l].voicesFinished(md);
 
                 currentValues[l].store(blockBuffer[l][numSamples - 1], std::memory_order_relaxed);
-                currentPhases[l].store(audioStates[l].phase, std::memory_order_relaxed);
                 active[l].store(isActive, std::memory_order_relaxed);
             }
 

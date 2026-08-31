@@ -22,8 +22,7 @@ static ModulationSourceConfig buildSidechainConfig(OscirenderAudioProcessor& pro
     cfg.dragPrefix = "SC";
     cfg.getLabel = [](int) { return juce::String("INPUT"); };
     cfg.getSourceColour = &SidechainComponent::getSidechainColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.sidechainParameters.getCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.sidechainParameters.isActive(i); };
+    cfg.getDisplayBuffer = [&proc](int i) -> ModulationDisplayBuffer& { return proc.sidechainParameters.displayBuffers[i]; };
     cfg.getAssignments = [&proc]() { return proc.sidechainParameters.getAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.sidechainParameters.addAssignment(a); };
     cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.sidechainParameters.removeAssignment(idx, pid); };
@@ -157,15 +156,12 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
 SidechainComponent::~SidechainComponent() {
 }
 
-void SidechainComponent::timerCallback() {
-    ModulationSourceComponent::timerCallback();
-
-    // Show the current input level as a vertical marker on the graph
-    float inputLevel = audioProcessor.sidechainParameters.getInputLevel(0);
-    bool active = audioProcessor.sidechainParameters.isActive(0);
-
-    if (active) {
-        double pos = (double)inputLevel;
+void SidechainComponent::displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) {
+    if (index != getActiveSourceIndex()) {
+        return;
+    }
+    if (sample.active) {
+        double pos = sample.position;
         graph.setFlowMarkerDomainPositions(&pos, 1);
     } else {
         graph.clearFlowMarkers();

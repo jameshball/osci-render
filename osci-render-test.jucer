@@ -4,7 +4,7 @@
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
               cppLanguageStandard="20" projectLineFeed="&#10;" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
-              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
+              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
@@ -125,13 +125,19 @@
       </GROUP>
     </GROUP>
     <GROUP id="{C3D4E5F6-A7B8-9012-CDEF-123456789012}" name="Tests">
+      <FILE id="AudBatchTests" name="AudioBatchTests.cpp" compile="1" resource="0"
+            file="tests/AudioBatchTests.cpp"/>
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="tests/TestMain.cpp"/>
+      <FILE id="BufConTests" name="BufferConsumerTests.cpp" compile="1" resource="0"
+            file="tests/BufferConsumerTests.cpp"/>
       <FILE id="H4tQvH" name="BenchmarkAnimateValues.cpp" compile="1" resource="0"
             file="tests/BenchmarkAnimateValues.cpp"/>
       <FILE id="VcBnch" name="BenchmarkVoiceCloning.cpp" compile="1" resource="0"
             file="tests/BenchmarkVoiceCloning.cpp"/>
       <FILE id="LfoStr" name="LfoStressTest.cpp" compile="1" resource="0"
             file="tests/LfoStressTest.cpp"/>
+      <FILE id="ModDis" name="ModulationDisplayTests.cpp" compile="1" resource="0"
+            file="tests/ModulationDisplayTests.cpp"/>
       <FILE id="LuaCor" name="LuaCorrectnessTests.cpp" compile="1" resource="0"
             file="tests/LuaCorrectnessTests.cpp"/>
       <FILE id="FfMedI" name="FFmpegMediaInfoTests.cpp" compile="1" resource="0"

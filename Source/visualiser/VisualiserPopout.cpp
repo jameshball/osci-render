@@ -10,6 +10,7 @@ constexpr auto frameVisibleKey = "popoutFrameVisible";
 constexpr auto clicksPassThroughKey = "popoutClicksPassThrough";
 constexpr auto windowBoundsKey = "popoutWindowBounds";
 constexpr auto fullScreenKey = "popoutFullScreen";
+constexpr auto openKey = "popoutOpen";
 
 }
 
@@ -56,8 +57,9 @@ void VisualiserPresentationView::mouseUp(const juce::MouseEvent& event) {
     }
 }
 
-VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner, osci::SettingsStore& settings)
-    : TransparentWindow(std::move(name), loadWindowState(settings)),
+VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner, osci::SettingsStore& settings,
+                                   bool useSosciStandaloneDefaults)
+    : TransparentWindow(std::move(name), loadWindowState(settings, makeDefaultState(owner, useSosciStandaloneDefaults))),
       owner(owner),
       settings(settings) {
     auto content = std::make_unique<VisualiserPresentationView>(owner);
@@ -114,6 +116,15 @@ void VisualiserWindow::setAlwaysOnTopPreference(osci::SettingsStore& settings, b
     settings.save();
 }
 
+bool VisualiserWindow::getOpenPreference(const osci::SettingsStore& settings, bool defaultValue) {
+    return settings.getBool(openKey, defaultValue);
+}
+
+void VisualiserWindow::setOpenPreference(osci::SettingsStore& settings, bool open) {
+    settings.set(openKey, open);
+    settings.save();
+}
+
 void VisualiserWindow::closeRequested() {
     owner.closePopout();
 }
@@ -162,15 +173,45 @@ void VisualiserWindow::refreshOpenGLSurfaceTransparency() {
 #endif
 }
 
-TransparentWindowState VisualiserWindow::loadWindowState(const osci::SettingsStore& settings) {
+TransparentWindowState VisualiserWindow::loadWindowState(const osci::SettingsStore& settings,
+                                                          const TransparentWindowState& defaults) {
+    const auto savedBounds = constrainSavedBounds(
+        juce::Rectangle<int>::fromString(settings.getString(windowBoundsKey)));
     return {
-        .normalBounds = constrainSavedBounds(
-            juce::Rectangle<int>::fromString(settings.getString(windowBoundsKey))),
-        .fullScreen = settings.getBool(fullScreenKey, false),
-        .frameVisible = settings.getBool(frameVisibleKey, true),
-        .alwaysOnTop = settings.getBool(alwaysOnTopKey, true),
-        .mouseEventsPassThrough = settings.getBool(clicksPassThroughKey, false),
+        .normalBounds = savedBounds.isEmpty() ? defaults.normalBounds : savedBounds,
+        .fullScreen = settings.getBool(fullScreenKey, defaults.fullScreen),
+        .frameVisible = settings.getBool(frameVisibleKey, defaults.frameVisible),
+        .alwaysOnTop = settings.getBool(alwaysOnTopKey, defaults.alwaysOnTop),
+        .mouseEventsPassThrough = settings.getBool(clicksPassThroughKey, defaults.mouseEventsPassThrough),
     };
+}
+
+TransparentWindowState VisualiserWindow::makeDefaultState(const juce::Component& owner,
+                                                           bool useSosciStandaloneDefaults) {
+    TransparentWindowState state;
+    if (!useSosciStandaloneDefaults) {
+        return state;
+    }
+
+    state.frameVisible = false;
+    const auto& displays = juce::Desktop::getInstance().getDisplays();
+    auto* display = displays.getDisplayForRect(owner.getScreenBounds());
+    if (display == nullptr) {
+        display = displays.getPrimaryDisplay();
+    }
+    if (display == nullptr) {
+        return state;
+    }
+
+    constexpr int margin = 24;
+    constexpr int minimumSide = 360;
+    constexpr int maximumSide = 560;
+    const auto available = display->userBounds.toNearestInt();
+    const int availableSide = juce::jmax(100, juce::jmin(available.getWidth(), available.getHeight()) - 2 * margin);
+    const int preferredSide = juce::roundToInt(0.35f * static_cast<float>(juce::jmin(available.getWidth(), available.getHeight())));
+    const int side = juce::jmin(availableSide, juce::jlimit(minimumSide, maximumSide, preferredSide));
+    state.normalBounds = { available.getRight() - margin - side, available.getY() + margin, side, side };
+    return state;
 }
 
 juce::Rectangle<int> VisualiserWindow::constrainSavedBounds(juce::Rectangle<int> bounds) {
