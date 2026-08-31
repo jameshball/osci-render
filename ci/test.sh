@@ -2,6 +2,8 @@
 
 PLUGIN="osci-render-test"
 
+python3 -m unittest discover -s "$ROOT/ci" -p 'test_publish_release.py'
+
 # Build LuaJIT before Projucer resave (the test project needs it but can't
 # use Projucer postExportShellCommand because of its 60-second timeout)
 if [ "$OS" = "win" ]; then
