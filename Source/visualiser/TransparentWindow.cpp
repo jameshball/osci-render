@@ -209,6 +209,12 @@ void TransparentWindow::setContent(std::unique_ptr<juce::Component> content) {
         dragSurface->removeMouseListener(this);
     }
     dragSurface = content.get();
+    if (toolbar != nullptr) {
+        // Composite controls with the content, above any native OpenGL surface.
+        // Reparent before replacing the old content so the window retains ownership.
+        auto* overlayParent = dragSurface != nullptr ? dragSurface : this;
+        overlayParent->addChildComponent(*toolbar);
+    }
     setContentOwned(content.release(), false);
     if (dragSurface != nullptr) {
         dragSurface->addMouseListener(this, false);
