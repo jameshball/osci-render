@@ -402,13 +402,13 @@ void OscirenderAudioProcessor::prepareToPlayInternal(double sampleRate, int samp
     {
         juce::SpinLock::ScopedLockType lock(effectsLock);
         
-        // Update sample rate for all voice effects
-        for (int i = 0; i < synth.getNumVoices(); i++) {
-            auto voice = dynamic_cast<ShapeVoice*>(synth.getVoice(i));
-            if (voice) {
-                voice->prepareToPlay(sampleRate, samplesPerBlock);
+        // Keep each voice alive while its effect buffers are reconfigured.
+        synth.forEachVoice([sampleRate, samplesPerBlock](juce::SynthesiserVoice& voice) {
+            auto* shapeVoice = dynamic_cast<ShapeVoice*>(&voice);
+            if (shapeVoice != nullptr) {
+                shapeVoice->prepareToPlay(sampleRate, samplesPerBlock);
             }
-        }
+        });
     }
 }
 
