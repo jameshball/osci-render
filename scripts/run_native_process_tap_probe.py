@@ -2,14 +2,28 @@
 """Build and run a JUCE-free CoreAudio tap probe; system capture permission is required."""
 import argparse
 import json
+import math
 from pathlib import Path
 import plistlib
 import re
+import struct
 import subprocess
 import tempfile
 import time
+import wave
 
-from experiment_process_tap import make_tone
+
+def make_tone(path, seconds):
+    rate = 48000
+    # Quiet quadrature stereo: the two channels are never simultaneously zero.
+    block = b"".join(struct.pack("<hh", int(327 * math.sin(2 * math.pi * 220 * i / rate)),
+                                int(327 * math.cos(2 * math.pi * 220 * i / rate))) for i in range(rate))
+    with wave.open(str(path), "wb") as output:
+        output.setnchannels(2)
+        output.setsampwidth(2)
+        output.setframerate(rate)
+        for _ in range(math.ceil(seconds)):
+            output.writeframesraw(block)
 
 
 def main():

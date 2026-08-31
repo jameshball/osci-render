@@ -49,7 +49,7 @@ public:
         }
     }
 
-    void stopTask() override {}
+    void stopTask() override { releaseFirst.signal(); }
 
 private:
     const int lastSample;
@@ -240,6 +240,37 @@ public:
             if (probe.frames.size() == 6) {
                 expect(probe.frames.back().time - probe.frames.front().time < 2000.0);
             }
+        }
+
+        beginTest("Stopping the worker releases an audio producer blocked by recording backpressure");
+        {
+            osci::AudioBackgroundThreadManager manager;
+            BatchProbe probe(parameters, manager, 60.0, 0);
+            probe.holdFirst = true;
+            manager.prepare(48000.0, 64);
+            probe.setShouldBeRunning(true);
+            probe.setBlockOnAudioThread(true);
+            auto first = input(0, 800);
+            manager.write(first);
+            expect(probe.firstFrame.wait(2000));
+
+            auto queued = input(800, 1601); // Fill the two-batch queue, then block on one more sample.
+            juce::WaitableEvent entered, returned;
+            std::thread writer([&] {
+                entered.signal();
+                manager.write(queued);
+                returned.signal();
+            });
+            expect(entered.wait(1000));
+            expect(!returned.wait(100), "Recording should apply backpressure while the worker holds its frame");
+            probe.setShouldBeRunning(false);
+            const bool stopped = returned.wait(1000);
+            expect(stopped, "Stopping must release the writer and the manager lock without a separate recording toggle");
+            if (!stopped) {
+                probe.setBlockOnAudioThread(false);
+            }
+            writer.join();
+            checkFrames(probe, {0}, 800);
         }
 
         beginTest("Small callbacks retain the unpaced single-frame path");
