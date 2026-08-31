@@ -126,6 +126,8 @@
     </GROUP>
     <GROUP id="{C3D4E5F6-A7B8-9012-CDEF-123456789012}" name="Tests">
       <FILE id="bQ1rDR" name="TestMain.cpp" compile="1" resource="0" file="tests/TestMain.cpp"/>
+      <FILE id="BufConTests" name="BufferConsumerTests.cpp" compile="1" resource="0"
+            file="tests/BufferConsumerTests.cpp"/>
       <FILE id="H4tQvH" name="BenchmarkAnimateValues.cpp" compile="1" resource="0"
             file="tests/BenchmarkAnimateValues.cpp"/>
       <FILE id="VcBnch" name="BenchmarkVoiceCloning.cpp" compile="1" resource="0"

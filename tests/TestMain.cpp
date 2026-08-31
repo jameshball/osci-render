@@ -50,7 +50,7 @@ private:
 
 class BufferConsumerTest : public juce::UnitTest {
 public:
-    BufferConsumerTest() : juce::UnitTest("Buffer Consumer") {}
+    BufferConsumerTest() : juce::UnitTest("Buffer Consumer", "BufferConsumer") {}
 
     void runTest() override {
         beginTest("All data received");
