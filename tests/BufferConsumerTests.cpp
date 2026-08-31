@@ -11,7 +11,7 @@ public:
         beginTest("Live publication keeps its existing next-sample boundary and selects the latest batch");
         osci::BufferConsumer consumer(8);
         writeRange(consumer, 0, 25);
-        consumer.waitUntilFull();
+        expect(consumer.waitUntilFull() != nullptr);
         auto& held = consumer.getBuffer();
         expect(matches(held, 16));
         const auto* heldStorage = held.getReadPointer(0);
@@ -145,7 +145,8 @@ public:
         osci::BufferConsumer emptyRecording(8);
         emptyRecording.setBlockOnWrite(true);
         juce::WaitableEvent recordingAwake;
-        std::thread recordingWaiter([&] { emptyRecording.waitUntilFull(); recordingAwake.signal(); });
+        juce::AudioBuffer<float>* stoppedBatch = nullptr;
+        std::thread recordingWaiter([&] { stoppedBatch = emptyRecording.waitUntilFull(); recordingAwake.signal(); });
         expect(!recordingAwake.wait(100));
         emptyRecording.forceNotify();
         const bool recordingStopped = recordingAwake.wait(1000);
@@ -154,6 +155,7 @@ public:
             emptyRecording.setBlockOnWrite(false);
         }
         recordingWaiter.join();
+        expect(stoppedBatch == nullptr, "An incomplete recording batch must not be rendered after a stop wake-up");
 
         beginTest("Leaving recording wakes a producer blocked on its full queue");
         osci::BufferConsumer full(8);
