@@ -529,11 +529,14 @@ void ModulationSourceComponent::ModTabHandle::refreshDepthIndicators(
 // ============================================================================
 
 ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfig& cfg)
-    : config(cfg) {
+    : config(cfg), displaySamples(static_cast<size_t>(cfg.sourceCount)) {
     tabList.setOrientation(VerticalTabListComponent::Horizontal);
     tabList.setTabGap(kTabGap);
     tabList.setMinTabSize(kMinTabWidth);
     for (int i = 0; i < config.sourceCount; ++i) {
+        if (config.getDisplayBuffer) {
+            config.getDisplayBuffer(i).discard();
+        }
         auto tab = std::make_unique<ModTabHandle>(config.getLabel(i), i, *this);
         tabHandles.push_back(tab.get());
         tabList.addTab(std::move(tab));
@@ -574,16 +577,25 @@ void ModulationSourceComponent::timerCallback() {
     if (config.getAssignments)
         refreshAllDepthIndicators();
 
-    if (config.getCurrentValue) {
+    if (config.getCurrentValue || config.getDisplayBuffer) {
         // Vital-style smooth decay: smoothing factor = 15 * dt (frame-rate independent)
         float dt = (float)getTimerInterval() / 1000.0f;
         float decay = juce::jlimit(0.0f, 1.0f, 15.0f * dt);
+        const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
         for (int i = 0; i < (int)tabHandles.size(); ++i) {
-            float current = config.getCurrentValue(i);
-            tabHandles[i]->setSourceValue(current);
-            tabHandles[i]->updateSmoothedValue(current, decay);
-            if (config.isSourceActive)
-                tabHandles[i]->setSourceActive(config.isSourceActive(i));
+            auto& sample = displaySamples[static_cast<size_t>(i)];
+            if (config.getDisplayBuffer) {
+                config.getDisplayBuffer(i).consume(now, [&](const auto& incoming) {
+                    sample = incoming;
+                    displaySampleArrived(i, sample);
+                });
+            } else {
+                sample.value = config.getCurrentValue(i);
+                sample.active = config.isSourceActive && config.isSourceActive(i);
+            }
+            tabHandles[i]->setSourceValue(sample.value);
+            tabHandles[i]->updateSmoothedValue(sample.value, decay);
+            tabHandles[i]->setSourceActive(sample.active);
         }
     }
 }

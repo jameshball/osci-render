@@ -190,8 +190,7 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     cfg.dragPrefix = "LFO";
     cfg.getLabel = [](int i) { return "LFO " + juce::String(i + 1); };
     cfg.getSourceColour = &LfoComponent::getLfoColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.lfoParameters.getCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.lfoParameters.isActive(i); };
+    cfg.getDisplayBuffer = [&proc](int i) -> ModulationDisplayBuffer& { return proc.lfoParameters.displayBuffers[i]; };
     cfg.getAssignments = [&proc]() { return proc.lfoParameters.getAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.lfoParameters.addAssignment(a); };
     cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.lfoParameters.removeAssignment(idx, pid); };
@@ -399,26 +398,21 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
 LfoComponent::~LfoComponent() {
 }
 
-void LfoComponent::timerCallback() {
-    ModulationSourceComponent::timerCallback();
-
-    int idx = getActiveSourceIndex();
-    bool active = audioProcessor.lfoParameters.isActive(idx);
-
-    if (active) {
-        // Reset the flow trail when transitioning from inactive to active, or when
-        // the LFO was retriggered (new note played while already running) so the
-        // old trail doesn't linger at the previous position
-        if (!wasLfoActive || audioProcessor.lfoParameters.consumeRetriggered(idx))
+void LfoComponent::displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) {
+    if (index != getActiveSourceIndex()) {
+        return;
+    }
+    if (sample.active) {
+        if (!wasLfoActive || sample.reset) {
             graph.resetFlowTrail();
-
-        double phase = (double)audioProcessor.lfoParameters.getCurrentPhase(idx);
+        }
+        double phase = sample.position;
         graph.setFlowMarkerDomainPositions(&phase, 1);
     } else {
         graph.clearFlowMarkers();
     }
 
-    wasLfoActive = active;
+    wasLfoActive = sample.active;
 }
 
 void LfoComponent::paint(juce::Graphics& g) {

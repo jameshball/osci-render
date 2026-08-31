@@ -26,8 +26,7 @@ static ModulationSourceConfig buildRandomConfig(OscirenderAudioProcessor& proc) 
     cfg.dragPrefix = "RNG";
     cfg.getLabel = [](int i) { return "RAND " + juce::String(i + 1); };
     cfg.getSourceColour = &RandomComponent::getRandomColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.randomParameters.getCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.randomParameters.isActive(i); };
+    cfg.getDisplayBuffer = [&proc](int i) -> ModulationDisplayBuffer& { return proc.randomParameters.displayBuffers[i]; };
     cfg.getAssignments = [&proc]() { return proc.randomParameters.getAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.randomParameters.addAssignment(a); };
     cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.randomParameters.removeAssignment(idx, pid); };
@@ -113,27 +112,10 @@ RandomComponent::RandomComponent(OscirenderAudioProcessor& processor)
 RandomComponent::~RandomComponent() {
 }
 
-void RandomComponent::timerCallback() {
-    ModulationSourceComponent::timerCallback();
-
-    int idx = getActiveSourceIndex();
-
-    // Drain all subsampled values from the audio thread ring buffer.
-    RandomUIRingBuffer::Entry entries[256];
-    int count = audioProcessor.randomParameters.drainUIBuffer(idx, entries, 256);
-
-    if (count > 0) {
-        for (int i = 0; i < count; ++i)
-            graph.pushValueSilent(entries[i].value, entries[i].active);
-        graph.repaint();
-    } else {
-        // No audio data available — push current snapshot to keep scrolling.
-        bool isActive = audioProcessor.randomParameters.isActive(idx);
-        float value = audioProcessor.randomParameters.getCurrentValue(idx);
-        graph.pushValue(value, isActive);
+void RandomComponent::displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) {
+    if (index == getActiveSourceIndex()) {
+        graph.pushValue(sample.value, sample.active);
     }
-
-    wasActive = audioProcessor.randomParameters.isActive(idx);
 }
 
 void RandomComponent::resized() {

@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <melatonin_blur/melatonin_blur.h>
 #include "../../audio/modulation/ModAssignment.h"
+#include "../../audio/modulation/ModulationDisplayBuffer.h"
 #include <osci_gui/osci_gui.h>
 
 namespace osci { class MidiManager; }
@@ -21,6 +22,7 @@ struct ModulationSourceConfig {
     std::function<juce::Colour(int)> getSourceColour;
     std::function<float(int)> getCurrentValue;        // 0..1 output for value bar
     std::function<bool(int)> isSourceActive;          // whether the pill should be visible
+    std::function<ModulationDisplayBuffer&(int)> getDisplayBuffer;
 
     // Assignment CRUD
     std::function<std::vector<ModAssignment>()> getAssignments;
@@ -118,6 +120,7 @@ protected:
     // Called when active source changes. Override for subclass-specific logic
     // (e.g. updating graph, preset selector). Base implementation is empty.
     virtual void onActiveSourceChanged(int /*newIndex*/) {}
+    virtual void displaySampleArrived(int /*index*/, const ModulationDisplayBuffer::Sample& /*sample*/) {}
 
     int activeSourceIndex = 0;
 
@@ -126,6 +129,7 @@ protected:
 
 private:
     ModulationSourceConfig config;
+    std::vector<ModulationDisplayBuffer::Sample> displaySamples;
     bool collapsed = false;
 
     // --- Layout constants ---
