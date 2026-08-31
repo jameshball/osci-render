@@ -7,6 +7,7 @@
 #include "RandomState.h"
 #include "ModulationParameterTypes.h"
 #include "ModulationSource.h"
+#include "ModulationDisplayBuffer.h"
 
 // Encapsulates all DAW-automatable Random modulator parameters, assignments,
 // and audio-thread state. Follows the VisualiserParameters/LfoParameters pattern.
@@ -32,9 +33,7 @@ public:
     std::atomic<bool> active[NUM_RANDOM_SOURCES] = {};
     std::atomic<bool> retriggered[NUM_RANDOM_SOURCES] = {};
 
-    // Ring buffers for streaming random values to UI
-    RandomUIRingBuffer uiBuffers[NUM_RANDOM_SOURCES];
-    static constexpr int kUISubsampleInterval = 64;
+    ModulationDisplayBuffer displayBuffers[NUM_RANDOM_SOURCES];
 
     RandomParameters() {
         for (int i = 0; i < NUM_RANDOM_SOURCES; ++i) {
@@ -61,9 +60,11 @@ public:
     int getSourceCount() const override { return NUM_RANDOM_SOURCES; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
-    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
-        for (int r = 0; r < NUM_RANDOM_SOURCES; ++r)
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
+        for (int r = 0; r < NUM_RANDOM_SOURCES; ++r) {
             blockBuffer[r].resize(samplesPerBlock);
+            displayBuffers[r].prepare(sampleRate, samplesPerBlock);
+        }
     }
 
     // === Parameter getters ===
@@ -115,11 +116,6 @@ public:
     bool consumeRetriggered(int i) {
         if (i < 0 || i >= NUM_RANDOM_SOURCES) return false;
         return retriggered[i].exchange(false, std::memory_order_relaxed);
-    }
-
-    int drainUIBuffer(int i, RandomUIRingBuffer::Entry* out, int maxEntries) {
-        if (i < 0 || i >= NUM_RANDOM_SOURCES) return 0;
-        return uiBuffers[i].drain(out, maxEntries);
     }
 
     // === Block buffer generation (called from audio thread each processBlock) ===
@@ -184,20 +180,13 @@ public:
                 audioStates[r].style = style[r] ? (RandomStyle)style[r]->getValueUnnormalised() : RandomStyle::Perlin;
                 bool isActive = !audioStates[r].finished;
 
-                audioStates[r].advanceBlock(blockBuffer[r].data(), numSamples,
-                                            rt, (float)sampleRate);
+                displayBuffers[r].process(numSamples, [&](int offset, int count) {
+                    audioStates[r].advanceBlock(blockBuffer[r].data() + offset, count, rt, (float)sampleRate);
+                    return ModulationDisplayBuffer::Sample { blockBuffer[r][offset + count - 1], 0.0f, isActive };
+                });
 
                 if (!effectiveVoiceActive && prevAnyVoiceActive)
                     audioStates[r].voicesFinished();
-
-                // Subsample the block into the UI ring buffer
-                for (int s = kUISubsampleInterval - 1; s < numSamples; s += kUISubsampleInterval)
-                    uiBuffers[r].push(blockBuffer[r][s], isActive);
-                if (numSamples > 0) {
-                    int lastPushed = ((numSamples - 1) / kUISubsampleInterval) * kUISubsampleInterval + kUISubsampleInterval - 1;
-                    if (lastPushed != numSamples - 1)
-                        uiBuffers[r].push(blockBuffer[r][numSamples - 1], isActive);
-                }
 
                 currentValues[r].store(blockBuffer[r][numSamples - 1], std::memory_order_relaxed);
                 active[r].store(isActive, std::memory_order_relaxed);

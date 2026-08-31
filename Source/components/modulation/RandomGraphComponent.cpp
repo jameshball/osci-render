@@ -12,16 +12,13 @@ RandomGraphComponent::RandomGraphComponent() {
 }
 
 void RandomGraphComponent::pushValue(float value, bool isActive) {
-    pushValueSilent(value, isActive);
-    repaint();
-}
-
-void RandomGraphComponent::pushValueSilent(float value, bool isActive) {
     history[(size_t)writeIndex] = juce::jlimit(0.0f, 1.0f, value);
     activeHistory[(size_t)writeIndex] = isActive;
     writeIndex = (writeIndex + 1) % kMaxHistory;
-    if (historyCount < kMaxHistory)
+    if (historyCount < kMaxHistory) {
         historyCount++;
+    }
+    repaint();
 }
 
 void RandomGraphComponent::clearHistory() {

@@ -3,12 +3,6 @@
 #include "SosciPluginEditor.h"
 
 SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(5), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
-    // demo audio file on standalone only
-    if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        std::unique_ptr<juce::InputStream> stream = std::make_unique<juce::MemoryInputStream>(BinaryData::sosci_flac, BinaryData::sosci_flacSize, false);
-        loadAudioFile(std::move(stream));
-    }
-
     addAllParameters();
 }
 
@@ -36,6 +30,8 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
 
     // Get source buffer (either from WAV parser or input)
     juce::AudioBuffer<float> sourceBuffer;
+    bool awaitingStartupDemoHandoff = false;
+    bool playingStartupAudio = false;
 
     {
         // Scope the wavParserLock to only the section that accesses wavParser.
@@ -44,13 +40,19 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
         // and the consumer chain depends on the message thread being responsive,
         // which in turn may need this same lock (via AudioTimelineController::getCurrentPosition).
         juce::SpinLock::ScopedLockType lock2(wavParserLock);
-        bool readingFromWav = wavParser.isInitialised();
+        awaitingStartupDemoHandoff = startupDemoFinished.load(std::memory_order_acquire);
+        const bool readingFromWav = wavParser.isInitialised() && !awaitingStartupDemoHandoff;
 
         if (readingFromWav) {
+            playingStartupAudio = startupDemoActive.load(std::memory_order_acquire);
             wavBuffer.setSize(6, numSamples, false, true, true);
             wavBuffer.clear();
             wavParser.processBlock(wavBuffer);
             sourceBuffer = juce::AudioBuffer<float>(wavBuffer.getArrayOfWritePointers(), wavBuffer.getNumChannels(), numSamples);
+            if (playingStartupAudio && !wavParser.isLooping()
+                && wavParser.currentSample.load() >= wavParser.totalSamples.load()) {
+                startupDemoFinished.store(true, std::memory_order_release);
+            }
         } else {
             sourceBuffer = juce::AudioBuffer<float>(input.getArrayOfWritePointers(), input.getNumChannels(), numSamples);
         }
@@ -150,8 +152,9 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
         applyVolumeAndThreshold(workArray, numSamples);
     }
 
-    // Mute the physical output in both standalone and plugin wrappers.
-    if (muteParameter->getBoolValue()) {
+    // Only startup-file blocks bypass mute; they never contain live input.
+    // Keep live output silent while the completed startup file awaits cleanup.
+    if (!playingStartupAudio && (muteParameter->getBoolValue() || awaitingStartupDemoHandoff)) {
         juce::FloatVectorOperations::clear(workArray[0], numSamples);
         juce::FloatVectorOperations::clear(workArray[1], numSamples);
     }
@@ -170,6 +173,49 @@ void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer,
             juce::FloatVectorOperations::clear(outputArray[ch], numSamples);
         }
     }
+}
+
+void SosciAudioProcessor::loadAudioFile(std::unique_ptr<juce::InputStream> stream) {
+    if (stream == nullptr) {
+        return;
+    }
+    cancelStartupDemo();
+    CommonAudioProcessor::loadAudioFile(std::move(stream));
+}
+
+void SosciAudioProcessor::stopAudioFile() {
+    cancelStartupDemo();
+    CommonAudioProcessor::stopAudioFile();
+}
+
+void SosciAudioProcessor::serviceDeferredAudioSourceChanges() {
+    if (!startupDemoFinished.load(std::memory_order_acquire)) {
+        return;
+    }
+    CommonAudioProcessor::stopAudioFile();
+    startupDemoActive.store(false, std::memory_order_release);
+    startupDemoFinished.store(false, std::memory_order_release);
+}
+
+void SosciAudioProcessor::startStartupDemo() {
+    if (!juce::JUCEApplicationBase::isStandaloneApp() || startupDemoStarted) {
+        return;
+    }
+
+    startupDemoStarted = true;
+    auto stream = std::make_unique<juce::MemoryInputStream>(BinaryData::sosci_flac, BinaryData::sosci_flacSize, false);
+    juce::SpinLock::ScopedLockType lock(wavParserLock);
+    wavParser.parse(std::move(stream));
+    startupDemoFinished.store(false, std::memory_order_release);
+    startupDemoActive.store(true, std::memory_order_release);
+    notifyAudioFileChanged();
+}
+
+void SosciAudioProcessor::cancelStartupDemo() {
+    startupDemoStarted = true;
+    juce::SpinLock::ScopedLockType lock(wavParserLock);
+    startupDemoActive.store(false, std::memory_order_release);
+    startupDemoFinished.store(false, std::memory_order_release);
 }
 
 void SosciAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {

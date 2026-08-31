@@ -570,18 +570,17 @@ void CommonAudioProcessor::loadAudioFile(std::unique_ptr<juce::InputStream> stre
     if (stream != nullptr) {
         juce::SpinLock::ScopedLockType lock(wavParserLock);
         wavParser.parse(std::move(stream));
-
-        juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
-        for (auto listener : audioPlayerListeners) {
-            listener->parserChanged();
-        }
+        notifyAudioFileChanged();
     }
 }
 
 void CommonAudioProcessor::stopAudioFile() {
     juce::SpinLock::ScopedLockType lock(wavParserLock);
     wavParser.close();
+    notifyAudioFileChanged();
+}
 
+void CommonAudioProcessor::notifyAudioFileChanged() {
     juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
     for (auto listener : audioPlayerListeners) {
         listener->parserChanged();

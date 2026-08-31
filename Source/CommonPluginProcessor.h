@@ -75,8 +75,9 @@ public:
     bool canSetInternalSampleRateRatio(double ratio) const;
     void setInternalSampleRateRatio(double ratio);
     void loadAudioFile(const juce::File& file);
-    void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
-    void stopAudioFile();
+    virtual void loadAudioFile(std::unique_ptr<juce::InputStream> stream);
+    virtual void stopAudioFile();
+    virtual void serviceDeferredAudioSourceChanges() {}
     void addAudioPlayerListener(AudioPlayerListener* listener);
     void removeAudioPlayerListener(AudioPlayerListener* listener);
     std::any getProperty(const std::string& key);
@@ -198,6 +199,7 @@ public:
     
 protected:
     bool isCreatingPortableProjectSnapshot() const;
+    void notifyAudioFileChanged();
     
     bool brightnessEnabled = false;
     bool rgbEnabled = false;

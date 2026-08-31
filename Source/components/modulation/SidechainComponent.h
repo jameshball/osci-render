@@ -29,7 +29,7 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     void paintOverChildren(juce::Graphics& g) override;
-    void timerCallback() override;
+    void displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) override;
     void lookAndFeelChanged() override;
 
     static juce::Colour getSidechainColour(int index = 0);

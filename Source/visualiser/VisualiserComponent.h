@@ -42,6 +42,7 @@ public:
     void enableFullScreen();
     void setFullScreen(bool fullScreen);
     void setFullScreenCallback(std::function<void(FullScreenMode)> callback);
+    void setPopoutShownCallback(std::function<void()> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -107,6 +108,7 @@ private:
     CommonPluginEditor& editor;
     std::unique_ptr<VisualiserWindow> popout;
     bool popoutVisible = false;
+    bool restorePopoutPending = false;
 
     VisualiserSettings& settings;
     RecordingSettings& recordingSettings;
@@ -130,6 +132,7 @@ private:
     bool hideButtonRow = false;
     bool fullScreen = false;
     std::function<void(FullScreenMode)> fullScreenCallback;
+    std::function<void()> popoutShownCallback;
     osci::ToggleAnimationController overlayFadeController { this };
     FadeCoverComponent overlayFadeCover;
 
@@ -148,7 +151,7 @@ private:
 
     juce::Rectangle<int> buttonRow;
 
-    void popoutWindow();
+    void popoutWindow(bool saveOpenPreference = true);
     void newOpenGLContextCreated() override;
     void openGLContextClosing() override;
     int prepareTask(double sampleRate, int samplesPerBlock) override;
