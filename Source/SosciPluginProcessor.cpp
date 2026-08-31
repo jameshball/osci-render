@@ -4,9 +4,6 @@
 
 SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::namedChannelSet(5), true).withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     addAllParameters();
-    if (juce::JUCEApplicationBase::isStandaloneApp()) {
-        visualiserParameters.transparentBackground->setBoolValueNotifyingHost(true);
-    }
 }
 
 SosciAudioProcessor::~SosciAudioProcessor() {}
