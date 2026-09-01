@@ -1,6 +1,6 @@
 #include "TransparentWindow.h"
 
-#if !JUCE_MAC && !JUCE_WINDOWS
+#if !JUCE_MAC && !JUCE_WINDOWS && !JUCE_LINUX
 bool TransparentWindow::isTransparencySupported() {
     return false;
 }
@@ -11,6 +11,7 @@ juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rec
 void TransparentWindow::configureNativeTransparency() {}
 void TransparentWindow::setNativeIgnoresMouseEvents(bool) {}
 bool TransparentWindow::isNativeMouseInteractionStateApplied(bool) const { return true; }
+void TransparentWindow::setNativeAlwaysOnTop(bool) {}
 
 void TransparentWindow::setMovesToActiveSpace(bool) {}
 void TransparentWindow::setNativeRoundedWindowRegion(float) {}
