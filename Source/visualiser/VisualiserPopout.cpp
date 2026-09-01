@@ -32,6 +32,12 @@ void VisualiserPresentationView::paint(juce::Graphics& g) {
     if (!paused) {
         return;
     }
+    auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent());
+    if (window != nullptr && !window->isFullScreenRequested()) {
+        juce::Path windowShape;
+        windowShape.addRoundedRectangle(getLocalBounds().toFloat(), TransparentWindow::cornerRadius);
+        g.reduceClipRegion(windowShape);
+    }
     g.setColour(juce::Colours::black.withAlpha(0.5f));
     g.fillRect(getLocalBounds());
     g.setColour(juce::Colours::white);

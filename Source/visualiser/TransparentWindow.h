@@ -63,6 +63,8 @@ private:
 class TransparentWindow : public juce::DocumentWindow,
                           private juce::Timer {
 public:
+    static constexpr float cornerRadius = 11.0f;
+
     TransparentWindow(juce::String name, TransparentWindowState initialState);
     ~TransparentWindow() override;
 
@@ -120,10 +122,16 @@ private:
     static bool supportsClickThroughInTransparentFullScreen();
     static juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds);
     void configureNativeTransparency();
+    void applyAlwaysOnTop();
     void setNativeIgnoresMouseEvents(bool ignoresMouseEvents);
     bool isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const;
+    void setNativeAlwaysOnTop(bool alwaysOnTop);
     void setMovesToActiveSpace(bool shouldMove);
     void setNativeRoundedWindowRegion(float cornerRadius);
+#if JUCE_LINUX
+    bool isNativeFullScreenStateActive() const;
+    void setNativeBounds(juce::Rectangle<int> bounds);
+#endif
 
     std::unique_ptr<TransparentWindowToolbar> toolbar;
     juce::Component* dragSurface = nullptr;
@@ -133,12 +141,13 @@ private:
     bool restoreFullScreen = false;
     bool fullScreenRequested = false;
     bool fullScreenTransitionPending = false;
-#if JUCE_WINDOWS || JUCE_MAC
     juce::Rectangle<int> boundsBeforeFullScreen;
     juce::Rectangle<int> transparentFullScreenBounds;
     bool transparentFullScreen = false;
     bool settingTransparentFullScreenBounds = false;
     bool reenterFullScreenAfterTransition = false;
+#if JUCE_LINUX
+    std::uint32_t transparentFullScreenTransitionTime = 0;
 #endif
     bool pinned = true;
     bool frameRequestedVisible = true;

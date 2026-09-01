@@ -107,6 +107,8 @@ bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEv
     return !windowIgnoresMouse && acceptsMouseMovedEvents && hasTrackingAreas;
 }
 
+void TransparentWindow::setNativeAlwaysOnTop(bool) {}
+
 void TransparentWindow::setMovesToActiveSpace(bool shouldMove) {
     NSWindow* window = getWindow(this);
     if (window == nil) {
