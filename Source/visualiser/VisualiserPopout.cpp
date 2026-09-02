@@ -20,7 +20,19 @@ VisualiserPresentationView::VisualiserPresentationView(VisualiserComponent& owne
     setCheckerColours(osci::Colours::surface(), osci::Colours::darker());
     const auto themeBase = osci::Colours::surfaceSunken();
     setOpaqueBackground(themeBase.interpolatedWith(osci::Colours::shadow(), osci::Theme::isDark() ? 0.86f : 0.38f));
-    setContextCreatedCallback([](void* context) { TransparentWindow::configureOpenGLSurface(context); });
+    setContextCreatedCallback([this](void* context) {
+        TransparentWindow::configureOpenGLSurface(context);
+#if JUCE_LINUX
+        triggerAsyncUpdate();
+#endif
+    });
+}
+
+void VisualiserPresentationView::handleAsyncUpdate() {
+    auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent());
+    if (window != nullptr) {
+        window->refreshPresentationSurface();
+    }
 }
 
 void VisualiserPresentationView::setPaused(bool shouldBePaused) {
@@ -31,12 +43,6 @@ void VisualiserPresentationView::setPaused(bool shouldBePaused) {
 void VisualiserPresentationView::paint(juce::Graphics& g) {
     if (!paused) {
         return;
-    }
-    auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent());
-    if (window != nullptr && !window->isFullScreenRequested()) {
-        juce::Path windowShape;
-        windowShape.addRoundedRectangle(getLocalBounds().toFloat(), TransparentWindow::cornerRadius);
-        g.reduceClipRegion(windowShape);
     }
     g.setColour(juce::Colours::black.withAlpha(0.5f));
     g.fillRect(getLocalBounds());

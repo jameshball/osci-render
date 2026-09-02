@@ -380,6 +380,9 @@ void TransparentWindow::restoreSavedFullScreen() {
 }
 
 void TransparentWindow::refreshPresentationSurface() {
+#if JUCE_LINUX
+    configureNativeTransparency();
+#endif
     presentationRefreshGeneration = getAlphaMaskGeneration();
     presentationRefreshDeadline = juce::Time::getMillisecondCounter() + 1000;
     presentationRefreshActive = true;
@@ -443,6 +446,11 @@ void TransparentWindow::resized() {
         toolbar->setBounds(getLocalBounds());
         toolbar->toFront(false);
     }
+#if JUCE_LINUX
+    if (windowCornersRounded) {
+        setNativeRoundedWindowRegion(cornerRadius);
+    }
+#endif
     if (fullScreenRequested && transparentFullScreen && !settingTransparentFullScreenBounds
         && !transparentFullScreenBounds.isEmpty() && getBounds() != transparentFullScreenBounds) {
 #if JUCE_LINUX
@@ -450,6 +458,7 @@ void TransparentWindow::resized() {
             transparentFullScreen = false;
             reenterFullScreenAfterTransition = true;
             transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+            updatePresentation();
             return;
         }
 #endif

@@ -6,10 +6,13 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xrender.h>
 #include <X11/extensions/Xfixes.h>
 #include <X11/extensions/shape.h>
 
 #include <algorithm>
+#include <atomic>
+#include <cmath>
 #include <vector>
 
 extern "C" EGLBoolean __real_eglChooseConfig(EGLDisplay display, const EGLint* attributes, EGLConfig* configs, EGLint configSize, EGLint* configCount);
@@ -49,6 +52,11 @@ bool hasExtension(Display* display, const char* name) {
     return display != nullptr && XQueryExtension(display, name, &opcode, &firstEvent, &firstError);
 }
 
+std::atomic<VisualID>& getAlphaVisualId() {
+    static std::atomic<VisualID> id{ 0 };
+    return id;
+}
+
 bool requestsAlpha(const EGLint* attributes) {
     if (attributes == nullptr) {
         return false;
@@ -61,22 +69,16 @@ bool requestsAlpha(const EGLint* attributes) {
     return false;
 }
 
-bool usesAlphaVisual(Display* display, EGLDisplay eglDisplay, EGLConfig config) {
+VisualID getVisualId(EGLDisplay eglDisplay, EGLConfig config) {
     EGLint visualId = 0;
-    if (display == nullptr
-        || eglGetConfigAttrib(eglDisplay, config, EGL_NATIVE_VISUAL_ID, &visualId) != EGL_TRUE) {
-        return false;
+    if (eglGetConfigAttrib(eglDisplay, config, EGL_NATIVE_VISUAL_ID, &visualId) != EGL_TRUE) {
+        return 0;
     }
+    return static_cast<VisualID>(visualId);
+}
 
-    XVisualInfo visualTemplate{};
-    visualTemplate.visualid = static_cast<VisualID>(visualId);
-    int visualCount = 0;
-    auto* visuals = XGetVisualInfo(display, VisualIDMask, &visualTemplate, &visualCount);
-    const bool result = visuals != nullptr && visualCount > 0 && visuals[0].depth == 32;
-    if (visuals != nullptr) {
-        XFree(visuals);
-    }
-    return result;
+bool usesAlphaVisual(EGLDisplay eglDisplay, EGLConfig config) {
+    return getVisualId(eglDisplay, config) == getAlphaVisualId().load(std::memory_order_acquire);
 }
 
 bool supportsInputPassthrough(Display* display) {
@@ -109,27 +111,42 @@ bool hasCompatibleOpenGLVisual(Display* display) {
         EGL_SAMPLES, 0,
         EGL_NONE,
     };
-    EGLConfig config = nullptr;
     EGLint configCount = 0;
-    const bool configFound = eglChooseConfig(eglDisplay, attributes, &config, 1, &configCount) == EGL_TRUE
-                          && configCount > 0;
-    EGLint visualId = 0;
-    const bool visualFound = configFound
-                          && eglGetConfigAttrib(eglDisplay, config, EGL_NATIVE_VISUAL_ID, &visualId) == EGL_TRUE;
-    eglTerminate(eglDisplay);
-    if (!visualFound) {
+    if (__real_eglChooseConfig(eglDisplay, attributes, nullptr, 0, &configCount) != EGL_TRUE || configCount <= 0) {
+        eglTerminate(eglDisplay);
         return false;
     }
 
-    XVisualInfo visualTemplate{};
-    visualTemplate.visualid = static_cast<VisualID>(visualId);
-    int visualCount = 0;
-    auto* visuals = XGetVisualInfo(display, VisualIDMask, &visualTemplate, &visualCount);
-    const bool hasAlphaVisual = visuals != nullptr && visualCount > 0 && visuals[0].depth == 32;
-    if (visuals != nullptr) {
-        XFree(visuals);
+    std::vector<EGLConfig> configs(static_cast<std::size_t>(configCount));
+    if (__real_eglChooseConfig(eglDisplay, attributes, configs.data(), configCount, &configCount) != EGL_TRUE) {
+        eglTerminate(eglDisplay);
+        return false;
     }
-    return hasAlphaVisual;
+    configs.resize(static_cast<std::size_t>(configCount));
+
+    for (const auto config : configs) {
+        const auto visualId = getVisualId(eglDisplay, config);
+        XVisualInfo visualTemplate{};
+        visualTemplate.visualid = visualId;
+        int visualCount = 0;
+        auto* visuals = XGetVisualInfo(display, VisualIDMask, &visualTemplate, &visualCount);
+        bool foundAlphaVisual = false;
+        if (visuals != nullptr && visualCount > 0) {
+            const auto* format = XRenderFindVisualFormat(display, visuals[0].visual);
+            if (format != nullptr && format->type == PictTypeDirect && format->direct.alphaMask != 0) {
+                getAlphaVisualId().store(visualId, std::memory_order_release);
+                foundAlphaVisual = true;
+            }
+        }
+        if (visuals != nullptr) {
+            XFree(visuals);
+        }
+        if (foundAlphaVisual) {
+            break;
+        }
+    }
+    eglTerminate(eglDisplay);
+    return getAlphaVisualId().load(std::memory_order_acquire) != 0;
 }
 
 bool windowHasState(Display* display, Window window, Atom requestedState) {
@@ -158,9 +175,6 @@ void setWindowState(Display* display, Window window, const char* stateName, bool
     }
 
     const auto state = XInternAtom(display, stateName, False);
-    if (windowHasState(display, window, state) == enabled) {
-        return;
-    }
     XEvent event{};
     event.xclient.type = ClientMessage;
     event.xclient.window = window;
@@ -171,7 +185,6 @@ void setWindowState(Display* display, Window window, const char* stateName, bool
     event.xclient.data.l[3] = 1;
     XSendEvent(display, DefaultRootWindow(display), False,
                SubstructureRedirectMask | SubstructureNotifyMask, &event);
-    XFlush(display);
 }
 
 void setInputPassthrough(Display* display, Window window, bool passthrough) {
@@ -187,7 +200,6 @@ void setInputPassthrough(Display* display, Window window, bool passthrough) {
     if (region != None) {
         XFixesDestroyRegion(display, region);
     }
-    XFlush(display);
 }
 
 void makeChildWindowsInputTransparent(Display* display, Window window) {
@@ -207,51 +219,32 @@ void makeChildWindowsInputTransparent(Display* display, Window window) {
     }
 }
 
-bool isInputPassthrough(Display* display, Window window) {
-    if (display == nullptr || window == None || !supportsInputPassthrough(display)) {
-        return false;
-    }
-    int rectangleCount = 0;
-    int ordering = 0;
-    auto* rectangles = XShapeGetRectangles(display, window, ShapeInput, &rectangleCount, &ordering);
-    if (rectangles != nullptr) {
-        XFree(rectangles);
-    }
-    return rectangleCount == 0;
-}
-
-bool areChildWindowsInputTransparent(Display* display, Window window) {
-    Window root = None;
-    Window parent = None;
-    Window* children = nullptr;
-    unsigned int childCount = 0;
-    if (display == nullptr || window == None
-        || XQueryTree(display, window, &root, &parent, &children, &childCount) == False) {
-        return true;
-    }
-    bool result = true;
-    for (unsigned int child = 0; child < childCount; ++child) {
-        result = result && isInputPassthrough(display, children[child]);
-    }
-    if (children != nullptr) {
-        XFree(children);
-    }
-    return result;
-}
-
 juce::Rectangle<int> getDesktopWorkArea(Display* display) {
     if (display == nullptr) {
         return {};
     }
+
+    const auto root = DefaultRootWindow(display);
+    unsigned long desktop = 0;
+    unsigned char* data = nullptr;
     Atom type = None;
     int format = 0;
     unsigned long count = 0;
     unsigned long remaining = 0;
-    unsigned char* data = nullptr;
-    const auto status = XGetWindowProperty(display, DefaultRootWindow(display),
-                                           XInternAtom(display, "_NET_WORKAREA", False), 0, 4, False,
-                                           XA_CARDINAL, &type, &format, &count, &remaining, &data);
-    if (status != Success || type != XA_CARDINAL || format != 32 || count < 4 || data == nullptr) {
+    if (XGetWindowProperty(display, root, XInternAtom(display, "_NET_CURRENT_DESKTOP", False), 0, 1, False,
+                           XA_CARDINAL, &type, &format, &count, &remaining, &data) == Success
+        && type == XA_CARDINAL && format == 32 && count == 1 && data != nullptr) {
+        desktop = *reinterpret_cast<unsigned long*>(data);
+    }
+    if (data != nullptr) {
+        XFree(data);
+        data = nullptr;
+    }
+
+    const auto offset = static_cast<long>(desktop * 4);
+    if (XGetWindowProperty(display, root, XInternAtom(display, "_NET_WORKAREA", False), offset, 4, False,
+                           XA_CARDINAL, &type, &format, &count, &remaining, &data) != Success
+        || type != XA_CARDINAL || format != 32 || count != 4 || data == nullptr) {
         if (data != nullptr) {
             XFree(data);
         }
@@ -282,9 +275,10 @@ extern "C" EGLBoolean __wrap_eglChooseConfig(EGLDisplay eglDisplay, const EGLint
     if (__real_eglChooseConfig(eglDisplay, attributes, matches.data(), matchCount, &matchCount) != EGL_TRUE) {
         return EGL_FALSE;
     }
+    matches.resize(static_cast<std::size_t>(matchCount));
 
     auto alphaConfig = std::find_if(matches.begin(), matches.end(), [eglDisplay](EGLConfig config) {
-        return usesAlphaVisual(getDisplay(), eglDisplay, config);
+        return usesAlphaVisual(eglDisplay, config);
     });
     if (alphaConfig != matches.end()) {
         std::rotate(matches.begin(), alphaConfig, std::next(alphaConfig));
@@ -293,13 +287,14 @@ extern "C" EGLBoolean __wrap_eglChooseConfig(EGLDisplay eglDisplay, const EGLint
     const auto copyCount = juce::jmin(configSize, matchCount);
     std::copy_n(matches.begin(), copyCount, configs);
     if (configCount != nullptr) {
-        *configCount = matchCount;
+        *configCount = copyCount;
     }
     return EGL_TRUE;
 }
 
 bool TransparentWindow::isTransparencySupported() {
     static const bool supported = juce::Desktop::canUseSemiTransparentWindows()
+                               && supportsInputPassthrough(getDisplay())
                                && hasCompatibleOpenGLVisual(getDisplay());
     return supported;
 }
@@ -309,9 +304,15 @@ bool TransparentWindow::supportsClickThroughInTransparentFullScreen() {
 }
 
 juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
+    auto& displays = juce::Desktop::getInstance().getDisplays();
+    auto* display = displays.getDisplayForRect(displayBounds);
     const auto workArea = getDesktopWorkArea(getDisplay());
-    const auto usableDisplay = displayBounds.getIntersection(workArea);
-    return usableDisplay.isEmpty() ? displayBounds : usableDisplay;
+    if (display == nullptr || workArea.isEmpty()) {
+        return displayBounds;
+    }
+    const auto physicalDisplay = displays.logicalToPhysical(displayBounds, display);
+    const auto usablePhysical = physicalDisplay.getIntersection(workArea);
+    return usablePhysical.isEmpty() ? displayBounds : displays.physicalToLogical(usablePhysical, display);
 }
 
 void TransparentWindow::configureNativeTransparency() {
@@ -330,30 +331,35 @@ void TransparentWindow::configureNativeTransparency() {
         // Keep transparent fullscreen as an ordinary composited window instead.
         setWindowState(display, window, "_NET_WM_STATE_FULLSCREEN", false);
     }
-    // JUCE's EGL surface is a native child that otherwise intercepts events
-    // before the parent peer can route them to the composited toolbar.
-    makeChildWindowsInputTransparent(display, window);
     setWindowState(display, window, "_NET_WM_STATE_ABOVE", pinned);
-    setInputPassthrough(display, window, nativeIgnoresMouseEvents);
-    XFlush(display);
+    setNativeIgnoresMouseEvents(nativeIgnoresMouseEvents);
 }
 
 void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
     auto* display = getDisplay();
     const auto window = getWindow(*this);
+    if (display == nullptr || window == None) {
+        return;
+    }
+
+    // Prevent the EGL child from disappearing between discovery and shaping.
+    XGrabServer(display);
     makeChildWindowsInputTransparent(display, window);
     setInputPassthrough(display, window, ignoresMouseEvents);
+    XUngrabServer(display);
+    XFlush(display);
 }
 
 bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const {
-    auto* display = getDisplay();
-    const auto window = getWindow(*this);
-    return isInputPassthrough(display, window) == ignoresMouseEvents
-        && areChildWindowsInputTransparent(display, window);
+    return nativeIgnoresMouseEvents == ignoresMouseEvents;
 }
 
 void TransparentWindow::setNativeAlwaysOnTop(bool alwaysOnTop) {
-    setWindowState(getDisplay(), getWindow(*this), "_NET_WM_STATE_ABOVE", alwaysOnTop);
+    auto* display = getDisplay();
+    setWindowState(display, getWindow(*this), "_NET_WM_STATE_ABOVE", alwaysOnTop);
+    if (display != nullptr) {
+        XFlush(display);
+    }
 }
 
 bool TransparentWindow::isNativeFullScreenStateActive() const {
@@ -364,7 +370,43 @@ bool TransparentWindow::isNativeFullScreenStateActive() const {
 }
 
 void TransparentWindow::setMovesToActiveSpace(bool) {}
-void TransparentWindow::setNativeRoundedWindowRegion(float) {}
+
+void TransparentWindow::setNativeRoundedWindowRegion(float radius) {
+    auto* display = getDisplay();
+    const auto window = getWindow(*this);
+    if (display == nullptr || window == None || !supportsInputPassthrough(display)) {
+        return;
+    }
+    if (radius <= 0.0f) {
+        XFixesSetWindowShapeRegion(display, window, ShapeBounding, 0, 0, None);
+        XFlush(display);
+        return;
+    }
+
+    XWindowAttributes attributes{};
+    if (XGetWindowAttributes(display, window, &attributes) == False) {
+        return;
+    }
+    const auto scale = getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f;
+    const int scaledRadius = juce::jlimit(1, juce::jmin(attributes.width, attributes.height) / 2,
+                                          juce::roundToInt(radius * scale));
+    std::vector<XRectangle> rectangles;
+    rectangles.reserve(static_cast<std::size_t>(scaledRadius * 2 + 1));
+    rectangles.push_back({ 0, static_cast<short>(scaledRadius), static_cast<unsigned short>(attributes.width),
+                           static_cast<unsigned short>(juce::jmax(0, attributes.height - scaledRadius * 2)) });
+    for (int y = 0; y < scaledRadius; ++y) {
+        const auto dy = static_cast<double>(scaledRadius - y) - 0.5;
+        const int inset = juce::roundToInt(static_cast<double>(scaledRadius)
+                                          - std::sqrt(static_cast<double>(scaledRadius * scaledRadius) - dy * dy));
+        const auto width = static_cast<unsigned short>(juce::jmax(0, attributes.width - inset * 2));
+        rectangles.push_back({ static_cast<short>(inset), static_cast<short>(y), width, 1 });
+        rectangles.push_back({ static_cast<short>(inset), static_cast<short>(attributes.height - y - 1), width, 1 });
+    }
+    const auto region = XFixesCreateRegion(display, rectangles.data(), static_cast<int>(rectangles.size()));
+    XFixesSetWindowShapeRegion(display, window, ShapeBounding, 0, 0, region);
+    XFixesDestroyRegion(display, region);
+    XFlush(display);
+}
 
 void TransparentWindow::setNativeBounds(juce::Rectangle<int> bounds) {
     auto* display = getDisplay();
@@ -372,9 +414,12 @@ void TransparentWindow::setNativeBounds(juce::Rectangle<int> bounds) {
     if (display == nullptr || window == None) {
         return;
     }
-    XMoveResizeWindow(display, window, bounds.getX(), bounds.getY(),
-                      static_cast<unsigned int>(bounds.getWidth()),
-                      static_cast<unsigned int>(bounds.getHeight()));
+    auto& displays = juce::Desktop::getInstance().getDisplays();
+    auto* targetDisplay = displays.getDisplayForRect(bounds);
+    const auto physicalBounds = displays.logicalToPhysical(bounds, targetDisplay);
+    XMoveResizeWindow(display, window, physicalBounds.getX(), physicalBounds.getY(),
+                      static_cast<unsigned int>(physicalBounds.getWidth()),
+                      static_cast<unsigned int>(physicalBounds.getHeight()));
     XFlush(display);
 }
 
