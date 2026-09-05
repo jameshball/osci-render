@@ -115,6 +115,18 @@ public:
         const auto limited = deriveTransparentWindowInteractionPolicy(context);
         expect(capable.mode == TransparentWindowInteractionMode::alphaAware);
         expect(limited.mode == TransparentWindowInteractionMode::interactive);
+
+        beginTest("Unavailable fullscreen pass-through preserves requested controls");
+        context.frameRequestedVisible = true;
+        context.passThroughRequested = true;
+        const auto unavailable = deriveTransparentWindowInteractionPolicy(context);
+        expect(unavailable.frameVisible);
+        expect(unavailable.mode == TransparentWindowInteractionMode::interactive);
+        expect(context.passThroughRequested);
+        context.alphaClickThroughAllowed = true;
+        const auto restored = deriveTransparentWindowInteractionPolicy(context);
+        expect(!restored.frameVisible);
+        expect(restored.mode == TransparentWindowInteractionMode::passAll);
     }
 };
 

@@ -243,6 +243,12 @@
               file="Source/visualiser/TransparentWindow_mac.mm"/>
         <FILE id="sW2Win" name="TransparentWindow_windows.cpp" compile="1"
               resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
+        <FILE id="sGlLnx" name="OpenGL_linux.cpp" compile="1" resource="0"
+              file="Source/visualiser/OpenGL_linux.cpp"/>
+        <FILE id="sGlLnh" name="OpenGL_linux.h" compile="0" resource="0"
+              file="Source/visualiser/OpenGL_linux.h"/>
+        <FILE id="sW2Lnx" name="TransparentWindow_linux.cpp" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow_linux.cpp"/>
         <FILE id="sW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
               resource="0" file="Source/visualiser/TransparentWindow_fallback.cpp"/>
         <FILE id="VTA002" name="VisualiserTextureAssets.h" compile="0" resource="0"
@@ -265,10 +271,12 @@
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"/>
+               JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"
+               JUCE_USE_XRENDER="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
-                bigIcon="KigaoN">
+                bigIcon="KigaoN" externalLibraries="X11&#10;Xext&#10;Xrender"
+                extraLinkerFlags="-Wl,--wrap=eglChooseConfig,--wrap=eglInitialize,--wrap=eglTerminate">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci"/>

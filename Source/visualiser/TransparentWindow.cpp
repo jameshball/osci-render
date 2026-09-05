@@ -74,29 +74,23 @@ void TransparentWindowToolbar::setState(const TransparentWindowToolbarState& new
 }
 
 bool TransparentWindowToolbar::hitTest(int x, int y) {
-    if (!state.frameVisible) {
-        return false;
-    }
-    if (y < toolbarHeight) {
-        return true;
-    }
-    for (auto* child : getChildren()) {
-        if (child->getBounds().contains(x, y)) {
-            return true;
-        }
-    }
-    return false;
+    return state.frameVisible && getLocalBounds().removeFromTop(toolbarHeight).contains(x, y);
 }
 
 void TransparentWindowToolbar::paint(juce::Graphics& g) {
     if (state.frameVisible) {
-        constexpr float cornerRadius = 11.0f;
         auto bounds = getLocalBounds();
+        const juce::Graphics::ScopedSaveState saveState(g);
+        if (!state.fullScreen) {
+            juce::Path windowShape;
+            windowShape.addRoundedRectangle(bounds.toFloat(), TransparentWindow::cornerRadius);
+            g.reduceClipRegion(windowShape);
+        }
         g.setColour(osci::Colours::veryDark());
         g.fillRect(bounds.removeFromTop(toolbarHeight));
         if (!state.fullScreen) {
             g.setColour(juce::Colours::white.withAlpha(0.5f));
-            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), cornerRadius - 0.5f, 1.0f);
+            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), TransparentWindow::cornerRadius - 0.5f, 1.0f);
         }
     }
     if (state.clickThroughHintVisible) {
@@ -159,8 +153,6 @@ void TransparentWindowToolbar::mouseDrag(const juce::MouseEvent& event) {
     }
 }
 
-void TransparentWindowToolbar::mouseUp(const juce::MouseEvent&) {}
-
 TransparentWindow::TransparentWindow(juce::String name, TransparentWindowState initialState)
     : juce::DocumentWindow(name,
                            isTransparencySupported() ? juce::Colours::transparentBlack : juce::Colours::black,
@@ -169,9 +161,9 @@ TransparentWindow::TransparentWindow(juce::String name, TransparentWindowState i
       pinned(initialState.alwaysOnTop),
       frameRequestedVisible(initialState.frameVisible),
       allMouseEventsPassThrough(initialState.mouseEventsPassThrough) {
-    setAlwaysOnTop(pinned);
     setUsingNativeTitleBar(!isTransparencySupported());
     setResizable(true, false);
+    applyAlwaysOnTop();
     if (!initialState.normalBounds.isEmpty()) {
         setBounds(initialState.normalBounds);
     }
@@ -198,10 +190,15 @@ TransparentWindow::TransparentWindow(juce::String name, TransparentWindowState i
 
 TransparentWindow::~TransparentWindow() {
     stopTimer();
+#if JUCE_MAC
+    removeFullScreenExitObserver();
+#endif
     if (dragSurface != nullptr) {
         dragSurface->removeMouseListener(this);
     }
-    setNativeIgnoresMouseEvents(false);
+    if (isTransparencySupported()) {
+        setNativeIgnoresMouseEvents(false);
+    }
 }
 
 void TransparentWindow::setContent(std::unique_ptr<juce::Component> content) {
@@ -232,11 +229,18 @@ void TransparentWindow::setTransparencyEnabled(bool enabled) {
     }
     transparencyEnabled = enabled;
     if (fullScreenRequested) {
-#if JUCE_WINDOWS || JUCE_MAC
         if (transparencyEnabled && !transparentFullScreen) {
-            reenterFullScreenAfterTransition = true;
             fullScreenTransitionPending = true;
+            reenterFullScreenAfterTransition = true;
+#if JUCE_LINUX
+            transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+#elif JUCE_MAC
+            observeNativeFullScreenExit();
+#endif
             juce::ResizableWindow::setFullScreen(false);
+#if JUCE_LINUX
+            configureNativeTransparency();
+#endif
         } else if (!transparencyEnabled) {
             reenterFullScreenAfterTransition = false;
             if (transparentFullScreen) {
@@ -246,9 +250,7 @@ void TransparentWindow::setTransparencyEnabled(bool enabled) {
                     const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
                     setBounds(boundsBeforeFullScreen);
                 }
-#if JUCE_MAC
                 setMovesToActiveSpace(false);
-#endif
             }
             fullScreenTransitionPending = true;
             juce::ResizableWindow::setFullScreen(true);
@@ -256,15 +258,12 @@ void TransparentWindow::setTransparencyEnabled(bool enabled) {
             scheduleNativeFullScreenBoundsSync();
 #endif
         }
-#endif
         updatePresentation();
         return;
     }
-#if JUCE_WINDOWS || JUCE_MAC
     if (reenterFullScreenAfterTransition) {
         return;
     }
-#endif
     if (transparencyEnabled) {
         refreshPresentationSurface();
     } else {
@@ -313,7 +312,7 @@ void TransparentWindow::setPinned(bool shouldBePinned) {
         return;
     }
     pinned = shouldBePinned;
-    setAlwaysOnTop(pinned);
+    applyAlwaysOnTop();
 #if JUCE_WINDOWS
     if (isTransparencySupported()) {
         refreshPresentationSurface();
@@ -329,18 +328,15 @@ void TransparentWindow::setPinned(bool shouldBePinned) {
 void TransparentWindow::toggleFullScreen() {
     fullScreenRequested = !fullScreenRequested;
     fullScreenTransitionPending = true;
-#if JUCE_WINDOWS || JUCE_MAC
     reenterFullScreenAfterTransition = false;
-    setAlwaysOnTop(pinned);
+    applyAlwaysOnTop();
     if (fullScreenRequested) {
         boundsBeforeFullScreen = getBounds();
         transparentFullScreen = transparencyEnabled;
         if (transparentFullScreen) {
             enterTransparentFullScreen();
         } else {
-#if JUCE_MAC
             setMovesToActiveSpace(false);
-#endif
             juce::ResizableWindow::setFullScreen(true);
 #if JUCE_WINDOWS
             scheduleNativeFullScreenBoundsSync();
@@ -353,17 +349,12 @@ void TransparentWindow::toggleFullScreen() {
                 setBounds(boundsBeforeFullScreen);
             }
             transparentFullScreen = false;
-#if JUCE_MAC
             setMovesToActiveSpace(false);
-#endif
         } else {
             juce::ResizableWindow::setFullScreen(false);
         }
         transparentFullScreenBounds = {};
     }
-#else
-    juce::ResizableWindow::setFullScreen(fullScreenRequested);
-#endif
     stateChanged(getWindowState());
     updatePresentation();
 }
@@ -377,6 +368,12 @@ void TransparentWindow::restoreSavedFullScreen() {
 }
 
 void TransparentWindow::refreshPresentationSurface() {
+    if (!isTransparencySupported()) {
+        return;
+    }
+#if JUCE_LINUX
+    configureNativeTransparency();
+#endif
     presentationRefreshGeneration = getAlphaMaskGeneration();
     presentationRefreshDeadline = juce::Time::getMillisecondCounter() + 1000;
     presentationRefreshActive = true;
@@ -386,11 +383,9 @@ void TransparentWindow::refreshPresentationSurface() {
 
 TransparentWindowState TransparentWindow::getWindowState() const {
     auto normalBounds = getBounds();
-#if JUCE_WINDOWS || JUCE_MAC
     if (fullScreenRequested && !boundsBeforeFullScreen.isEmpty()) {
         normalBounds = boundsBeforeFullScreen;
     }
-#endif
     return {
         .normalBounds = normalBounds,
         .fullScreen = fullScreenRequested,
@@ -422,7 +417,11 @@ void TransparentWindow::closeButtonPressed() {
 
 void TransparentWindow::visibilityChanged() {
     juce::DocumentWindow::visibilityChanged();
+    if (isVisible()) {
+        applyAlwaysOnTop();
+    }
     if (isVisible() && isTransparencySupported()) {
+        windowCornersConfigured = false;
         configureNativeTransparency();
         updatePresentation();
     }
@@ -430,19 +429,39 @@ void TransparentWindow::visibilityChanged() {
 
 void TransparentWindow::resized() {
     juce::DocumentWindow::resized();
-    if (isTransparencySupported() && getContentComponent() != nullptr) {
+    if (!isTransparencySupported()) {
+        return;
+    }
+#if JUCE_LINUX
+    if (reenterFullScreenAfterTransition) {
+        transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+    }
+#endif
+    if (getContentComponent() != nullptr) {
         getContentComponent()->setBounds(getLocalBounds());
     }
     if (toolbar != nullptr) {
         toolbar->setBounds(getLocalBounds());
         toolbar->toFront(false);
     }
-#if JUCE_MAC || JUCE_WINDOWS
-    if (fullScreenRequested && transparentFullScreen && !settingTransparentFullScreenBounds
-        && !transparentFullScreenBounds.isEmpty() && getBounds() != transparentFullScreenBounds) {
-        leaveTransparentFullScreenAfterResize();
+#if JUCE_LINUX
+    if (windowCornersRounded) {
+        setNativeRoundedWindowRegion(cornerRadius);
     }
 #endif
+    if (fullScreenRequested && transparentFullScreen && !settingTransparentFullScreenBounds
+        && !transparentFullScreenBounds.isEmpty() && getBounds() != transparentFullScreenBounds) {
+#if JUCE_LINUX
+        if (static_cast<std::int32_t>(juce::Time::getMillisecondCounter() - transparentFullScreenTransitionTime) < 0) {
+            transparentFullScreen = false;
+            reenterFullScreenAfterTransition = true;
+            transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+            updatePresentation();
+            return;
+        }
+#endif
+        leaveTransparentFullScreenAfterResize();
+    }
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
     const bool frameVisible = hasAppliedInteractionPolicy ? appliedInteractionPolicy.frameVisible : frameRequestedVisible;
     updateResizeBorderVisibility(frameVisible && !fullScreenRequested && !nativeFullScreen);
@@ -478,34 +497,40 @@ void TransparentWindow::mouseDrag(const juce::MouseEvent& event) {
 void TransparentWindow::leaveTransparentFullScreenAfterResize() {
     fullScreenRequested = false;
     fullScreenTransitionPending = false;
-#if JUCE_WINDOWS || JUCE_MAC
     transparentFullScreen = false;
     transparentFullScreenBounds = {};
     reenterFullScreenAfterTransition = false;
-#endif
-#if JUCE_MAC
     setMovesToActiveSpace(false);
-#endif
-    setAlwaysOnTop(pinned);
+    applyAlwaysOnTop();
     stateChanged(getWindowState());
     updatePresentation();
 }
 
 void TransparentWindow::enterTransparentFullScreen() {
-#if JUCE_WINDOWS || JUCE_MAC
     transparentFullScreen = true;
-#if JUCE_MAC
     setMovesToActiveSpace(true);
-#endif
     const auto displayBounds = boundsBeforeFullScreen.isEmpty() ? getBounds() : boundsBeforeFullScreen;
     auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(displayBounds);
     if (display != nullptr) {
+#if JUCE_LINUX
+        // A normal X11 window is constrained to the desktop work area. Matching
+        // it avoids mistaking the window manager's adjustment for a user resize.
+        transparentFullScreenBounds = getTransparentFullScreenBounds(display->userBounds.toNearestInt());
+#else
         transparentFullScreenBounds = getTransparentFullScreenBounds(display->logicalBounds.toNearestInt());
+#endif
         const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
+#if JUCE_LINUX
+        transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+#endif
         setBounds(transparentFullScreenBounds);
+#if JUCE_LINUX
+        // Stale ConfigureNotify events can leave JUCE's component bounds ahead
+        // of the native X11 peer after leaving native fullscreen.
+        setNativeBounds(transparentFullScreenBounds);
+#endif
     }
     fullScreenTransitionPending = true;
-#endif
 }
 
 #if JUCE_WINDOWS
@@ -532,6 +557,11 @@ void TransparentWindow::timerCallback() {
 }
 
 void TransparentWindow::updatePresentation() {
+    if (!isTransparencySupported()) {
+        fullScreenTransitionPending = false;
+        stopTimer();
+        return;
+    }
     const auto now = juce::Time::getMillisecondCounter();
     if (presentationPaused) {
         clickThroughHintVisible = false;
@@ -547,8 +577,17 @@ void TransparentWindow::updatePresentation() {
     }
 
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
-#if JUCE_WINDOWS || JUCE_MAC
-    if (reenterFullScreenAfterTransition && !nativeFullScreen) {
+    bool canReenterTransparentFullScreen = reenterFullScreenAfterTransition && !nativeFullScreen;
+#if JUCE_LINUX
+    // X11 has no fullscreen-exit completion notification. Allow queued WM resizes to settle.
+    if (canReenterTransparentFullScreen) {
+        canReenterTransparentFullScreen = static_cast<std::int32_t>(now - transparentFullScreenTransitionTime) >= 0
+                                      && !isNativeFullScreenStateActive();
+    }
+#elif JUCE_MAC
+    canReenterTransparentFullScreen = canReenterTransparentFullScreen && fullScreenExitObserver == nullptr;
+#endif
+    if (canReenterTransparentFullScreen) {
         reenterFullScreenAfterTransition = false;
         enterTransparentFullScreen();
     }
@@ -557,7 +596,7 @@ void TransparentWindow::updatePresentation() {
     if (fullScreenTransitionPending && fullScreenTransitionComplete) {
         fullScreenTransitionPending = false;
         configureNativeTransparency();
-        setAlwaysOnTop(pinned);
+        applyAlwaysOnTop();
         refreshOpenGLSurfaceTransparency();
 #if JUCE_WINDOWS
         if (getAlphaHitTestComponent() != nullptr) {
@@ -571,17 +610,12 @@ void TransparentWindow::updatePresentation() {
             transparentFullScreen = false;
         }
     }
-#endif
 
-    if (presentationRefreshActive && getAlphaMaskGeneration() != presentationRefreshGeneration) {
+    if (presentationRefreshActive && (getAlphaMaskGeneration() != presentationRefreshGeneration
+                                     || static_cast<std::int32_t>(now - presentationRefreshDeadline) >= 0)) {
         presentationRefreshActive = false;
         configureNativeTransparency();
-        setAlwaysOnTop(pinned);
-    }
-    if (presentationRefreshActive && static_cast<std::int32_t>(now - presentationRefreshDeadline) >= 0) {
-        presentationRefreshActive = false;
-        configureNativeTransparency();
-        setAlwaysOnTop(pinned);
+        applyAlwaysOnTop();
     }
 
     const bool fullPassThroughActive = transparencyEnabled && allMouseEventsPassThrough && !presentationPaused;
@@ -603,7 +637,7 @@ void TransparentWindow::updatePresentation() {
     const bool framedWindow = interactionPolicy.frameVisible && !fullScreenActive;
     updateResizeBorderVisibility(framedWindow);
     if (!windowCornersConfigured || windowCornersRounded != framedWindow) {
-        setNativeRoundedWindowRegion(framedWindow ? 11.0f : 0.0f);
+        setNativeRoundedWindowRegion(framedWindow ? cornerRadius : 0.0f);
         windowCornersConfigured = true;
         windowCornersRounded = framedWindow;
     }
@@ -659,9 +693,7 @@ void TransparentWindow::updatePresentation() {
 
     const bool needsTimer = interactionPolicy.mode == TransparentWindowInteractionMode::alphaAware
                          || fullScreenTransitionPending
-#if JUCE_WINDOWS || JUCE_MAC
                          || reenterFullScreenAfterTransition
-#endif
                          || (transparencyEnabled && presentationRefreshActive)
                          || (transparencyEnabled && clickThroughHintVisible);
     if (needsTimer && !isTimerRunning()) {
@@ -685,6 +717,12 @@ void TransparentWindow::applyNativeInteraction(bool ignoresMouseEvents) {
     nativeIgnoresMouseEvents = ignoresMouseEvents;
     setNativeIgnoresMouseEvents(ignoresMouseEvents);
 }
+
+#if !JUCE_LINUX
+void TransparentWindow::applyAlwaysOnTop() {
+    setAlwaysOnTop(pinned);
+}
+#endif
 
 void TransparentWindow::updateResizeBorderVisibility(bool visible) {
     if (resizeBorderVisibilityInitialised && resizeBorderVisible == visible) {

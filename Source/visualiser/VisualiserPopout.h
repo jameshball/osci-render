@@ -4,7 +4,7 @@
 
 class VisualiserComponent;
 
-class VisualiserPresentationView final : public osci::OpenGLTextureView {
+class VisualiserPresentationView final : private juce::AsyncUpdater, public osci::OpenGLTextureView {
 public:
     explicit VisualiserPresentationView(VisualiserComponent& owner);
 
@@ -15,6 +15,8 @@ public:
     void mouseUp(const juce::MouseEvent& event) override;
 
 private:
+    void handleAsyncUpdate() override;
+
     VisualiserComponent& owner;
     bool paused = false;
     bool pauseOnMouseUp = false;
