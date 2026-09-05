@@ -20,7 +20,19 @@ VisualiserPresentationView::VisualiserPresentationView(VisualiserComponent& owne
     setCheckerColours(osci::Colours::surface(), osci::Colours::darker());
     const auto themeBase = osci::Colours::surfaceSunken();
     setOpaqueBackground(themeBase.interpolatedWith(osci::Colours::shadow(), osci::Theme::isDark() ? 0.86f : 0.38f));
-    setContextCreatedCallback([](void* context) { TransparentWindow::configureOpenGLSurface(context); });
+    setContextCreatedCallback([this](void* context) {
+        TransparentWindow::configureOpenGLSurface(context);
+#if JUCE_LINUX
+        triggerAsyncUpdate();
+#endif
+    });
+}
+
+void VisualiserPresentationView::handleAsyncUpdate() {
+    auto* window = dynamic_cast<TransparentWindow*>(getTopLevelComponent());
+    if (window != nullptr) {
+        window->refreshPresentationSurface();
+    }
 }
 
 void VisualiserPresentationView::setPaused(bool shouldBePaused) {
@@ -74,6 +86,9 @@ VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner
 }
 
 void VisualiserWindow::showPresentation() {
+#if JUCE_MAC
+    cancelDeferredClose();
+#endif
     setVisible(true);
     setMinimised(false);
     visualiser->setActive(true);

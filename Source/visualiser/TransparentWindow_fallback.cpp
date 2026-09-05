@@ -1,6 +1,6 @@
 #include "TransparentWindow.h"
 
-#if !JUCE_MAC && !JUCE_WINDOWS
+#if !JUCE_MAC && !JUCE_WINDOWS && !JUCE_LINUX
 bool TransparentWindow::isTransparencySupported() {
     return false;
 }

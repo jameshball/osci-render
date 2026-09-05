@@ -31,7 +31,8 @@ struct TransparentWindowInteractionPolicy {
 
 inline TransparentWindowInteractionPolicy deriveTransparentWindowInteractionPolicy(
     const TransparentWindowInteractionContext& context) {
-    const bool passAll = context.transparencyEnabled && context.passThroughRequested && !context.paused;
+    const bool passAll = context.transparencyEnabled && context.passThroughRequested
+                      && !context.paused && context.alphaClickThroughAllowed;
 
     TransparentWindowInteractionPolicy policy;
     policy.frameVisible = (context.frameRequestedVisible || context.paused) && !passAll;

@@ -44,7 +44,6 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
-    void mouseUp(const juce::MouseEvent& event) override;
 
 private:
     static constexpr int toolbarHeight = 24;
@@ -63,6 +62,8 @@ private:
 class TransparentWindow : public juce::DocumentWindow,
                           private juce::Timer {
 public:
+    static constexpr float cornerRadius = 11.0f;
+
     TransparentWindow(juce::String name, TransparentWindowState initialState);
     ~TransparentWindow() override;
 
@@ -79,6 +80,10 @@ public:
     void restoreSavedFullScreen();
     void refreshPresentationSurface();
     void saveWindowState();
+#if JUCE_MAC
+    bool deferCloseUntilFullScreenExit();
+    void cancelDeferredClose() { closeAfterFullScreenExit = false; }
+#endif
 
     bool isFullScreenRequested() const { return fullScreenRequested; }
     bool isFrameVisibleRequested() const { return frameRequestedVisible; }
@@ -120,10 +125,18 @@ private:
     static bool supportsClickThroughInTransparentFullScreen();
     static juce::Rectangle<int> getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds);
     void configureNativeTransparency();
+    void applyAlwaysOnTop();
     void setNativeIgnoresMouseEvents(bool ignoresMouseEvents);
     bool isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const;
     void setMovesToActiveSpace(bool shouldMove);
     void setNativeRoundedWindowRegion(float cornerRadius);
+#if JUCE_LINUX
+    bool isNativeFullScreenStateActive() const;
+    void setNativeBounds(juce::Rectangle<int> bounds);
+#elif JUCE_MAC
+    void observeNativeFullScreenExit();
+    void removeFullScreenExitObserver();
+#endif
 
     std::unique_ptr<TransparentWindowToolbar> toolbar;
     juce::Component* dragSurface = nullptr;
@@ -133,12 +146,16 @@ private:
     bool restoreFullScreen = false;
     bool fullScreenRequested = false;
     bool fullScreenTransitionPending = false;
-#if JUCE_WINDOWS || JUCE_MAC
     juce::Rectangle<int> boundsBeforeFullScreen;
     juce::Rectangle<int> transparentFullScreenBounds;
     bool transparentFullScreen = false;
     bool settingTransparentFullScreenBounds = false;
     bool reenterFullScreenAfterTransition = false;
+#if JUCE_LINUX
+    std::uint32_t transparentFullScreenTransitionTime = 0;
+#elif JUCE_MAC
+    void* fullScreenExitObserver = nullptr;
+    bool closeAfterFullScreenExit = false;
 #endif
     bool pinned = true;
     bool frameRequestedVisible = true;

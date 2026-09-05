@@ -29,8 +29,8 @@ NSWindow* getWindow(juce::Component* topLevelWindow) {
 }
 
 void removeMouseTrackingAreas(NSView* view) {
-    for (NSTrackingArea* trackingArea in [view trackingAreas]) {
-        [view removeTrackingArea:trackingArea];
+    while ([[view trackingAreas] count] != 0) {
+        [view removeTrackingArea:[[view trackingAreas] objectAtIndex:0]];
     }
 }
 
@@ -45,7 +45,45 @@ bool TransparentWindow::supportsClickThroughInTransparentFullScreen() {
 }
 
 juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
-    return displayBounds;
+    // AppKit constrains ordinary windows below the menu bar. Fit the usable
+    // desktop so this adjustment cannot push the bottom of the window off-screen.
+    auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(displayBounds);
+    return display != nullptr ? display->userBounds.toNearestInt() : displayBounds;
+}
+
+bool TransparentWindow::deferCloseUntilFullScreenExit() {
+    closeAfterFullScreenExit = fullScreenExitObserver != nullptr;
+    return closeAfterFullScreenExit;
+}
+
+void TransparentWindow::removeFullScreenExitObserver() {
+    if (fullScreenExitObserver != nullptr) {
+        [[NSNotificationCenter defaultCenter] removeObserver:static_cast<id>(fullScreenExitObserver)];
+        fullScreenExitObserver = nullptr;
+    }
+}
+
+void TransparentWindow::observeNativeFullScreenExit() {
+    removeFullScreenExitObserver();
+    const juce::Component::SafePointer<TransparentWindow> safeWindow(this);
+    fullScreenExitObserver = [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSWindowDidExitFullScreenNotification object:getWindow(this) queue:nil
+        usingBlock:^(NSNotification*) {
+            // Let JUCE finish its own fullscreen-exit handling before changing bounds.
+            juce::MessageManager::callAsync([safeWindow] {
+                if (safeWindow == nullptr) {
+                    return;
+                }
+                safeWindow->removeFullScreenExitObserver();
+                if (safeWindow->closeAfterFullScreenExit) {
+                    safeWindow->closeAfterFullScreenExit = false;
+                    safeWindow->reenterFullScreenAfterTransition = false;
+                    safeWindow->closeRequested();
+                } else {
+                    safeWindow->updatePresentation();
+                }
+            });
+        }];
 }
 
 void TransparentWindow::configureNativeTransparency() {
@@ -59,10 +97,8 @@ void TransparentWindow::configureNativeTransparency() {
     [window setHasShadow:NO];
 
     NSView* contentView = [window contentView];
+    contentView.wantsLayer = YES;
     setViewTreeTransparent(contentView);
-    if (contentView != nil) {
-        contentView.wantsLayer = YES;
-    }
 }
 
 void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
