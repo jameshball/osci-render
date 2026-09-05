@@ -591,7 +591,7 @@ void VisualiserComponent::popoutWindow(bool saveOpenPreference) {
     // Ensure any blocked render completes before changing presentation state.
     renderingSemaphore.release();
 
-#if JUCE_LINUX
+#if JUCE_LINUX || JUCE_MAC
     if (popout != nullptr) {
         popout->showPresentation();
         popoutVisible = true;
@@ -625,6 +625,15 @@ void VisualiserComponent::closePopout() {
         return;
     }
     popout->saveWindowState();
+#if JUCE_MAC
+    // Destroying the peer during AppKit's exit animation leaves its snapshot window behind.
+    if (popout->deferCloseUntilFullScreenExit()) {
+        popoutVisible = false;
+        popoutUpdated();
+        resized();
+        return;
+    }
+#endif
 #if JUCE_LINUX
     popout->suspendPresentation();
     popoutVisible = false;

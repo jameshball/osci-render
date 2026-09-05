@@ -80,6 +80,10 @@ public:
     void restoreSavedFullScreen();
     void refreshPresentationSurface();
     void saveWindowState();
+#if JUCE_MAC
+    bool deferCloseUntilFullScreenExit();
+    void cancelDeferredClose() { closeAfterFullScreenExit = false; }
+#endif
 
     bool isFullScreenRequested() const { return fullScreenRequested; }
     bool isFrameVisibleRequested() const { return frameRequestedVisible; }
@@ -151,6 +155,7 @@ private:
     std::uint32_t transparentFullScreenTransitionTime = 0;
 #elif JUCE_MAC
     void* fullScreenExitObserver = nullptr;
+    bool closeAfterFullScreenExit = false;
 #endif
     bool pinned = true;
     bool frameRequestedVisible = true;
