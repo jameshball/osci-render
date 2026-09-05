@@ -135,7 +135,7 @@ protected:
     bool handleShortcut(const juce::KeyPress& key);
     juce::Component* topLevelKeyTarget = nullptr;
     std::vector<std::unique_ptr<osci::OverlayComponent>> activeOverlays;
-    bool visualiserWasVisibleBeforeOverlay = true;
+    std::optional<bool> visualiserWasVisibleBeforeOverlay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CommonPluginEditor)
 };

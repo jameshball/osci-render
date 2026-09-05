@@ -211,15 +211,7 @@ void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
 }
 
 void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
-    bool anyHeavy = false;
-    for (auto& o : activeOverlays) {
-        if (!o->lightweight) {
-            anyHeavy = true;
-            break;
-        }
-    }
-
-    if (!anyHeavy && !overlay->lightweight) {
+    if (!overlay->lightweight && !visualiserWasVisibleBeforeOverlay.has_value()) {
         visualiser.cancelOverlayFadeIn();
         visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
         visualiser.setVisible(false);
@@ -254,14 +246,6 @@ void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
         }
     }
 
-    bool anyHeavy = false;
-    for (auto& o : activeOverlays) {
-        if (!o->lightweight) {
-            anyHeavy = true;
-            break;
-        }
-    }
-
     if (beforeVisualiserRestore != nullptr) {
         beforeVisualiserRestore();
     }
@@ -272,14 +256,22 @@ void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
         return;
     }
 
-    if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
+    // Dismissal callbacks can open another overlay (for example, a render error).
+    const bool anyHeavy = std::any_of(activeOverlays.begin(), activeOverlays.end(), [](const auto& active) {
+        return !active->lightweight;
+    });
+    const bool restoreVisualiser = !anyHeavy && visualiserWasVisibleBeforeOverlay.value_or(false);
+    if (!anyHeavy) {
+        visualiserWasVisibleBeforeOverlay.reset();
+    }
+    if (restoreVisualiser) {
         visualiser.prepareOverlayFadeIn();
         visualiser.setVisible(true);
     }
 
     resized();
 
-    if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
+    if (restoreVisualiser) {
         visualiser.fadeInAfterOverlay();
     }
 }
@@ -309,7 +301,6 @@ CommonPluginEditor::~CommonPluginEditor() {
     }
 
     setLookAndFeel(nullptr);
-    juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
 }
 
 // Shared handler for standard OS shortcuts (undo, redo, save, open).

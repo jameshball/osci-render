@@ -397,6 +397,22 @@ private:
 
         expectEquals(osci::lottie::extractAnimationJsonFromDotLottie(archive), secondJson);
 
+        beginTest("dotLottie v2 honours the initial animation in the a directory");
+        auto v2Archive = makeDotLottieArchive({
+            { "a/first.json", firstJson },
+            { "a/second.json", secondJson },
+            { "manifest.json", R"json({"version":"2","initial":{"animation":"second"},"animations":[{"id":"first"},{"id":"second"}]})json" }
+        });
+        expectEquals(osci::lottie::extractAnimationJsonFromDotLottie(v2Archive), secondJson);
+
+        beginTest("dotLottie v2 defaults to manifest order");
+        auto defaultV2Archive = makeDotLottieArchive({
+            { "a/first.json", firstJson },
+            { "a/second.json", secondJson },
+            { "manifest.json", R"json({"version":"2","animations":[{"id":"second"},{"id":"first"}]})json" }
+        });
+        expectEquals(osci::lottie::extractAnimationJsonFromDotLottie(defaultV2Archive), secondJson);
+
         beginTest("dotLottie fallback is deterministic without a manifest");
         auto fallbackArchive = makeDotLottieArchive({
             { "animations/z-last.json", R"json({"nm":"z"})json" },

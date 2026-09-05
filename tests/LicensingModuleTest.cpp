@@ -306,6 +306,46 @@ public:
             deleteTempSettings (config.settingsOptions);
         }
 
+        beginTest("License manager waits for owned work before destruction");
+        {
+            auto manager = std::make_unique<osci::LicenseManager>();
+            std::promise<void> releaseWork;
+            const auto release = releaseWork.get_future().share();
+            std::atomic<bool> finished{false};
+            manager->runBackgroundTask([release, &finished] {
+                release.wait();
+                finished = true;
+            });
+            auto destruction = std::async(std::launch::async, [manager = std::move(manager)]() mutable {
+                manager.reset();
+            });
+            expect(destruction.wait_for(std::chrono::milliseconds(20)) == std::future_status::timeout);
+            releaseWork.set_value();
+            destruction.get();
+            expect(finished.load());
+        }
+
+        beginTest("Malformed cached token clears previously loaded premium state");
+        {
+            osci::LicenseManager::Config config;
+            config.settingsOptions = makeTempSettingsOptions("license-invalid-reload");
+            osci::LicenseManager manager(config);
+            const auto nowSeconds = juce::Time::getCurrentTime().toMilliseconds() / 1000;
+            osci::SettingsStore store(config.settingsOptions);
+            store.set(manager.getTokenSettingsKey(), makeToken(nowSeconds - 60, nowSeconds + 3600, "premium"));
+            expect(store.save());
+            expect(manager.loadCachedToken().wasOk());
+            expect(manager.hasPremium());
+
+            store.set(manager.getTokenSettingsKey(), "not-a-license-token");
+            expect(store.save());
+            expect(manager.loadCachedToken().failed());
+            expect(!manager.hasPremium());
+            expect(manager.getCachedToken().isEmpty());
+            expect(!manager.getPayload().has_value());
+            deleteTempSettings(config.settingsOptions);
+        }
+
         beginTest ("LicenseManager isolates tokens by product");
         {
             auto options = makeTempSettingsOptions ("license-products");

@@ -189,7 +189,7 @@ void EffectComponent::setupComponent() {
         slider.setTooltip("Sidechain effect applied - click the microphone icon to disable this.");
     } else {
         slider.setEnabled(true);
-        slider.setColour(osci::sliderThumbOutlineColourId, findColour(osci::sliderThumbOutlineColourId));
+        slider.removeColour(osci::sliderThumbOutlineColourId);
         slider.setTooltip("");
     }
 }

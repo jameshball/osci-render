@@ -42,6 +42,20 @@ public:
     TransparentVideoEncodingTest() : juce::UnitTest("Transparent video encoding", "Video") {}
 
     void runTest() override {
+#if JUCE_MAC || JUCE_LINUX
+        beginTest("Encoder discovery refreshes after FFmpeg is installed");
+        juce::TemporaryFile installedEncoder(".sh");
+        FFmpegEncoderManager installedManager(installedEncoder.getFile());
+        expect(!installedManager.supportsVideoCodec(VideoCodec::H264));
+        const juce::String encoderScript = "#!/bin/sh\nprintf '%s\\n' header header header header header header header header header header ' V..... libx264 H.264'\n";
+        expect(installedEncoder.getFile().replaceWithText(encoderScript, false, false, "\n"));
+        expect(installedEncoder.getFile().setExecutePermission(true));
+        installedManager.refreshAvailableEncoders();
+        expect(installedManager.supportsVideoCodec(VideoCodec::H264));
+        expect(installedEncoder.getFile().deleteFile());
+        installedManager.refreshAvailableEncoders();
+        expect(!installedManager.supportsVideoCodec(VideoCodec::H264));
+#endif
         const auto ffmpeg = findFFmpegExecutable();
         if (!ffmpeg.existsAsFile()) {
             logMessage("Skipping transparent video tests because FFmpeg is not on PATH.");

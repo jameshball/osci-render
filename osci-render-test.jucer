@@ -148,6 +148,8 @@
             file="tests/PopoutInteractionTests.cpp"/>
       <FILE id="LivRecT" name="LiveRecordingSessionTests.cpp" compile="1"
             resource="0" file="tests/LiveRecordingSessionTests.cpp"/>
+      <FILE id="WrProcT" name="WriteProcessTests.cpp" compile="1" resource="0"
+            file="tests/WriteProcessTests.cpp"/>
       <FILE id="RecExpT" name="RecordingExporterTests.cpp" compile="1" resource="0"
             file="tests/RecordingExporterTests.cpp"/>
       <FILE id="VisTexT" name="VisualiserTextureOutputControllerTests.cpp"

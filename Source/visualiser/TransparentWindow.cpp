@@ -185,7 +185,7 @@ TransparentWindow::TransparentWindow(juce::String name, TransparentWindowState i
     toolbar->onToggleMouseInteraction = [this] {
         setMouseEventsPassThrough(!allMouseEventsPassThrough);
     };
-    addAndMakeVisible(toolbar.get());
+    juce::Component::addAndMakeVisible(toolbar.get());
 }
 
 TransparentWindow::~TransparentWindow() {
