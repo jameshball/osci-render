@@ -272,7 +272,7 @@
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
                 bigIcon="KigaoN" externalLibraries="X11&#10;Xext&#10;Xrender"
-                extraLinkerFlags="-Wl,--wrap=eglChooseConfig">
+                extraLinkerFlags="-Wl,--wrap=eglChooseConfig,--wrap=eglInitialize,--wrap=eglTerminate">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="sosci"/>

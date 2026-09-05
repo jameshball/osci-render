@@ -12,12 +12,27 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 extern "C" EGLBoolean __real_eglChooseConfig(EGLDisplay display, const EGLint* attributes, EGLConfig* configs, EGLint configSize, EGLint* configCount);
+extern "C" EGLBoolean __real_eglInitialize(EGLDisplay display, EGLint* major, EGLint* minor);
+extern "C" EGLBoolean __real_eglTerminate(EGLDisplay display);
 
 namespace {
+
+struct EGLDisplayReferences {
+    // Initialisation and termination may block inside the driver.
+    std::mutex mutex;
+    std::map<EGLDisplay, unsigned int> counts;
+};
+
+EGLDisplayReferences& getEGLDisplayReferences() {
+    static EGLDisplayReferences references;
+    return references;
+}
 
 Display* getDisplay() {
     static const std::unique_ptr<Display, decltype(&XCloseDisplay)> display(XOpenDisplay(nullptr), XCloseDisplay);
@@ -237,6 +252,32 @@ juce::Rectangle<int> getDesktopWorkArea(Display* display) {
 }
 
 } // namespace
+
+// JUCE initialises/terminates the same EGL display for each OpenGL context.
+// EGL does not count these calls: hiding one visualiser would otherwise destroy
+// the editor's surfaces too. Terminate only when the last context releases it.
+extern "C" EGLBoolean __wrap_eglInitialize(EGLDisplay display, EGLint* major, EGLint* minor) {
+    auto& references = getEGLDisplayReferences();
+    const std::lock_guard<std::mutex> lock(references.mutex);
+    const auto result = __real_eglInitialize(display, major, minor);
+    if (result == EGL_TRUE) {
+        ++references.counts[display];
+    }
+    return result;
+}
+
+extern "C" EGLBoolean __wrap_eglTerminate(EGLDisplay display) {
+    auto& references = getEGLDisplayReferences();
+    const std::lock_guard<std::mutex> lock(references.mutex);
+    const auto entry = references.counts.find(display);
+    if (entry != references.counts.end()) {
+        if (--entry->second != 0) {
+            return EGL_TRUE;
+        }
+        references.counts.erase(entry);
+    }
+    return __real_eglTerminate(display);
+}
 
 // Mesa exposes both opaque and ARGB native visuals for otherwise identical RGBA
 // configs. JUCE accepts the first match, so prefer an actual depth-32 X11 visual.
