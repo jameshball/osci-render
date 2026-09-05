@@ -243,6 +243,10 @@
               file="Source/visualiser/TransparentWindow_mac.mm"/>
         <FILE id="sW2Win" name="TransparentWindow_windows.cpp" compile="1"
               resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
+        <FILE id="sGlLnx" name="OpenGL_linux.cpp" compile="1" resource="0"
+              file="Source/visualiser/OpenGL_linux.cpp"/>
+        <FILE id="sGlLnh" name="OpenGL_linux.h" compile="0" resource="0"
+              file="Source/visualiser/OpenGL_linux.h"/>
         <FILE id="sW2Lnx" name="TransparentWindow_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/TransparentWindow_linux.cpp"/>
         <FILE id="sW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
