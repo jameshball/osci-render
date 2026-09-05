@@ -589,6 +589,9 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     int totalNumOutputChannels = getTotalNumOutputChannels();
     double sampleRate = getEffectiveSampleRate();
     int numSamples = buffer.getNumSamples();
+    if (numSamples == 0) {
+        return;
+    }
 
     osci::DawPosition::Options dawPositionOptions;
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
@@ -614,20 +617,16 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     if (selectedMidiChannel != 0) {
         filteredMidiMessages.clear();
         for (const auto metadata : midiMessages) {
-            const auto message = metadata.getMessage();
-            if (message.getChannel() == 0 || message.getChannel() == selectedMidiChannel) {
-                filteredMidiMessages.addEvent(message, metadata.samplePosition);
+            const int channel = metadata.data[0] < 0xf0 ? (metadata.data[0] & 0x0f) + 1 : 0;
+            if (channel == 0 || channel == selectedMidiChannel) {
+                filteredMidiMessages.addEvent(metadata.data, metadata.numBytes, metadata.samplePosition);
             }
         }
         midiMessages.clear();
         midiMessages.addEvents(filteredMidiMessages, 0, -1, 0);
     }
-    if (selectedMidiChannel != previousMidiInputChannel) {
-        // VoiceManager treats allSoundOff globally, so one message releases
-        // notes that would otherwise be hidden by the new channel filter.
-        midiMessages.addEvent(juce::MidiMessage::allSoundOff(1), 0);
-        previousMidiInputChannel = selectedMidiChannel;
-    }
+    const bool midiChannelChanged = selectedMidiChannel != previousMidiInputChannel;
+    previousMidiInputChannel = selectedMidiChannel;
 
     // The on-screen keyboard remains usable regardless of the external MIDI
     // channel filter.
@@ -640,19 +639,21 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         midiMessages.clear();
     }
 
-    // if midi enabled has changed state, kill all voices immediately
-    // (allSoundOff, not allNotesOff, so voices don't linger in release)
-    if (prevMidiEnabled != usingMidi) {
-        for (int i = 1; i <= 16; i++) {
-            midiMessages.addEvent(juce::MidiMessage::allSoundOff(i), i);
-        }
+    // Release voices hidden by a new channel filter or MIDI mode.
+    if (prevMidiEnabled != usingMidi || (usingMidi && midiChannelChanged)) {
+        // Reset before new notes, including notes at the start of a one-sample block.
+        filteredMidiMessages.clear();
+        filteredMidiMessages.addEvent(juce::MidiMessage::allSoundOff(1), 0);
+        filteredMidiMessages.addEvents(midiMessages, 0, -1, 0);
+        midiMessages.clear();
+        midiMessages.addEvents(filteredMidiMessages, 0, -1, 0);
     }
 
     // if midi has just been disabled or we need to retrigger
     if (!usingMidi && (retriggerMidi || prevMidiEnabled)) {
         retriggerMidi = true;
         if (numSamples > 0 && voiceBuilder != nullptr && voiceBuilder->hasAnyVoiceReady()) {
-            midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), juce::jmin(17, numSamples - 1));
+            midiMessages.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 0);
             retriggerMidi = false;
         }
     }
@@ -1171,10 +1172,10 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 #if !OSCI_PREMIUM
         if (xml->getBoolAttribute("premiumProject", false)) {
             juce::Logger::writeToLog("setStateInformation: premium project loaded in free build, some features unavailable");
-            juce::MessageManager::callAsync([this] {
-                auto* editor = dynamic_cast<CommonPluginEditor*>(getActiveEditor());
+            const juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(getActiveEditor()));
+            juce::MessageManager::callAsync([editor] {
                 osci::showOverlayMessageOrAlert(
-                    editor,
+                    editor.getComponent(),
                     "Premium Project",
                     "This project was saved with the premium version of osci-render. "
                     "Some features (global LFOs, envelopes, random/sidechain modulation, "

@@ -41,7 +41,7 @@ juce::String readEntry(juce::ZipFile& zip, int entryIndex) {
     return stream->readEntireStreamAsString();
 }
 
-juce::String pathForManifestAnimation(const juce::var& animation) {
+juce::String pathForManifestAnimation(const juce::var& animation, const juce::String& directory) {
     auto* object = animation.getDynamicObject();
     if (object == nullptr) return {};
 
@@ -49,7 +49,9 @@ juce::String pathForManifestAnimation(const juce::var& animation) {
     if (path.isNotEmpty()) return normaliseArchivePath(path);
 
     auto id = object->getProperty("id").toString().trim();
-    if (id.isNotEmpty()) return "animations/" + id + ".json";
+    if (id.isNotEmpty()) {
+        return directory + id + ".json";
+    }
 
     return {};
 }
@@ -63,7 +65,11 @@ juce::String selectManifestAnimationPath(const juce::String& manifestJson) {
     auto* animations = animationsVar.getArray();
     if (animations == nullptr || animations->isEmpty()) return {};
 
-    auto activeId = manifestObject->getProperty("activeAnimationId").toString().trim();
+    const juce::String directory = manifestObject->getProperty("version").toString().getIntValue() >= 2 ? "a/" : "animations/";
+    auto activeId = manifestObject->getProperty("initial").getProperty("animation", {}).toString().trim();
+    if (activeId.isEmpty()) {
+        activeId = manifestObject->getProperty("activeAnimationId").toString().trim();
+    }
     if (activeId.isEmpty()) {
         activeId = manifestObject->getProperty("defaultAnimationId").toString().trim();
     }
@@ -81,12 +87,12 @@ juce::String selectManifestAnimationPath(const juce::String& manifestJson) {
             if (animationObject == nullptr) continue;
 
             if (animationObject->getProperty("id").toString().trim() == activeId) {
-                return pathForManifestAnimation(animation);
+                return pathForManifestAnimation(animation, directory);
             }
         }
     }
 
-    return pathForManifestAnimation(animations->getReference(0));
+    return pathForManifestAnimation(animations->getReference(0), directory);
 }
 
 int findDeterministicFallbackAnimation(juce::ZipFile& zip) {
@@ -97,7 +103,7 @@ int findDeterministicFallbackAnimation(juce::ZipFile& zip) {
 
         auto name = normaliseArchivePath(entry->filename);
         auto lowerName = name.toLowerCase();
-        if (lowerName.startsWith("animations/") && lowerName.endsWith(".json")) {
+        if ((lowerName.startsWith("animations/") || lowerName.startsWith("a/")) && lowerName.endsWith(".json")) {
             animationEntries.add(name);
         }
     }

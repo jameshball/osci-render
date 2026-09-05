@@ -104,7 +104,8 @@ public:
     juce::StretchableLayoutManager luaLayout;
     juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
-    void updateCodeEditor(bool binaryFile, bool shouldOpenEditor = false);
+    bool shouldOpenCodeEditor = false;
+    void updateCodeEditor(bool shouldOpenEditor = false);
     void setCodeEditorVisible(std::optional<bool> visible);
     void commitCodeModel(osci::LuaScriptEditorModel& model);
     std::shared_ptr<osci::LuaScriptEditorModel> getVisibleLuaEditorModel() const;

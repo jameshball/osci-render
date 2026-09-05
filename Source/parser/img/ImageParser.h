@@ -37,7 +37,6 @@ private:
     void findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert);
     void resetPosition();
     float getPixelValue(int x, int y, bool invert);
-    int getPixelIndex(int x, int y);
     void findWhite(double thresholdPow, bool invert);
     bool isOverThreshold(double pixel, double thresholdValue);
     int jumpFrequency();
@@ -47,10 +46,7 @@ private:
 #if OSCI_PREMIUM
     void processVideoFile(juce::File& file);
     bool loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile);
-    bool isVideoFile(const juce::String& extension) const;
 #endif
-
-    const juce::String ALGORITHM = "HILLIGOSS";
 
     OscirenderAudioProcessor& audioProcessor;
     juce::SpinLock pendingLiveFrameLock;
@@ -65,7 +61,6 @@ private:
     int pendingLiveHeight = 0;
     bool pendingLiveFrameAvailable = false;
     bool liveInput = false;
-    bool waitingForFFmpeg = false;
     int currentX, currentY;
     int width = -1;
     int height = -1;
@@ -77,14 +72,8 @@ private:
 #if OSCI_PREMIUM
     // Video processing fields
     juce::ChildProcess ffmpegProcess;
-    bool isVideo = false;
     std::vector<uint8_t> frameBuffer;
     int videoFrameSize = 0;
 #endif
-
-    // experiments
-    double scanX = -1;
-    double scanY = 1;
-    int scanCount = 0;
 
 };

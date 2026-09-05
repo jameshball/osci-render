@@ -435,22 +435,30 @@ void VisualiserComponent::setRecording(bool recording) {
     if (recording) {
 #if OSCI_PREMIUM
         if (recordingController.wantsVideo(recordingSettings)) {
-            auto onDownloadSuccess = [this] {
-                juce::MessageManager::callAsync([this] {
-                    record.setEnabled(true);
-                    juce::Timer::callAfterDelay(3000, [this] {
-                        juce::MessageManager::callAsync([this] {
-                            editor.ffmpegDownloader.setVisible(false);
-                            downloading = false;
-                            resized();
-                        });
-                    }); });
+            auto safeThis = juce::Component::SafePointer<VisualiserComponent>(this);
+            auto onDownloadSuccess = [safeThis] {
+                juce::MessageManager::callAsync([safeThis] {
+                    if (safeThis == nullptr) {
+                        return;
+                    }
+                    safeThis->record.setEnabled(true);
+                    juce::Timer::callAfterDelay(3000, [safeThis] {
+                        if (safeThis != nullptr) {
+                            safeThis->editor.ffmpegDownloader.setVisible(false);
+                            safeThis->downloading = false;
+                            safeThis->resized();
+                        }
+                    });
+                });
             };
-            auto onDownloadStart = [this] {
-                juce::MessageManager::callAsync([this] {
-                    record.setEnabled(false);
-                    downloading = true;
-                    resized(); });
+            auto onDownloadStart = [safeThis] {
+                juce::MessageManager::callAsync([safeThis] {
+                    if (safeThis != nullptr) {
+                        safeThis->record.setEnabled(false);
+                        safeThis->downloading = true;
+                        safeThis->resized();
+                    }
+                });
             };
             if (!audioProcessor.ensureFFmpegExists(onDownloadStart, onDownloadSuccess)) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
@@ -640,15 +648,20 @@ void VisualiserComponent::closePopout() {
     popoutUpdated();
     resized();
 #else
+    popoutVisible = false;
+    popoutUpdated();
+    resized();
     const juce::Component::SafePointer<VisualiserComponent> safeThis(this);
     juce::MessageManager::callAsync([safeThis] {
-        if (safeThis == nullptr || safeThis->popout == nullptr) {
+        if (safeThis == nullptr || safeThis->popout == nullptr || safeThis->popoutVisible) {
             return;
         }
+#if JUCE_MAC
+        if (safeThis->popout->deferCloseUntilFullScreenExit()) {
+            return;
+        }
+#endif
         safeThis->popout.reset();
-        safeThis->popoutVisible = false;
-        safeThis->popoutUpdated();
-        safeThis->resized();
     });
 #endif
 #endif
