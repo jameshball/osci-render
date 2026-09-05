@@ -224,9 +224,10 @@ void ImageParser::processImageFile(juce::File& file) {
         visited = std::vector<bool>(frameSize, false);
         frames.emplace_back(std::vector<uint8_t>(frameSize));
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                juce::Colour pixel = image.getPixelAt(x, y);
+        const juce::Image::BitmapData pixels(image, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                juce::Colour pixel = pixels.getPixelColour(x, y);
                 int index = y * width + x;
                 // RGB should be equal since we have desaturated
                 int value = pixel.getRed();

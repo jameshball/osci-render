@@ -1038,6 +1038,8 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         auto version = xml->hasAttribute("version") ? xml->getStringAttribute("version") : "2.0.0";
         juce::Logger::writeToLog("setStateInformation: restoring state version " + version);
 
+    bool reloadObjectServer = false;
+    {
         juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
 
@@ -1157,8 +1159,10 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         recordingParameters.load(xml.get());
 
+        const auto previousObjectServerPort = std::any_cast<int>(getProperty("objectServerPort", 51677));
         loadProperties(*xml);
-        objectServer.reload();
+        reloadObjectServer = previousObjectServerPort != std::any_cast<int>(getProperty("objectServerPort", 51677))
+            || !objectServer.isThreadRunning() || fileController.isObjectServerActive();
 
         loadMidiCCState(xml.get());
 #if OSCI_PREMIUM
@@ -1168,6 +1172,12 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         broadcaster.sendChangeMessage();
         prevMidiEnabled = !midiEnabled->getBoolValue();
         undoManager.clearUndoHistory();
+    }
+
+    if (reloadObjectServer) {
+        // Server callbacks acquire the file/effect locks, so release them before joining.
+        objectServer.reload();
+    }
 
 #if !OSCI_PREMIUM
         if (xml->getBoolAttribute("premiumProject", false)) {
@@ -1207,8 +1217,8 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
                 uiVoiceActive[i].store(false, std::memory_order_relaxed);
                 uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
             }
-            voiceBuilder->setTargetVoiceCount(numVoices + 1); // +1 overlap voice for kill-fade
         }
+        voiceBuilder->setTargetVoiceCount(numVoices + 1); // +1 overlap voice for kill-fade
 #if OSCI_PREMIUM
     } else if (parameterIndex == legato->getParameterIndex()) {
         synth.setLegato(legato->getBoolValue());

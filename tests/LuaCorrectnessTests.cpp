@@ -36,6 +36,8 @@ public:
     }
 
     void runTest() override {
+        testStateLifetime();
+        testParserSwitching();
         testBasicExecution();
         testReturnValues();
         testGlobalVariables();
@@ -79,9 +81,9 @@ private:
     std::vector<float> runOnce(const juce::String& script, LuaVariables& vars) {
         ErrorCollector errors;
         LuaParser parser("test.lua", script, errors.callback());
-        lua_State* L = nullptr;
+        LuaState L;
         auto lr = parser.run(L, vars);
-        parser.close(L);
+        L.reset();
         return std::vector<float>(lr.values, lr.values + lr.count);
     }
 
@@ -93,6 +95,58 @@ private:
     }
 
     // ------------------------------------------------------------------
+
+    void testStateLifetime() {
+        beginTest("Owned states close safely after their parser is destroyed");
+        auto marker = juce::File::createTempFile(".lua-gc");
+        marker.deleteFile();
+        int callbacks = 0;
+        auto oldPrint = LuaParser::onPrint;
+        auto oldClear = LuaParser::onClear;
+        LuaParser::onPrint = [&](const std::string&) { ++callbacks; };
+        LuaParser::onClear = [&] { ++callbacks; };
+        const auto script = "guard = newproxy(true); getmetatable(guard).__gc = function() "
+            "print('closing'); clear(); local f = assert(io.open(" + juce::JSON::toString(juce::var(marker.getFullPathName()))
+            + ", 'a')); f:write('closed'); f:close() end; return {1, 2}";
+        auto vars = makeDefaultVars();
+        {
+            LuaState state;
+            {
+                ErrorCollector errors;
+                LuaParser parser("lifetime.lua", script, errors.callback());
+                parser.setConsoleCallbacks([&](const std::string&) { ++callbacks; }, [&] { ++callbacks; });
+                expectEquals(parser.run(state, vars).count, 2);
+            }
+            expect(!marker.existsAsFile());
+        }
+        expectEquals(marker.loadFileAsString(), juce::String("closed"));
+        expectEquals(callbacks, 0, "Closing must not call a destroyed parser or global UI callback");
+        LuaParser::onPrint = std::move(oldPrint);
+        LuaParser::onClear = std::move(oldClear);
+        marker.deleteFile();
+    }
+
+    void testParserSwitching() {
+        beginTest("States reinitialise on A/B/A parser changes");
+        ErrorCollector errors;
+        LuaParser a("a.lua", "counter = (counter or 0) + 1; return {counter, 10}", errors.callback());
+        LuaParser b("b.lua", "counter = (counter or 0) + 1; return {counter, 20}", errors.callback());
+        LuaState states[2];
+        auto vars = makeDefaultVars();
+        for (int repetition = 0; repetition < 32; ++repetition) {
+            for (auto& state : states) {
+                auto first = a.run(state, vars);
+                expectEquals(first.values[1], 10.0f);
+                auto second = b.run(state, vars);
+                expectEquals(second.values[0], 1.0f);
+                expectEquals(second.values[1], 20.0f);
+                auto third = a.run(state, vars);
+                expectEquals(third.values[0], 1.0f);
+                expectEquals(third.values[1], 10.0f);
+            }
+        }
+        expect(!errors.hasErrors());
+    }
 
     void testBasicExecution() {
         beginTest("Basic script returns table");
@@ -246,7 +300,7 @@ private:
 
         ErrorCollector errors;
         LuaParser parser("test.lua", "return {step, phase}", errors.callback());
-        lua_State* L = nullptr;
+        LuaState L;
 
         auto result1 = parser.run(L, vars);
         expectWithinAbsoluteError(result1.values[0], 1.0f, 0.001f);
@@ -258,7 +312,7 @@ private:
         // Second call sees the incremented values
         expect(result2.values[0] > result1.values[0], "step should be larger on second call");
 
-        parser.close(L);
+        L.reset();
     }
 
     void testOsciCircle() {
@@ -512,7 +566,7 @@ private:
         beginTest("Syntax error triggers fallback");
         ErrorCollector errors;
         LuaParser parser("test.lua", "return {{{INVALID", errors.callback());
-        lua_State* L = nullptr;
+        LuaState L;
         LuaVariables vars;
         vars.sampleRate = 44100;
         vars.frequency = 440;
@@ -520,7 +574,7 @@ private:
         expectEquals(result.count, 2);
         expectWithinAbsoluteError(result.values[0], 0.0f, 0.001f);
         expectWithinAbsoluteError(result.values[1], 0.0f, 0.001f);
-        parser.close(L);
+        L.reset();
     }
 
     void testInfiniteLoopProtection() {
@@ -533,7 +587,7 @@ private:
         LuaParser parser("test.lua",
             "jit.off()\nwhile true do end\nreturn {0,0}",
             errors.callback());
-        lua_State* L = nullptr;
+        LuaState L;
         LuaVariables vars;
         vars.sampleRate = 44100;
         vars.frequency = 440;
@@ -546,16 +600,16 @@ private:
         auto result2 = parser.run(L, vars);
         expectEquals(result2.count, 2);
 
-        parser.close(L);
+        L.reset();
     }
 
     void testMultipleStates() {
         beginTest("Multiple lua_States get independent initialization");
         ErrorCollector errors;
-        LuaParser parser("test.lua", "return {42, 0}", errors.callback());
+        LuaParser parser("test.lua", "counter = (counter or 41) + 1; return {counter, 0}", errors.callback());
 
-        lua_State* L1 = nullptr;
-        lua_State* L2 = nullptr;
+        LuaState L1;
+        LuaState L2;
         LuaVariables vars;
         vars.sampleRate = 44100;
         vars.frequency = 440;
@@ -568,10 +622,12 @@ private:
         expectEquals(result2.count, 2);
         expectWithinAbsoluteError(result2.values[0], 42.0f, 0.001f);
 
-        expect(L1 != L2, "States should be different pointers");
+        expectWithinAbsoluteError(parser.run(L1, vars).values[0], 43.0f, 0.001f);
+        expectWithinAbsoluteError(parser.run(L1, vars).values[0], 44.0f, 0.001f);
+        expectWithinAbsoluteError(parser.run(L2, vars).values[0], 43.0f, 0.001f);
 
-        parser.close(L1);
-        parser.close(L2);
+        L1.reset();
+        L2.reset();
     }
 
     void testScriptStatePreservation() {
@@ -583,7 +639,7 @@ private:
             "return {counter, 0}",
             errors.callback());
 
-        lua_State* L = nullptr;
+        LuaState L;
         LuaVariables vars;
         vars.sampleRate = 44100;
         vars.frequency = 440;
@@ -597,7 +653,7 @@ private:
         auto r3 = parser.run(L, vars);
         expectWithinAbsoluteError(r3.values[0], 3.0f, 0.001f);
 
-        parser.close(L);
+        L.reset();
     }
 
     void testPrintAllTypes() {
@@ -621,10 +677,10 @@ private:
             "return {0, 0}",
             errors.callback());
 
-        lua_State* L = nullptr;
+        LuaState L;
         auto vars = makeDefaultVars();
         parser.run(L, vars);
-        parser.close(L);
+        L.reset();
 
         LuaParser::onPrint = oldPrint;
 
@@ -666,7 +722,7 @@ private:
         ErrorCollector errors;
         LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
 
-        lua_State* L = nullptr;
+        LuaState L;
         auto vars = makeDefaultVars();
 
         // Run 5 times to accumulate state
@@ -681,7 +737,7 @@ private:
         auto r6 = parser.run(L, vars);
         expectWithinAbsoluteError(r6.values[0], 1.0f, 0.001f);
 
-        parser.close(L);
+        L.reset();
     }
 
     void testResetMultipleStates() {
@@ -689,9 +745,9 @@ private:
         ErrorCollector errors;
         LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
 
-        lua_State* L1 = nullptr;
-        lua_State* L2 = nullptr;
-        lua_State* L3 = nullptr;
+        LuaState L1;
+        LuaState L2;
+        LuaState L3;
         auto vars = makeDefaultVars();
 
         // Accumulate state in 3 independent lua_States
@@ -718,9 +774,9 @@ private:
         expectWithinAbsoluteError(rr2.values[0], 1.0f, 0.001f);
         expectWithinAbsoluteError(rr3.values[0], 1.0f, 0.001f);
 
-        parser.close(L1);
-        parser.close(L2);
-        parser.close(L3);
+        L1.reset();
+        L2.reset();
+        L3.reset();
     }
 
     void testRapidResetBetweenRuns() {
@@ -728,7 +784,7 @@ private:
         ErrorCollector errors;
         LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
 
-        lua_State* L = nullptr;
+        LuaState L;
         auto vars = makeDefaultVars();
 
         // Repeatedly: accumulate a few runs, reset, verify clean start
@@ -752,7 +808,7 @@ private:
             parser.forgetAllStates();
         }
 
-        parser.close(L);
+        L.reset();
     }
 
     void testResetPreservesScriptCorrectness() {
@@ -764,7 +820,7 @@ private:
             "return {acc, math.sin(phase * math.pi * 2)}",
             errors.callback());
 
-        lua_State* L = nullptr;
+        LuaState L;
         auto vars = makeDefaultVars();
 
         // Run and accumulate
@@ -788,7 +844,7 @@ private:
         auto r2 = parser.run(L, vars);
         expectWithinAbsoluteError(r2.values[0], 8.0f, 0.001f); // 5 + 3
 
-        parser.close(L);
+        L.reset();
         expect(!errors.hasErrors(), "No errors expected after reset");
     }
 
@@ -798,7 +854,7 @@ private:
         LuaParser parser("test.lua", COUNTER_SCRIPT, errors.callback());
 
         constexpr int NUM_STATES = 4;
-        lua_State* states[NUM_STATES] = {};
+        LuaState states[NUM_STATES];
         auto vars = makeDefaultVars();
 
         for (int cycle = 0; cycle < 100; cycle++) {
@@ -830,7 +886,7 @@ private:
         }
 
         for (int s = 0; s < NUM_STATES; s++)
-            parser.close(states[s]);
+            states[s].reset();
 
         expect(!errors.hasErrors(), "No errors expected during stress test");
     }

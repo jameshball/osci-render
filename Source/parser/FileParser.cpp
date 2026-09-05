@@ -310,7 +310,7 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
     return tempShapes;
 }
 
-osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
+osci::Point FileParser::nextSample(LuaState& L, LuaVariables& vars) {
     juce::SpinLock::ScopedLockType scope(lock);
 
     if (lua != nullptr) {
