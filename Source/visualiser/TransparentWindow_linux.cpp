@@ -7,49 +7,26 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xrender.h>
-#include <X11/extensions/Xfixes.h>
 #include <X11/extensions/shape.h>
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <memory>
 #include <vector>
 
 extern "C" EGLBoolean __real_eglChooseConfig(EGLDisplay display, const EGLint* attributes, EGLConfig* configs, EGLint configSize, EGLint* configCount);
 
 namespace {
 
-class XDisplayConnection {
-public:
-    XDisplayConnection() : display(XOpenDisplay(nullptr)) {}
-
-    ~XDisplayConnection() {
-        if (display != nullptr) {
-            XCloseDisplay(display);
-        }
-    }
-
-    Display* get() const { return display; }
-
-private:
-    Display* display = nullptr;
-};
-
 Display* getDisplay() {
-    static XDisplayConnection connection;
-    return connection.get();
+    static const std::unique_ptr<Display, decltype(&XCloseDisplay)> display(XOpenDisplay(nullptr), XCloseDisplay);
+    return display.get();
 }
 
 Window getWindow(const juce::Component& component) {
     auto* peer = component.getPeer();
     return peer != nullptr ? reinterpret_cast<Window>(peer->getNativeHandle()) : None;
-}
-
-bool hasExtension(Display* display, const char* name) {
-    int opcode = 0;
-    int firstEvent = 0;
-    int firstError = 0;
-    return display != nullptr && XQueryExtension(display, name, &opcode, &firstEvent, &firstError);
 }
 
 std::atomic<VisualID>& getAlphaVisualId() {
@@ -82,7 +59,12 @@ bool usesAlphaVisual(EGLDisplay eglDisplay, EGLConfig config) {
 }
 
 bool supportsInputPassthrough(Display* display) {
-    static const bool supported = hasExtension(display, "XFIXES") && hasExtension(display, "SHAPE");
+    static const bool supported = [display] {
+        int major = 0;
+        int minor = 0;
+        return display != nullptr && XShapeQueryVersion(display, &major, &minor)
+            && (major > 1 || (major == 1 && minor >= 1));
+    }();
     return supported;
 }
 
@@ -192,13 +174,10 @@ void setInputPassthrough(Display* display, Window window, bool passthrough) {
         return;
     }
 
-    XserverRegion region = None;
     if (passthrough) {
-        region = XFixesCreateRegion(display, nullptr, 0);
-    }
-    XFixesSetWindowShapeRegion(display, window, ShapeInput, 0, 0, region);
-    if (region != None) {
-        XFixesDestroyRegion(display, region);
+        XShapeCombineRectangles(display, window, ShapeInput, 0, 0, nullptr, 0, ShapeSet, Unsorted);
+    } else {
+        XShapeCombineMask(display, window, ShapeInput, 0, 0, None, ShapeSet);
     }
 }
 
@@ -262,7 +241,8 @@ juce::Rectangle<int> getDesktopWorkArea(Display* display) {
 // Mesa exposes both opaque and ARGB native visuals for otherwise identical RGBA
 // configs. JUCE accepts the first match, so prefer an actual depth-32 X11 visual.
 extern "C" EGLBoolean __wrap_eglChooseConfig(EGLDisplay eglDisplay, const EGLint* attributes, EGLConfig* configs, EGLint configSize, EGLint* configCount) {
-    if (configs == nullptr || configSize <= 0 || !requestsAlpha(attributes)) {
+    if (configs == nullptr || configSize <= 0 || configCount == nullptr || !requestsAlpha(attributes)
+        || getAlphaVisualId().load(std::memory_order_acquire) == 0) {
         return __real_eglChooseConfig(eglDisplay, attributes, configs, configSize, configCount);
     }
 
@@ -286,9 +266,7 @@ extern "C" EGLBoolean __wrap_eglChooseConfig(EGLDisplay eglDisplay, const EGLint
 
     const auto copyCount = juce::jmin(configSize, matchCount);
     std::copy_n(matches.begin(), copyCount, configs);
-    if (configCount != nullptr) {
-        *configCount = copyCount;
-    }
+    *configCount = copyCount;
     return EGL_TRUE;
 }
 
@@ -326,12 +304,11 @@ void TransparentWindow::configureNativeTransparency() {
     const unsigned long forceCompositing = 2;
     XChangeProperty(display, window, bypassCompositor, XA_CARDINAL, 32, PropModeReplace,
                     reinterpret_cast<const unsigned char*>(&forceCompositing), 1);
-    if (transparencyEnabled) {
-        // Mutter promotes an undecorated display-sized window to EWMH fullscreen.
-        // Keep transparent fullscreen as an ordinary composited window instead.
+    if (transparencyEnabled || !fullScreenRequested) {
+        // Mutter can promote a display-sized window to EWMH fullscreen. Clear
+        // that state for transparent mode and when leaving opaque fullscreen.
         setWindowState(display, window, "_NET_WM_STATE_FULLSCREEN", false);
     }
-    setWindowState(display, window, "_NET_WM_STATE_ABOVE", pinned);
     setNativeIgnoresMouseEvents(nativeIgnoresMouseEvents);
 }
 
@@ -354,9 +331,10 @@ bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEv
     return nativeIgnoresMouseEvents == ignoresMouseEvents;
 }
 
-void TransparentWindow::setNativeAlwaysOnTop(bool alwaysOnTop) {
+void TransparentWindow::applyAlwaysOnTop() {
+    // JUCE's X11 peer cannot change this flag and recreates the peer instead.
     auto* display = getDisplay();
-    setWindowState(display, getWindow(*this), "_NET_WM_STATE_ABOVE", alwaysOnTop);
+    setWindowState(display, getWindow(*this), "_NET_WM_STATE_ABOVE", pinned);
     if (display != nullptr) {
         XFlush(display);
     }
@@ -378,33 +356,31 @@ void TransparentWindow::setNativeRoundedWindowRegion(float radius) {
         return;
     }
     if (radius <= 0.0f) {
-        XFixesSetWindowShapeRegion(display, window, ShapeBounding, 0, 0, None);
+        XShapeCombineMask(display, window, ShapeBounding, 0, 0, None, ShapeSet);
         XFlush(display);
         return;
     }
 
-    XWindowAttributes attributes{};
-    if (XGetWindowAttributes(display, window, &attributes) == False) {
-        return;
-    }
-    const auto scale = getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f;
-    const int scaledRadius = juce::jlimit(1, juce::jmin(attributes.width, attributes.height) / 2,
-                                          juce::roundToInt(radius * scale));
+    // JUCE's resize request may still be queued on its X11 connection. Use the
+    // requested component size rather than querying the previous native size.
+    const auto scale = getDesktopScaleFactor() * (getPeer() != nullptr ? static_cast<float>(getPeer()->getPlatformScaleFactor()) : 1.0f);
+    const int width = juce::jmax(1, juce::roundToInt(getWidth() * scale));
+    const int height = juce::jmax(1, juce::roundToInt(getHeight() * scale));
+    const int scaledRadius = juce::jlimit(0, juce::jmin(width, height) / 2, juce::roundToInt(radius * scale));
     std::vector<XRectangle> rectangles;
     rectangles.reserve(static_cast<std::size_t>(scaledRadius * 2 + 1));
-    rectangles.push_back({ 0, static_cast<short>(scaledRadius), static_cast<unsigned short>(attributes.width),
-                           static_cast<unsigned short>(juce::jmax(0, attributes.height - scaledRadius * 2)) });
+    rectangles.push_back({ 0, static_cast<short>(scaledRadius), static_cast<unsigned short>(width),
+                           static_cast<unsigned short>(juce::jmax(0, height - scaledRadius * 2)) });
     for (int y = 0; y < scaledRadius; ++y) {
         const auto dy = static_cast<double>(scaledRadius - y) - 0.5;
         const int inset = juce::roundToInt(static_cast<double>(scaledRadius)
                                           - std::sqrt(static_cast<double>(scaledRadius * scaledRadius) - dy * dy));
-        const auto width = static_cast<unsigned short>(juce::jmax(0, attributes.width - inset * 2));
-        rectangles.push_back({ static_cast<short>(inset), static_cast<short>(y), width, 1 });
-        rectangles.push_back({ static_cast<short>(inset), static_cast<short>(attributes.height - y - 1), width, 1 });
+        const auto rowWidth = static_cast<unsigned short>(juce::jmax(0, width - inset * 2));
+        rectangles.push_back({ static_cast<short>(inset), static_cast<short>(y), rowWidth, 1 });
+        rectangles.push_back({ static_cast<short>(inset), static_cast<short>(height - y - 1), rowWidth, 1 });
     }
-    const auto region = XFixesCreateRegion(display, rectangles.data(), static_cast<int>(rectangles.size()));
-    XFixesSetWindowShapeRegion(display, window, ShapeBounding, 0, 0, region);
-    XFixesDestroyRegion(display, region);
+    XShapeCombineRectangles(display, window, ShapeBounding, 0, 0, rectangles.data(),
+                            static_cast<int>(rectangles.size()), ShapeSet, Unsorted);
     XFlush(display);
 }
 

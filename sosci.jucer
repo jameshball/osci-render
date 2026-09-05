@@ -271,7 +271,7 @@
                JUCE_USE_XRENDER="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/sosci/LinuxMakefile" smallIcon="KigaoN"
-                bigIcon="KigaoN" externalLibraries="X11&#10;Xfixes&#10;Xext&#10;Xrender"
+                bigIcon="KigaoN" externalLibraries="X11&#10;Xext&#10;Xrender"
                 extraLinkerFlags="-Wl,--wrap=eglChooseConfig">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="sosci"/>

@@ -142,8 +142,6 @@ bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEv
     return ignoresMouseEvents ? ignoresMouse && layered : !ignoresMouse && !layered;
 }
 
-void TransparentWindow::setNativeAlwaysOnTop(bool) {}
-
 void TransparentWindow::setMovesToActiveSpace(bool) {}
 
 void TransparentWindow::setNativeRoundedWindowRegion(float cornerRadius) {

@@ -29,8 +29,8 @@ NSWindow* getWindow(juce::Component* topLevelWindow) {
 }
 
 void removeMouseTrackingAreas(NSView* view) {
-    for (NSTrackingArea* trackingArea in [view trackingAreas]) {
-        [view removeTrackingArea:trackingArea];
+    while ([[view trackingAreas] count] != 0) {
+        [view removeTrackingArea:[[view trackingAreas] objectAtIndex:0]];
     }
 }
 
@@ -45,7 +45,10 @@ bool TransparentWindow::supportsClickThroughInTransparentFullScreen() {
 }
 
 juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rectangle<int> displayBounds) {
-    return displayBounds;
+    // AppKit constrains ordinary windows below the menu bar. Fit the usable
+    // desktop so this adjustment cannot push the bottom of the window off-screen.
+    auto* display = juce::Desktop::getInstance().getDisplays().getDisplayForRect(displayBounds);
+    return display != nullptr ? display->userBounds.toNearestInt() : displayBounds;
 }
 
 void TransparentWindow::configureNativeTransparency() {
@@ -59,10 +62,8 @@ void TransparentWindow::configureNativeTransparency() {
     [window setHasShadow:NO];
 
     NSView* contentView = [window contentView];
+    contentView.wantsLayer = YES;
     setViewTreeTransparent(contentView);
-    if (contentView != nil) {
-        contentView.wantsLayer = YES;
-    }
 }
 
 void TransparentWindow::setNativeIgnoresMouseEvents(bool ignoresMouseEvents) {
@@ -106,8 +107,6 @@ bool TransparentWindow::isNativeMouseInteractionStateApplied(bool ignoresMouseEv
     }
     return !windowIgnoresMouse && acceptsMouseMovedEvents && hasTrackingAreas;
 }
-
-void TransparentWindow::setNativeAlwaysOnTop(bool) {}
 
 void TransparentWindow::setMovesToActiveSpace(bool shouldMove) {
     NSWindow* window = getWindow(this);
