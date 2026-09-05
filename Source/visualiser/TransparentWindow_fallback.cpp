@@ -11,7 +11,6 @@ juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rec
 void TransparentWindow::configureNativeTransparency() {}
 void TransparentWindow::setNativeIgnoresMouseEvents(bool) {}
 bool TransparentWindow::isNativeMouseInteractionStateApplied(bool) const { return true; }
-void TransparentWindow::setNativeAlwaysOnTop(bool) {}
 
 void TransparentWindow::setMovesToActiveSpace(bool) {}
 void TransparentWindow::setNativeRoundedWindowRegion(float) {}

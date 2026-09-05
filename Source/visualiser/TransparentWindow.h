@@ -44,7 +44,6 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
-    void mouseUp(const juce::MouseEvent& event) override;
 
 private:
     static constexpr int toolbarHeight = 24;
@@ -125,7 +124,6 @@ private:
     void applyAlwaysOnTop();
     void setNativeIgnoresMouseEvents(bool ignoresMouseEvents);
     bool isNativeMouseInteractionStateApplied(bool ignoresMouseEvents) const;
-    void setNativeAlwaysOnTop(bool alwaysOnTop);
     void setMovesToActiveSpace(bool shouldMove);
     void setNativeRoundedWindowRegion(float cornerRadius);
 #if JUCE_LINUX
@@ -146,9 +144,7 @@ private:
     bool transparentFullScreen = false;
     bool settingTransparentFullScreenBounds = false;
     bool reenterFullScreenAfterTransition = false;
-#if JUCE_LINUX
     std::uint32_t transparentFullScreenTransitionTime = 0;
-#endif
     bool pinned = true;
     bool frameRequestedVisible = true;
     AlphaInteractionHold alphaInteractionHold;
