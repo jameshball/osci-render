@@ -10,7 +10,7 @@
 #include <osci_gui/osci_gui.h>
 #include "components/ProductUpdateConfig.h"
 
-#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+#if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
 #endif
 
@@ -121,7 +121,7 @@ public:
     juce::OpenGLContext openGlContext;
 #endif
 
-#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+#if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright
     jucewright::EnvironmentAutomation automation { *this };
 #endif
 

@@ -96,14 +96,17 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
     if (!isLegato) {
         // Non-legato: full reset — reload frame, reset drawing position,
         // retrigger envelopes.
-        frame.clear();
-        frameLength = 0.0;
-        int tries = 0;
-        while (frame.empty() && tries < 50) {
-            if (shapeSound->updateFrame(frame)) {
-                frameLength = shapeSound->getFrameLength();
+        // Sample parsers generate points directly and never consume the shape frame.
+        if (!renderingSample) {
+            frame.clear();
+            frameLength = 0.0;
+            int tries = 0;
+            while (frame.empty() && tries < 50) {
+                if (shapeSound->updateFrame(frame)) {
+                    frameLength = shapeSound->getFrameLength();
+                }
+                tries++;
             }
-            tries++;
         }
 
         currentShape = 0;
@@ -189,26 +192,37 @@ void ShapeVoice::voiceKilled() {
     killFadeGain = 1.0f;
 }
 
-// TODO this is the slowest part of the program - any way to improve this would help!
 void ShapeVoice::incrementShapeDrawing() {
-    if (frame.size() <= 0) return;
-    double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
+    if (frame.empty() || frameLength <= 0.0) {
+        return;
+    }
     frameDrawn += lengthIncrement;
     shapeDrawn += lengthIncrement;
-
-    // Need to skip all shapes that the lengthIncrement draws over.
-    // This is especially an issue when there are lots of small lines being
-    // drawn.
-    while (shapeDrawn > length) {
-        shapeDrawn -= length;
-        currentShape++;
-        if (currentShape >= frame.size()) {
+    // Nearby edges are cheaper to walk; cap the work before using the index.
+    for (int skipped = 0; skipped < 32 && shapeDrawn > frame[currentShape]->len; ++skipped) {
+        shapeDrawn -= frame[currentShape]->len;
+        if (++currentShape >= frame.size()) {
             currentShape = 0;
         }
-        // POTENTIAL TODO: Think of a way to make this more efficient when iterating
-        // this loop many times
-        length = frame[currentShape]->len;
     }
+    if (shapeDrawn <= frame[currentShape]->len) {
+        return;
+    }
+
+    // The length pass indexes each endpoint, so skipping dense geometry stays bounded.
+    double position = shapeDrawn + (currentShape > 0 ? frame[currentShape - 1]->cumulativeEndLength : 0.0);
+    const double total = frame.back()->cumulativeEndLength;
+    if (position > total) {
+        position = std::fmod(position, total);
+        if (position == 0.0) {
+            position = total;
+        }
+    }
+    const auto next = std::lower_bound(frame.begin(), frame.end(), position, [](const auto& shape, double distance) {
+        return shape->cumulativeEndLength < distance;
+    });
+    currentShape = static_cast<int>(next - frame.begin());
+    shapeDrawn = position - (currentShape > 0 ? frame[currentShape - 1]->cumulativeEndLength : 0.0);
 }
 
 double ShapeVoice::getFrequency() {

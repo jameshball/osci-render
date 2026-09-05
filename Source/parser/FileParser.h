@@ -17,7 +17,7 @@ public:
 	void prepareLiveImageInput(int width, int height);
 	void updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
 	std::vector<std::unique_ptr<osci::Shape>> nextFrame() override;
-	osci::Point nextSample(lua_State*& L, LuaVariables& vars);
+	osci::Point nextSample(LuaState& L, LuaVariables& vars);
 
 	bool isSample() override;
 	bool isActive() override;
