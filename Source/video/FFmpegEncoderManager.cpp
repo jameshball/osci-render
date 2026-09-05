@@ -1,9 +1,11 @@
 #include "FFmpegEncoderManager.h"
 #include <cmath>
+#include <string>
+#include <thread>
 
 FFmpegEncoderManager::FFmpegEncoderManager(const juce::File& ffmpegExecutable)
     : ffmpegExecutable(ffmpegExecutable) {
-    queryAvailableEncoders();
+    refreshAvailableEncoders();
 }
 
 juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
@@ -73,16 +75,43 @@ bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const 
         return false;
     }
 
+    // Draining a child pipe can block, so keep cancellation on this thread.
+    // Only the reader touches output storage; join before inspecting it.
+    std::string outputTail;
+    std::thread outputReader([&] {
+        constexpr std::size_t maxOutputBytes = 64 * 1024;
+        char buffer[4096];
+        for (;;) {
+            const int count = process.readProcessOutput(buffer, sizeof(buffer));
+            if (count <= 0) {
+                return;
+            }
+            outputTail.append(buffer, static_cast<std::size_t>(count));
+            if (outputTail.size() > maxOutputBytes) {
+                outputTail.erase(0, outputTail.size() - maxOutputBytes);
+            }
+        }
+    });
+
+    bool cancelled = false;
+    auto* exportJob = juce::ThreadPoolJob::getCurrentThreadPoolJob();
     while (process.isRunning()) {
-        if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()) {
+        if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()
+            || (exportJob != nullptr && exportJob->shouldExit())) {
             process.kill();
-            error = "Cancelled.";
-            return false;
+            cancelled = true;
+            break;
         }
         process.waitForProcessToFinish(200);
     }
+    outputReader.join();
+    if (cancelled) {
+        process.waitForProcessToFinish(200);
+        error = "Cancelled.";
+        return false;
+    }
 
-    const juce::String processOutput = process.readAllProcessOutput();
+    const auto processOutput = juce::String::fromUTF8(outputTail.data(), static_cast<int>(outputTail.size()));
     const bool succeeded = process.getExitCode() == 0 && output.existsAsFile() && output.getSize() > 0;
     if (!succeeded) {
         output.deleteFile();
@@ -222,7 +251,7 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
     return fallback;
 }
 
-void FFmpegEncoderManager::queryAvailableEncoders() {
+void FFmpegEncoderManager::refreshAvailableEncoders() {
     // Query available encoders using ffmpeg -encoders
     juce::String output = runFFmpegCommand({"-encoders", "-hide_banner"});
     parseEncoderList(output);
@@ -278,13 +307,18 @@ void FFmpegEncoderManager::parseEncoderList(const juce::String& output) {
 }
 
 juce::String FFmpegEncoderManager::runFFmpegCommand(const juce::StringArray& args) {
+    if (!ffmpegExecutable.existsAsFile()) {
+        return {};
+    }
     juce::ChildProcess process;
     juce::StringArray command;
 
     command.add(ffmpegExecutable.getFullPathName());
     command.addArray(args);
 
-    process.start(command, juce::ChildProcess::wantStdOut);
+    if (!process.start(command, juce::ChildProcess::wantStdOut)) {
+        return {};
+    }
 
     juce::String output = process.readAllProcessOutput();
 

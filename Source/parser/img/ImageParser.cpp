@@ -25,19 +25,19 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
         processGifFile(file);
     }
 #if OSCI_PREMIUM
-    else if (isVideoFile(extension)) {
+    else if (osci::files::isVideo(extension)) {
         processVideoFile(file);
     }
 #endif
     else {
         processImageFile(file);
     }
-    if (frames.empty() && !waitingForFFmpeg) {
+    if (frames.empty()) {
         if (extension.equalsIgnoreCase(".gif")) {
             handleError("The image could not be loaded. Please try optimising the GIF with https://ezgif.com/optimize.");
         }
 #if OSCI_PREMIUM
-        else if (isVideoFile(extension)) {
+        else if (osci::files::isVideo(extension)) {
             handleError("The video could not be loaded. Please check that ffmpeg is installed.");
         }
 #endif
@@ -224,9 +224,10 @@ void ImageParser::processImageFile(juce::File& file) {
         visited = std::vector<bool>(frameSize, false);
         frames.emplace_back(std::vector<uint8_t>(frameSize));
 
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                juce::Colour pixel = image.getPixelAt(x, y);
+        const juce::Image::BitmapData pixels(image, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                juce::Colour pixel = pixels.getPixelColour(x, y);
                 int index = y * width + x;
                 // RGB should be equal since we have desaturated
                 int value = pixel.getRed();
@@ -240,44 +241,16 @@ void ImageParser::processImageFile(juce::File& file) {
 }
 
 #if OSCI_PREMIUM
-bool ImageParser::isVideoFile(const juce::String& extension) const {
-    return osci::files::isVideo(extension);
-}
-
 void ImageParser::processVideoFile(juce::File& file) {
-    // Set video processing flag
-    isVideo = true;
-
     // assert on the message thread
     if (!juce::MessageManager::getInstance()->isThisTheMessageThread()) {
         handleError("Could not process video file - not on the message thread.");
         return;
     }
 
-    // Try to get ffmpeg
-    juce::File ffmpegFile = audioProcessor.getFFmpegFile();
-
-    if (ffmpegFile.exists()) {
-        // FFmpeg exists, continue with video processing
-        if (!loadAllVideoFrames(file, ffmpegFile)) {
-            handleError("Could not read video frames. Please ensure the video file is valid.");
-        }
-    } else {
-        // Ask user to download ffmpeg
-        waitingForFFmpeg = true;
-        audioProcessor.ensureFFmpegExists(nullptr, [this, file]() {
-            waitingForFFmpeg = false;
-            // This will be called once ffmpeg is successfully downloaded
-            juce::File ffmpegFile = audioProcessor.getFFmpegFile();
-            if (!loadAllVideoFrames(file, ffmpegFile)) {
-                handleError("Could not read video frames after downloading ffmpeg. Please ensure the video file is valid.");
-            } else {
-                // Successfully loaded frames after downloading ffmpeg
-                if (frames.size() > 0) {
-                    setFrame(0);
-                }
-            }
-        });
+    const auto ffmpegFile = audioProcessor.getFFmpegFile();
+    if (!ffmpegFile.existsAsFile() || !loadAllVideoFrames(file, ffmpegFile)) {
+        handleError("Could not read video frames. Please ensure FFmpeg is installed and the video file is valid.");
     }
 }
 
@@ -457,9 +430,6 @@ void ImageParser::applyPendingFrameRequest() {
 
 void ImageParser::resetTraversalState() {
     count = 0;
-    scanX = -1;
-    scanY = 1;
-    scanCount = 0;
     resetPosition();
     std::fill(visited.begin(), visited.end(), false);
 }
@@ -540,53 +510,20 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
         return osci::Point();
     }
 
-    if (ALGORITHM == "HILLIGOSS") {
-        if (count % jumpFrequency() == 0) {
-            resetPosition();
-        }
-
-        if (count % 10 * jumpFrequency() == 0) {
-            std::fill(visited.begin(), visited.end(), false);
-        }
-
-        float thresholdPow = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) * 10 + 1;
-
-        findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)), audioProcessor.invertImage->getValue());
-        float maxDim = juce::jmax(width, height);
-        count++;
-        float widthDiff = (maxDim - width) / 2;
-        float heightDiff = (maxDim - height) / 2;
-        return osci::Point(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
-    } else {
-        double scanIncrement = audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) / 100;
-        float thresholdVal = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex));
-
-        double pixel = 0;
-        int maxIterations = 10000;
-        while (pixel <= thresholdVal && maxIterations > 0) {
-            int x = (int) ((scanX + 1) * width / 2);
-            int y = (int) ((scanY + 1) * height / 2);
-            pixel = getPixelValue(x, y, audioProcessor.invertImage->getValue());
-
-            double increment = 0.01;
-            if (pixel > thresholdVal) {
-                increment = (1 - std::tanh(4 * pixel)) * 0.3;
-            }
-
-            scanX += increment;
-            if (scanX >= 1) {
-                scanX = -1;
-                scanY -= scanIncrement;
-            }
-            if (scanY < -1) {
-                double offset = ((scanCount % 15) / 15.0) * scanIncrement;
-                scanY = 1 - offset;
-                scanCount++;
-            }
-
-            maxIterations--;
-        }
-
-        return osci::Point(scanX, scanY);
+    const int jumpInterval = juce::jmax(1, jumpFrequency());
+    const int resetInterval = 10 * jumpInterval;
+    if (count % jumpInterval == 0) {
+        resetPosition();
     }
+    if (count == 0) {
+        std::fill(visited.begin(), visited.end(), false);
+    }
+
+    float thresholdPow = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) * 10 + 1;
+    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)), audioProcessor.invertImage->getValue());
+    float maxDim = juce::jmax(width, height);
+    count = (count + 1) % resetInterval;
+    float widthDiff = (maxDim - width) / 2;
+    float heightDiff = (maxDim - height) / 2;
+    return osci::Point(2 * (currentX + widthDiff) / maxDim - 1, 2 * (currentY + heightDiff) / maxDim - 1);
 }

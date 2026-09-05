@@ -242,18 +242,20 @@ int main(int argc, char* argv[]) {
         runner.runAllTests();
     }
     
+	int exitCode = 0;
 	for (int i = 0; i < runner.getNumResults(); ++i) {
 		const juce::UnitTestRunner::TestResult* result = runner.getResult(i);
 		if (result->failures > 0) {
-			return 1;
+			exitCode = 1;
 		}
 	}
 
 	// Clean up MessageManager if any test created one (e.g. MidiCC tests use
 	// Timer/ChangeBroadcaster which require it).
 	juce::DeletedAtShutdown::deleteAll();
-	if (juce::MessageManager::getInstanceWithoutCreating() != nullptr)
+	if (juce::MessageManager::getInstanceWithoutCreating() != nullptr) {
 		juce::MessageManager::deleteInstance();
+    }
     
-	return 0;
+	return exitCode;
 }

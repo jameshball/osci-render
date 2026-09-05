@@ -52,6 +52,7 @@ private:
                                juce::WaitableEvent& glReadyEventToSignal);
 
         void newOpenGLContextCreated() override;
+        void detach() { openGLContext.detach(); }
 
         void setPostRenderCallback(std::function<void()> cb) { postRenderCallback = std::move(cb); }
         void setPreRenderCallback(std::function<void()> cb) { preRenderCallback = std::move(cb); }

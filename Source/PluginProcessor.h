@@ -98,6 +98,12 @@ public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
 
+#if OSCI_PROFILING
+    // Profiling harness only: call between audio callbacks.
+    int getActiveVoiceCountForProfiling() const { return synth.getNumActiveVoices(); }
+    int getVoiceCountForProfiling() const { return synth.getNumVoices(); }
+#endif
+
     // VoiceManagerClient interface
     void voiceActivated(ManagedVoice& mv, bool isLegato) override;
     void voiceDeactivated(ManagedVoice& mv) override;
