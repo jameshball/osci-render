@@ -51,6 +51,11 @@ juce::Rectangle<int> TransparentWindow::getTransparentFullScreenBounds(juce::Rec
     return display != nullptr ? display->userBounds.toNearestInt() : displayBounds;
 }
 
+bool TransparentWindow::deferCloseUntilFullScreenExit() {
+    closeAfterFullScreenExit = fullScreenExitObserver != nullptr;
+    return closeAfterFullScreenExit;
+}
+
 void TransparentWindow::removeFullScreenExitObserver() {
     if (fullScreenExitObserver != nullptr) {
         [[NSNotificationCenter defaultCenter] removeObserver:static_cast<id>(fullScreenExitObserver)];
@@ -70,7 +75,13 @@ void TransparentWindow::observeNativeFullScreenExit() {
                     return;
                 }
                 safeWindow->removeFullScreenExitObserver();
-                safeWindow->updatePresentation();
+                if (safeWindow->closeAfterFullScreenExit) {
+                    safeWindow->closeAfterFullScreenExit = false;
+                    safeWindow->reenterFullScreenAfterTransition = false;
+                    safeWindow->closeRequested();
+                } else {
+                    safeWindow->updatePresentation();
+                }
             });
         }];
 }

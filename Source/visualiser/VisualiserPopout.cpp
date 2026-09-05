@@ -86,6 +86,9 @@ VisualiserWindow::VisualiserWindow(juce::String name, VisualiserComponent& owner
 }
 
 void VisualiserWindow::showPresentation() {
+#if JUCE_MAC
+    cancelDeferredClose();
+#endif
     setVisible(true);
     setMinimised(false);
     visualiser->setActive(true);
