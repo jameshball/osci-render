@@ -129,6 +129,9 @@ private:
 #if JUCE_LINUX
     bool isNativeFullScreenStateActive() const;
     void setNativeBounds(juce::Rectangle<int> bounds);
+#elif JUCE_MAC
+    void observeNativeFullScreenExit();
+    void removeFullScreenExitObserver();
 #endif
 
     std::unique_ptr<TransparentWindowToolbar> toolbar;
@@ -144,7 +147,11 @@ private:
     bool transparentFullScreen = false;
     bool settingTransparentFullScreenBounds = false;
     bool reenterFullScreenAfterTransition = false;
+#if JUCE_LINUX
     std::uint32_t transparentFullScreenTransitionTime = 0;
+#elif JUCE_MAC
+    void* fullScreenExitObserver = nullptr;
+#endif
     bool pinned = true;
     bool frameRequestedVisible = true;
     AlphaInteractionHold alphaInteractionHold;

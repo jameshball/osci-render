@@ -190,6 +190,9 @@ TransparentWindow::TransparentWindow(juce::String name, TransparentWindowState i
 
 TransparentWindow::~TransparentWindow() {
     stopTimer();
+#if JUCE_MAC
+    removeFullScreenExitObserver();
+#endif
     if (dragSurface != nullptr) {
         dragSurface->removeMouseListener(this);
     }
@@ -229,7 +232,11 @@ void TransparentWindow::setTransparencyEnabled(bool enabled) {
         if (transparencyEnabled && !transparentFullScreen) {
             fullScreenTransitionPending = true;
             reenterFullScreenAfterTransition = true;
+#if JUCE_LINUX
             transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+#elif JUCE_MAC
+            observeNativeFullScreenExit();
+#endif
             juce::ResizableWindow::setFullScreen(false);
 #if JUCE_LINUX
             configureNativeTransparency();
@@ -425,9 +432,11 @@ void TransparentWindow::resized() {
     if (!isTransparencySupported()) {
         return;
     }
+#if JUCE_LINUX
     if (reenterFullScreenAfterTransition) {
         transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
     }
+#endif
     if (getContentComponent() != nullptr) {
         getContentComponent()->setBounds(getLocalBounds());
     }
@@ -442,6 +451,7 @@ void TransparentWindow::resized() {
 #endif
     if (fullScreenRequested && transparentFullScreen && !settingTransparentFullScreenBounds
         && !transparentFullScreenBounds.isEmpty() && getBounds() != transparentFullScreenBounds) {
+#if JUCE_LINUX
         if (static_cast<std::int32_t>(juce::Time::getMillisecondCounter() - transparentFullScreenTransitionTime) < 0) {
             transparentFullScreen = false;
             reenterFullScreenAfterTransition = true;
@@ -449,6 +459,7 @@ void TransparentWindow::resized() {
             updatePresentation();
             return;
         }
+#endif
         leaveTransparentFullScreenAfterResize();
     }
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
@@ -509,7 +520,9 @@ void TransparentWindow::enterTransparentFullScreen() {
         transparentFullScreenBounds = getTransparentFullScreenBounds(display->logicalBounds.toNearestInt());
 #endif
         const juce::ScopedValueSetter<bool> settingBounds(settingTransparentFullScreenBounds, true);
+#if JUCE_LINUX
         transparentFullScreenTransitionTime = juce::Time::getMillisecondCounter() + 250;
+#endif
         setBounds(transparentFullScreenBounds);
 #if JUCE_LINUX
         // Stale ConfigureNotify events can leave JUCE's component bounds ahead
@@ -564,13 +577,15 @@ void TransparentWindow::updatePresentation() {
     }
 
     const bool nativeFullScreen = juce::ResizableWindow::isFullScreen();
-    // Native fullscreen flags can clear before the window manager finishes resizing.
-    bool canReenterTransparentFullScreen = reenterFullScreenAfterTransition && !nativeFullScreen
-                                       && static_cast<std::int32_t>(now - transparentFullScreenTransitionTime) >= 0;
+    bool canReenterTransparentFullScreen = reenterFullScreenAfterTransition && !nativeFullScreen;
 #if JUCE_LINUX
+    // X11 has no fullscreen-exit completion notification. Allow queued WM resizes to settle.
     if (canReenterTransparentFullScreen) {
-        canReenterTransparentFullScreen = !isNativeFullScreenStateActive();
+        canReenterTransparentFullScreen = static_cast<std::int32_t>(now - transparentFullScreenTransitionTime) >= 0
+                                      && !isNativeFullScreenStateActive();
     }
+#elif JUCE_MAC
+    canReenterTransparentFullScreen = canReenterTransparentFullScreen && fullScreenExitObserver == nullptr;
 #endif
     if (canReenterTransparentFullScreen) {
         reenterFullScreenAfterTransition = false;
