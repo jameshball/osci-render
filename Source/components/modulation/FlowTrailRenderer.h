@@ -158,6 +158,9 @@ public:
     void paintTrail(juce::Graphics& g, const juce::Path& fillPath,
                     juce::Colour trailColour, float& outGlowStrength,
                     double tauMs = kDefaultTauMs) {
+        if (!hasTrailData()) {
+            return;
+        }
         const float maxTrailAlpha = 1.0f;
         const float alphaFloor = 0.0f;
 
@@ -175,6 +178,7 @@ public:
             }
 
             juce::Image::BitmapData bd(flowTrailStrip, juce::Image::BitmapData::writeOnly);
+            bool anyVisible = false;
             for (int x = 0; x < w; ++x) {
                 const double lastSeen = flowTrailLastSeenMs[(size_t)x];
                 if (lastSeen <= 0.0) {
@@ -188,10 +192,13 @@ public:
                 const float shaped = a * (2.0f - a);
                 const float finalA = juce::jlimit(0.0f, 1.0f, maxTrailAlpha * (alphaFloor + (1.0f - alphaFloor) * shaped));
                 outGlowStrength = juce::jmax(outGlowStrength, finalA);
+                anyVisible |= finalA > 0.0f;
                 bd.setPixelColour(x, 0, trailColour.withAlpha(finalA));
             }
 
-            g.drawImage(flowTrailStrip, 0, 0, w, h, 0, 0, w, 1);
+            if (anyVisible) {
+                g.drawImage(flowTrailStrip, 0, 0, w, h, 0, 0, w, 1);
+            }
         }
     }
 
