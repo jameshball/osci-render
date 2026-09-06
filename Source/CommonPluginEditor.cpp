@@ -20,7 +20,6 @@ const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
     : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType) {
-    setOpaque(true);
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
     openGlContext.attachTo(*getTopLevelComponent());
@@ -56,6 +55,10 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
                 dw->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark());
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
+                // Configure the backing surface before the visualiser is shown.
+                if (FramePresenter::usesNativeSurface()) {
+                    dw->setOpaque(false);
+                }
             }
         }
 
@@ -196,11 +199,13 @@ void CommonPluginEditor::resized() {
 }
 
 void CommonPluginEditor::refreshBetaUpdatesButton() {
-    betaUpdatesButton.setVisible(osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled());
+    betaUpdatesEnabled = osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled();
+    betaUpdatesButton.setVisible(betaUpdatesEnabled);
 }
 
 void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
-    if (!betaUpdatesButton.isVisible()) {
+    betaUpdatesButton.setVisible(betaUpdatesEnabled);
+    if (!betaUpdatesEnabled) {
         return;
     }
 
