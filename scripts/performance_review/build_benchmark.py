@@ -2,7 +2,19 @@
 """Link the benchmark against an already-built macOS Profiling product library.
 
 Reuses the compiler response file and framework list from its xcodebuild log.
-Never resaves the project or rebuilds product code.
+Never resaves the project or rebuilds product code. Retain the build intermediates
+and use a log containing both PluginProcessor compilation and standalone linking.
+
+From the repository root, after building the Profiling standalone:
+  python3 scripts/performance_review/build_benchmark.py --build-log /path/to/build.log
+  python3 scripts/performance_review/generate_projects.py --template /path/to/current.osci --output build/performance-review/corpus
+  python3 scripts/performance_review/run_matrix.py --manifest build/performance-review/corpus/manifest.json --benchmark build/performance-review/processor_benchmark --output build/performance-review/results
+
+Use --compare-with on run_matrix.py for alternating before/after runs, and
+--sample-rates, --block-sizes and --ratios for workload sweeps. Video cases require
+--ffmpeg. The runner isolates settings and measures the processor without an editor
+or audio device. Use --allocation-probe here for optional macOS allocator counters;
+its instrumented timings are diagnostic, not performance comparisons.
 """
 import argparse
 import pathlib
