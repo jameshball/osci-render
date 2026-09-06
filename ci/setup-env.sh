@@ -3,7 +3,7 @@
 # linux specific stiff
 if [ "$OS" = "linux" ]; then
   sudo apt-get update
-  sudo apt-get install clang cmake git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev webkit2gtk-4.0 juce-tools xvfb
+  sudo apt-get install -y clang cmake git ladspa-sdk freeglut3-dev g++ libasound2-dev libcurl4-openssl-dev libfreetype6-dev libjack-jackd2-dev libx11-dev libxext-dev libxcomposite-dev libxcursor-dev libxinerama-dev libxrandr-dev mesa-common-dev libegl1-mesa-dev libwebkit2gtk-4.1-dev juce-tools xvfb
 fi
 
 ROOT=$(pwd)

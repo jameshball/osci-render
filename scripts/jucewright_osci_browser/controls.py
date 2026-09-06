@@ -12,12 +12,16 @@ from .utils import numeric, slug, walk_tree
 
 class ControlDiscoveryMixin:
     PROTECTED_GENERIC_CONTROL_CLASSES = {
+        "osci::CloseButton",
         "MidiComponent",
         "juce::CustomMidiKeyboardComponent",
         "CustomMidiKeyboardComponent",
     }
 
     PROTECTED_GENERIC_COMPONENT_NAMES = {
+        "close",
+        "close icon",
+        "dismiss",
         "midi",
         "inputenabled",
     }

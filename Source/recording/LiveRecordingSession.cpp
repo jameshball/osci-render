@@ -13,12 +13,11 @@ public:
     }
 
     bool write(std::span<const std::uint8_t> frame) override {
-        return process.write(const_cast<std::uint8_t*>(frame.data()), frame.size(),
-                             VideoEncodingConstants::frameWriteTimeoutMs) != 0;
+        return process.write(frame.data(), frame.size(), VideoEncodingConstants::frameWriteTimeoutMs) != 0;
     }
 
-    void finish() override {
-        process.close();
+    bool finish() override {
+        return process.close();
     }
 
 private:
@@ -214,9 +213,11 @@ LiveRecordingArtifacts LiveRecordingSession::finish() {
     if (writerThread->isThreadRunning()) {
         writerThread->signalThreadShouldExit();
         videoFrameReady.signal();
-        writerThread->stopThread(VideoEncodingConstants::frameWriteTimeoutMs + 1000);
+        writerThread->waitForThreadToExit(-1);
     }
-    videoBackend->finish();
+    if (!videoBackend->finish()) {
+        fail("FFmpeg could not finish writing the video file.");
+    }
     audioBackend->finish();
     videoFramePending.store(false, std::memory_order_release);
     videoFrame.clear();

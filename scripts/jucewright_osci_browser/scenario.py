@@ -34,23 +34,30 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
     SOURCE_EDITOR_CLASS = "osci::LuaScriptEditorComponent::Editor"
 
     def close_feedback_image_preview(self) -> None:
-        self.call(self.cli("press", "Escape", "--component-id", "feedbackImagePreviewOverlay", "--timeout-ms", "3000"))
+        self.call(self.cli("press", "Escape", "--component-id", "imagePreviewOverlay", "--timeout-ms", "3000"))
         self.call(self.cli("wait", "--ms", "250"))
+
+    def click_component_button(self, component_id: str) -> None:
+        snapshot = json.loads(self.call(self.cli("snapshot", "--json", "--full", "--depth", "24", "--component-id", component_id)))
+        for node in walk_tree(snapshot.get("tree", {})):
+            if node.get("role") == "button" and node.get("visible", True):
+                self.call(self.cli("click", node["ref"], "--timeout-ms", "5000"))
+                return
+        raise StepError(f"no button inside {component_id}")
 
     def exercise_feedback_dialog(self) -> None:
         feedback_viewport_centre_x = (self.window_width or 1100) // 2
-        user_preview_centre_x = feedback_viewport_centre_x - 282
 
         self.run_step("open feedback dialog", self.select_menu_item("Send Feedback..."))
         self.run_step("feedback dialog snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "16", "--class", "osci::FeedbackOverlay"))
         self.run_step("feedback dialog screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-form.png"))
         self.run_step("open feedback report settings", self.cli("click", "--component-id", "feedbackSettingsButton", "--timeout-ms", "5000"))
         self.run_step("feedback report settings snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "12", "--component-id", "feedbackSettingsOverlay"))
-        for component_name, label in [
-            ("Diagnostic log", "diagnostic log enabled"),
-            ("Current project", "project snapshot enabled"),
+        for component_id, label in [
+            ("diagnostic_log", "diagnostic log enabled"),
+            ("current_project", "project snapshot enabled"),
         ]:
-            self.ensure_checked_switch(component_name, label, True)
+            self.ensure_checked_switch(component_id, label, True, by_id=True)
         self.run_step("feedback report settings screenshot", self.cli("screenshot", "--component-id", "feedbackSettingsOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-settings.png"))
         self.run_step("close feedback report settings", self.close_overlay)
         self.run_step("validate required feedback fields", self.cli("click", "--component-id", "submitFeedback", "--timeout-ms", "5000"))
@@ -59,21 +66,22 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step("fill feedback title", self.cli("fill", "--component-id", "feedback_title", "--timeout-ms", "3000", "Automation feedback report"))
         self.run_step("fill feedback details", self.cli("fill", "--component-id", "feedback_details", "--timeout-ms", "3000", "Jucewright verifies the complete in-app feedback submission flow."))
         self.run_step("drop user feedback screenshot", self.cli("drop-files", "--file", self.root_dir / "Resources" / "oscilloscope" / "real.png", "--class", "osci::FileDropZoneComponent", "--timeout-ms", "5000"))
-        self.run_step("remove user feedback screenshot", self.cli("click", "--component-id", "removeUserScreenshot1", "--timeout-ms", "5000"))
+        self.run_step("remove user feedback screenshot", lambda: self.click_component_button("removeUserScreenshot1"))
+        self.run_step("verify user screenshot removed", self.cli("wait-for-locator", "--role", "label", "--name", "1 screenshot attached: App screenshot", "--exact", "--timeout-ms", "3000"))
         self.run_step("drop user feedback screenshot again", self.cli("drop-files", "--file", self.root_dir / "Resources" / "oscilloscope" / "real.png", "--class", "osci::FileDropZoneComponent", "--timeout-ms", "5000"))
         self.run_step("feedback attachments screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-attachments.png"))
         self.run_step("scroll feedback form to previews", self.cli("wheel", feedback_viewport_centre_x, "560", "--dy", "-2"))
         self.run_step("feedback previews screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-previews.png"))
-        self.run_step("hover user screenshot preview", self.cli("hover", user_preview_centre_x, "256"))
+        self.run_step("hover user screenshot preview", self.cli("hover", "--component-id", "userScreenshotPreview1", "--timeout-ms", "5000"))
         self.run_step("wait for screenshot preview hover", self.cli("wait", "--ms", "250"))
         self.run_step("screenshot preview hover screenshot", self.cli("screenshot", "--component-id", "userScreenshotPreview1", "--source", "component", "--file", self.artifact_dir / "feedback-preview-hover.png"))
         self.run_step("open user screenshot preview", self.cli("click", "--component-id", "userScreenshotPreview1", "--timeout-ms", "5000"))
         self.run_step("wait for user screenshot preview transition", self.cli("wait", "--ms", "400"))
-        self.run_step("user screenshot preview screenshot", self.cli("screenshot", "--component-id", "feedbackImagePreviewOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-user-image-preview.png"))
+        self.run_step("user screenshot preview screenshot", self.cli("screenshot", "--component-id", "imagePreviewOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-user-image-preview.png"))
         self.run_step("close user screenshot preview", self.close_feedback_image_preview)
         self.run_step("open automatic screenshot preview", self.cli("click", "--component-id", "automaticScreenshotPreview", "--timeout-ms", "5000"))
         self.run_step("wait for automatic screenshot preview transition", self.cli("wait", "--ms", "400"))
-        self.run_step("automatic screenshot preview screenshot", self.cli("screenshot", "--component-id", "feedbackImagePreviewOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-automatic-image-preview.png"))
+        self.run_step("automatic screenshot preview screenshot", self.cli("screenshot", "--component-id", "imagePreviewOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-automatic-image-preview.png"))
         self.run_step("close automatic screenshot preview", self.close_feedback_image_preview)
         self.run_step("scroll feedback form to submit", self.cli("wheel", feedback_viewport_centre_x, "560", "--dy", "-8"))
         self.run_step("feedback footer screenshot", self.cli("screenshot", "--class", "osci::FeedbackOverlay", "--source", "auto", "--file", self.artifact_dir / "feedback-footer.png"))
@@ -129,7 +137,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.try_step(f"reset lua state for {name}", self.cli("click", "--name", "luaReset", "--exact", "--timeout-ms", "3000"))
         self.try_step(f"open lua scripting reference for {name}", self.cli("click", "--name", "luaHelp", "--exact", "--timeout-ms", "3000"))
         self.try_step(f"lua scripting reference snapshot for {name}", self.cli("snapshot", "--json", "--interesting", "--depth", "10"))
-        self.try_step(f"close lua scripting reference for {name}", self.cli("click", "--name", "closeOverlay", "--exact", "--timeout-ms", "3000"))
+        self.try_step(f"close lua scripting reference for {name}", self.close_overlay)
         self.try_step(f"lua slider a for {name}", self.cli("set-value", "--role", "slider", "--name", "Lua Slider A", "--exact", "--timeout-ms", "3000", "0.25"))
         self.try_step(f"lua slider b for {name}", self.cli("set-value", "--role", "slider", "--name", "Lua Slider B", "--exact", "--timeout-ms", "3000", "0.75"))
         self.try_step(f"pause lua console for {name}", self.cli("click", "--name", "pauseConsole", "--exact", "--timeout-ms", "3000"))
@@ -186,9 +194,11 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step("show midi keyboard preference", self.select_menu_item("Show MIDI Keyboard"))
         self.run_step("wait after showing midi keyboard preference", self.cli("wait", "--ms", "500"))
 
-    def checked_switch_ref_for_component(self, component_name: str) -> tuple[str, bool]:
+    def checked_switch_ref_for_component(self, component_name: str, by_id: bool = False) -> tuple[str, bool]:
+        selector = ["--component-id" if by_id else "--component-name", component_name, "--exact"]
+        self.call(self.cli("click", *selector, "--trial", "--timeout-ms", "5000"))
         snapshot_file = self.artifact_dir / f"switch_{slug(component_name)}.json"
-        if not self.call_to_file(self.cli("snapshot", "--json", "--interesting", "--depth", "6", "--component-name", component_name, "--timeout-ms", "3000"), snapshot_file, snapshot_file.with_suffix(snapshot_file.suffix + ".stderr")):
+        if not self.call_to_file(self.cli("snapshot", "--json", "--interesting", "--depth", "24", *selector, "--timeout-ms", "3000"), snapshot_file, snapshot_file.with_suffix(snapshot_file.suffix + ".stderr")):
             raise StepError(f"could not snapshot switch component {component_name}")
 
         data = json.loads(snapshot_file.read_text(encoding="utf-8"))
@@ -199,9 +209,9 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
 
         raise StepError("no checked switch descendant")
 
-    def ensure_checked_switch(self, component_name: str, label: str, desired: bool = True) -> None:
+    def ensure_checked_switch(self, component_name: str, label: str, desired: bool = True, by_id: bool = False) -> None:
         try:
-            ref, checked = self.checked_switch_ref_for_component(component_name)
+            ref, checked = self.checked_switch_ref_for_component(component_name, by_id)
         except Exception:
             self.run_step(f"{label} switch lookup", lambda: (_ for _ in ()).throw(StepError("switch lookup failed")))
             return
@@ -319,9 +329,30 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.try_step(f"snapshot menu {menu}", self.cli("snapshot", "--json", "--full", "--depth", "8"))
         self.try_step(f"close menu {menu}", self.cli("press", "Escape"))
 
+    @staticmethod
+    def overlay_close_ref(tree: dict) -> str | None:
+        dialogs = [node for node in walk_tree(tree) if node.get("role") == "dialogWindow" and node.get("visible", True)]
+        if not dialogs:
+            return None
+        # JUCE children are ordered back to front. Only dismiss the foremost dialog,
+        # never an underlying overlay or the separate visualiser window.
+        for node in walk_tree(dialogs[-1]):
+            if node.get("role") == "button" and node.get("name") == "Close icon" and node.get("visible", True):
+                return node.get("ref")
+        return None
+
     def close_overlay(self) -> None:
-        self.call(self.cli("click", "--name", "closeOverlay", "--exact", "--timeout-ms", "3000"))
-        self.call(self.cli("wait", "--ms", "250"))
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            snapshot = json.loads(self.call(self.cli("snapshot", "--json", "--interesting", "--depth", "20")))
+            ref = self.overlay_close_ref(snapshot.get("tree", {}))
+            if ref:
+                self.call(self.cli("click", ref, "--timeout-ms", "3000"))
+                self.call(self.cli("wait", "--ms", "250"))
+                return
+            # Opening animations temporarily replace the panel with an image.
+            self.call(self.cli("wait", "--ms", "100"))
+        raise StepError("topmost overlay has no visible close button")
 
     def exercise_about_dialog(self) -> None:
         self.run_step("open about dialog", self.select_menu_item("About osci-render"))
@@ -353,7 +384,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
         self.run_step("wait for audio settings overlay animation", self.cli("wait", "--ms", "1200"))
         self.run_step("audio settings snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "14"))
         self.try_step("audio settings full snapshot", self.cli("snapshot", "--json", "--full", "--depth", "16"))
-        self.exercise_visible_controls("audio settings dialog", 0, "--class", "AudioSettingsOverlay")
+        self.exercise_visible_controls("audio settings dialog", 0, "--class", "osci::StandaloneAudioSettingsOverlay")
         self.run_step("close audio settings dialog", self.close_overlay)
 
     def exercise_visualiser_settings_dialog(self) -> None:

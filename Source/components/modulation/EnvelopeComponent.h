@@ -119,6 +119,7 @@ private:
 	std::array<EnvelopeData, NUM_ENVELOPES> envData;
 
 	// --- Graph helpers ---
+    void lookAndFeelChanged() override;
 	void syncGraphColours();
 	void onGraphNodesChanged();
 	void beginGestureForDrag();

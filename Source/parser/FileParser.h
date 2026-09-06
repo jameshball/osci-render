@@ -9,7 +9,7 @@
 #endif
 
 class OscirenderAudioProcessor;
-class FileParser : public FrameSource {
+class FileParser : public FrameSource, public std::enable_shared_from_this<FileParser> {
 public:
 	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
@@ -17,7 +17,7 @@ public:
 	void prepareLiveImageInput(int width, int height);
 	void updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
 	std::vector<std::unique_ptr<osci::Shape>> nextFrame() override;
-	osci::Point nextSample(lua_State*& L, LuaVariables& vars);
+	osci::Point nextSample(LuaState& L, LuaVariables& vars);
 
 	bool isSample() override;
 	bool isActive() override;
@@ -46,6 +46,7 @@ public:
 
 private:
 	void clearLoadedSource();
+	std::function<void()> makeDeferredLoad(std::function<void()> load);
 	void showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
 		juce::String fileType, std::function<void()> callback);
 
@@ -54,6 +55,7 @@ private:
 	bool active = true;
 	bool sampleSource = false;
 	std::atomic<double> frameRate{30.0};
+	std::atomic<uint64_t> sourceGeneration{0};
 	juce::SpinLock lock;
 
 	std::shared_ptr<WorldObject> object;

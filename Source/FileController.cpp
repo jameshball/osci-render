@@ -70,6 +70,7 @@ void FileController::updateFile(int index, std::shared_ptr<juce::MemoryBlock> da
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     updateFileUnlocked(index, std::move(data));
+    selectFileUnlocked(index);
 }
 
 void FileController::updateFileById(const juce::String& id, std::shared_ptr<juce::MemoryBlock> data) {
@@ -87,7 +88,6 @@ void FileController::updateFileUnlocked(int index, std::shared_ptr<juce::MemoryB
     }
     files[index].data = std::move(data);
     parseFile(index);
-    selectFileUnlocked(index);
 }
 
 std::optional<int> FileController::findFileIndexByIdUnlocked(const juce::String& id) const {
@@ -341,7 +341,8 @@ void FileController::updateTextureInputFrame(
 void FileController::stopTextureInput() {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    if (activeSource.exchange(ActiveSource::files, std::memory_order_acq_rel) == ActiveSource::textureInput) {
+    if (isTextureInputActive()) {
+        activeSource.store(ActiveSource::files, std::memory_order_release);
         textureInputName.clear();
         updateActiveSound(false);
         notifySelectionChanged();

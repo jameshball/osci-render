@@ -32,6 +32,7 @@ public:
 
     // Get available encoders for a given codec
     juce::Array<EncoderDetails> getAvailableEncodersForCodec(VideoCodec codec);
+    void refreshAvailableEncoders();
     bool supportsVideoCodec(VideoCodec codec) const;
     bool supportsTransparentVideoEncoding() const;
 
@@ -47,9 +48,6 @@ public:
 private:
     juce::File ffmpegExecutable;
     std::map<VideoCodec, juce::Array<EncoderDetails>> availableEncoders;
-
-    // Query available encoders from FFmpeg
-    void queryAvailableEncoders();
 
     // Parse encoder output from FFmpeg
     void parseEncoderList(const juce::String& output);

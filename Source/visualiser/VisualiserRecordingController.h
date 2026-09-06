@@ -11,6 +11,7 @@ public:
     using ExportCompletion = std::function<void(RecordingExportResult result, juce::File destination)>;
 
     explicit VisualiserRecordingController(const juce::File& ffmpegExecutable);
+    ~VisualiserRecordingController();
 
     [[nodiscard]] bool wantsVideo(RecordingSettings& settings) const;
     LiveRecordingResult start(RecordingSettings& settings, double sampleRate);

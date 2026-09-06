@@ -191,7 +191,9 @@ private:
 
         void setSourceValue(float value01) {
             sourceValue = value01;
-            repaint();
+            if (sourceActive && !depthIndicators.isEmpty()) {
+                repaint();
+            }
         }
 
         void updateSmoothedValue(float current, float decay) {

@@ -10,7 +10,7 @@
 #include <osci_gui/osci_gui.h>
 #include "components/ProductUpdateConfig.h"
 
-#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+#if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
 #endif
 
@@ -67,6 +67,7 @@ private:
     int defaultEditorWidth = 0;
     int defaultEditorHeight = 0;
     bool fullScreen = false;
+    bool betaUpdatesEnabled = false;
     juce::Rectangle<int> windowedBounds;
 public:
     PluginLookAndFeel lookAndFeel;
@@ -121,7 +122,7 @@ public:
     juce::OpenGLContext openGlContext;
 #endif
 
-#if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
+#if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright
     jucewright::EnvironmentAutomation automation { *this };
 #endif
 
@@ -135,7 +136,7 @@ protected:
     bool handleShortcut(const juce::KeyPress& key);
     juce::Component* topLevelKeyTarget = nullptr;
     std::vector<std::unique_ptr<osci::OverlayComponent>> activeOverlays;
-    bool visualiserWasVisibleBeforeOverlay = true;
+    std::optional<bool> visualiserWasVisibleBeforeOverlay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CommonPluginEditor)
 };

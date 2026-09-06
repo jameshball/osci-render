@@ -143,6 +143,10 @@ VisualiserComponent::VisualiserComponent(
     };
 
     postRenderCallback = [this] {
+        if (framePresenter != nullptr) {
+            const auto texture = getRenderTexture();
+            framePresenter->present(texture.id, texture.width, texture.height);
+        }
         serviceTextureOutputFrame();
 
         if (recordingController.isRecording()) {
@@ -173,6 +177,7 @@ VisualiserComponent::VisualiserComponent(
 
         stopwatch.addTime(juce::RelativeTime::seconds(1.0 / this->recordingSettings.getFrameRate()));
     };
+    framePresenter = FramePresenter::create(*this, openGLContext);
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -187,6 +192,7 @@ VisualiserComponent::~VisualiserComponent() {
     // Detach while the derived renderer is still alive so OpenGL-owned services
     // are stopped by openGLContextClosing() on the context thread.
     openGLContext.detach();
+    framePresenter.reset();
     recordingController.discard();
     audioProcessor.removeAudioPlayerListener(this);
     audioProcessor.visualiserParameters.visualiserPaused->removeListener(this);
@@ -310,6 +316,7 @@ void VisualiserComponent::parameterValueChanged(int parameterIndex, float newVal
 }
 
 void VisualiserComponent::timerCallback() {
+    updateFramePresentation();
     audioProcessor.serviceDeferredAudioSourceChanges();
 #if OSCI_PREMIUM
     // Restore the saved popout visibility once the editor has a visible native window.
@@ -435,22 +442,30 @@ void VisualiserComponent::setRecording(bool recording) {
     if (recording) {
 #if OSCI_PREMIUM
         if (recordingController.wantsVideo(recordingSettings)) {
-            auto onDownloadSuccess = [this] {
-                juce::MessageManager::callAsync([this] {
-                    record.setEnabled(true);
-                    juce::Timer::callAfterDelay(3000, [this] {
-                        juce::MessageManager::callAsync([this] {
-                            editor.ffmpegDownloader.setVisible(false);
-                            downloading = false;
-                            resized();
-                        });
-                    }); });
+            auto safeThis = juce::Component::SafePointer<VisualiserComponent>(this);
+            auto onDownloadSuccess = [safeThis] {
+                juce::MessageManager::callAsync([safeThis] {
+                    if (safeThis == nullptr) {
+                        return;
+                    }
+                    safeThis->record.setEnabled(true);
+                    juce::Timer::callAfterDelay(3000, [safeThis] {
+                        if (safeThis != nullptr) {
+                            safeThis->editor.ffmpegDownloader.setVisible(false);
+                            safeThis->downloading = false;
+                            safeThis->resized();
+                        }
+                    });
+                });
             };
-            auto onDownloadStart = [this] {
-                juce::MessageManager::callAsync([this] {
-                    record.setEnabled(false);
-                    downloading = true;
-                    resized(); });
+            auto onDownloadStart = [safeThis] {
+                juce::MessageManager::callAsync([safeThis] {
+                    if (safeThis != nullptr) {
+                        safeThis->record.setEnabled(false);
+                        safeThis->downloading = true;
+                        safeThis->resized();
+                    }
+                });
             };
             if (!audioProcessor.ensureFFmpegExists(onDownloadStart, onDownloadSuccess)) {
                 record.setToggleState(false, juce::NotificationType::dontSendNotification);
@@ -522,6 +537,7 @@ void VisualiserComponent::resized() {
         overlayFadeCover.setBounds(getLocalBounds());
         overlayFadeCover.toFront(false);
         setViewportArea(area);
+        updateFramePresentation();
         return;
     } else {
         buttonRow = area.removeFromBottom(25);
@@ -578,6 +594,14 @@ void VisualiserComponent::resized() {
     overlayFadeCover.toFront(false);
 
     setViewportArea(area);
+    updateFramePresentation();
+}
+
+void VisualiserComponent::updateFramePresentation() {
+    if (framePresenter != nullptr) {
+        const auto base = osci::Colours::surfaceSunken().interpolatedWith(osci::Colours::shadow(), osci::Theme::isDark() ? 0.86f : 0.38f);
+        framePresenter->resized(getViewportArea(), isTransparentBackgroundEnabled() ? juce::Colours::black : base);
+    }
 }
 
 void VisualiserComponent::popoutWindow(bool saveOpenPreference) {
@@ -640,15 +664,20 @@ void VisualiserComponent::closePopout() {
     popoutUpdated();
     resized();
 #else
+    popoutVisible = false;
+    popoutUpdated();
+    resized();
     const juce::Component::SafePointer<VisualiserComponent> safeThis(this);
     juce::MessageManager::callAsync([safeThis] {
-        if (safeThis == nullptr || safeThis->popout == nullptr) {
+        if (safeThis == nullptr || safeThis->popout == nullptr || safeThis->popoutVisible) {
             return;
         }
+#if JUCE_MAC
+        if (safeThis->popout->deferCloseUntilFullScreenExit()) {
+            return;
+        }
+#endif
         safeThis->popout.reset();
-        safeThis->popoutVisible = false;
-        safeThis->popoutUpdated();
-        safeThis->resized();
     });
 #endif
 #endif
@@ -866,6 +895,9 @@ void VisualiserComponent::updateRenderModeFromProcessor() {
 }
 
 void VisualiserComponent::openGLContextClosing() {
+    if (framePresenter != nullptr) {
+        framePresenter->releaseResources();
+    }
     textureOutputController.stop();
 
     VisualiserRenderer::openGLContextClosing();
@@ -906,6 +938,9 @@ void VisualiserComponent::setTimelineController(std::shared_ptr<TimelineControll
 }
 
 void VisualiserComponent::paint(juce::Graphics &g) {
+    if (framePresenter != nullptr) {
+        framePresenter->paint(g, getViewportArea());
+    }
     bool colourSpecified = isColourSpecified(buttonRowColourId);
     auto buttonRowColour = osci::Colours::veryDark();
     if (colourSpecified) {

@@ -46,7 +46,7 @@ public:
     virtual ~VideoRecordingBackend() = default;
     virtual bool start(const juce::String& command) = 0;
     virtual bool write(std::span<const std::uint8_t> frame) = 0;
-    virtual void finish() = 0;
+    virtual bool finish() = 0;
 };
 
 class AudioRecordingBackend {

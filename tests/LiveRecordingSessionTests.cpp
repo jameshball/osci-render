@@ -11,6 +11,8 @@ struct VideoBackendState {
     juce::WaitableEvent allowWrite;
     std::atomic<int> writes { 0 };
     std::atomic<bool> blockWrites { false };
+    bool failWrites = false;
+    bool failFinish = false;
     bool running = false;
 };
 
@@ -32,10 +34,13 @@ public:
             state->allowWrite.wait(5000);
         }
         ++state->writes;
-        return true;
+        return !state->failWrites;
     }
 
-    void finish() override { state->running = false; }
+    bool finish() override {
+        state->running = false;
+        return !state->failFinish;
+    }
 
 private:
     std::shared_ptr<VideoBackendState> state;
@@ -175,6 +180,49 @@ public:
         waitingAcquireThread.join();
         finishWhileBlockedThread.join();
         expectEquals(videoState->writes.load(), 1);
+
+        beginTest("A final queued frame failure is visible after finish drains the writer");
+        videoState = std::make_shared<VideoBackendState>();
+        videoState->blockWrites = true;
+        videoState->failWrites = true;
+        LiveRecordingSession failingSession(std::make_unique<FakeVideoRecordingBackend>(videoState),
+                                            std::make_unique<FakeAudioRecordingBackend>(std::make_shared<AudioBackendState>()));
+        expect(static_cast<bool>(failingSession.start(configuration)));
+        auto failingFrame = failingSession.acquireVideoFrame();
+        expect(failingFrame.isValid());
+        failingFrame.submit();
+        expect(videoState->writeEntered.wait(1000));
+        expect(!failingSession.hasFailed());
+        videoState->allowWrite.signal();
+        failingSession.finish();
+        expect(failingSession.hasFailed());
+        expect(failingSession.getFailureMessage().isNotEmpty());
+        expect(!failingSession.acquireVideoFrame().isValid());
+        expect(!failingSession.isRecording());
+
+        beginTest("Starting a new recording clears the previous writer failure");
+        videoState->failWrites = false;
+        expect(static_cast<bool>(failingSession.start(configuration)));
+        expect(!failingSession.hasFailed());
+        expect(failingSession.getFailureMessage().isEmpty());
+        auto retryFrame = failingSession.acquireVideoFrame();
+        expect(retryFrame.isValid());
+        retryFrame.submit();
+        failingSession.finish();
+        expect(!failingSession.hasFailed());
+        expectEquals(videoState->writes.load(), 2);
+
+        beginTest("Encoder finalization failure is reported even after successful frame writes");
+        videoState->blockWrites = false;
+        expect(static_cast<bool>(failingSession.start(configuration)));
+        auto finalFrame = failingSession.acquireVideoFrame();
+        expect(finalFrame.isValid());
+        finalFrame.submit();
+        videoState->failFinish = true;
+        failingSession.finish();
+        expect(failingSession.hasFailed());
+        expect(failingSession.getFailureMessage().contains("finish"));
+        videoState->failFinish = false;
 
         beginTest("Invalid configurations fail without starting a backend");
         LiveRecordingSession invalidSession(std::make_unique<FakeVideoRecordingBackend>(std::make_shared<VideoBackendState>()),

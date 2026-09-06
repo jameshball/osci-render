@@ -38,6 +38,7 @@ public:
         testBypass();
         testOversamplingRatios();
         testMidiMapping();
+        testZeroSampleBlocks();
         testOversizeBlockFailsSafely();
     }
 
@@ -122,46 +123,109 @@ private:
         }
     }
 
-    void testMidiMapping()
-    {
-        beginTest ("MIDI maps once and monotonically");
+    void testMidiMapping() {
+        beginTest("MIDI preserves exact positions, ordering and SysEx across variable blocks");
 
-        for (const auto ratio : { 2.0, 4.0, 8.0 })
-        {
+        for (const auto ratio : { 2.0, 4.0, 8.0 }) {
             Adapter adapter;
             constexpr int maxBlock = 64;
-            adapter.prepare ({ 48000.0, ratio, maxBlock, 2 });
-
-            juce::AudioBuffer<float> buffer (2, maxBlock);
+            adapter.prepare({ 48000.0, ratio, maxBlock, 2 });
+            juce::AudioBuffer<float> buffer(2, maxBlock);
             juce::MidiBuffer midi;
-            std::vector<int64_t> delivered;
-            auto internalCursor = (int64_t) 0;
+            const std::array<juce::uint8, 5> payload { 0x7d, 1, 2, 3, 4 };
+            const auto sysEx = juce::MidiMessage::createSysExMessage(payload.data(), (int)payload.size());
+            const auto blocks = makeVariableBlocks(maxBlock, 80);
 
-            for (int blockIndex = 0; blockIndex < 80; ++blockIndex)
-            {
-                const auto blockSize = makeVariableBlocks (maxBlock, 80)[(size_t) blockIndex];
-                juce::AudioBuffer<float> block (buffer.getArrayOfWritePointers(), 2, blockSize);
+            for (int blockIndex = 0; blockIndex < (int)blocks.size(); ++blockIndex) {
+                const int blockSize = blocks[(size_t)blockIndex];
+                juce::AudioBuffer<float> block(buffer.getArrayOfWritePointers(), 2, blockSize);
                 block.clear();
                 midi.clear();
-
-                if (blockIndex % 3 == 0)
-                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), blockSize / 2);
-
-                const auto before = internalCursor;
-                const auto result = adapter.process (block, midi, [&] (auto& inner, auto& internalMidi)
-                {
-                    for (const auto metadata : internalMidi)
-                        delivered.push_back (before + metadata.samplePosition);
-
+                if (blockIndex % 3 == 0) {
+                    midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)100), -1);
+                    midi.addEvent(sysEx, blockSize / 2);
+                    midi.addEvent(juce::MidiMessage::noteOff(1, 60), blockSize / 2);
+                    midi.addEvent(juce::MidiMessage::controllerEvent(2, 1, 127), blockSize + 5);
+                }
+                const juce::MidiBuffer expected(midi);
+                adapter.process(block, midi, [&](auto& inner, auto& internalMidi) {
+                    expectEquals(internalMidi.getNumEvents(), expected.getNumEvents());
+                    auto original = expected.cbegin();
+                    for (const auto event : internalMidi) {
+                        if (original == expected.cend()) {
+                            break;
+                        }
+                        const auto source = *original++;
+                        expectEquals(event.samplePosition, juce::jlimit(0, blockSize - 1, source.samplePosition) * (int)ratio);
+                        expectEquals(event.numBytes, source.numBytes);
+                        expect(std::equal(event.data, event.data + event.numBytes, source.data, source.data + source.numBytes));
+                    }
                     inner.clear();
                 });
-
-                internalCursor += result.internalSamplesProcessed;
+                expect(midi.isEmpty());
             }
+        }
+    }
 
-            expect (! delivered.empty());
-            for (size_t i = 1; i < delivered.size(); ++i)
-                expect (delivered[i] >= delivered[i - 1]);
+    void testZeroSampleBlocks() {
+        beginTest("Zero-sample blocks defer MIDI and processing until audio resumes");
+        const std::array<juce::uint8, 4> payload { 0x7d, 1, 2, 3 };
+        const std::array<juce::MidiMessage, 5> messages {
+            juce::MidiMessage::noteOn(2, 64, (juce::uint8)100),
+            juce::MidiMessage::createSysExMessage(payload.data(), (int)payload.size()),
+            juce::MidiMessage::noteOff(2, 64),
+            juce::MidiMessage::controllerEvent(3, 1, 127),
+            juce::MidiMessage::pitchWheel(3, 9000)
+        };
+        for (const auto ratio : { 1.0, 2.0, 4.0, 8.0 }) {
+            Adapter adapter;
+            adapter.prepare({ 48000.0, ratio, 8, 2 });
+            juce::AudioBuffer<float> empty(2, 0);
+            juce::AudioBuffer<float> audio(2, 8);
+            audio.clear();
+            juce::MidiBuffer midi;
+            midi.addEvent(messages[0], 17);
+            midi.addEvent(messages[1], 17);
+            const auto result = adapter.process(empty, midi, [this](auto&, auto&) {
+                expect(false, "An empty block must not advance processor state");
+            });
+            expectEquals(result.internalSamplesProcessed, 0);
+            expect(midi.isEmpty());
+            midi.addEvent(messages[2], 0);
+            adapter.process(empty, midi, [this](auto&, auto&) {
+                expect(false, "Successive empty blocks must remain deferred");
+            });
+            midi.addEvent(messages[3], 0);
+            midi.addEvent(messages[4], 2);
+            adapter.process(audio, midi, [&](auto& block, auto& events) {
+                expectEquals(block.getNumSamples(), 8 * (int)ratio);
+                expectEquals(events.getNumEvents(), (int)messages.size());
+                size_t index = 0;
+                for (const auto event : events) {
+                    if (index >= messages.size()) {
+                        break;
+                    }
+                    const auto& expected = messages[index];
+                    expectEquals(event.samplePosition, index == 4 ? 2 * (int)ratio : 0);
+                    expectEquals(event.numBytes, expected.getRawDataSize());
+                    expect(std::equal(event.data, event.data + event.numBytes,
+                                      expected.getRawData(), expected.getRawData() + expected.getRawDataSize()));
+                    ++index;
+                }
+                block.clear();
+            });
+            midi.clear();
+            adapter.process(audio, midi, [this](auto& block, auto& events) {
+                expect(events.isEmpty(), "Deferred MIDI must be delivered only once");
+                block.clear();
+            });
+            midi.addEvent(messages[0], 0);
+            adapter.process(empty, midi, [this](auto&, auto&) { expect(false); });
+            adapter.reset();
+            adapter.process(audio, midi, [this](auto& block, auto& events) {
+                expect(events.isEmpty(), "Reset must discard deferred MIDI");
+                block.clear();
+            });
         }
     }
 
