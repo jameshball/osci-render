@@ -1300,16 +1300,23 @@ void NodeGraphComponent::setFlowMarkerDomainPositions(const double* positions, i
 }
 
 void NodeGraphComponent::clearFlowMarkers() {
-    if (flowTrailRenderer)
-        flowTrailRenderer->clear();
+    if (!flowTrailRenderer || !flowTrailRenderer->clear()) {
+        return;
+    }
     ensureFlowRepaintTimerRunning();
     repaint();
 }
 
 void NodeGraphComponent::resetFlowTrail() {
-    if (flowTrailRenderer)
-        flowTrailRenderer->reset();
-    repaint();
+    if (!flowTrailRenderer) {
+        return;
+    }
+    const bool hadTrailData = flowTrailRenderer->hasTrailData();
+    flowTrailRenderer->reset();
+    stopTimer();
+    if (hadTrailData) {
+        repaint();
+    }
 }
 
 void NodeGraphComponent::setFlowTrailWrapping(bool shouldWrap, double domainMin, double domainMax) {

@@ -28,7 +28,7 @@ public:
           getWidth(std::move(componentWidthFn)),
           getHeight(std::move(componentHeightFn)) {}
 
-    bool hasTrailData() const { return !flowTrailLastSeenMs.empty(); }
+    bool hasTrailData() const { return numFlowMarkers > 0 || flowTrailNewestMs > 0.0; }
 
     // Returns true if the trail has fully decayed and repainting can stop.
     bool shouldStopRepaint(double nowMs, double tauMs = kDefaultTauMs) {
@@ -52,7 +52,7 @@ public:
                 flowTrailLastSeenMs.resize((size_t)width);
                 for (int x = 0; x < width; ++x) {
                     int src = juce::jlimit(0, oldWidth - 1,
-                                           (int)std::round((double)x * (double)(oldWidth - 1) / (double)(width - 1)));
+                                           (int)std::round((double)x * (double)(oldWidth - 1) / (double)juce::jmax(1, width - 1)));
                     flowTrailLastSeenMs[(size_t)x] = old[(size_t)src];
                 }
             } else {
@@ -129,7 +129,11 @@ public:
         }
     }
 
-    void clear() { numFlowMarkers = 0; }
+    bool clear() {
+        const bool hadMarkers = numFlowMarkers > 0;
+        numFlowMarkers = 0;
+        return hadMarkers;
+    }
 
     // Set wrapping mode for cyclic domains (e.g. LFO phase 0–1).
     // When enabled, backward jumps in position are treated as domain wrapping
