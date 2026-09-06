@@ -3,3 +3,6 @@
 *.cmd text eol=crlf
 
 Source/lua/*.c linguist-vendored
+
+# Preserve upstream line endings and unified-diff context whitespace.
+ci/patches/*.patch -text whitespace=-blank-at-eol,cr-at-eol
