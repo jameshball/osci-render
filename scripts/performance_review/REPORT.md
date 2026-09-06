@@ -321,3 +321,21 @@ JUCE's synchronous macOS OpenGL resize rendering has an explicit correctness pur
 The swap-interval 0 experiment was rejected after a further 30.025-second native resize capture. JUCE confirmed interval 0 was applied, and the targeted NSWaitUntilHostTime synchronization waits disappeared. However, 5.484 seconds of GL presentation waits and 6.194 seconds of backing-store queue waits remained. Main sampled CPU per wall time was essentially unchanged (32.94% normal, 32.68% experiment); the user noticed no performance improvement and identified resize flicker as pre-existing. Different manual gesture coverage prevents treating the aggregate wait reduction as a controlled speedup. The temporary hook was removed byte-for-byte, and the normal standalone binary was restored. Only the validated transparent-trail skip is retained from this native resize follow-up.
 
 The next substantial investigation should use a minimal JUCE macOS reproduction to distinguish native OpenGL surface resizing/presentation from editor painting, capturing actual resize callbacks, frame submission and visible flicker together. JUCE's synchronous resize path has a correctness purpose, so changing it requires proving correct frame sizing, pacing and overlay composition. The present evidence does not justify a broad renderer rewrite or another speculative graphics flag.
+
+
+## Minimal macOS OpenGL surface-update investigation
+
+An audio-free JUCE reproduction isolated a simple animated native OpenGL child from application/editor work. Bounded native event hooks recorded view setFrame/reshape/update and context update, preserving the original calls. Across all 38 baseline child-frame changes, two automatic updates used the old child frame, then setFrame synchronously caused an automatic update at the new frame, then JUCE repeated update at that same frame before rendering. This establishes duplication for this particular geometry sequence, not for every host, fullscreen or display transition. Native geometry setters already compare frames; removing duplicate setter invocations would not remove the actual costly mutations. Existing native-resize CPU samples contained only 11ms of framebuffer allocation versus 828ms in NSOpenGLContext update, 818ms of which also contained automatic AppKit invalidation (inclusive, with inlining caveats).
+
+A shadow copy of the JUCE OpenGL module removed only handleResize's explicit view update; live framework and product code were unchanged. The diagnostic then recorded three updates per changed child frame instead of four. Four alternating uninstrumented pairs used identical binaries except that deletion, the same stationary/size/move/combined geometry sequence, two seconds warmup and ten seconds capture per run. Event hooks were not installed. Median of run medians, milliseconds:
+
+| Scope | Baseline | Omit explicit update |
+| --- | ---: | ---: |
+| Content resize callback including child layout | 6.817 | 6.468 |
+| Complete programmatic window size change | 9.934 | 10.127 |
+| Complete programmatic size plus position change | 10.193 | 10.284 |
+| Main timer interval | 19.946 | 19.844 |
+
+The smaller child callback cost did not translate into a consistent overall improvement. Tail results were mixed. These are programmatic geometry diagnostics, not native mouse resizing or displayed frame measurements. The removal is not retained: negligible overall benefit does not justify changing framework behavior that still needs fullscreen/display/host validation. Automatic surface updates, painting and presentation remain. No render synchronization was changed.
+
+Local sources, build recipes and raw evidence are in build/performance-review/native-resize-repro/. geometry-gl.csv.native.csv and geometry-ordering.json contain the baseline ordering; geometry-gl-no-update-2.csv.native.csv is the complete variant capture; uninstrumented-pairs/results.json and summary.json contain all eight timing runs. The first variant native-event file was truncated by stopping its process while CSV writing was still in progress and is excluded; the capture was repeated, and subsequent instrumentation has an explicit completion marker. All reproduction processes were closed after testing.
