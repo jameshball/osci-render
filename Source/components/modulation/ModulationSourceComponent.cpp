@@ -654,6 +654,9 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
+    // Only the tab seam is visible. Keep the bottom corners beyond the shadow's blur
+    // radius without regenerating a full-panel shadow on every height change.
+    panelBounds.setHeight(juce::jmin(panelBounds.getHeight(), 2.0f * kSeamShadowHeight));
     juce::Path panelPath;
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),

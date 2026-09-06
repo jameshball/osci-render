@@ -2,6 +2,16 @@
 
 Supplementary build documentation. See [copilot-instructions.md](../copilot-instructions.md) for primary guide.
 
+## JUCE patch (macOS)
+
+After installing or updating JUCE, apply this patch once before building either product:
+
+```bash
+patch --batch -d "$HOME/JUCE" -p1 < ci/patches/juce-tahoe-opengl-presentation.patch
+```
+
+Adjust the JUCE path if needed. CI applies the same patch after downloading JUCE. It enables JUCE's existing main-thread OpenGL presentation path on macOS 26, avoiding the measured half-second window-server stalls while retaining drag images above the native OpenGL view. Other operating systems keep their existing behavior. The patch is tested against JUCE 9.0.1; review it when updating JUCE if it no longer applies cleanly.
+
 ## ccache + PCH (macOS)
 
 Debug builds use two compile-time optimisations wired into the `.jucer` files:
