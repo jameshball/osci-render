@@ -3,6 +3,7 @@
 
 #include <osci_file_import/osci_file_import.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <limits>
@@ -38,7 +39,7 @@ private:
     void resetPosition();
     float getPixelValue(int x, int y, bool invert);
     void findWhite(double thresholdPow, bool invert);
-    bool isOverThreshold(double pixel, double thresholdValue);
+    bool isOverThreshold(float pixel, float thresholdValue);
     int jumpFrequency();
     void handleError(juce::String message);
     void processGifFile(juce::File& file);
@@ -51,6 +52,12 @@ private:
     OscirenderAudioProcessor& audioProcessor;
     juce::SpinLock pendingLiveFrameLock;
     juce::Random rng;
+    struct ThresholdEntry {
+        float pixel = -1.0f;
+        float power = -1.0f;
+        float threshold = 0.0f;
+    };
+    std::array<ThresholdEntry, 256> thresholdCache;
     int frameIndex = 0;
     std::atomic<int> requestedFrameIndex = noPendingFrameRequest;
     std::atomic<int> reportedFrameIndex = 0;

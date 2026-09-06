@@ -434,9 +434,16 @@ void ImageParser::resetTraversalState() {
     std::fill(visited.begin(), visited.end(), false);
 }
 
-bool ImageParser::isOverThreshold(double pixel, double thresholdPow) {
-    float threshold = std::pow(pixel, thresholdPow);
-    return pixel > 0.2 && rng.nextFloat() < threshold;
+bool ImageParser::isOverThreshold(float pixel, float thresholdPow) {
+    if (pixel <= 0.2) {
+        return false;
+    }
+    // Pixels have 256 intensities; retain exact values for inverted float rounding.
+    auto& cached = thresholdCache[static_cast<int>(pixel * 255.0 + 0.5)];
+    if (cached.pixel != pixel || cached.power != thresholdPow) {
+        cached = {pixel, thresholdPow, static_cast<float>(std::pow(static_cast<double>(pixel), static_cast<double>(thresholdPow)))};
+    }
+    return rng.nextFloat() < cached.threshold;
 }
 
 void ImageParser::resetPosition() {
