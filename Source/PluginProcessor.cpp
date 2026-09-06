@@ -617,6 +617,8 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     if (selectedMidiChannel != 0) {
         filteredMidiMessages.clear();
         for (const auto metadata : midiMessages) {
+            // Channel messages store channels 0-15 in the low four status bits; system messages use channel 0 here.
+            // Read the bytes directly to avoid getMessage() allocating for long SysEx messages on the audio thread.
             const int channel = metadata.data[0] < 0xf0 ? (metadata.data[0] & 0x0f) + 1 : 0;
             if (channel == 0 || channel == selectedMidiChannel) {
                 filteredMidiMessages.addEvent(metadata.data, metadata.numBytes, metadata.samplePosition);
