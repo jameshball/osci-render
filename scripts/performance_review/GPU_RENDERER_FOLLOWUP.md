@@ -1,12 +1,12 @@
 # Integrated GPU visualiser follow-up
 
-This is a proposed investigation, not an implemented backend or a speedup claim. The first experiment should retain the newly optimized CPU Lanczos filter and remove the fourfold CPU vertex expansion. Only move convolution to the GPU if that simpler renderer establishes a worthwhile baseline and a subsequent integrated comparison beats it.
+Stage 1 is implemented and measured: CPU Lanczos is retained, while supported contexts draw instanced segments from packed points. The later GPU convolution stages remain proposals. They must beat this simpler renderer in a separate integrated comparison before adoption. See the packed-line follow-up in `REPORT.md` for measurements and their limits.
 
 ## Current path and measured limits
 
 `modules/osci_gui/visualiser/osci_VisualiserRenderer.cpp` currently prepares samples in `runTask`: it retains the separate audio-output copy, applies visual effects/modulation, flips and coordinate transforms, then resamples the active channels. XY/XYZ/XYRGB filter 2/3/5 channels; sweep mode interpolates X separately, so filters 1/2/4. The existing worker/GL handoff then permits `renderOpenGL` to consume those vectors. This is visualiser work, not a proposal to move the synthesizer or audio callback onto the GPU.
 
-`drawLine` allocates position data and duplicates each `{x, y, brightness}` four times. RGB mode also duplicates each colour four times. Both are uploaded using `glBufferData`. The separate, unused `scratchVertices` allocation has already been removed in favour of an explicit arrays-ready flag; that cleanup does not remove these live position/colour allocations. Adjacent records provide the start/end attributes, a separate index attribute identifies the corner and shutter position, and six element indices draw each segment. Blur, composition, presentation and the completed texture shared through `OpenGLFrameMirror` follow this draw.
+Before Stage 1, `drawLine` allocated position data and duplicated each `{x, y, brightness}` four times. RGB mode also duplicated each colour four times. Both were uploaded using `glBufferData`. The separate, unused `scratchVertices` allocation has already been removed in favour of an explicit arrays-ready flag; that cleanup does not remove these live position/colour allocations. Adjacent records provide the start/end attributes, a separate index attribute identifies the corner and shutter position, and six element indices draw each segment. Blur, composition, presentation and the completed texture shared through `OpenGLFrameMirror` follow this draw.
 
 The shared CPU filter already reduces isolated 800-input resampling from 31.96 to 20.70 µs for two channels, 47.84 to 26.21 µs for three, and 79.84 to 37.60 µs for five. At 6,400 inputs/five channels it takes approximately 301.61 µs. These are kernel measurements, not whole-frame improvements.
 
@@ -16,27 +16,27 @@ Measured versus inferred distinctions:
 
 - CPU kernel time, aggregate prototype CPU preparation/submission, readback time, output errors and uploaded array sizes were measured or inspected directly.
 - Descriptor generation, individual uploads and driver dispatch were **not separately timed**. Calling any one of them the dominant bottleneck would be an inference.
-- CPU vertex expansion and its allocations are present in production, but their isolated cost and the benefit of removing them have not yet been measured.
+- Stage 1 removes the fourfold expansion on contexts supporting instancing. Exact-output probes and alternating application captures now measure this change; later GPU convolution remains unimplemented.
 - Live GL elapsed-query scopes include scheduling/driver effects and instrumentation can alter batching. They are not pure shader arithmetic time. The isolated fisheye rewrite saved only about 0.19 µs in its line probe; production shaders remain unchanged.
 
 Local evidence is under `build/performance-review/resampling-followup/` (`bench-repeat-*.csv`, precise-output fixtures) and `build/performance-review/shader-stages/`. The maintained CPU oracle is `scripts/performance_review/check_visualiser_resampling.py`; results and measurement limitations are recorded in `REPORT.md`.
 
 ## Stage 1: CPU Lanczos, packed points, instanced segments
 
-Create one packed record per output point, initially `{x, y, brightness, r, g, b}`. Keep the existing brightness calculation, including the negative-red colour sentinel, and all filter output unchanged. Use one segment instance with a constant four-corner quad and element order `0,2,1,1,2,3`. Start/end attributes reference adjacent packed records with divisor one. Derive the original global index as `gl_InstanceID * 4 + gl_VertexID`, preserving the current corner and shutter calculations in `LineVertexShader.glsl` rather than simplifying their rounding incidentally.
+The renderer now retains one CPU packing vector and writes `{x, y, brightness}` or `{x, y, brightness, r, g, b}`, depending on the existing render mode. RGB uses the same upload as position data. Start/end attributes address adjacent records with divisor one; a fixed four-corner attribute and element order `0,2,1,1,2,3` draw each segment. The shader reconstructs the original global index from instance number and corner attribute, preserving the original shutter rounding. Divisors are explicitly restored before other drawing passes.
 
-Instanced attributes advance according to their divisor, which fits this layout. Use a dedicated VAO or restore divisors explicitly so subsequent fullscreen passes cannot inherit segment state. Verify the live context and JUCE function availability rather than assume support from the shader version. [Khronos instanced-array specification](https://registry.khronos.org/OpenGL/extensions/ARB/ARB_instanced_arrays.txt)
+No context upgrade is required. The captured Mac application uses OpenGL 2.1 Metal and the ARB instancing extensions. Extension functions are explicitly resolved because JUCE does not automatically load those extension pointers. Core contexts use their corresponding functions; contexts lacking the required capabilities retain duplicated drawing through the same packing code. GLSL selection matches JUCE's translation threshold. CPU Lanczos, fragment shaders, triangle order, nominal shutter normalization and the rendering handoff remain unchanged.
 
-A texture-buffer variant can fetch start/end points directly in the vertex shader. Compare it only if it materially simplifies integration or avoids an attribute limitation: shader fetches are not automatically cheaper. Prefer an indexed four-vertex quad over six independent vertices, which would increase vertex shader invocations. Keep fragment shaders, triangle order, nominal `nEdges` shutter normalization, actual output count, brightness, colour, additive blending and final texture interfaces unchanged.
+At 4,800 output points, submitted point payload is reduced by 75%:
 
-Payload arithmetic, not measured bus traffic, illustrates the opportunity. For N=800 inputs and approximately M=4,800 outputs:
-
-| Per-frame data | Current | Fixed six-float packed record |
+| Per-frame data | Previous | Packed |
 | --- | ---: | ---: |
-| XY position upload | 230,400 bytes | 115,200 bytes |
-| RGB position plus colour upload | 460,800 bytes | 115,200 bytes |
+| XY/XYZ | 230,400 bytes | 57,600 bytes |
+| RGB | 460,800 bytes | 115,200 bytes |
 
-A separate three-float non-RGB record could reduce XY further, but start with one layout unless measurements justify another shader/layout variant. This stage can be accepted independently; it does not depend on a GPU resampler.
+These are submitted buffer sizes, not measured hardware bus traffic. The fallback retains the previous payload size. Its isolated XY packing was slightly slower, while completed line-stage time was approximately unchanged. This stage adds about 40 net runtime lines, removes the separate colour buffer, and needs no new synchronization or GPU history management.
+
+The exact-output matrix covers both instanced and fallback paths. In five alternating application pairs per upsampling setting, the median CPU render scope fell about 7–8%; line-stage CPU time fell about 22% with upsampling. GPU elapsed results were mixed. This is evidence for a focused CPU/data preparation improvement, not a guaranteed FPS or whole-application CPU reduction. Detailed values, coverage and the separate offscreen measurements are in `REPORT.md`.
 
 ## Stage 2: GPU convolution into that same point buffer
 
@@ -57,11 +57,11 @@ The reference is `LanczosResampler<2048, 8>` with sixfold output, 16 taps, 4,096
 
 The GLSL 150 prototype differed in 63,316 of 274,429 samples, with maximum absolute error 2.38418579e-7. GLSL 410 with explicit `precise` accumulation/output produced bit-identical results for that fixture on the M3 Pro. This is one driver/CPU pairing, not a portable guarantee. `precise` constrains expression transformations; it must be applied inside relevant helper functions because precision requirements do not automatically propagate through calls. [Khronos precise-operation rules](https://registry.khronos.org/OpenGL/extensions/ARB/ARB_gpu_shader5.txt)
 
-The production shader path uses GLSL 150; do not raise the application's global requirement just to reuse the prototype. Apple exposes legacy, 3.2 and 4.1 profiles, but profile availability alone does not validate a shader or establish a precision guarantee. Keep the CPU path when the selected context cannot compile and pass the candidate's exactness checks. [Apple OpenGL profiles](https://developer.apple.com/documentation/appkit/opengl-profiles)
+The production context is not explicitly versioned: the captured M3 Pro application used OpenGL 2.1 Metal, with JUCE choosing shader translation for the actual context. The earlier assumption that production necessarily used GLSL 150 was incorrect. Do not raise the application's global requirement just to reuse the prototype. Apple exposes legacy, 3.2 and 4.1 profiles, but profile availability alone does not validate a shader or establish a precision guarantee. Keep the CPU path when the selected context cannot compile and pass the candidate's exactness checks. [Apple OpenGL profiles](https://developer.apple.com/documentation/appkit/opengl-profiles)
 
 GPU double arithmetic is a separate capability described by ARB_gpu_shader_fp64; Apple support/performance for the intended live context was not established by this experiment. Keeping double phase on the CPU avoids depending on it. Even supported GPU doubles would still require proof of the recurrence and rounding behavior. [Khronos double-precision shader specification](https://registry.khronos.org/OpenGL/extensions/ARB/ARB_gpu_shader_fp64.txt)
 
-Descriptor cost is a central go/no-go test. The prototype used a 16-byte descriptor per output point. At N=800, five channels, uploading only new inputs plus these descriptors would still mean approximately 92,800 bytes/frame, versus 115,200 for Stage 1's packed CPU output. That is only a calculated 22,400-byte difference, before dispatch and GPU output writes. Packing descriptors or generating phase on the GPU adds complexity and must earn its place independently. Test against the actual SIMD/reduction behavior on each supported CPU architecture; M3 equality alone does not prove x86 equality.
+Descriptor cost is a central go/no-go test. The prototype used a 16-byte descriptor per output point. At N=800, five channels, uploading only new inputs plus these descriptors would still mean approximately 92,800 bytes/frame, versus 115,200 for Stage 1's five-channel packed CPU output. That is only a calculated 22,400-byte difference, before dispatch and GPU output writes. Packing descriptors or generating phase on the GPU adds complexity and must earn its place independently. Test against the actual SIMD/reduction behavior on each supported CPU architecture; M3 equality alone does not prove x86 equality.
 
 ## History, memory and ownership
 
