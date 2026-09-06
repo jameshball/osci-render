@@ -19,8 +19,7 @@ const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 }
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType)
-{
+    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType) {
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
     openGlContext.attachTo(*getTopLevelComponent());
@@ -56,6 +55,10 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
                 dw->setColour(juce::ResizableWindow::backgroundColourId, osci::Colours::veryDark());
                 dw->setTitleBarButtonsRequired(juce::DocumentWindow::allButtons, false);
                 dw->setUsingNativeTitleBar(true);
+                // Configure the backing surface before the visualiser is shown.
+                if (FramePresenter::usesNativeSurface()) {
+                    dw->setOpaque(false);
+                }
             }
         }
 
@@ -177,7 +180,6 @@ bool CommonPluginEditor::openFile(const juce::File& file) {
 void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
-    refreshBetaUpdatesButton();
 
     const int promptWidth = juce::jmin(updatePrompt.getPreferredWidth(), getWidth() - 28);
     if (promptWidth > 340) {
@@ -197,13 +199,15 @@ void CommonPluginEditor::resized() {
 }
 
 void CommonPluginEditor::refreshBetaUpdatesButton() {
-    betaUpdatesButton.setVisible(osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled());
+    betaUpdatesEnabled = osci::UpdateSettings(audioProcessor.getProductSlug()).betaUpdatesEnabled();
+    betaUpdatesButton.setVisible(betaUpdatesEnabled);
 }
 
 void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
-    refreshBetaUpdatesButton();
-    if (!betaUpdatesButton.isVisible())
+    betaUpdatesButton.setVisible(betaUpdatesEnabled);
+    if (!betaUpdatesEnabled) {
         return;
+    }
 
     const auto width = juce::jmin(118, topBar.getWidth());
     betaUpdatesButton.setBounds(topBar.removeFromRight(width).reduced(2, 2));
@@ -211,15 +215,7 @@ void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
 }
 
 void CommonPluginEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
-    bool anyHeavy = false;
-    for (auto& o : activeOverlays) {
-        if (!o->lightweight) {
-            anyHeavy = true;
-            break;
-        }
-    }
-
-    if (!anyHeavy && !overlay->lightweight) {
+    if (!overlay->lightweight && !visualiserWasVisibleBeforeOverlay.has_value()) {
         visualiser.cancelOverlayFadeIn();
         visualiserWasVisibleBeforeOverlay = visualiser.isVisible();
         visualiser.setVisible(false);
@@ -254,14 +250,6 @@ void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
         }
     }
 
-    bool anyHeavy = false;
-    for (auto& o : activeOverlays) {
-        if (!o->lightweight) {
-            anyHeavy = true;
-            break;
-        }
-    }
-
     if (beforeVisualiserRestore != nullptr) {
         beforeVisualiserRestore();
     }
@@ -272,14 +260,22 @@ void CommonPluginEditor::dismissOverlay(osci::OverlayComponent* overlay,
         return;
     }
 
-    if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
+    // Dismissal callbacks can open another overlay (for example, a render error).
+    const bool anyHeavy = std::any_of(activeOverlays.begin(), activeOverlays.end(), [](const auto& active) {
+        return !active->lightweight;
+    });
+    const bool restoreVisualiser = !anyHeavy && visualiserWasVisibleBeforeOverlay.value_or(false);
+    if (!anyHeavy) {
+        visualiserWasVisibleBeforeOverlay.reset();
+    }
+    if (restoreVisualiser) {
         visualiser.prepareOverlayFadeIn();
         visualiser.setVisible(true);
     }
 
     resized();
 
-    if (!anyHeavy && visualiserWasVisibleBeforeOverlay) {
+    if (restoreVisualiser) {
         visualiser.fadeInAfterOverlay();
     }
 }
@@ -309,7 +305,6 @@ CommonPluginEditor::~CommonPluginEditor() {
     }
 
     setLookAndFeel(nullptr);
-    juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
 }
 
 // Shared handler for standard OS shortcuts (undo, redo, save, open).

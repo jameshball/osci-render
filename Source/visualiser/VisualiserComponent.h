@@ -15,6 +15,7 @@
 #include "VisualiserRecordingController.h"
 #include "VisualiserSettings.h"
 #include "VisualiserTextureOutputController.h"
+#include "FramePresenter.h"
 #include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 
 enum class FullScreenMode {
@@ -84,6 +85,7 @@ private:
     static constexpr int overlayFadeDurationMs = 225;
 
     void updatePausedState();
+    void updateFramePresentation();
     void closePopout();
     void setOverlayFadeProgress(float progress);
     void refreshTextureOutputButton();
@@ -106,6 +108,7 @@ private:
 
     CommonAudioProcessor& audioProcessor;
     CommonPluginEditor& editor;
+    std::unique_ptr<FramePresenter> framePresenter;
     std::unique_ptr<VisualiserWindow> popout;
     bool popoutVisible = false;
     bool restorePopoutPending = false;

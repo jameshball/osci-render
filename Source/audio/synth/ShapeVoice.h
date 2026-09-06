@@ -89,7 +89,7 @@ private:
 		double frameDrawn = 0.0;
 	} savedDrawingState;
 
-	lua_State* L = nullptr;
+	LuaState L;
 	LuaVariables vars;
 
 	DahdsrParams dahdsr;

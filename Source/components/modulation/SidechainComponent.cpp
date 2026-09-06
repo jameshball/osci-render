@@ -232,10 +232,11 @@ void SidechainComponent::lookAndFeelChanged() {
 }
 
 void SidechainComponent::syncGraphColours() {
-    // Override NodeGraphComponent's constructor defaults with LookAndFeel colours
-    graph.setColour(NodeGraphComponent::backgroundColourId,  getLookAndFeel().findColour(NodeGraphComponent::backgroundColourId));
-    graph.setColour(NodeGraphComponent::gridLineColourId,    getLookAndFeel().findColour(NodeGraphComponent::gridLineColourId));
-    graph.setColour(NodeGraphComponent::nodeOutlineColourId, getLookAndFeel().findColour(NodeGraphComponent::nodeOutlineColourId));
+    auto& inherited = getLookAndFeel();
+    for (int colourId : { NodeGraphComponent::backgroundColourId, NodeGraphComponent::gridLineColourId, NodeGraphComponent::nodeOutlineColourId }) {
+        auto& palette = inherited.isColourSpecified(colourId) ? inherited : PluginLookAndFeel::getSharedInstance();
+        graph.setColour(colourId, palette.findColour(colourId));
+    }
     graph.invalidateGrid();
     graph.repaint();
 }

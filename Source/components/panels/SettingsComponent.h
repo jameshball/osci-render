@@ -102,26 +102,11 @@ private:
     // Envelope flow-marker animation timer
     void timerCallback() override;
 
-    // Proxy components whose bounds are set by layOutComponents() in resized().
-    // They persist into the deferred layoutChildren() call so the async path
-    // reads the same column geometry that was computed synchronously.
+    // Proxy components used to calculate column and row bounds.
     juce::Component layoutVisColumnProxy, layoutEffectsColumnProxy;
 #if OSCI_PREMIUM
     juce::Component layoutTopProxy, layoutBottomProxy;
 #endif
-
-    // Deferred child-layout updater – coalesces rapid resizer-bar drag events
-    // so that the expensive child setBounds cascade runs at most once per
-    // message-loop iteration (≤60fps) while the resizerbar itself tracks
-    // the cursor synchronously at full rate.
-    struct ChildLayoutUpdater : public juce::AsyncUpdater {
-        SettingsComponent& owner;
-        explicit ChildLayoutUpdater(SettingsComponent& o) : owner(o) {}
-        void handleAsyncUpdate() override;
-    };
-    ChildLayoutUpdater childLayoutUpdater{*this};
-
-    void layoutChildren();
 
     // DAHDSR parameter listener helper
     struct DahdsrListener : public juce::AudioProcessorParameter::Listener, public juce::AsyncUpdater {

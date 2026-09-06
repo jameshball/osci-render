@@ -1,6 +1,7 @@
 #include "ModulationSourceComponent.h"
 #include "../effects/EffectComponent.h"
 #include "../../LookAndFeel.h"
+#include "../../visualiser/FramePresenter.h"
 #include "../../audio/modulation/ModulationTypes.h"
 #include <osci_gui/osci_gui.h>
 #include <osci_render_core/midi/osci_MidiManager.h>
@@ -386,10 +387,12 @@ void ModulationSourceComponent::ModTabHandle::mouseDrag(const juce::MouseEvent& 
             g.drawText(label, 0, 0, 50, 20, juce::Justification::centred);
         }
 
-        if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this)) {
-            container->startDragging(desc, this, juce::ScaledImage(dragImage), true);
-            if (owner.onDragActiveChanged)
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+        if (container != nullptr) {
+            container->startDragging(desc, this, juce::ScaledImage(dragImage), !FramePresenter::usesNativeSurface());
+            if (owner.onDragActiveChanged) {
                 owner.onDragActiveChanged(true);
+            }
         }
         isDragging = false;
     }
@@ -654,6 +657,9 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
+    // Only the tab seam is visible. Keep the bottom corners beyond the shadow's blur
+    // radius without regenerating a full-panel shadow on every height change.
+    panelBounds.setHeight(juce::jmin(panelBounds.getHeight(), 2.0f * kSeamShadowHeight));
     juce::Path panelPath;
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),

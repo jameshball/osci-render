@@ -43,6 +43,9 @@ FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce
     : audioProcessor(p), errorCallback(errorCallback) {}
 
 void FileParser::clearLoadedSource() {
+	++sourceGeneration;
+	isAnimatable = false;
+	sampleSource = false;
 	object = nullptr;
 	svg = nullptr;
 	text = nullptr;
@@ -57,6 +60,27 @@ void FileParser::clearLoadedSource() {
 #endif
 }
 
+std::function<void()> FileParser::makeDeferredLoad(std::function<void()> load) {
+	auto weakThis = weak_from_this();
+	const auto generation = sourceGeneration.load();
+	return [weakThis, generation, load = std::move(load)] {
+		auto parser = weakThis.lock();
+		if (parser == nullptr) {
+			return;
+		}
+		{
+			juce::SpinLock::ScopedLockType fileLock(parser->audioProcessor.getFileController().lock);
+			juce::SpinLock::ScopedLockType effectLock(parser->audioProcessor.effectsLock);
+			juce::SpinLock::ScopedLockType scope(parser->lock);
+			if (parser->sourceGeneration != generation) {
+				return;
+			}
+			load();
+		}
+		parser->audioProcessor.getFileController().sendChangeMessage();
+	};
+}
+
 // Helper function to show file size warning
 void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
 	juce::String fileType, std::function<void()> callback) {
@@ -69,26 +93,26 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	const double fileSizeMB = totalBytes / (1024.0 * 1024.0);
 	juce::String message = "The " + fileType + " file '" + fileName + "' you're trying to open is " + juce::String(fileSizeMB, 2) + " MB in size, and may take a long time to open.\n\nWould you like to continue loading it?";
 	
-	juce::MessageManager::callAsync([this, message, callback]() {
-		auto* editor = dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor());
+	auto weakThis = weak_from_this();
+	const auto generation = sourceGeneration.load();
+	juce::MessageManager::callAsync([weakThis, generation, message, deferredLoad = makeDeferredLoad(std::move(callback))] {
+		auto parser = weakThis.lock();
+		if (parser == nullptr || parser->sourceGeneration != generation) {
+			return;
+		}
+		auto* editor = dynamic_cast<CommonPluginEditor*>(parser->audioProcessor.getActiveEditor());
 		osci::showOverlayConfirmationOrAlert(
 			editor,
 			"Large File",
 			message,
 			"Continue",
 			"Cancel",
-			[this, callback] {
-				juce::SpinLock::ScopedLockType scope(lock);
-				callback();
-			},
-			[this] {
-				juce::SpinLock::ScopedLockType scope(lock);
-				disable(); // Mark this parser as inactive
-
-				// Notify the processor to remove this parser
-				juce::MessageManager::callAsync([this] {
-					audioProcessor.getFileController().removeParser(this);
-				});
+			deferredLoad,
+			[weakThis, generation] {
+				auto parser = weakThis.lock();
+				if (parser != nullptr && parser->sourceGeneration == generation) {
+					parser->audioProcessor.getFileController().removeParser(parser.get());
+				}
 			},
 			osci::ErrorOverlay::Icon::Warning,
 			{ 520, 330 });
@@ -139,14 +163,30 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		juce::MemoryBlock buffer{};
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 
+		auto loadImage = [this, buffer, extension] {
+			img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
+			frameRate.store(img->getFrameRate(), std::memory_order_relaxed);
+			isAnimatable = osci::files::isAnimated(extension);
+			sampleSource = true;
+		};
 		showFileSizeWarning(fileName, bytesRead, 20, osci::files::isVideo(extension) ? "video" : "image",
-			[this, buffer, extension]() {
-				img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
-				frameRate.store(img->getFrameRate(), std::memory_order_relaxed);
-				isAnimatable = osci::files::isAnimated(extension);
-                sampleSource = true;
-			}
-		);
+			[this, loadImage, extension] {
+#if OSCI_PREMIUM
+				if (osci::files::isVideo(extension) && !audioProcessor.getFFmpegFile().existsAsFile()) {
+					auto weakThis = weak_from_this();
+					const auto generation = sourceGeneration.load();
+					juce::MessageManager::callAsync([weakThis, generation, deferredLoad = makeDeferredLoad(loadImage)] {
+						auto parser = weakThis.lock();
+						if (parser == nullptr || parser->sourceGeneration != generation) {
+							return;
+						}
+						parser->audioProcessor.ensureFFmpegExists(nullptr, deferredLoad);
+					});
+					return;
+				}
+#endif
+				loadImage();
+			});
 	} else if (extension == ".lsystem") {
 #if OSCI_PREMIUM
 		fractal = std::make_shared<FractalParser>(stream->readEntireStreamAsString());
@@ -188,9 +228,9 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	} else if (osci::files::isAudio(extension)) {
 		wav = std::make_shared<WavParser>([this] { return audioProcessor.currentSampleRate.load(); });
 		if (!wav->parse(std::move(stream))) {
-			juce::MessageManager::callAsync([this, fileName] {
-				auto* editor = dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor());
-				osci::showOverlayMessageOrAlert(editor,
+			juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor()));
+			juce::MessageManager::callAsync([editor, fileName] {
+				osci::showOverlayMessageOrAlert(editor.getComponent(),
 					"Error Loading " + fileName,
 					"The audio file '" + fileName + "' could not be loaded.",
 					osci::ErrorOverlay::Icon::Warning,
@@ -261,7 +301,7 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
     return tempShapes;
 }
 
-osci::Point FileParser::nextSample(lua_State*& L, LuaVariables& vars) {
+osci::Point FileParser::nextSample(LuaState& L, LuaVariables& vars) {
     juce::SpinLock::ScopedLockType scope(lock);
 
     if (lua != nullptr) {

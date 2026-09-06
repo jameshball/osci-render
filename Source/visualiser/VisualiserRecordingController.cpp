@@ -10,6 +10,12 @@ VisualiserRecordingController::VisualiserRecordingController(const juce::File& f
 #endif
 }
 
+VisualiserRecordingController::~VisualiserRecordingController() {
+    chooser.reset();
+    // Export jobs use the encoder and exporter members until they finish.
+    exportThreadPool.removeAllJobs(true, -1);
+}
+
 bool VisualiserRecordingController::wantsVideo(RecordingSettings& settings) const {
 #if OSCI_PREMIUM
     return settings.recordingVideo();
@@ -42,6 +48,9 @@ LiveRecordingResult VisualiserRecordingController::start(RecordingSettings& sett
     const auto outputExtension = captureVideo ? encodingConfiguration.fileExtension : "wav";
 
     if (captureVideo) {
+        if (encoderManager != nullptr) {
+            encoderManager->refreshAvailableEncoders();
+        }
         if (encoderManager == nullptr || !encoderManager->supportsVideoCodec(encodingConfiguration.codec)) {
             return {
                 false,
@@ -81,11 +90,9 @@ LiveRecordingResult VisualiserRecordingController::stopAndChooseExport(const juc
     }
 
     jassert(completion != nullptr);
-    const bool failed = session.hasFailed();
-    const auto failureMessage = session.getFailureMessage();
     auto artifacts = std::make_shared<LiveRecordingArtifacts>(session.finish());
-    if (failed) {
-        return { false, failureMessage };
+    if (session.hasFailed()) {
+        return { false, session.getFailureMessage() };
     }
 
     const auto extension = artifacts->getOutputFileExtension();

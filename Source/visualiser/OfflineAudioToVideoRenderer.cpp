@@ -108,11 +108,14 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
     });
 }
 
-OfflineAudioToVideoRendererComponent::~OfflineAudioToVideoRendererComponent()
-{
+OfflineAudioToVideoRendererComponent::~OfflineAudioToVideoRendererComponent() {
     cancel();
-    if (worker != nullptr)
-        worker->stopThread(2000);
+    if (worker != nullptr) {
+        worker->waitForThreadToExit(-1);
+    }
+    // The render callback captures this component's frame buffer and lock.
+    // Stop it before those members are destroyed.
+    preview.detach();
 }
 
 void OfflineAudioToVideoRendererComponent::paint(juce::Graphics& g)
@@ -568,7 +571,10 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         }
     }
 
-    ffmpegProcess.close();
+    if (!ffmpegProcess.close(shouldCancel() ? 0 : 5000) && !shouldCancel() && result.errorMessage.isEmpty()) {
+        result.errorMessage = "FFmpeg could not finish writing the video file.";
+    }
+    result.cancelled = result.cancelled || shouldCancel();
     offlineRenderLog.event(
         "render loop finished: framesWritten=" + juce::String(framesWritten)
         + " of " + juce::String(totalFrames)

@@ -290,10 +290,6 @@ void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue
 void SettingsComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void SettingsComponent::resized() {
-    childLayoutUpdater.triggerAsyncUpdate();
-}
-
-void SettingsComponent::layoutChildren() {
     auto padding = 7;
     static constexpr int kGap = 3; // small gap between stacked panels
 
@@ -566,10 +562,6 @@ void SettingsComponent::layoutChildren() {
 #endif
 
     repaint();
-}
-
-void SettingsComponent::ChildLayoutUpdater::handleAsyncUpdate() {
-    owner.layoutChildren();
 }
 
 void SettingsComponent::paint(juce::Graphics& g) {
