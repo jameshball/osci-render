@@ -4,6 +4,13 @@ Measurements use an M3 Pro MacBook with 18 GiB RAM and the optimized macOS Profi
 
 ## Measurement scope
 
+Dependency update (6 September): LuaJIT is now pinned to upstream production
+`v2.1` commit `24c20c94e7db195b640854619577441f9b4bc6be` (3 September 2026),
+the latest branch head checked against the official remote. It includes the previously
+measured allocation fix `68354f444728ef99bb51bb4d86e8f1b40853a898`.
+The LuaJIT timings and validation below describe that earlier measured revision;
+the new pin passed the final local builds and regular unit suite below, but was not rebenchmarked.
+
 `processor_benchmark.cpp` runs the real processor in a JUCE standalone application with isolated settings, no audio device and no editor. It measures the outer callback, including internal sample-rate conversion. MIDI/input preparation, output checks, message pumping and serialization are outside timing. Asynchronous voice creation is warmed up and the harness waits, with a timeout, for the exact requested pool before retriggering notes; actual active voices are also checked. One short high-rate warmup exposed an under-filled pool (11/16 active voices), so that run was rejected. Six repeated checks after adding readiness waiting all reached 16 voices, with an additional 46–78 ms setup wait.
 
 The runner validates loaded sources, effects, voices and modulation assignments. Ordinary cases require finite, nonzero output; the zero-length geometry regression permits silence. Missing or malformed measurements fail, and stale output is removed before each launch. Comparisons alternate executable order. Current manifests specify MIDI velocity 80; early runs used approximately 102. Comparisons must use matching inputs. Current per-channel sample-bit hashes are stronger than the older aggregate checksum, but are not a proof against every possible collision. Randomized image paths and asynchronous voice activation can legitimately differ between runs.
@@ -164,7 +171,7 @@ The paused comparison more directly isolates editor rendering: the later app als
 
 JUCE's flag changes how CoreGraphics drawing reaches the backing layer, preserving separated dirty regions instead of relying on macOS's consolidated display-list drawing. It still uses CoreGraphics for component painting. Native interactive live resize uses a distinct synchronous presentation path; compatibility with embedded OpenGL, transparent popouts and fullscreen also needs visual validation before treating this as a generally safe shipping change. No native drag improvement is claimed. Background held-mouse experiments were rejected because native covered-window hit testing prevented the source drag from starting. The candidate flag was removed from the tracked Profiling configuration so profiling continues to represent the normal renderer. Enablement is deferred pending native interaction and visual compatibility checks; the preserved flag-1 app permits that check without rebuilding.
 
-A separate small cleanup removes synchronous beta-update settings refreshes from resize/layout and marks the editor opaque, matching both products' full-background paint methods. Constructor and explicit update-settings callbacks still refresh the badge. Another instance's beta-track change is consequently no longer discovered incidentally when resizing this editor; reopening the editor or its settings refreshes it. These cleanup changes were not included in the flag comparison, and no separate speedup has yet been measured for them.
+A separate small cleanup removes synchronous beta-update settings refreshes from resize/layout and initially marked the editor opaque. The final review removed that opacity change; only the macOS native presenter configures its backing window for transparency. Constructor and explicit update-settings callbacks still refresh the badge. Another instance's beta-track change is consequently no longer discovered incidentally when resizing this editor; reopening the editor or its settings refreshes it. These cleanup changes were not included in the flag comparison, and no separate speedup has yet been measured for them.
 
 To obtain an isolated session through the existing input-disabling preparation path, run `python3 scripts/browse_osci_render_with_jucewright.py --quick --keep-app --session ui-measure --app /absolute/path/to/osci-render.app`. This executes UI coverage and leaves the app open; it is separate from timing and should be run when UI automation is appropriate. Establish the desired muted/project/paused state before measuring. Do not launch directly with a copied profile that has bypassed `disable_profile_audio_input`.
 
@@ -352,3 +359,114 @@ An independent simple OpenGL reproduction tested a synthetic frozen scene in a c
 The user also reported smooth resizing with Recording Settings open and the visualiser stopped. Source inspection confirms heavyweight overlays hide the visualiser before capturing their backdrop, so this observation is consistent with the visualiser/presentation path being the dominant remaining issue; other overlay painting changes mean it is not a perfectly isolated comparison. A possible next live prototype is a fixed-size offscreen GL render into IOSurface-backed textures, presented through CALayer.contents. The installed public SDK explicitly supports IOSurfaceRef contents. GPU completion and surface reuse must be handled without main-thread waits or CPU readback, and production integration must preserve final presentation alpha/cropping/fades and controls. This has not been implemented or benchmarked. Existing application renderer synchronization remains unchanged.
 
 Local experiment files: build/performance-review/live-resize-cache/ and build/performance-review/native-resize-repro/layer-cache/. Production source and normal standalone binary were restored after the temporary comparison build; all snapshot test applications were closed.
+
+## Fixed offscreen renderer with native JUCE image presentation
+
+A user-requested comparison reused the existing renderer, attaching its context to a fixed offscreen child and copying each completed texture into a bounded three-slot native JUCE image mailbox. The visible VisualiserComponent and its controls used normal JUCE painting. It used BGRA readback and row copies, preserving the existing rendering semaphore/triggerRepaint/acquire sequence. This is an opaque embedded-editor prototype; transparency, crop/fade equivalence, recording and popout integration are not validated production paths. It is not retained as a runtime change.
+
+The sibling osci-modular implementation was inspected: it similarly positions a fixed1024-square GL renderer offscreen, reads pixels with glGetTexImage, converts on a worker and paints a JUCE image. It caps large previews at roughly30/20Hz. The osci-render comparison deliberately kept requested resolution and60Hz unchanged. Unlike modular's worker conversion, this small prototype performs reusable row conversion on the GL thread; moving that CPU work would not eliminate it, and alternative scheduling has not been evaluated.
+
+The isolated legacy-context GL probe checked5,505,024 rendered fixture pixels and11,010,048 conversion pixels exactly, including opaque and preserved-alpha conversion. At1024 square, median/p95 microseconds were RGBA completed read554/657, BGRA completed read708/825, scalar conversion748/861, BGRA row conversion with opaque alpha377/409, and fresh native-image painting180/258. BGRA readback was slower while conversion was cheaper. Each native paint followed writable BitmapData access, invalidating JUCE's cached CGImage; the measured draw therefore includes rebuilding its CFData/CGImage representation. These are separate synthetic stages, not an end-to-end sum or app FPS. GPU timing showed variability; current-thread CPU was also recorded.
+
+The application used one identical instrumented Profiling binary with the mode selected at launch. Each isolated profile was muted/input-disabled, loaded the same square SVG, and showed all four modulation panels expanded at a1500x900 window. A test-only message-thread MIDI note started the waveform deterministically in both modes. A first keyboard-pointer fixture was rejected because background input did not reliably start audio; its PNG showed a stationary point. Two alternating-order steady-state pairs per resolution and three alternating-order resize pairs each requested180 warmup and600 measured completed producer-frame callbacks. Process CPU averaged a separately sampled run interval, rather than exactly the600-frame counter window, and used proc_pid_rusage converted with mach_timebase_info, independently checked against process_time; an earlier smoke omitted this conversion and is explicitly excluded. No builds or other owned test applications ran during the paired batch; the user's unrelated desktop activity continued.
+
+| Render size | Native process CPU, cores | CPU-image process CPU, cores | Native footprint, MiB | CPU-image footprint, MiB |
+| --- | ---: | ---: | ---: | ---: |
+| 512 square |0.709|0.871|602|630|
+| 1024 square |0.698|1.108|637|771|
+| 2048 square |0.708|1.583|819|1213|
+
+Values are medians of run measurements. One core corresponds to100% in macOS process CPU conventions. Steady completed producer frames and distinct image painting stayed about60Hz; this is callback/paint accounting, not compositor-confirmed display FPS. Actual1024 readback averaged about5.03ms elapsed but0.73ms GL-thread CPU, with0.57ms conversion CPU per frame. Elapsed readback includes synchronization with actual rendering; it cannot be treated as additional CPU consumption or compared directly with an already-completed synthetic texture read.
+
+Resize requests were paced at up to30Hz through Jucewright, with snapshot:false and no catch-up bursts. They measure programmatic geometry/message-thread round trips, not native mouse resizing or visible frame latency. Native median RTT varied substantially across runs (28.0–75.2ms); its median-of-run medians was67.4ms. CPU-image results were65.8–66.9ms, median66.6ms. This establishes no repeatable overall resize improvement. CPU-image rendering continued near60Hz but only25.5–26.5% of generated frames reached a distinct JUCE image paint (about15–16Hz); the rest were replaced in the bounded display mailbox. Native completed producer-frame callbacks varied24–53Hz during these geometry runs, without a corresponding native displayed-frame counter. Do not claim comparative displayed FPS from those different counters.
+
+The simple continuous-readback route is rejected for now: it raises steady CPU and memory without a demonstrated resize benefit. The single-frame resize preview remains a separate experiment and does not incur this continuous copy cost. A GPU-shared presentation surface could avoid readback, but requires platform-specific integration and remains unimplemented. Local sources, exact checks and eighteen paired run records are under build/performance-review/cpu-image-presentation/ (probe/EVIDENCE.md, application/, manifest.jsonl, application-summary.json, runs/).
+
+The resize-preview comparison was also extended to actual internal splitter mouse-down/up events, retaining live normal-sized toolbar controls. Caching is scoped to each splitter's layout impact: the Premium visualiser/effects splitter caches only the scope; outer editor/code and vertical modulation splitters affect both; the Lua splitter affects neither. Native window resizing still caches both. These preview helpers remain isolated comparison code. Separately, the old SettingsComponent child-layout AsyncUpdater introduced in2a9f34a6 was removed from the branch: layout now runs directly in resized(), eliminating23 net lines. The user reported improved title-bar zoom behavior with that change.
+
+
+Manual follow-up: the user tried the continuous GPU-to-CPU build and reported that it felt substantially smoother. This is positive native-interaction evidence that the programmatic resize RTT experiment did not capture; the measured CPU/memory increase remains. The earlier rejection should therefore be read as rejection of this prototype as a default performance optimization, not proof of no user-visible benefit. The desired follow-up is to preserve fixed offscreen rendering and native layering while avoiding recurring pixel readback, evaluating platform GPU-surface interop rather than forcing ordinary UI painting onto OpenGL.
+
+### macOS GPU-backed native presentation (6 September)
+
+The continuous CPU-image prototype felt substantially smoother in the user's
+manual resize test. A subsequent IOSurface/Core Animation prototype retained
+that feel (user: “Similarly smooth”) while avoiding per-frame GPU readback,
+CPU pixel conversion and native image upload. The app's other components still
+use JUCE's native painting; the main visualiser's fixed OpenGL host renders
+textures and an IOSurface-backed view sits below the JUCE peer view. The native
+painting clears only the scope area, then draws controls/paused text above it.
+
+Two runs per mode/resolution, in reverse order, used the same instrumented
+Profiling binary, square SVG, muted output, no audio input, a fixed MIDI note,
+upsampling, and all four modulation panels expanded. Each run had 180 warm-up
+and 600 measured producer frames. Ordinary laptop use continued, including
+another application instance; these are process CPU measurements, not isolated
+machine-wide energy measurements. The process usage interval also includes a
+small amount of setup outside the frame window, as in the earlier image tests.
+
+| Canvas | Direct GL CPU cores | CPU-image CPU cores | IOSurface CPU cores | IOSurface vs CPU-image |
+| --- | ---: | ---: | ---: | ---: |
+| 1024² | 0.520 / 0.712 | 0.983 / 1.127 | 0.777 / 0.761 | 27% lower mean |
+| 2048² | 0.682 / 0.691 | 1.611 / 1.662 | 0.775 / 0.751 | 53% lower mean |
+
+The 1024 direct-GL runs varied materially; do not turn their mean into a precise
+overhead claim. At 2048 the new path cost about 0.08 additional CPU cores over
+direct GL, while retaining the user-observed resize improvement. Mean process
+footprint fell from about 800 to 659 MiB at 1024, and from 1166 to 889 MiB at
+2048, compared with CPU-image presentation. All modes completed roughly 60
+producer frames/s. IOSurface counters reported no allocation/publish failures
+and 0–2 pool-busy skips over approximately 780 calls; submission is not a
+measurement of compositor-displayed frames.
+
+The GPU transfer uses an explicit completion wait on the GL worker before
+publishing the surface. It has no CPU pixel readback and does not change the
+renderer semaphore/repaint scheduling. A bounded three-surface pool avoids
+writing into the displayed/pending surfaces or surfaces still used by the
+compositor; pending presentation is replaced rather than queued indefinitely.
+The final implementation reduces pool ownership to a single available flag per
+surface and keeps platform-specific work in `FramePresenter_mac.mm`, behind a
+small `FramePresenter` interface. Windows/Linux retain their existing GL path.
+This change applies to the main editor visualiser; existing popout texture
+mirroring and transparent-window presentation remain in place.
+
+`iosurface_copy_probe.mm` checks the physical IOSurface bytes against the old
+readback conversion, including row inversion, BGRA ordering and opaque alpha.
+128×256, 321×157 and 1024×1024 fixtures passed: 1,131,741 pixels, zero channel
+mismatches or GL errors. Reading the rectangle texture back through GL applies
+a different orientation convention, so the check deliberately examines the
+physical surface consumed by Core Animation. The CPU reads exist only in this
+standalone verification program.
+
+The final Profiling build passed native-window screenshot checks for the
+paused overlay, recording settings, About, audio settings, ordinary resizing
+and the expanded modulation panels. The initial prototype's late opacity
+change recreated the native peer and left an extra window; opacity is now set
+in the existing editor window setup before display instead. The GL host was
+also reduced to 1×1 and its native view hidden after the user spotted its tiny
+drawable. The latter adjustment is validated separately from the table above.
+
+Local numerical evidence and screenshots are under
+`build/performance-review/gpu-layer-presentation/`; raw paired results are
+`runs/paired-*/run.json`. The small transfer-check source is retained alongside
+this report. No additional application copies are needed for each test run.
+
+Disk cleanup: the performance directory reached 23 GiB. Redundant objects,
+archives, old comparison bundles and benchmark symbols were removed (9.09 GiB),
+followed by 25 duplicate test-profile FFmpeg binaries (1.06 GiB). Source,
+reports and raw traces were retained. The current build runner refuses to build
+with less than 5 GiB free. Removal manifests are retained locally.
+
+
+## Final local validation (6 September)
+
+After the IOSurface presenter, beta-button cleanup and LuaJIT production pin update,
+local arm64 builds passed for osci-render Profiling Standalone and VST3, sosci
+Debug Standalone, and the Debug unit-test console application. The full regular
+unit suite completed with exit status zero. Projucer rebuilt both arm64 and x86_64
+LuaJIT libraries; application builds here exercised arm64 only. Generated headers
+were restored for osci-render after testing.
+
+No UI automation, pluginval, sanitizer reruns or new performance measurements were
+run in this final pass. Earlier measurements retain their original revision and
+platform scope.

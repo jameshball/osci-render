@@ -219,6 +219,9 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="pxVOD9" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
+        <FILE id="sFrmPr0" name="FramePresenter.h" compile="0" resource="0" file="Source/visualiser/FramePresenter.h"/>
+        <FILE id="sFrmPr1" name="FramePresenter.cpp" compile="1" resource="0" file="Source/visualiser/FramePresenter.cpp"/>
+        <FILE id="sFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0" file="Source/visualiser/FramePresenter_mac.mm"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
         <FILE id="SViRcC" name="VisualiserRecordingController.cpp" compile="1" resource="0"
@@ -362,7 +365,7 @@
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
       </MODULEPATHS>
     </VS2022>
-    <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak"
+    <XCODE_MAC targetFolder="Builds/sosci/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak -framework IOSurface"
                extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="CeSRLV"
                bigIcon="CeSRLV" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"

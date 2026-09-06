@@ -67,6 +67,7 @@ private:
     int defaultEditorWidth = 0;
     int defaultEditorHeight = 0;
     bool fullScreen = false;
+    bool betaUpdatesEnabled = false;
     juce::Rectangle<int> windowedBounds;
 public:
     PluginLookAndFeel lookAndFeel;
