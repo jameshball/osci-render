@@ -19,8 +19,8 @@ const auto& offlineRenderLog = osci::WorkflowLoggers::offlineAudioToVideo;
 }
 
 CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String appName, juce::String projectFileType, int defaultWidth, int defaultHeight)
-    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType)
-{
+    : AudioProcessorEditor(&p), audioProcessor(p), defaultEditorWidth(defaultWidth), defaultEditorHeight(defaultHeight), appName(appName), projectFileType(projectFileType) {
+    setOpaque(true);
 #if JUCE_LINUX
     // use OpenGL on Linux for much better performance. The default on Mac is CoreGraphics, and on Window is Direct2D which is much faster.
     openGlContext.attachTo(*getTopLevelComponent());
@@ -177,7 +177,6 @@ bool CommonPluginEditor::openFile(const juce::File& file) {
 void CommonPluginEditor::resized() {
     audioProcessor.setProperty("appWidth", getWidth());
     audioProcessor.setProperty("appHeight", getHeight());
-    refreshBetaUpdatesButton();
 
     const int promptWidth = juce::jmin(updatePrompt.getPreferredWidth(), getWidth() - 28);
     if (promptWidth > 340) {
@@ -201,9 +200,9 @@ void CommonPluginEditor::refreshBetaUpdatesButton() {
 }
 
 void CommonPluginEditor::layoutBetaUpdatesButton(juce::Rectangle<int>& topBar) {
-    refreshBetaUpdatesButton();
-    if (!betaUpdatesButton.isVisible())
+    if (!betaUpdatesButton.isVisible()) {
         return;
+    }
 
     const auto width = juce::jmin(118, topBar.getWidth());
     betaUpdatesButton.setBounds(topBar.removeFromRight(width).reduced(2, 2));
