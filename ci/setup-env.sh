@@ -48,12 +48,6 @@ else
   unzip -q Projucer.zip
 fi
 
-# Keep OpenGL presentation on the message thread on macOS Tahoe to avoid
-# window-server transaction stalls when moving a floating drag image.
-if [ "$OS" = "mac" ]; then
-  patch --batch -d "$ROOT/ci/bin/JUCE" -p1 < "$ROOT/ci/patches/juce-tahoe-opengl-presentation.patch"
-fi
-
 # Set Projucer path based on OS
 if [ "$OS" = "mac" ]; then
   PROJUCER_PATH="$ROOT/ci/bin/JUCE/Projucer.app/Contents/MacOS/Projucer"
