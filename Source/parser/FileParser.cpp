@@ -60,6 +60,27 @@ void FileParser::clearLoadedSource() {
 #endif
 }
 
+std::function<void()> FileParser::makeDeferredLoad(std::function<void()> load) {
+	auto weakThis = weak_from_this();
+	const auto generation = sourceGeneration.load();
+	return [weakThis, generation, load = std::move(load)] {
+		auto parser = weakThis.lock();
+		if (parser == nullptr) {
+			return;
+		}
+		{
+			juce::SpinLock::ScopedLockType fileLock(parser->audioProcessor.getFileController().lock);
+			juce::SpinLock::ScopedLockType effectLock(parser->audioProcessor.effectsLock);
+			juce::SpinLock::ScopedLockType scope(parser->lock);
+			if (parser->sourceGeneration != generation) {
+				return;
+			}
+			load();
+		}
+		parser->audioProcessor.getFileController().sendChangeMessage();
+	};
+}
+
 // Helper function to show file size warning
 void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
 	juce::String fileType, std::function<void()> callback) {
@@ -74,7 +95,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	
 	auto weakThis = weak_from_this();
 	const auto generation = sourceGeneration.load();
-	juce::MessageManager::callAsync([weakThis, generation, message, callback] {
+	juce::MessageManager::callAsync([weakThis, generation, message, deferredLoad = makeDeferredLoad(std::move(callback))] {
 		auto parser = weakThis.lock();
 		if (parser == nullptr || parser->sourceGeneration != generation) {
 			return;
@@ -86,22 +107,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 			message,
 			"Continue",
 			"Cancel",
-			[weakThis, generation, callback] {
-				auto parser = weakThis.lock();
-				if (parser == nullptr) {
-					return;
-				}
-				{
-					juce::SpinLock::ScopedLockType fileLock(parser->audioProcessor.getFileController().lock);
-					juce::SpinLock::ScopedLockType effectLock(parser->audioProcessor.effectsLock);
-					juce::SpinLock::ScopedLockType scope(parser->lock);
-					if (parser->sourceGeneration != generation) {
-						return;
-					}
-					callback();
-				}
-				parser->audioProcessor.getFileController().sendChangeMessage();
-			},
+			deferredLoad,
 			[weakThis, generation] {
 				auto parser = weakThis.lock();
 				if (parser != nullptr && parser->sourceGeneration == generation) {
@@ -169,27 +175,12 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 				if (osci::files::isVideo(extension) && !audioProcessor.getFFmpegFile().existsAsFile()) {
 					auto weakThis = weak_from_this();
 					const auto generation = sourceGeneration.load();
-					juce::MessageManager::callAsync([weakThis, generation, loadImage] {
+					juce::MessageManager::callAsync([weakThis, generation, deferredLoad = makeDeferredLoad(loadImage)] {
 						auto parser = weakThis.lock();
 						if (parser == nullptr || parser->sourceGeneration != generation) {
 							return;
 						}
-						parser->audioProcessor.ensureFFmpegExists(nullptr, [weakThis, generation, loadImage] {
-							auto parser = weakThis.lock();
-							if (parser == nullptr) {
-								return;
-							}
-							{
-								juce::SpinLock::ScopedLockType fileLock(parser->audioProcessor.getFileController().lock);
-								juce::SpinLock::ScopedLockType effectLock(parser->audioProcessor.effectsLock);
-								juce::SpinLock::ScopedLockType scope(parser->lock);
-								if (parser->sourceGeneration != generation) {
-									return;
-								}
-								loadImage();
-							}
-							parser->audioProcessor.getFileController().sendChangeMessage();
-						});
+						parser->audioProcessor.ensureFFmpegExists(nullptr, deferredLoad);
 					});
 					return;
 				}

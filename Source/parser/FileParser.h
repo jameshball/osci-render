@@ -46,6 +46,7 @@ public:
 
 private:
 	void clearLoadedSource();
+	std::function<void()> makeDeferredLoad(std::function<void()> load);
 	void showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
 		juce::String fileType, std::function<void()> callback);
 
