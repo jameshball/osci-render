@@ -156,6 +156,8 @@
             file="tests/RecordingExporterTests.cpp"/>
       <FILE id="VisTexT" name="VisualiserTextureOutputControllerTests.cpp"
             compile="1" resource="0" file="tests/VisualiserTextureOutputControllerTests.cpp"/>
+      <FILE id="ObjTst" name="ObjLoadingTests.cpp" compile="1" resource="0"
+            file="tests/ObjLoadingTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"
             file="tests/LottieParserTests.cpp"/>
       <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"
@@ -210,6 +212,7 @@
     <MODULE id="juce_mts_esp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
@@ -246,6 +249,7 @@
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="juce_audio_utils" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
@@ -280,6 +284,7 @@
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="juce_audio_utils" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
@@ -313,6 +318,7 @@
         <MODULEPATH id="juce_dsp" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_formats" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
         <MODULEPATH id="osci_gui" path="modules"/>
         <MODULEPATH id="juce_audio_utils" path="../JUCE/modules"/>
         <MODULEPATH id="juce_audio_devices" path="../JUCE/modules"/>
