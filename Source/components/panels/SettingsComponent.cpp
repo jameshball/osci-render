@@ -588,7 +588,7 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     const bool textureInputActive = files.isTextureInputActive();
     bool skipProcessing = files.isObjectServerActive() || (fileName.isEmpty() && !textureInputActive);
     const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);
-    const bool usesFrameControls = isImage || osci::files::isAnimated(extension);
+    const bool usesFrameControls = isImage || (isAnimatedFile && !juce::JUCEApplicationBase::isStandaloneApp());
     quickControls.setAnimated(!skipProcessing && isAnimatedFile);
 
     if (skipProcessing) {
