@@ -222,9 +222,38 @@ public:
         expect(fitted.getHeight() >= 1);
 
         beginTest("Graticule line generation is pure geometry");
-        const auto graticuleLines = VisualiserGeometry::getGraticuleLineVertices({1920, 1080});
+        constexpr VisualiserRenderSize graticuleSize{1920, 1080};
+        const auto graticuleLines = VisualiserGeometry::getGraticuleLineVertices(graticuleSize);
         expect(!graticuleLines.empty());
         expect(graticuleLines.size() % 4 == 0);
+
+        beginTest("Graticule ticks are centred on their grid positions");
+        graticule = VisualiserGeometry::getGraticuleLayout(graticuleSize);
+        constexpr int minorDivisions = 5;
+        const int majorLineCount = graticule.yDivisions + graticule.xDivisions + 2;
+        const int horizontalTicksPerLine = graticule.xDivisions * minorDivisions + 1;
+        const int verticalTicksPerLine = graticule.yDivisions * minorDivisions + 1;
+        size_t lineIndex = static_cast<size_t>(majorLineCount);
+
+        for (int i = 1; i < graticule.yDivisions; i++) {
+            const float y = graticule.yOriginPixels + graticule.cellSizePixels * static_cast<float>(i);
+            const float expectedY = VisualiserGeometry::graticulePixelToClip(y, graticuleSize.height);
+            for (int j = 0; j < horizontalTicksPerLine; j++, lineIndex++) {
+                const size_t vertexIndex = lineIndex * 4;
+                const float tickMidpoint = (graticuleLines[vertexIndex + 1] + graticuleLines[vertexIndex + 3]) * 0.5f;
+                expectWithinAbsoluteError(tickMidpoint, expectedY, 0.000001f);
+            }
+        }
+
+        for (int i = 1; i < graticule.xDivisions; i++) {
+            const float x = graticule.xOriginPixels + graticule.cellSizePixels * static_cast<float>(i);
+            const float expectedX = VisualiserGeometry::graticulePixelToClip(x, graticuleSize.width);
+            for (int j = 0; j < verticalTicksPerLine; j++, lineIndex++) {
+                const size_t vertexIndex = lineIndex * 4;
+                const float tickMidpoint = (graticuleLines[vertexIndex] + graticuleLines[vertexIndex + 2]) * 0.5f;
+                expectWithinAbsoluteError(tickMidpoint, expectedX, 0.000001f);
+            }
+        }
     }
 };
 
