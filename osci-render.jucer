@@ -767,7 +767,7 @@
                        debugInformationFormat="ProgramDatabase" winWarningLevel="2"
                        libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
-                       prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="1"/>
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
