@@ -156,6 +156,8 @@
             file="tests/RecordingExporterTests.cpp"/>
       <FILE id="VisTexT" name="VisualiserTextureOutputControllerTests.cpp"
             compile="1" resource="0" file="tests/VisualiserTextureOutputControllerTests.cpp"/>
+      <FILE id="WhlTst" name="PerformanceWheelTests.cpp" compile="1" resource="0"
+            file="tests/PerformanceWheelTests.cpp"/>
       <FILE id="ObjTst" name="ObjLoadingTests.cpp" compile="1" resource="0"
             file="tests/ObjLoadingTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"

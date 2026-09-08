@@ -163,6 +163,9 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 
     // Keyboard
     addAndMakeVisible(keyboardViewport);
+#if OSCI_PREMIUM
+    addAndMakeVisible(wheels);
+#endif
     keyboardViewport.setViewedComponent(&keyboard, false);
     keyboardViewport.setScrollBarsShown(false, false, false, true);
     keyboardViewport.setColour(osci::scrollFadeOverlayBackgroundColourId,
@@ -445,8 +448,15 @@ void SettingsComponent::resized() {
         // ============================================================
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
-        const bool showKeyboard = midiOn
-                          && audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
+        const bool keyboardEnabled = audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
+        const bool showKeyboard = midiOn && keyboardEnabled;
+
+        midi.setAccessory(keyboardEnabled ? nullptr : &wheels);
+        if (keyboardEnabled && wheels.getParentComponent() != this) {
+            addAndMakeVisible(wheels);
+        }
+
+        wheels.setVisible(!keyboardEnabled || midiOn);
 
         // Reserve space for keyboard at the very bottom if MIDI is on
         if (showKeyboard) {
@@ -455,7 +465,10 @@ void SettingsComponent::resized() {
                 area.getBottom() - keyboardHeight,
                 area.getWidth(),
                 keyboardHeight);
-            keyboardViewport.setBounds(keyboardPanelBounds);
+            auto keyArea = keyboardPanelBounds;
+            wheels.setBounds(keyArea.removeFromLeft(PerformanceWheelsComponent::compactPreferredWidth));
+            keyArea.removeFromLeft(PerformanceWheelsComponent::wheelGap);
+            keyboardViewport.setBounds(keyArea);
 
             const auto viewportBounds = keyboardViewport.getLocalBounds();
             const auto whiteKeyCount = juce::CustomMidiKeyboardComponent::getWhiteKeyCount(keyboard.getRangeStart(), keyboard.getRangeEnd());

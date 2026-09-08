@@ -34,6 +34,9 @@
 #include "audio/modulation/SidechainState.h"
 #include "audio/modulation/SidechainParameters.h"
 #include "audio/modulation/ModulationEngine.h"
+#if OSCI_PREMIUM
+#include "audio/modulation/WheelParameters.h"
+#endif
 #include "audio/modulation/ModulationTypes.h"
 #include <osci_render_core/osci_render_core.h>
 #include <osci_file_import/osci_file_import.h>
@@ -232,6 +235,11 @@ public:
     // Returns all modulation source bindings for generic wiring in EffectComponent.
     std::vector<ModulationSourceBinding> getModulationSourceBindings();
 
+#if OSCI_PREMIUM
+    WheelParameters wheelParameters;
+    std::shared_ptr<osci::Effect> pitchModulation = std::make_shared<osci::SimpleEffect>(
+        new osci::EffectParameter("Pitch Modulation", "Additional pitch bend, scaled by the bend range.", "pitchModulation", VERSION_HINT, 0.0, -1.0, 1.0));
+#endif
     juce::MidiKeyboardState keyboardState;
 
     osci::IntParameter* voices = new osci::IntParameter("Voices", "voices", VERSION_HINT, 4, 1, 16);

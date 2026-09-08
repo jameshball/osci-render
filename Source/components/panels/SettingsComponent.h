@@ -10,6 +10,9 @@
 #include "LuaComponent.h"
 #include "MidiComponent.h"
 #include "QuickControlsBar.h"
+#if OSCI_PREMIUM
+#include "PerformanceWheelsComponent.h"
+#endif
 #include "../../PluginProcessor.h"
 #include "../modulation/EnvelopeComponent.h"
 #include "../OpenFileComponent.h"
@@ -61,6 +64,9 @@ private:
     std::unique_ptr<SidechainComponent> sidechain;
     osci::ScrollFadeViewport keyboardViewport;
     juce::CustomMidiKeyboardComponent keyboard;
+#if OSCI_PREMIUM
+    PerformanceWheelsComponent wheels{audioProcessor, keyboard};
+#endif
 
     bool examplesVisible = false;
 

@@ -99,6 +99,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     std::vector<std::shared_ptr<osci::Effect>> osciPermanentEffects;
     osciPermanentEffects.push_back(perspective);
     osciPermanentEffects.push_back(frequencyEffect);
+#if OSCI_PREMIUM
+    osciPermanentEffects.push_back(pitchModulation);
+#endif
     osciPermanentEffects.push_back(imageThreshold);
     osciPermanentEffects.push_back(imageStride);
     osciPermanentEffects.push_back(animationSpeed);
@@ -146,6 +149,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     floatParameters.push_back(legacyAnimationRate);
     floatParameters.push_back(animationOffset);
     floatParameters.push_back(standaloneBpm);
+#if OSCI_PREMIUM
+    for (auto* parameter : wheelParameters.getFloatParameters()) { floatParameters.push_back(parameter); }
+#endif
 
     // Adopt parameters from modulation state classes (premium only)
 #if OSCI_PREMIUM
@@ -250,6 +256,13 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     modulationEngine.addSource(&envelopeParameters);
     modulationEngine.addSource(&randomParameters);
     modulationEngine.addSource(&sidechainParameters);
+#if OSCI_PREMIUM
+    modulationEngine.addSource(&wheelParameters);
+    wheelParameters.setColourFunction([](int) { return osci::Colours::accentColor(); });
+    wheelParameters.setUndoManager(&undoManager);
+    wheelParameters.setUndoSuppressedFlag(&undoSuppressed);
+    wheelParameters.setUndoGroupingFlag(&undoGrouping);
+#endif
 
     // Set colour functions (defined in UI component headers, so set here to avoid
     // coupling the audio-layer headers to UI headers).
@@ -627,6 +640,28 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         midiMessages.clear();
         midiMessages.addEvents(filteredMidiMessages, 0, -1, 0);
     }
+#if OSCI_PREMIUM
+    // UI/automation changes affect only their channel; MIDI events retain their sample positions.
+    for (int ch = 0; ch < 16; ++ch) {
+        const int value = juce::jlimit(0, 16383, juce::roundToInt((wheelParameters.pitch[ch]->getValueUnnormalised() + 1.0f) * 8192.0f));
+        if (value != wheelParameters.lastPitch[ch]) {
+            synth.handleMidiEvent(juce::MidiMessage::pitchWheel(ch + 1, value));
+            wheelParameters.lastPitch[ch] = value;
+        }
+    }
+    for (const auto event : midiMessages) {
+        if (event.numBytes == 3 && (event.data[0] & 0xf0) == 0xe0) {
+            const int ch = event.data[0] & 0x0f;
+            const int value = event.data[1] | (event.data[2] << 7);
+            wheelParameters.pitch[ch]->setValueUnnormalised((value - 8192.0f) / 8192.0f);
+            wheelParameters.lastPitch[ch] = value;
+            if (!midiEnabled->getBoolValue()) {
+                synth.handleMidiEvent(juce::MidiMessage::pitchWheel(ch + 1, value));
+            }
+        }
+    }
+    wheelParameters.fillBlock(buffer.getNumSamples(), midiMessages);
+#endif
     const bool midiChannelChanged = selectedMidiChannel != previousMidiInputChannel;
     previousMidiInputChannel = selectedMidiChannel;
 
@@ -735,6 +770,17 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
         // Apply all modulation buffers to animated parameter values (generic)
         modulationEngine.applyAllModulation(numSamples);
+#if OSCI_PREMIUM
+        const auto* pitch = pitchModulation->getAnimatedValuesReadPointer(0, numSamples);
+        const float bend = float(pitchBendRange->getValueUnnormalised());
+        for (int i = 0; i < numSamples; ++i) {
+            const float value = pitch != nullptr ? pitch[i] : float(pitchModulation->getValue());
+            wheelParameters.pitchMultipliers[i] = value == 0.0f ? 1.0f : std::exp2(value * bend / 12.0f);
+        }
+        if (numSamples > 0) {
+            wheelParameters.pitchDisplay.store(pitch != nullptr ? pitch[numSamples - 1] : float(pitchModulation->getValue()), std::memory_order_relaxed);
+        }
+#endif
     }
 
     outputBuffer3d.setSize(6, buffer.getNumSamples(), false, false, true);
@@ -985,6 +1031,10 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
     sidechainParameters.saveToXml(xml.get());
 #endif
 
+#if OSCI_PREMIUM
+    wheelParameters.saveToXml(xml.get());
+#endif
+
     auto customFunction = xml->createNewChildElement("customFunction");
     customFunction->addTextElement(juce::Base64::toBase64(luaEffectState->getCode()));
 
@@ -1159,6 +1209,9 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
         sidechainParameters.loadFromXml(xml.get());
 #endif
 
+#if OSCI_PREMIUM
+        wheelParameters.loadFromXml(xml.get());
+#endif
         recordingParameters.load(xml.get());
 
         const auto previousObjectServerPort = std::any_cast<int>(getProperty("objectServerPort", 51677));

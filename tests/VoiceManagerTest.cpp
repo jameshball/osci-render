@@ -67,7 +67,8 @@ public:
     bool canPlaySound(juce::SynthesiserSound*) override { return true; }
     void startNote(int, float, juce::SynthesiserSound*, int) override {}
     void stopNote(float, bool) override {}
-    void pitchWheelMoved(int) override {}
+    int lastPitchWheel = 8192;
+    void pitchWheelMoved(int value) override { lastPitchWheel = value; }
     void controllerMoved(int, int) override {}
 
     void renderNextBlock(juce::AudioSampleBuffer& buf, int startSample, int numSamples) override {
@@ -898,3 +899,26 @@ static VMDrawingStateTransferTest vmDrawingStateTransferTest;
 static VMPolyphonyEnforcementTest vmPolyphonyEnforcementTest;
 static VMRapidNoteFlurryTest vmRapidNoteFlurryTest;
 static VMStressTest vmStressTest;
+
+class VMPitchWheelTest final : public juce::UnitTest {
+public:
+    VMPitchWheelTest() : juce::UnitTest("Channel pitch wheel", "Wheels") {}
+    void runTest() override {
+        beginTest("New notes inherit the bend on their channel only");
+        auto [vm, client] = createVM(4);
+        vm->handleMidiEvent(juce::MidiMessage::pitchWheel(2, 12288));
+        sendNoteOn(*vm, 60, 0.8f, 1);
+        sendNoteOn(*vm, 64, 0.8f, 2);
+        auto* first = findVoicePlayingNote(*vm, 60);
+        auto* second = findVoicePlayingNote(*vm, 64);
+        expect(first != nullptr && second != nullptr);
+        if (first != nullptr && second != nullptr) {
+            expectEquals(first->lastPitchWheel, 8192);
+            expectEquals(second->lastPitchWheel, 12288);
+            vm->handleMidiEvent(juce::MidiMessage::pitchWheel(1, 4096));
+            expectEquals(first->lastPitchWheel, 4096);
+            expectEquals(second->lastPitchWheel, 12288);
+        }
+    }
+};
+static VMPitchWheelTest vmPitchWheelTest;

@@ -18,7 +18,25 @@ public:
 
 	void resized() override;
 	void paint(juce::Graphics& g) override;
+#if OSCI_PREMIUM
+    // Optional performance controls beside the MIDI toggle.
+    void setAccessory(juce::Component* component) {
+        if (accessory == component) { return; }
+        if (accessory != nullptr) {
+            accessory->setAlpha(1.0f);
+            accessory->setEnabled(true);
+            removeChildComponent(accessory);
+        }
+        accessory = component;
+        if (accessory != nullptr) { addAndMakeVisible(accessory); }
+        updateEnabledState();
+        resized();
+    }
+#endif
 private:
+#if OSCI_PREMIUM
+    juce::Component* accessory = nullptr;
+#endif
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;
 

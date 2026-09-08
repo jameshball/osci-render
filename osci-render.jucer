@@ -274,6 +274,8 @@
                 file="Source/audio/modulation/ModulationAssignmentStore.h"/>
           <FILE id="MdSrH1" name="ModulationSource.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationSource.h"/>
+          <FILE id="WhlPrH" name="WheelParameters.h" compile="0" resource="0"
+                file="Source/audio/modulation/WheelParameters.h"/>
           <FILE id="MdDsH1" name="ModulationDisplayBuffer.h" compile="0" resource="0"
                 file="Source/audio/modulation/ModulationDisplayBuffer.h"/>
           <FILE id="MdUaH1" name="ModulationUndoActions.h" compile="0" resource="0"
@@ -482,6 +484,8 @@
                 file="Source/components/panels/QuickControlsBar.cpp"/>
           <FILE id="QkCtBH" name="QuickControlsBar.h" compile="0" resource="0"
                 file="Source/components/panels/QuickControlsBar.h"/>
+          <FILE id="WhlUiH" name="PerformanceWheelsComponent.h" compile="0" resource="0"
+                file="Source/components/panels/PerformanceWheelsComponent.h"/>
           <FILE id="x57ccs" name="SettingsComponent.cpp" compile="1" resource="0"
                 file="Source/components/panels/SettingsComponent.cpp"/>
           <FILE id="Vlmozi" name="SettingsComponent.h" compile="0" resource="0"

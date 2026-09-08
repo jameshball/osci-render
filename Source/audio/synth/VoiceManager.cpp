@@ -193,6 +193,9 @@ void VoiceManager::noteOn(int note, float velocity, int channel) {
 
     if (client != nullptr) {
         client->voiceActivated(*voice, isLegatoNote);
+        if (voice->getJuceVoice() != nullptr) {
+            voice->getJuceVoice()->pitchWheelMoved(juce::roundToInt(pitchWheelValues[channel] * 8192.0f) + 8192);
+        }
         if (restoreSource != nullptr)
             client->restoreDrawingState(*voice, *restoreSource);
     }
@@ -280,6 +283,9 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
 
                     if (client != nullptr) {
                         client->voiceActivated(*newVoice, isLegatoNote);
+                        if (newVoice->getJuceVoice() != nullptr) {
+                            newVoice->getJuceVoice()->pitchWheelMoved(juce::roundToInt(pitchWheelValues[oldChannel] * 8192.0f) + 8192);
+                        }
                         if (restoreSource != nullptr)
                             client->restoreDrawingState(*newVoice, *restoreSource);
                     }
