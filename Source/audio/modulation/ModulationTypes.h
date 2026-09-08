@@ -19,6 +19,9 @@ inline const std::vector<ModulationType>& getModulationTypes() {
         { "ENV", "env", 0xFFFF6E4A },
         { "RNG", "rng", 0xFF50FA7B },
         { "SC",  "sc",  0xFFFF6B6B },
+#if OSCI_PREMIUM
+        { "MW",  "mw",  0xFFB080FF },
+#endif
     };
     return types;
 }

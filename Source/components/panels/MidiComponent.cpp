@@ -80,6 +80,12 @@ void MidiComponent::updateEnabledState() {
     float alpha = midiOn ? 1.0f : 0.4f;
     voicesBar.setAlpha(alpha);
 #if OSCI_PREMIUM
+    if (accessory != nullptr) {
+        accessory->setAlpha(alpha);
+        accessory->setEnabled(midiOn);
+    }
+#endif
+#if OSCI_PREMIUM
     disabledOverlay.setDisabledWithSiblings(!midiOn,
         { velTrkKnob, bendBar, glideKnob, slopeGraph,
           alwaysGlideToggle, legatoToggle, octaveScaleToggle, tempoBar });
@@ -112,8 +118,19 @@ void MidiComponent::resized() {
     auto toggleSection = area.removeFromLeft(kToggleSectionWidth);
     midiSwitch.setBounds(toggleSection);
 
+#if OSCI_PREMIUM
+    const auto overlayArea = area;
+    if (accessory != nullptr) {
+        accessory->setBounds(area.removeFromLeft(accessory->getWidth() + 6).reduced(3));
+    }
+#endif
+
     // Settings section — cumulative boundary layout to avoid jitter
+#if OSCI_PREMIUM
+    auto settingsArea = area.reduced(0, 3).withTrimmedLeft(accessory != nullptr ? 0 : 5).withTrimmedRight(5);
+#else
     auto settingsArea = area.reduced(5, 3);
+#endif
 
     constexpr int gap = 3;
 #if OSCI_PREMIUM
@@ -183,7 +200,7 @@ void MidiComponent::resized() {
         tempoBar.setBounds(nextCol(colWidth, 2));
 
     // Overlay covers the settings section (right of toggle)
-    disabledOverlay.setBounds(area);
+    disabledOverlay.setBounds(overlayArea);
 #endif
 }
 
