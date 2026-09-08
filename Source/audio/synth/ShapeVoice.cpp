@@ -452,7 +452,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             frameDrawn -= frameLength;
             if (currentSound != nullptr && currentlyPlaying) {
                 if (currentSound->updateFrame(frame)) {
+                    double prevFrameLength = frameLength;
                     frameLength = currentSound->getFrameLength();
+                    frameDrawn *= frameLength / prevFrameLength;
                 }
             }
             shapeDrawn = frameDrawn;
