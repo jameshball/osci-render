@@ -451,7 +451,7 @@ void SettingsComponent::resized() {
         const bool keyboardEnabled = audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
         const bool showKeyboard = midiOn && keyboardEnabled;
 
-        midi.setAccessory(keyboardEnabled ? nullptr : &wheels);
+        midi.setAccessory(keyboardEnabled ? nullptr : &wheels, PerformanceWheelsComponent::preferredWidth);
         if (keyboardEnabled && wheels.getParentComponent() != this) {
             addAndMakeVisible(wheels);
         }

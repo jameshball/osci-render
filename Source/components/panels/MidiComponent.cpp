@@ -121,7 +121,7 @@ void MidiComponent::resized() {
 #if OSCI_PREMIUM
     const auto overlayArea = area;
     if (accessory != nullptr) {
-        accessory->setBounds(area.removeFromLeft(accessory->getWidth() + 6).reduced(3));
+        accessory->setBounds(area.removeFromLeft(accessoryWidth + 6).reduced(3));
     }
 #endif
 

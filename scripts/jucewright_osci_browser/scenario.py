@@ -166,6 +166,17 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.try_step(f"timeline pause after play for {label}", self.cli("click", "--name", "Pause", "--exact", "--timeout-ms", "3000"))
             self.try_step(f"timeline stop for {label}", self.cli("click", "--name", "Stop", "--exact", "--timeout-ms", "3000"))
 
+    def exercise_performance_wheels(self) -> None:
+        pitch = ["--name", "Pitch wheel", "--exact"]
+        modulation = ["--name", "Modulation wheel", "--exact"]
+        self.run_step("pitch wheel drag", self.cli("drag", *pitch, "--dx", "0", "--dy", "-35", "--steps", "8"))
+        self.run_step("pitch wheel returns to centre", self.cli("wait-for-value", *pitch, "--value", "0"))
+        self.run_step("set modulation wheel", self.cli("set-value", *modulation, "0.6"))
+        self.run_step("modulation wheel retains value", self.cli("wait-for-value", *modulation, "--value", "0.6"))
+        self.run_step("reset modulation wheel", self.cli("dblclick", *modulation))
+        self.run_step("modulation wheel returns to zero", self.cli("wait-for-value", *modulation, "--value", "0"))
+        self.run_step("performance wheels screenshot", self.cli("screenshot", "--class", "PerformanceWheelsComponent", "--file", self.artifact_dir / "performance_wheels.png"))
+
     def exercise_file_switching(self) -> None:
         self.try_step("switch to previous file", self.cli("click", "--name", "leftArrow", "--exact", "--timeout-ms", "3000"))
         self.try_step("snapshot after previous file", self.cli("snapshot", "--json", "--interesting", "--depth", "10"))
@@ -618,6 +629,7 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             self.run_step("midi controls after enabling for keyboard and env", self.cli("snapshot", "--json", "--interesting", "--depth", "10", "--class", "MidiComponent"))
             self.ensure_midi_keyboard_visible()
             self.exercise_midi_keyboard_clicks()
+            self.exercise_performance_wheels()
             self.run_step("modulation tabs snapshot with midi enabled", self.cli("locator", "--format", "json", "--class", "ModTabHandle"))
             self.exercise_modulation_tabs(env_tabs, True)
             self.ensure_midi_mode(False, "after keyboard and env modulation")

@@ -20,7 +20,7 @@ public:
 	void paint(juce::Graphics& g) override;
 #if OSCI_PREMIUM
     // Optional performance controls beside the MIDI toggle.
-    void setAccessory(juce::Component* component) {
+    void setAccessory(juce::Component* component, int width) {
         if (accessory == component) { return; }
         if (accessory != nullptr) {
             accessory->setAlpha(1.0f);
@@ -28,6 +28,7 @@ public:
             removeChildComponent(accessory);
         }
         accessory = component;
+        accessoryWidth = width;
         if (accessory != nullptr) { addAndMakeVisible(accessory); }
         updateEnabledState();
         resized();
@@ -36,6 +37,7 @@ public:
 private:
 #if OSCI_PREMIUM
     juce::Component* accessory = nullptr;
+    int accessoryWidth = 0;
 #endif
 	OscirenderAudioProcessor& audioProcessor;
 	OscirenderAudioProcessorEditor& pluginEditor;

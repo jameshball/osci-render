@@ -35,7 +35,22 @@ public:
         bool receivedController = false;
         float value = modulation->getValueUnnormalised();
         for (const auto event : midi) {
-            if (event.numBytes != 3 || (event.data[0] & 0xf0) != 0xb0 || event.data[1] != 1) { continue; }
+            if (event.samplePosition >= samples) {
+                break;
+            }
+            if (event.numBytes != 3) {
+                continue;
+            }
+            const int status = event.data[0] & 0xf0;
+            if (status == 0xe0) {
+                const int channel = event.data[0] & 0x0f;
+                const int bend = event.data[1] | (event.data[2] << 7);
+                pitch[channel]->setValueUnnormalised((bend - 8192.0f) / 8192.0f);
+                lastPitch[channel] = bend;
+            }
+            if (status != 0xb0 || event.data[1] != 1) {
+                continue;
+            }
             const int end = juce::jlimit(written, samples, event.samplePosition);
             std::fill(buffer.begin() + written, buffer.begin() + end, value);
             written = end;

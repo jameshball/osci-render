@@ -262,25 +262,9 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     // Recompute pitch wheel adjustment using current bend range parameter
     pitchWheelMoved(rawPitchWheelValue);
 
-    // Per-sample frequency animated buffer pointer for non-MIDI mode
-#if OSCI_PREMIUM
-    const float* freqAnimBuf = (!audioProcessor.midiEnabled->getBoolValue())
+    const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
+    const float* freqAnimBuf = !midiEnabled
         ? audioProcessor.frequencyEffect->getAnimatedValuesReadPointer(0, startSample + numSamples) : nullptr;
-#else
-    const float* freqAnimBuf = (!audioProcessor.midiEnabled->getBoolValue())
-        ? audioProcessor.frequencyEffect->getAnimatedValuesReadPointer(0, numSamples) : nullptr;
-
-    if (audioProcessor.midiEnabled->getBoolValue()) {
-        // Glide is advanced per-sample below; set initial frequency here
-        if (!glideActive) {
-            actualFrequency = frequency * pitchWheelAdjustment;
-        }
-    } else {
-        // Non-MIDI: initial frequency from animated buffer (first sample).
-        // Per-sample updates happen inside the rendering loop below.
-        actualFrequency = freqAnimBuf ? (double)freqAnimBuf[0] + 0.000001 : audioProcessor.frequencyEffect->getValue() + 0.000001;
-    }
-#endif
 
     // Prepare working buffers for effect processing
     voiceBuffer.setSize(numChannels, numSamples, false, false, true);
@@ -290,7 +274,6 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     frameSyncBuffer.setSize(1, numSamples, false, false, true);
     frameSyncBuffer.clear();
 
-    const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
     const double sampleRate = audioProcessor.getEffectiveSampleRate();
     const double dt = 1.0 / sampleRate;
 
@@ -341,22 +324,15 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                 double logTarget = std::log(glideTargetFreq);
                 frequency = std::exp(logSource + t * (logTarget - logSource));
             }
-#if !OSCI_PREMIUM
-            actualFrequency = frequency * pitchWheelAdjustment;
-#endif
         }
 
-#if !OSCI_PREMIUM
-        // Per-sample frequency update from animated buffer in non-MIDI mode
-        if (freqAnimBuf) {
-            actualFrequency = (double)freqAnimBuf[i] + 0.000001;
-        }
-#endif
-
-        int sample = startSample + i;
+        const int sample = startSample + i;
+        const double baseFrequency = midiEnabled ? frequency
+            : (freqAnimBuf != nullptr ? double(freqAnimBuf[sample]) : audioProcessor.frequencyEffect->getValue()) + 0.000001;
 #if OSCI_PREMIUM
-        const double baseFrequency = midiEnabled ? frequency : (freqAnimBuf != nullptr ? double(freqAnimBuf[startSample + i]) : audioProcessor.frequencyEffect->getValue()) + 0.000001;
-        actualFrequency = baseFrequency * pitchWheelAdjustment * audioProcessor.wheelParameters.pitchMultipliers[startSample + i];
+        actualFrequency = baseFrequency * pitchWheelAdjustment * audioProcessor.wheelParameters.pitchMultipliers[sample];
+#else
+        actualFrequency = baseFrequency * (midiEnabled ? pitchWheelAdjustment : 1.0);
 #endif
         lengthIncrement = juce::jmax(frameLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
