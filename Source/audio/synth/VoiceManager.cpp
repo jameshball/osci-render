@@ -4,6 +4,7 @@
 #include "VoiceManager.h"
 
 VoiceManager::VoiceManager() {
+    pitchWheelValues.fill(8192);
     pressedNotes.reserve(128);
     allVoices.reserve(kMaxPolyphony + 1);
     activeVoices.reserve(kMaxPolyphony + 1);
@@ -143,8 +144,9 @@ void VoiceManager::handleMidiEventUnlocked(const juce::MidiMessage& m) {
         allSoundsOff();
     } else if (m.isPitchWheel()) {
         int ch = m.getChannel() - 1;
-        if (ch >= 0 && ch < kNumMidiChannels)
-            pitchWheelValues[ch] = (m.getPitchWheelValue() - 8192.0f) / 8192.0f;
+        if (ch >= 0 && ch < kNumMidiChannels) {
+            pitchWheelValues[ch] = m.getPitchWheelValue();
+        }
         for (auto* mv : activeVoices) {
             if (mv->getState().channel == ch && mv->getJuceVoice() != nullptr)
                 mv->getJuceVoice()->pitchWheelMoved(m.getPitchWheelValue());
@@ -194,7 +196,7 @@ void VoiceManager::noteOn(int note, float velocity, int channel) {
     if (client != nullptr) {
         client->voiceActivated(*voice, isLegatoNote);
         if (voice->getJuceVoice() != nullptr) {
-            voice->getJuceVoice()->pitchWheelMoved(juce::roundToInt(pitchWheelValues[channel] * 8192.0f) + 8192);
+            voice->getJuceVoice()->pitchWheelMoved(pitchWheelValues[channel]);
         }
         if (restoreSource != nullptr)
             client->restoreDrawingState(*voice, *restoreSource);
@@ -284,7 +286,7 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
                     if (client != nullptr) {
                         client->voiceActivated(*newVoice, isLegatoNote);
                         if (newVoice->getJuceVoice() != nullptr) {
-                            newVoice->getJuceVoice()->pitchWheelMoved(juce::roundToInt(pitchWheelValues[oldChannel] * 8192.0f) + 8192);
+                            newVoice->getJuceVoice()->pitchWheelMoved(pitchWheelValues[oldChannel]);
                         }
                         if (restoreSource != nullptr)
                             client->restoreDrawingState(*newVoice, *restoreSource);

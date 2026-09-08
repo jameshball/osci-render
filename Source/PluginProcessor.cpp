@@ -150,7 +150,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     floatParameters.push_back(animationOffset);
     floatParameters.push_back(standaloneBpm);
 #if OSCI_PREMIUM
-    for (auto* parameter : wheelParameters.getFloatParameters()) { floatParameters.push_back(parameter); }
+    for (auto* parameter : wheelParameters.getFloatParameters()) {
+        floatParameters.push_back(parameter);
+    }
 #endif
 
     // Adopt parameters from modulation state classes (premium only)
@@ -649,17 +651,6 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
             wheelParameters.lastPitch[ch] = value;
         }
     }
-    for (const auto event : midiMessages) {
-        if (event.numBytes == 3 && (event.data[0] & 0xf0) == 0xe0) {
-            const int ch = event.data[0] & 0x0f;
-            const int value = event.data[1] | (event.data[2] << 7);
-            wheelParameters.pitch[ch]->setValueUnnormalised((value - 8192.0f) / 8192.0f);
-            wheelParameters.lastPitch[ch] = value;
-            if (!midiEnabled->getBoolValue()) {
-                synth.handleMidiEvent(juce::MidiMessage::pitchWheel(ch + 1, value));
-            }
-        }
-    }
     wheelParameters.fillBlock(buffer.getNumSamples(), midiMessages);
 #endif
     const bool midiChannelChanged = selectedMidiChannel != previousMidiInputChannel;
@@ -673,7 +664,19 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
     bool usingMidi = midiEnabled->getBoolValue();
     if (!usingMidi) {
+#if OSCI_PREMIUM
+        // Keep bends sample accurate while suppressing external note/pedal events.
+        filteredMidiMessages.clear();
+        for (const auto event : midiMessages) {
+            if (event.numBytes == 3 && (event.data[0] & 0xf0) == 0xe0) {
+                filteredMidiMessages.addEvent(event.data, event.numBytes, event.samplePosition);
+            }
+        }
         midiMessages.clear();
+        midiMessages.addEvents(filteredMidiMessages, 0, -1, 0);
+#else
+        midiMessages.clear();
+#endif
     }
 
     // Release voices hidden by a new channel filter or MIDI mode.
@@ -1021,18 +1024,9 @@ void OscirenderAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
         parameter->save(parameterXml);
     }
 
-    // Save global LFO waveforms & assignments (premium only)
+    // Save every registered modulation source, including wheel assignments.
 #if OSCI_PREMIUM
-    lfoParameters.saveToXml(xml.get());
-
-    envelopeParameters.saveToXml(xml.get());
-
-    randomParameters.saveToXml(xml.get());
-    sidechainParameters.saveToXml(xml.get());
-#endif
-
-#if OSCI_PREMIUM
-    wheelParameters.saveToXml(xml.get());
+    modulationEngine.saveToXml(xml.get());
 #endif
 
     auto customFunction = xml->createNewChildElement("customFunction");
@@ -1182,35 +1176,13 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
             migrateLegacyAnimationRate(*legacyAnimationRateXml);
         }
 
-        // Load global LFO waveforms & assignments (premium only)
 #if OSCI_PREMIUM
-        lfoParameters.loadFromXml(xml.get());
-
-        // If this is a free project, convert per-parameter LFOs to global LFO assignments
+        modulationEngine.loadFromXml(xml.get());
         if (!xml->getBoolAttribute("premiumProject", false)) {
             convertFreeProjectLfos(xml->getChildByName("effects"));
         }
 #else
         lfoParameters.resetAudioState();
-#endif
-
-        // Load envelope assignments (premium only)
-#if OSCI_PREMIUM
-        envelopeParameters.loadFromXml(xml.get());
-#endif
-
-        // Load random modulator state (premium only)
-#if OSCI_PREMIUM
-        randomParameters.loadFromXml(xml.get());
-#endif
-
-        // Load sidechain modulator state (premium only)
-#if OSCI_PREMIUM
-        sidechainParameters.loadFromXml(xml.get());
-#endif
-
-#if OSCI_PREMIUM
-        wheelParameters.loadFromXml(xml.get());
 #endif
         recordingParameters.load(xml.get());
 
@@ -1551,10 +1523,10 @@ juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& p
     name = search(luaEffects);
     if (name.isNotEmpty()) return name;
 
-    for (auto* p : frequencyEffect->parameters)
-        if (p->paramID == paramId) return p->name;
-    for (auto* p : perspective->parameters)
-        if (p->paramID == paramId) return p->name;
+    name = search(permanentEffects);
+    if (name.isNotEmpty()) {
+        return name;
+    }
 
     name = search(visualiserParameters.effects);
     if (name.isNotEmpty()) return name;

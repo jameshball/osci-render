@@ -234,6 +234,7 @@ public:
 
     // Returns all modulation source bindings for generic wiring in EffectComponent.
     std::vector<ModulationSourceBinding> getModulationSourceBindings();
+    const std::vector<ModulationSource*>& getModulationSources() const { return modulationEngine.getSources(); }
 
 #if OSCI_PREMIUM
     WheelParameters wheelParameters;

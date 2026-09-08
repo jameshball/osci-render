@@ -904,6 +904,47 @@ class VMPitchWheelTest final : public juce::UnitTest {
 public:
     VMPitchWheelTest() : juce::UnitTest("Channel pitch wheel", "Wheels") {}
     void runTest() override {
+        beginTest("Pitch changes reach the rendered voice at their MIDI sample offsets");
+        {
+            class PitchProbe : public TestVoice {
+            public:
+                void renderNextBlock(juce::AudioBuffer<float>& buffer, int start, int count) override {
+                    for (int i = start; i < start + count; ++i) {
+                        buffer.setSample(0, i, float(lastPitchWheel));
+                    }
+                }
+            };
+            TestClient client;
+            VoiceManager manager;
+            manager.setClient(&client);
+            manager.addVoice(new PitchProbe());
+            juce::AudioBuffer<float> output(1, 8);
+            output.clear();
+            juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::pitchWheel(2, 0), 0);
+            midi.addEvent(juce::MidiMessage::noteOn(2, 60, 1.0f), 1);
+            midi.addEvent(juce::MidiMessage::pitchWheel(2, 16383), 3);
+            midi.addEvent(juce::MidiMessage::pitchWheel(1, 4096), 4);
+            midi.addEvent(juce::MidiMessage::pitchWheel(2, 8192), 6);
+            manager.renderNextBlock(output, midi, 0, 8);
+            for (int i = 1; i < 8; ++i) {
+                expectEquals(output.getSample(0, i), i < 3 ? 0.0f : i < 6 ? 16383.0f : 8192.0f);
+            }
+        }
+        beginTest("Revoiced held notes recover their own channel's bend");
+        {
+            auto [manager, client] = createVM(1);
+            manager->setLegato(true);
+            manager->handleMidiEvent(juce::MidiMessage::pitchWheel(2, 0));
+            sendNoteOn(*manager, 60, 1.0f, 1);
+            sendNoteOn(*manager, 64, 1.0f, 2);
+            sendNoteOff(*manager, 64, 2);
+            auto* restored = findVoicePlayingNote(*manager, 60);
+            expect(restored != nullptr);
+            if (restored != nullptr) {
+                expectEquals(restored->lastPitchWheel, 8192);
+            }
+        }
         beginTest("New notes inherit the bend on their channel only");
         auto [vm, client] = createVM(4);
         vm->handleMidiEvent(juce::MidiMessage::pitchWheel(2, 12288));

@@ -5,6 +5,7 @@
 
 #include <JuceHeader.h>
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -230,7 +231,7 @@ private:
 
     bool sustainState[kNumMidiChannels] = {};
     bool sostenutoState[kNumMidiChannels] = {};
-    float pitchWheelValues[kNumMidiChannels] = {};
+    std::array<int, kNumMidiChannels> pitchWheelValues;
 
     juce::ReferenceCountedArray<juce::SynthesiserSound> sounds;
 

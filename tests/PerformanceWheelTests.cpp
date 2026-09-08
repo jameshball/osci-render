@@ -1,6 +1,8 @@
 #if OSCI_PREMIUM
 #include <osci_gui/osci_gui.h>
 #include "../Source/audio/modulation/WheelParameters.h"
+#include "../Source/audio/modulation/ModulationEngine.h"
+#include "TestCleanup.h"
 
 class PerformanceWheelTests final : public juce::UnitTest {
 public:
@@ -35,6 +37,82 @@ public:
                 expect(assignments[0].bipolar);
             }
             for (auto* parameter : parameters.getFloatParameters()) { delete parameter; }
+        }
+        beginTest("CC1 modulates pitch sample accurately and engine state restores its routing");
+        {
+            WheelParameters parameters;
+            osci::SimpleEffect target(new osci::EffectParameter("Pitch", "Pitch", "pitchModulation", VERSION_HINT, 0.0f, -1.0f, 1.0f));
+            std::unordered_map<juce::String, ParamLocation> locations{{"pitchModulation", {&target, 0}}};
+            ModulationEngine engine(locations);
+            engine.addSource(&parameters);
+            engine.prepareToPlay(48000.0, 8);
+            target.prepareToPlay(48000.0, 8);
+            parameters.addAssignment({0, "pitchModulation", 0.5f, false});
+            juce::XmlElement state("state");
+            engine.saveToXml(&state);
+            parameters.removeAssignment(0, "pitchModulation");
+            engine.loadFromXml(&state);
+            expectEquals(int(parameters.getAssignments().size()), 1);
+            juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::controllerEvent(1, 1, 127), 3);
+            midi.addEvent(juce::MidiMessage::controllerEvent(1, 1, 0), 6);
+            parameters.fillBlock(8, midi);
+            target.animateValues(8, nullptr);
+            engine.applyAllModulation(8);
+            for (int i = 0; i < 8; ++i) {
+                expectEquals(target.getAnimatedValue(0, i), i >= 3 && i < 6 ? 1.0f : 0.0f);
+            }
+            juce::XmlElement emptyState("empty");
+            engine.loadFromXml(&emptyState);
+            expect(parameters.getAssignments().empty());
+            testutil::cleanupEffectParams(target);
+            for (auto* parameter : parameters.getFloatParameters()) {
+                delete parameter;
+            }
+        }
+        beginTest("Wheel input respects block boundaries and preserves each channel's pitch");
+        {
+            WheelParameters parameters;
+            parameters.prepareToPlay(48000.0, 8);
+            juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::pitchWheel(2, 16383), 0);
+            midi.addEvent(juce::MidiMessage::pitchWheel(16, 0), 7);
+            midi.addEvent(juce::MidiMessage::controllerEvent(1, 1, 64), 7);
+            midi.addEvent(juce::MidiMessage::controllerEvent(1, 1, 0), 8);
+            midi.addEvent(juce::MidiMessage::pitchWheel(2, 8192), 8);
+            parameters.fillBlock(8, midi);
+            expectEquals(parameters.pitch[0]->getValueUnnormalised(), 0.0f);
+            expectEquals(parameters.pitch[1]->getValueUnnormalised(), 8191.0f / 8192.0f);
+            expectEquals(parameters.pitch[15]->getValueUnnormalised(), -1.0f);
+            expectEquals(parameters.lastPitch[1], 16383);
+            expectEquals(parameters.buffer[6], 0.0f);
+            expectEquals(parameters.buffer[7], 64.0f / 127.0f);
+            midi.clear();
+            parameters.fillBlock(8, midi);
+            expectEquals(parameters.buffer[0], 64.0f / 127.0f);
+            expectEquals(parameters.buffer[7], 64.0f / 127.0f);
+            for (auto* parameter : parameters.getFloatParameters()) {
+                delete parameter;
+            }
+        }
+        beginTest("External wheel updates repaint without feeding changes back to the host");
+        {
+            osci::PerformanceWheel wheel(osci::PerformanceWheel::Mode::modulation);
+            wheel.setBounds(0, 0, 20, 54);
+            const auto before = wheel.createComponentSnapshot(wheel.getLocalBounds());
+            int notifications = 0;
+            wheel.onValueChange = [&] { ++notifications; };
+            wheel.setExternalValue(1.0);
+            const auto after = wheel.createComponentSnapshot(wheel.getLocalBounds());
+            expectEquals(wheel.getValue(), 1.0);
+            expectEquals(notifications, 0);
+            bool changed = false;
+            for (int y = 0; y < before.getHeight(); ++y) {
+                for (int x = 0; x < before.getWidth(); ++x) {
+                    changed |= before.getPixelAt(x, y) != after.getPixelAt(x, y);
+                }
+            }
+            expect(changed, "The wheel must display the incoming value");
         }
         beginTest("Pitch returns to neutral within the drag gesture; modulation stays put");
         for (auto mode : {osci::PerformanceWheel::Mode::pitch, osci::PerformanceWheel::Mode::modulation}) {
