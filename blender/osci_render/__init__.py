@@ -1,20 +1,6 @@
-bl_info = {
-    "name": "osci-render",
-    "author": "James Ball", 
-    "version": (1, 1, 0),
-    "blender": (3, 1, 2),
-    "location": "View3D",
-    "description": "Addon to send gpencil frames over to osci-render",
-    "warning": "Requires a camera and gpencil object",
-    "wiki_url": "https://github.com/jameshball/osci-render",
-    "category": "Development",
-}
-
 import bpy
 import os
-import bmesh
 import socket
-import json
 import atexit
 import struct
 import base64
@@ -60,13 +46,16 @@ class osci_render_connect(bpy.types.Operator):
     def execute(self, context):
         global sock
         if sock is None:
+            if context.scene.camera is None:
+                self.report({"WARNING"}, "Choose a scene camera before connecting")
+                return {"CANCELLED"}
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(1)
                 sock.connect((HOST, context.scene.oscirenderPort))
                 send_scene_to_osci_render(bpy.context.scene)
-            except socket.error as exp:
-                sock = None
+            except (OSError, ValueError, AttributeError) as exp:
+                close_osci_render()
                 self.report({"WARNING"}, "Failed to connect to osci-render - make sure it is running first!")
                 return {"CANCELLED"}
                 
@@ -124,7 +113,10 @@ def close_osci_render():
         try:
             sock.send("CLOSE\n".encode('utf-8'))
             sock.close()
-        except socket.error as exp:
+        except OSError:
+            pass
+        finally:
+            sock.close()
             sock = None
 
 def get_gpla_file_allframes(scene):
@@ -178,16 +170,14 @@ def get_gpla_file(scene):
 @persistent
 def save_scene_to_file(scene, file_path):
     return_frame = scene.frame_current
-    
-    bin = get_gpla_file_allframes(scene)
-    
-    if file_path is not None:
+    try:
+        if scene.camera is None or file_path is None:
+            return 1
+        bin = get_gpla_file_allframes(scene)
         with open(file_path, "wb") as f:
             f.write(bytes(bin))
-    else:
-        return 1
-    
-    scene.frame_set(return_frame)
+    finally:
+        scene.frame_set(return_frame)
     return 0
 
 def get_frame_info_binary():
@@ -195,7 +185,10 @@ def get_frame_info_binary():
     frame_info.extend(("FRAME   ").encode("utf8"))
     
     frame_info.extend(("focalLen").encode("utf8"))
-    frame_info.extend(struct.pack("d", -0.05 * bpy.data.cameras[0].lens))
+    camera = bpy.context.scene.camera
+    if camera is None:
+        raise ValueError("Choose a scene camera before exporting line art")
+    frame_info.extend(struct.pack("d", -0.05 * camera.data.lens))
     
     frame_info.extend(("OBJECTS ").encode("utf8"))
     
@@ -218,7 +211,10 @@ def get_frame_info_binary():
                 frame_info.extend(("STROKES ").encode("utf8"))
                 layers = obj.data.layers
                 for layer in layers:
-                    strokes = layer.frames.data.current_frame().drawing.strokes
+                    frame = layer.current_frame()
+                    if frame is None:
+                        continue
+                    strokes = frame.drawing.strokes
                     for stroke in strokes:
                         frame_info.extend(("STROKE  ").encode("utf8"))
                     
@@ -261,7 +257,9 @@ def get_frame_info_binary():
                 frame_info.extend(("STROKES ").encode("utf8"))
                 layers = obj.data.layers
                 for layer in layers:
-                    strokes = layer.frames.data.active_frame.strokes
+                    if layer.active_frame is None:
+                        continue
+                    strokes = layer.active_frame.strokes
                     for stroke in strokes:
                         frame_info.extend(("STROKE  ").encode("utf8"))
                         
@@ -299,11 +297,11 @@ def send_scene_to_osci_render(scene):
     global sock
 
     if sock is not None:
-        bin = get_gpla_file(scene)
         try:
+            bin = get_gpla_file(scene)
             sock.sendall(base64.b64encode(bytes(bin)) + "\n".encode("utf8"))
-        except socket.error as exp:
-            sock = None
+        except (OSError, ValueError, AttributeError):
+            close_osci_render()
 
 
 operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_close, osci_render_save]
@@ -311,20 +309,27 @@ operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_c
 
 def register():
     bpy.types.Scene.oscirenderPort = bpy.props.IntProperty(name="osci-render port",description="The port through which osci-render will connect",min=51600,max=51699,default=51677)
-    bpy.app.handlers.frame_change_pre.append(send_scene_to_osci_render)
-    bpy.app.handlers.depsgraph_update_post.append(send_scene_to_osci_render)
+    for handlers in (bpy.app.handlers.frame_change_pre, bpy.app.handlers.depsgraph_update_post):
+        if send_scene_to_osci_render not in handlers:
+            handlers.append(send_scene_to_osci_render)
+    atexit.unregister(close_osci_render)
     atexit.register(close_osci_render)
     for operation in operations:
-        bpy.utils.register_class(operation)
+        if not operation.is_registered:
+            bpy.utils.register_class(operation)
 
 
 def unregister():
-    del bpy.types.Object.oscirenderPort
-    bpy.app.handlers.frame_change_pre.remove(send_scene_to_osci_render)
-    bpy.app.handlers.depsgraph_update_post.remove(send_scene_to_osci_render)
+    close_osci_render()
+    if hasattr(bpy.types.Scene, "oscirenderPort"):
+        del bpy.types.Scene.oscirenderPort
+    for handlers in (bpy.app.handlers.frame_change_pre, bpy.app.handlers.depsgraph_update_post):
+        if send_scene_to_osci_render in handlers:
+            handlers.remove(send_scene_to_osci_render)
     atexit.unregister(close_osci_render)
     for operation in reversed(operations):
-        bpy.utils.unregister_class(operation)
+        if operation.is_registered:
+            bpy.utils.unregister_class(operation)
 
 
 if __name__ == "__main__":
