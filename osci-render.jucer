@@ -625,9 +625,12 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="Ju0mVn" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
-        <FILE id="oFrmPr0" name="FramePresenter.h" compile="0" resource="0" file="Source/visualiser/FramePresenter.h"/>
-        <FILE id="oFrmPr1" name="FramePresenter.cpp" compile="1" resource="0" file="Source/visualiser/FramePresenter.cpp"/>
-        <FILE id="oFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0" file="Source/visualiser/FramePresenter_mac.mm"/>
+        <FILE id="oFrmPr0" name="FramePresenter.h" compile="0" resource="0"
+              file="Source/visualiser/FramePresenter.h"/>
+        <FILE id="oFrmPr1" name="FramePresenter.cpp" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter.cpp"/>
+        <FILE id="oFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter_mac.mm"/>
         <FILE id="frfxSR" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
         <FILE id="VisRecC" name="VisualiserRecordingController.cpp" compile="1"
@@ -654,8 +657,7 @@
               resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
         <FILE id="tGlLnx" name="OpenGL_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/OpenGL_linux.cpp"/>
-        <FILE id="tGlLnh" name="OpenGL_linux.h" compile="0" resource="0"
-              file="Source/visualiser/OpenGL_linux.h"/>
+        <FILE id="tGlLnh" name="OpenGL_linux.h" compile="0" resource="0" file="Source/visualiser/OpenGL_linux.h"/>
         <FILE id="tW2Lnx" name="TransparentWindow_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/TransparentWindow_linux.cpp"/>
         <FILE id="tW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
@@ -681,6 +683,12 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
+      <GROUP id="ScnEdG" name="scene">
+        <FILE id="ScnNavH" name="NavigationMotion.h" compile="0" resource="0"
+              file="Source/scene/NavigationMotion.h"/>
+        <FILE id="ScnMdH" name="Scene.h" compile="0" resource="0" file="Source/scene/Scene.h"/>
+        <FILE id="ScnEdH" name="SceneEditor.h" compile="0" resource="0" file="Source/scene/SceneEditor.h"/>
+      </GROUP>
       <FILE id="FSlMnC" name="FileController.cpp" compile="1" resource="0"
             file="Source/FileController.cpp"/>
       <FILE id="FSlMnH" name="FileController.h" compile="0" resource="0"

@@ -19,6 +19,10 @@
 
 class OscirenderAudioProcessorEditor : public CommonPluginEditor, public juce::AsyncUpdater, public juce::ChangeListener, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer {
 public:
+    void openSceneEditor();
+    void openEditorForSelection();
+    void editSceneSource(std::shared_ptr<scene::Object> object);
+    bool layoutSourceEditor(juce::Rectangle<int> bounds);
     OscirenderAudioProcessorEditor(OscirenderAudioProcessor&);
     ~OscirenderAudioProcessorEditor() override;
 
@@ -104,6 +108,11 @@ public:
     juce::StretchableLayoutManager luaLayout;
     juce::StretchableLayoutResizerBar luaResizerBar{&luaLayout, 1, false};
 
+    std::shared_ptr<scene::Object> sceneSourceObject;
+    std::shared_ptr<osci::LuaScriptEditorModel> sceneSourceModel;
+    std::unique_ptr<osci::LuaScriptEditorComponent> sceneSourceEditor;
+    int sceneSourceFileIndex = -1;
+    void clearSceneSourceEditor();
     bool shouldOpenCodeEditor = false;
     void updateCodeEditor(bool shouldOpenEditor = false);
     void setCodeEditorVisible(std::optional<bool> visible);

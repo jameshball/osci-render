@@ -58,3 +58,12 @@ double ShapeSound::getFrameLength() const {
 bool ShapeSound::consumeFreshFrame() {
     return freshFrameAvailable.exchange(false, std::memory_order_acquire);
 }
+
+void ShapeSound::enableScene(std::shared_ptr<scene::Scene> value) {
+    frames.kill();
+    if (producer != nullptr) {
+        producer->stopThread(-1);
+        producer.reset();
+    }
+    scene = std::move(value);
+}

@@ -7,6 +7,9 @@
 #import <OpenGL/OpenGL.h>
 #include <array>
 #include <atomic>
+#if JUCE_MODULE_AVAILABLE_jucewright
+#include <jucewright/jucewright.h>
+#endif
 
 @interface OsciGpuPresentationView : NSView
 @end
@@ -94,12 +97,47 @@ public:
         [CATransaction commit];
     }
     void paint(juce::Graphics& g, juce::Rectangle<int> viewport) override {
+#if JUCE_MODULE_AVAILABLE_jucewright && JUCEWRIGHT_ENABLE_AUTOMATION
+        if (jucewright::isTakingComponentScreenshot()) {
+            paintPresentedFrame(g, viewport);
+            return;
+        }
+#endif
         if (available) {
             // Replace ancestor painting with a hole; controls paint normally above it.
             g.setColour(juce::Colours::transparentBlack);
             g.getInternalContext().fillRect(viewport, true);
         }
     }
+#if JUCE_MODULE_AVAILABLE_jucewright && JUCEWRIGHT_ENABLE_AUTOMATION
+    void paintPresentedFrame(juce::Graphics& g, juce::Rectangle<int> viewport) {
+        // Message thread owns displayed. The displayed slot is unavailable to
+        // the GL producer until the next presentation, so its pixels stay stable.
+        handleAsyncUpdate();
+        if (displayed < 0) { return; }
+        const auto surface = slots[displayed].surface;
+        if (surface == nullptr || IOSurfaceLock(surface, kIOSurfaceLockReadOnly, nullptr) != kIOReturnSuccess) { return; }
+        const auto unlock = juce::ScopeGuard([&] { IOSurfaceUnlock(surface, kIOSurfaceLockReadOnly, nullptr); });
+        const int width = (int)IOSurfaceGetWidth(surface);
+        const int height = (int)IOSurfaceGetHeight(surface);
+        const auto* source = static_cast<const juce::uint8*>(IOSurfaceGetBaseAddress(surface));
+        if (source == nullptr || width <= 0 || height <= 0) { return; }
+        juce::Image image(juce::Image::ARGB, width, height, false);
+        {
+            juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
+            const auto stride = IOSurfaceGetBytesPerRow(surface);
+            for (int y = 0; y < height; ++y) {
+                const auto* row = source + y * stride;
+                for (int x = 0; x < width; ++x) {
+                    pixels.setPixelColour(x, y, juce::Colour(row[x * 4 + 2], row[x * 4 + 1], row[x * 4], row[x * 4 + 3]));
+                }
+            }
+        }
+        g.setColour(backgroundColour);
+        g.fillRect(viewport);
+        g.drawImageWithin(image, viewport.getX(), viewport.getY(), viewport.getWidth(), viewport.getHeight(), juce::RectanglePlacement::centred);
+    }
+#endif
     void handleAsyncUpdate() override {
         const int next = pending.exchange(-1);
         if (next < 0) { return; }

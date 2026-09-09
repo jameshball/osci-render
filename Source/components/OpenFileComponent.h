@@ -19,8 +19,18 @@ public:
     // This is called for each file opened (e.g., multiple files when importing).
     std::function<void(const juce::String& fileName, bool shouldOpenEditor, int fileIndex)> onFileOpened;
 
+    std::function<bool(const juce::String&, const juce::MemoryBlock&)> onImportSource;
+    std::function<void(int)> onImportLive;
+    void setSceneImport(bool enabled) {
+        group.setText(enabled ? "Add to scene" : "Open Files");
+        for (auto* button : { &blenderInput, &textureInput, &audioInput }) { button->setVisible(enabled); }
+        resized();
+    }
+
 private:
     OscirenderAudioProcessor& audioProcessor;
+
+    juce::TextButton blenderInput{"Blender input"}, textureInput{"Texture input"}, audioInput{"Audio input"};
 
     // Start screen buttons
     juce::TextButton startImportButton { "Import a File" };

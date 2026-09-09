@@ -62,6 +62,7 @@ private:
 	double frameDrawn = 0.0;
 	double lengthIncrement = 0.0;
 
+    double scenePhase = 0.0;
     bool currentlyPlaying = false;
 	int currentMidiNote = -1;
 

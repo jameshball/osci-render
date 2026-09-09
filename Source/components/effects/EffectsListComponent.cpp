@@ -156,16 +156,10 @@ void EffectsListComponent::resized() {
 
 std::shared_ptr<juce::Component> EffectsListComponent::createComponent(osci::EffectParameter* parameter) {
     if (parameter->paramID == "customEffectStrength") {
-        std::shared_ptr<osci::SvgButton> button = std::make_shared<osci::SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::red);
-        std::weak_ptr<osci::SvgButton> weakButton = button;
+        auto button = std::make_shared<osci::SvgButton>(parameter->name, BinaryData::pencil_svg, juce::Colours::white, juce::Colours::white);
         button->setEdgeIndent(5);
-        button->setToggleState(editor.editingCustomFunction, juce::dontSendNotification);
-        button->setTooltip("Toggles whether the text editor is editing the currently open file, or the custom Lua effect.");
-        button->onClick = [this, weakButton] {
-            if (auto button = weakButton.lock()) {
-                editor.editCustomFunction(button->getToggleState());
-            }
-        };
+        button->setTooltip("Edit the Lua effect in the Editor tab");
+        button->onClick = [this] { editor.editCustomFunction(true); };
         return button;
     }
     return nullptr;

@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include <osci_file_import/osci_file_import.h>
 
+namespace scene { class Scene; }
 class FileParser;
 class FrameProducer;
 class OscirenderAudioProcessor;
@@ -23,6 +24,8 @@ public:
 	bool consumeFreshFrame();
 
 	std::shared_ptr<FileParser> parser;
+    std::shared_ptr<scene::Scene> scene;
+    void enableScene(std::shared_ptr<scene::Scene> value);
 
 	using Ptr = juce::ReferenceCountedObjectPtr<ShapeSound>;
 

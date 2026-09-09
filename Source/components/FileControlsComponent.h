@@ -24,6 +24,7 @@ private:
     void finishRenameFile(bool commit);
     void layoutRenameEditor();
     void removeFile(int index);
+    void removeFileNow(int index);
 
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& pluginEditor;
