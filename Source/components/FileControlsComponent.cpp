@@ -1,6 +1,7 @@
 #include "FileControlsComponent.h"
 #include "../PluginEditor.h"
 #include "../parser/FileFormatRegistry.h"
+#include "OverlayDialogHelpers.h"
 
 namespace {
 
@@ -9,6 +10,45 @@ int getTextWidth(const juce::Font& font, const juce::String& text) {
     glyphs.addLineOfText(font, text, 0.0f, 0.0f);
     return juce::roundToInt(glyphs.getBoundingBox(0, glyphs.getNumGlyphs(), true).getWidth());
 }
+
+class RemoveSceneAction final : public juce::UndoableAction {
+public:
+    RemoveSceneAction(OscirenderAudioProcessor& processor, OscirenderAudioProcessorEditor& editor, int index,
+        juce::String name, std::shared_ptr<juce::MemoryBlock> data, std::unique_ptr<juce::XmlElement> scene)
+        : processor(processor), editor(&editor), originalIndex(index), currentIndex(index), name(std::move(name)),
+          data(std::move(data)), scene(std::move(scene)) {}
+
+    bool perform() override {
+        if (currentIndex < 0) {
+            return false;
+        }
+        processor.getFileController().removeFile(currentIndex);
+        currentIndex = -1;
+        return true;
+    }
+
+    bool undo() override {
+        if (currentIndex >= 0 || scene == nullptr) {
+            return false;
+        }
+        currentIndex = processor.getFileController().restoreFile(originalIndex, name,
+            std::make_shared<juce::MemoryBlock>(*data), *scene);
+        if (editor != nullptr) {
+            editor->addCodeEditor(currentIndex);
+            editor->refreshFileUi(name);
+        }
+        return currentIndex >= 0;
+    }
+
+private:
+    OscirenderAudioProcessor& processor;
+    juce::Component::SafePointer<OscirenderAudioProcessorEditor> editor;
+    int originalIndex;
+    int currentIndex;
+    juce::String name;
+    std::shared_ptr<juce::MemoryBlock> data;
+    std::unique_ptr<juce::XmlElement> scene;
+};
 
 } // namespace
 
@@ -128,6 +168,7 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
 
     juce::PopupMenu menu;
     if (hasFile) {
+        menu.addItem(6, "Edit scene...");
         if (osci::files::isCodeEditable(fileName)) {
             menu.addItem(editFileId, "Edit file");
         }
@@ -150,7 +191,9 @@ void FileControlsComponent::showFileMenu(juce::Point<int> screenPosition) {
         }
 
         auto& files = safeThis->audioProcessor.getFileController();
-        if (result == editFileId) {
+        if (result == 6) {
+            safeThis->pluginEditor.openSceneEditor();
+        } else if (result == editFileId) {
             safeThis->pluginEditor.editFile(fileIndex);
         } else if (result == renameFileId) {
             safeThis->beginRenameFile(fileIndex);
@@ -243,17 +286,59 @@ void FileControlsComponent::removeFile(int index) {
     if (index < 0) {
         return;
     }
-    audioProcessor.getFileController().removeFile(index);
+
+    int objectCount = 0;
+    const auto scene = audioProcessor.getFileController().getScene(index);
+    if (scene != nullptr) {
+        juce::SpinLock::ScopedLockType guard(scene->lock);
+        objectCount = static_cast<int>(scene->objects.size());
+    }
+    if (objectCount > 1) {
+        auto safeThis = juce::Component::SafePointer<FileControlsComponent>(this);
+        osci::showOverlayConfirmationOrAlert(&pluginEditor,
+            "Delete scene?",
+            "This scene contains " + juce::String(objectCount) + " objects. You can undo this after deleting it.",
+            "Delete scene",
+            "Cancel",
+            [safeThis, index] {
+                if (safeThis != nullptr) {
+                    safeThis->removeFileNow(index);
+                }
+            },
+            {},
+            osci::ErrorOverlay::Icon::Warning,
+            { 460, 280 });
+        return;
+    }
+    removeFileNow(index);
+}
+
+void FileControlsComponent::removeFileNow(int index) {
+    auto& files = audioProcessor.getFileController();
+    juce::String name;
+    std::shared_ptr<juce::MemoryBlock> data;
+    auto sceneXml = std::make_unique<juce::XmlElement>("scene");
+    {
+        juce::SpinLock::ScopedLockType guard(files.lock);
+        if (!files.contains(index)) {
+            return;
+        }
+        name = files.getFileName(index);
+        data = std::make_shared<juce::MemoryBlock>(*files.getFileData(index));
+        const auto scene = files.getScene(index);
+        if (scene != nullptr) {
+            files.saveScene(*scene, *sceneXml);
+        }
+    }
+    audioProcessor.getUndoManager().beginNewTransaction("Delete scene");
+    audioProcessor.getUndoManager().perform(new RemoveSceneAction(audioProcessor, pluginEditor, index,
+        std::move(name), std::move(data), std::move(sceneXml)));
     updateFileLabel();
 }
 
 void FileControlsComponent::paint(juce::Graphics& g)
 {
-    // Rounded veryDark background
-    auto b = getLocalBounds().toFloat();
-    auto bg = osci::Colours::veryDark();
-    g.setColour(bg);
-    g.fillRoundedRectangle(b, osci::LookAndFeel::RECT_RADIUS);
+    osci::PanelHeader::paintBackground(g, getLocalBounds().toFloat());
 }
 
 void FileControlsComponent::resized()
@@ -296,6 +381,7 @@ void FileControlsComponent::resized()
         fileNumberLabel.setBounds(bounds.removeFromRight(45));
     }
     
+
     fileLabel.setBounds(bounds);
     layoutRenameEditor();
 }

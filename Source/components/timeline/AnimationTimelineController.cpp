@@ -12,7 +12,11 @@ void AnimationTimelineController::onValueChange(double value)
     auto& files = audioProcessor.getFileController();
     juce::SpinLock::ScopedLockType sl(files.lock);
     auto parser = files.getCurrentParser();
-    if (parser != nullptr) {
+    const auto scene = files.getScene(files.getCurrentFileIndex().value_or(-1));
+    if (scene != nullptr) {
+        audioProcessor.animationFrame = value * (scene->numFrames() - 1);
+        scene->setFrame(audioProcessor.animationFrame.load(), audioProcessor.loopAnimation->getBoolValue());
+    } else if (parser != nullptr) {
         audioProcessor.animationFrame = value * (parser->getNumFrames() - 1);
         parser->setFrame((int)audioProcessor.animationFrame);
     }
@@ -49,7 +53,8 @@ double AnimationTimelineController::getCurrentPosition()
     juce::SpinLock::ScopedLockType sl(files.lock);
     auto parser = files.getCurrentParser();
     if (parser == nullptr) return 0.0;
-    int totalFrames = parser->getNumFrames();
+    const auto scene = files.getScene(files.getCurrentFileIndex().value_or(-1));
+    int totalFrames = scene != nullptr ? scene->numFrames() : parser->getNumFrames();
     if (totalFrames <= 1) return 0.0;
     double frame = std::fmod(audioProcessor.animationFrame, (double)totalFrames);
     if (frame < 0.0) frame += (double)totalFrames;
@@ -64,7 +69,11 @@ void AnimationTimelineController::setup(
     auto& files = audioProcessor.getFileController();
     juce::SpinLock::ScopedLockType sl(files.lock);
     auto parser = files.getCurrentParser();
-    if (parser != nullptr && parser->isAnimatable) {
+    const auto scene = files.getScene(files.getCurrentFileIndex().value_or(-1));
+    if (scene != nullptr) {
+        const int count = scene->numFrames();
+        setValueCallback(count > 1 ? std::fmod(audioProcessor.animationFrame.load(), (double)count) / (count - 1) : 0.0);
+    } else if (parser != nullptr && parser->isAnimatable) {
         int totalFrames = parser->getNumFrames();
         int currentFrame = parser->getCurrentFrame();
 

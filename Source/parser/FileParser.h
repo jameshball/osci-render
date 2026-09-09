@@ -42,7 +42,7 @@ public:
 	std::shared_ptr<OsciLottieParser> getLottie();
 #endif
 
-	bool isAnimatable = false;
+	std::atomic<bool> isAnimatable {false};
 
 private:
 	void clearLoadedSource();
@@ -52,8 +52,8 @@ private:
 
 	OscirenderAudioProcessor& audioProcessor;
 
-	bool active = true;
-	bool sampleSource = false;
+	std::atomic<bool> active {true};
+	std::atomic<bool> sampleSource {false};
 	std::atomic<double> frameRate{30.0};
 	std::atomic<uint64_t> sourceGeneration{0};
 	juce::SpinLock lock;

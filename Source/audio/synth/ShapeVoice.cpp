@@ -91,7 +91,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
 
     auto* currentSound = this->sound.load();
     auto parser = currentSound != nullptr ? currentSound->parser : nullptr;
-    renderingSample = parser != nullptr && parser->isSample();
+    renderingSample = this->sound.load()->scene != nullptr || (parser != nullptr && parser->isSample());
 
     if (!isLegato) {
         // Non-legato: full reset — reload frame, reset drawing position,
@@ -109,6 +109,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
             }
         }
 
+        scenePhase = 0.0;
         currentShape = 0;
         shapeDrawn = 0.0;
         frameDrawn = 0.0;
@@ -235,7 +236,7 @@ void ShapeVoice::updateSound(juce::SynthesiserSound* sound) {
     if (currentlyPlaying) {
         this->sound = dynamic_cast<ShapeSound*>(sound);
         auto parser = this->sound.load()->parser;
-        renderingSample = parser != nullptr && parser->isSample();
+        renderingSample = this->sound.load()->scene != nullptr || (parser != nullptr && parser->isSample());
     }
 }
 
@@ -394,7 +395,16 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
                     vars.sliders[s] = audioProcessor.luaEffects[s]->getAnimatedValue(0, static_cast<size_t>(i));
                 }
 
-                channels = parser->nextSample(L, vars);
+                if (currentSound->scene != nullptr) {
+                    channels = currentSound->scene->render(scenePhase, vars, voiceIndex);
+                    scenePhase += actualFrequency.load() / sampleRate;
+                    if (scenePhase >= 1.0) {
+                        scenePhase -= std::floor(scenePhase);
+                        pendingFrameStart = true;
+                    }
+                } else {
+                    channels = parser->nextSample(L, vars);
+                }
             } else if (currentShape < frame.size()) {
                 auto& shape = frame[currentShape];
                 double length = shape->length();

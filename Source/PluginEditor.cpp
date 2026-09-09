@@ -1,3 +1,4 @@
+#include "scene/SceneEditor.h"
 #include "PluginEditor.h"
 #include "parser/FileFormatRegistry.h"
 
@@ -155,6 +156,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
 }
 
 OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
+    clearSceneSourceEditor();
     stopTextureInput();
     stopTimer();
     visualiserSettingsWindow.removeKeyListener(this);
@@ -273,16 +275,10 @@ juce::String OscirenderAudioProcessorEditor::getTextureInputName() const {
 }
 
 void OscirenderAudioProcessorEditor::setCodeEditorVisible(std::optional<bool> visible) {
-    std::optional<int> originalIndex;
-    {
-        auto& files = audioProcessor.getFileController();
-        juce::SpinLock::ScopedLockType lock(files.lock);
-        originalIndex = files.getCurrentFileIndex();
-    }
-    const int index = editingCustomFunction ? 0 : originalIndex.value_or(0) + 1;
-    if ((originalIndex.has_value() || editingCustomFunction) && index < codeEditors.size()) {
-        codeEditors[index]->setVisible(visible.value_or(!codeEditors[index]->isVisible()));
-        triggerAsyncUpdate();
+    if (visible.value_or(!settings.isEditorVisible())) {
+        openEditorForSelection();
+    } else {
+        settings.showEffects();
     }
 }
 
@@ -307,6 +303,10 @@ bool OscirenderAudioProcessorEditor::openSourceFile(const juce::File& file) {
         return false;
     }
 
+    juce::MemoryBlock sourceData;
+    if (file.loadFileAsData(sourceData) && settings.importSceneSource(file.getFileName(), sourceData)) {
+        return true;
+    }
     stopTextureInput();
     auto& fileController = audioProcessor.getFileController();
     const int fileIndex = fileController.addFile(file);
@@ -316,6 +316,7 @@ bool OscirenderAudioProcessorEditor::openSourceFile(const juce::File& file) {
 }
 
 void OscirenderAudioProcessorEditor::editFile(int index) {
+    clearSceneSourceEditor();
     juce::String fileName;
     {
         auto& files = audioProcessor.getFileController();
@@ -336,7 +337,8 @@ void OscirenderAudioProcessorEditor::editFile(int index) {
     auto& files = audioProcessor.getFileController();
     files.clearPendingSelection();
     files.selectFile(index);
-    setCodeEditorVisible(true);
+    updateCodeEditor();
+    settings.showEditor();
 }
 
 juce::String OscirenderAudioProcessorEditor::renameFile(int index, juce::String newName) {
@@ -487,109 +489,10 @@ void OscirenderAudioProcessorEditor::resized() {
 #endif
     }
 
-    bool editorVisible = false;
-
-    {
-        auto& files = audioProcessor.getFileController();
-        std::optional<int> originalIndex;
-        juce::String fileName;
-        {
-            juce::SpinLock::ScopedLockType lock(files.lock);
-            originalIndex = files.getCurrentFileIndex();
-            fileName = files.getCurrentFileName();
-        }
-        const int index = editingCustomFunction ? 0 : originalIndex.value_or(0) + 1;
-
-        bool ableToEditFile = (originalIndex.has_value() && !isBinaryFile(fileName)) || editingCustomFunction;
-        bool fileOpen = false;
-        bool luaFileOpen = false;
-
-        if (ableToEditFile) {
-            if (index < codeEditors.size() && codeEditors[index]->isVisible()) {
-                editorVisible = true;
-
-                juce::Component dummy;
-                juce::Component dummy2;
-                juce::Component dummy3;
-
-                juce::Component* columns[] = {&dummy, &resizerBar, &dummy2};
-
-                // offsetting the y position by -1 and the height by +1 is a hack to fix a bug where the code editor
-                // doesn't draw up to the edges of the menu bar above.
-                layout.layOutComponents(columns, 3, area.getX(), area.getY() - 1, area.getWidth(), area.getHeight() + 1, false, true);
-                auto dummyBounds = dummy.getBounds();
-                collapseButton.setBounds(dummyBounds.removeFromRight(20));
-                area = dummyBounds;
-
-                auto dummy2Bounds = dummy2.getBounds();
-                dummy2Bounds.removeFromBottom(5);
-                dummy2Bounds.removeFromTop(5);
-                dummy2Bounds.removeFromRight(5);
-
-                juce::String extension;
-                if (originalIndex.has_value()) {
-                    extension = fileName.fromLastOccurrenceOf(".", true, false);
-                }
-
-                bool isTxtFile = extension == ".txt";
-                txtFont.setVisible(isTxtFile);
-
-                if (editingCustomFunction || extension == ".lua") {
-                    juce::Component* rows[] = {&dummy3, &luaResizerBar, &lua};
-                    luaLayout.layOutComponents(rows, 3, dummy2Bounds.getX(), dummy2Bounds.getY(), dummy2Bounds.getWidth(), dummy2Bounds.getHeight(), true, true);
-                    auto dummy3Bounds = dummy3.getBounds();
-                    console.setBounds(dummy3Bounds.removeFromBottom(console.getConsoleOpen() ? 200 : 30));
-                    dummy3Bounds.removeFromBottom(RESIZER_BAR_SIZE);
-                    codeEditors[index]->setBounds(dummy3Bounds);
-                    luaFileOpen = true;
-                } else {
-                    auto editorBounds = dummy2Bounds;
-                    if (isTxtFile) {
-                        txtFont.setBounds(editorBounds.removeFromTop(30));
-                        editorBounds.removeFromTop(5); // Add small gap
-                    }
-                    codeEditors[index]->setBounds(editorBounds);
-                }
-
-                fileOpen = true;
-            } else {
-                collapseButton.setBounds(area.removeFromRight(20));
-            }
-        }
-
-        collapseButton.setVisible(ableToEditFile);
-
-        if (index < codeEditors.size()) {
-            codeEditors[index]->setVisible(fileOpen);
-        }
-        resizerBar.setVisible(fileOpen);
-
-        console.setVisible(luaFileOpen);
-        luaResizerBar.setVisible(luaFileOpen);
-        lua.setVisible(luaFileOpen);
-
-        // Hide txtFont if code editor is not visible
-        if (!fileOpen) {
-            txtFont.setVisible(false);
-        }
-    }
-
-    if (editorVisible) {
-        juce::Path path;
-        path.addTriangle(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.5f);
-        collapseButton.setShape(path, false, true, true);
-    } else {
-        juce::Path path;
-        path.addTriangle(0.0f, 0.5f, 1.0f, 1.0f, 1.0f, 0.0f);
-        collapseButton.setShape(path, false, true, true);
-    }
-
+    collapseButton.setVisible(false);
+    resizerBar.setVisible(false);
     settings.setBounds(area);
-
-    if (editorVisible) {
-        audioProcessor.setProperty("codeEditorLayoutPreferredSize", sanitiseCodeEditorMainPanelSize(layout.getItemCurrentRelativeSize(0)));
-    }
-    audioProcessor.setProperty("luaLayoutPreferredSize", luaLayout.getItemCurrentRelativeSize(0));
+    settings.resized();
 
     repaint();
 }
@@ -682,60 +585,26 @@ void OscirenderAudioProcessorEditor::removeCodeEditor(int index) {
 }
 
 void OscirenderAudioProcessorEditor::updateCodeEditor(bool shouldOpenEditor) {
-    for (int i = 0; i < codeEditors.size(); ++i) {
-        if (codeEditors[i]->isVisible()) {
-            codeModels[i]->flushPendingEdit();
+    auto& files = audioProcessor.getFileController();
+    const auto current = files.getCurrentFileIndex();
+    if (sceneSourceObject != nullptr) {
+        const auto scene = current.has_value() ? files.getScene(*current) : nullptr;
+        bool exists = false;
+        if (scene != nullptr) {
+            juce::SpinLock::ScopedLockType guard(scene->lock);
+            exists = std::find(scene->objects.begin(), scene->objects.end(), sceneSourceObject) != scene->objects.end();
         }
+        if (!exists || current.value_or(-1) != sceneSourceFileIndex) { clearSceneSourceEditor(); }
     }
-
-    std::optional<int> originalIndex;
-    juce::String fileName;
-    juce::String code;
-    {
-        auto& files = audioProcessor.getFileController();
-        juce::SpinLock::ScopedLockType lock(files.lock);
-        originalIndex = files.getCurrentFileIndex();
-        fileName = files.getCurrentFileName();
-        if (!editingCustomFunction && originalIndex.has_value() && !isBinaryFile(fileName)) {
-            code = juce::MemoryInputStream(*files.getFileData(*originalIndex), false).readEntireStreamAsString();
-        }
+    const int index = editingCustomFunction ? 0 : current.value_or(-1) + 1;
+    if (sceneSourceObject == nullptr && (editingCustomFunction || (current.has_value() && osci::files::isCodeEditable(files.getCurrentFileName()))) && index >= 0 && index < (int)codeModels.size()) {
+        auto& model = codeModels[index];
+        model->flushPendingEdit();
+        const auto code = editingCustomFunction ? audioProcessor.luaEffectState->getCode() : juce::MemoryInputStream(*files.getFileData(*current), false).readEntireStreamAsString();
+        if (model->getCode() != code) { model->replaceCodeFromHost(code); }
     }
-    if (editingCustomFunction) {
-        juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-        code = audioProcessor.luaEffectState->getCode();
-    }
-    const bool binaryFile = !editingCustomFunction && isBinaryFile(fileName);
-
-    // check if any code editors are visible
-    bool visible = shouldOpenEditor;
-    if (!visible) {
-        for (int i = 0; i < codeEditors.size(); i++) {
-            if (codeEditors[i]->isVisible()) {
-                if (binaryFile) {
-                    codeEditors[i]->setVisible(false);
-                } else {
-                    visible = true;
-                }
-                break;
-            }
-        }
-    }
-
-    collapseButton.setVisible(!binaryFile);
-
-    if (!binaryFile) {
-        const int index = editingCustomFunction ? 0 : originalIndex.value_or(0) + 1;
-        if ((originalIndex.has_value() || editingCustomFunction) && visible && index < codeEditors.size() && index < codeModels.size()) {
-            for (int i = 0; i < codeEditors.size(); i++) {
-                codeEditors[i]->setVisible(i == index);
-            }
-            if (codeModels[index]->getCode() != code) {
-                codeModels[index]->replaceCodeFromHost(code);
-            }
-        }
-    }
-
-    audioProcessor.setProperty("codeEditorVisible", visible);
+    if (shouldOpenEditor) { settings.showEditor(); }
+    audioProcessor.setProperty("codeEditorVisible", settings.isEditorVisible());
 }
 
 void OscirenderAudioProcessorEditor::refreshFileUi(juce::String fileName, bool shouldOpenEditor) {
@@ -819,16 +688,10 @@ void OscirenderAudioProcessorEditor::resetWindowSizeAndPosition() {
 }
 
 void OscirenderAudioProcessorEditor::editCustomFunction(bool enable) {
-    if (enable) {
-        // Record whether the code editor was open before entering custom-function edit mode.
-        // We'll restore this state when exiting.
-        codeEditorWasVisibleBeforeEditingCustomFunction = std::any_cast<bool>(audioProcessor.getProperty("codeEditorVisible", false));
-    }
-
+    clearSceneSourceEditor();
     editingCustomFunction = enable;
-    codeEditors[0]->setVisible(enable);
-    // Preserve the ordinary editor's open state when leaving the custom effect.
-    updateCodeEditor(enable || codeEditorWasVisibleBeforeEditingCustomFunction);
+    updateCodeEditor();
+    if (enable) { settings.showEditor(); }
     triggerAsyncUpdate();
 }
 
@@ -847,6 +710,7 @@ void OscirenderAudioProcessorEditor::commitCodeModel(osci::LuaScriptEditorModel&
 }
 
 std::shared_ptr<osci::LuaScriptEditorModel> OscirenderAudioProcessorEditor::getVisibleLuaEditorModel() const {
+    if (sceneSourceEditor != nullptr && sceneSourceEditor->isVisible()) { return sceneSourceModel; }
     for (int i = 0; i < codeEditors.size() && i < codeModels.size(); i++) {
         if (codeEditors[i]->isVisible()) {
             return codeModels[i];
@@ -990,7 +854,8 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
             auto parser = files.getParser(*currentFileIndex);
 
             // Check if it's an animatable file (gpla, gif, video)
-            if (parser->isAnimatable) {
+            const auto scene = files.getScene(*currentFileIndex);
+            if ((scene != nullptr && scene->numFrames() > 1) || parser->isAnimatable) {
                 controller = animationTimelineController;
             }
             // Check if it's an audio file (FileParser contains a WavParser)
@@ -1001,4 +866,103 @@ void OscirenderAudioProcessorEditor::updateTimelineController() {
     }
 
     visualiser.setTimelineController(controller);
+}
+
+void OscirenderAudioProcessorEditor::openSceneEditor() {
+    settings.showScene();
+}
+
+void OscirenderAudioProcessorEditor::clearSceneSourceEditor() {
+    if (sceneSourceModel != nullptr) {
+        sceneSourceModel->flushPendingEdit();
+        audioProcessor.removeErrorListener(sceneSourceModel.get());
+    }
+    sceneSourceEditor.reset();
+    sceneSourceModel.reset();
+    sceneSourceObject.reset();
+    sceneSourceFileIndex = -1;
+}
+
+void OscirenderAudioProcessorEditor::openEditorForSelection() {
+    const auto object = settings.selectedSceneObject();
+    if (!editingCustomFunction && object != nullptr && osci::files::isCodeEditable(object->name)) {
+        editSceneSource(object);
+    } else {
+        clearSceneSourceEditor();
+        updateCodeEditor();
+        settings.showEditor();
+    }
+}
+
+void OscirenderAudioProcessorEditor::editSceneSource(std::shared_ptr<scene::Object> object) {
+    if (object == nullptr || !osci::files::isCodeEditable(object->name)) { return; }
+    editingCustomFunction = false;
+    if (sceneSourceObject != object) {
+        clearSceneSourceEditor();
+        sceneSourceObject = object;
+        sceneSourceFileIndex = audioProcessor.getFileController().getCurrentFileIndex().value_or(-1);
+        const bool luaSource = object->name.endsWithIgnoreCase(".lua");
+        sceneSourceModel = std::make_shared<osci::LuaScriptEditorModel>(object->transform.id, object->name,
+            juce::String::fromUTF8((const char*)object->data->getData(), (int)object->data->getSize()), luaSource, luaSource ? 250 : 0);
+        sceneSourceModel->onCodeCommitted = [this, object](const juce::String& code) { audioProcessor.getFileController().updateSceneObject(object, code); };
+        sceneSourceModel->onHelpRequested = [this] { showLuaDocumentation(); };
+        sceneSourceModel->onResetRequested = [object] {
+            if (object->parser != nullptr && object->parser->getLua() != nullptr) { object->parser->getLua()->forgetAllStates(); }
+        };
+        osci::LuaScriptEditorComponent::Options options;
+        options.useLuaTokeniser = luaSource;
+        options.showConsole = false;
+        options.legacyGroupChrome = true;
+        options.helpButtonSvg = juce::String(BinaryData::help_svg);
+        options.resetButtonSvg = juce::String(BinaryData::refresh_svg);
+        options.buttonColour = juce::Colours::white;
+        options.buttonOnColour = juce::Colours::white;
+        options.showHelpButton = luaSource;
+        options.showResetButton = luaSource;
+        if (object->name.endsWithIgnoreCase(".svg")) { options.externalTokeniser = &xmlTokeniser; }
+        sceneSourceEditor = std::make_unique<osci::LuaScriptEditorComponent>(*sceneSourceModel, options);
+        audioProcessor.addErrorListener(sceneSourceModel.get());
+        addChildComponent(*sceneSourceEditor);
+    }
+    settings.showEditor();
+}
+
+bool OscirenderAudioProcessorEditor::layoutSourceEditor(juce::Rectangle<int> bounds) {
+    for (auto& editor : codeEditors) { editor->setVisible(false); }
+    if (sceneSourceEditor != nullptr) { sceneSourceEditor->setVisible(false); }
+    lua.setVisible(false);
+    luaResizerBar.setVisible(false);
+    console.setVisible(false);
+    txtFont.setVisible(false);
+    if (bounds.isEmpty()) { return false; }
+    auto& files = audioProcessor.getFileController();
+    const auto current = files.getCurrentFileIndex();
+    const int index = editingCustomFunction ? 0 : current.value_or(-1) + 1;
+    const auto name = sceneSourceObject != nullptr ? sceneSourceObject->name : (editingCustomFunction ? juce::String("Lua effect") : files.getCurrentFileName());
+    auto* editor = sceneSourceEditor != nullptr ? sceneSourceEditor.get() : ((editingCustomFunction || current.has_value()) && index >= 0 && index < (int)codeEditors.size() ? codeEditors[index].get() : nullptr);
+    if (editor == nullptr || (!editingCustomFunction && !osci::files::isCodeEditable(name))) { return false; }
+    if (name.endsWithIgnoreCase(".txt")) {
+        txtFont.setVisible(true);
+        txtFont.setBounds(bounds.removeFromTop(30));
+        bounds.removeFromTop(osci::PanelHeader::panelGap);
+    }
+    if (editingCustomFunction || name.endsWithIgnoreCase(".lua")) {
+        juce::Component editorProxy;
+        juce::Component* rows[] = { &editorProxy, &luaResizerBar, &lua };
+        luaLayout.layOutComponents(rows, 3, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true, true);
+        bounds = editorProxy.getBounds();
+        console.setBounds(bounds.removeFromBottom(console.getConsoleOpen() ? juce::jmin(160, bounds.getHeight() / 2) : 30));
+        bounds.removeFromBottom(osci::PanelHeader::panelGap);
+        lua.setVisible(true);
+        luaResizerBar.setVisible(true);
+        console.setVisible(true);
+    }
+    editor->getEditor().setColour(juce::CodeEditorComponent::backgroundColourId, osci::Colours::darker().interpolatedWith(osci::Colours::veryDark(), 0.75f));
+    editor->setBounds(bounds);
+    editor->setVisible(true);
+    editor->toFront(false);
+    for (auto* control : std::array<juce::Component*, 4>{ &txtFont, &lua, &luaResizerBar, &console }) {
+        if (control->isVisible()) { control->toFront(false); }
+    }
+    return true;
 }

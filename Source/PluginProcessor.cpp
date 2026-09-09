@@ -230,6 +230,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         luaEffects[i]->parameters[0]->addListener(this);
     }
 
+    fileController.sceneAutomation.initialise(floatParameters);
     fileController.initialise();
 
     // Default to MIDI enabled when running as a plugin (VST/AU)
@@ -366,6 +367,7 @@ void VoiceBuilder::run() {
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     // Stop the voice builder before tearing down any processor state it references.
     voiceBuilder.reset();
+    undoManager.clearUndoHistory();
 
     for (int i = luaEffects.size() - 1; i >= 0; i--) {
         luaEffects[i]->parameters[0]->removeListener(this);
@@ -810,7 +812,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         {
             juce::SpinLock::ScopedLockType lock1(fileController.lock);
             const auto parser = fileController.getCurrentParser();
-            if (parser != nullptr) {
+            const auto scene = fileController.getScene(fileController.getCurrentFileIndex().value_or(-1));
+            if (scene != nullptr) {
+                nativeRate = scene->frameRate();
+            } else if (parser != nullptr) {
                 nativeRate = parser->getFrameRate();
             }
         }
@@ -837,7 +842,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         const auto parser = fileController.getCurrentParser();
-        if (parser != nullptr && parser->isAnimatable) {
+        const auto scene = fileController.getScene(fileController.getCurrentFileIndex().value_or(-1));
+        if (scene != nullptr) {
+            scene->setFrame(animationFrame.load(), loopAnimation->getBoolValue());
+        } else if (parser != nullptr && parser->isAnimatable) {
             const int totalFrames = parser->getNumFrames();
             if (totalFrames > 0) {
             if (loopAnimation->getBoolValue()) {

@@ -1,4 +1,5 @@
 #include "SettingsComponent.h"
+#include "../../scene/SceneEditor.h"
 #include "../../parser/FileFormatRegistry.h"
 
 #include "../../PluginEditor.h"
@@ -51,6 +52,22 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
       envelope(p),
     keyboard(p.keyboardState, juce::CustomMidiKeyboardComponent::horizontalKeyboard) {
     addAndMakeVisible(effects);
+    addAndMakeVisible(panelTabs);
+    panelTabs.setName("Workspace tabs");
+    for (const auto* label : { "Effects", "Scene", "Editor", "Examples" }) { panelTabs.addTab(label); }
+    panelTabs.onSelectionChanged = [this](int index) {
+        if (index == 0) {
+            showEffects();
+        } else if (index == 1) {
+            showScene();
+        } else if (index == 2) {
+            pluginEditor.openEditorForSelection();
+        } else {
+            showExamples(true);
+        }
+    };
+    addChildComponent(editorEmpty);
+    editorEmpty.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(fileControls);
     addAndMakeVisible(quickControls);
     addAndMakeVisible(mainResizerBar);
@@ -184,6 +201,10 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     // Envelope flow-marker animation
     startTimerHz(60);
 
+    examples.onImportLive = [this](int kind) {
+        if (sceneImportContext && sceneEditor != nullptr && sceneEditor->isCurrentScene()) { sceneEditor->importLive(kind); }
+    };
+    examples.onImportSource = [this](const auto& name, const auto& data) { return importSceneSource(name, data); };
     examples.onClosed = [this]() {
         showExamples(false);
     };
@@ -291,7 +312,7 @@ void SettingsComponent::parameterGestureChanged(int parameterIndex, bool gesture
 
 void SettingsComponent::resized() {
     auto padding = 7;
-    static constexpr int kGap = 3; // small gap between stacked panels
+    static constexpr int kGap = osci::PanelHeader::panelGap;
 
     auto area = getLocalBounds();
     area.removeFromLeft(5);
@@ -329,17 +350,65 @@ void SettingsComponent::resized() {
 
     // --- Effects column (shared by both modes) ---
     auto layoutEffectsColumn = [&](juce::Rectangle<int> effectsBounds) {
+        audioProcessor.setProperty("codeEditorVisible", editorVisible);
+        panelTabs.setBounds(effectsBounds.removeFromTop(osci::PanelHeader::height));
+        panelTabs.setSelectedIndex(examplesVisible ? 3 : (editorVisible ? 2 : (sceneVisible ? 1 : 0)), juce::dontSendNotification);
+        panelTabs.setTabEnabled(1, audioProcessor.getFileController().getCurrentFileIndex().has_value());
+        effectsBounds.removeFromTop(kGap);
+        editorEmpty.setVisible(editorVisible);
+        if (editorVisible) {
+            effects.setVisible(false);
+            examples.setVisible(false);
+            frame.setVisible(false);
+#if OSCI_PREMIUM
+            fractalEditor.setVisible(false);
+#endif
+            if (sceneEditor != nullptr) { sceneEditor->setVisible(false); }
+#if !OSCI_PREMIUM
+            quickControls.setVisible(true);
+            quickControls.setBounds(effectsBounds.removeFromBottom(60));
+            effectsBounds.removeFromBottom(kGap);
+#endif
+            editorEmpty.setBounds(effectsBounds.reduced(20));
+            const auto content = pluginEditor.getLocalArea(this, effectsBounds);
+            editorEmpty.setVisible(!pluginEditor.layoutSourceEditor(content));
+            return;
+        }
+        pluginEditor.layoutSourceEditor({});
+        if (sceneEditor != nullptr) { sceneEditor->setVisible(sceneVisible); }
+        if (sceneVisible && sceneEditor != nullptr) {
+            effects.setVisible(false);
+            examples.setVisible(false);
+            frame.setVisible(false);
+#if OSCI_PREMIUM
+            fractalEditor.setVisible(false);
+#endif
+#if !OSCI_PREMIUM
+            quickControls.setVisible(true);
+            quickControls.setBounds(effectsBounds.removeFromBottom(60));
+            effectsBounds.removeFromBottom(kGap);
+#endif
+            const float zoom = juce::jmin(1.0f, juce::jmin(effectsBounds.getWidth() / 620.0f, effectsBounds.getHeight() / 430.0f));
+            sceneEditor->setTransform(juce::AffineTransform());
+            if (zoom >= 1.0f) {
+                sceneEditor->setBounds(effectsBounds);
+            } else {
+                sceneEditor->setBounds(0, 0, juce::roundToInt(effectsBounds.getWidth() / juce::jmax(0.01f, zoom)), juce::roundToInt(effectsBounds.getHeight() / juce::jmax(0.01f, zoom)));
+                sceneEditor->setTransform(juce::AffineTransform::scale(zoom).translated((float)effectsBounds.getX(), (float)effectsBounds.getY()));
+            }
+            return;
+        }
         if (!examplesVisible) {
             if (frame.isVisible()) {
                 int preferredHeight = frame.getPreferredHeight();
                 frame.setBounds(effectsBounds.removeFromBottom(preferredHeight));
-                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+                effectsBounds.removeFromBottom(kGap);
             }
 #if OSCI_PREMIUM
             else if (fractalEditor.isVisible()) {
                 int preferredHeight = juce::jmin(210, effectsBounds.getHeight() / 2);
                 fractalEditor.setBounds(effectsBounds.removeFromBottom(preferredHeight));
-                effectsBounds.removeFromBottom(pluginEditor.RESIZER_BAR_SIZE);
+                effectsBounds.removeFromBottom(kGap);
             }
 #endif
         }
@@ -623,6 +692,10 @@ void SettingsComponent::mouseMove(const juce::MouseEvent& event) {
 }
 
 void SettingsComponent::showExamples(bool shouldShow) {
+    editorVisible = false;
+    sceneVisible = !shouldShow && sceneImportContext && sceneEditor != nullptr;
+    if (sceneEditor != nullptr) { sceneEditor->stopNavigation(); }
+    examples.setSceneImport(sceneImportContext && sceneEditor != nullptr);
     examplesVisible = shouldShow;
     resized();
     if (examplesVisible) {
@@ -632,12 +705,69 @@ void SettingsComponent::showExamples(bool shouldShow) {
     }
 }
 
+bool SettingsComponent::importSceneSource(const juce::String& name, const juce::MemoryBlock& data) {
+    if (!sceneImportContext || sceneEditor == nullptr || !sceneEditor->isCurrentScene()) { return false; }
+    sceneEditor->importSource(name, data);
+    return true;
+}
+
+std::shared_ptr<scene::Object> SettingsComponent::selectedSceneObject() const {
+    return sceneEditor != nullptr && sceneEditor->isCurrentScene() ? sceneEditor->getSelectedObject() : nullptr;
+}
+
+void SettingsComponent::showEffects() {
+    editorVisible = false;
+    sceneVisible = false;
+    sceneImportContext = false;
+    examplesVisible = false;
+    if (sceneEditor != nullptr) { sceneEditor->stopNavigation(); }
+    fileUpdated(audioProcessor.getFileController().getCurrentFileName());
+}
+
+void SettingsComponent::showEditor() {
+    editorVisible = true;
+    sceneVisible = false;
+    examplesVisible = false;
+    if (sceneEditor != nullptr) { sceneEditor->stopNavigation(); }
+    resized();
+}
+
+void SettingsComponent::showScene() {
+    editorVisible = false;
+    sceneImportContext = true;
+    const auto index = audioProcessor.getFileController().getCurrentFileIndex();
+    if (!index.has_value()) {
+        sceneEditor.reset();
+        showExamples(false);
+        return;
+    }
+    if (sceneEditor != nullptr && sceneEditor->isCurrentScene()) {
+        sceneVisible = true;
+        examplesVisible = false;
+        resized();
+        return;
+    }
+    sceneEditor.reset();
+    sceneEditor = std::make_unique<SceneEditor>(audioProcessor, *index, [this](auto source) {
+        pluginEditor.setTextureInputSource(std::move(source));
+    });
+    sceneEditor->onEditSource = [this](const auto& object) { pluginEditor.editSceneSource(object); };
+    sceneEditor->onAddObject = [this] { showExamples(true); };
+    addAndMakeVisible(*sceneEditor);
+    sceneVisible = true;
+    examplesVisible = false;
+    resized();
+}
+
 void SettingsComponent::mouseDown(const juce::MouseEvent& event) {
 }
 
 // --- Envelope flow-marker animation (moved from MidiComponent) ---
 
 void SettingsComponent::timerCallback() {
+    if (sceneVisible && sceneEditor != nullptr && !sceneEditor->isCurrentScene()) {
+        showScene();
+    }
     if (!audioProcessor.midiEnabled->getBoolValue()) {
         envelope.resetFlowPersistenceForUi();
         return;
