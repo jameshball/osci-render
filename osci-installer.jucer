@@ -10,6 +10,12 @@
     <GROUP id="{3E43E8D7-6C31-4F48-9B36-6E2D9F53E991}" name="Source">
       <GROUP id="{F7307549-98C6-4E26-8FD8-BFFFC2E56622}" name="installer">
         <FILE id="iMain1" name="Main.cpp" compile="1" resource="0" file="Source/installer/Main.cpp"/>
+        <FILE id="iBlend1" name="BlenderInstaller.h" compile="0" resource="0"
+              file="Source/installer/BlenderInstaller.h"/>
+        <FILE id="iBlend2" name="BlenderSetupComponent.h" compile="0" resource="0"
+              file="Source/installer/BlenderSetupComponent.h"/>
+        <FILE id="iBlend3" name="blender_setup.py" compile="0" resource="1"
+              file="Source/installer/blender_setup.py"/>
         <FILE id="iInstComp" name="InstallerComponent.h" compile="0" resource="0"
               file="Source/installer/InstallerComponent.h"/>
         <FILE id="iInstWin" name="InstallerWindow.h" compile="0" resource="0"
