@@ -13,11 +13,12 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-24.04, windows-latest]
         blender: ['4.2.9', '4.5.9', '5.2.0']
     steps:
       - uses: actions/checkout@v4
@@ -25,15 +26,22 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install Blender runtime libraries
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxi6 libxrender1 libxfixes3 libxxf86vm1 libxkbcommon0 libsm6 libgl1 libegl1
-      - run: bash ci/download_blender.sh '${{ matrix.blender }}' "$RUNNER_TEMP/blender"
+      - run: bash ci/download_blender.sh '${{ matrix.blender }}' "$RUNNER_TEMP/blender" '${{ runner.os }}'
+        shell: bash
       - name: Build and test repository installation
+        shell: bash
         run: |
-          BLENDER="$RUNNER_TEMP/blender/blender-${{ matrix.blender }}-linux-x64/blender"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            BLENDER="$RUNNER_TEMP/blender/blender-${{ matrix.blender }}-windows-x64/blender.exe"
+          else
+            BLENDER="$RUNNER_TEMP/blender/blender-${{ matrix.blender }}-linux-x64/blender"
+          fi
           python ci/build_blender_extension.py --blender "$BLENDER" --output "$RUNNER_TEMP/repository"
           python ci/test_blender_extension.py --blender "$BLENDER" --repository "$RUNNER_TEMP/repository"
       - uses: actions/upload-artifact@v4
-        if: matrix.blender == '4.2.9'
+        if: matrix.blender == '4.2.9' && runner.os == 'Linux'
         with:
           name: blender-repository
           path: ${{ runner.temp }}/repository
