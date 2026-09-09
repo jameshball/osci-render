@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "osci_render"
-version = "1.1.1"
+version = "1.1.2"
 name = "osci-render"
 tagline = "Send Grease Pencil line art to osci-render"
 maintainer = "James H. Ball <https://github.com/jameshball>"
@@ -19,3 +19,4 @@ license = [
 
 [permissions]
 files = "Export Grease Pencil line art to GPLA files"
+network = "Send line art to the local osci-render application"

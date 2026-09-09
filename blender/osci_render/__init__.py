@@ -1,15 +1,13 @@
 import bpy
-import os
 import socket
 import atexit
 import struct
 import base64
 from bpy.props import StringProperty
 from bpy.app.handlers import persistent
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ExportHelper
 
 HOST = "localhost"
-PORT = 51677
 
 sock = None
 
@@ -25,9 +23,6 @@ class OBJECT_PT_osci_render_settings(bpy.types.Panel):
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
-
-    def draw_header(self, context):
-        layout = self.layout
 
     def draw(self, context):
         self.layout.prop(context.scene, "oscirenderPort")
@@ -55,47 +50,30 @@ class osci_render_connect(bpy.types.Operator):
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_NOSIGPIPE, 1)
                 sock.settimeout(1)
                 sock.connect((HOST, context.scene.oscirenderPort))
-                send_scene_to_osci_render(bpy.context.scene)
-            except (OSError, ValueError, AttributeError) as exp:
+                send_bytes(base64.b64encode(get_gpla_file(context.scene)) + b"\n")
+            except (OSError, ValueError, AttributeError) as error:
                 close_osci_render()
-                self.report({"WARNING"}, "Failed to connect to osci-render - make sure it is running first!")
+                self.report({"WARNING"}, f"Could not connect to osci-render: {error}")
                 return {"CANCELLED"}
                 
         return {"FINISHED"}
         
-class osci_render_save(bpy.types.Operator, ImportHelper):
+class osci_render_save(bpy.types.Operator, ExportHelper):
     bl_label = "Save Line Art"
     bl_idname = "render.osci_render_save"
     bl_description = "Save line art to the chosen file"
     filename_ext = ".gpla"
 
-    filter_glob: StringProperty(
-        default="*.gpla",
-        options={"HIDDEN"}
-    )
-    
+    filter_glob: StringProperty(default="*.gpla", options={"HIDDEN"})
+
     def execute(self, context):
-        FilePath = self.filepath
-        filename, extension = os.path.splitext(self.filepath)
-
-        if extension != ".gpla":
-            extension = ".gpla"
-            FilePath = FilePath + ".gpla"
-        
-        self.report({"INFO"}, FilePath)
-
-        if filename is not None and extension is not None:
-            fin = save_scene_to_file(bpy.context.scene, FilePath)
-            if fin == 0:
-                self.report({"INFO"}, "File write successful!")
-                return {"FINISHED"}
-            else:
-                self.report({"WARNING"}, "Something went wrong in saving the file")
-        else:
-            filename = None
-            extension = None
-            self.report({"WARNING"}, "The filename or extension isn't right, action stopped for your own safety")
+        try:
+            save_scene_to_file(context.scene, bpy.path.ensure_ext(self.filepath, self.filename_ext))
+        except (OSError, ValueError, RuntimeError) as error:
+            self.report({"ERROR"}, str(error))
             return {"CANCELLED"}
+        self.report({"INFO"}, "Line art saved")
+        return {"FINISHED"}
 
 
 class osci_render_close(bpy.types.Operator):
@@ -108,13 +86,11 @@ class osci_render_close(bpy.types.Operator):
         return {"FINISHED"}
 
 
-@persistent
 def close_osci_render():
     global sock
     if sock is not None:
         try:
             send_bytes("CLOSE\n".encode('utf-8'))
-            sock.close()
         except OSError:
             pass
         finally:
@@ -130,178 +106,75 @@ def send_bytes(data):
             raise OSError("osci-render connection closed")
         view = view[sent:]
 
-def get_gpla_file_allframes(scene):
-    bin = bytearray()
-    
-    # header
-    bin.extend(("GPLA    ").encode("utf8"))
-    bin.extend(GPLA_MAJOR.to_bytes(8, "little"))
-    bin.extend(GPLA_MINOR.to_bytes(8, "little"))
-    bin.extend(GPLA_PATCH.to_bytes(8, "little"))
-    
-    # file info
-    bin.extend(("FILE    ").encode("utf8"))
-    bin.extend(("fCount  ").encode("utf8"))
-    bin.extend((scene.frame_end - scene.frame_start + 1).to_bytes(8, "little"))
-    bin.extend(("fRate   ").encode("utf8"))
-    bin.extend(scene.render.fps.to_bytes(8, "little"))
-    bin.extend(("DONE    ").encode("utf8"))
-    
-    for frame in range(0, scene.frame_end - scene.frame_start + 1):
-        scene.frame_set(frame + scene.frame_start)
-        bin.extend(get_frame_info_binary())
-    
-    bin.extend(("END GPLA").encode("utf8"))
-    
-    return bin
-    
+def gpla_header(scene, frame_count):
+    return (b"GPLA    " + struct.pack("<3Q", GPLA_MAJOR, GPLA_MINOR, GPLA_PATCH)
+            + b"FILE    fCount  " + struct.pack("<Q", frame_count)
+            + b"fRate   " + struct.pack("<Q", scene.render.fps) + b"DONE    ")
+
+
 def get_gpla_file(scene):
-    bin = bytearray()
-    
-    # header
-    bin.extend(("GPLA    ").encode("utf8"))
-    bin.extend(GPLA_MAJOR.to_bytes(8, "little"))
-    bin.extend(GPLA_MINOR.to_bytes(8, "little"))
-    bin.extend(GPLA_PATCH.to_bytes(8, "little"))
-    
-    # file info
-    bin.extend(("FILE    ").encode("utf8"))
-    bin.extend(("fCount  ").encode("utf8"))
-    bin.extend((scene.frame_end - scene.frame_start + 1).to_bytes(8, "little"))
-    bin.extend(("fRate   ").encode("utf8"))
-    bin.extend(scene.render.fps.to_bytes(8, "little"))
-    bin.extend(("DONE    ").encode("utf8"))
-    
-    bin.extend(get_frame_info_binary())
-    
-    bin.extend(("END GPLA").encode("utf8"))
-    
-    return bin
-    
-@persistent
+    return gpla_header(scene, 1) + get_frame_info_binary() + b"END GPLA"
+
+
 def save_scene_to_file(scene, file_path):
+    if scene.camera is None:
+        raise ValueError("Choose a scene camera before exporting line art")
     return_frame = scene.frame_current
+    return_subframe = scene.frame_subframe
     try:
-        if scene.camera is None or file_path is None:
-            return 1
-        bin = get_gpla_file_allframes(scene)
-        with open(file_path, "wb") as f:
-            f.write(bytes(bin))
+        with open(file_path, "wb") as output:
+            output.write(gpla_header(scene, scene.frame_end - scene.frame_start + 1))
+            for frame in range(scene.frame_start, scene.frame_end + 1):
+                scene.frame_set(frame)
+                output.write(get_frame_info_binary())
+            output.write(b"END GPLA")
     finally:
-        scene.frame_set(return_frame)
-    return 0
+        scene.frame_set(return_frame, subframe=return_subframe)
+
 
 def get_frame_info_binary():
-    frame_info = bytearray() 
-    frame_info.extend(("FRAME   ").encode("utf8"))
-    
-    frame_info.extend(("focalLen").encode("utf8"))
-    camera = bpy.context.scene.camera
-    if camera is None:
+    scene = bpy.context.scene
+    if scene.camera is None:
         raise ValueError("Choose a scene camera before exporting line art")
-    frame_info.extend(struct.pack("d", -0.05 * camera.data.lens))
-    
-    frame_info.extend(("OBJECTS ").encode("utf8"))
-    
-    if (bpy.app.version[0] > 4) or (bpy.app.version[0] == 4 and bpy.app.version[1] >= 3):
-        for object in bpy.data.objects:
-            if object.visible_get() and object.type == 'GREASEPENCIL':
-                dg =  bpy.context.evaluated_depsgraph_get()
-                obj = object.evaluated_get(dg)
-                frame_info.extend(("OBJECT  ").encode("utf8"))
-                
-                # matrix
-                frame_info.extend(("MATRIX  ").encode("utf8"))
-                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # strokes
-                frame_info.extend(("STROKES ").encode("utf8"))
-                layers = obj.data.layers
-                for layer in layers:
-                    frame = layer.current_frame()
-                    if frame is None:
-                        continue
-                    strokes = frame.drawing.strokes
-                    for stroke in strokes:
-                        frame_info.extend(("STROKE  ").encode("utf8"))
-                    
-                        frame_info.extend(("vertexCt").encode("utf8"))
-                        frame_info.extend(len(stroke.points).to_bytes(8, "little"))
-                    
-                        frame_info.extend(("VERTICES").encode("utf8"))
-                        for vert in stroke.points:
-                            frame_info.extend(struct.pack("d", vert.position.x))
-                            frame_info.extend(struct.pack("d", vert.position.y))
-                            frame_info.extend(struct.pack("d", vert.position.z))
-                        # VERTICES
-                        frame_info.extend(("DONE    ").encode("utf8"))
-                
-                        # STROKE
-                        frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # STROKES
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # OBJECT
-                frame_info.extend(("DONE    ").encode("utf8"))
-    else:
-        for object in bpy.data.objects: 
-            if object.visible_get() and object.type == 'GPENCIL':
-                dg =  bpy.context.evaluated_depsgraph_get()
-                obj = object.evaluated_get(dg)
-                frame_info.extend(("OBJECT  ").encode("utf8"))
-                
-                # matrix
-                frame_info.extend(("MATRIX  ").encode("utf8"))
-                camera_space = bpy.context.scene.camera.matrix_world.inverted() @ obj.matrix_world
-                for i in range(4):
-                    for j in range(4):
-                        frame_info.extend(struct.pack("d", camera_space[i][j]))
-                # MATRIX
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # strokes
-                frame_info.extend(("STROKES ").encode("utf8"))
-                layers = obj.data.layers
-                for layer in layers:
-                    if layer.active_frame is None:
-                        continue
-                    strokes = layer.active_frame.strokes
-                    for stroke in strokes:
-                        frame_info.extend(("STROKE  ").encode("utf8"))
-                        
-                        frame_info.extend(("vertexCt").encode("utf8"))
-                        frame_info.extend(len(stroke.points).to_bytes(8, "little"))
-                        
-                        frame_info.extend(("VERTICES").encode("utf8"))
-                        for vert in stroke.points:
-                            frame_info.extend(struct.pack("d", vert.co[0]))
-                            frame_info.extend(struct.pack("d", vert.co[1]))
-                            frame_info.extend(struct.pack("d", vert.co[2]))
-                        # VERTICES
-                        frame_info.extend(("DONE    ").encode("utf8"))
-                    
-                        # STROKE
-                        frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # STROKES
-                frame_info.extend(("DONE    ").encode("utf8"))
-                
-                # OBJECT
-                frame_info.extend(("DONE    ").encode("utf8"))
-    
-    # OBJECTS
-    frame_info.extend(("DONE    ").encode("utf8"))
-    
-    # FRAME
-    frame_info.extend(("DONE    ").encode("utf8"))
-    
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    camera = scene.camera.evaluated_get(depsgraph)
+    camera_inverse = camera.matrix_world.inverted()
+    frame_info = bytearray(b"FRAME   focalLen")
+    frame_info.extend(struct.pack("<d", -0.05 * camera.data.lens))
+    frame_info.extend(b"OBJECTS ")
+    modern = bpy.app.version >= (4, 3, 0)
+    object_type = 'GREASEPENCIL' if modern else 'GPENCIL'
+    for original in bpy.context.view_layer.objects:
+        if original.type != object_type or not original.visible_get():
+            continue
+        obj = original.evaluated_get(depsgraph)
+        frame_info.extend(b"OBJECT  MATRIX  ")
+        camera_space = camera_inverse @ obj.matrix_world
+        for row in camera_space:
+            frame_info.extend(struct.pack("<4d", *row))
+        frame_info.extend(b"DONE    STROKES ")
+        for layer in obj.data.layers:
+            if layer.hide:
+                continue
+            frame = layer.current_frame() if modern else layer.active_frame
+            if frame is None:
+                continue
+            strokes = frame.drawing.strokes if modern else frame.strokes
+            for stroke in strokes:
+                points = [point.position if modern else point.co for point in stroke.points]
+                cyclic = stroke.cyclic if modern else stroke.use_cyclic
+                if cyclic and points:
+                    points.append(points[0])
+                frame_info.extend(b"STROKE  vertexCt")
+                frame_info.extend(struct.pack("<Q", len(points)))
+                frame_info.extend(b"VERTICES")
+                for point in points:
+                    frame_info.extend(struct.pack("<3d", *point))
+                frame_info.extend(b"DONE    DONE    ")
+        frame_info.extend(b"DONE    DONE    ")
+    frame_info.extend(b"DONE    DONE    ")
     return frame_info
-    
+
 
 @persistent
 def send_scene_to_osci_render(scene):
@@ -320,7 +193,7 @@ operations = [OBJECT_PT_osci_render_settings, osci_render_connect, osci_render_c
 
 def register():
     bpy.types.Scene.oscirenderPort = bpy.props.IntProperty(name="osci-render port",description="The port through which osci-render will connect",min=51600,max=51699,default=51677)
-    for handlers in (bpy.app.handlers.frame_change_pre, bpy.app.handlers.depsgraph_update_post):
+    for handlers in (bpy.app.handlers.frame_change_post, bpy.app.handlers.depsgraph_update_post):
         if send_scene_to_osci_render not in handlers:
             handlers.append(send_scene_to_osci_render)
     atexit.unregister(close_osci_render)
@@ -334,7 +207,7 @@ def unregister():
     close_osci_render()
     if hasattr(bpy.types.Scene, "oscirenderPort"):
         del bpy.types.Scene.oscirenderPort
-    for handlers in (bpy.app.handlers.frame_change_pre, bpy.app.handlers.depsgraph_update_post):
+    for handlers in (bpy.app.handlers.frame_change_post, bpy.app.handlers.depsgraph_update_post):
         if send_scene_to_osci_render in handlers:
             handlers.remove(send_scene_to_osci_render)
     atexit.unregister(close_osci_render)

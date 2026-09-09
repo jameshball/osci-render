@@ -132,17 +132,12 @@ private:
     void discover(juce::StringArray chosen = {}) {
         retryDiscovery = false;
         finished = false;
-        if (BlenderInstaller::blenderRunning()) {
-            retryDiscovery = true;
-            install.setButtonText("Retry");
-            setWorking(false, "Close Blender to continue.");
-            return;
-        }
         setWorking(true, "Finding Blender...");
         auto safe = juce::Component::SafePointer<BlenderSetupComponent>(this);
         juce::Thread::launch([safe, chosen] {
             BlenderInstaller backend;
-            auto commands = chosen.isEmpty() ? BlenderInstaller::candidates() : std::vector<juce::StringArray> { chosen };
+            const auto running = BlenderInstaller::blenderRunning();
+            auto commands = running ? std::vector<juce::StringArray> {} : chosen.isEmpty() ? BlenderInstaller::candidates() : std::vector<juce::StringArray> { chosen };
             std::vector<BlenderInstaller::Target> found;
             juce::StringArray profiles;
             juce::String error;
@@ -157,8 +152,14 @@ private:
                 }
             }
             const auto log = backend.saveLog();
-            juce::MessageManager::callAsync([safe, found, error, log] {
+            juce::MessageManager::callAsync([safe, found, error, log, running] {
                 if (safe == nullptr) {
+                    return;
+                }
+                if (running) {
+                    safe->retryDiscovery = true;
+                    safe->install.setButtonText("Retry");
+                    safe->setWorking(false, "Close Blender to continue.");
                     return;
                 }
                 safe->targets = found;
@@ -173,7 +174,7 @@ private:
                 safe->versions.addItem("Choose another...", 10000);
                 safe->versions.setVisible(!found.empty());
                 safe->install.setButtonText(found.empty() ? "Choose Blender..." : "Install");
-                safe->setWorking(false, found.empty() ? "Choose Blender 4.2 or newer." : "");
+                safe->setWorking(false, found.empty() ? (error.isNotEmpty() ? error : "Choose Blender 4.2 or newer.") : "");
                 if (!found.empty()) {
                     safe->versions.setSelectedItemIndex(0, juce::sendNotificationSync);
                 }
@@ -218,20 +219,19 @@ private:
         juce::Thread::launch([safe, target, replacing] {
             BlenderInstaller backend;
             const auto result = backend.install(target, replacing);
-            const auto log = backend.saveLog();
-            juce::MessageManager::callAsync([safe, result, log, target] {
+            const auto log = backend.saveLog(result);
+            juce::MessageManager::callAsync([safe, result, log] {
                 if (safe == nullptr) {
                     return;
                 }
                 safe->logFile = log;
                 safe->logButton.setVisible(result.failed() && log.existsAsFile());
                 safe->manual.setVisible(result.failed());
-                const auto downloadFailed = result.getErrorMessage().containsIgnoreCase("HTTP")
-                    || result.getErrorMessage().containsIgnoreCase("sync");
-                safe->setWorking(false, result.wasOk()
-                    ? "Installed. Open Blender to get started."
-                    : (downloadFailed ? "Couldn't download the extension. Try again later."
-                                      : "Couldn't install the extension. See Details."));
+                const auto error = result.getErrorMessage();
+                const auto downloadFailed = error.containsIgnoreCase("sync:") || error.containsIgnoreCase("HTTP");
+                safe->setWorking(false, result.wasOk() ? "Installed. Open Blender to get started."
+                    : downloadFailed ? "Couldn't download the extension. Retry or use manual installation."
+                    : error.length() > 150 ? "Couldn't install the extension. See Details." : error);
                 if (result.wasOk()) {
                     auto& installedTarget = safe->targets[static_cast<size_t>(safe->versions.getSelectedItemIndex())];
                     installedTarget.enabled = true;

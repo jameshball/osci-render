@@ -15,7 +15,6 @@ public:
         bool conflicts = false;
     };
 
-    static constexpr auto repositoryUrl = "https://osci-render.com/blender/index.json";
     static constexpr auto manualUrl = "https://osci-render.com/blender/";
 
     BlenderInstaller() : directory(juce::File::getSpecialLocation(juce::File::tempDirectory)
@@ -27,7 +26,9 @@ public:
     }
 
     ~BlenderInstaller() {
-        directory.deleteRecursively();
+        if (!keepRecoveryFiles) {
+            directory.deleteRecursively();
+        }
     }
 
     static juce::StringArray executableCommand(juce::File file) {
@@ -154,29 +155,33 @@ public:
         if (result.failed() && directory.getChildFile("journal.json").existsAsFile()) {
             const auto restored = action(target.command, "rollback", false, state);
             if (restored.failed()) {
+                keepRecoveryFiles = true;
                 result = juce::Result::fail(result.getErrorMessage() + "\nCould not restore the previous add-on selection: "
-                                          + restored.getErrorMessage());
+                                          + restored.getErrorMessage() + "\nRecovery files: " + directory.getFullPathName());
             }
         }
-        directory.getChildFile("journal.json").deleteFile();
+        if (!keepRecoveryFiles) {
+            directory.getChildFile("journal.json").deleteFile();
+        }
         return result;
     }
 
-    juce::File saveLog() const {
+    juce::File saveLog(const juce::Result& result = juce::Result::ok()) const {
         const auto folder = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
             .getChildFile("osci-installer/blender-logs");
-        const auto result = folder.createDirectory();
-        if (result.failed()) {
+        const auto created = folder.createDirectory();
+        if (created.failed()) {
             return {};
         }
         const auto file = folder.getNonexistentChildFile("setup", ".log", false);
-        return file.replaceWithText(log) ? file : juce::File {};
+        return file.replaceWithText(log + "\n" + result.getErrorMessage()) ? file : juce::File {};
     }
 
 private:
     juce::File directory;
     juce::Result ready = juce::Result::ok();
     juce::String log;
+    bool keepRecoveryFiles = false;
 
     juce::File script() const { return directory.getChildFile("blender_setup.py"); }
 
@@ -231,7 +236,7 @@ private:
         }
         juce::String output;
         auto result = run(command, output);
-        log += "\n" + name + "\n" + output;
+        log += "\n" + command.joinIntoString(" ") + "\n" + output + "\n" + result.getErrorMessage();
         bool reported = false;
         for (const auto& line : juce::StringArray::fromLines(output)) {
             if (line.startsWith("OSCI_RESULT=")) {
