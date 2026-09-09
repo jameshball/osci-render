@@ -51,6 +51,8 @@ class osci_render_connect(bpy.types.Operator):
                 return {"CANCELLED"}
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                if hasattr(socket, "SO_NOSIGPIPE"):
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_NOSIGPIPE, 1)
                 sock.settimeout(1)
                 sock.connect((HOST, context.scene.oscirenderPort))
                 send_scene_to_osci_render(bpy.context.scene)
@@ -111,13 +113,22 @@ def close_osci_render():
     global sock
     if sock is not None:
         try:
-            sock.send("CLOSE\n".encode('utf-8'))
+            send_bytes("CLOSE\n".encode('utf-8'))
             sock.close()
         except OSError:
             pass
         finally:
             sock.close()
             sock = None
+
+def send_bytes(data):
+    view = memoryview(data)
+    flags = getattr(socket, "MSG_NOSIGNAL", 0)
+    while view:
+        sent = sock.send(view, flags)
+        if sent == 0:
+            raise OSError("osci-render connection closed")
+        view = view[sent:]
 
 def get_gpla_file_allframes(scene):
     bin = bytearray()
@@ -299,7 +310,7 @@ def send_scene_to_osci_render(scene):
     if sock is not None:
         try:
             bin = get_gpla_file(scene)
-            sock.sendall(base64.b64encode(bytes(bin)) + "\n".encode("utf8"))
+            send_bytes(base64.b64encode(bytes(bin)) + "\n".encode("utf8"))
         except (OSError, ValueError, AttributeError):
             close_osci_render()
 
