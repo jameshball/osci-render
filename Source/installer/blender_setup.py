@@ -4,12 +4,16 @@ Each action runs in a fresh process so migrating a legacy add-on with a broken
 unregister() cannot leave classes behind in the installation process.
 """
 
+import sys
+
+# Setup must not create Python caches inside the Blender application bundle.
+sys.dont_write_bytecode = True
+
 import argparse
 from contextlib import redirect_stdout, redirect_stderr
 import io
 import json
 from pathlib import Path
-import sys
 import traceback
 
 import addon_utils
@@ -95,6 +99,11 @@ def prepare(args):
 
 
 def install(args):
+    # Blender's extension subprocess otherwise writes .pyc files inside Blender.app,
+    # triggering macOS App Management protection for the parent installer.
+    from bl_pkg import bl_extension_utils
+    command = bl_extension_utils.blender_ext_cmd
+    bl_extension_utils.blender_ext_cmd = lambda python_args: command((*python_args, "-B"))
     repo = repository(args.url)
     if repo is None:
         raise RuntimeError("The osci-render repository was not saved")
@@ -124,7 +133,9 @@ def rollback(args):
     if args.journal.exists():
         state = json.loads(args.journal.read_text(encoding="utf-8"))
         addons = bpy.context.preferences.addons
-        if not state["previously_enabled"] and state["target"] in addons:
+        if state["previously_enabled"] and state["target"] not in addons:
+            addons.new().module = state["target"]
+        elif not state["previously_enabled"] and state["target"] in addons:
             addons.remove(addons[state["target"]])
         for name in state["disabled"]:
             if name not in addons:
