@@ -32,7 +32,7 @@ def main():
                 result = subprocess.run(base + extra, env=env, text=True, stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT, timeout=120)
                 if (result.returncode == 0) != success:
-                    raise AssertionError(result.stdout)
+                    raise AssertionError(f"Blender exited {result.returncode}:\n{result.stdout}")
                 return result.stdout
 
             def action(name, *extra, success=True, repository_url=url):

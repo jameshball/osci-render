@@ -7,6 +7,11 @@ from pathlib import Path
 
 import bpy
 
+
+def mark(message):
+    print(f"SMOKE: {message}", flush=True)
+
+mark("import extension")
 extension = importlib.import_module("bl_ext.osci_render.osci_render")
 assert hasattr(bpy.types.Scene, "oscirenderPort")
 extension.unregister()
@@ -14,6 +19,7 @@ extension.unregister()
 assert not hasattr(bpy.types.Scene, "oscirenderPort")
 extension.register()
 extension.register()
+mark("registration")
 assert bpy.app.handlers.frame_change_pre.count(extension.send_scene_to_osci_render) == 1
 assert bpy.app.handlers.depsgraph_update_post.count(extension.send_scene_to_osci_render) == 1
 
@@ -30,6 +36,7 @@ if bpy.app.version >= (4, 3, 0):
     drawing.strokes[0].points[0].position = (0, 0, 0)
     drawing.strokes[0].points[1].position = (1, 1, 0)
 else:
+    mark("create Blender 4.2 Grease Pencil stroke")
     bpy.ops.object.gpencil_add(type='EMPTY')
     layer = bpy.context.object.data.layers.new("Empty test layer", set_active=True)
     assert extension.get_frame_info_binary().startswith(b"FRAME   ")
@@ -38,8 +45,10 @@ else:
     stroke.points[0].co = (0, 0, 0)
     stroke.points[1].co = (1, 1, 0)
 bpy.context.view_layer.update()
+mark("export stroke")
 assert b"STROKE  " in extension.get_frame_info_binary()
 with tempfile.TemporaryDirectory() as directory:
+    mark("export GPLA")
     path = Path(directory) / "test.gpla"
     assert extension.save_scene_to_file(scene, str(path)) == 0
     assert path.read_bytes().startswith(b"GPLA    ")
@@ -53,6 +62,7 @@ except ValueError:
     pass
 scene.camera = camera
 extension.sock = socket.socket()
+mark("disconnect")
 extension.close_osci_render()
 assert extension.sock is None
 extension.unregister()
