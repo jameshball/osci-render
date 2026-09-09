@@ -2,6 +2,7 @@ name: Blender extension
 
 on:
   push:
+    branches: [develop]
     paths: ['blender/**', 'Source/installer/blender_setup.py', 'ci/*blender*', '.github/workflows/blender.yaml']
   pull_request:
     paths: ['blender/**', 'Source/installer/blender_setup.py', 'ci/*blender*', '.github/workflows/blender.yaml']
