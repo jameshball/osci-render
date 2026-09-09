@@ -10,11 +10,10 @@ import sys
 sys.dont_write_bytecode = True
 
 import argparse
-from contextlib import redirect_stdout, redirect_stderr
-import io
 import json
 from pathlib import Path
 import traceback
+import subprocess
 
 import addon_utils
 import bpy
@@ -22,6 +21,7 @@ import bpy
 REPOSITORY_URL = "https://osci-render.com/blender/index.json"
 REPOSITORY_ID = "osci_render"
 PACKAGE_ID = "osci_render"
+command_errors = []
 
 
 def require_finished(result, operation):
@@ -29,19 +29,28 @@ def require_finished(result, operation):
         raise RuntimeError(f"Blender could not {operation}")
 
 
+def extension_command(args, use_idle, *, python_args):
+    # Setup is synchronous. Blender's nonblocking reader can lose the final error
+    # on Windows, so collect the complete response and check the process exit code.
+    from bl_pkg import bl_extension_utils
+    command = [*bl_extension_utils.blender_ext_cmd((*python_args, "-B")), *args, "--output-type=JSON_0"]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+    messages = [json.loads(message) for message in result.stdout.split(b"\0") if message]
+    errors = [str(message) for kind, message in messages if kind in {"ERROR", "FATAL_ERROR"}]
+    if result.returncode and not errors:
+        errors.append(result.stderr.decode("utf-8", errors="replace")
+                      or f"Blender extension command exited with code {result.returncode}")
+    command_errors.extend(errors)
+    yield messages
+
+
 def extension_operation(operator, **kwargs):
-    # Blender 4.2 can return FINISHED even when its download subprocess failed.
-    # Preserve the diagnostic and treat that failure as a setup error.
-    output = io.StringIO()
-    try:
-        with redirect_stdout(output), redirect_stderr(output):
-            result = operator(**kwargs)
-    finally:
-        print(output.getvalue(), end="", flush=True)
-    errors = [line for line in output.getvalue().splitlines()
-              if line.startswith(("FATAL_ERROR", "ERROR", "Error:"))]
-    if errors:
-        raise RuntimeError("\n".join(errors))
+    command_errors.clear()
+    result = operator(**kwargs)
+    # Let Blender finish and release its repository locks before raising.
+    if command_errors:
+        raise RuntimeError("\n".join(command_errors))
     require_finished(result, "complete the extension operation")
 
 
@@ -99,11 +108,9 @@ def prepare(args):
 
 
 def install(args):
-    # Blender's extension subprocess otherwise writes .pyc files inside Blender.app,
-    # triggering macOS App Management protection for the parent installer.
     from bl_pkg import bl_extension_utils
-    command = bl_extension_utils.blender_ext_cmd
-    bl_extension_utils.blender_ext_cmd = lambda python_args: command((*python_args, "-B"))
+    # -B also prevents the extension subprocess from writing caches into Blender.app.
+    bl_extension_utils.command_output_from_json_0 = extension_command
     repo = repository(args.url)
     if repo is None:
         raise RuntimeError("The osci-render repository was not saved")
@@ -155,10 +162,10 @@ def main():
         if bpy.app.version < (4, 2, 0):
             raise RuntimeError("Blender 4.2 or newer is required")
         result = inspect(args.url) if args.action == "inspect" else globals()[args.action](args)
-        print("OSCI_RESULT=" + json.dumps({"ok": True, **result}), flush=True)
+        print("\nOSCI_RESULT=" + json.dumps({"ok": True, **result}), flush=True)
     except Exception as error:
         traceback.print_exc()
-        print("OSCI_RESULT=" + json.dumps({"ok": False, "error": str(error)}), flush=True)
+        print("\nOSCI_RESULT=" + json.dumps({"ok": False, "error": str(error)}), flush=True)
         raise
 
 
