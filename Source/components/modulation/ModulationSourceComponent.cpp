@@ -163,6 +163,7 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
 #endif
 
     juce::Component::SafePointer<DepthIndicator> safeThis(this);
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
         [safeThis
 #if OSCI_PREMIUM

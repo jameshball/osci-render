@@ -746,6 +746,7 @@ void LfoComponent::showPaintShapeMenu() {
     addItem("Tri", PS::Tri);
     addItem("Bump", PS::Bump);
 
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options()
         .withTargetComponent(&shapePreview)
         .withMinimumWidth(80));

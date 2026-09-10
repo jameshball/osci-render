@@ -136,6 +136,7 @@ void LfoPresetBrowserOverlay::PresetRow::mouseDown(const juce::MouseEvent& e) {
         } else {
             menu.addItem("Set as Default", [this]() { if (onSetDefault) onSetDefault(); });
         }
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
             { e.getScreenX(), e.getScreenY(), 1, 1 }));
     }
