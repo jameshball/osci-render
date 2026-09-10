@@ -10,6 +10,7 @@
 #include "../components/InstallFlowHelpers.h"
 #include "InstallCompletionComponent.h"
 #include "LinuxInstallLocationsComponent.h"
+#include "BlenderSetupComponent.h"
 
 namespace osci::installer {
 
@@ -110,6 +111,10 @@ public:
 
         addAndMakeVisible (panel);
 
+        panel.addAndMakeVisible(blenderButton);
+        blenderButton.setButtonText("Blender integration");
+        blenderButton.onClick = [this] { showBlenderSetup(); };
+
         panel.addAndMakeVisible (choiceLabel);
         choiceLabel.setJustificationType (juce::Justification::centred);
 
@@ -208,6 +213,9 @@ public:
     }
 
     void resized() override {
+        if (blenderSetup != nullptr) {
+            blenderSetup->setBounds(getLocalBounds());
+        }
 #if JUCE_LINUX
         if (installationComplete) {
             helpButton.setBounds ({});
@@ -350,6 +358,9 @@ private:
     ProductTile osciRenderTile;
     ProductTile sosciTile;
     juce::Component panel;
+    juce::TextButton blenderButton;
+    std::unique_ptr<BlenderSetupComponent> blenderSetup;
+    std::vector<juce::Component::SafePointer<juce::Component>> blenderHiddenComponents;
     juce::Label choiceLabel;
     juce::TextButton freeChoiceButton;
     juce::TextButton premiumChoiceButton;
@@ -380,6 +391,46 @@ private:
     bool cachedTokenNeedsRefresh = false;
     juce::String cachedTokenMessage;
     juce::String lastInstalledVersion;
+
+    void showBlenderSetup() {
+        if (busy || blenderSetup != nullptr) {
+            return;
+        }
+        blenderSetup = std::make_unique<BlenderSetupComponent>();
+        blenderSetup->onBusyChanged = [this](bool value) {
+            busy = value;
+            if (onBusyChanged) {
+                onBusyChanged(value);
+            }
+        };
+        blenderSetup->onDismissRequested = [safe = juce::Component::SafePointer<InstallerComponent>(this)] {
+            juce::MessageManager::callAsync([safe] {
+                if (safe != nullptr) {
+                    safe->blenderSetup = nullptr;
+                    for (auto& component : safe->blenderHiddenComponents) {
+                        if (component != nullptr) {
+                            component->setVisible(true);
+                        }
+                    }
+                    safe->blenderHiddenComponents.clear();
+                    safe->refreshUi();
+                    safe->resized();
+                    safe->blenderButton.grabKeyboardFocus();
+                }
+            });
+        };
+        blenderSetup->captureBackdropFrom(*this);
+        for (auto* component : getChildren()) {
+            if (component->isVisible()) {
+                blenderHiddenComponents.emplace_back(component);
+                component->setVisible(false);
+            }
+        }
+        addAndMakeVisible(*blenderSetup);
+        blenderSetup->setBounds(getLocalBounds());
+        blenderSetup->toFront(true);
+        blenderSetup->grabKeyboardFocus();
+    }
 
 #if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
     jucewright::EnvironmentAutomation automation { *this };
@@ -521,6 +572,8 @@ private:
             freeChoiceButton.setBounds (row.removeFromLeft (200));
             row.removeFromLeft (20);
             premiumChoiceButton.setBounds (row.removeFromLeft (200));
+            area.removeFromTop(12);
+            blenderButton.setBounds(area.removeFromTop(32).withSizeKeepingCentre(200, 32));
             choiceLabel.setBounds ({});
             statusLabel.setBounds ({});
             progressBar.setBounds ({});
@@ -639,10 +692,12 @@ private:
     }
 
     void refreshUi() {
+        blenderButton.setEnabled(!busy);
         const auto selectedOsciRender = selectedProduct == ProductChoice::OsciRender;
         const auto selectedSosci = selectedProduct == ProductChoice::Sosci;
         const auto premiumPath = isPremiumPath (currentPath);
         const auto showOsciChoice = selectedOsciRender && currentPath == InstallPath::None;
+        blenderButton.setVisible(showOsciChoice);
         const auto showPanel = selectedProduct != ProductChoice::None;
         const auto showKeyEntry = premiumPath && !hasCachedPremiumToken;
         const auto showChoiceLabel = showKeyEntry && !busy;
