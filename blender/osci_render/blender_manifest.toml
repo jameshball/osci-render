@@ -7,7 +7,7 @@ tagline = "Send Grease Pencil line art to osci-render"
 maintainer = "James H. Ball <https://github.com/jameshball>"
 type = "add-on"
 
-website = "https://github.com/jameshball/osci-render"
+website = "https://osci-render.com/blender/"
 
 tags = ["Animation", "Bake", "Grease Pencil", "Import-Export", "Render"]
 
