@@ -192,12 +192,10 @@ void ShapeVoice::voiceKilled() {
     killFadeGain = 1.0f;
 }
 
-void ShapeVoice::incrementShapeDrawing() {
+void ShapeVoice::locateShapeDrawing() {
     if (frame.empty() || frameLength <= 0.0) {
         return;
     }
-    frameDrawn += lengthIncrement;
-    shapeDrawn += lengthIncrement;
     // Nearby edges are cheaper to walk; cap the work before using the index.
     for (int skipped = 0; skipped < 32 && shapeDrawn > frame[currentShape]->len; ++skipped) {
         shapeDrawn -= frame[currentShape]->len;
@@ -445,18 +443,25 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         frequencyBuffer.setSample(0, i, (float) actualFrequency);
 
         if (!renderingSample) {
-            incrementShapeDrawing();
+            frameDrawn += lengthIncrement;
+            shapeDrawn += lengthIncrement;
+            locateShapeDrawing();
         }
 
         if (!renderingSample && frameDrawn >= frameLength) {
-            double prevFrameLength = frameLength;
+            frameDrawn -= frameLength;
             if (currentSound != nullptr && currentlyPlaying) {
                 if (currentSound->updateFrame(frame)) {
+                    double prevFrameLength = frameLength;
                     frameLength = currentSound->getFrameLength();
+                    if (frameLength > 0 && prevFrameLength > 0) {
+                        frameDrawn *= frameLength / prevFrameLength;
+                    }
                 }
             }
-            frameDrawn -= prevFrameLength;
+            shapeDrawn = frameDrawn;
             currentShape = 0;
+            locateShapeDrawing();
 
             // The first sample of the new frame is the *next* sample.
             pendingFrameStart = true;
