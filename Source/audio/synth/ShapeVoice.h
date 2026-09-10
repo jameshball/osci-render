@@ -24,7 +24,7 @@ public:
 	void pitchWheelMoved(int newPitchWheelValue) override;
 	void controllerMoved(int controllerNumber, int newControllerValue) override;
 
-	void incrementShapeDrawing();
+	void locateShapeDrawing();
 	double getFrequency();
 
 	// VoiceManager lifecycle callbacks (called by OscirenderAudioProcessor)

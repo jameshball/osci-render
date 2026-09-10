@@ -625,9 +625,12 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="Ju0mVn" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
-        <FILE id="oFrmPr0" name="FramePresenter.h" compile="0" resource="0" file="Source/visualiser/FramePresenter.h"/>
-        <FILE id="oFrmPr1" name="FramePresenter.cpp" compile="1" resource="0" file="Source/visualiser/FramePresenter.cpp"/>
-        <FILE id="oFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0" file="Source/visualiser/FramePresenter_mac.mm"/>
+        <FILE id="oFrmPr0" name="FramePresenter.h" compile="0" resource="0"
+              file="Source/visualiser/FramePresenter.h"/>
+        <FILE id="oFrmPr1" name="FramePresenter.cpp" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter.cpp"/>
+        <FILE id="oFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter_mac.mm"/>
         <FILE id="frfxSR" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
         <FILE id="VisRecC" name="VisualiserRecordingController.cpp" compile="1"
@@ -654,8 +657,7 @@
               resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
         <FILE id="tGlLnx" name="OpenGL_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/OpenGL_linux.cpp"/>
-        <FILE id="tGlLnh" name="OpenGL_linux.h" compile="0" resource="0"
-              file="Source/visualiser/OpenGL_linux.h"/>
+        <FILE id="tGlLnh" name="OpenGL_linux.h" compile="0" resource="0" file="Source/visualiser/OpenGL_linux.h"/>
         <FILE id="tW2Lnx" name="TransparentWindow_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/TransparentWindow_linux.cpp"/>
         <FILE id="tW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
@@ -765,7 +767,7 @@
                        debugInformationFormat="ProgramDatabase" winWarningLevel="2"
                        libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
-                       prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -906,7 +908,7 @@
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_gui" showAllCode="0" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
