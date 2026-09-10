@@ -109,7 +109,8 @@ def send_bytes(data):
 def gpla_header(scene, frame_count):
     return (b"GPLA    " + struct.pack("<3Q", GPLA_MAJOR, GPLA_MINOR, GPLA_PATCH)
             + b"FILE    fCount  " + struct.pack("<Q", frame_count)
-            + b"fRate   " + struct.pack("<Q", scene.render.fps) + b"DONE    ")
+            + b"fRate   " + struct.pack("<Q", scene.render.fps)
+            + b"DONE    ")  # FILE
 
 
 def get_gpla_file(scene):
@@ -133,6 +134,7 @@ def save_scene_to_file(scene, file_path):
 
 
 def get_frame_info_binary():
+    # GPLA sections are nested. Each DONE closes the innermost open section.
     scene = bpy.context.scene
     if scene.camera is None:
         raise ValueError("Choose a scene camera before exporting line art")
@@ -150,8 +152,8 @@ def get_frame_info_binary():
         obj = original.evaluated_get(depsgraph)
         frame_info.extend(b"OBJECT  MATRIX  ")
         camera_space = camera_inverse @ obj.matrix_world
-        for row in camera_space:
-            frame_info.extend(struct.pack("<4d", *row))
+        frame_info.extend(struct.pack("<16d", *(value for row in camera_space for value in row)))
+        # Close MATRIX, then open STROKES.
         frame_info.extend(b"DONE    STROKES ")
         for layer in obj.data.layers:
             if layer.hide:
@@ -170,8 +172,11 @@ def get_frame_info_binary():
                 frame_info.extend(b"VERTICES")
                 for point in points:
                     frame_info.extend(struct.pack("<3d", *point))
+                # Close VERTICES, then STROKE.
                 frame_info.extend(b"DONE    DONE    ")
+        # Close STROKES, then OBJECT.
         frame_info.extend(b"DONE    DONE    ")
+    # Close OBJECTS, then FRAME.
     frame_info.extend(b"DONE    DONE    ")
     return frame_info
 
