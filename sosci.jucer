@@ -72,7 +72,6 @@
         <FILE id="LockS1" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
         <FILE id="MouseS" name="mouse.svg" compile="0" resource="1" file="Resources/svg/mouse.svg"/>
         <FILE id="e19TQV" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
-        <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="uEmfHD" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
         <FILE id="WoY9r2" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
@@ -110,12 +109,6 @@
       <GROUP id="{9182E7E6-C853-4D53-A6D4-BF588DB62B31}" name="parser">
         <FILE id="FmtSos1" name="FileFormatRegistry.h" compile="0" resource="0"
               file="Source/parser/FileFormatRegistry.h"/>
-      </GROUP>
-      <GROUP id="{B801DAEE-F8DF-49E2-95CB-46F8FC480B34}" name="feedback">
-        <FILE id="SFbRpC" name="FeedbackReportBuilder.cpp" compile="1" resource="0"
-              file="Source/feedback/FeedbackReportBuilder.cpp"/>
-        <FILE id="SFbRpH" name="FeedbackReportBuilder.h" compile="0" resource="0"
-              file="Source/feedback/FeedbackReportBuilder.h"/>
       </GROUP>
       <GROUP id="{34BCEBE9-062C-27E1-5661-B33652D8F4F5}" name="video">
         <FILE id="pmHHqY" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
@@ -219,25 +212,28 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
         <FILE id="pxVOD9" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
-        <FILE id="sFrmPr0" name="FramePresenter.h" compile="0" resource="0" file="Source/visualiser/FramePresenter.h"/>
-        <FILE id="sFrmPr1" name="FramePresenter.cpp" compile="1" resource="0" file="Source/visualiser/FramePresenter.cpp"/>
-        <FILE id="sFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0" file="Source/visualiser/FramePresenter_mac.mm"/>
+        <FILE id="sFrmPr0" name="FramePresenter.h" compile="0" resource="0"
+              file="Source/visualiser/FramePresenter.h"/>
+        <FILE id="sFrmPr1" name="FramePresenter.cpp" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter.cpp"/>
+        <FILE id="sFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter_mac.mm"/>
         <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserComponent.h"/>
-        <FILE id="SViRcC" name="VisualiserRecordingController.cpp" compile="1" resource="0"
-              file="Source/visualiser/VisualiserRecordingController.cpp"/>
-        <FILE id="SViRcH" name="VisualiserRecordingController.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserRecordingController.h"/>
-        <FILE id="SViTxC" name="VisualiserTextureOutputController.cpp" compile="1" resource="0"
-              file="Source/visualiser/VisualiserTextureOutputController.cpp"/>
-        <FILE id="SViTxH" name="VisualiserTextureOutputController.h" compile="0" resource="0"
-              file="Source/visualiser/VisualiserTextureOutputController.h"/>
+        <FILE id="SViRcC" name="VisualiserRecordingController.cpp" compile="1"
+              resource="0" file="Source/visualiser/VisualiserRecordingController.cpp"/>
+        <FILE id="SViRcH" name="VisualiserRecordingController.h" compile="0"
+              resource="0" file="Source/visualiser/VisualiserRecordingController.h"/>
+        <FILE id="SViTxC" name="VisualiserTextureOutputController.cpp" compile="1"
+              resource="0" file="Source/visualiser/VisualiserTextureOutputController.cpp"/>
+        <FILE id="SViTxH" name="VisualiserTextureOutputController.h" compile="0"
+              resource="0" file="Source/visualiser/VisualiserTextureOutputController.h"/>
         <FILE id="SosPopC" name="VisualiserPopout.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserPopout.cpp"/>
         <FILE id="SosPopH" name="VisualiserPopout.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserPopout.h"/>
-        <FILE id="TrWinInt2" name="TransparentWindowInteraction.h" compile="0" resource="0"
-              file="Source/visualiser/TransparentWindowInteraction.h"/>
+        <FILE id="TrWinInt2" name="TransparentWindowInteraction.h" compile="0"
+              resource="0" file="Source/visualiser/TransparentWindowInteraction.h"/>
         <FILE id="sW1nDo" name="TransparentWindow.h" compile="0" resource="0"
               file="Source/visualiser/TransparentWindow.h"/>
         <FILE id="sW1Cpp" name="TransparentWindow.cpp" compile="1" resource="0"
@@ -248,8 +244,7 @@
               resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
         <FILE id="sGlLnx" name="OpenGL_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/OpenGL_linux.cpp"/>
-        <FILE id="sGlLnh" name="OpenGL_linux.h" compile="0" resource="0"
-              file="Source/visualiser/OpenGL_linux.h"/>
+        <FILE id="sGlLnh" name="OpenGL_linux.h" compile="0" resource="0" file="Source/visualiser/OpenGL_linux.h"/>
         <FILE id="sW2Lnx" name="TransparentWindow_linux.cpp" compile="1" resource="0"
               file="Source/visualiser/TransparentWindow_linux.cpp"/>
         <FILE id="sW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
