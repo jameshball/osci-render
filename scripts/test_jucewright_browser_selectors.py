@@ -20,13 +20,13 @@ def dialog(ref, children):
 
 class BrowserSelectorTests(unittest.TestCase):
     def test_close_targets_topmost_dialog_not_underlying_dialog_or_popout(self):
-        tree = {"children": [dialog("feedback", [close_button("feedback-close")]),
+        tree = {"children": [dialog("about", [close_button("about-close")]),
                              dialog("settings", [close_button("settings-close")]),
                              {"role": "window", "children": [close_button("popout-close")]}]}
         self.assertEqual(OsciRenderBrowserRun.overlay_close_ref(tree), "settings-close")
 
     def test_animation_does_not_close_underlying_dialog(self):
-        tree = {"children": [dialog("feedback", [close_button("feedback-close")]),
+        tree = {"children": [dialog("about", [close_button("about-close")]),
                              dialog("settings", [{"class": "AnimationImageComponent"}])]}
         self.assertIsNone(OsciRenderBrowserRun.overlay_close_ref(tree))
 
@@ -47,21 +47,6 @@ class BrowserSelectorTests(unittest.TestCase):
             path.write_text(json.dumps({"tree": tree}))
             rows = ControlDiscoveryMixin().discover_visible_controls(path, 0)
         self.assertEqual(rows, [("toggle", "button", "set-checked", "true", "Diagnostic log")])
-
-    def test_composite_remove_click_targets_inner_button(self):
-        run = object.__new__(OsciRenderBrowserRun)
-        commands = []
-        run.cli = lambda *args: list(args)
-
-        def call(command):
-            commands.append(command)
-            return json.dumps({"tree": {"ref": "container", "role": "unspecified", "children": [
-                {"ref": "remove-icon", "role": "button", "name": "Remove image icon"}]}})
-
-        run.call = call
-        run.click_component_button("removeUserScreenshot1")
-        self.assertEqual(commands[1][:2], ["click", "remove-icon"])
-        self.assertIn("removeUserScreenshot1", commands[0])
 
     def test_switch_waits_for_actionability_before_snapshot(self):
         run = object.__new__(OsciRenderBrowserRun)

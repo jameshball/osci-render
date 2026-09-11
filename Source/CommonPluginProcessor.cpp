@@ -150,15 +150,6 @@ juce::String CommonAudioProcessor::getProductSlug() const
     return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
 }
 
-void CommonAudioProcessor::getPortableProjectSnapshot(juce::MemoryBlock& destData) {
-    const juce::ScopedValueSetter<bool> snapshotScope(creatingPortableProjectSnapshot, true);
-    getStateInformation(destData);
-}
-
-bool CommonAudioProcessor::isCreatingPortableProjectSnapshot() const {
-    return creatingPortableProjectSnapshot;
-}
-
 int CommonAudioProcessor::getNumRecentProjectFiles() const
 {
     return recentProjectFiles.getNumFiles();
@@ -244,9 +235,6 @@ int CommonAudioProcessor::createRecentRecordingsPopupMenuItems(juce::PopupMenu& 
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
 {
-    if (creatingPortableProjectSnapshot) {
-        return;
-    }
     if (!juce::JUCEApplicationBase::isStandaloneApp())
         return;
 

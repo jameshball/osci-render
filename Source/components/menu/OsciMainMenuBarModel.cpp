@@ -183,7 +183,6 @@ void OsciMainMenuBarModel::resetMenuItems() {
             editor.resized();
         };
         aboutInfo.websiteUrl = "https://osci-render.com";
-        aboutInfo.onSendFeedback = [this] { editor.openFeedback(); };
         aboutInfo.credits = {
             { "DJ_Level_3",          "Contributed several features to osci-render" },
             { "Anthony Hall",        "Added many new effects, and improved existing ones" },

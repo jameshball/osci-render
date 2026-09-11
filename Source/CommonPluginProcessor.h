@@ -36,7 +36,6 @@ public:
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
-    void getPortableProjectSnapshot(juce::MemoryBlock& destData);
     void clearRecentProjectFiles();
     void recordingExportCompleted(const juce::File& file);
     juce::File getRecentRecordingFile(int index) const;
@@ -198,7 +197,6 @@ public:
     }
     
 protected:
-    bool isCreatingPortableProjectSnapshot() const;
     void notifyAudioFileChanged();
     
     bool brightnessEnabled = false;
@@ -278,7 +276,6 @@ protected:
 
 private:
     InternalSampleRateController internalSampleRate;
-    inline static thread_local bool creatingPortableProjectSnapshot = false;
 
     void startHeartbeat();
     void stopHeartbeat();
