@@ -135,6 +135,7 @@ def main(argv: list[str]) -> int:
     p.add_argument('--semver', required=True, help='e.g. 2.6.0.0')
     p.add_argument('--platform', required=True,
                    choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64', 'linux-arm64'])
+    p.add_argument('--legal-manifest', type=Path, help='Pinned document manifest generated before building')
     p.add_argument('--release-track', default='alpha', choices=['alpha', 'beta', 'stable'],
                    help='Release track to register with the API. CI should publish alpha.')
     p.add_argument('--variant', default='premium', choices=['free', 'premium'],
@@ -192,6 +193,11 @@ def main(argv: list[str]) -> int:
         'ed25519_sig': sig,
         'size_bytes': args.artifact.stat().st_size,
     }
+    if args.legal_manifest:
+        manifest = json.loads(args.legal_manifest.read_text(encoding='utf-8'))
+        if any(manifest.get(key) != body[key] for key in ('product', 'semver', 'release_track')):
+            raise SystemExit('Document manifest belongs to a different release')
+        body['legal_bundle_sha256'] = manifest['sha256']
     if notes:
         body['notes_md'] = notes
     if args.min_supported_from:

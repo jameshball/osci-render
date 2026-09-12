@@ -377,3 +377,5 @@ vital/
 # Local migration secrets and Ed25519 keys (NEVER commit)
 /.migration/
 /.wrangler/
+# Generated per-build Release-plane pin, not a manually maintained document source.
+/ci/legal-build.json
