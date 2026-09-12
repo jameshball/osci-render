@@ -16,6 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--app", required=True, help="Path to the Debug osci-installer executable.")
     parser.add_argument("--jucewright", help="Path to the jucewright CLI.")
     parser.add_argument("--artifact-dir", help="Directory for screenshots, snapshots and logs.")
+    parser.add_argument("--recovery-only", action="store_true", help="Only exercise settings recovery in an isolated home.")
     parser.add_argument("--keep-app", action="store_true", help="Leave the final installer process running.")
     return parser.parse_args()
 
@@ -30,6 +31,7 @@ class InstallerBrowser:
         self.home = self.artifacts / "home"
         self.home.mkdir(parents=True, exist_ok=True)
         self.keep_app = args.keep_app
+        self.recovery_only = args.recovery_only
         self.session = "osci-installer"
         self.jucewright = Path(args.jucewright).resolve() if args.jucewright else self.find_jucewright()
 
@@ -231,6 +233,60 @@ class InstallerBrowser:
         if self.component_exists("10_failure_dismissed", "Install failed"):
             raise RuntimeError("Escape did not dismiss the install failure dialog")
 
+    def run_recovery_flow(self) -> None:
+        self.launch("success", "recovery")
+        config = self.home / "recovery" / ".config"
+        config.mkdir(parents=True, exist_ok=True)
+        fixtures = {
+            "osci-render.settings": b'<PROPERTIES><VALUE name="filterState" val="saved-project"/></PROPERTIES>',
+            "osci-render_globals.settings": b'<PROPERTIES><VALUE name="popoutOpen" val="1"/></PROPERTIES>',
+            "sosci.settings": b'<PROPERTIES><VALUE name="filterState" val="sosci-project"/></PROPERTIES>',
+            "sosci_globals.settings": b'<PROPERTIES><VALUE name="popoutOpen" val="1"/></PROPERTIES>',
+            "osci-licensing.settings": b'<PROPERTIES><VALUE name="recovery-test" val="keep"/></PROPERTIES>',
+            "unrelated.settings": b"do not touch",
+            "exported.osci": b"keep exported project",
+        }
+        for name, data in fixtures.items():
+            (config / name).write_bytes(data)
+        self.click("Settings & recovery")
+        self.wait_for_button("Reset selected settings...")
+        self.snapshot("recovery_initial")
+        self.screenshot("recovery_initial")
+        self.click("Reset selected settings...")
+        self.wait_for_button("Confirm reset")
+        self.snapshot("recovery_confirm")
+        self.screenshot("recovery_confirm")
+        self.click("Cancel")
+        for name, data in fixtures.items():
+            assert (config / name).read_bytes() == data, f"Cancel changed {name}"
+        self.click("Reset selected settings...")
+        self.click("Confirm reset")
+        self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
+        for name in ("osci-render.settings", "osci-render_globals.settings"):
+            assert not (config / name).exists(), f"Reset left {name} active"
+            backups = list(config.glob(name + ".backup-*"))
+            assert len(backups) == 1 and backups[0].read_bytes() == fixtures[name], f"Backup mismatch: {name}"
+        for name in ("sosci.settings", "sosci_globals.settings", "osci-licensing.settings", "unrelated.settings", "exported.osci"):
+            assert (config / name).read_bytes() == fixtures[name], f"Reset changed {name}"
+        self.snapshot("recovery_complete")
+        self.screenshot("recovery_complete")
+        assert not self.component_state("recovery_complete", "Reset selected settings...").get("enabled", True)
+        self.session_command("select-option", "--role", "comboBox", "--name", "App settings", "--text", "All apps")
+        self.click("Reset selected settings...")
+        self.click("Confirm reset")
+        self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
+        for name in ("sosci.settings", "sosci_globals.settings"):
+            assert not (config / name).exists(), f"All-app reset left {name} active"
+            backups = list(config.glob(name + ".backup-*"))
+            assert len(backups) == 1 and backups[0].read_bytes() == fixtures[name]
+        self.session_command("check", "--role", "toggleButton", "--name", "Shared installer & licensing data")
+        self.click("Reset selected settings...")
+        self.click("Confirm reset")
+        self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
+        assert not (config / "osci-licensing.settings").exists()
+        assert (config / "unrelated.settings").read_bytes() == fixtures["unrelated.settings"]
+        assert (config / "exported.osci").read_bytes() == fixtures["exported.osci"]
+
     def run(self) -> int:
         if not self.app.is_file() or not os.access(self.app, os.X_OK):
             raise RuntimeError(f"installer executable is not usable: {self.app}")
@@ -238,9 +294,11 @@ class InstallerBrowser:
             raise RuntimeError(f"jucewright executable is not usable: {self.jucewright}")
 
         try:
-            self.run_success_flow()
-            self.run_warning_flow()
-            self.run_failure_flow()
+            self.run_recovery_flow()
+            if not self.recovery_only:
+                self.run_success_flow()
+                self.run_warning_flow()
+                self.run_failure_flow()
         finally:
             if not self.keep_app:
                 self.stop()
