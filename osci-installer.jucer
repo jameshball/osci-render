@@ -12,6 +12,8 @@
         <FILE id="iMain1" name="Main.cpp" compile="1" resource="0" file="Source/installer/Main.cpp"/>
         <FILE id="iBlend1" name="BlenderInstaller.h" compile="0" resource="0"
               file="Source/installer/BlenderInstaller.h"/>
+        <FILE id="iRecov1" name="SettingsRecoveryComponent.h" compile="0" resource="0"
+              file="Source/installer/SettingsRecoveryComponent.h"/>
         <FILE id="iBlend2" name="BlenderSetupComponent.h" compile="0" resource="0"
               file="Source/installer/BlenderSetupComponent.h"/>
         <FILE id="iBlend3" name="blender_setup.py" compile="0" resource="1"

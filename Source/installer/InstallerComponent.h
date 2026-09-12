@@ -11,6 +11,7 @@
 #include "InstallCompletionComponent.h"
 #include "LinuxInstallLocationsComponent.h"
 #include "BlenderSetupComponent.h"
+#include "SettingsRecoveryComponent.h"
 
 namespace osci::installer {
 
@@ -89,6 +90,12 @@ public:
         helpButton.setTooltip ("Help");
         helpButton.onClick = [this] {
             showSupportOverlay();
+        };
+        addAndMakeVisible(settingsButton);
+        settingsButton.onClick = [this] {
+            if (!busy) {
+                osci::OverlayComponent::show(*this, std::make_unique<SettingsRecoveryComponent>(productSlug(selectedProduct)));
+            }
         };
 
         addAndMakeVisible (osciRenderTile);
@@ -234,6 +241,7 @@ public:
         auto area = getLocalBounds().reduced (40, 16);
 #endif
         helpButton.setBounds (getLocalBounds().reduced (24, 20).removeFromTop (34).removeFromRight (34));
+        settingsButton.setBounds(getLocalBounds().withTrimmedRight(24).removeFromBottom(32).removeFromRight(180));
 
         headingLabel.setBounds (area.removeFromTop (44));
         area.removeFromTop (16);
@@ -353,6 +361,7 @@ private:
     };
 #endif
 
+    juce::TextButton settingsButton { "Settings & recovery" };
     osci::SvgButton helpButton { "installerHelp", juce::String (BinaryData::help_svg), juce::Colours::white };
     juce::Label headingLabel;
     ProductTile osciRenderTile;
@@ -693,6 +702,7 @@ private:
 
     void refreshUi() {
         blenderButton.setEnabled(!busy);
+        settingsButton.setEnabled(!busy);
         const auto selectedOsciRender = selectedProduct == ProductChoice::OsciRender;
         const auto selectedSosci = selectedProduct == ProductChoice::Sosci;
         const auto premiumPath = isPremiumPath (currentPath);
