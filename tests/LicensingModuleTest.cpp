@@ -154,7 +154,7 @@ public:
         beginTest("Legal documents share acknowledgement without enabling identification");
         {
             const auto options = makeTempSettingsOptions("legal");
-            auto bundle = juce::JSON::parse(R"({"scope":"osci-products","revision":"test-1","documents":{"privacy":{"revision":"test-1","text":"Test privacy document"},"terms":{"revision":"test-1","text":"Test terms document"}}})");
+            auto bundle = juce::JSON::parse(R"({"scope":"osci-products","revision":"test-1","documents":{"privacy":{"revision":"test-1","text":"Test privacy document","change_type":"material"},"terms":{"revision":"test-1","text":"Test terms document","change_type":"material"}}})");
             for (const auto* kind : {"privacy", "terms"}) {
                 const auto text = bundle["documents"][kind]["text"].toString();
                 bundle["documents"][kind].getDynamicObject()->setProperty("sha256", juce::SHA256(text.toRawUTF8(), text.getNumBytesAsUTF8()).toHexString());
@@ -180,8 +180,31 @@ public:
                 expect(!otherProduct.hasAcknowledged(changed));
                 expect(otherProduct.termsAccepted(changed));
                 expect(otherProduct.statisticsDisabled());
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("change_type", "administrative");
+                expect(otherProduct.hasAcknowledged(changed));
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("change_type", "unexpected");
+                expect(!osci::LegalState::valid(changed));
                 changed["documents"]["privacy"].getDynamicObject()->setProperty("text", "tampered");
                 expect(!osci::LegalState::valid(changed));
+            }
+            {
+                auto administrative = juce::JSON::parse(juce::JSON::toString(bundle));
+                auto* terms = administrative["documents"]["terms"].getDynamicObject();
+                terms->setProperty("revision", "address-update");
+                terms->setProperty("text", "Terms with an updated contact address");
+                terms->setProperty("change_type", "administrative");
+                const auto text = administrative["documents"]["terms"]["text"].toString();
+                terms->setProperty("sha256", juce::SHA256(text.toRawUTF8(), text.getNumBytesAsUTF8()).toHexString());
+
+                osci::LegalState returning{osci::SettingsStore(options)};
+                expect(returning.hasAcknowledged(administrative));
+
+                const auto freshOptions = makeTempSettingsOptions("legal-admin-first-use");
+                osci::LegalState firstUse{osci::SettingsStore(freshOptions)};
+                expect(!firstUse.hasAcknowledged(administrative));
+                expect(!firstUse.acknowledge(administrative, false, true));
+                expect(firstUse.acknowledge(administrative, true, true));
+                deleteTempSettings(freshOptions);
             }
             deleteTempSettings(options);
         }
