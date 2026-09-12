@@ -1,4 +1,6 @@
 #include <JuceHeader.h>
+#include "TestCleanup.h"
+#include "../Source/audio/modulation/LfoParameters.h"
 #include "../Source/audio/modulation/LfoState.h"
 
 // ============================================================================
@@ -683,6 +685,43 @@ public:
 };
 
 // ============================================================================
+// Test 8: Preview assignments restore the exact pre-preview state
+// ============================================================================
+
+class LfoPreviewAssignmentTest : public juce::UnitTest {
+public:
+    LfoPreviewAssignmentTest() : juce::UnitTest("LFO Preview Assignment Restoration", "LFO") {}
+
+    void runTest() override {
+        beginTest("Stopping preview preserves existing assignments");
+
+        LfoParameters lfoParameters;
+        osci::EffectParameter parameter("Amount", "", "previewAmount", 2, 0.75f, 0.0f, 1.0f, 0.01f,
+                                        osci::LfoType::Sine, 2.0f);
+        auto effect = std::make_shared<osci::SimpleEffect>(&parameter);
+        std::vector<std::shared_ptr<osci::Effect>> effects{effect};
+        const LfoAssignment original{7, parameter.paramID, 0.35f, true};
+        lfoParameters.addAssignment(original);
+
+        lfoParameters.startPreview(effect->getId(), effects);
+        lfoParameters.stopPreview();
+
+        const auto restored = lfoParameters.getAssignments();
+        expectEquals(static_cast<int>(restored.size()), 1);
+        if (restored.size() == 1) {
+            expectEquals(restored[0].sourceIndex, original.sourceIndex);
+            expectEquals(restored[0].paramId, original.paramId);
+            expectWithinAbsoluteError(restored[0].depth, original.depth, 0.0001f);
+            expect(restored[0].bipolar == original.bipolar);
+        }
+        expectWithinAbsoluteError(parameter.getValueUnnormalised(), 0.75f, 0.0001f);
+
+        testutil::cleanupSubParams(parameter);
+        testutil::cleanupLfoParams(lfoParameters);
+    }
+};
+
+// ============================================================================
 // Static registration — JUCE auto-discovers these
 // ============================================================================
 static LfoAssignmentRaceTest lfoAssignmentRaceTest;
@@ -692,3 +731,4 @@ static LfoAssignmentOrderTest lfoAssignmentOrderTest;
 static LfoFullSystemStressTest lfoFullSystemStressTest;
 static LfoWaveformCorrectnessTest lfoWaveformCorrectnessTest;
 static LfoSerializationTest lfoSerializationTest;
+static LfoPreviewAssignmentTest lfoPreviewAssignmentTest;

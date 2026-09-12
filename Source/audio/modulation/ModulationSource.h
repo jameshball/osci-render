@@ -62,9 +62,6 @@ public:
         return cachedAssignments;
     }
 
-    template<typename Pred>
-    void removeAssignmentsIf(Pred pred) { assignments.removeIf(pred); }
-
     // === Block buffers (filled by type-specific code each processBlock) ===
     virtual const std::vector<float>* getBlockBuffers() const = 0;
 

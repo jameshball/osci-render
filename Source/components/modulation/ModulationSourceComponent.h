@@ -3,11 +3,10 @@
 #include <JuceHeader.h>
 #include <melatonin_blur/melatonin_blur.h>
 #include "../../audio/modulation/ModAssignment.h"
-#include "../VerticalTabListComponent.h"
-#include "../ScrollFadeViewport.h"
-#include "../HoverAnimationMixin.h"
+#include "../../audio/modulation/ModulationDisplayBuffer.h"
+#include <osci_gui/osci_gui.h>
 
-namespace osci { class MidiCCManager; }
+namespace osci { class MidiManager; }
 
 class EffectComponent;
 
@@ -23,6 +22,7 @@ struct ModulationSourceConfig {
     std::function<juce::Colour(int)> getSourceColour;
     std::function<float(int)> getCurrentValue;        // 0..1 output for value bar
     std::function<bool(int)> isSourceActive;          // whether the pill should be visible
+    std::function<ModulationDisplayBuffer&(int)> getDisplayBuffer;
 
     // Assignment CRUD
     std::function<std::vector<ModAssignment>()> getAssignments;
@@ -43,9 +43,9 @@ struct ModulationSourceConfig {
     bool alwaysShowTabs = false;
 
     // MIDI CC manager (optional) — enables Learn/Remove MIDI CC on depth indicators.
-    osci::MidiCCManager* midiCCManager = nullptr;
+    osci::MidiManager* midiManager = nullptr;
 
-    // Builds the custom-target id used by midiCCManager to map CC → depth for
+    // Builds the custom-target id used by midiManager to map CC → depth for
     // (sourceIndex, paramId). Usually OscirenderAudioProcessor::modDepthCustomId.
     std::function<juce::String(int sourceIndex, const juce::String& paramId)> buildModDepthCustomId;
 
@@ -115,11 +115,12 @@ protected:
 
     // The tab list and viewport (accessible for subclass layout if needed).
     VerticalTabListComponent tabList;
-    ScrollFadeViewport tabViewport;
+    osci::ScrollFadeViewport tabViewport;
 
     // Called when active source changes. Override for subclass-specific logic
     // (e.g. updating graph, preset selector). Base implementation is empty.
     virtual void onActiveSourceChanged(int /*newIndex*/) {}
+    virtual void displaySampleArrived(int /*index*/, const ModulationDisplayBuffer::Sample& /*sample*/) {}
 
     int activeSourceIndex = 0;
 
@@ -128,6 +129,7 @@ protected:
 
 private:
     ModulationSourceConfig config;
+    std::vector<ModulationDisplayBuffer::Sample> displaySamples;
     bool collapsed = false;
 
     // --- Layout constants ---
@@ -141,7 +143,7 @@ private:
     melatonin::DropShadow panelEdgeShadow { juce::Colours::black.withAlpha(0.5f), 5, {0, -2}, 0 };
 
     // DepthIndicator – small arc knob for a single source→param connection.
-    class DepthIndicator : public HoverAnimationMixin {
+    class DepthIndicator : public osci::HoverAnimationMixin {
     public:
         DepthIndicator(ModulationSourceComponent& owner, int sourceIndex,
                        juce::String paramId, float depth, bool bipolar);
@@ -189,7 +191,9 @@ private:
 
         void setSourceValue(float value01) {
             sourceValue = value01;
-            repaint();
+            if (sourceActive && !depthIndicators.isEmpty()) {
+                repaint();
+            }
         }
 
         void updateSmoothedValue(float current, float decay) {
@@ -215,8 +219,7 @@ private:
         juce::OwnedArray<DepthIndicator> depthIndicators;
 
         float hoverProgress = 0.0f;
-        juce::VBlankAnimatorUpdater hoverAnimUpdater { this };
-        std::optional<juce::Animator> hoverAnim;
+        osci::ToggleAnimationController hoverAnimationController { this };
     };
 
     // Non-owning typed pointers into tab handles (tab list owns them).

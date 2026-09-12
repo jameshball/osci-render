@@ -14,6 +14,10 @@
   #error "MyAppVstSource must be defined before including CommonProductInstaller.iss"
 #endif
 
+#ifndef TextureInteropSpoutLibrarySource
+  #define TextureInteropSpoutLibrarySource ProjectRoot + "modules\\osci_texture_interop\\third_party\\spout2\\2.007.017\\windows\\x64\\SpoutLibrary.dll"
+#endif
+
 #ifndef MyAppVstDefaultDir
   #define MyAppVstDefaultDir "{cf}\\VST3"
 #endif
@@ -72,8 +76,7 @@ Name: "deletefiles"; Description: "Remove any existing settings (Clean installat
 [Files]
 Source: "{#MyAppStandaloneSource}"; DestDir: "{code:GetExeInstallDir}"; Flags: ignoreversion
 Source: "{#MyAppVstSource}"; DestDir: "{code:GetVstInstallDir}"; Flags: ignoreversion
-Source: "{#SourcePath}..\\External\\spout\\SpoutLibrary.dll"; DestDir: "{code:GetExeInstallDir}"; Flags: ignoreversion
-Source: "{#SourcePath}..\\External\\spout\\SpoutLibrary.dll"; DestDir: "{sys}"; Flags: ignoreversion
+Source: "{#TextureInteropSpoutLibrarySource}"; DestDir: "{commonappdata}\osci-render"; DestName: "SpoutLibrary.dll"; Flags: ignoreversion
 
 [InstallDelete]
 Type: files; Name: {userappdata}\{#MyAppName}\{#MyAppName}.settings; Tasks: deletefiles

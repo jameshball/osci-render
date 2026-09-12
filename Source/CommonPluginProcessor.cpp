@@ -8,11 +8,29 @@
 
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "JucewrightAutomation.h"
+#include "audio/OutputClip.h"
+#include "components/OverlayDialogHelpers.h"
+
+#include <cmath>
+
+namespace
+{
+    osci::LicenseManager::Config makeLicenseManagerConfig() {
+        osci::LicenseManager::Config config;
+        const juce::String pluginName (JucePlugin_Name);
+        config.productSlug = pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+        return config;
+    }
+}
 
 //==============================================================================
 CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesProperties)
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor(busesProperties)
+     : AudioProcessor(busesProperties),
+       licenseManager (makeLicenseManagerConfig())
+#else
+     : licenseManager (makeLicenseManagerConfig())
 #endif
 {
 
@@ -55,28 +73,47 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
                                  + juce::SystemStats::getUserRegion() + ")");
     }
 
-    // Initialize the global settings with the plugin name
-    juce::PropertiesFile::Options options;
-    options.applicationName = JucePlugin_Name + juce::String("_globals");
-    options.filenameSuffix = ".settings";
-    options.osxLibrarySubFolder = "Application Support";
-    
-    #if JUCE_LINUX || JUCE_BSD
-    options.folderName = "~/.config";
-    #else
-    options.folderName = "";
-    #endif
-    
-    globalSettings = std::make_unique<juce::PropertiesFile>(options);
+    globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
+
+    const auto licenseCacheResult = licenseManager.loadCachedToken();
+    if (licenseCacheResult.failed()) {
+        juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());
+    }
+    const auto licenseStatus = licenseManager.status();
+    osci::LegalState legalState;
+    const auto legalConfig = osci::makeProductUpdateConfig();
+    legalNoticePending.store(!legalState.hasAcknowledged(osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion)));
+    if (legalState.hasAcknowledged(osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion))
+        && (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
+        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline)) {
+        licenseManager.scheduleBackgroundRefresh();
+    }
+
+    // Restore internal sample-rate ratio (1.0 = follow device).
+    {
+#if OSCI_PREMIUM
+        internalSampleRate.restoreSavedRatio(globalSettings.getDouble(InternalSampleRateController::settingKey, 1.0));
+#else
+        internalSampleRate.restoreSavedRatio(1.0);
+#endif
+    }
 
     // Restore recently-opened project files (shared across instances).
     recentProjectFiles.setMaxNumberOfItems(10);
     {
-        const auto savedRecent = getGlobalStringValue("recentProjectFiles");
+        const auto savedRecent = globalSettings.getString("recentProjectFiles");
         if (savedRecent.isNotEmpty())
             recentProjectFiles.restoreFromString(savedRecent);
     }
-    
+
+    recentRecordingFiles.setMaxNumberOfItems(10);
+    {
+        const auto savedRecordings = globalSettings.getString("recentRecordingFiles");
+        if (savedRecordings.isNotEmpty()) {
+            recentRecordingFiles.restoreFromString(savedRecordings);
+        }
+    }
+
     // locking isn't necessary here because we are in the constructor
 
     for (auto effect : visualiserParameters.effects) {
@@ -86,15 +123,15 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         // audio thread. They are shader-only effects (no audio processing).
         effects.push_back(effect);
     }
-    
+
     for (auto effect : visualiserParameters.audioEffects) {
         effects.push_back(effect);
     }
-        
+
     for (auto parameter : visualiserParameters.booleans) {
         booleanParameters.push_back(parameter);
     }
-    
+
     for (auto parameter : visualiserParameters.integers) {
         intParameters.push_back(parameter);
     }
@@ -109,6 +146,12 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
     wavParser.setLooping(false);
     startHeartbeat();
+}
+
+juce::String CommonAudioProcessor::getProductSlug() const
+{
+    const juce::String pluginName (JucePlugin_Name);
+    return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const
@@ -129,8 +172,8 @@ void CommonAudioProcessor::addRecentProjectFile(const juce::File& file)
     recentProjectFiles.addFile(file);
 
     // Persist to global settings.
-    setGlobalValue("recentProjectFiles", recentProjectFiles.toString());
-    saveGlobalSettings();
+    globalSettings.set("recentProjectFiles", recentProjectFiles.toString());
+    globalSettings.save();
 
     // Best-effort: register with OS for native "recent documents" integration (jump lists / dock).
     // This is optional and should be safe across platforms.
@@ -147,8 +190,8 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
         recentProjectFiles.removeNonExistentFiles();
         const auto after = recentProjectFiles.toString();
         if (after != before) {
-            setGlobalValue("recentProjectFiles", after);
-            saveGlobalSettings();
+            globalSettings.set("recentProjectFiles", after);
+            globalSettings.save();
         }
     }
 
@@ -157,6 +200,41 @@ int CommonAudioProcessor::createRecentProjectsPopupMenuItems(juce::PopupMenu& me
                                                    showFullPaths,
                                                    dontAddNonExistentFiles,
                                                    nullptr);
+}
+
+void CommonAudioProcessor::clearRecentProjectFiles() {
+    recentProjectFiles.clear();
+    globalSettings.set("recentProjectFiles", juce::String());
+    globalSettings.save();
+}
+
+void CommonAudioProcessor::recordingExportCompleted(const juce::File& file) {
+    if (file == juce::File()) {
+        return;
+    }
+
+    recentRecordingFiles.addFile(file);
+    globalSettings.set("recentRecordingFiles", recentRecordingFiles.toString());
+    globalSettings.save();
+    if (globalSettings.getBool("showVideoAfterExport", false)) {
+        file.revealToUser();
+    }
+}
+
+juce::File CommonAudioProcessor::getRecentRecordingFile(int index) const {
+    return recentRecordingFiles.getFile(index);
+}
+
+int CommonAudioProcessor::createRecentRecordingsPopupMenuItems(juce::PopupMenu& menuToAddItemsTo, int baseItemId) {
+    const auto before = recentRecordingFiles.toString();
+    recentRecordingFiles.removeNonExistentFiles();
+    const auto after = recentRecordingFiles.toString();
+    if (after != before) {
+        globalSettings.set("recentRecordingFiles", after);
+        globalSettings.save();
+    }
+
+    return recentRecordingFiles.createPopupMenuItems(menuToAddItemsTo, baseItemId, false, true, nullptr);
 }
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
@@ -190,7 +268,7 @@ void CommonAudioProcessor::addAllParameters() {
             }
         }
     }
-        
+
     for (auto parameter : booleanParameters) {
         addParameter(parameter);
     }
@@ -227,30 +305,30 @@ void CommonAudioProcessor::addAllParameters() {
         }
     }
     undoManager.clearUndoHistory();
-    midiCCManager.setUndoManager(&undoManager, &undoSuppressed, &stateTree);
+    midiManager.setUndoManager(&undoManager, &undoSuppressed, &stateTree);
 
-    // Set MidiCCManager on all parameters so UI components can auto-discover
+    // Set MidiManager on all parameters so UI components can auto-discover
     // CC support from the parameter they're bound to — no manual wiring needed.
     for (auto* param : getParameters()) {
         if (auto* fp = dynamic_cast<osci::FloatParameter*>(param))
-            fp->midiCCManager = &midiCCManager;
+            fp->midiManager = &midiManager;
         else if (auto* bp = dynamic_cast<osci::BooleanParameter*>(param))
-            bp->midiCCManager = &midiCCManager;
+            bp->midiManager = &midiManager;
         else if (auto* ip = dynamic_cast<osci::IntParameter*>(param))
-            ip->midiCCManager = &midiCCManager;
+            ip->midiManager = &midiManager;
     }
 }
 
 void CommonAudioProcessor::loadMidiCCState(const juce::XmlElement* xml) {
-    midiCCManager.load(xml, [this](const juce::String& paramId) -> osci::MidiCCManager::ParamBinding {
+    midiManager.load(xml, [this](const juce::String& paramId) -> osci::MidiManager::ParamBinding {
         if (auto* fp = getFloatParameter(paramId)) {
             auto* ep = dynamic_cast<osci::EffectParameter*>(fp);
-            return osci::MidiCCManager::makeBinding(fp, ep);
+            return osci::MidiManager::makeBinding(fp, ep);
         }
         if (auto* ip = getIntParameter(paramId))
-            return osci::MidiCCManager::makeBinding(ip);
+            return osci::MidiManager::makeBinding(ip);
         if (auto* bp = getBooleanParameter(paramId))
-            return osci::MidiCCManager::makeBinding(bp);
+            return osci::MidiManager::makeBinding(bp);
         return {};
     });
 }
@@ -284,14 +362,14 @@ void CommonAudioProcessor::stopHeartbeat() {
 }
 
 void CommonAudioProcessor::timerCallback() {
-    setGlobalValue("lastHeartbeatTime", juce::Time::getCurrentTime().toISO8601(true));
-    saveGlobalSettings();
+    globalSettings.set("lastHeartbeatTime", juce::Time::getCurrentTime().toISO8601(true));
+    globalSettings.save();
 }
 
-CommonAudioProcessor::~CommonAudioProcessor() 
+CommonAudioProcessor::~CommonAudioProcessor()
 {
-    setGlobalValue("endTime", juce::Time::getCurrentTime().toISO8601(true));
-    saveGlobalSettings();
+    globalSettings.set("endTime", juce::Time::getCurrentTime().toISO8601(true));
+    globalSettings.save();
     stopHeartbeat();
     juce::Logger::setCurrentLogger(nullptr);
 }
@@ -351,13 +429,66 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         + " samplesPerBlock=" + juce::String(samplesPerBlock)
         + " effects=" + juce::String(effects.size()));
 
-	currentSampleRate = sampleRate;
-    
+    const int numChannels = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels(), 1);
+    const auto prepared = internalSampleRate.prepare(sampleRate, samplesPerBlock, numChannels, supportsInternalSampleRateOverride());
+    const double internalRate = prepared.sampleRate;
+    const int internalBlock = prepared.blockSize;
+    currentSampleRate.store(internalRate);
+    setLatencySamples(prepared.latencySamples);
+
     for (auto& effect : effects) {
-        effect->prepareToPlay(currentSampleRate, samplesPerBlock);
+        effect->prepareToPlay(internalRate, internalBlock);
     }
-    
-    threadManager.prepare(sampleRate, samplesPerBlock);
+
+    threadManager.prepare(internalRate, internalBlock);
+    prepareToPlayInternal(internalRate, internalBlock);
+}
+
+void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    const int deviceNumSamples = buffer.getNumSamples();
+    if (deviceNumSamples <= 0) {
+        return;
+    }
+
+    if (isSuspended() || legalNoticePending.load(std::memory_order_relaxed)) {
+        buffer.clear();
+        midi.clear();
+        return;
+    }
+
+    internalSampleRate.process(buffer, midi, [this](auto& b, auto& m) { processBlockInternal(b, m); });
+}
+
+bool CommonAudioProcessor::canSetInternalSampleRateRatio(double ratio) const {
+#if OSCI_PREMIUM
+    return supportsInternalSampleRateOverride() && internalSampleRate.canSetRatio(ratio);
+#else
+    return std::abs(ratio - 1.0) < 0.000001;
+#endif
+}
+
+void CommonAudioProcessor::setInternalSampleRateRatio(double ratio) {
+#if !OSCI_PREMIUM
+    juce::ignoreUnused(ratio);
+    return;
+#else
+    if (!supportsInternalSampleRateOverride()) {
+        return;
+    }
+
+    if (!internalSampleRate.setRatio(ratio)) {
+        return;
+    }
+
+    globalSettings.set(InternalSampleRateController::settingKey, internalSampleRate.getRatio());
+    globalSettings.save();
+
+    if (internalSampleRate.hasPreparedDevice()) {
+        suspendProcessing(true);
+        prepareToPlay(internalSampleRate.getLastDeviceSampleRate(), internalSampleRate.getLastDeviceBlockSize());
+        suspendProcessing(false);
+    }
+#endif
 }
 
 void CommonAudioProcessor::releaseResources() {
@@ -408,11 +539,16 @@ osci::IntParameter* CommonAudioProcessor::getIntParameter(juce::String id) {
 
 //==============================================================================
 bool CommonAudioProcessor::hasEditor() const {
-    return true; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 double CommonAudioProcessor::getSampleRate() {
-    return currentSampleRate;
+    return getEffectiveSampleRate();
+}
+
+double CommonAudioProcessor::getEffectiveSampleRate() {
+    const double sampleRate = currentSampleRate.load();
+    return sampleRate > 0.0 ? sampleRate : 192000.0;
 }
 
 void CommonAudioProcessor::loadAudioFile(const juce::File& file) {
@@ -426,18 +562,17 @@ void CommonAudioProcessor::loadAudioFile(std::unique_ptr<juce::InputStream> stre
     if (stream != nullptr) {
         juce::SpinLock::ScopedLockType lock(wavParserLock);
         wavParser.parse(std::move(stream));
-
-        juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
-        for (auto listener : audioPlayerListeners) {
-            listener->parserChanged();
-        }
+        notifyAudioFileChanged();
     }
 }
 
 void CommonAudioProcessor::stopAudioFile() {
     juce::SpinLock::ScopedLockType lock(wavParserLock);
     wavParser.close();
+    notifyAudioFileChanged();
+}
 
+void CommonAudioProcessor::notifyAudioFileChanged() {
     juce::SpinLock::ScopedLockType lock2(audioPlayerListenersLock);
     for (auto listener : audioPlayerListeners) {
         listener->parserChanged();
@@ -497,9 +632,9 @@ void CommonAudioProcessor::loadEffectsFromXml(const juce::XmlElement* effectsXml
 
 void CommonAudioProcessor::saveProperties(juce::XmlElement& xml) {
     juce::SpinLock::ScopedLockType lock(propertiesLock);
-    
+
     auto propertiesXml = xml.createNewChildElement("properties");
-    
+
     for (auto& property : properties) {
         auto element = propertiesXml->createNewChildElement("property");
         element->setAttribute("key", property.first);
@@ -526,14 +661,14 @@ void CommonAudioProcessor::saveProperties(juce::XmlElement& xml) {
 
 void CommonAudioProcessor::loadProperties(juce::XmlElement& xml) {
     juce::SpinLock::ScopedLockType lock(propertiesLock);
-    
+
     auto propertiesXml = xml.getChildByName("properties");
-    
+
     if (propertiesXml != nullptr) {
         for (auto property : propertiesXml->getChildIterator()) {
             auto key = property->getStringAttribute("key").toStdString();
             auto type = property->getStringAttribute("type");
-            
+
             if (type == "int") {
                 properties[key] = property->getIntAttribute("value");
             } else if (type == "float") {
@@ -551,76 +686,21 @@ void CommonAudioProcessor::loadProperties(juce::XmlElement& xml) {
     }
 }
 
-bool CommonAudioProcessor::getGlobalBoolValue(const juce::String& keyName, bool defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getBoolValue(keyName, defaultValue) : defaultValue;
-}
-
-int CommonAudioProcessor::getGlobalIntValue(const juce::String& keyName, int defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getIntValue(keyName, defaultValue) : defaultValue;
-}
-
-double CommonAudioProcessor::getGlobalDoubleValue(const juce::String& keyName, double defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getDoubleValue(keyName, defaultValue) : defaultValue;
-}
-
-juce::String CommonAudioProcessor::getGlobalStringValue(const juce::String& keyName, const juce::String& defaultValue) const
-{
-    return globalSettings != nullptr ? globalSettings->getValue(keyName, defaultValue) : defaultValue;
-}
-
-void CommonAudioProcessor::setGlobalValue(const juce::String& keyName, const juce::var& value)
-{
-    if (globalSettings != nullptr)
-        globalSettings->setValue(keyName, value);
-}
-
-void CommonAudioProcessor::removeGlobalValue(const juce::String& keyName)
-{
-    if (globalSettings != nullptr)
-        globalSettings->removeValue(keyName);
-}
-
-void CommonAudioProcessor::saveGlobalSettings()
-{
-    if (globalSettings != nullptr)
-        globalSettings->saveIfNeeded();
-}
-
-void CommonAudioProcessor::reloadGlobalSettings()
-{
-    if (globalSettings != nullptr)
-        globalSettings->reload();
-}
-
 juce::File CommonAudioProcessor::getAppSettingsFile()
 {
-    // Mirror the PropertiesFile::Options used by CustomStandaloneFilterApp so this
-    // always resolves to the same path the standalone app writes to.
-    juce::PropertiesFile::Options options;
-    options.applicationName     = juce::CharPointer_UTF8 (JucePlugin_Name);
-    options.filenameSuffix      = ".settings";
-    options.osxLibrarySubFolder = "Application Support";
-   #if JUCE_LINUX || JUCE_BSD
-    options.folderName          = "~/.config";
-   #else
-    options.folderName          = "";
-   #endif
-    return options.getDefaultFile();
+    return osci::SettingsStore::optionsForStandaloneApp (JucePlugin_Name).getDefaultFile();
 }
 
 juce::File CommonAudioProcessor::getLastOpenedDirectory()
 {
-    juce::String savedDir = getGlobalStringValue("lastOpenedDirectory");
+    juce::String savedDir = globalSettings.getString("lastOpenedDirectory");
     if (savedDir.isEmpty())
         return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-    
+
     juce::File dir(savedDir);
     if (dir.exists() && dir.isDirectory())
         return dir;
-    
+
     return juce::File::getSpecialLocation(juce::File::userHomeDirectory);
 }
 
@@ -628,45 +708,46 @@ void CommonAudioProcessor::setLastOpenedDirectory(const juce::File& directory)
 {
     if (directory.exists() && directory.isDirectory())
     {
-        setGlobalValue("lastOpenedDirectory", directory.getFullPathName());
-        saveGlobalSettings();
+        globalSettings.set("lastOpenedDirectory", directory.getFullPathName());
+        globalSettings.save();
     }
 }
 
 bool CommonAudioProcessor::programCrashedAndUserWantsToReset() {
     bool userWantsToReset = false;
     if (!hasSetSessionStartTime) {
-        juce::String startTime = getGlobalStringValue("startTime");
-        juce::String endTime = getGlobalStringValue("endTime");
-        juce::String lastHeartbeat = getGlobalStringValue("lastHeartbeatTime");
+        juce::String startTime = globalSettings.getString("startTime");
+        juce::String endTime = globalSettings.getString("endTime");
+        juce::String lastHeartbeat = globalSettings.getString("lastHeartbeatTime");
         juce::Time start = juce::Time::fromISO8601(startTime);
         juce::Time end = juce::Time::fromISO8601(endTime);
         juce::Time heartbeat = juce::Time::fromISO8601(lastHeartbeat);
         juce::Time now = juce::Time::getCurrentTime();
         bool heartbeatStale = (now.toMilliseconds() - heartbeat.toMilliseconds()) > 3000;
         if ((startTime.isNotEmpty() && endTime.isNotEmpty()) || (startTime.isNotEmpty() && endTime.isEmpty())) {
-            if (((start > end || end == juce::Time()) && heartbeatStale) && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
-                // Ensure the custom look and feel is set before showing the dialog,
-                // since the editor (which normally creates it) hasn't been opened yet.
-                OscirenderLookAndFeel::getSharedInstance();
+            if ((start > end || end == juce::Time()) && heartbeatStale) {
+                if (!osci::isJucewrightAutomationLaunch() && juce::MessageManager::getInstance()->isThisTheMessageThread()) {
+                    juce::Component dialogOwner;
+                    dialogOwner.setLookAndFeel(&PluginLookAndFeel::getSharedInstance());
 
-                juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
-                bool userPressedReset = juce::AlertWindow::showOkCancelBox(
-                    juce::AlertWindow::WarningIcon,
-                    "Possible Crash Detected",
-                    message + "\n\nDo you want to reset to a new project, or continue loading your previous session?",
-                    "Reset to New Project",
-                    "Continue",
-                    nullptr,
-                    nullptr
-                );
-                if (userPressedReset) {
-                    userWantsToReset = true;
+                    juce::String message = "It appears that " + juce::String(ProjectInfo::projectName) + " did not close properly during your last session. This may indicate a problem with your project or session.";
+                    bool userPressedReset = juce::AlertWindow::showOkCancelBox(
+                        juce::AlertWindow::WarningIcon,
+                        "Possible Crash Detected",
+                        message + "\n\nDo you want to reset to a new project, or continue loading your previous session?",
+                        "Reset to New Project",
+                        "Continue",
+                        &dialogOwner,
+                        nullptr
+                    );
+                    if (userPressedReset) {
+                        userWantsToReset = true;
+                    }
                 }
             }
         }
-        setGlobalValue("startTime", juce::Time::getCurrentTime().toISO8601(true));
-        saveGlobalSettings();
+        globalSettings.set("startTime", juce::Time::getCurrentTime().toISO8601(true));
+        globalSettings.save();
         hasSetSessionStartTime = true;
     }
     return userWantsToReset;
@@ -703,7 +784,7 @@ juce::String CommonAudioProcessor::getFFmpegURL() {
     #endif
 #endif
     + ".gz";
-    
+
     return ffmpegURL;
 }
 
@@ -749,7 +830,7 @@ bool CommonAudioProcessor::validateFFmpegBinary() {
 
 bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std::function<void()> onSuccess) {
     juce::File ffmpegFile = getFFmpegFile();
-    
+
     if (ffmpegFile.existsAsFile()) {
         // Verify the binary actually works on this system
         if (!validateFFmpegBinary()) {
@@ -771,13 +852,13 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
 #endif
                 ;
 
-            juce::MessageBoxOptions options = juce::MessageBoxOptions()
-                .withTitle("FFmpeg Incompatible")
-                .withMessage(message)
-                .withButton("OK")
-                .withIconType(juce::AlertWindow::WarningIcon)
-                .withAssociatedComponent(editor);
-            juce::AlertWindow::showAsync(options, nullptr);
+            osci::showOverlayMessageOrAlert(editor,
+                                            "FFmpeg Incompatible",
+                                            message,
+                                            osci::ErrorOverlay::Icon::Warning,
+                                            juce::MessageBoxIconType::WarningIcon,
+                                            { 500, 360 },
+                                            juce::Justification::centredTop);
             return false;
         }
 
@@ -791,36 +872,46 @@ bool CommonAudioProcessor::ensureFFmpegExists(std::function<void()> onStart, std
     if (editor == nullptr) {
         return false; // Editor not found
     }
-    
+
     juce::String url = getFFmpegURL();
     editor->ffmpegDownloader.setup(url, ffmpegFile);
-    
+
     editor->ffmpegDownloader.onSuccessfulDownload = [this, onSuccess]() {
         if (onSuccess != nullptr) {
             juce::MessageManager::callAsync(onSuccess);
         }
     };
 
-    // Ask the user if they want to download ffmpeg
-    juce::MessageBoxOptions options = juce::MessageBoxOptions()
-        .withTitle("FFmpeg Required")
-        .withMessage("FFmpeg is required to process video files.\n\nWould you like to download it now?")
-        .withButton("Yes")
-        .withButton("No")
-        .withIconType(juce::AlertWindow::QuestionIcon)
-        .withAssociatedComponent(editor);
-
-    juce::AlertWindow::showAsync(options, [this, onStart, editor](int result) {
-        if (result == 1) {  // Yes
-            editor->ffmpegDownloader.setVisible(true);
-            editor->ffmpegDownloader.download();
-            if (onStart != nullptr) {
-                onStart();
-            }
-            editor->resized();
+    auto safeEditor = juce::Component::SafePointer<CommonPluginEditor>(editor);
+    juce::MessageManager::callAsync([this, onStart, safeEditor] {
+        if (safeEditor == nullptr) {
+            return;
         }
+
+        osci::showOverlayConfirmationOrAlert(
+            safeEditor.getComponent(),
+            "FFmpeg Required",
+            "FFmpeg is required to process video files.\n\nWould you like to download it now?",
+            "Yes",
+            "No",
+            [this, onStart, safeEditor] {
+                if (safeEditor == nullptr) {
+                    return;
+                }
+
+                auto* editorComponent = safeEditor.getComponent();
+                editorComponent->ffmpegDownloader.setVisible(true);
+                editorComponent->ffmpegDownloader.download();
+                if (onStart != nullptr) {
+                    onStart();
+                }
+                editorComponent->resized();
+            },
+            {},
+            osci::ErrorOverlay::Icon::Warning,
+            { 460, 280 });
     });
-    
+
     return false;
 }
 #endif
@@ -833,8 +924,7 @@ void CommonAudioProcessor::applyVolumeAndThreshold(float* const* channels, int n
     for (int i = 0; i < numSamples; ++i) {
         float vol = volBuf ? volBuf[i] : volFallback;
         float thr = thrBuf ? thrBuf[i] : thrFallback;
-        channels[0][i] = juce::jlimit(-thr, thr, channels[0][i] * vol);
-        channels[1][i] = juce::jlimit(-thr, thr, channels[1][i] * vol);
+        channels[0][i] = osci::applyVolumeAndOptionalClip(channels[0][i], vol, thr);
+        channels[1][i] = osci::applyVolumeAndOptionalClip(channels[1][i], vol, thr);
     }
 }
-

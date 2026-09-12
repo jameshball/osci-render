@@ -9,10 +9,9 @@ AnimationTimelineController::AnimationTimelineController(OscirenderAudioProcesso
 
 void AnimationTimelineController::onValueChange(double value)
 {
-    juce::SpinLock::ScopedLockType sl(audioProcessor.parsersLock);
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    if (currentFileIndex < 0) return;
-    auto parser = audioProcessor.parsers[currentFileIndex];
+    auto& files = audioProcessor.getFileController();
+    juce::SpinLock::ScopedLockType sl(files.lock);
+    auto parser = files.getCurrentParser();
     if (parser != nullptr) {
         audioProcessor.animationFrame = value * (parser->getNumFrames() - 1);
         parser->setFrame((int)audioProcessor.animationFrame);
@@ -46,14 +45,14 @@ bool AnimationTimelineController::isActive()
 
 double AnimationTimelineController::getCurrentPosition()
 {
-    juce::SpinLock::ScopedLockType sl(audioProcessor.parsersLock);
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    if (currentFileIndex < 0) return 0.0;
-    auto parser = audioProcessor.parsers[currentFileIndex];
+    auto& files = audioProcessor.getFileController();
+    juce::SpinLock::ScopedLockType sl(files.lock);
+    auto parser = files.getCurrentParser();
     if (parser == nullptr) return 0.0;
     int totalFrames = parser->getNumFrames();
     if (totalFrames <= 1) return 0.0;
-    double frame = std::fmod(audioProcessor.animationFrame, totalFrames);
+    double frame = std::fmod(audioProcessor.animationFrame, (double)totalFrames);
+    if (frame < 0.0) frame += (double)totalFrames;
     return frame / (totalFrames - 1);
 }
 
@@ -62,23 +61,20 @@ void AnimationTimelineController::setup(
     std::function<void(bool)> setPlayingCallback,
     std::function<void(bool)> setRepeatCallback)
 {
-    int currentFileIndex = audioProcessor.getCurrentFileIndex();
-    
-    if (currentFileIndex >= 0) {
-        auto parser = audioProcessor.parsers[currentFileIndex];
-        
-        if (parser->isAnimatable) {
-            int totalFrames = parser->getNumFrames();
-            int currentFrame = parser->getCurrentFrame();
-            
-            if (totalFrames > 1) {
-                setValueCallback(static_cast<double>(currentFrame) / (totalFrames - 1));
-            } else {
-                setValueCallback(0.0);
-            }
+    auto& files = audioProcessor.getFileController();
+    juce::SpinLock::ScopedLockType sl(files.lock);
+    auto parser = files.getCurrentParser();
+    if (parser != nullptr && parser->isAnimatable) {
+        int totalFrames = parser->getNumFrames();
+        int currentFrame = parser->getCurrentFrame();
+
+        if (totalFrames > 1) {
+            setValueCallback(static_cast<double>(currentFrame) / (totalFrames - 1));
+        } else {
+            setValueCallback(0.0);
         }
     }
-    
+
     setPlayingCallback(audioProcessor.animateFrames->getBoolValue());
     setRepeatCallback(audioProcessor.loopAnimation->getBoolValue());
 }

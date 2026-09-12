@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../ModulationState.h"
 
 #ifndef SOSCI
@@ -73,8 +73,6 @@ public:
     void showContextMenu(juce::Point<int> screenPos);
 
     void mouseDown(const juce::MouseEvent& event) override;
-    void mouseEnter(const juce::MouseEvent& event) override;
-    void mouseExit(const juce::MouseEvent& event) override;
 
 #ifndef SOSCI
     // Wire standard modulation callbacks (LFO + envelope drop, query) to the processor.
@@ -111,7 +109,7 @@ private:
 
     void setSliderValueIfChanged(osci::FloatParameter* parameter, juce::Slider& slider);
     void setupComponent();
-    void wireMidiCC(osci::MidiCCManager& manager);
+    void wireMidiCC(osci::MidiManager& manager);
     void showValueEditor();
     void updateLabelAppearance();
     bool lfoEnabled = true;
@@ -119,9 +117,9 @@ private:
     bool modDropHighlight = false;
     std::shared_ptr<juce::Component> component;
 
-    std::unique_ptr<SvgButton> sidechainButton;
+    std::unique_ptr<osci::SvgButton> sidechainButton;
 
-    SvgButton linkButton = SvgButton(effect.parameters[index]->name + " Link",
+    osci::SvgButton linkButton = osci::SvgButton(effect.parameters[index]->name + " Link",
         BinaryData::link_svg,
         juce::Colours::white,
         juce::Colours::red,
@@ -129,11 +127,10 @@ private:
         BinaryData::link_svg
     );
 
-    juce::Label label;
+    osci::ContextMenuLabel label;
 
     ModulationUpdateBroadcaster* modBroadcaster = nullptr;
-    osci::MidiCCManager* midiCCManager = nullptr;
-    bool labelHovered = false;
+    osci::MidiManager* midiManager = nullptr;
     bool rangeEnabled = true;
     bool* undoGroupingFlag = nullptr;
     juce::String* lastChangedParamIdPtr = nullptr;

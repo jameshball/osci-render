@@ -6,7 +6,7 @@
 #include "ModulationModeComponent.h"
 #include "../../audio/modulation/RandomState.h"
 #include "ModulationSourceComponent.h"
-#include "../ParameterSyncHelper.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessor;
 
@@ -18,7 +18,7 @@ public:
     ~RandomComponent() override;
 
     void resized() override;
-    void timerCallback() override;
+    void displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) override;
 
     int getActiveRandomIndex() const { return getActiveSourceIndex(); }
 
@@ -42,7 +42,6 @@ private:
     static constexpr int kMaxRateWidth  = 130;
     static constexpr int kMaxStyleWidth = 130;
 
-    bool wasActive = false;
 
     ParameterSyncHelper paramSync { [this] { syncFromProcessorState(); } };
 

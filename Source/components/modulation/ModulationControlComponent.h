@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../LabelledBarComponent.h"
+#include <osci_gui/osci_gui.h>
 
 // Base class for Vital-inspired dark-bar modulation controls.
 // Inherits from LabelledBarComponent (generic dark bar + label strip)
@@ -44,7 +44,7 @@ public:
                                iconBounds.getBottom() - 3.0f);
 
             bool iconHover = iconHovered;
-            g.setColour(iconHover ? juce::Colours::white.withAlpha(0.7f) : Colours::grey());
+            g.setColour(iconHover ? juce::Colours::white.withAlpha(0.7f) : osci::Colours::grey());
             drawIcon(g, iconBounds.reduced(2.0f, 2.0f));
         }
     }

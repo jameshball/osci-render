@@ -112,7 +112,7 @@ static ModulationSourceConfig buildEnvConfig(OscirenderAudioProcessor& proc) {
     cfg.setActiveTab = [&proc](int i) { proc.envelopeParameters.activeTab = i; };
 #if OSCI_PREMIUM
     cfg.typeId = "env";
-    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.midiManager = &proc.midiManager;
     cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
         return OscirenderAudioProcessor::modDepthCustomId("env", idx, pid);
     };
@@ -203,8 +203,7 @@ void EnvelopeComponent::initEnvelopeData(int envIndex) {
     envData[envIndex].nodes = buildDahdsrNodes(audioProcessor.getCurrentDahdsrParams(envIndex));
 }
 
-void EnvelopeComponent::onActiveSourceChanged(int index) {
-    envData[activeSourceIndex].nodes = graph.getNodes();
+void EnvelopeComponent::onActiveSourceChanged(int) {
     syncGraphToActiveEnv();
     syncKnobsToActiveEnv();
     graph.resetFlowTrail();
@@ -495,11 +494,17 @@ void EnvelopeComponent::resized() {
 
 // --- Look & Feel colour sync ---
 
+void EnvelopeComponent::lookAndFeelChanged() {
+    ModulationSourceComponent::lookAndFeelChanged();
+    syncGraphColours();
+}
+
 void EnvelopeComponent::syncGraphColours() {
-    // Override NodeGraphComponent's constructor defaults with LookAndFeel colours
-    graph.setColour(NodeGraphComponent::backgroundColourId,  getLookAndFeel().findColour(NodeGraphComponent::backgroundColourId));
-    graph.setColour(NodeGraphComponent::gridLineColourId,    getLookAndFeel().findColour(NodeGraphComponent::gridLineColourId));
-    graph.setColour(NodeGraphComponent::nodeOutlineColourId, getLookAndFeel().findColour(NodeGraphComponent::nodeOutlineColourId));
+    auto& inherited = getLookAndFeel();
+    for (int colourId : { NodeGraphComponent::backgroundColourId, NodeGraphComponent::gridLineColourId, NodeGraphComponent::nodeOutlineColourId }) {
+        auto& palette = inherited.isColourSpecified(colourId) ? inherited : PluginLookAndFeel::getSharedInstance();
+        graph.setColour(colourId, palette.findColour(colourId));
+    }
 
     auto colour = getEnvColour(getActiveSourceIndex());
     graph.setColour(NodeGraphComponent::lineColourId,        colour);

@@ -76,7 +76,7 @@ public:
 private:
     BenchmarkResult benchmarkRun(const juce::String& script, int iterations, int warmup) {
         LuaParser parser("bench.lua", script, [](int, juce::String, juce::String) {});
-        lua_State* L = nullptr;
+        LuaState L;
 
         LuaVariables vars;
         vars.sampleRate = 44100;
@@ -99,7 +99,7 @@ private:
             parser.run(L, vars);
         const auto end = juce::Time::getHighResolutionTicks();
 
-        parser.close(L);
+        L.reset();
         return {juce::Time::highResolutionTicksToSeconds(end - start), iterations};
     }
 

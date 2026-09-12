@@ -18,7 +18,7 @@ LfoPresetBrowserOverlay::LfoPresetBrowserOverlay(LfoPresetManager& manager, List
 
     saveEditor.setFont(juce::Font(13.0f));
     saveEditor.setTextToShowWhenEmpty("Preset name...", juce::Colours::white.withAlpha(0.3f));
-    saveEditor.setColour(juce::TextEditor::backgroundColourId, Colours::veryDark());
+    saveEditor.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
     saveEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
     saveEditor.setColour(juce::TextEditor::textColourId, juce::Colours::white);
@@ -79,7 +79,7 @@ void LfoPresetBrowserOverlay::BrowserPanel::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
     constexpr float radius = 6.0f;
 
-    g.setColour(Colours::veryDark().brighter(0.08f));
+    g.setColour(osci::Colours::veryDark().brighter(0.08f));
     g.fillRoundedRectangle(bounds, radius);
 }
 
@@ -136,6 +136,7 @@ void LfoPresetBrowserOverlay::PresetRow::mouseDown(const juce::MouseEvent& e) {
         } else {
             menu.addItem("Set as Default", [this]() { if (onSetDefault) onSetDefault(); });
         }
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
             { e.getScreenX(), e.getScreenY(), 1, 1 }));
     }

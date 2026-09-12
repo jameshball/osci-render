@@ -9,7 +9,7 @@ if /I "%VSTEL_MSBuildProjectFullPath:~-18%" neq "SharedCode.vcxproj" (
   goto finish_luajit
 )
 
-cd ..\..\..\modules\LuaJIT\src
+cd ..\..\..\modules\osci_scripting\third_party\LuaJIT\src
 call .\msvcbuild.bat static
 copy /b lua51.lib luajit51.lib
 goto finish_luajit

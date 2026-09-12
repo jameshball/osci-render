@@ -6,6 +6,7 @@
 #include <atomic>
 #include "SidechainState.h"
 #include "ModulationSource.h"
+#include "ModulationDisplayBuffer.h"
 
 // Encapsulates all DAW-automatable Sidechain parameters, assignments,
 // and audio-thread state. Follows the VisualiserParameters/LfoParameters pattern.
@@ -25,6 +26,7 @@ public:
     // Thread-safe snapshots for UI
     std::atomic<float> currentValues[NUM_SIDECHAINS] = {};
     std::atomic<float> inputLevels[NUM_SIDECHAINS] = {};
+    ModulationDisplayBuffer displayBuffers[NUM_SIDECHAINS];
 
     // Transfer curve (protected by curveLock)
     std::vector<GraphNode> transferCurve;
@@ -48,9 +50,11 @@ public:
     int getSourceCount() const override { return NUM_SIDECHAINS; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
-    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
-        for (int sc = 0; sc < NUM_SIDECHAINS; ++sc)
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
+        for (int sc = 0; sc < NUM_SIDECHAINS; ++sc) {
             blockBuffer[sc].resize(samplesPerBlock);
+            displayBuffers[sc].prepare(sampleRate, samplesPerBlock);
+        }
         {
             juce::SpinLock::ScopedLockType lock(curveLock);
             cachedFullCurve = fullCurve;
@@ -122,10 +126,11 @@ public:
             if ((int)blockBuffer[sc].size() < numSamples)
                 blockBuffer[sc].resize(numSamples);
 
-            audioStates[sc].advanceBlock(
-                blockBuffer[sc].data(), rectifiedIn, numSamples,
-                attackVal, releaseVal, (float)sampleRate,
-                cachedFullCurve);
+            displayBuffers[sc].process(numSamples, [&](int offset, int count) {
+                audioStates[sc].advanceBlock(blockBuffer[sc].data() + offset, rectifiedIn + offset, count,
+                                             attackVal, releaseVal, (float)sampleRate, cachedFullCurve);
+                return ModulationDisplayBuffer::Sample { blockBuffer[sc][offset + count - 1], sidechain::linearToDb(audioStates[sc].smoothedLevel), true };
+            });
 
             currentValues[sc].store(blockBuffer[sc][numSamples - 1], std::memory_order_relaxed);
             inputLevels[sc].store(sidechain::linearToDb(audioStates[sc].smoothedLevel), std::memory_order_relaxed);

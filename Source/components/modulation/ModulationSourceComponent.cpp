@@ -1,9 +1,10 @@
 #include "ModulationSourceComponent.h"
 #include "../effects/EffectComponent.h"
 #include "../../LookAndFeel.h"
+#include "../../visualiser/FramePresenter.h"
 #include "../../audio/modulation/ModulationTypes.h"
-#include "InlineEditorHelper.h"
-#include <osci_render_core/midi/osci_MidiCCManager.h>
+#include <osci_gui/osci_gui.h>
+#include <osci_render_core/midi/osci_MidiManager.h>
 
 // ============================================================================
 // DepthIndicator – small arc knob for a single source→param connection
@@ -23,7 +24,7 @@ void ModulationSourceComponent::DepthIndicator::paint(juce::Graphics& g) {
 
     auto colour = owner.config.getSourceColour(sourceIndex);
 
-    g.setColour(Colours::veryDark());
+    g.setColour(osci::Colours::veryDark());
     g.fillEllipse(bounds);
 
     g.setColour(colour.withAlpha(0.2f));
@@ -78,7 +79,7 @@ void ModulationSourceComponent::DepthIndicator::mouseUp(const juce::MouseEvent&)
 }
 
 void ModulationSourceComponent::DepthIndicator::mouseEnter(const juce::MouseEvent& e) {
-    HoverAnimationMixin::mouseEnter(e);
+    osci::HoverAnimationMixin::mouseEnter(e);
     hovering = true;
     EffectComponent::highlightedParamId = paramId;
     EffectComponent::modRangeParamId = paramId;
@@ -91,7 +92,7 @@ void ModulationSourceComponent::DepthIndicator::mouseEnter(const juce::MouseEven
 }
 
 void ModulationSourceComponent::DepthIndicator::mouseExit(const juce::MouseEvent& e) {
-    HoverAnimationMixin::mouseExit(e);
+    osci::HoverAnimationMixin::mouseExit(e);
     hovering = false;
     EffectComponent::highlightedParamId = juce::String();
     EffectComponent::modRangeParamId = juce::String();
@@ -134,7 +135,7 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
     menu.addItem(3, "Enter Value");
 
 #if OSCI_PREMIUM
-    osci::MidiCCManager* ccMgr = owner.config.midiCCManager;
+    osci::MidiManager* ccMgr = owner.config.midiManager;
     juce::String ccId;
     if (ccMgr != nullptr
         && owner.config.buildModDepthCustomId
@@ -162,6 +163,7 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
 #endif
 
     juce::Component::SafePointer<DepthIndicator> safeThis(this);
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
         [safeThis
 #if OSCI_PREMIUM
@@ -213,7 +215,7 @@ void ModulationSourceComponent::DepthIndicator::startTextEdit() {
         juce::String((int)(depth * 100.0f)),
         getLocalBounds().expanded(8, 2),
         { commitFn, cancelFn },
-        Dracula::background, Dracula::foreground,
+        osci::Colours::codeBackground(), osci::Colours::codeForeground(),
         owner.config.getSourceColour(sourceIndex), 11.0f);
     addAndMakeVisible(inlineEditor.get());
     inlineEditor->grabKeyboardFocus();
@@ -223,8 +225,8 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     if (!valuePopup) {
         valuePopup = std::make_unique<juce::Label>();
         valuePopup->setFont(juce::Font(11.0f, juce::Font::bold));
-        valuePopup->setColour(juce::Label::backgroundColourId, Dracula::background);
-        valuePopup->setColour(juce::Label::textColourId, Dracula::foreground);
+        valuePopup->setColour(juce::Label::backgroundColourId, osci::Colours::codeBackground());
+        valuePopup->setColour(juce::Label::textColourId, osci::Colours::codeForeground());
         valuePopup->setJustificationType(juce::Justification::centred);
         valuePopup->setInterceptsMouseClicks(false, false);
         valuePopup->addToDesktop(juce::ComponentPeer::windowIsTemporary | juce::ComponentPeer::windowIgnoresKeyPresses);
@@ -238,7 +240,7 @@ void ModulationSourceComponent::DepthIndicator::showValuePopup() {
     int pct = (int)(depth * 100.0f);
     valuePopup->setText(paramName + " " + juce::String(pct) + "%", juce::dontSendNotification);
 
-    int popupW = valuePopup->getFont().getStringWidth(valuePopup->getText()) + 14;
+    int popupW = juce::GlyphArrangement::getStringWidthInt(valuePopup->getFont(), valuePopup->getText()) + 14;
     int popupH = 20;
     auto screenPos = localPointToGlobal(juce::Point<int>(getWidth() / 2, 0));
     valuePopup->setBounds(screenPos.x - popupW / 2, screenPos.y - popupH - 4, popupW, popupH);
@@ -257,6 +259,10 @@ ModulationSourceComponent::ModTabHandle::ModTabHandle(
         const juce::String& l, int idx, ModulationSourceComponent& o)
     : label(l), sourceIndex(idx), owner(o) {
     setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    hoverAnimationController.setValueChangedCallback ([this] (auto value) {
+        hoverProgress = static_cast<float>(value);
+        repaint();
+    });
 }
 
 void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
@@ -274,7 +280,7 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
                                       radius, radius,
                                       true, true, true, true);
         // All tabs look "active" when collapsed
-        g.setColour(Colours::darker());
+        g.setColour(osci::Colours::darker());
         g.fillPath(tabShape);
     } else {
         tabShape.addRoundedRectangle(bounds.getX(), bounds.getY(),
@@ -282,10 +288,10 @@ void ModulationSourceComponent::ModTabHandle::paint(juce::Graphics& g) {
                                       radius, radius,
                                       true, true, false, false);
         if (active) {
-            g.setColour(Colours::darker());
+            g.setColour(osci::Colours::darker());
             g.fillPath(tabShape);
         } else {
-            g.setColour(Colours::darker().darker(0.5f));
+            g.setColour(osci::Colours::darker().darker(0.5f));
             g.fillPath(tabShape);
 
             juce::ColourGradient shadow(juce::Colours::black.withAlpha(0.2f), bounds.getCentreX(), bounds.getBottom(),
@@ -382,10 +388,12 @@ void ModulationSourceComponent::ModTabHandle::mouseDrag(const juce::MouseEvent& 
             g.drawText(label, 0, 0, 50, 20, juce::Justification::centred);
         }
 
-        if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this)) {
-            container->startDragging(desc, this, juce::ScaledImage(dragImage), true);
-            if (owner.onDragActiveChanged)
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+        if (container != nullptr) {
+            container->startDragging(desc, this, juce::ScaledImage(dragImage), !FramePresenter::usesNativeSurface());
+            if (owner.onDragActiveChanged) {
                 owner.onDragActiveChanged(true);
+            }
         }
         isDragging = false;
     }
@@ -409,34 +417,12 @@ void ModulationSourceComponent::ModTabHandle::mouseUp(const juce::MouseEvent& e)
 
 void ModulationSourceComponent::ModTabHandle::mouseEnter(const juce::MouseEvent&) {
     isHovering = true;
-    float startP = hoverProgress;
-    hoverAnim = juce::ValueAnimatorBuilder{}
-        .withOnStartReturningValueChangedCallback([this, startP] {
-            return [this, startP](float p) {
-                hoverProgress = startP + p * (1.0f - startP);
-                repaint();
-            };
-        })
-        .withDurationMs(150.0)
-        .build();
-    hoverAnim->start();
-    hoverAnimUpdater.addAnimator(*hoverAnim);
+    hoverAnimationController.animateTo (true, 150, juce::Easings::createEaseOut());
 }
 
 void ModulationSourceComponent::ModTabHandle::mouseExit(const juce::MouseEvent&) {
     isHovering = false;
-    float startP = hoverProgress;
-    hoverAnim = juce::ValueAnimatorBuilder{}
-        .withOnStartReturningValueChangedCallback([this, startP] {
-            return [this, startP](float p) {
-                hoverProgress = startP * (1.0f - p);
-                repaint();
-            };
-        })
-        .withDurationMs(150.0)
-        .build();
-    hoverAnim->start();
-    hoverAnimUpdater.addAnimator(*hoverAnim);
+    hoverAnimationController.animateTo (false, 150, juce::Easings::createEaseOut());
 }
 
 void ModulationSourceComponent::ModTabHandle::resized() {
@@ -547,11 +533,14 @@ void ModulationSourceComponent::ModTabHandle::refreshDepthIndicators(
 // ============================================================================
 
 ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfig& cfg)
-    : config(cfg) {
+    : config(cfg), displaySamples(static_cast<size_t>(cfg.sourceCount)) {
     tabList.setOrientation(VerticalTabListComponent::Horizontal);
     tabList.setTabGap(kTabGap);
     tabList.setMinTabSize(kMinTabWidth);
     for (int i = 0; i < config.sourceCount; ++i) {
+        if (config.getDisplayBuffer) {
+            config.getDisplayBuffer(i).discard();
+        }
         auto tab = std::make_unique<ModTabHandle>(config.getLabel(i), i, *this);
         tabHandles.push_back(tab.get());
         tabList.addTab(std::move(tab));
@@ -561,7 +550,7 @@ ModulationSourceComponent::ModulationSourceComponent(const ModulationSourceConfi
 
     tabViewport.setViewedComponent(&tabList, false);
     tabViewport.setScrollBarsShown(false, false, false, true);
-    tabViewport.setColour(scrollFadeOverlayBackgroundColourId,
+    tabViewport.setColour(osci::scrollFadeOverlayBackgroundColourId,
                           findColour(juce::ResizableWindow::backgroundColourId));
     tabViewport.setSidesEnabled(false, false, true, true);
     tabViewport.setFadeWidth(20);
@@ -592,16 +581,25 @@ void ModulationSourceComponent::timerCallback() {
     if (config.getAssignments)
         refreshAllDepthIndicators();
 
-    if (config.getCurrentValue) {
+    if (config.getCurrentValue || config.getDisplayBuffer) {
         // Vital-style smooth decay: smoothing factor = 15 * dt (frame-rate independent)
         float dt = (float)getTimerInterval() / 1000.0f;
         float decay = juce::jlimit(0.0f, 1.0f, 15.0f * dt);
+        const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
         for (int i = 0; i < (int)tabHandles.size(); ++i) {
-            float current = config.getCurrentValue(i);
-            tabHandles[i]->setSourceValue(current);
-            tabHandles[i]->updateSmoothedValue(current, decay);
-            if (config.isSourceActive)
-                tabHandles[i]->setSourceActive(config.isSourceActive(i));
+            auto& sample = displaySamples[static_cast<size_t>(i)];
+            if (config.getDisplayBuffer) {
+                config.getDisplayBuffer(i).consume(now, [&](const auto& incoming) {
+                    sample = incoming;
+                    displaySampleArrived(i, sample);
+                });
+            } else {
+                sample.value = config.getCurrentValue(i);
+                sample.active = config.isSourceActive && config.isSourceActive(i);
+            }
+            tabHandles[i]->setSourceValue(sample.value);
+            tabHandles[i]->updateSmoothedValue(sample.value, decay);
+            tabHandles[i]->setSourceActive(sample.active);
         }
     }
 }
@@ -644,13 +642,13 @@ void ModulationSourceComponent::paint(juce::Graphics& g) {
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
-    float r = OscirenderLookAndFeel::RECT_RADIUS;
+    float r = osci::LookAndFeel::RECT_RADIUS;
     juce::Path panelPath;
     // When there are no tabs, round all four corners; otherwise only the bottom ones
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
                                    r, r, !hasTabs, !hasTabs, true, true);
-    g.setColour(Colours::darker());
+    g.setColour(osci::Colours::darker());
     g.fillPath(panelPath);
 }
 
@@ -660,10 +658,13 @@ void ModulationSourceComponent::paintOverChildren(juce::Graphics& g) {
     const bool hasTabs = config.sourceCount > 1 || config.alwaysShowTabs;
     const float tabOffset = hasTabs ? (float)kTabHeight : 0.0f;
     auto panelBounds = getLocalBounds().toFloat().withTrimmedTop(tabOffset);
+    // Only the tab seam is visible. Keep the bottom corners beyond the shadow's blur
+    // radius without regenerating a full-panel shadow on every height change.
+    panelBounds.setHeight(juce::jmin(panelBounds.getHeight(), 2.0f * kSeamShadowHeight));
     juce::Path panelPath;
     panelPath.addRoundedRectangle(panelBounds.getX(), panelBounds.getY(),
                                    panelBounds.getWidth(), panelBounds.getHeight(),
-                                   OscirenderLookAndFeel::RECT_RADIUS, OscirenderLookAndFeel::RECT_RADIUS,
+                                   osci::LookAndFeel::RECT_RADIUS, osci::LookAndFeel::RECT_RADIUS,
                                    !hasTabs, !hasTabs, true, true);
 
     if (!hasTabs) {

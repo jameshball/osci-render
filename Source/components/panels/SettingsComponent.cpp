@@ -1,13 +1,13 @@
 #include "SettingsComponent.h"
+#include "../../parser/FileFormatRegistry.h"
 
 #include "../../PluginEditor.h"
 #include "../effects/EffectComponent.h"
 #include "../../audio/modulation/EnvState.h"
 #include "../../audio/modulation/LfoState.h"
 #include "../../parser/FileParser.h"
-#include "../CustomMidiKeyboardComponent.h"
 #if OSCI_PREMIUM
-#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include <osci_standalone/osci_standalone.h>
 #endif
 
 // ============================================================================
@@ -20,7 +20,7 @@ SettingsComponent::VerticalDragBar::VerticalDragBar() {
 
 void SettingsComponent::VerticalDragBar::paint(juce::Graphics& g) {
     if (isMouseOver() || isDragging) {
-        g.setColour(Colours::accentColor().withAlpha(0.5f));
+        g.setColour(osci::Colours::accentColor().withAlpha(0.5f));
         g.fillRoundedRectangle(getLocalBounds().toFloat(), 4.0f);
     }
 }
@@ -165,7 +165,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     addAndMakeVisible(keyboardViewport);
     keyboardViewport.setViewedComponent(&keyboard, false);
     keyboardViewport.setScrollBarsShown(false, false, false, true);
-    keyboardViewport.setColour(scrollFadeOverlayBackgroundColourId,
+    keyboardViewport.setColour(osci::scrollFadeOverlayBackgroundColourId,
                                findColour(juce::ResizableWindow::backgroundColourId));
     keyboardViewport.setSidesEnabled(false, false, true, true);
     keyboardViewport.setFadeWidth(20);
@@ -189,7 +189,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
     };
     examples.onFileOpened = [this](const juce::String& fileName, bool shouldOpenEditor, int fileIndex) {
         pluginEditor.addCodeEditor(fileIndex);
-        pluginEditor.fileUpdated(fileName, shouldOpenEditor);
+        pluginEditor.refreshFileUi(fileName, shouldOpenEditor);
     };
 
     double mainLayoutVisSize = std::any_cast<double>(audioProcessor.getProperty("mainLayoutVisSize", -0.25));
@@ -253,6 +253,22 @@ SettingsComponent::~SettingsComponent() {
     audioProcessor.midiEnabled->removeListener(this);
 }
 
+void SettingsComponent::resetLayoutToDefault() {
+    constexpr double defaultVisualiserSize = -0.25;
+    mainLayout.setItemLayout(0, -0.1, -0.5, defaultVisualiserSize);
+    mainLayout.setItemLayout(1, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE, pluginEditor.RESIZER_BAR_SIZE);
+    mainLayout.setItemLayout(2, -0.1, -0.9, -(1.0 + defaultVisualiserSize));
+    audioProcessor.setProperty("mainLayoutVisSize", defaultVisualiserSize);
+
+#if OSCI_PREMIUM
+    modPanelCollapsed = true;
+    modPanelHeight = kCollapsedModHeight;
+    audioProcessor.setProperty("mainLayoutModSize", -0.35);
+#endif
+
+    resized();
+}
+
 void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue) {
     auto safeThis = juce::Component::SafePointer<SettingsComponent>(this);
     bool midiJustEnabled = (parameterIndex == audioProcessor.midiEnabled->getParameterIndex()
@@ -274,10 +290,6 @@ void SettingsComponent::parameterValueChanged(int parameterIndex, float newValue
 void SettingsComponent::parameterGestureChanged(int parameterIndex, bool gestureIsStarting) {}
 
 void SettingsComponent::resized() {
-    childLayoutUpdater.triggerAsyncUpdate();
-}
-
-void SettingsComponent::layoutChildren() {
     auto padding = 7;
     static constexpr int kGap = 3; // small gap between stacked panels
 
@@ -372,7 +384,7 @@ void SettingsComponent::layoutChildren() {
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
         const bool showKeyboard = midiOn
-                          && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
+                          && audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
 
         midi.setVisible(false);
 
@@ -434,7 +446,7 @@ void SettingsComponent::layoutChildren() {
 
         const bool midiOn = audioProcessor.midiEnabled->getBoolValue();
         const bool showKeyboard = midiOn
-                          && audioProcessor.getGlobalBoolValue("showMidiKeyboard", true);
+                          && audioProcessor.globalSettings.getBool("showMidiKeyboard", true);
 
         // Reserve space for keyboard at the very bottom if MIDI is on
         if (showKeyboard) {
@@ -552,22 +564,17 @@ void SettingsComponent::layoutChildren() {
     repaint();
 }
 
-void SettingsComponent::ChildLayoutUpdater::handleAsyncUpdate() {
-    owner.layoutChildren();
-}
-
 void SettingsComponent::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black);
-    g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+    g.fillRoundedRectangle(volumeVisualiserBounds.toFloat(), osci::LookAndFeel::RECT_RADIUS);
 
-    if (! keyboardPanelBounds.isEmpty()) {
+    if (!keyboardPanelBounds.isEmpty()) {
         g.setColour(findColour(juce::ResizableWindow::backgroundColourId));
-        g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) OscirenderLookAndFeel::RECT_RADIUS);
+        g.fillRoundedRectangle(keyboardPanelBounds.toFloat(), (float) osci::LookAndFeel::RECT_RADIUS);
 
     }
 }
 
-// syphonLock must be held when calling this function
 void SettingsComponent::fileUpdated(juce::String fileName) {
     juce::String extension = fileName.fromLastOccurrenceOf(".", true, false).toLowerCase();
     frame.setVisible(false);
@@ -575,40 +582,32 @@ void SettingsComponent::fileUpdated(juce::String fileName) {
     fractalEditor.setVisible(false);
 #endif
 
-    // Check if the file is an image based on extension or Syphon/Spout input
-    bool isSyphonActive = false;
-#if (JUCE_MAC || JUCE_WINDOWS) && OSCI_PREMIUM
-    isSyphonActive = audioProcessor.syphonInputActive;
-#endif
+    const bool isImage = osci::files::isImage(extension);
 
-    bool isImage = isSyphonActive ||
-                   (extension == ".gif" ||
-                    extension == ".png" ||
-                    extension == ".jpg" ||
-                    extension == ".jpeg" ||
-                    extension == ".mov" ||
-                    extension == ".mp4");
-
-    // Skip processing if object server is rendering or if no file is selected and no Syphon input
-    bool skipProcessing = audioProcessor.objectServerRendering || (fileName.isEmpty() && !isSyphonActive);
+    auto& files = audioProcessor.getFileController();
+    const bool textureInputActive = files.isTextureInputActive();
+    bool skipProcessing = files.isObjectServerActive() || (fileName.isEmpty() && !textureInputActive);
+    const bool isAnimatedFile = !textureInputActive && osci::files::isAnimated(extension);
+    const bool usesFrameControls = isImage || (isAnimatedFile && !juce::JUCEApplicationBase::isStandaloneApp());
+    quickControls.setAnimated(!skipProcessing && isAnimatedFile);
 
     if (skipProcessing) {
         // do nothing
     } else if (extension == ".lsystem") {
 #if OSCI_PREMIUM
-        int fileIndex = audioProcessor.getCurrentFileIndex();
-        if (fileIndex >= 0) {
-            auto parser = audioProcessor.getCurrentFileParser();
+        const auto fileIndex = files.getCurrentFileIndex();
+        if (fileIndex.has_value()) {
+            auto parser = files.getCurrentParser();
             if (parser != nullptr) {
-                fractalEditor.setParser(parser->getFractal(), fileIndex);
+                fractalEditor.setParser(parser->getFractal(), *fileIndex);
                 fractalEditor.setVisible(true);
             }
         }
 #endif
-    } else if (extension == ".gpla" || isImage) {
+    } else if (textureInputActive || usesFrameControls) {
         frame.setVisible(true);
-        frame.setAnimated(extension == ".gpla" || extension == ".gif" || extension == ".mov" || extension == ".mp4");
-        frame.setImage(isImage);
+        frame.setAnimated(isAnimatedFile);
+        frame.setImage(textureInputActive || isImage);
         frame.resized();
     }
     fileControls.updateFileLabel();

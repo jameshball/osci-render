@@ -8,11 +8,9 @@
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/LfoPresetManager.h"
 #include "ModulationSourceComponent.h"
-#include "../PhaseSliderComponent.h"
-#include "../SvgButton.h"
+#include <osci_gui/osci_gui.h>
 #include "../KnobContainerComponent.h"
 
-#include "../ParameterSyncHelper.h"
 
 class OscirenderAudioProcessor;
 
@@ -26,7 +24,7 @@ public:
 
     void resized() override;
     void paint(juce::Graphics& g) override;
-    void timerCallback() override;
+    void displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) override;
 
     int getActiveLfoIndex() const { return getActiveSourceIndex(); }
 
@@ -37,7 +35,7 @@ public:
 
     static juce::Colour getLfoColour(int lfoIndex);
 
-    // Restrict LFO features when MIDI is disabled (only Free mode available)
+    // Restrict LFO features when MIDI is disabled.
     void setMidiEnabled(bool enabled);
 
     void syncFromProcessorState() override;
@@ -104,7 +102,7 @@ private:
     };
 
     PresetSelector presetSelector;
-    SvgButton paintToggle;
+    osci::SvgButton paintToggle;
 
     // Custom S-curve toggle for smooth/straight interpolation mode.
     class SmoothToggle : public juce::Component, public juce::SettableTooltipClient {
@@ -123,8 +121,8 @@ private:
 
     SmoothToggle smoothToggle;
     PaintShapePreview shapePreview;
-    SvgButton copyButton;
-    SvgButton pasteButton;
+    osci::SvgButton copyButton;
+    osci::SvgButton pasteButton;
     LfoPresetManager presetManager;
     LfoPresetBrowserOverlay presetBrowser;
     bool presetBrowserVisible = false;

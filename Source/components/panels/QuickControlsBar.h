@@ -3,8 +3,7 @@
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "../KnobContainerComponent.h"
-#include "../SwitchButton.h"
-#include "../ParameterBarComponent.h"
+#include <osci_gui/osci_gui.h>
 
 class OscirenderAudioProcessorEditor;
 
@@ -22,6 +21,10 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
 
+    // Show/hide the animation speed knob based on whether the current file is
+    // animatable (Lottie, GPLA, GIF, video, ...).
+    void setAnimated(bool animated);
+
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
     void handleAsyncUpdate() override;
@@ -33,10 +36,10 @@ private:
     KnobContainerComponent frequencyKnob{"FREQUENCY"};
     KnobContainerComponent perspectiveKnob{"PERSPECTIVE"};
     KnobContainerComponent fovKnob{"FOV"};
+    KnobContainerComponent animationSpeedKnob{"SPEED"};
 
 #if !OSCI_PREMIUM
-    jux::SwitchButton midiToggle{audioProcessor.midiEnabled};
-    juce::Label midiLabel{"", "Enable MIDI"};
+    SvgSwitchButton midiSwitch{"midi", juce::String(BinaryData::midi_svg), audioProcessor.midiEnabled};
     ParameterBarComponent voicesBar{audioProcessor.voices, "VOICES"};
 #endif
 

@@ -1,12 +1,9 @@
 #pragma once
-#include "../DraggableListBox.h"
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "EffectComponent.h"
-#include "../ComponentList.h"
-#include "../SwitchButton.h"
+#include <osci_gui/osci_gui.h>
 #include "EffectTypeGridComponent.h"
-#include "../SvgButton.h"
 #include <random>
 #include <unordered_map>
 
@@ -20,6 +17,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     std::function<void()> onAddNewEffectRequested; // callback hooked by parent to open the grid
 
     AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
+        data.reserve(audioProcessor.toggleableEffects.size());
         resetData();
     }
 
@@ -230,7 +228,7 @@ protected:
     ComponentListModel listModel { ROW_HEIGHT };
     VListBox list;
     jux::SwitchButton enabled = { effect.enabled };
-    SvgButton closeButton = SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
+    osci::CloseButton closeButton { "Close effect", juce::Colours::white, juce::Colours::white };
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

@@ -14,50 +14,6 @@ namespace rng {
 }
 using rng::NUM_RANDOM_SOURCES;
 
-// Lock-free SPSC ring buffer for passing subsampled random values from
-// the audio thread to the UI thread.  One writer (audio), one reader (UI).
-struct RandomUIRingBuffer {
-    struct Entry {
-        float value;
-        bool active;
-    };
-
-    static constexpr int kCapacity = 1024;
-
-    // Audio thread writes here.
-    void push(float value, bool active) {
-        int w = writePos.load(std::memory_order_relaxed);
-        values[w].store(value, std::memory_order_relaxed);
-        actives[w].store(active, std::memory_order_relaxed);
-        // Release-store: guarantees the data writes above are visible to the
-        // reader before the updated write position.
-        writePos.store((w + 1) & (kCapacity - 1), std::memory_order_release);
-    }
-
-    // UI thread drains all available entries into the supplied array.
-    // Returns the number of entries read.
-    int drain(Entry* out, int maxEntries) {
-        int r = readPos.load(std::memory_order_relaxed);
-        // Acquire-load: synchronises with the writer's release-store,
-        // guaranteeing visibility of all data stores that preceded it.
-        int w = writePos.load(std::memory_order_acquire);
-        int count = 0;
-        while (r != w && count < maxEntries) {
-            out[count++] = { values[r].load(std::memory_order_relaxed),
-                             actives[r].load(std::memory_order_relaxed) };
-            r = (r + 1) & (kCapacity - 1);
-        }
-        readPos.store(r, std::memory_order_relaxed);
-        return count;
-    }
-
-private:
-    std::atomic<float> values[kCapacity] = {};
-    std::atomic<bool> actives[kCapacity] = {};
-    std::atomic<int> writePos { 0 };
-    std::atomic<int> readPos { 0 };
-};
-
 // RandomAssignment is a type alias for the generic ModAssignment.
 // XML serialisation uses "rng" as the index attribute name.
 using RandomAssignment = ModAssignment;

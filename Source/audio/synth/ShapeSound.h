@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#include "../../parser/FrameConsumer.h"
+#include <osci_file_import/osci_file_import.h>
 
 class FileParser;
 class FrameProducer;
