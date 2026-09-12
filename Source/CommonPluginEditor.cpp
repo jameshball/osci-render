@@ -533,7 +533,8 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             "*." + ext);
 
         auto saveFlags = juce::FileBrowserComponent::saveMode |
-            juce::FileBrowserComponent::canSelectFiles;
+            juce::FileBrowserComponent::canSelectFiles |
+            juce::FileBrowserComponent::warnAboutOverwriting;
 
         offlineRenderLog.event("output selection opened");
         safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, encodingConfiguration](const juce::FileChooser& outputChooser) {
