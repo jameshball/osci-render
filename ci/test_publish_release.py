@@ -9,6 +9,12 @@ from publish_release import http_put_file, main
 
 
 class UploadTests(unittest.TestCase):
+    def test_dry_run_cannot_create_a_release(self):
+        with patch('publish_release.http_post_json') as post:
+            with self.assertRaises(SystemExit):
+                main(['--prepare-only', '--dry-run', '--product', 'example', '--semver', '1.2.3'])
+            post.assert_not_called()
+
     def test_preparation_only_writes_release_context_without_artifact_or_signing_key(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'release.json'
