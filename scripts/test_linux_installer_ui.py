@@ -143,6 +143,13 @@ class InstallerBrowser:
     def wait_for_button(self, name: str) -> None:
         self.session_command("wait-for-locator", "--role", "button", "--name", name, "--timeout-ms", "10000")
 
+    def acknowledge_install_terms(self) -> None:
+        self.session_command("wait-for-locator", "--role", "toggleButton", "--name",
+                             "I agree to the terms and acknowledge the privacy policy", "--timeout-ms", "5000")
+        self.session_command("check", "--role", "toggleButton", "--name",
+                             "I agree to the terms and acknowledge the privacy policy")
+        self.click("Continue")
+
     def run_success_flow(self) -> None:
         self.launch("success", "success")
         self.snapshot("01_initial")
@@ -185,6 +192,7 @@ class InstallerBrowser:
         self.screenshot("05_default_paths")
 
         self.click("Confirm installation")
+        self.acknowledge_install_terms()
         self.session_command("wait-for-text", "Installing application and plugins", "--timeout-ms", "5000")
         self.screenshot("06_progress")
         self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
@@ -206,6 +214,7 @@ class InstallerBrowser:
         self.click("osci-render")
         self.click("Install free")
         self.click("Confirm installation")
+        self.acknowledge_install_terms()
         self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
         time.sleep(0.5)
         self.snapshot("09_warning")
@@ -216,6 +225,7 @@ class InstallerBrowser:
         self.click("osci-render")
         self.click("Install free")
         self.click("Confirm installation")
+        self.acknowledge_install_terms()
         self.session_command("wait-for-text", "test installation could not write", "--timeout-ms", "10000")
         time.sleep(0.5)
         self.snapshot("10_failure")

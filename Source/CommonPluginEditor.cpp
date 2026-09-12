@@ -124,7 +124,16 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     setWantsKeyboardFocus(true);
 
     updatePrompt.showPendingInstallStatusIfNeeded();
-    updatePrompt.scheduleInitialCheck();
+    const juce::Component::SafePointer<CommonPluginEditor> legalOwner(this);
+    const auto legalConfig = osci::makeProductUpdateConfig();
+    juce::MessageManager::callAsync([legalOwner, legalConfig] {
+        if (legalOwner == nullptr) { return; }
+        osci::LegalOverlay::ensure(*legalOwner, osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion), [legalOwner, legalConfig] {
+            if (legalOwner == nullptr) { return; }
+            legalOwner->audioProcessor.legalNoticePending.store(false);
+            legalOwner->updatePrompt.scheduleInitialCheck();
+        });
+    });
 }
 
 void CommonPluginEditor::parentHierarchyChanged()
@@ -456,6 +465,16 @@ void CommonPluginEditor::openAudioSettings() {
 }
 
 void CommonPluginEditor::openLicenseAndUpdates() {
+    const auto legalConfig = osci::makeProductUpdateConfig();
+    const auto documents = osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion);
+    osci::LegalState legalState;
+    if (!legalState.hasAcknowledged(documents)) {
+        const juce::Component::SafePointer<CommonPluginEditor> owner(this);
+        osci::LegalOverlay::ensure(*this, documents, [owner] {
+            if (owner != nullptr) { owner->openLicenseAndUpdates(); }
+        });
+        return;
+    }
     if (findActiveOverlay<osci::LicenseAndUpdatesComponent>() != nullptr)
         return;
 
