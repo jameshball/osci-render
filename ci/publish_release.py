@@ -169,6 +169,8 @@ def main(argv: list[str]) -> int:
                    help='Compute sha + sig and print the request body, but do not POST')
     args = p.parse_args(argv)
 
+    if args.prepare_only and args.dry_run:
+        p.error('--prepare-only cannot be combined with --dry-run')
     if not args.api_token:
         raise SystemExit('--api-token or $PUBLISH_API_TOKEN is required')
     if args.prepare_only:

@@ -314,7 +314,7 @@ class BrowserSession:
 
         profile["ffmpegFile"] = self.copy_profile_ffmpeg(profile, launch_home)
         if self.legal_only:
-            # Only reset legal state inside this freshly created automation profile.
+            # Reset acknowledgements, preserving the installer's offline document cache.
             legal_file = Path(profile['supportDirectory']) / 'osci-licensing.settings'
             if not legal_file.resolve().is_relative_to(launch_home.resolve()):
                 self.die('Legal smoke profile must be isolated')
@@ -322,7 +322,8 @@ class BrowserSession:
                 tree = ET.parse(legal_file)
                 root = tree.getroot()
                 for entry in list(root):
-                    if entry.get('name', '').startswith('legal.'):
+                    name = entry.get('name', '')
+                    if name.startswith('legal.') and not name.startswith('legal.cache.'):
                         root.remove(entry)
                 tree.write(legal_file, encoding='utf-8', xml_declaration=True)
 

@@ -857,9 +857,8 @@ private:
 #if DEBUG
         if (juce::SystemStats::getEnvironmentVariable("OSCI_INSTALLER_AUTOMATION_RESULT", {}).isNotEmpty()) {
             setBusy(false, {});
-            osci::LegalOverlay::ensure(*this, osci::LegalState::mostRecentDocuments(), [owner, path] {
-                if (owner != nullptr) { owner->beginAcknowledgedInstall(path); }
-            });
+            // Outcome-only UI simulation: the debug worker performs no download or installation.
+            beginAcknowledgedInstall(path);
             return;
         }
 #endif
@@ -874,8 +873,7 @@ private:
                     owner->statusLabel.setText("Could not check installation details. Please try again.", juce::dontSendNotification);
                     return;
                 }
-                const auto remote = version->legal;
-                const auto documents = remote;
+                const auto documents = version->legal;
                 if (!osci::LegalState::valid(documents)) {
                     owner->statusLabel.setText("The release documents could not be verified.", juce::dontSendNotification);
                     return;
