@@ -42,9 +42,6 @@ jobs:
           token: ${{ secrets.ACCESS_TOKEN }}
           submodules: recursive
 
-      - name: Verify bundled legal documents
-        run: python scripts/verify_legal_assets.py
-
       - name: Set platform variables
         shell: bash
         run: |
@@ -83,6 +80,14 @@ jobs:
           PROJECT_VERSION=$(cat version.txt)
           echo "version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
           echo "Using project version: $PROJECT_VERSION"
+
+      - name: Prepare pinned offline documents
+        env:
+          PUBLISH_API_TOKEN: ${{ secrets.PUBLISH_API_TOKEN }}
+        run: |
+          python -m unittest discover -s ci -p test_prepare_legal.py
+          python ci/prepare_legal.py --product "${{ matrix.project }}" --semver "${{ steps.version.outputs.version }}"
+          python scripts/verify_legal_assets.py
 
       # macOS specific: setup Xcode and import certificates (skipped in EARLY_MEGA_TEST)
       - uses: maxim-lobanov/setup-xcode@v1
@@ -452,8 +457,8 @@ jobs:
 
           # Map matrix -> (product id/slug, platform, artifact path, kind)
           case "${{ matrix.project }}" in
-            osci-render) PRODUCT='wHBxF-jb7oyeVNPRzKDorA==' ;;
-            sosci)       PRODUCT='Hsr9C58_YhTxYP0MNvsIow==' ;;
+            osci-render) PRODUCT='osci-render' ;;
+            sosci)       PRODUCT='sosci' ;;
             osci-installer) PRODUCT='osci-installer' ;;
             *) echo "::error::unknown project ${{ matrix.project }}"; exit 1 ;;
           esac
@@ -497,6 +502,7 @@ jobs:
           fi
 
           python3 ci/publish_release.py \
+            --legal-manifest ci/legal-build.json \
             --product "${PRODUCT}" \
             --semver "${{ steps.version.outputs.version }}" \
             --platform "${PLATFORM}" \
