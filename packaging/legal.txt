@@ -1,0 +1,147 @@
+Before installing
+
+Selecting Agree accepts the Terms & Conditions and acknowledges the Privacy Policy below. Optional version statistics can be disabled in Privacy & Terms in the application. Agreement does not provide consent to optional processing.
+
+Permanent document links:
+https://osci-render.com/terms/2026-09-12/
+https://osci-render.com/privacy/2026-09-12/
+
+Terms & Conditions — 12 September 2026
+
+1. INTRODUCTION
+
+These Terms and Conditions ("Terms") govern the supply of the software binaries for the product(s) selected by you at checkout, including but not limited to osci-render and sosci (collectively, the "Software") by James Harry Ball T/A osci-render a sole trader established in the United Kingdom, to you ("you" or "Licensee"). By checking the "I agree to the Terms & Conditions" box at checkout, you explicitly agree that this contract is formed in the United Kingdom and is subject to the jurisdiction set out below.
+
+2. JURISDICTION AND GOVERNING LAW
+
+These Terms and any dispute or claim arising out of or in connection with them (including non-contractual disputes) shall be governed by and construed in accordance with the laws of England and Wales.
+
+Each party irrevocably agrees that the courts of England and Wales shall have exclusive jurisdiction to settle any dispute or claim arising out of or in connection with these Terms.
+
+3. LICENSING AND USAGE
+
+The Software is a derivative work based on components licensed under the GNU General Public License v3 (GPLv3).
+
+Accordingly, your rights to use, copy, modify, and distribute the Software are governed by the terms of the GPLv3. Nothing in these Terms restricts the freedoms granted to you by the GPLv3.
+
+These Terms apply specifically to the service of supplying the binary files, the transaction of purchase, and the limitations of the supplier's liability to you.
+
+4. LIMITATION OF LIABILITY
+
+The Software is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of satisfactory quality, merchantability, or fitness for a particular purpose.
+
+To the maximum extent permitted by law:
+
+The supplier shall not be liable for any indirect, special, incidental, or consequential damages, including loss of data, loss of profits, or business interruption (e.g., failed renders or project delays), arising out of the use or inability to use the Software.
+
+Our total liability to you for any claim arising out of or relating to these Terms shall not exceed the amount you actually paid for the Software.
+
+Nothing in these Terms limits the supplier's liability for death or personal injury caused by the supplier's negligence or for fraud.
+
+5. UPDATES AND SUPPORT
+
+No Support: The purchase of the Software does not include any dedicated technical support. The supplier may provide support via email at the supplier's sole discretion, but the supplier make no guarantee of response times or solutions.
+
+Updates and Versioning: Your purchase constitutes a license for the specific Major Version of the Software available at the time of purchase (e.g., v1.x). You are entitled to download minor updates and patches (e.g., v1.2, v1.3) released for that Major Version for the lifetime of that version. Future Major Versions (e.g., v2.0), which may include significant feature additions or architectural changes, are considered separate products and are not included in this purchase.
+
+End of Life: The supplier reserve the right to discontinue the distribution or development of any Major Version at any time without ongoing liability.
+
+6. REFUNDS (30-DAY GUARANTEE)
+
+The supplier offer a 30-day money-back guarantee. If you are not satisfied with the Software, you may request a full refund within 30 days of your purchase date.
+
+To request a refund, you must contact the supplier at james@ball.sh with your order details. Upon processing a refund, your agreement with the supplier for the supply of the Software is terminated.
+
+7. SEVERABILITY
+
+If any provision of these Terms is determined to be invalid, illegal, or unenforceable, the remaining provisions of these Terms remain in full force to the extent permitted by law.
+
+Privacy Policy — 12 September 2026
+
+1. Controller and scope
+James Harry Ball trading as osci-render, London, United Kingdom, is the controller for customer information processed for osci-render, sosci and osci-installer, including the release-plane licensing and distribution service. Contact: james@ball.sh. This notice covers those products together.
+
+2. Purchases and licensing
+Gumroad, Payhip and other selected sales platforms supply customer and transaction information through purchase notifications, license verification and sales imports. Records may include name, email, product and variant, order and transaction identifiers, amount, currency, quantity, discounts, refund status and license keys. These records support delivery, license validation, customer support, accounting and sales analysis. Payment credentials are handled by the payment platform; full card numbers and security codes are not required by the licensing service.
+
+License activation and refresh send the license key and product information to release-plane. Signed activation tokens contain license, purchase and entitlement information and are stored on the device for offline validation. Premium downloads require an activation token.
+
+3. Updates and operational records
+The software contacts release-plane to check for updates and obtain downloads. Update requests include product, current software version, platform and the requested release track and variant. Network providers receive an IP address when serving requests. Security and audit records may include IP address, user agent, time, operation and response status, including license verification, activation and download requests. These records support security, reliability and investigation of errors.
+
+4. Optional version statistics
+Where permitted without consent, eligible update checks may contribute to aggregate counts by product, version, platform and day, to help improve updates and platform support. There is no persistent installation identifier in these statistics, and the counters are not linked to license keys, emails or purchase history. They count checks, not unique users or installations. Version statistics can be disabled in Privacy & Terms in the installer or application. Disabling statistics does not prevent installation, activation or updates. Collection remains disabled where eligibility has not been established. Individual analytics events are not retained by the counter service. Separate operational processing described above still occurs.
+
+5. Purposes and legal bases
+Contractual necessity applies where information is needed to supply downloads and licensing. Legal obligations apply to required accounting records. Legitimate interests, subject to the applicable balancing assessment and rights of objection, apply to proportionate support, security and business analysis, including aggregate sales reports and matching free downloads with subsequent purchases by email. Optional statistical processing relies on an applicable storage/access exception and an appropriate data-protection basis where personal information is processed; collection is not enabled simply by accepting the terms or acknowledging this notice.
+
+Email addresses may also be used for essential service messages and marketing about similar products, updates and offers. Marketing relies on consent where required, or an applicable existing-customer exception with an opt-out when details are collected and in every message. Legitimate interests apply where that exception is available. Marketing can be stopped using the unsubscribe link or by contacting james@ball.sh; a suppression record may be retained to respect that choice. Opting out of marketing does not stop essential service messages.
+
+6. Providers and transfers
+Gumroad and Payhip process purchases under their own privacy notices. Hosting, database, delivery and storage providers process information needed to operate release-plane; the infrastructure includes Fly.io and Cloudflare, including R2 object storage for downloads and temporary sales-import files. Authorised administrators can access customer records for the purposes described here. Information is not sold. Information may be disclosed where legally required. Providers may process information outside the UK; applicable transfer safeguards and details of the providers used for a particular request can be requested at james@ball.sh.
+
+7. Retention
+Retention depends on purpose. Accounting records are retained for the applicable statutory period; license records are needed while providing the associated entitlement; support and security records are retained only as justified for those purposes. Temporary sales-import files are scheduled for removal after processing, with short retention for failed imports. Aggregate statistics are retained separately from customer records. Contact james@ball.sh for the applicable retention details or to request deletion.
+
+8. Rights and contact
+Subject to applicable conditions, individuals may request access, correction, deletion, restriction and portability, object to processing based on legitimate interests, and withdraw consent for processing that relies on consent. Contact james@ball.sh to exercise rights or raise a privacy complaint. Complaints can also be raised with the UK Information Commissioner's Office at ico.org.uk, or the relevant local supervisory authority. Acknowledging this notice does not waive these rights.
+
+9. Website cookies and analytics
+The website uses Google Analytics, provided by Google LLC, to understand website use. Google may process cookie identifiers, device/browser information, approximate location, pages viewed and interactions. In consent-required countries, including the UK/EEA, analytics runs only after "Allow analytics" is selected in the cookie banner. Elsewhere it may run by default, subject to the applicable legal basis and right to object. Change this choice at any time using "Cookie Preferences" in the footer. Software statistics choices do not change website preferences.
+
+Google Analytics user-level retention is configured to 14 months. Google may process information outside the UK/EEA; Google's privacy notice is at https://policies.google.com/privacy. The Google Analytics opt-out browser add-on is available at https://tools.google.com/dlpage/gaoptout. Disabling analytics attempts to remove its cookies; browser or Google-managed cookies may need to be removed using browser controls.
+
+The necessary osci_cookie_consent cookie remembers the website choice for up to six months. Cloudflare country information, derived from the network request, determines which cookie choices are initially presented. If the country check fails, the banner is shown. Country detection can be inaccurate, including when using a VPN; the footer control remains available. Checkout services such as Payhip and Gumroad and embedded third-party media may set cookies or process information under their own notices.
+
+10. Changes
+Archived revisions remain available. Material changes are explained before the affected new processing starts. First-time notices provide the documents and relevant choices without assuming an earlier notice has been seen.
+
+Terms & Conditions — 12 September 2026
+
+1. INTRODUCTION
+
+These Terms and Conditions ("Terms") govern the supply of the software binaries for the product(s) selected by you at checkout, including but not limited to osci-render and sosci (collectively, the "Software") by James Harry Ball T/A osci-render a sole trader established in the United Kingdom, to you ("you" or "Licensee"). By checking the "I agree to the Terms & Conditions" box at checkout, you explicitly agree that this contract is formed in the United Kingdom and is subject to the jurisdiction set out below.
+
+2. JURISDICTION AND GOVERNING LAW
+
+These Terms and any dispute or claim arising out of or in connection with them (including non-contractual disputes) shall be governed by and construed in accordance with the laws of England and Wales.
+
+Each party irrevocably agrees that the courts of England and Wales shall have exclusive jurisdiction to settle any dispute or claim arising out of or in connection with these Terms.
+
+3. LICENSING AND USAGE
+
+The Software is a derivative work based on components licensed under the GNU General Public License v3 (GPLv3).
+
+Accordingly, your rights to use, copy, modify, and distribute the Software are governed by the terms of the GPLv3. Nothing in these Terms restricts the freedoms granted to you by the GPLv3.
+
+These Terms apply specifically to the service of supplying the binary files, the transaction of purchase, and the limitations of the supplier's liability to you.
+
+4. LIMITATION OF LIABILITY
+
+The Software is provided "as is" without warranty of any kind, express or implied, including but not limited to warranties of satisfactory quality, merchantability, or fitness for a particular purpose.
+
+To the maximum extent permitted by law:
+
+The supplier shall not be liable for any indirect, special, incidental, or consequential damages, including loss of data, loss of profits, or business interruption (e.g., failed renders or project delays), arising out of the use or inability to use the Software.
+
+The supplier's total liability to you for any claim arising out of or relating to these Terms shall not exceed the amount you actually paid for the Software.
+
+Nothing in these Terms limits the supplier's liability for death or personal injury caused by the supplier's negligence or for fraud.
+
+5. UPDATES AND SUPPORT
+
+No Support: The purchase of the Software does not include any dedicated technical support. The supplier may provide support via email at the supplier's sole discretion, but the supplier makes no guarantee of response times or solutions.
+
+Updates and Versioning: Your purchase constitutes a license for the specific Major Version of the Software available at the time of purchase (e.g., v1.x). You are entitled to download minor updates and patches (e.g., v1.2, v1.3) released for that Major Version for the lifetime of that version. Future Major Versions (e.g., v2.0), which may include significant feature additions or architectural changes, are considered separate products and are not included in this purchase.
+
+End of Life: The supplier reserves the right to discontinue the distribution or development of any Major Version at any time without ongoing liability.
+
+6. REFUNDS (30-DAY GUARANTEE)
+
+The supplier offers a 30-day money-back guarantee. If you are not satisfied with the Software, you may request a full refund within 30 days of your purchase date.
+
+To request a refund, you must contact the supplier at james@ball.sh with your order details. Upon processing a refund, your agreement with the supplier for the supply of the Software is terminated.
+
+7. SEVERABILITY
+
+If any provision of these Terms is determined to be invalid, illegal, or unenforceable, the remaining provisions of these Terms remain in full force to the extent permitted by law.

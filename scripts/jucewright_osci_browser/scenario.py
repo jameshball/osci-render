@@ -441,6 +441,8 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
                 if not self.find_jucewright():
                     self.die("Could not find jucewright after build")
 
+            if self.installer_legal_only and (self.build_app_requested or not is_executable(self.app_executable)):
+                self.die('Build osci-installer separately before running its legal smoke test')
             if self.build_app_requested or not is_executable(self.app_executable):
                 self.build_app()
 
@@ -458,6 +460,34 @@ class OsciRenderBrowserRun(ControlDiscoveryMixin, BrowserSession):
             if self.window_width is not None and self.window_height is not None:
                 self.run_step("resize test window", self.cli("resize-window", "--w", self.window_width, "--h", self.window_height))
                 self.run_step("wait for test window resize", self.cli("wait", "--ms", "400"))
+
+            if self.legal_only:
+                if self.installer_legal_only:
+                    self.run_step("open installer privacy preferences", self.cli("click", "--name", "Privacy & Terms", "--exact", "--timeout-ms", "5000"))
+                self.run_step("first-time legal overlay", self.cli("click", "--name", "Privacy Policy", "--exact", "--trial", "--timeout-ms", "20000"))
+                self.run_step("legal introduction screenshot", self.cli("screenshot", "--target", "root", "--file", self.artifact_dir / "legal-introduction.png"))
+                self.run_step("legal snapshot", self.cli("snapshot", "--json", "--interesting", "--depth", "16"))
+                if not self.installer_legal_only:
+                    self.run_step("escape does not dismiss required notice", self.cli("press", "Escape"))
+                self.run_step("read privacy policy", self.cli("click", "--name", "Privacy Policy", "--exact", "--timeout-ms", "3000"))
+                self.run_step("wait for document layout", self.cli("wait", "--ms", "400"))
+                self.run_step("legal document screenshot", self.cli("screenshot", "--target", "root", "--file", self.artifact_dir / "legal-document.png"))
+                self.run_step("return from document", self.cli("click", "--name", "Back", "--exact"))
+                self.run_step("statistics settings", self.cli("click", "--name", "Statistics settings", "--exact"))
+                self.run_step("opt out", self.cli("set-checked", "--name", "Disable optional version statistics", "--exact", "true"))
+                self.run_step("agree in isolated test profile", self.cli("set-checked", "--name", "I agree to the terms and acknowledge the privacy policy", "--exact", "true"))
+                self.run_step("statistics screenshot", self.cli("screenshot", "--target", "root", "--file", self.artifact_dir / "legal-statistics.png"))
+                self.run_step("continue", self.cli("click", "--name", "Save" if self.installer_legal_only else "Continue", "--exact"))
+                return 1 if self.failures else 0
+
+            # A copied profile may not have acknowledged this build's documents.
+            # Exercise the actual controls only in the isolated automation profile.
+            startup = self.call(self.cli("snapshot", "--json", "--interesting", "--depth", "16"))
+            if "I agree to the terms and acknowledge the privacy policy" in startup:
+                self.run_step("startup statistics settings", self.cli("click", "--name", "Statistics settings", "--exact"))
+                self.run_step("disable test statistics", self.cli("set-checked", "--name", "Disable optional version statistics", "--exact", "true"))
+                self.run_step("acknowledge isolated profile", self.cli("set-checked", "--name", "I agree to the terms and acknowledge the privacy policy", "--exact", "true"))
+                self.run_step("continue isolated profile", self.cli("click", "--name", "Continue", "--exact"))
 
             self.run_step("list sessions", self.jw("list"))
             self.run_step("capabilities", self.cli("capabilities"))

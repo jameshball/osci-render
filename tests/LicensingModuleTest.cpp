@@ -151,6 +151,37 @@ public:
         juce::MessageManager::getInstance();
         installTestVerifier();
 
+        beginTest("Legal documents share acknowledgement without enabling identification");
+        {
+            const auto options = makeTempSettingsOptions("legal");
+            const auto bundle = osci::LegalState::bundledDocuments();
+            expect(osci::LegalState::valid(bundle));
+            {
+                osci::LegalState state{osci::SettingsStore(options)};
+                expect(!state.hasSeenKind("privacy"));
+                expect(!state.hasAcknowledged(bundle));
+                expect(state.recordShown(bundle));
+                expect(state.hasSeenKind("privacy"));
+                expect(!state.hasSeenOtherRevision(bundle, "privacy"));
+                expect(!state.hasAcknowledged(bundle));
+                expect(!state.acknowledge(bundle, false, true));
+                expect(state.acknowledge(bundle, true, true));
+            }
+            {
+                osci::LegalState otherProduct{osci::SettingsStore(options)};
+                expect(otherProduct.hasAcknowledged(bundle));
+                expect(otherProduct.statisticsDisabled());
+                auto changed = juce::JSON::parse(juce::JSON::toString(bundle));
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("revision", "future");
+                expect(!otherProduct.hasAcknowledged(changed));
+                expect(otherProduct.termsAccepted(changed));
+                expect(otherProduct.statisticsDisabled());
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("text", "tampered");
+                expect(!osci::LegalState::valid(changed));
+            }
+            deleteTempSettings(options);
+        }
+
         beginTest ("Premium token validates before expiry");
         {
             const juce::Time now (1'000'000LL * 1000);

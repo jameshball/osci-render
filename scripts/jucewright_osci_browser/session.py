@@ -53,6 +53,8 @@ class BrowserSession:
 
         self.build_app_requested = args.build_app
         self.quick = args.quick
+        self.legal_only = getattr(args, 'legal_only', False)
+        self.installer_legal_only = getattr(args, 'installer_legal_only', False)
         self.window_width = args.window_width
         self.window_height = args.window_height
         self.keep_app = args.keep_app
@@ -311,6 +313,18 @@ class BrowserSession:
             self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
 
         profile["ffmpegFile"] = self.copy_profile_ffmpeg(profile, launch_home)
+        if self.legal_only:
+            # Only reset legal state inside this freshly created automation profile.
+            legal_file = Path(profile['supportDirectory']) / 'osci-licensing.settings'
+            if not legal_file.resolve().is_relative_to(launch_home.resolve()):
+                self.die('Legal smoke profile must be isolated')
+            if legal_file.exists():
+                tree = ET.parse(legal_file)
+                root = tree.getroot()
+                for entry in list(root):
+                    if entry.get('name', '').startswith('legal.'):
+                        root.remove(entry)
+                tree.write(legal_file, encoding='utf-8', xml_declaration=True)
 
         return profile
 
