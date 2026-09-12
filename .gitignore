@@ -378,4 +378,4 @@ vital/
 /.migration/
 /.wrangler/
 # Generated per-build Release-plane pin, not a manually maintained document source.
-/ci/legal-build.json
+/ci/release.json
