@@ -154,7 +154,11 @@ public:
         beginTest("Legal documents share acknowledgement without enabling identification");
         {
             const auto options = makeTempSettingsOptions("legal");
-            const auto bundle = osci::LegalState::bundledDocuments();
+            auto bundle = juce::JSON::parse(R"({"scope":"osci-products","revision":"test-1","documents":{"privacy":{"revision":"test-1","text":"Test privacy document"},"terms":{"revision":"test-1","text":"Test terms document"}}})");
+            for (const auto* kind : {"privacy", "terms"}) {
+                const auto text = bundle["documents"][kind]["text"].toString();
+                bundle["documents"][kind].getDynamicObject()->setProperty("sha256", juce::SHA256(text.toRawUTF8(), text.getNumBytesAsUTF8()).toHexString());
+            }
             expect(osci::LegalState::valid(bundle));
             {
                 osci::LegalState state{osci::SettingsStore(options)};

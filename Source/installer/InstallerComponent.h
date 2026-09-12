@@ -93,8 +93,21 @@ public:
         };
         addAndMakeVisible (privacyButton);
         privacyButton.onClick = [this] {
-            osci::OverlayComponent::show (*this, std::make_unique<osci::LegalOverlay>(
-                osci::LegalState::mostRecentDocuments(), std::function<void()>{}, true));
+            privacyButton.setEnabled(false);
+            const juce::Component::SafePointer<InstallerComponent> owner(this);
+            juce::Thread::launch([owner] {
+                juce::var documents;
+                const auto result = osci::BackendClient().getCurrentDocuments("osci-products", documents);
+                juce::MessageManager::callAsync([owner, result, documents] {
+                    if (owner == nullptr) return;
+                    owner->privacyButton.setEnabled(true);
+                    if (result.failed()) {
+                        owner->statusLabel.setText("Could not load Privacy & Terms. Check the connection and try again.", juce::dontSendNotification);
+                        return;
+                    }
+                    osci::OverlayComponent::show(*owner, std::make_unique<osci::LegalOverlay>(documents, std::function<void()>{}, true));
+                });
+            });
         };
 
         addAndMakeVisible (osciRenderTile);
@@ -844,7 +857,7 @@ private:
 #if DEBUG
         if (juce::SystemStats::getEnvironmentVariable("OSCI_INSTALLER_AUTOMATION_RESULT", {}).isNotEmpty()) {
             setBusy(false, {});
-            osci::LegalOverlay::ensure(*this, osci::LegalState::bundledDocuments(), [owner, path] {
+            osci::LegalOverlay::ensure(*this, osci::LegalState::mostRecentDocuments(), [owner, path] {
                 if (owner != nullptr) { owner->beginAcknowledgedInstall(path); }
             });
             return;
@@ -862,7 +875,7 @@ private:
                     return;
                 }
                 const auto remote = version->legal;
-                const auto documents = remote.isVoid() ? osci::LegalState::bundledDocuments() : remote;
+                const auto documents = remote;
                 if (!osci::LegalState::valid(documents)) {
                     owner->statusLabel.setText("The release documents could not be verified.", juce::dontSendNotification);
                     return;

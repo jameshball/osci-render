@@ -47,7 +47,6 @@
 #endif
 
 [Setup]
-LicenseFile={#ProjectRoot}packaging\legal.txt
 AppId={#MyAppId}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}

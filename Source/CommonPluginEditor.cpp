@@ -131,27 +131,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
         osci::LegalOverlay::ensure(*legalOwner, osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion), [legalOwner, legalConfig] {
             if (legalOwner == nullptr) { return; }
             legalOwner->audioProcessor.legalNoticePending.store(false);
-            juce::Thread::launch([legalOwner, legalConfig] {
-                juce::var response;
-                const auto result = osci::BackendClient().getLegal(legalConfig.productSlug, legalConfig.currentVersion, response);
-                auto documents = osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion);
-                if (result.wasOk() && osci::LegalState::valid(response["legal"])) {
-                    documents = response["legal"];
-                    osci::LegalState::cacheDocuments(legalConfig.productSlug, legalConfig.currentVersion, documents);
-                }
-                juce::MessageManager::callAsync([legalOwner, documents] {
-                    if (legalOwner != nullptr) {
-                        osci::LegalState state;
-                        legalOwner->audioProcessor.legalNoticePending.store(!state.hasAcknowledged(documents));
-                        osci::LegalOverlay::ensure(*legalOwner, documents, [legalOwner] {
-                            if (legalOwner != nullptr) {
-                                legalOwner->audioProcessor.legalNoticePending.store(false);
-                                legalOwner->updatePrompt.scheduleInitialCheck();
-                            }
-                        });
-                    }
-                });
-            });
+            legalOwner->updatePrompt.scheduleInitialCheck();
         });
     });
 }
