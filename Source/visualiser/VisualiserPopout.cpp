@@ -91,7 +91,7 @@ void VisualiserWindow::showPresentation() {
 #endif
     setVisible(true);
     setMinimised(false);
-    visualiser->setActive(true);
+    visualiser->setActive(owner.isShowing());
 #if JUCE_WINDOWS
     if (isTransparencySupported()) {
         refreshPresentationSurface();
@@ -100,6 +100,10 @@ void VisualiserWindow::showPresentation() {
     restoreSavedFullScreen();
     visualiser->repaint();
     toFront(true);
+}
+
+void VisualiserWindow::setSourceVisible(bool visible) {
+    visualiser->setActive(visible);
 }
 
 void VisualiserWindow::suspendPresentation() {

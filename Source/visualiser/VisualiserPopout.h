@@ -29,6 +29,7 @@ public:
 
     void showPresentation();
     void suspendPresentation();
+    void setSourceVisible(bool visible);
     void setPresentationPaused(bool paused);
     void setTransparencyEnabled(bool enabled);
     void setPresentationFadeAlpha(float alpha);
