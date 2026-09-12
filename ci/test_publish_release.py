@@ -5,10 +5,26 @@ import unittest
 import urllib.error
 from unittest.mock import MagicMock, patch
 
-from publish_release import http_put_file
+from publish_release import http_put_file, main
 
 
 class UploadTests(unittest.TestCase):
+    def test_dry_run_cannot_create_a_release(self):
+        with patch('publish_release.http_post_json') as post:
+            with self.assertRaises(SystemExit):
+                main(['--prepare-only', '--dry-run', '--product', 'example', '--semver', '1.2.3'])
+            post.assert_not_called()
+
+    def test_preparation_only_writes_release_context_without_artifact_or_signing_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'release.json'
+            with patch('publish_release.http_post_json', return_value={'success': True, 'release_id': 42}) as post:
+                self.assertEqual(main(['--prepare-only', '--product', 'example', '--semver', '1.2.3',
+                    '--api-token', 'test-token', '--release-manifest', str(output)]), 0)
+            import json
+            self.assertEqual(json.loads(output.read_text()), dict(product='example', semver='1.2.3', release_track='alpha', release_id=42))
+            self.assertTrue(post.call_args.args[0].endswith('/api/admin/releases/prepare'))
+
     def test_retries_transient_failures_from_the_start_of_the_file(self):
         for failure in (500, 502, 503, 504, 408, 429, TimeoutError(), urllib.error.URLError('reset')):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:

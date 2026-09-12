@@ -37,6 +37,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Optional
 
@@ -82,6 +83,11 @@ def sha256_file(path: Path, *, chunk: int = 1 << 20) -> str:
 
 
 def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 300.0) -> dict:
+    if urlsplit(url).scheme != 'https':
+        raise SystemExit('Release API must use HTTPS')
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):
+            return None
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode('utf-8'),
@@ -89,10 +95,13 @@ def http_post_json(url: str, body: dict, *, headers: dict, timeout: float = 300.
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode('utf-8'))
+        with urllib.request.build_opener(NoRedirect()).open(req, timeout=timeout) as resp:
+            raw = resp.read(1000001)
+            if len(raw) > 1000000:
+                raise SystemExit('Release API response is too large')
+            return json.loads(raw.decode('utf-8'))
     except urllib.error.HTTPError as e:
-        raise SystemExit(f'POST {url} -> HTTP {e.code}: {e.read().decode("utf-8", errors="replace")}')
+        raise SystemExit(f'Release API returned HTTP {e.code}')
     except TimeoutError:
         raise SystemExit(f'POST {url} timed out after {timeout:g}s waiting for the API response')
     except urllib.error.URLError as e:
@@ -133,14 +142,16 @@ def main(argv: list[str]) -> int:
     p.add_argument('--product', required=True,
                    help='Gumroad product id, Payhip product link, product slug, or numeric internal id')
     p.add_argument('--semver', required=True, help='e.g. 2.6.0.0')
-    p.add_argument('--platform', required=True,
+    p.add_argument('--platform',
                    choices=['mac-arm64', 'mac-x86_64', 'mac-universal', 'win-x86_64', 'linux-x86_64', 'linux-arm64'])
+    p.add_argument('--release-manifest', type=Path, help='Release context returned by preparation')
+    p.add_argument('--prepare-only', action='store_true', help='Prepare the release without downloading or changing build inputs')
     p.add_argument('--release-track', default='alpha', choices=['alpha', 'beta', 'stable'],
                    help='Release track to register with the API. CI should publish alpha.')
     p.add_argument('--variant', default='premium', choices=['free', 'premium'],
                    help='Licensing variant of the build (free or premium); separate Version row per variant.')
-    p.add_argument('--artifact-kind', required=True, choices=['pkg', 'dmg', 'exe', 'binary', 'zip', 'appimage', 'tar.gz'])
-    p.add_argument('--artifact', required=True, type=Path,
+    p.add_argument('--artifact-kind', choices=['pkg', 'dmg', 'exe', 'binary', 'zip', 'appimage', 'tar.gz'])
+    p.add_argument('--artifact', type=Path,
                    help='Path to the artifact file on disk; uploaded as-is to R2')
     p.add_argument('--filename', default=None,
                    help='Object key filename (defaults to the artifact basename)')
@@ -158,8 +169,23 @@ def main(argv: list[str]) -> int:
                    help='Compute sha + sig and print the request body, but do not POST')
     args = p.parse_args(argv)
 
+    if args.prepare_only and args.dry_run:
+        p.error('--prepare-only cannot be combined with --dry-run')
     if not args.api_token:
         raise SystemExit('--api-token or $PUBLISH_API_TOKEN is required')
+    if args.prepare_only:
+        if not args.release_manifest:
+            raise SystemExit('--release-manifest is required for preparation')
+        target = dict(product=args.product, semver=args.semver, release_track=args.release_track)
+        prepared = http_post_json(args.api_base.rstrip('/') + '/api/admin/releases/prepare', target,
+                                  headers={'Authorization': 'Bearer ' + args.api_token})
+        if type(prepared.get('release_id')) is not int:
+            raise SystemExit('Release preparation returned no release ID')
+        args.release_manifest.write_text(json.dumps(dict(**target, release_id=prepared['release_id'])), encoding='utf-8')
+        print('Release prepared')
+        return 0
+    if not args.artifact or not args.platform or not args.artifact_kind:
+        raise SystemExit('--artifact, --platform and --artifact-kind are required for upload')
     if not args.artifact.exists():
         raise SystemExit(f'artifact does not exist: {args.artifact}')
 
@@ -192,6 +218,11 @@ def main(argv: list[str]) -> int:
         'ed25519_sig': sig,
         'size_bytes': args.artifact.stat().st_size,
     }
+    if args.release_manifest:
+        manifest = json.loads(args.release_manifest.read_text(encoding='utf-8'))
+        if any(manifest.get(key) != body[key] for key in ('product', 'semver', 'release_track')):
+            raise SystemExit('Manifest belongs to a different release')
+        body['release_id'] = manifest['release_id']
     if notes:
         body['notes_md'] = notes
     if args.min_supported_from:
