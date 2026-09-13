@@ -33,9 +33,7 @@ public:
 
     std::function<void()> onClose;
     std::function<void()> onFullScreen;
-    std::function<void()> onToggleFrame;
-    std::function<void()> onToggleAlwaysOnTop;
-    std::function<void()> onToggleMouseInteraction;
+    std::function<void(juce::Component*)> onShowWindowControls;
 
     void setState(const TransparentWindowToolbarState& state);
     bool hitTest(int x, int y) override;
@@ -50,10 +48,7 @@ private:
 
     osci::CloseButton closeButton;
     osci::SvgButton fullscreenButton { "fullscreen", BinaryData::fullscreen_svg, juce::Colours::white };
-    osci::SvgButton frameButton { "windowFrame", BinaryData::eye_svg, juce::Colours::white, juce::Colours::white,
-                                  nullptr, BinaryData::eyeoff_svg };
-    osci::SvgButton alwaysOnTopButton { "alwaysOnTop", BinaryData::pushpin_svg, juce::Colours::white, juce::Colours::green };
-    osci::SvgButton mouseInteractionButton { "mouseInteraction", BinaryData::mouse_svg, juce::Colours::white, juce::Colours::red };
+    osci::SvgButton windowControlsButton { "windowControls", BinaryData::cog_svg, juce::Colours::white };
     juce::ComponentDragger dragger;
     TransparentWindowToolbarState state;
     bool hasState = false;
@@ -76,6 +71,7 @@ public:
     void setFrameVisible(bool visible);
     void setMouseEventsPassThrough(bool shouldPassThrough, bool showHint = true);
     void setPinned(bool shouldBePinned);
+    void showControlsMenu(juce::Component* targetComponent);
     void toggleFullScreen();
     void restoreSavedFullScreen();
     void refreshPresentationSurface();
@@ -109,6 +105,14 @@ protected:
     virtual void refreshOpenGLSurfaceTransparency();
 
 private:
+    enum class PresentationMode {
+        framed,
+        frameless,
+        clickThrough,
+    };
+
+    PresentationMode getPresentationMode() const;
+    void setPresentationMode(PresentationMode mode);
     void timerCallback() override;
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;

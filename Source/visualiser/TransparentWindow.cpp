@@ -5,11 +5,10 @@
 #include <cstdint>
 
 TransparentWindowToolbar::TransparentWindowToolbar() {
+    setLookAndFeel(&PluginLookAndFeel::getSharedInstance());
     addAndMakeVisible(closeButton);
     addAndMakeVisible(fullscreenButton);
-    addAndMakeVisible(frameButton);
-    addAndMakeVisible(alwaysOnTopButton);
-    addAndMakeVisible(mouseInteractionButton);
+    addAndMakeVisible(windowControlsButton);
     closeButton.setIconColours(juce::Colours::white, juce::Colours::white.withAlpha(0.8f));
     closeButton.onClick = [this] {
         if (onClose != nullptr) {
@@ -21,22 +20,9 @@ TransparentWindowToolbar::TransparentWindowToolbar() {
             onFullScreen();
         }
     };
-    frameButton.setClickingTogglesState(false);
-    frameButton.onClick = [this] {
-        if (onToggleFrame != nullptr) {
-            onToggleFrame();
-        }
-    };
-    alwaysOnTopButton.setClickingTogglesState(false);
-    alwaysOnTopButton.onClick = [this] {
-        if (onToggleAlwaysOnTop != nullptr) {
-            onToggleAlwaysOnTop();
-        }
-    };
-    mouseInteractionButton.setClickingTogglesState(false);
-    mouseInteractionButton.onClick = [this] {
-        if (onToggleMouseInteraction != nullptr) {
-            onToggleMouseInteraction();
+    windowControlsButton.onClick = [this] {
+        if (onShowWindowControls != nullptr) {
+            onShowWindowControls(&windowControlsButton);
         }
     };
     setState({});
@@ -51,24 +37,7 @@ void TransparentWindowToolbar::setState(const TransparentWindowToolbarState& new
     hasState = true;
     closeButton.setVisible(state.frameVisible);
     fullscreenButton.setVisible(state.frameVisible);
-    frameButton.setVisible(state.frameVisible);
-    alwaysOnTopButton.setVisible(state.frameVisible);
-    mouseInteractionButton.setVisible(state.frameVisible && state.transparencyEnabled);
-    mouseInteractionButton.setEnabled(state.passThroughAvailable);
-    frameButton.setToggleState(!state.frameRequestedVisible, juce::dontSendNotification);
-    frameButton.setTooltip(state.frameRequestedVisible ? "Hide Window Frame." : "Show Window Frame.");
-    alwaysOnTopButton.setToggleState(state.alwaysOnTop, juce::dontSendNotification);
-    alwaysOnTopButton.setTooltip(state.alwaysOnTop ? "Disable Always on Top." : "Enable Always on Top.");
-    mouseInteractionButton.setToggleState(state.passThroughRequested, juce::dontSendNotification);
-    if (!state.passThroughAvailable) {
-        mouseInteractionButton.setTooltip("Click-through is unavailable in fullscreen on this system.");
-    } else if (state.passThroughRequested) {
-        mouseInteractionButton.setTooltip("Keep This Window Interactive.");
-    } else {
-        mouseInteractionButton.setTooltip(state.paused ? "Let Clicks Pass Through After Resuming."
-                                                       : "Let Clicks Pass Through.");
-    }
-    fullscreenButton.setTooltip(state.fullScreen ? "Exit Fullscreen." : "Enter Fullscreen.");
+    windowControlsButton.setVisible(state.frameVisible);
     resized();
     repaint();
 }
@@ -100,33 +69,29 @@ void TransparentWindowToolbar::paint(juce::Graphics& g) {
         g.fillRoundedRectangle(hintBounds, 8.0f);
         g.setColour(juce::Colours::white);
         g.setFont(14.0f);
-        g.drawFittedText("Clicks now pass through this window. Pause the main visualiser to bring the controls back.",
+        g.drawFittedText("Clicks now pass through this window. Use the popout button in the main window to restore controls.",
                          hintBounds.reduced(14.0f).toNearestInt(), juce::Justification::centred, 2);
     }
 }
 
 void TransparentWindowToolbar::resized() {
     auto bar = getLocalBounds().removeFromTop(toolbarHeight);
-    const auto placeFromLeft = [&bar](juce::Component& component, int inset) {
-        component.setBounds(component.isVisible() ? bar.removeFromLeft(toolbarHeight).reduced(inset)
-                                                  : juce::Rectangle<int>());
+    const auto placeFromLeft = [&bar](juce::Component& component, int inset, int horizontalOffset = 0) {
+        auto bounds = component.isVisible() ? bar.removeFromLeft(toolbarHeight).reduced(inset) : juce::Rectangle<int>();
+        component.setBounds(bounds.translated(horizontalOffset, 0));
     };
-    const auto placeFromRight = [&bar](juce::Component& component, int inset) {
-        component.setBounds(component.isVisible() ? bar.removeFromRight(toolbarHeight).reduced(inset)
-                                                  : juce::Rectangle<int>());
+    const auto placeFromRight = [&bar](juce::Component& component, int inset, int horizontalOffset = 0) {
+        auto bounds = component.isVisible() ? bar.removeFromRight(toolbarHeight).reduced(inset) : juce::Rectangle<int>();
+        component.setBounds(bounds.translated(horizontalOffset, 0));
     };
 #if JUCE_WINDOWS || JUCE_LINUX
     placeFromRight(closeButton, 3);
-    placeFromLeft(fullscreenButton, 4);
-    placeFromLeft(frameButton, 4);
-    placeFromLeft(mouseInteractionButton, 4);
-    placeFromLeft(alwaysOnTopButton, 4);
+    placeFromLeft(fullscreenButton, 1, 2);
+    placeFromLeft(windowControlsButton, 1, 2);
 #else
     placeFromLeft(closeButton, 3);
-    placeFromRight(fullscreenButton, 4);
-    placeFromRight(frameButton, 4);
-    placeFromRight(mouseInteractionButton, 4);
-    placeFromRight(alwaysOnTopButton, 4);
+    placeFromRight(fullscreenButton, 1, -2);
+    placeFromRight(windowControlsButton, 1, -2);
 #endif
 }
 
@@ -180,11 +145,7 @@ TransparentWindow::TransparentWindow(juce::String name, TransparentWindowState i
     toolbar = std::make_unique<TransparentWindowToolbar>();
     toolbar->onClose = [this] { closeButtonPressed(); };
     toolbar->onFullScreen = [this] { toggleFullScreen(); };
-    toolbar->onToggleFrame = [this] { setFrameVisible(!frameRequestedVisible); };
-    toolbar->onToggleAlwaysOnTop = [this] { setPinned(!pinned); };
-    toolbar->onToggleMouseInteraction = [this] {
-        setMouseEventsPassThrough(!allMouseEventsPassThrough);
-    };
+    toolbar->onShowWindowControls = [this](juce::Component* targetComponent) { showControlsMenu(targetComponent); };
     juce::Component::addAndMakeVisible(toolbar.get());
 }
 
@@ -323,6 +284,99 @@ void TransparentWindow::setPinned(bool shouldBePinned) {
     updatePresentation();
 #endif
     stateChanged(getWindowState());
+}
+
+TransparentWindow::PresentationMode TransparentWindow::getPresentationMode() const {
+    if (allMouseEventsPassThrough) {
+        return PresentationMode::clickThrough;
+    }
+    return frameRequestedVisible ? PresentationMode::framed : PresentationMode::frameless;
+}
+
+void TransparentWindow::setPresentationMode(PresentationMode mode) {
+    switch (mode) {
+        case PresentationMode::framed:
+            setMouseEventsPassThrough(false, false);
+            setFrameVisible(true);
+            break;
+        case PresentationMode::frameless:
+            setMouseEventsPassThrough(false, false);
+            setFrameVisible(false);
+            break;
+        case PresentationMode::clickThrough:
+            setFrameVisible(false);
+            setMouseEventsPassThrough(true);
+            break;
+    }
+}
+
+void TransparentWindow::showControlsMenu(juce::Component* targetComponent) {
+    const auto mode = getPresentationMode();
+    const bool fullScreenActive = fullScreenRequested || juce::ResizableWindow::isFullScreen();
+    const bool clickThroughAvailable = transparencyEnabled
+                                    && (!fullScreenActive || supportsClickThroughInTransparentFullScreen());
+    const juce::Component::SafePointer<TransparentWindow> safeWindow(this);
+
+    const auto createIcon = [](const char* data, int dataSize) {
+        auto icon = juce::Drawable::createFromImageData(data, static_cast<size_t>(dataSize));
+        if (icon != nullptr) {
+            icon->replaceColour(juce::Colours::black, juce::Colours::white);
+        }
+        return icon;
+    };
+    const auto setMode = [safeWindow](PresentationMode newMode) {
+        return [safeWindow, newMode] {
+            if (safeWindow != nullptr) {
+                safeWindow->setPresentationMode(newMode);
+            }
+        };
+    };
+    const auto addItem = [&createIcon](juce::PopupMenu& menu, juce::String text, bool enabled, bool ticked,
+                                       const char* iconData, int iconSize, std::function<void()> action) {
+        juce::PopupMenu::Item item(std::move(text));
+        item.setID(-1);
+        item.setEnabled(enabled);
+        item.setTicked(ticked);
+        item.setImage(createIcon(iconData, iconSize));
+        item.setAction(std::move(action));
+        menu.addItem(std::move(item));
+    };
+
+    juce::PopupMenu menu;
+    addItem(menu, "Standard window", true, mode == PresentationMode::framed,
+            BinaryData::windowframed_svg, BinaryData::windowframed_svgSize, setMode(PresentationMode::framed));
+    addItem(menu, "Borderless window", isTransparencySupported(), mode == PresentationMode::frameless,
+            BinaryData::windowframeless_svg, BinaryData::windowframeless_svgSize, setMode(PresentationMode::frameless));
+    const auto clickThroughLabel = !clickThroughAvailable ? "Let clicks pass through (unavailable)"
+                                                          : (presentationPaused ? "Let clicks pass through (after resuming)"
+                                                                                : "Let clicks pass through");
+    addItem(menu, clickThroughLabel, clickThroughAvailable, mode == PresentationMode::clickThrough,
+            BinaryData::clickthrough_svg, BinaryData::clickthrough_svgSize, setMode(PresentationMode::clickThrough));
+    menu.addSeparator();
+    addItem(menu, "Keep on top", true, pinned, BinaryData::pushpin_svg, BinaryData::pushpin_svgSize,
+            [safeWindow] {
+                if (safeWindow != nullptr) {
+                    safeWindow->setPinned(!safeWindow->isPinned());
+                }
+            });
+    addItem(menu, fullScreenActive ? "Exit full screen" : "Enter full screen", true, fullScreenActive,
+            BinaryData::fullscreen_svg, BinaryData::fullscreen_svgSize,
+            [safeWindow] {
+                if (safeWindow != nullptr) {
+                    safeWindow->toggleFullScreen();
+                }
+            });
+    menu.addSeparator();
+    addItem(menu, "Close popout", true, false, BinaryData::close_svg, BinaryData::close_svgSize,
+            [safeWindow] {
+                if (safeWindow != nullptr) {
+                    safeWindow->closeButtonPressed();
+                }
+            });
+    menu.setLookAndFeel(&PluginLookAndFeel::getSharedInstance());
+    menu.showMenuAsync(juce::PopupMenu::Options()
+                           .withTargetComponent(targetComponent != nullptr ? targetComponent : this)
+                           .withMinimumWidth(260));
 }
 
 void TransparentWindow::toggleFullScreen() {

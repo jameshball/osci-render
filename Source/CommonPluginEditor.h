@@ -33,6 +33,7 @@ public:
     void fileUpdated(juce::String fileName);
     void openAudioSettings();
     void openLicenseAndUpdates();
+    void openPrivacyAndTerms();
     void refreshBetaUpdatesButton();
     virtual void openRecordingSettings();
     virtual void showPremiumSplashScreen();
