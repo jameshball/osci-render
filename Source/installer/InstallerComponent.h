@@ -78,7 +78,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
-          needLicenseLink ("Where do I find my license key?", juce::URL()),
+          needLicenseLink ("Find my license key", juce::URL()),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
         headingLabel.setText ("Choose what to install", juce::dontSendNotification);
