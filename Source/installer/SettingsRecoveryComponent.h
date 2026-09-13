@@ -43,7 +43,7 @@ public:
                 reset.setButtonText("Confirm backup & reset");
                 reset.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred.withAlpha(0.72f));
                 reset.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
-                back.setButtonText("Cancel");
+                cancel.setVisible(true);
                 status.setText("Back up and reset the selected settings? Each existing file will be kept beside the original."
                                + juce::String(shared.getToggleState() ? "\nLicensing settings will be reset for both apps, so you may need to activate again." : ""), juce::dontSendNotification);
                 setSelectionEnabled(false);
@@ -51,19 +51,13 @@ public:
             }
             performReset();
         };
-        back.setButtonText("Back");
-        back.onClick = [this] {
-            if (confirming) {
-                refresh();
-            } else {
-                requestDismiss();
-            }
-        };
+        cancel.setButtonText("Cancel");
+        cancel.onClick = [this] { refresh(); };
         status.setJustificationType(juce::Justification::topLeft);
         status.setFont(juce::FontOptions(14.0f));
         status.setMinimumHorizontalScale(1.0f);
         for (auto* component : std::initializer_list<juce::Component*> { &product, &description,
-                &globals, &session, &shared, &openGlobals, &openSession, &openShared, &status, &reset, &back }) {
+                &globals, &session, &shared, &openGlobals, &openSession, &openShared, &status, &reset, &cancel }) {
             addPanelContentAndMakeVisible(*component);
         }
         refresh();
@@ -82,7 +76,7 @@ public:
         }
         area.removeFromTop(12);
         auto buttons = area.removeFromBottom(36);
-        back.setBounds(buttons.removeFromLeft(90));
+        cancel.setBounds(buttons.removeFromLeft(90));
         reset.setBounds(buttons.removeFromRight(240));
         area.removeFromBottom(12);
         status.setBounds(area);
@@ -92,7 +86,7 @@ private:
     juce::ComboBox product;
     juce::Label description, status;
     juce::ToggleButton globals, session, shared;
-    juce::TextButton openGlobals, openSession, openShared, reset, back;
+    juce::TextButton openGlobals, openSession, openShared, reset, cancel;
     bool confirming = false;
 
     juce::StringArray products() const {
@@ -146,7 +140,7 @@ private:
         reset.setButtonText("Back up & reset selected...");
         reset.removeColour(juce::TextButton::buttonColourId);
         reset.removeColour(juce::TextButton::textColourOffId);
-        back.setButtonText("Back");
+        cancel.setVisible(false);
         const bool globalsAvailable = anyProductSettingsFileExists(false);
         const bool sessionAvailable = anyProductSettingsFileExists(true);
         const bool sharedAvailable = osci::SettingsStore::optionsForSharedLicensing().getDefaultFile().existsAsFile();
