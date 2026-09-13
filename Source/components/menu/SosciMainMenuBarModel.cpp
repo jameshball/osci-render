@@ -112,6 +112,7 @@ void SosciMainMenuBarModel::resetMenuItems() {
             editor.resized();
         };
         aboutInfo.websiteUrl = "https://osci-render.com";
+        aboutInfo.onPrivacyAndTerms = [this] { editor.openPrivacyAndTerms(); };
         aboutInfo.credits = {
             { "Neil Thapen",    "Allowing adaptation of the brilliant dood.al/oscilloscope" },
             { "Kevin Kripper",  "Guiding much of the features and development of sosci" },

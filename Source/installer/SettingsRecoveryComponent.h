@@ -6,44 +6,46 @@ namespace osci::installer {
 class SettingsRecoveryComponent final : public osci::OverlayComponent {
 public:
     explicit SettingsRecoveryComponent(juce::String initialProduct) {
-        setOverlayTitle("Settings & recovery");
-        product.setTitle("App settings");
+        setOverlayTitle("Repair app settings");
+        product.setTitle("App");
         product.addItem("osci-render", 1);
         product.addItem("sosci", 2);
         product.addItem("All apps", 3);
         product.setSelectedId(initialProduct == "sosci" ? 2 : 1, juce::dontSendNotification);
         product.onChange = [this] { refresh(); };
-        description.setText("Close the apps and any DAWs using their plugins before resetting.\nYour exported projects and recordings are kept.", juce::dontSendNotification);
+        description.setText("Close the apps and any DAWs using their plugins before resetting.\nProjects and recordings will not be deleted.", juce::dontSendNotification);
         description.setFont(juce::FontOptions(14.0f));
         description.setJustificationType(juce::Justification::topLeft);
-        globals.setButtonText("Global preferences");
+        globals.setButtonText("App preferences");
         globals.setTooltip("Detached window, recent files, interface and global app preferences.");
         globals.setToggleState(true, juce::dontSendNotification);
-        session.setButtonText("Saved session & audio setup");
+        session.setButtonText("Session, window & audio settings");
         session.setTooltip("The automatically restored project, window position and audio device settings.");
         session.setToggleState(true, juce::dontSendNotification);
-        shared.setButtonText("Shared installer & licensing data");
+        shared.setButtonText("Licensing & installer settings");
         shared.setTooltip("Affects all apps: licenses, legal consent, updates and install locations. You will need to activate again.");
         for (auto* toggle : { &globals, &session, &shared }) {
             toggle->onClick = [this] { refresh(); };
         }
-        openGlobals.setButtonText("Open file");
-        openSession.setButtonText("Open file");
-        openShared.setButtonText("Open file");
+        openGlobals.setButtonText("Show file");
+        openSession.setButtonText("Show file");
+        openShared.setButtonText("Show file");
         openGlobals.setTitle("Open global preferences");
         openSession.setTitle("Open saved session");
         openShared.setTitle("Open shared settings");
         openGlobals.onClick = [this] { reveal(false); };
         openSession.onClick = [this] { reveal(true); };
         openShared.onClick = [] { revealFile(osci::SettingsStore::optionsForSharedLicensing().getDefaultFile()); };
-        reset.setButtonText("Reset selected settings...");
+        reset.setButtonText("Back up & reset selected...");
         reset.onClick = [this] {
             if (!confirming) {
                 confirming = true;
-                reset.setButtonText("Confirm reset");
+                reset.setButtonText("Back up & reset");
+                reset.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred.withAlpha(0.72f));
+                reset.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
                 back.setButtonText("Cancel");
-                status.setText("Reset the selected settings? A backup of each existing file will be kept beside it."
-                               + juce::String(shared.getToggleState() ? "\nShared data reset removes activations for all apps." : ""), juce::dontSendNotification);
+                status.setText("Back up and reset the selected settings? Each existing file will be kept beside the original."
+                               + juce::String(shared.getToggleState() ? "\nLicensing settings will be reset for both apps, so you may need to activate again." : ""), juce::dontSendNotification);
                 setSelectionEnabled(false);
                 return;
             }
@@ -60,8 +62,6 @@ public:
         status.setJustificationType(juce::Justification::topLeft);
         status.setFont(juce::FontOptions(14.0f));
         status.setMinimumHorizontalScale(1.0f);
-        reset.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
-        reset.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
         for (auto* component : std::initializer_list<juce::Component*> { &product, &description,
                 &globals, &session, &shared, &openGlobals, &openSession, &openShared, &status, &reset, &back }) {
             addPanelContentAndMakeVisible(*component);
@@ -134,7 +134,8 @@ private:
     }
 
     void setSelectionEnabled(bool enabled) {
-        for (auto* component : std::initializer_list<juce::Component*> { &product, &globals, &session, &shared }) {
+        for (auto* component : std::initializer_list<juce::Component*> {
+                 &product, &globals, &session, &shared, &openGlobals, &openSession, &openShared }) {
             component->setEnabled(enabled);
         }
     }
@@ -142,8 +143,19 @@ private:
     void refresh() {
         confirming = false;
         setSelectionEnabled(true);
-        reset.setButtonText("Reset selected settings...");
+        reset.setButtonText("Back up & reset selected...");
+        reset.removeColour(juce::TextButton::buttonColourId);
+        reset.removeColour(juce::TextButton::textColourOffId);
         back.setButtonText("Back");
+        const bool globalsAvailable = anyProductSettingsFileExists(false);
+        const bool sessionAvailable = anyProductSettingsFileExists(true);
+        const bool sharedAvailable = osci::SettingsStore::optionsForSharedLicensing().getDefaultFile().existsAsFile();
+        globals.setEnabled(globalsAvailable);
+        session.setEnabled(sessionAvailable);
+        shared.setEnabled(sharedAvailable);
+        openGlobals.setEnabled(globalsAvailable);
+        openSession.setEnabled(sessionAvailable);
+        openShared.setEnabled(sharedAvailable);
         int existing = 0;
         for (const auto& file : selectedFiles()) {
             if (file.existsAsFile()) {
@@ -151,8 +163,20 @@ private:
             }
         }
         reset.setEnabled(existing > 0);
-        status.setText(existing > 0 ? juce::String(existing) + " settings file(s) selected. Licenses are kept unless shared data is selected."
+        status.setText(existing > 0 ? juce::String(existing) + (existing == 1 ? " settings file selected. " : " settings files selected. ")
+                                       + "Licenses are kept unless licensing settings are selected."
                                    : "No saved settings found for this selection.", juce::dontSendNotification);
+    }
+
+    bool anyProductSettingsFileExists(bool standalone) const {
+        for (const auto& name : products()) {
+            const auto file = (standalone ? osci::SettingsStore::optionsForStandaloneApp(name)
+                                          : osci::SettingsStore::optionsForProductGlobals(name)).getDefaultFile();
+            if (file.existsAsFile()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     void performReset() {
@@ -171,7 +195,8 @@ private:
             }
         }
         refresh();
-        status.setText(failures.isEmpty() ? "Reset " + juce::String(resetCount) + " settings file(s). You can reopen the apps now. Backups are beside the original files."
+        status.setText(failures.isEmpty() ? "Reset " + juce::String(resetCount) + (resetCount == 1 ? " settings file. " : " settings files. ")
+                                               + "You can reopen the apps now. Backups are beside the original files."
                                          : "Could not reset:\n" + failures.joinIntoString("\n"), juce::dontSendNotification);
     }
 };

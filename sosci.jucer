@@ -54,6 +54,9 @@
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="YzPzNV" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
         <FILE id="CHkskO" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
+        <FILE id="ClkThru" name="click-through.svg" compile="0" resource="1"
+              file="Resources/svg/click-through.svg"/>
+        <FILE id="Close01" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="XC04mb" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
         <FILE id="qIMww8" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
@@ -103,6 +106,10 @@
               file="Resources/svg/vector-cancelling.svg"/>
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
         <FILE id="Zc5gBX" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
+        <FILE id="WndFrm1" name="window-framed.svg" compile="0" resource="1"
+              file="Resources/svg/window-framed.svg"/>
+        <FILE id="WndFrml" name="window-frameless.svg" compile="0" resource="1"
+              file="Resources/svg/window-frameless.svg"/>
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">

@@ -145,6 +145,9 @@ public:
     // When true, processBlock should do minimal work and output silence.
     // Used during offline video rendering so the UI renderer can use CPU/GPU without contention.
     std::atomic<bool> offlineRenderActive { false };
+    // Transient legal-notice gate, not a saved or DAW-automatable audio setting.
+    // Read-only on the realtime thread; acknowledgement is handled by the editor.
+    std::atomic<bool> legalNoticePending { true };
     
     std::atomic<bool> forceDisableBrightnessInput = false;
     std::atomic<bool> forceDisableRgbInput = false;

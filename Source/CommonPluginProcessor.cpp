@@ -80,8 +80,12 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
         juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());
     }
     const auto licenseStatus = licenseManager.status();
-    if (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
-        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline) {
+    osci::LegalState legalState;
+    const auto legalConfig = osci::makeProductUpdateConfig();
+    legalNoticePending.store(!legalState.hasAcknowledged(osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion)));
+    if (legalState.hasAcknowledged(osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion))
+        && (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
+        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline)) {
         licenseManager.scheduleBackgroundRefresh();
     }
 
@@ -446,7 +450,7 @@ void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         return;
     }
 
-    if (isSuspended()) {
+    if (isSuspended() || legalNoticePending.load(std::memory_order_relaxed)) {
         buffer.clear();
         midi.clear();
         return;

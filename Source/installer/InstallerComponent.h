@@ -45,6 +45,7 @@ namespace osci::installer {
         juce::String licenseKey;
         osci::LinuxInstallLocations locations;
         bool premium = false;
+        std::optional<osci::VersionInfo> reviewedVersion;
     };
 
     juce::String currentInstallerVersionBaseline() {
@@ -96,6 +97,24 @@ public:
             if (!busy) {
                 osci::OverlayComponent::show(*this, std::make_unique<SettingsRecoveryComponent>(productSlug(selectedProduct)));
             }
+        };
+        addAndMakeVisible (privacyButton);
+        privacyButton.onClick = [this] {
+            privacyButton.setEnabled(false);
+            const juce::Component::SafePointer<InstallerComponent> owner(this);
+            juce::Thread::launch([owner] {
+                juce::var documents;
+                const auto result = osci::BackendClient().getCurrentDocuments("osci-products", documents);
+                juce::MessageManager::callAsync([owner, result, documents] {
+                    if (owner == nullptr) return;
+                    owner->privacyButton.setEnabled(true);
+                    if (result.failed()) {
+                        owner->statusLabel.setText("Could not load Privacy & Terms. Check the connection and try again.", juce::dontSendNotification);
+                        return;
+                    }
+                    osci::OverlayComponent::show(*owner, std::make_unique<osci::LegalOverlay>(documents, std::function<void()>{}, true));
+                });
+            });
         };
 
         addAndMakeVisible (osciRenderTile);
@@ -242,6 +261,7 @@ public:
 #endif
         helpButton.setBounds (getLocalBounds().reduced (24, 20).removeFromTop (34).removeFromRight (34));
         settingsButton.setBounds(getLocalBounds().withTrimmedRight(24).removeFromBottom(32).removeFromRight(180));
+        privacyButton.setBounds (getLocalBounds().withTrimmedLeft (24).removeFromBottom (32).removeFromLeft (140));
 
         headingLabel.setBounds (area.removeFromTop (44));
         area.removeFromTop (16);
@@ -361,8 +381,10 @@ private:
     };
 #endif
 
-    juce::TextButton settingsButton { "Settings & recovery" };
+    juce::TextButton settingsButton { "Repair app settings..." };
     osci::SvgButton helpButton { "installerHelp", juce::String (BinaryData::help_svg), juce::Colours::white };
+    juce::TextButton privacyButton { "Privacy & Terms" };
+    std::optional<osci::VersionInfo> reviewedVersion;
     juce::Label headingLabel;
     ProductTile osciRenderTile;
     ProductTile sosciTile;
@@ -839,7 +861,46 @@ private:
         }
 
         currentPath = path;
-        const auto request = makeRequest (path);
+        const auto request = makeRequest(path);
+        setBusy(true, "Checking installation details...");
+        const juce::Component::SafePointer<InstallerComponent> owner(this);
+#if DEBUG
+        if (juce::SystemStats::getEnvironmentVariable("OSCI_INSTALLER_AUTOMATION_RESULT", {}).isNotEmpty()) {
+            setBusy(false, {});
+            // Outcome-only UI simulation: the debug worker performs no download or installation.
+            beginAcknowledgedInstall(path);
+            return;
+        }
+#endif
+        juce::Thread::launch([owner, path, request] {
+            osci::UpdateChecker checker;
+            const auto version = checker.checkForUpdate(request.productSlug, currentInstallerVersionBaseline(), osci::ReleaseTrack::Stable, request.variant);
+            const auto result = checker.getLastResult();
+            juce::MessageManager::callAsync([owner, path, result, version] {
+                if (owner == nullptr) { return; }
+                owner->setBusy(false, {});
+                if (result.failed() || !version.has_value()) {
+                    owner->statusLabel.setText("Could not check installation details. Please try again.", juce::dontSendNotification);
+                    return;
+                }
+                const auto documents = version->legal;
+                if (!osci::LegalState::valid(documents)) {
+                    owner->statusLabel.setText("The release documents could not be verified.", juce::dontSendNotification);
+                    return;
+                }
+                owner->reviewedVersion = version;
+                osci::LegalOverlay::ensure(*owner, documents, [owner, path] {
+                    if (owner != nullptr) { owner->beginAcknowledgedInstall(path); }
+                });
+            });
+        });
+    }
+
+    void beginAcknowledgedInstall(InstallPath path) {
+        if (busy) { return; }
+        currentPath = path;
+        auto request = makeRequest(path);
+        request.reviewedVersion = reviewedVersion;
 
         progressValue = 0.0;
         setBusy (true, request.premium ? "Preparing premium install..." : "Preparing free install...");
@@ -881,7 +942,7 @@ private:
 
         juce::Result result = juce::Result::ok();
         juce::String token;
-        std::optional<osci::VersionInfo> version;
+        std::optional<osci::VersionInfo> version = request.reviewedVersion;
         juce::File installerFile;
         osci::LinuxInstaller::Report installReport;
 
@@ -895,7 +956,7 @@ private:
             result = preparePremiumToken (licenseManager, request.licenseKey, token);
         }
 
-        if (result.wasOk()) {
+        if (result.wasOk() && !version.has_value()) {
             juce::MessageManager::callAsync ([safeThis, request] {
                 if (safeThis == nullptr) {
                     return;
