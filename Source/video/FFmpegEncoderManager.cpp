@@ -1,9 +1,11 @@
 #include "FFmpegEncoderManager.h"
 #include <cmath>
+#include <string>
+#include <thread>
 
-FFmpegEncoderManager::FFmpegEncoderManager(juce::File& ffmpegExecutable)
+FFmpegEncoderManager::FFmpegEncoderManager(const juce::File& ffmpegExecutable)
     : ffmpegExecutable(ffmpegExecutable) {
-    queryAvailableEncoders();
+    refreshAvailableEncoders();
 }
 
 juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
@@ -13,7 +15,15 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
     int height,
     double frameRate,
     const juce::String& compressionPreset,
-    const juce::File& outputFile) {
+    const juce::File& outputFile,
+    bool preserveAlpha) {
+    if (!supportsVideoCodec(preserveAlpha ? VideoCodec::ProRes4444 : codec)) {
+        return {};
+    }
+    if (preserveAlpha) {
+        return buildProRes4444AlphaEncodingCommand(width, height, frameRate, outputFile);
+    }
+
     switch (codec) {
         case VideoCodec::H264:
             return buildH264EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
@@ -21,14 +31,93 @@ juce::String FFmpegEncoderManager::buildVideoEncodingCommand(
             return buildH265EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
         case VideoCodec::VP9:
             return buildVP9EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
-#if JUCE_MAC
         case VideoCodec::ProRes:
             return buildProResEncodingCommand(width, height, frameRate, outputFile);
-#endif
+        case VideoCodec::ProRes4444:
+            return buildProRes4444AlphaEncodingCommand(width, height, frameRate, outputFile);
         default:
             // Default to H.264 if unknown codec
             return buildH264EncodingCommand(crf, width, height, frameRate, compressionPreset, outputFile);
     }
+}
+
+bool FFmpegEncoderManager::muxAudioAndVideo(const juce::File& videoInput, const juce::File& audioInput, const juce::File& output,
+                                            const juce::StringArray& audioCodecArgs, juce::String& error, const std::atomic<bool>* cancelRequested) const {
+    error.clear();
+    if (!ffmpegExecutable.existsAsFile()) {
+        error = "FFmpeg executable not found.";
+        return false;
+    }
+    if (!videoInput.existsAsFile()) {
+        error = "Temporary video file was not created.";
+        return false;
+    }
+    if (!audioInput.existsAsFile()) {
+        error = "Input audio file not found.";
+        return false;
+    }
+    if (output.existsAsFile() && !output.deleteFile()) {
+        error = "Could not replace output file.";
+        return false;
+    }
+
+    juce::StringArray command { ffmpegExecutable.getFullPathName(),
+                                "-hide_banner", "-loglevel", "error",
+                                "-i", videoInput.getFullPathName(),
+                                "-i", audioInput.getFullPathName(),
+                                "-c:v", "copy" };
+    command.addArray(audioCodecArgs);
+    command.addArray({ "-shortest", "-y", output.getFullPathName() });
+
+    juce::ChildProcess process;
+    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+        error = "Failed to start FFmpeg for audio mux.";
+        return false;
+    }
+
+    // Draining a child pipe can block, so keep cancellation on this thread.
+    // Only the reader touches output storage; join before inspecting it.
+    std::string outputTail;
+    std::thread outputReader([&] {
+        constexpr std::size_t maxOutputBytes = 64 * 1024;
+        char buffer[4096];
+        for (;;) {
+            const int count = process.readProcessOutput(buffer, sizeof(buffer));
+            if (count <= 0) {
+                return;
+            }
+            outputTail.append(buffer, static_cast<std::size_t>(count));
+            if (outputTail.size() > maxOutputBytes) {
+                outputTail.erase(0, outputTail.size() - maxOutputBytes);
+            }
+        }
+    });
+
+    bool cancelled = false;
+    auto* exportJob = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+    while (process.isRunning()) {
+        if ((cancelRequested != nullptr && cancelRequested->load()) || juce::Thread::currentThreadShouldExit()
+            || (exportJob != nullptr && exportJob->shouldExit())) {
+            process.kill();
+            cancelled = true;
+            break;
+        }
+        process.waitForProcessToFinish(200);
+    }
+    outputReader.join();
+    if (cancelled) {
+        process.waitForProcessToFinish(200);
+        error = "Cancelled.";
+        return false;
+    }
+
+    const auto processOutput = juce::String::fromUTF8(outputTail.data(), static_cast<int>(outputTail.size()));
+    const bool succeeded = process.getExitCode() == 0 && output.existsAsFile() && output.getSize() > 0;
+    if (!succeeded) {
+        output.deleteFile();
+        error = processOutput.isNotEmpty() ? processOutput : "FFmpeg mux failed.";
+    }
+    return succeeded;
 }
 
 int FFmpegEncoderManager::estimateBitrateForVideotoolbox(int width, int height, double frameRate, int crfValue) {
@@ -69,6 +158,23 @@ juce::Array<FFmpegEncoderManager::EncoderDetails> FFmpegEncoderManager::getAvail
     return {};
 }
 
+bool FFmpegEncoderManager::supportsVideoCodec(VideoCodec codec) const {
+    const auto iterator = availableEncoders.find(codec);
+    if (iterator == availableEncoders.end()) {
+        return false;
+    }
+    for (const auto& encoder : iterator->second) {
+        if (encoder.isSupported) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FFmpegEncoderManager::supportsTransparentVideoEncoding() const {
+    return supportsVideoCodec(VideoCodec::ProRes4444);
+}
+
 bool FFmpegEncoderManager::isHardwareEncoderAvailable(const juce::String& encoderName) {
     // Check if the encoder is available and supported
     for (auto& pair : availableEncoders) {
@@ -89,9 +195,8 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
     juce::StringArray h264Encoders = {"h264_nvenc", "h264_amf", "h264_videotoolbox", "libx264"};
     juce::StringArray h265Encoders = {"hevc_nvenc", "hevc_amf", "hevc_videotoolbox", "libx265"};
     juce::StringArray vp9Encoders = {"libvpx-vp9"};
-#if JUCE_MAC
-    juce::StringArray proResEncoders = {"prores_ks", "prores"};
-#endif
+    juce::StringArray proResEncoders = {"prores_ks", "prores_aw"};
+    juce::StringArray proRes4444Encoders = {"prores_ks"};
 
     // Select the appropriate priority list based on codec
     juce::StringArray* priorityList = nullptr;
@@ -105,11 +210,12 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
         case VideoCodec::VP9:
             priorityList = &vp9Encoders;
             break;
-#if JUCE_MAC
         case VideoCodec::ProRes:
             priorityList = &proResEncoders;
             break;
-#endif
+        case VideoCodec::ProRes4444:
+            priorityList = &proRes4444Encoders;
+            break;
         default:
             priorityList = &h264Encoders; // Default to H.264
     }
@@ -135,10 +241,9 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
             fallback = "libx265"; break;
         case VideoCodec::VP9:
             fallback = "libvpx-vp9"; break;
-#if JUCE_MAC
         case VideoCodec::ProRes:
-            fallback = "prores"; break;
-#endif
+        case VideoCodec::ProRes4444:
+            fallback = "prores_ks"; break;
         default:
             fallback = "libx264"; break;
     }
@@ -146,7 +251,7 @@ juce::String FFmpegEncoderManager::getBestEncoderForCodec(VideoCodec codec) {
     return fallback;
 }
 
-void FFmpegEncoderManager::queryAvailableEncoders() {
+void FFmpegEncoderManager::refreshAvailableEncoders() {
     // Query available encoders using ffmpeg -encoders
     juce::String output = runFFmpegCommand({"-encoders", "-hide_banner"});
     parseEncoderList(output);
@@ -160,9 +265,8 @@ void FFmpegEncoderManager::parseEncoderList(const juce::String& output) {
     availableEncoders[VideoCodec::H264] = {};
     availableEncoders[VideoCodec::H265] = {};
     availableEncoders[VideoCodec::VP9] = {};
-#if JUCE_MAC
     availableEncoders[VideoCodec::ProRes] = {};
-#endif
+    availableEncoders[VideoCodec::ProRes4444] = {};
 
     // Split the output into lines
     juce::StringArray lines;
@@ -193,23 +297,28 @@ void FFmpegEncoderManager::parseEncoderList(const juce::String& output) {
             availableEncoders[VideoCodec::H265].add(encoder);
         } else if (name == "libvpx-vp9") {
             availableEncoders[VideoCodec::VP9].add(encoder);
-        }
-#if JUCE_MAC
-        else if (name.startsWith("prores")) {
+        } else if (name.startsWith("prores")) {
             availableEncoders[VideoCodec::ProRes].add(encoder);
+            if (name == "prores_ks") {
+                availableEncoders[VideoCodec::ProRes4444].add(encoder);
+            }
         }
-#endif
     }
 }
 
 juce::String FFmpegEncoderManager::runFFmpegCommand(const juce::StringArray& args) {
+    if (!ffmpegExecutable.existsAsFile()) {
+        return {};
+    }
     juce::ChildProcess process;
     juce::StringArray command;
 
     command.add(ffmpegExecutable.getFullPathName());
     command.addArray(args);
 
-    process.start(command, juce::ChildProcess::wantStdOut);
+    if (!process.start(command, juce::ChildProcess::wantStdOut)) {
+        return {};
+    }
 
     juce::String output = process.readAllProcessOutput();
 
@@ -220,17 +329,18 @@ juce::String FFmpegEncoderManager::buildBaseEncodingCommand(
     int width,
     int height,
     double frameRate,
-    const juce::File& outputFile) {
+    VideoCodec codec) {
+    const auto& codecInfo = VideoEncodingConstants::getVideoCodecInfo(codec);
     juce::String resolution = juce::String(width) + "x" + juce::String(height);
     juce::String cmd = "\"" + ffmpegExecutable.getFullPathName() + "\"" +
                        " -r " + juce::String(frameRate) +
                        " -f rawvideo" +
-                       " -pix_fmt rgba" +
+                       " -pix_fmt " + VideoEncodingConstants::PixelFormat::rgba8 +
                        " -s " + resolution +
                        " -i -" +
                        " -threads 4" +
                        " -y" +
-                       " -pix_fmt yuv420p" +
+                       " -pix_fmt " + codecInfo.outputPixelFormat +
                        " -vf vflip";
 
     return cmd;
@@ -314,7 +424,7 @@ juce::String FFmpegEncoderManager::buildH264EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::H264);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H264);
 
     // Pass width, height, and frameRate to addH264EncoderSettings
@@ -331,7 +441,7 @@ juce::String FFmpegEncoderManager::buildH265EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::H265);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::H265);
 
     cmd = addH265EncoderSettings(cmd, bestEncoder, crf, compressionPreset, width, height, frameRate);
@@ -347,7 +457,7 @@ juce::String FFmpegEncoderManager::buildVP9EncodingCommand(
     double frameRate,
     const juce::String& compressionPreset,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::VP9);
 
     cmd += juce::String(" -c:v libvpx-vp9") +
            " -b:v 0" +
@@ -359,13 +469,12 @@ juce::String FFmpegEncoderManager::buildVP9EncodingCommand(
     return cmd;
 }
 
-#if JUCE_MAC
 juce::String FFmpegEncoderManager::buildProResEncodingCommand(
     int width,
     int height,
     double frameRate,
     const juce::File& outputFile) {
-    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, outputFile);
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::ProRes);
     juce::String bestEncoder = getBestEncoderForCodec(VideoCodec::ProRes);
 
     cmd += " -c:v " + bestEncoder +
@@ -375,7 +484,24 @@ juce::String FFmpegEncoderManager::buildProResEncodingCommand(
 
     return cmd;
 }
-#endif
+
+juce::String FFmpegEncoderManager::buildProRes4444AlphaEncodingCommand(
+    int width,
+    int height,
+    double frameRate,
+    const juce::File& outputFile) {
+    juce::String cmd = buildBaseEncodingCommand(width, height, frameRate, VideoCodec::ProRes4444);
+
+    // prores_ks is available cross-platform in FFmpeg
+    cmd += " -c:v prores_ks"
+           " -profile:v 4444"
+           " -vendor apl0"
+           " -bits_per_mb 8000";
+
+    cmd += " \"" + outputFile.getFullPathName() + "\"";
+
+    return cmd;
+}
 
 bool FFmpegEncoderManager::testEncoderWorks(const juce::String& encoderName) {
     juce::Logger::writeToLog("FFmpeg: testing encoder '" + encoderName + "'");

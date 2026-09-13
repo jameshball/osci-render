@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "LabelledBarComponent.h"
+#include <osci_gui/osci_gui.h>
 #include "../LookAndFeel.h"
 #include "../audio/GraphNode.h"
 #include <osci_render_core/effect/osci_EffectParameter.h>
@@ -56,7 +56,7 @@ public:
         }
 
         // Stroke curve
-        g.setColour(Colours::accentColor().withAlpha(0.9f));
+        g.setColour(osci::Colours::accentColor().withAlpha(0.9f));
         g.strokePath(path, juce::PathStrokeType(1.5f, juce::PathStrokeType::beveled, juce::PathStrokeType::rounded));
     }
 

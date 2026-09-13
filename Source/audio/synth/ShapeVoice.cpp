@@ -16,8 +16,9 @@ void ShapeVoice::initializeEffectsFromGlobal() {
         if (simpleEffect) {
             auto cloned = simpleEffect->cloneWithSharedParameters();
             // Initialize the effect with current sample rate
-            if (audioProcessor.currentSampleRate > 0) {
-                cloned->prepareToPlay(audioProcessor.currentSampleRate, 512);
+            const double sampleRate = audioProcessor.getEffectiveSampleRate();
+            if (sampleRate > 0) {
+                cloned->prepareToPlay(sampleRate, 512);
             }
             voiceEffectsMap[globalEffect->getId()] = cloned;
         }
@@ -25,15 +26,8 @@ void ShapeVoice::initializeEffectsFromGlobal() {
 }
 
 void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
-    if (effect) {
-        voicePreviewEffect = effect->cloneWithSharedParameters();
-        // Initialize the effect with current sample rate
-        if (audioProcessor.currentSampleRate > 0) {
-            voicePreviewEffect->prepareToPlay(audioProcessor.currentSampleRate, 512);
-        }
-    } else {
-        voicePreviewEffect = nullptr;
-    }
+    auto existingEffect = effect != nullptr ? voiceEffectsMap.find(effect->getId()) : voiceEffectsMap.end();
+    voicePreviewEffect = existingEffect != voiceEffectsMap.end() ? existingEffect->second : nullptr;
 }
 
 void ShapeVoice::clearPreviewEffect() {
@@ -44,10 +38,6 @@ void ShapeVoice::prepareToPlay(double sampleRate, int samplesPerBlock) {
     // Update sample rate for all voice effects
     for (auto& pair : voiceEffectsMap) {
         pair.second->prepareToPlay(sampleRate, samplesPerBlock);
-    }
-    // Update sample rate for preview effect if set
-    if (voicePreviewEffect) {
-        voicePreviewEffect->prepareToPlay(sampleRate, samplesPerBlock);
     }
 }
 
@@ -106,14 +96,17 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
     if (!isLegato) {
         // Non-legato: full reset — reload frame, reset drawing position,
         // retrigger envelopes.
-        frame.clear();
-        frameLength = 0.0;
-        int tries = 0;
-        while (frame.empty() && tries < 50) {
-            if (shapeSound->updateFrame(frame)) {
-                frameLength = shapeSound->getFrameLength();
+        // Sample parsers generate points directly and never consume the shape frame.
+        if (!renderingSample) {
+            frame.clear();
+            frameLength = 0.0;
+            int tries = 0;
+            while (frame.empty() && tries < 50) {
+                if (shapeSound->updateFrame(frame)) {
+                    frameLength = shapeSound->getFrameLength();
+                }
+                tries++;
             }
-            tries++;
         }
 
         currentShape = 0;
@@ -199,26 +192,35 @@ void ShapeVoice::voiceKilled() {
     killFadeGain = 1.0f;
 }
 
-// TODO this is the slowest part of the program - any way to improve this would help!
-void ShapeVoice::incrementShapeDrawing() {
-    if (frame.size() <= 0) return;
-    double length = currentShape < frame.size() ? frame[currentShape]->len : 0.0;
-    frameDrawn += lengthIncrement;
-    shapeDrawn += lengthIncrement;
-
-    // Need to skip all shapes that the lengthIncrement draws over.
-    // This is especially an issue when there are lots of small lines being
-    // drawn.
-    while (shapeDrawn > length) {
-        shapeDrawn -= length;
-        currentShape++;
-        if (currentShape >= frame.size()) {
+void ShapeVoice::locateShapeDrawing() {
+    if (frame.empty() || frameLength <= 0.0) {
+        return;
+    }
+    // Nearby edges are cheaper to walk; cap the work before using the index.
+    for (int skipped = 0; skipped < 32 && shapeDrawn > frame[currentShape]->len; ++skipped) {
+        shapeDrawn -= frame[currentShape]->len;
+        if (++currentShape >= frame.size()) {
             currentShape = 0;
         }
-        // POTENTIAL TODO: Think of a way to make this more efficient when iterating
-        // this loop many times
-        length = frame[currentShape]->len;
     }
+    if (shapeDrawn <= frame[currentShape]->len) {
+        return;
+    }
+
+    // The length pass indexes each endpoint, so skipping dense geometry stays bounded.
+    double position = shapeDrawn + (currentShape > 0 ? frame[currentShape - 1]->cumulativeEndLength : 0.0);
+    const double total = frame.back()->cumulativeEndLength;
+    if (position > total) {
+        position = std::fmod(position, total);
+        if (position == 0.0) {
+            position = total;
+        }
+    }
+    const auto next = std::lower_bound(frame.begin(), frame.end(), position, [](const auto& shape, double distance) {
+        return shape->cumulativeEndLength < distance;
+    });
+    currentShape = static_cast<int>(next - frame.begin());
+    shapeDrawn = position - (currentShape > 0 ? frame[currentShape - 1]->cumulativeEndLength : 0.0);
 }
 
 double ShapeVoice::getFrequency() {
@@ -282,15 +284,17 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     frameSyncBuffer.clear();
 
     const bool midiEnabled = audioProcessor.midiEnabled->getBoolValue();
-    const double dt = 1.0 / audioProcessor.currentSampleRate;
+    const double sampleRate = audioProcessor.getEffectiveSampleRate();
+    const double dt = 1.0 / sampleRate;
 
     // Snapshot DAW transport once per block (constant within a processBlock call)
-    const double blockBpm = audioProcessor.luaBpm.load(std::memory_order_relaxed);
-    const double blockPlayTime = audioProcessor.luaPlayTime.load(std::memory_order_relaxed);
-    const double blockPlayTimeBeats = audioProcessor.luaPlayTimeBeats.load(std::memory_order_relaxed);
-    const bool blockIsPlaying = audioProcessor.luaIsPlaying.load(std::memory_order_relaxed);
-    const int blockTimeSigNum = audioProcessor.luaTimeSigNum.load(std::memory_order_relaxed);
-    const int blockTimeSigDen = audioProcessor.luaTimeSigDen.load(std::memory_order_relaxed);
+    const auto& dawPosition = audioProcessor.dawPosition;
+    const double blockBpm = dawPosition.bpm.load(std::memory_order_relaxed);
+    const double blockPlayTime = dawPosition.seconds.load(std::memory_order_relaxed);
+    const double blockPlayTimeBeats = dawPosition.beats.load(std::memory_order_relaxed);
+    const bool blockIsPlaying = dawPosition.isPlaying.load(std::memory_order_relaxed);
+    const int blockTimeSigNum = dawPosition.timeSigNumerator.load(std::memory_order_relaxed);
+    const int blockTimeSigDen = dawPosition.timeSigDenominator.load(std::memory_order_relaxed);
 
     // Snapshot the sound pointer once per block.  The underlying ShapeSound
     // is ref-counted so it stays alive even if another thread swaps it out.
@@ -339,7 +343,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         }
 
         int sample = startSample + i;
-        lengthIncrement = juce::jmax(frameLength / (audioProcessor.currentSampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
+        lengthIncrement = juce::jmax(frameLength / (sampleRate / actualFrequency), MIN_LENGTH_INCREMENT);
 
         osci::Point channels;
 
@@ -347,7 +351,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             auto parser = currentSound->parser;
 
             if (renderingSample) {
-                vars.sampleRate = audioProcessor.currentSampleRate;
+                vars.sampleRate = sampleRate;
                 vars.frequency = actualFrequency;
                 vars.ext_x = 0;
                 vars.ext_y = 0;
@@ -439,18 +443,25 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         frequencyBuffer.setSample(0, i, (float) actualFrequency);
 
         if (!renderingSample) {
-            incrementShapeDrawing();
+            frameDrawn += lengthIncrement;
+            shapeDrawn += lengthIncrement;
+            locateShapeDrawing();
         }
 
         if (!renderingSample && frameDrawn >= frameLength) {
-            double prevFrameLength = frameLength;
+            frameDrawn -= frameLength;
             if (currentSound != nullptr && currentlyPlaying) {
                 if (currentSound->updateFrame(frame)) {
+                    double prevFrameLength = frameLength;
                     frameLength = currentSound->getFrameLength();
+                    if (frameLength > 0 && prevFrameLength > 0) {
+                        frameDrawn *= frameLength / prevFrameLength;
+                    }
                 }
             }
-            frameDrawn -= prevFrameLength;
+            shapeDrawn = frameDrawn;
             currentShape = 0;
+            locateShapeDrawing();
 
             // The first sample of the new frame is the *next* sample.
             pendingFrameStart = true;
@@ -482,7 +493,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
 
     // Kill-fade: per-sample linear ramp from 1→0 over kKillFadeTimeSec.
     const float killFadeDecPerSample = killFading
-        ? static_cast<float>(1.0 / (kKillFadeTimeSec * audioProcessor.currentSampleRate))
+        ? static_cast<float>(1.0 / (kKillFadeTimeSec * sampleRate))
         : 0.0f;
 
     for (int i = 0; i < numSamples; ++i) {

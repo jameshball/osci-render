@@ -7,8 +7,8 @@
 // ---- RulesPanel paint: darker rounded background ----
 
 void FractalComponent::RulesPanel::paint(juce::Graphics& g) {
-    g.setColour(Colours::darker().darker(0.3f));
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), OscirenderLookAndFeel::RECT_RADIUS);
+    g.setColour(osci::Colours::darker().darker(0.3f));
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), osci::LookAndFeel::RECT_RADIUS);
 }
 
 // ---- FractalComponent ----
@@ -167,9 +167,8 @@ void FractalComponent::updateFileFromUI() {
     auto block = std::make_shared<juce::MemoryBlock>();
     block->append(json.toRawUTF8(), json.getNumBytesAsUTF8());
 
-    juce::SpinLock::ScopedLockType lock1(audioProcessor.parsersLock);
-    juce::SpinLock::ScopedLockType lock2(audioProcessor.effectsLock);
-    audioProcessor.updateFileBlock(currentFileIndex, block);
+    auto& files = audioProcessor.getFileController();
+    files.updateFile(currentFileIndex, block);
 }
 
 void FractalComponent::timerCallback() {}

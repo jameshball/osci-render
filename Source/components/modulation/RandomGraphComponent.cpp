@@ -5,23 +5,20 @@ RandomGraphComponent::RandomGraphComponent() {
     history.resize(kMaxHistory, 0.5f);
     activeHistory.resize(kMaxHistory, false);
 
-    setColour(backgroundColourId, Colours::veryDark());
+    setColour(backgroundColourId, osci::Colours::veryDark());
     setColour(gridLineColourId, juce::Colours::white.withAlpha(0.1f));
     setColour(lineColourId, juce::Colour(0xFF00E5FF));
     setColour(fillColourId, juce::Colour(0xFF00E5FF).withAlpha(0.15f));
 }
 
 void RandomGraphComponent::pushValue(float value, bool isActive) {
-    pushValueSilent(value, isActive);
-    repaint();
-}
-
-void RandomGraphComponent::pushValueSilent(float value, bool isActive) {
     history[(size_t)writeIndex] = juce::jlimit(0.0f, 1.0f, value);
     activeHistory[(size_t)writeIndex] = isActive;
     writeIndex = (writeIndex + 1) % kMaxHistory;
-    if (historyCount < kMaxHistory)
+    if (historyCount < kMaxHistory) {
         historyCount++;
+    }
+    repaint();
 }
 
 void RandomGraphComponent::clearHistory() {

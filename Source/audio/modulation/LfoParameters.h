@@ -7,6 +7,8 @@
 #include "LfoState.h"
 #include "ModulationParameterTypes.h"
 #include "ModulationSource.h"
+#include "ModulationDisplayBuffer.h"
+#include <osci_render_core/transport/osci_DawPosition.h>
 
 // Encapsulates all DAW-automatable LFO parameters, waveform data, assignments,
 // and audio-thread state. Follows the VisualiserParameters pattern:
@@ -40,12 +42,13 @@ public:
 
     // Thread-safe snapshots for UI
     std::atomic<float> currentValues[NUM_LFOS] = {};
-    std::atomic<float> currentPhases[NUM_LFOS] = {};
+    ModulationDisplayBuffer displayBuffers[NUM_LFOS];
     std::atomic<bool> active[NUM_LFOS] = {};
-    std::atomic<bool> retriggered[NUM_LFOS] = {};
     std::atomic<bool> customState[NUM_LFOS] = {};  // true when LFO waveform is user-modified
 
     LfoParameters() {
+        previewSavedLfoStates.reserve(NUM_LFOS);
+
         for (int i = 0; i < NUM_LFOS; ++i) {
             juce::String idx = juce::String(i + 1);
             juce::String pfx = "lfo" + idx;
@@ -78,9 +81,11 @@ public:
     int getSourceCount() const override { return NUM_LFOS; }
     const std::vector<float>* getBlockBuffers() const override { return blockBuffer.data(); }
 
-    void prepareToPlay(double /*sampleRate*/, int samplesPerBlock) override {
-        for (int l = 0; l < NUM_LFOS; ++l)
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override {
+        for (int l = 0; l < NUM_LFOS; ++l) {
             blockBuffer[l].resize(samplesPerBlock);
+            displayBuffers[l].prepare(sampleRate, samplesPerBlock);
+        }
     }
 
     // === Waveform access ===
@@ -139,23 +144,31 @@ public:
         return customState[i].load(std::memory_order_relaxed);
     }
 
-    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
-    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
-    void switchUnmodifiedFreeToTrigger() {
+    void switchUnmodifiedFreeTo(LfoMode targetMode) {
         auto allAssignments = getAssignments();
         int assignCount[NUM_LFOS] = {};
-        for (const auto& a : allAssignments)
-            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS)
+        for (const auto& a : allAssignments) {
+            if (a.sourceIndex >= 0 && a.sourceIndex < NUM_LFOS) {
                 assignCount[a.sourceIndex]++;
+            }
+        }
 
         for (int i = 0; i < NUM_LFOS; ++i) {
             bool isFree = getMode(i) == LfoMode::Free;
             bool unassigned = assignCount[i] == 0;
             bool unmodified = !getIsCustom(i);
-            if (isFree && unassigned && unmodified)
-                setMode(i, LfoMode::Trigger);
+            if (isFree && unassigned && unmodified) {
+                setMode(i, targetMode);
+            }
         }
     }
+
+    // Switch unmodified Free-mode LFOs (with no assignments) to Trigger mode.
+    // Intended to be called when MIDI is enabled so that LFOs retrigger with notes.
+    void switchUnmodifiedFreeToTrigger() { switchUnmodifiedFreeTo(LfoMode::Trigger); }
+
+    // Switch untouched Free-mode LFOs to DAW Sync when MIDI is disabled in a plugin host.
+    void switchUnmodifiedFreeToSync() { switchUnmodifiedFreeTo(LfoMode::Sync); }
 
     void setIsCustom(int i, bool custom) {
         if (i < 0 || i >= NUM_LFOS) return;
@@ -206,19 +219,9 @@ public:
         return currentValues[i].load(std::memory_order_relaxed);
     }
 
-    float getCurrentPhase(int i) const {
-        if (i < 0 || i >= NUM_LFOS) return 0.0f;
-        return currentPhases[i].load(std::memory_order_relaxed);
-    }
-
     bool isActive(int i) const override {
         if (i < 0 || i >= NUM_LFOS) return false;
         return active[i].load(std::memory_order_relaxed);
-    }
-
-    bool consumeRetriggered(int i) {
-        if (i < 0 || i >= NUM_LFOS) return false;
-        return retriggered[i].exchange(false, std::memory_order_relaxed);
     }
 
     // === Audio-thread reset ===
@@ -234,8 +237,7 @@ public:
     // Processes MIDI note events for LFO triggering and computes per-sample LFO values.
     template<int MaxVoices>
     void fillBlockBuffers(int numSamples, double sampleRate, const juce::MidiBuffer& midi,
-                          double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices],
-                          double syncStartSeconds = 0.0, bool useHostSync = false) {
+                          const osci::DawPosition& dawPosition, const std::atomic<bool> (&voiceActive)[MaxVoices]) {
         if (numSamples <= 0) return;
 
         // Process MIDI note events to drive LFO triggering for non-Free modes
@@ -249,8 +251,7 @@ public:
                     if (!mode[l]) continue;
                     LfoMode m = (LfoMode)mode[l]->getValueUnnormalised();
                     if (m != LfoMode::Free && m != LfoMode::Sync) {
-                        if (!audioStates[l].finished)
-                            retriggered[l].store(true, std::memory_order_relaxed);
+                        displayBuffers[l].resetMarker();
                         float phaseOff = phaseOffset[l] ? phaseOffset[l]->getValueUnnormalised() : 0.0f;
                         audioStates[l].noteOn(m, phaseOff);
                         delayElapsed[l] = 0.0f;
@@ -302,7 +303,7 @@ public:
                 } else {
                     int tdIdx = tempoDivision[l] ? tempoDivision[l]->getValueUnnormalised() : 8;
                     int idx = juce::jlimit(0, (int)divisions.size() - 1, tdIdx);
-                    r = (float)divisions[idx].toHz(bpm, rateMd);
+                    r = (float)divisions[idx].toHz(dawPosition.bpm.load(std::memory_order_relaxed), rateMd);
                 }
                 float sr = (float)sampleRate;
                 LfoMode md = mode[l] ? (LfoMode)mode[l]->getValueUnnormalised() : LfoMode::Free;
@@ -332,38 +333,48 @@ public:
                     delayElapsed[l] = elapsed + blockTimeSec;
                 }
 
-                int advanceSamples = numSamples - delaySkipSamples;
-                if (advanceSamples > 0) {
-                    double segmentSyncStartSeconds = syncStartSeconds;
-                    if (useHostSync && sampleRate > 0.0)
-                        segmentSyncStartSeconds += (double)delaySkipSamples / sampleRate;
-                    audioStates[l].advanceBlock(blockBuffer[l].data() + delaySkipSamples, advanceSamples,
-                                                r, sr, waveforms[l], md, phaseOff,
-                                                segmentSyncStartSeconds, useHostSync);
-                }
-                if (md == LfoMode::Sync && !effectiveVoiceActive) {
-                    for (int s = 0; s < numSamples; ++s)
-                        blockBuffer[l][s] = 0.0f;
-                }
-
+                const bool syncPosition = md == LfoMode::Sync && dawPosition.hasSyncPosition.load(std::memory_order_relaxed);
+                const double syncStartSeconds = dawPosition.syncSeconds.load(std::memory_order_relaxed);
+                const double syncSecondsPerSample = dawPosition.syncSecondsPerSample.load(std::memory_order_relaxed);
+                const bool syncHeldByTransport = md == LfoMode::Sync
+                    && dawPosition.hasSyncPosition.load(std::memory_order_relaxed)
+                    && !dawPosition.isPlaying.load(std::memory_order_relaxed);
                 float smoothSecs = smoothAmount[l] ? smoothAmount[l]->getValueUnnormalised() : 0.005f;
-                if (smoothSecs > 1e-6f) {
-                    float alpha = 1.0f - std::exp(-1.0f / (smoothSecs * sr));
-                    float prev = smoothedOutput[l];
-                    for (int s = 0; s < numSamples; ++s) {
-                        prev += alpha * (blockBuffer[l][s] - prev);
-                        blockBuffer[l][s] = prev;
+                const float alpha = smoothSecs > 1e-6f ? 1.0f - std::exp(-1.0f / (smoothSecs * sr)) : 1.0f;
+                displayBuffers[l].process(numSamples, [&](int offset, int count) {
+                    const int end = offset + count;
+                    const int start = juce::jmax(offset, delaySkipSamples);
+                    if (start < end) {
+                        if (syncPosition) {
+                            for (int s = start; s < end; ++s) {
+                                const double syncSeconds = syncStartSeconds + (double)s * syncSecondsPerSample;
+                                const double phase = syncSeconds * (double)r + (double)phaseOff;
+                                const float wrappedPhase = (float)(phase - std::floor(phase));
+                                audioStates[l].phase = wrappedPhase;
+                                blockBuffer[l][s] = waveforms[l].evaluate(wrappedPhase);
+                            }
+                        } else {
+                            audioStates[l].advanceBlock(blockBuffer[l].data() + start, end - start, r, sr, waveforms[l], md, phaseOff);
+                        }
                     }
-                    smoothedOutput[l] = prev;
-                } else {
-                    smoothedOutput[l] = blockBuffer[l][numSamples - 1];
-                }
+                    if (md == LfoMode::Sync && !effectiveVoiceActive) {
+                        std::fill(blockBuffer[l].begin() + offset, blockBuffer[l].begin() + end, 0.0f);
+                    }
+                    if (!syncHeldByTransport && smoothSecs > 1e-6f) {
+                        float prev = smoothedOutput[l];
+                        for (int s = offset; s < end; ++s) {
+                            prev += alpha * (blockBuffer[l][s] - prev);
+                            blockBuffer[l][s] = prev;
+                        }
+                    }
+                    smoothedOutput[l] = blockBuffer[l][end - 1];
+                    return ModulationDisplayBuffer::Sample { smoothedOutput[l], audioStates[l].phase, isActive };
+                });
 
                 if (!effectiveVoiceActive && prevAnyVoiceActive)
                     audioStates[l].voicesFinished(md);
 
                 currentValues[l].store(blockBuffer[l][numSamples - 1], std::memory_order_relaxed);
-                currentPhases[l].store(audioStates[l].phase, std::memory_order_relaxed);
                 active[l].store(isActive, std::memory_order_relaxed);
             }
 
@@ -424,7 +435,7 @@ public:
 
     // Automatically assign LFOs to modulate the parameters of an effect,
     // based on each parameter's lfoTypeDefault and lfoRateDefault.
-    void autoAssignForEffect(osci::Effect& effect) {
+    void autoAssignForEffect(osci::Effect& effect, bool isPreview = false) {
         std::vector<LfoAssignment> currentAssignments = getAssignments();
 
         int assignmentCount[NUM_LFOS] = {};
@@ -467,13 +478,26 @@ public:
         };
 
         auto configureLfo = [&](int lfoIdx, LfoPreset desiredPreset, float desiredRate, int score) {
+            if (isPreview && score <= 3) {
+                savePreviewLfoState(lfoIdx, score <= 2);
+            }
             if (score <= 2) {
+                if (isPreview) {
+                    preset[lfoIdx]->setValueUnnormalised(static_cast<float>(desiredPreset));
+                } else {
+                    setPreset(lfoIdx, desiredPreset);
+                }
+                auto replacement = createLfoPreset(desiredPreset);
                 juce::SpinLock::ScopedLockType lock(waveformLock);
-                setPreset(lfoIdx, desiredPreset);
-                waveforms[lfoIdx] = createLfoPreset(desiredPreset);
+                std::swap(waveforms[lfoIdx].nodes, replacement.nodes);
+                std::swap(waveforms[lfoIdx].smooth, replacement.smooth);
             }
             if (score <= 3 && rate[lfoIdx] != nullptr) {
-                rate[lfoIdx]->setUnnormalisedValueNotifyingHost(desiredRate);
+                if (isPreview) {
+                    rate[lfoIdx]->setValueUnnormalised(desiredRate);
+                } else {
+                    rate[lfoIdx]->setUnnormalisedValueNotifyingHost(desiredRate);
+                }
             }
         };
 
@@ -500,7 +524,11 @@ public:
             }
             configureLfo(chosenLfo, desiredPreset, desiredRate, score);
 
-            param->setUnnormalisedValueNotifyingHost(param->min.load());
+            if (isPreview) {
+                param->setValueUnnormalised(param->min.load());
+            } else {
+                param->setUnnormalisedValueNotifyingHost(param->min.load());
+            }
 
             LfoAssignment assignment;
             assignment.sourceIndex = chosenLfo;
@@ -517,94 +545,99 @@ public:
     // Temporarily auto-assigns LFOs while hovering an effect in the grid.
 
     // Preview state (message-thread only — no lock needed)
-    juce::String previewEffectId;
-    std::vector<std::pair<juce::String, float>> previewSavedParamValues;
+    std::vector<std::pair<osci::EffectParameter*, float>> previewSavedParamValues;
+    std::vector<LfoAssignment> previewSavedAssignments;
 
     struct SavedLfoState {
         int lfoIndex;
         LfoPreset preset;
-        LfoWaveform waveform;
-        bool isCustom;
+        std::optional<LfoWaveform> waveform;
         float rateValue;
     };
     std::vector<SavedLfoState> previewSavedLfoStates;
 
+    void savePreviewLfoState(int lfoIndex, bool saveWaveform) {
+        auto saved = std::find_if(previewSavedLfoStates.begin(), previewSavedLfoStates.end(),
+                                  [lfoIndex](const SavedLfoState& state) { return state.lfoIndex == lfoIndex; });
+        if (saved == previewSavedLfoStates.end()) {
+            previewSavedLfoStates.push_back({ lfoIndex, getPreset(lfoIndex), std::nullopt,
+                                              rate[lfoIndex] != nullptr ? rate[lfoIndex]->getValueUnnormalised() : 1.0f });
+            saved = std::prev(previewSavedLfoStates.end());
+        }
+        if (saveWaveform && !saved->waveform.has_value()) {
+            juce::SpinLock::ScopedLockType lock(waveformLock);
+            saved->waveform = waveforms[lfoIndex];
+        }
+    }
+
+    void resetPreviewState() {
+        previewSavedParamValues.clear();
+        previewSavedAssignments.clear();
+        previewSavedLfoStates.clear();
+    }
+
+    bool isPreviewParameter(const LfoAssignment& assignment) const {
+        return std::any_of(previewSavedParamValues.begin(), previewSavedParamValues.end(),
+                           [&assignment](const auto& saved) { return saved.first->paramID == assignment.paramId; });
+    }
+
     // Start previewing: save current param values, auto-assign LFOs to the effect.
-    void startPreview(const juce::String& effectId,
-                      const std::vector<std::shared_ptr<osci::Effect>>& effects,
-                      std::function<void(const osci::Effect&)> removeAllAssignments) {
+    void startPreview(const juce::String& effectId, const std::vector<std::shared_ptr<osci::Effect>>& effects) {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        stopPreview(effects, removeAllAssignments);
+        stopPreview();
         for (auto& eff : effects) {
             if (eff->getId() == effectId) {
-                previewSavedParamValues.clear();
-                previewSavedLfoStates.clear();
+                previewSavedParamValues.reserve(eff->parameters.size());
 
                 // Save param values
                 for (auto* param : eff->parameters) {
-                    if (param->lfoTypeDefault != osci::LfoType::Static)
-                        previewSavedParamValues.emplace_back(param->paramID, param->getValueUnnormalised());
+                    if (param->lfoTypeDefault != osci::LfoType::Static) {
+                        previewSavedParamValues.emplace_back(param, param->getValueUnnormalised());
+                    }
                 }
 
-                // Save LFO waveform/preset state for all LFOs (before auto-assign modifies them)
-                previewSavedLfoStates.reserve(NUM_LFOS);
-                for (int i = 0; i < NUM_LFOS; ++i) {
-                    juce::SpinLock::ScopedLockType lock(waveformLock);
-                    previewSavedLfoStates.push_back({
-                        i, getPreset(i), waveforms[i], getIsCustom(i),
-                        rate[i] != nullptr ? rate[i]->getValueUnnormalised() : 1.0f
-                    });
+                for (const auto& assignment : getAssignments()) {
+                    if (isPreviewParameter(assignment)) {
+                        previewSavedAssignments.push_back(assignment);
+                    }
                 }
 
-                autoAssignForEffect(*eff);
-                previewEffectId = effectId;
+                autoAssignForEffect(*eff, true);
                 break;
             }
         }
     }
 
     // Stop previewing: remove assignments and restore saved parameter values.
-    void stopPreview(const std::vector<std::shared_ptr<osci::Effect>>& effects,
-                     std::function<void(const osci::Effect&)> removeAllAssignments) {
+    void stopPreview() {
         jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        if (previewEffectId.isEmpty()) return;
-        for (auto& eff : effects) {
-            if (eff->getId() == previewEffectId) {
-                removeAllAssignments(*eff);
-                for (const auto& [paramId, savedValue] : previewSavedParamValues) {
-                    for (auto* param : eff->parameters) {
-                        if (param->paramID == paramId) {
-                            param->setUnnormalisedValueNotifyingHost(savedValue);
-                            break;
-                        }
-                    }
-                }
-                break;
+        for (const auto& assignment : getAssignments()) {
+            if (isPreviewParameter(assignment)) {
+                removeAssignment(assignment.sourceIndex, assignment.paramId);
             }
         }
+        for (const auto& assignment : previewSavedAssignments) {
+            addAssignment(assignment);
+        }
 
-        // Restore LFO waveform/preset states
-        for (const auto& saved : previewSavedLfoStates) {
-            {
+        for (const auto& [param, savedValue] : previewSavedParamValues) {
+            param->setValueUnnormalised(savedValue);
+        }
+
+        // Restore only the LFO state changed by auto-assignment.
+        for (auto& saved : previewSavedLfoStates) {
+            preset[saved.lfoIndex]->setValueUnnormalised(static_cast<float>(saved.preset));
+            if (saved.waveform.has_value()) {
                 juce::SpinLock::ScopedLockType lock(waveformLock);
-                setPreset(saved.lfoIndex, saved.preset);
-                waveforms[saved.lfoIndex] = saved.waveform;
-                setIsCustom(saved.lfoIndex, saved.isCustom);
+                std::swap(waveforms[saved.lfoIndex].nodes, saved.waveform->nodes);
+                std::swap(waveforms[saved.lfoIndex].smooth, saved.waveform->smooth);
             }
-            if (rate[saved.lfoIndex] != nullptr)
-                rate[saved.lfoIndex]->setUnnormalisedValueNotifyingHost(saved.rateValue);
+            if (rate[saved.lfoIndex] != nullptr) {
+                rate[saved.lfoIndex]->setValueUnnormalised(saved.rateValue);
+            }
         }
 
-        previewSavedParamValues.clear();
-        previewSavedLfoStates.clear();
-        previewEffectId = juce::String();
+        resetPreviewState();
     }
 
-    // Promote preview: keep assignments and param values, just clear preview tracking.
-    void promotePreview() {
-        jassert(juce::MessageManager::getInstance()->isThisTheMessageThread());
-        previewSavedParamValues.clear();
-        previewSavedLfoStates.clear();
-        previewEffectId = juce::String();
-    }
 };

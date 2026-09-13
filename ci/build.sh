@@ -58,6 +58,13 @@ if [ "$VERSION" = "free" ]; then
   sed_jucer 's/OSCI_PREMIUM=1/OSCI_PREMIUM=0/'
 fi
 
+# Build LuaJIT before Projucer resave. Projucer's post-export shell command has
+# a 60-second timeout, which is too tight for a cold universal macOS LuaJIT build
+# on GitHub runners.
+if [ "$PLUGIN" = "osci-render" ] && [ "$OS" != "win" ]; then
+  "$ROOT/luajit_linux_macos.sh"
+fi
+
 # Resave jucer file
 RESAVE_COMMAND="$PROJUCER_PATH --resave '$ROOT/$PLUGIN.jucer'"
 eval "$RESAVE_COMMAND"
@@ -151,11 +158,11 @@ if [ "$OS" = "linux" ]; then
 
   if [ "$PLUGIN" = "osci-render" ]; then
     INSTRUMENT_TARGET="$PLUGIN-instrument"
-    zip -r "${OUTPUT_NAME}-linux.zip" "$PLUGIN" "$PLUGIN.vst3" "$INSTRUMENT_TARGET.vst3"
+    zip -r "${OUTPUT_NAME}.zip" "$PLUGIN" "$PLUGIN.vst3" "$INSTRUMENT_TARGET.vst3"
   else
-    zip -r "${OUTPUT_NAME}-linux.zip" "$PLUGIN" "$PLUGIN.vst3"
+    zip -r "${OUTPUT_NAME}.zip" "$PLUGIN" "$PLUGIN.vst3"
   fi
-  cp "${OUTPUT_NAME}-linux.zip" "$ROOT/bin"
+  cp "${OUTPUT_NAME}.zip" "$ROOT/bin"
 fi
 
 cd "$ROOT"

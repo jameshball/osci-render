@@ -29,10 +29,8 @@ inline float evaluateGraphCurve(const std::vector<GraphNode>& nodes, float time,
     if (time <= (float)nodes.front().time) return (float)nodes.front().value;
     if (time >= (float)nodes.back().time) return (float)nodes.back().value;
 
-    auto it = std::upper_bound(nodes.begin(), nodes.end(), time,
+    auto it = std::upper_bound(nodes.begin() + 1, nodes.end() - 1, time,
         [](float t, const GraphNode& n) { return t < (float)n.time; });
-
-    if (it == nodes.begin()) return (float)nodes.front().value;
 
     const auto& prev = *(it - 1);
     const auto& next = *it;

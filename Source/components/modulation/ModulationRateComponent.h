@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../../audio/modulation/LfoState.h"
-#include "../ValuePopupHelper.h"
+#include <osci_gui/osci_gui.h>
 #include "ModulationControlComponent.h"
 
 class OscirenderAudioProcessor;
