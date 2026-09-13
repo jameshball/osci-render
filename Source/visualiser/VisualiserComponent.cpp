@@ -108,8 +108,8 @@ VisualiserComponent::VisualiserComponent(
 
 #if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
-        if (popoutVisible) {
-            closePopout();
+        if (popoutVisible && popout != nullptr) {
+            popout->showControlsMenu(&popOutButton);
         } else {
             popoutWindow();
         }
@@ -701,7 +701,8 @@ void VisualiserComponent::popoutUpdated() {
 #if OSCI_PREMIUM
     popOutButton.setVisible(true);
     popOutButton.setToggleState(popoutVisible, juce::NotificationType::dontSendNotification);
-    popOutButton.setTooltip(popoutVisible ? "Close Visualiser Popout." : "Open Visualiser Popout.");
+    popOutButton.setTooltip(popoutVisible ? "Visualiser Popout Controls (including Click-through)."
+                                          : "Open Visualiser Popout.");
 #endif
 #if OSCI_PREMIUM
     editor.ffmpegDownloader.setVisible(!popoutVisible);

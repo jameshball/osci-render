@@ -145,6 +145,13 @@ class InstallerBrowser:
     def wait_for_button(self, name: str) -> None:
         self.session_command("wait-for-locator", "--role", "button", "--name", name, "--timeout-ms", "10000")
 
+    def acknowledge_install_terms(self) -> None:
+        self.session_command("wait-for-locator", "--role", "toggleButton", "--name",
+                             "I agree to the terms and acknowledge the privacy policy", "--timeout-ms", "5000")
+        self.session_command("check", "--role", "toggleButton", "--name",
+                             "I agree to the terms and acknowledge the privacy policy")
+        self.click("Continue")
+
     def run_success_flow(self) -> None:
         self.launch("success", "success")
         self.snapshot("01_initial")
@@ -187,6 +194,7 @@ class InstallerBrowser:
         self.screenshot("05_default_paths")
 
         self.click("Confirm installation")
+        self.acknowledge_install_terms()
         self.session_command("wait-for-text", "Installing application and plugins", "--timeout-ms", "5000")
         self.screenshot("06_progress")
         self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
@@ -208,6 +216,7 @@ class InstallerBrowser:
         self.click("osci-render")
         self.click("Install free")
         self.click("Confirm installation")
+        self.acknowledge_install_terms()
         self.session_command("wait-for-text", "Installation succeeded", "--timeout-ms", "10000")
         time.sleep(0.5)
         self.snapshot("09_warning")
@@ -218,6 +227,7 @@ class InstallerBrowser:
         self.click("osci-render")
         self.click("Install free")
         self.click("Confirm installation")
+        self.acknowledge_install_terms()
         self.session_command("wait-for-text", "test installation could not write", "--timeout-ms", "10000")
         time.sleep(0.5)
         self.snapshot("10_failure")
@@ -248,19 +258,19 @@ class InstallerBrowser:
         }
         for name, data in fixtures.items():
             (config / name).write_bytes(data)
-        self.click("Settings & recovery")
-        self.wait_for_button("Reset selected settings...")
+        self.click("Repair app settings...")
+        self.wait_for_button("Back up & reset selected...")
         self.snapshot("recovery_initial")
         self.screenshot("recovery_initial")
-        self.click("Reset selected settings...")
-        self.wait_for_button("Confirm reset")
+        self.click("Back up & reset selected...")
+        self.wait_for_button("Back up & reset")
         self.snapshot("recovery_confirm")
         self.screenshot("recovery_confirm")
         self.click("Cancel")
         for name, data in fixtures.items():
             assert (config / name).read_bytes() == data, f"Cancel changed {name}"
-        self.click("Reset selected settings...")
-        self.click("Confirm reset")
+        self.click("Back up & reset selected...")
+        self.click("Back up & reset")
         self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
         for name in ("osci-render.settings", "osci-render_globals.settings"):
             assert not (config / name).exists(), f"Reset left {name} active"
@@ -270,18 +280,21 @@ class InstallerBrowser:
             assert (config / name).read_bytes() == fixtures[name], f"Reset changed {name}"
         self.snapshot("recovery_complete")
         self.screenshot("recovery_complete")
-        assert not self.component_state("recovery_complete", "Reset selected settings...").get("enabled", True)
-        self.session_command("select-option", "--role", "comboBox", "--name", "App settings", "--text", "All apps")
-        self.click("Reset selected settings...")
-        self.click("Confirm reset")
+        assert not self.component_state("recovery_complete", "Back up & reset selected...").get("enabled", True)
+        assert not self.component_state("recovery_complete", "App preferences").get("enabled", True)
+        assert not self.component_state("recovery_complete", "Session, window & audio settings").get("enabled", True)
+        assert self.component_state("recovery_complete", "Licensing & installer settings").get("enabled", False)
+        self.session_command("select-option", "--role", "comboBox", "--name", "App", "--text", "All apps")
+        self.click("Back up & reset selected...")
+        self.click("Back up & reset")
         self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
         for name in ("sosci.settings", "sosci_globals.settings"):
             assert not (config / name).exists(), f"All-app reset left {name} active"
             backups = list(config.glob(name + ".backup-*"))
             assert len(backups) == 1 and backups[0].read_bytes() == fixtures[name]
-        self.session_command("check", "--role", "toggleButton", "--name", "Shared installer & licensing data")
-        self.click("Reset selected settings...")
-        self.click("Confirm reset")
+        self.session_command("check", "--role", "toggleButton", "--name", "Licensing & installer settings")
+        self.click("Back up & reset selected...")
+        self.click("Back up & reset")
         self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
         assert not (config / "osci-licensing.settings").exists()
         assert (config / "unrelated.settings").read_bytes() == fixtures["unrelated.settings"]

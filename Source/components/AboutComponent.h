@@ -23,6 +23,7 @@ public:
         std::vector<CreditEntry> credits;
         int blenderPort = -1;
         std::function<void(bool enabled)> onBetaUpdatesChanged;
+        std::function<void()> onPrivacyAndTerms;
     };
 
     explicit AboutComponent(const Info& info);
@@ -39,7 +40,7 @@ private:
     Info info;
     juce::Image logo;
     juce::ImageComponent logoComponent;
-    juce::TextButton websiteBtn, discordBtn;
+    juce::TextButton websiteBtn, discordBtn, privacyBtn;
     juce::Rectangle<float> versionStatusBounds;
     juce::String betaUnlockMessage;
     int betaUnlockClicks = 0;
