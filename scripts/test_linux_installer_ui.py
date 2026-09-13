@@ -205,6 +205,10 @@ class InstallerBrowser:
         self.click("sosci")
         self.snapshot("08_sosci_premium")
         self.screenshot("08_sosci_premium")
+        self.click("Where do I find my license key?")
+        self.session_command("wait-for-text", "Find your license key", "--timeout-ms", "5000")
+        self.session_command("press", "Escape", "--role", "dialogWindow", "--name", "Find your license key",
+                             "--timeout-ms", "5000")
         self.fill("Enter your license key", "TEST-LICENSE-KEY")
         self.session_command("press", "Enter", "--role", "editableText", "--name", "Enter your license key",
                              "--timeout-ms", "5000")

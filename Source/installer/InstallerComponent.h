@@ -78,7 +78,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
-          needLicenseLink ("Need a license key?", juce::URL ("https://osci-render.com/#purchase")),
+          needLicenseLink ("Where do I find my license key?", juce::URL()),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
         headingLabel.setText ("Choose what to install", juce::dontSendNotification);
@@ -180,6 +180,9 @@ public:
 
         panel.addAndMakeVisible (needLicenseLink);
         needLicenseLink.setColour (juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
+        needLicenseLink.onClick = [this] {
+            showSupportOverlay();
+        };
 
         panel.addAndMakeVisible (premiumInstallButton);
         premiumInstallButton.onClick = [this] {
