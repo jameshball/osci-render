@@ -31,15 +31,6 @@ public:
         statusLabel.setJustificationType (juce::Justification::centredLeft);
         statusLabel.setMinimumHorizontalScale (0.8f);
 
-        addAndMakeVisible (cancelButton);
-        cancelButton.setButtonText ("Cancel");
-        styleSecondaryButton (cancelButton);
-        cancelButton.onClick = [this] {
-            if (onCancel) {
-                onCancel();
-            }
-        };
-
         addAndMakeVisible (installButton);
         installButton.setButtonText ("Install");
         installButton.setTitle ("Confirm installation");
@@ -58,8 +49,6 @@ public:
     }
 
     std::function<void (osci::LinuxInstallLocations)> onConfirm;
-    std::function<void()> onCancel;
-
     void load (juce::StringRef productSlug) {
         osci::LinuxInstallLocations locations;
         const auto result = osci::LinuxInstallSettings (productSlug).load (locations);
@@ -91,16 +80,13 @@ public:
         standaloneBrowseButton.setEnabled (!busy);
         vst3BrowseButton.setEnabled (!busy);
         useDefaultsButton.setEnabled (!busy);
-        cancelButton.setEnabled (!busy);
         refreshValidation();
     }
 
     void resized() override {
         auto area = getLocalBounds().reduced (2, 4);
-        auto buttons = area.removeFromBottom (38).withSizeKeepingCentre (264, 38);
-        cancelButton.setBounds (buttons.removeFromLeft (126));
-        buttons.removeFromLeft (12);
-        installButton.setBounds (buttons.removeFromLeft (126));
+        auto buttons = area.removeFromBottom (38);
+        installButton.setBounds (buttons.removeFromRight (160));
         area.removeFromBottom (10);
 
         auto headingRow = area.removeFromTop (28);
@@ -124,7 +110,6 @@ private:
     juce::TextButton vst3BrowseButton;
     juce::TextButton useDefaultsButton;
     juce::Label statusLabel;
-    juce::TextButton cancelButton;
     juce::TextButton installButton;
     std::unique_ptr<juce::FileChooser> chooser;
     bool requiresEdit = false;

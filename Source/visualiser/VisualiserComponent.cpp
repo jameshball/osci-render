@@ -183,6 +183,7 @@ VisualiserComponent::VisualiserComponent(
 VisualiserComponent::~VisualiserComponent() {
     stopTimer();
     if (popout != nullptr) {
+        popout->setSourceVisible(false);
         popout->saveWindowState();
     }
     // Stop the background thread while VisualiserComponent's vtable is still live.
@@ -595,6 +596,19 @@ void VisualiserComponent::resized() {
 
     setViewportArea(area);
     updateFramePresentation();
+}
+
+void VisualiserComponent::setVisible(bool visible) {
+    // JUCE releases the source GL context inside Component::setVisible(false),
+    // before visibilityChanged(). Detach its shared consumer first, not on the
+    // presentation timer after the source native handle has been destroyed.
+    if (!visible && popout != nullptr) {
+        popout->setSourceVisible(false);
+    }
+    juce::Component::setVisible(visible);
+    if (visible && popout != nullptr && popoutVisible) {
+        popout->setSourceVisible(true);
+    }
 }
 
 void VisualiserComponent::updateFramePresentation() {

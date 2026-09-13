@@ -46,6 +46,7 @@ public:
     void setPopoutShownCallback(std::function<void()> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void resized() override;
+    void setVisible(bool visible) override;
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
     bool isPaused() const;

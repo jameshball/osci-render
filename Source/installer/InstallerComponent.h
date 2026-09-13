@@ -11,6 +11,7 @@
 #include "InstallCompletionComponent.h"
 #include "LinuxInstallLocationsComponent.h"
 #include "BlenderSetupComponent.h"
+#include "SettingsRecoveryComponent.h"
 
 namespace osci::installer {
 
@@ -77,7 +78,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
-          needLicenseLink ("Need a license key?", juce::URL ("https://osci-render.com/#purchase")),
+          needLicenseLink ("Find my license key", juce::URL()),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
         headingLabel.setText ("Choose what to install", juce::dontSendNotification);
@@ -90,6 +91,12 @@ public:
         helpButton.setTooltip ("Help");
         helpButton.onClick = [this] {
             showSupportOverlay();
+        };
+        addAndMakeVisible(settingsButton);
+        settingsButton.onClick = [this] {
+            if (!busy) {
+                osci::OverlayComponent::show(*this, std::make_unique<SettingsRecoveryComponent>(productSlug(selectedProduct)));
+            }
         };
         addAndMakeVisible (privacyButton);
         privacyButton.onClick = [this] {
@@ -173,6 +180,9 @@ public:
 
         panel.addAndMakeVisible (needLicenseLink);
         needLicenseLink.setColour (juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
+        needLicenseLink.onClick = [this] {
+            showSupportOverlay();
+        };
 
         panel.addAndMakeVisible (premiumInstallButton);
         premiumInstallButton.onClick = [this] {
@@ -183,11 +193,6 @@ public:
         progressBar.setVisible (false);
 
 #if JUCE_LINUX
-        locationsPanel.onCancel = [this] {
-            if (locationsOverlay != nullptr) {
-                locationsOverlay->requestDismiss();
-            }
-        };
         locationsPanel.onConfirm = [this] (osci::LinuxInstallLocations locations) {
             selectedLocations = std::move (locations);
             installLocationsConfirmed = true;
@@ -253,6 +258,7 @@ public:
         auto area = getLocalBounds().reduced (40, 16);
 #endif
         helpButton.setBounds (getLocalBounds().reduced (24, 20).removeFromTop (34).removeFromRight (34));
+        settingsButton.setBounds(getLocalBounds().withTrimmedRight(24).removeFromBottom(32).removeFromRight(180));
         privacyButton.setBounds (getLocalBounds().withTrimmedLeft (24).removeFromBottom (32).removeFromLeft (140));
 
         headingLabel.setBounds (area.removeFromTop (44));
@@ -373,6 +379,7 @@ private:
     };
 #endif
 
+    juce::TextButton settingsButton { "Repair app settings..." };
     osci::SvgButton helpButton { "installerHelp", juce::String (BinaryData::help_svg), juce::Colours::white };
     juce::TextButton privacyButton { "Privacy & Terms" };
     std::optional<osci::VersionInfo> reviewedVersion;
@@ -715,6 +722,7 @@ private:
 
     void refreshUi() {
         blenderButton.setEnabled(!busy);
+        settingsButton.setEnabled(!busy);
         const auto selectedOsciRender = selectedProduct == ProductChoice::OsciRender;
         const auto selectedSosci = selectedProduct == ProductChoice::Sosci;
         const auto premiumPath = isPremiumPath (currentPath);

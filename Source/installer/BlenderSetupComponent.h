@@ -23,20 +23,12 @@ public:
         install.setButtonText("Install");
         install.setEnabled(false);
         install.onClick = [this] {
-            if (finished) {
-                requestDismiss();
-            } else if (retryDiscovery) {
+            if (retryDiscovery) {
                 discover();
             } else if (targets.empty()) {
                 chooseBlender();
             } else {
                 performInstall();
-            }
-        };
-        close.setButtonText("Back");
-        close.onClick = [this] {
-            if (!working) {
-                requestDismiss();
             }
         };
         manual.setButtonText("Manual installation");
@@ -51,14 +43,14 @@ public:
         versions.setColour(juce::ComboBox::textColourId, juce::Colour(0xfff5f5f5));
         versions.setColour(juce::ComboBox::arrowColourId, juce::Colour(0xfff5f5f5));
         versions.setColour(juce::PopupMenu::backgroundColourId, juce::Colour(0xff303236));
-        for (auto* button : { &close, &manual, &logButton }) {
+        for (auto* button : { &manual, &logButton }) {
             button->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff414449));
             button->setColour(juce::TextButton::textColourOffId, juce::Colour(0xfff5f5f5));
         }
         install.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor());
         install.setColour(juce::TextButton::textColourOffId, osci::Colours::veryDark());
         for (auto* component : std::initializer_list<juce::Component*> { &versions,
-                &replace, &install, &close, &manual, &logButton, &status }) {
+                &replace, &install, &manual, &logButton, &status }) {
             addPanelContentAndMakeVisible(*component);
         }
         logButton.setVisible(false);
@@ -82,7 +74,6 @@ public:
         replace.setBounds(area.removeFromTop(30));
         area.removeFromTop(12);
         auto buttons = area.removeFromBottom(36);
-        close.setBounds(buttons.removeFromLeft(110));
         install.setBounds(buttons.removeFromRight(160));
         area.removeFromBottom(10);
         auto links = area.removeFromBottom(30);
@@ -94,13 +85,12 @@ public:
 private:
     juce::Label status;
     juce::ComboBox versions;
-    juce::TextButton install, close, manual, logButton;
+    juce::TextButton install, manual, logButton;
     juce::ToggleButton replace;
     std::unique_ptr<juce::FileChooser> chooser;
     std::vector<BlenderInstaller::Target> targets;
     juce::File logFile;
     bool working = false;
-    bool finished = false;
     bool retryDiscovery = false;
 
     void setWorking(bool value, const juce::String& message) {
@@ -108,7 +98,6 @@ private:
         setDismissible(!value);
         versions.setEnabled(!value);
         replace.setEnabled(!value);
-        close.setEnabled(!value);
         install.setEnabled(!value);
         status.setText(message, juce::dontSendNotification);
         if (onBusyChanged) {
@@ -120,7 +109,7 @@ private:
         const auto index = versions.getSelectedItemIndex();
         if (index >= 0 && index < static_cast<int>(targets.size())) {
             const auto& target = targets[static_cast<size_t>(index)];
-            finished = false;
+            install.setVisible(true);
             versions.setTooltip(target.command.joinIntoString(" "));
             install.setButtonText(target.enabled ? "Update" : "Install");
             replace.setVisible(target.conflicts);
@@ -131,7 +120,7 @@ private:
 
     void discover(juce::StringArray chosen = {}) {
         retryDiscovery = false;
-        finished = false;
+        install.setVisible(true);
         setWorking(true, "Finding Blender...");
         auto safe = juce::Component::SafePointer<BlenderSetupComponent>(this);
         juce::Thread::launch([safe, chosen] {
@@ -237,8 +226,7 @@ private:
                     installedTarget.enabled = true;
                     installedTarget.conflicts = false;
                     safe->replace.setVisible(false);
-                    safe->finished = true;
-                    safe->install.setButtonText("Done");
+                    safe->install.setVisible(false);
                 }
             });
         });
