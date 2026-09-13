@@ -282,7 +282,7 @@ class InstallerBrowser:
         self.screenshot("recovery_complete")
         assert not self.component_state("recovery_complete", "Back up & reset selected...").get("enabled", True)
         assert not self.component_state("recovery_complete", "Preferences & recent files").get("enabled", True)
-        assert not self.component_state("recovery_complete", "Startup session & audio setup").get("enabled", True)
+        assert not self.component_state("recovery_complete", "Startup project & audio settings").get("enabled", True)
         assert self.component_state("recovery_complete", "License, updates & install locations").get("enabled", False)
         self.session_command("select-option", "--role", "comboBox", "--name", "App", "--text", "All apps")
         self.click("Back up & reset selected...")
