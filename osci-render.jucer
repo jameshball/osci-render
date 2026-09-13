@@ -87,7 +87,10 @@
         <FILE id="hwlzvW" name="card.svg" compile="0" resource="1" file="Resources/svg/card.svg"/>
         <FILE id="GQM3jZ" name="cash.svg" compile="0" resource="1" file="Resources/svg/cash.svg"/>
         <FILE id="HtrsBQ" name="cat.svg" compile="0" resource="1" file="Resources/svg/cat.svg"/>
+        <FILE id="ClkThru" name="click-through.svg" compile="0" resource="1"
+              file="Resources/svg/click-through.svg"/>
         <FILE id="y9tCpG" name="clippy.svg" compile="0" resource="1" file="Resources/svg/clippy.svg"/>
+        <FILE id="Close01" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="cPySvg" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
         <FILE id="pTnUPp" name="cube.svg" compile="0" resource="1" file="Resources/svg/cube.svg"/>
@@ -186,6 +189,10 @@
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
         <FILE id="hH1OSK" name="vortex.svg" compile="0" resource="1" file="Resources/svg/vortex.svg"/>
         <FILE id="Unp5Kx" name="waves.svg" compile="0" resource="1" file="Resources/svg/waves.svg"/>
+        <FILE id="WndFrm1" name="window-framed.svg" compile="0" resource="1"
+              file="Resources/svg/window-framed.svg"/>
+        <FILE id="WndFrml" name="window-frameless.svg" compile="0" resource="1"
+              file="Resources/svg/window-frameless.svg"/>
         <FILE id="LoSvg01" name="lottie_android.svg" compile="0" resource="1"
               file="Resources/svg/lottie_android.svg"/>
         <FILE id="LoSvg06" name="lottie_switch.svg" compile="0" resource="1"

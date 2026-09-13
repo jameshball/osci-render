@@ -132,7 +132,7 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
             if (legalOwner == nullptr) { return; }
             legalOwner->audioProcessor.legalNoticePending.store(false);
             legalOwner->updatePrompt.scheduleInitialCheck();
-        });
+        }, legalConfig.productSlug, legalConfig.currentVersion);
     });
 }
 
@@ -472,7 +472,7 @@ void CommonPluginEditor::openLicenseAndUpdates() {
         const juce::Component::SafePointer<CommonPluginEditor> owner(this);
         osci::LegalOverlay::ensure(*this, documents, [owner] {
             if (owner != nullptr) { owner->openLicenseAndUpdates(); }
-        });
+        }, legalConfig.productSlug, legalConfig.currentVersion);
         return;
     }
     if (findActiveOverlay<osci::LicenseAndUpdatesComponent>() != nullptr)
