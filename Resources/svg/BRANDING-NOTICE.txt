@@ -2,9 +2,6 @@ Branding assets notice (osci-render)
 
 This repository's source code is licensed under the GNU GPLv3 (see ../../LICENSE).
 
-Unless stated otherwise, the SVG files in this directory are part of the
-GPLv3-licensed work.
-
 The following file is a branding asset (logo/wordmark) and is NOT licensed under
 the GPLv3. No trademark rights are granted. All rights reserved.
 
@@ -17,13 +14,3 @@ If you redistribute a modified build or fork, you should remove/replace this
 branding asset to avoid suggesting endorsement or official status.
 
 See ../../TRADEMARKS.md for more context.
-
-The following icons are Google Material Symbols Sharp, sourced from
-https://fonts.google.com/icons and licensed under the Apache License 2.0:
-
-- click-through.svg (touchpad_mouse_off)
-- close.svg (close)
-- window-framed.svg (web_asset)
-- window-frameless.svg (web_asset_off)
-
-License: https://www.apache.org/licenses/LICENSE-2.0
