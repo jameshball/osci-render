@@ -193,11 +193,6 @@ public:
         progressBar.setVisible (false);
 
 #if JUCE_LINUX
-        locationsPanel.onCancel = [this] {
-            if (locationsOverlay != nullptr) {
-                locationsOverlay->requestDismiss();
-            }
-        };
         locationsPanel.onConfirm = [this] (osci::LinuxInstallLocations locations) {
             selectedLocations = std::move (locations);
             installLocationsConfirmed = true;

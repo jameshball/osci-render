@@ -163,6 +163,8 @@ class InstallerBrowser:
         time.sleep(0.5)
         self.snapshot("02_locations")
         self.screenshot("02_locations")
+        if self.component_exists("02_locations", "Cancel"):
+            raise RuntimeError("Installation locations exposes both Cancel and the overlay close button")
 
         self.session_command("press", "Escape", "--role", "dialogWindow", "--name", "Install osci-render free",
                              "--timeout-ms", "5000")
@@ -266,6 +268,8 @@ class InstallerBrowser:
         self.wait_for_button("Back up & reset selected...")
         self.snapshot("recovery_initial")
         self.screenshot("recovery_initial")
+        if self.component_exists("recovery_initial", "Back"):
+            raise RuntimeError("Settings recovery exposes both Back and the overlay close button")
         self.click("Back up & reset selected...")
         self.wait_for_button("Confirm backup & reset")
         self.snapshot("recovery_confirm")
