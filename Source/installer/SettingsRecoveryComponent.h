@@ -16,14 +16,14 @@ public:
         description.setText("Close the apps and any DAWs using their plugins before resetting.\nProjects and recordings will not be deleted.", juce::dontSendNotification);
         description.setFont(juce::FontOptions(14.0f));
         description.setJustificationType(juce::Justification::topLeft);
-        globals.setButtonText("App preferences");
-        globals.setTooltip("Detached window, recent files, interface and global app preferences.");
+        globals.setButtonText("Preferences & recent files");
+        globals.setTooltip("Interface options, recent files, detached visualiser settings and other app preferences.");
         globals.setToggleState(true, juce::dontSendNotification);
-        session.setButtonText("Session, window & audio settings");
-        session.setTooltip("The automatically restored project, window position and audio device settings.");
+        session.setButtonText("Startup session & audio setup");
+        session.setTooltip("The project restored at startup, window position and standalone audio device settings.");
         session.setToggleState(true, juce::dontSendNotification);
-        shared.setButtonText("Licensing & installer settings");
-        shared.setTooltip("Affects all apps: licenses, legal consent, updates and install locations. You will need to activate again.");
+        shared.setButtonText("License, updates & install locations");
+        shared.setTooltip("Affects all apps: license activation, legal consent, update settings and install locations. You will need to activate again.");
         for (auto* toggle : { &globals, &session, &shared }) {
             toggle->onClick = [this] { refresh(); };
         }
@@ -40,7 +40,7 @@ public:
         reset.onClick = [this] {
             if (!confirming) {
                 confirming = true;
-                reset.setButtonText("Back up & reset");
+                reset.setButtonText("Confirm backup & reset");
                 reset.setColour(juce::TextButton::buttonColourId, juce::Colours::darkred.withAlpha(0.72f));
                 reset.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
                 back.setButtonText("Cancel");

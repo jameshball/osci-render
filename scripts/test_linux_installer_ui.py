@@ -263,14 +263,14 @@ class InstallerBrowser:
         self.snapshot("recovery_initial")
         self.screenshot("recovery_initial")
         self.click("Back up & reset selected...")
-        self.wait_for_button("Back up & reset")
+        self.wait_for_button("Confirm backup & reset")
         self.snapshot("recovery_confirm")
         self.screenshot("recovery_confirm")
         self.click("Cancel")
         for name, data in fixtures.items():
             assert (config / name).read_bytes() == data, f"Cancel changed {name}"
         self.click("Back up & reset selected...")
-        self.click("Back up & reset")
+        self.click("Confirm backup & reset")
         self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
         for name in ("osci-render.settings", "osci-render_globals.settings"):
             assert not (config / name).exists(), f"Reset left {name} active"
@@ -281,20 +281,20 @@ class InstallerBrowser:
         self.snapshot("recovery_complete")
         self.screenshot("recovery_complete")
         assert not self.component_state("recovery_complete", "Back up & reset selected...").get("enabled", True)
-        assert not self.component_state("recovery_complete", "App preferences").get("enabled", True)
-        assert not self.component_state("recovery_complete", "Session, window & audio settings").get("enabled", True)
-        assert self.component_state("recovery_complete", "Licensing & installer settings").get("enabled", False)
+        assert not self.component_state("recovery_complete", "Preferences & recent files").get("enabled", True)
+        assert not self.component_state("recovery_complete", "Startup session & audio setup").get("enabled", True)
+        assert self.component_state("recovery_complete", "License, updates & install locations").get("enabled", False)
         self.session_command("select-option", "--role", "comboBox", "--name", "App", "--text", "All apps")
         self.click("Back up & reset selected...")
-        self.click("Back up & reset")
+        self.click("Confirm backup & reset")
         self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
         for name in ("sosci.settings", "sosci_globals.settings"):
             assert not (config / name).exists(), f"All-app reset left {name} active"
             backups = list(config.glob(name + ".backup-*"))
             assert len(backups) == 1 and backups[0].read_bytes() == fixtures[name]
-        self.session_command("check", "--role", "toggleButton", "--name", "Licensing & installer settings")
+        self.session_command("check", "--role", "toggleButton", "--name", "License, updates & install locations")
         self.click("Back up & reset selected...")
-        self.click("Back up & reset")
+        self.click("Confirm backup & reset")
         self.session_command("wait-for-text", "You can reopen the apps now", "--timeout-ms", "5000")
         assert not (config / "osci-licensing.settings").exists()
         assert (config / "unrelated.settings").read_bytes() == fixtures["unrelated.settings"]
