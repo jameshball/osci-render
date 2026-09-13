@@ -19,7 +19,7 @@ public:
         globals.setButtonText("Preferences & recent files");
         globals.setTooltip("Interface options, recent files, detached visualiser settings and other app preferences.");
         globals.setToggleState(true, juce::dontSendNotification);
-        session.setButtonText("Startup session & audio setup");
+        session.setButtonText("Startup project & audio settings");
         session.setTooltip("The project restored at startup, window position and standalone audio device settings.");
         session.setToggleState(true, juce::dontSendNotification);
         shared.setButtonText("License, updates & install locations");
