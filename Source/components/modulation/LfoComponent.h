@@ -161,13 +161,7 @@ private:
     void applyPreset(LfoPreset preset);
     void updatePresetLabel();
     void applyLfoConstraints(int nodeIndex, double& time, double& value);
-    // Records an undoable change for both the graph nodes and the processor-side
-    // LFO waveform.  The waveform action operates on the processor directly so
-    // that undo works even if the editor is destroyed and recreated.
-    void recordLfoUndoableChange(const std::vector<GraphNode>& nodesBefore,
-                                 const LfoWaveform& waveformBefore, int lfoIndex);
-    void recordLfoUndoableChangeGuarded(const std::vector<GraphNode>& nodesBefore,
-                                        const LfoWaveform& waveformBefore, int lfoIndex);
+    void recordLfoUndoableChange(const LfoWaveform& waveformBefore, bool customBefore, int lfoIndex);
     void showPaintShapeMenu();
     void showPresetBrowser();
     void dismissPresetBrowser();

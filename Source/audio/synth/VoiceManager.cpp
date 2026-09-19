@@ -352,19 +352,15 @@ void VoiceManager::sostenutoOff(int channel) {
     }
 }
 
-void VoiceManager::allNotesOff() {
-    pressedNotes.clear();
-    lastPlayedNoteFreq.store(0.0, std::memory_order_relaxed);
-    lastPlayedNote = -1.0f;
-
-    for (auto* voice : activeVoices) {
-        voice->deactivate();
-        if (client != nullptr)
-            client->voiceDeactivated(*voice);
+void VoiceManager::resetAllVoices(bool immediate) {
+    juce::SpinLock::ScopedLockType sl(lock);
+    for (int channel = 0; channel < kNumMidiChannels; ++channel) {
+        if (immediate) {
+            allSoundsOff(channel);
+        } else {
+            allNotesOff(channel);
+        }
     }
-
-    std::fill(std::begin(sustainState), std::end(sustainState), false);
-    std::fill(std::begin(sostenutoState), std::end(sostenutoState), false);
 }
 
 void VoiceManager::allNotesOff(int channel) {
@@ -387,24 +383,6 @@ void VoiceManager::allNotesOff(int channel) {
         lastPlayedNoteFreq.store(0.0, std::memory_order_relaxed);
         lastPlayedNote = -1.0f;
     }
-}
-
-void VoiceManager::allSoundsOff() {
-    pressedNotes.clear();
-    lastPlayedNoteFreq.store(0.0, std::memory_order_relaxed);
-    lastPlayedNote = -1.0f;
-
-    for (auto* voice : activeVoices) {
-        voice->kill();
-        if (client != nullptr)
-            client->voiceKilled(*voice);
-        voice->markDead();
-        freeVoices.push_back(voice);
-    }
-    activeVoices.clear();
-
-    std::fill(std::begin(sustainState), std::end(sustainState), false);
-    std::fill(std::begin(sostenutoState), std::end(sostenutoState), false);
 }
 
 void VoiceManager::allSoundsOff(int channel) {

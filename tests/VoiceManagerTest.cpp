@@ -253,6 +253,30 @@ public:
             expect(findVoicePlayingNote(*vm, 67) != nullptr);
         }
 
+        beginTest("Internal panic and kill reset every channel, including pedal state");
+        for (bool immediate : { false, true }) {
+            auto [vm, client] = createVM(16);
+            for (int channel = 1; channel <= 16; ++channel) {
+                sendNoteOn(*vm, 60, 0.8f, channel);
+                vm->handleMidiEvent(juce::MidiMessage::controllerEvent(channel, 64, 127));
+                vm->handleMidiEvent(juce::MidiMessage::controllerEvent(channel, 66, 127));
+            }
+            vm->resetAllVoices(immediate);
+            expectEquals(vm->getNumPressedNotes(), 0);
+            expectEquals(countAudibleVoices(*vm), 0);
+            expectEquals(vm->getLastPlayedNoteFreq(), 0.0);
+            renderBlock(*vm);
+            expectEquals(vm->getNumActiveVoices(), 0);
+
+            // New events in the same callback must survive the reset, and must
+            // not inherit the old channel's sustain/sostenuto pedals.
+            sendNoteOn(*vm, 67, 0.8f, 9);
+            expectEquals(countAudibleVoices(*vm), 1);
+            sendNoteOff(*vm, 67, 9);
+            renderBlock(*vm);
+            expectEquals(vm->getNumActiveVoices(), 0);
+        }
+
         beginTest("velocity-0 noteOn treated as noteOff");
         {
             auto [vm, _] = createVM(4);

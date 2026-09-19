@@ -409,7 +409,7 @@ void OscirenderAudioProcessor::prepareToPlayInternal(double sampleRate, int samp
     if (voiceBuilder != nullptr) {
         voiceBuilder->waitForAnyVoice(5000);
     }
-    synth.handleMidiEvent(juce::MidiMessage::allSoundOff(1));
+    synth.resetAllVoices(true);
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
 
@@ -661,6 +661,8 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     // Release voices hidden by a new channel filter or MIDI mode.
     if (prevMidiEnabled != usingMidi || (usingMidi && midiChannelChanged)) {
         // Reset before new notes, including notes at the start of a one-sample block.
+        synth.resetAllVoices(true);
+        // Keep the ordered reset event for the LFO/random note trackers too.
         filteredMidiMessages.clear();
         filteredMidiMessages.addEvent(juce::MidiMessage::allSoundOff(1), 0);
         filteredMidiMessages.addEvents(midiMessages, 0, -1, 0);
@@ -942,8 +944,7 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
 void OscirenderAudioProcessor::sendMidiPanic(bool immediate) {
     keyboardState.allNotesOff(0);
-    synth.handleMidiEvent(immediate ? juce::MidiMessage::allSoundOff(1)
-                                    : juce::MidiMessage::allNotesOff(1));
+    synth.resetAllVoices(immediate);
 }
 
 juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
