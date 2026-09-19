@@ -770,6 +770,85 @@ public:
 // ============================================================================
 // Static registration — JUCE auto-discovers these
 // ============================================================================
+class LfoWaveformUndoTest : public juce::UnitTest {
+public:
+    LfoWaveformUndoTest() : juce::UnitTest("LFO Waveform Undo", "LFO") {}
+
+    void runTest() override {
+        beginTest("Custom/factory undo and redo restore audio and saved identity without an editor");
+        LfoParameters parameters;
+        parameters.prepareToPlay(100.0, 4);
+        auto custom = createLfoPreset(LfoPreset::Triangle);
+        custom.nodes[1].value = 0.37;
+        parameters.waveformChanged(0, custom);
+        parameters.setIsCustom(0, true);
+
+        juce::UndoManager undo;
+        juce::ValueTree tree("state");
+        juce::String lastParameter;
+        bool suppressed = false;
+        bool grouped = true;
+        auto& preset = *parameters.preset[0];
+        preset.bindToValueTree(tree, &undo, &lastParameter, &suppressed, &grouped);
+        struct Listener : juce::ValueTree::Listener {
+            explicit Listener(osci::IntParameter& p) : parameter(p) {}
+            void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override {
+                parameter.applyValueFromTree();
+            }
+            osci::IntParameter& parameter;
+        } listener(preset);
+        tree.addListener(&listener);
+
+        const auto factory = createLfoPreset(LfoPreset::Square);
+        undo.beginNewTransaction("Change LFO Preset");
+        parameters.setPreset(0, LfoPreset::Square);
+        undo.perform(new LfoWaveformChangeAction(parameters.waveforms, parameters.waveformLock, 0, custom, factory,
+                                               parameters.customState[0], true, false, preset));
+        undo.beginNewTransaction();
+
+        auto check = [&](const LfoWaveform& expected, bool isCustom, LfoPreset selected) {
+            expect(parameters.getIsCustom(0) == isCustom);
+            expect(parameters.getPreset(0) == selected);
+            expect(parameters.getEffectiveWaveform(0) == expected);
+            parameters.audioStates[0].phase = 0.13f;
+            juce::MidiBuffer midi;
+            osci::DawPosition position;
+            std::atomic<bool> voices[1] = {};
+            parameters.fillBlockBuffers(4, 100.0, midi, position, voices);
+            expectWithinAbsoluteError(parameters.blockBuffer[0][0], expected.evaluate(0.14f), 0.0001f);
+            juce::XmlElement state("state");
+            parameters.saveToXml(&state);
+            LfoParameters loaded;
+            loaded.setPreset(0, selected);
+            loaded.loadFromXml(&state);
+            expect(loaded.getIsCustom(0) == isCustom);
+            expect(loaded.getEffectiveWaveform(0) == expected);
+            testutil::cleanupLfoParams(loaded);
+        };
+        check(factory, false, LfoPreset::Square);
+        expect(undo.undo());
+        check(custom, true, LfoPreset::Triangle);
+        expect(undo.redo());
+        check(factory, false, LfoPreset::Square);
+
+        beginTest("Identity-only changes are undoable even when the waveform matches a factory preset");
+        undo.beginNewTransaction();
+        undo.perform(new LfoWaveformChangeAction(parameters.waveforms, parameters.waveformLock, 0, factory, factory,
+                                               parameters.customState[0], false, true, preset));
+        expect(parameters.getIsCustom(0));
+        expect(undo.undo());
+        expect(!parameters.getIsCustom(0));
+        expect(undo.redo());
+        expect(parameters.getIsCustom(0));
+
+        undo.clearUndoHistory();
+        tree.removeListener(&listener);
+        testutil::cleanupLfoParams(parameters);
+    }
+};
+
+static LfoWaveformUndoTest lfoWaveformUndoTest;
+
 class LfoPresetAutomationTest : public juce::UnitTest {
 public:
     LfoPresetAutomationTest() : juce::UnitTest("LFO Preset Automation", "LFO") {}

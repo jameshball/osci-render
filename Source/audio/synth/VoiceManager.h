@@ -183,6 +183,7 @@ public:
                          int startSample, int numSamples);
 
     void handleMidiEvent(const juce::MidiMessage& m);
+    void resetAllVoices(bool immediate);
 
 private:
     void handleMidiEventUnlocked(const juce::MidiMessage& m);
@@ -192,9 +193,7 @@ private:
     void sustainOff(int channel);
     void sostenutoOn(int channel);
     void sostenutoOff(int channel);
-    void allNotesOff();
     void allNotesOff(int channel);
-    void allSoundsOff();
     void allSoundsOff(int channel);
 
     ManagedVoice* grabVoice(ManagedVoice** restoreSource = nullptr);

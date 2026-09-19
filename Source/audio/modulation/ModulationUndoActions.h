@@ -56,21 +56,33 @@ struct LfoWaveformChangeAction : public juce::UndoableAction {
     int index;
     LfoWaveform oldWaveform;
     LfoWaveform newWaveform;
+    std::atomic<bool>& customState;
+    bool oldCustom;
+    bool newCustom;
+    juce::AudioProcessorParameter& presetParameter;
 
-    LfoWaveformChangeAction(LfoWaveform* waveforms, juce::SpinLock& lock, int idx,
-                            const LfoWaveform& oldWf, const LfoWaveform& newWf)
+    LfoWaveformChangeAction(LfoWaveform* waveforms, juce::SpinLock& lock, int idx, const LfoWaveform& oldWf, const LfoWaveform& newWf,
+                           std::atomic<bool>& custom, bool wasCustom, bool isCustom, juce::AudioProcessorParameter& preset)
         : waveforms(waveforms), waveformLock(lock), index(idx),
-          oldWaveform(oldWf), newWaveform(newWf) {}
+          oldWaveform(oldWf), newWaveform(newWf), customState(custom), oldCustom(wasCustom), newCustom(isCustom), presetParameter(preset) {}
 
     bool perform() override {
-        juce::SpinLock::ScopedLockType l(waveformLock);
-        waveforms[index] = newWaveform;
-        return true;
+        return apply(newWaveform, newCustom);
     }
 
     bool undo() override {
-        juce::SpinLock::ScopedLockType l(waveformLock);
-        waveforms[index] = oldWaveform;
+        return apply(oldWaveform, oldCustom);
+    }
+
+private:
+    bool apply(const LfoWaveform& waveform, bool custom) {
+        {
+            juce::SpinLock::ScopedLockType l(waveformLock);
+            waveforms[index] = waveform;
+            customState.store(custom, std::memory_order_relaxed);
+        }
+        // Refresh any currently open editor, including one created after this action.
+        presetParameter.sendValueChangedMessageToListeners(presetParameter.getValue());
         return true;
     }
 };
