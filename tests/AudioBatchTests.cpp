@@ -327,10 +327,16 @@ public:
             }
         }
 
-        beginTest("Stopping the worker releases an audio producer blocked by recording backpressure");
-        {
+        const juce::StringArray competingOperations { "none", "manager preparation", "worker preparation", "worker registration", "worker removal" };
+        for (int operation = 0; operation < competingOperations.size(); ++operation) {
+            beginTest("Stopping releases recording backpressure during " + competingOperations[operation]);
             osci::AudioBackgroundThreadManager manager;
             BatchProbe probe(parameters, manager, 60.0, 0);
+            auto other = std::make_unique<BatchProbe>(parameters, manager, 60.0, 0);
+            if (operation == 4) {
+                other->setShouldBeRunning(true);
+                other->setShouldBeRunning(false);
+            }
             probe.holdFirst = true;
             manager.prepare(48000.0, 64);
             probe.setShouldBeRunning(true);
@@ -348,13 +354,38 @@ public:
             });
             expect(entered.wait(1000));
             expect(!returned.wait(100), "Recording should apply backpressure while the worker holds its frame");
-            probe.setShouldBeRunning(false);
-            const bool stopped = returned.wait(1000);
-            expect(stopped, "Stopping must release the writer and the manager lock without a separate recording toggle");
-            if (!stopped) {
-                probe.setBlockOnAudioThread(false);
+
+            juce::WaitableEvent competingEntered, competingReturned, stopReturned;
+            std::thread competing([&] {
+                competingEntered.signal();
+                if (operation == 1) {
+                    manager.prepare(48000.0, 64);
+                } else if (operation == 2) {
+                    probe.prepare(48000.0, 64);
+                } else if (operation == 3) {
+                    other->setShouldBeRunning(true);
+                } else if (operation == 4) {
+                    other.reset();
+                }
+                competingReturned.signal();
+            });
+            expect(competingEntered.wait(1000));
+            if (operation != 0) {
+                expect(!competingReturned.wait(100), "The competing operation must wait for the blocked writer");
             }
+            std::thread stopper([&] {
+                probe.setShouldBeRunning(false);
+                stopReturned.signal();
+            });
+            const bool stopped = stopReturned.wait(1000);
+            expect(stopped, "Stop must remain available while another operation waits for the manager lock");
+            if (!stopped) {
+                probe.releaseFirst.signal(); // Let a failing test clean up instead of hanging.
+            }
+            stopper.join();
+            expect(returned.wait(1000), "Stopping must release the recording writer");
             writer.join();
+            competing.join();
             checkFrames(probe, {0}, 800);
         }
 
