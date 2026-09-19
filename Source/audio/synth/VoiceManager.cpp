@@ -2,9 +2,11 @@
 // Original copyright: Copyright 2013-2019 Matt Tytel.
 
 #include "VoiceManager.h"
-#include <cmath>
+#include <algorithm>
 
 VoiceManager::VoiceManager() {
+    // MIDI pitch wheel positions range from 0 to 16383; 8192 is neutral.
+    std::fill_n(pitchWheelValues, kNumMidiChannels, 8192);
     pressedNotes.reserve(128);
     allVoices.reserve(kMaxPolyphony + 1);
     activeVoices.reserve(kMaxPolyphony + 1);
@@ -144,8 +146,9 @@ void VoiceManager::handleMidiEventUnlocked(const juce::MidiMessage& m) {
         allSoundsOff(m.getChannel() - 1);
     } else if (m.isPitchWheel()) {
         int ch = m.getChannel() - 1;
-        if (ch >= 0 && ch < kNumMidiChannels)
-            pitchWheelValues[ch] = (m.getPitchWheelValue() - 8192.0f) / 8192.0f;
+        if (ch >= 0 && ch < kNumMidiChannels) {
+            pitchWheelValues[ch] = m.getPitchWheelValue();
+        }
         for (auto* mv : activeVoices) {
             if (mv->getState().channel == ch && mv->getJuceVoice() != nullptr)
                 mv->getJuceVoice()->pitchWheelMoved(m.getPitchWheelValue());
@@ -199,8 +202,7 @@ void VoiceManager::noteOn(int note, float velocity, int channel) {
     }
 
     if (voice->getJuceVoice() != nullptr) {
-        const int rawPitchWheelValue = juce::jlimit(0, 16383, (int)std::lround(pitchWheelValues[channel] * 8192.0f + 8192.0f));
-        voice->getJuceVoice()->pitchWheelMoved(rawPitchWheelValue);
+        voice->getJuceVoice()->pitchWheelMoved(pitchWheelValues[channel]);
     }
 
     activeVoices.push_back(voice);
@@ -291,8 +293,7 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
                     }
 
                     if (newVoice->getJuceVoice() != nullptr) {
-                        const int rawPitchWheelValue = juce::jlimit(0, 16383, (int)std::lround(pitchWheelValues[oldChannel] * 8192.0f + 8192.0f));
-                        newVoice->getJuceVoice()->pitchWheelMoved(rawPitchWheelValue);
+                        newVoice->getJuceVoice()->pitchWheelMoved(pitchWheelValues[oldChannel]);
                     }
 
                     activeVoices.push_back(newVoice);

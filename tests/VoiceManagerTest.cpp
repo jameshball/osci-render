@@ -549,6 +549,17 @@ public:
     VMPitchWheelTest() : juce::UnitTest("Pitch Wheel State", "Synth") {}
 
     void runTest() override {
+        beginTest("Every channel starts with a neutral pitch wheel");
+        for (int channel = 1; channel <= 16; ++channel) {
+            auto [vm, client] = createVM(1);
+            sendNoteOn(*vm, 60, 0.8f, channel);
+            auto* voice = findVoicePlayingNote(*vm, 60);
+            expect(voice != nullptr);
+            if (voice != nullptr) {
+                expectEquals(voice->lastPitchWheelValue, 8192);
+            }
+        }
+
         beginTest("A new voice inherits the channel pitch-wheel value");
         auto [vm, _] = createVM(1);
         vm->handleMidiEvent(juce::MidiMessage::pitchWheel(3, 12288));
