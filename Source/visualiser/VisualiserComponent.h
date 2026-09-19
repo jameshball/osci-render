@@ -63,6 +63,7 @@ public:
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
     void cancelOverlayFadeIn();
+    void restoreAfterOfflineRender(double sampleRate);
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;

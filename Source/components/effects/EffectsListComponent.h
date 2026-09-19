@@ -29,12 +29,22 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         audioProcessor.getUndoManager().beginNewTransaction("Randomise Effects");
         CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
 
+        std::vector<juce::String> beforeOrder;
+
         // Decide which effects to pick (indices into toggleableEffects)
         int total;
         std::vector<int> pickedIndices;
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             total = (int)audioProcessor.toggleableEffects.size();
+            auto effectsInOrder = audioProcessor.toggleableEffects;
+            std::sort(effectsInOrder.begin(), effectsInOrder.end(), [](const auto& a, const auto& b) {
+                return a->getPrecedence() < b->getPrecedence();
+            });
+            beforeOrder.reserve(effectsInOrder.size());
+            for (const auto& effect : effectsInOrder) {
+                beforeOrder.push_back(effect->getId());
+            }
         }
         int maxPick = juce::jmin(5, total);
         int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
@@ -83,15 +93,21 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         // Refresh local data with only selected effects
         resetData();
         
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            // shuffle precedence of the selected subset
-            std::shuffle(data.begin(), data.end(), g);
-            for (int i = 0; i < (int)data.size(); i++) {
-                data[i]->setPrecedence(i);
-            }
-            audioProcessor.updateEffectPrecedence();
+        std::shuffle(data.begin(), data.end(), g);
+        std::vector<juce::String> afterOrder;
+        afterOrder.reserve(beforeOrder.size());
+        for (const auto& effect : data) {
+            afterOrder.push_back(effect->getId());
         }
+        for (const auto& id : beforeOrder) {
+            if (std::find(afterOrder.begin(), afterOrder.end(), id) == afterOrder.end()) {
+                afterOrder.push_back(id);
+            }
+        }
+
+        audioProcessor.getUndoManager().perform(
+            new PrecedenceChangeAction(audioProcessor, std::move(beforeOrder), std::move(afterOrder)));
+        resetData();
     }
 
     void resetData() {

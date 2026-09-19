@@ -16,6 +16,7 @@ public:
     int lastMidiNote = -1;
     float lastVelocity = 0.0f;
     bool lastLegatoFlag = false;
+    int lastPitchWheelValue = 8192;
 
     // Drawing state
     int drawPosition = 0;
@@ -67,7 +68,7 @@ public:
     bool canPlaySound(juce::SynthesiserSound*) override { return true; }
     void startNote(int, float, juce::SynthesiserSound*, int) override {}
     void stopNote(float, bool) override {}
-    void pitchWheelMoved(int) override {}
+    void pitchWheelMoved(int value) override { lastPitchWheelValue = value; }
     void controllerMoved(int, int) override {}
 
     void renderNextBlock(juce::AudioSampleBuffer& buf, int startSample, int numSamples) override {
@@ -241,14 +242,39 @@ public:
             expectEquals(vm->getNumPressedNotes(), 0);
         }
 
-        beginTest("allSoundOff clears notes across MIDI channels");
+        beginTest("allSoundOff only clears its MIDI channel");
         {
             auto [vm, _] = createVM(4);
             sendNoteOn(*vm, 60, 0.8f, 2);
             sendNoteOn(*vm, 67, 0.8f, 9);
-            vm->handleMidiEvent(juce::MidiMessage::allSoundOff(1));
+            vm->handleMidiEvent(juce::MidiMessage::allSoundOff(2));
+            expectEquals(vm->getNumPressedNotes(), 1);
+            expect(findVoicePlayingNote(*vm, 60) == nullptr);
+            expect(findVoicePlayingNote(*vm, 67) != nullptr);
+        }
+
+        beginTest("Internal panic and kill reset every channel, including pedal state");
+        for (bool immediate : { false, true }) {
+            auto [vm, client] = createVM(16);
+            for (int channel = 1; channel <= 16; ++channel) {
+                sendNoteOn(*vm, 60, 0.8f, channel);
+                vm->handleMidiEvent(juce::MidiMessage::controllerEvent(channel, 64, 127));
+                vm->handleMidiEvent(juce::MidiMessage::controllerEvent(channel, 66, 127));
+            }
+            vm->resetAllVoices(immediate);
             expectEquals(vm->getNumPressedNotes(), 0);
             expectEquals(countAudibleVoices(*vm), 0);
+            expectEquals(vm->getLastPlayedNoteFreq(), 0.0);
+            renderBlock(*vm);
+            expectEquals(vm->getNumActiveVoices(), 0);
+
+            // New events in the same callback must survive the reset, and must
+            // not inherit the old channel's sustain/sostenuto pedals.
+            sendNoteOn(*vm, 67, 0.8f, 9);
+            expectEquals(countAudibleVoices(*vm), 1);
+            sendNoteOff(*vm, 67, 9);
+            renderBlock(*vm);
+            expectEquals(vm->getNumActiveVoices(), 0);
         }
 
         beginTest("velocity-0 noteOn treated as noteOff");
@@ -497,6 +523,51 @@ public:
             sendNoteOff(*vm, 60);
             sendNoteOn(*vm, 64); // new note while 60 is sustained
             expectEquals(countAudibleVoices(*vm), 2);
+        }
+
+        beginTest("Sostenuto holds only notes captured before the pedal");
+        {
+            auto [vm, _] = createVM(2);
+            sendNoteOn(*vm, 60);
+            vm->handleMidiEvent(juce::MidiMessage::controllerEvent(1, 66, 127));
+            sendNoteOn(*vm, 64);
+            sendNoteOff(*vm, 60);
+            sendNoteOff(*vm, 64);
+            renderBlock(*vm, 128);
+            expect(findVoicePlayingNote(*vm, 60) != nullptr);
+            expect(findVoicePlayingNote(*vm, 64) == nullptr);
+
+            vm->handleMidiEvent(juce::MidiMessage::controllerEvent(1, 66, 0));
+            renderBlock(*vm, 128);
+            expect(findVoicePlayingNote(*vm, 60) == nullptr);
+        }
+    }
+};
+
+class VMPitchWheelTest : public juce::UnitTest {
+public:
+    VMPitchWheelTest() : juce::UnitTest("Pitch Wheel State", "Synth") {}
+
+    void runTest() override {
+        beginTest("Every channel starts with a neutral pitch wheel");
+        for (int channel = 1; channel <= 16; ++channel) {
+            auto [vm, client] = createVM(1);
+            sendNoteOn(*vm, 60, 0.8f, channel);
+            auto* voice = findVoicePlayingNote(*vm, 60);
+            expect(voice != nullptr);
+            if (voice != nullptr) {
+                expectEquals(voice->lastPitchWheelValue, 8192);
+            }
+        }
+
+        beginTest("A new voice inherits the channel pitch-wheel value");
+        auto [vm, _] = createVM(1);
+        vm->handleMidiEvent(juce::MidiMessage::pitchWheel(3, 12288));
+        sendNoteOn(*vm, 60, 0.8f, 3);
+        auto* voice = findVoicePlayingNote(*vm, 60);
+        expect(voice != nullptr);
+        if (voice != nullptr) {
+            expectEquals(voice->lastPitchWheelValue, 12288);
         }
     }
 };
@@ -893,6 +964,7 @@ static VMLastPlayedNoteFreqTest vmLastPlayedNoteFreqTest;
 static VMVoiceAllocationTest vmVoiceAllocationTest;
 static VMReVoicingTest vmReVoicingTest;
 static VMSustainPedalTest vmSustainPedalTest;
+static VMPitchWheelTest vmPitchWheelTest;
 static VMLegatoTest vmLegatoTest;
 static VMDrawingStateTransferTest vmDrawingStateTransferTest;
 static VMPolyphonyEnforcementTest vmPolyphonyEnforcementTest;

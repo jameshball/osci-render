@@ -130,7 +130,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
     if (audioProcessor.midiEnabled->getBoolValue()) {
         double newFreq = audioProcessor.noteToFrequency(vs.midiNote, vs.channel) + osci_audio::kMacFrequencyEpsilonHz;
 #if OSCI_PREMIUM
-        double glideTimeSec = audioProcessor.glideTime->getValueUnnormalised();
+        double glideTimeSec = audioProcessor.glideTime->getModulatedValue();
 
         // Determine glide source and whether to glide.
 
@@ -488,8 +488,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     // Add processed samples to output buffer (apply envelope/velocity gain AFTER effects)
     // Velocity tracking: at 0% velocity has no effect (gain=1), at 100% full velocity,
     // at -100% inverted velocity
-    const float velTrack = audioProcessor.velocityTracking->getValueUnnormalised();
-    const float velGain = 1.0f + velTrack * ((float)velocity - 1.0f);
+    const float* velocityTrackingValues = audioProcessor.velocityTracking->getModulationReadPointer(startSample + numSamples);
 
     // Kill-fade: per-sample linear ramp from 1→0 over kKillFadeTimeSec.
     const float killFadeDecPerSample = killFading
@@ -519,6 +518,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             }
         }
 
+        const float velTrack = velocityTrackingValues != nullptr
+            ? velocityTrackingValues[startSample + i]
+            : audioProcessor.velocityTracking->getValueUnnormalised();
+        const float velGain = 1.0f + velTrack * ((float)velocity - 1.0f);
         float gain = velGain * envelopeBuffer.getSample(0, i) * killMul;
 
         int sample = startSample + i;

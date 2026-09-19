@@ -148,7 +148,8 @@ public:
             manager.processMidiBuffer(buffer);
             pumpMessageLoop(200);
 
-            expectWithinAbsoluteError(parameter->getValueUnnormalised(), 1.0f, 0.15f);
+            const auto expectedValue = OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN ? 1.0f : 0.0f;
+            expectWithinAbsoluteError(parameter->getValueUnnormalised(), expectedValue, 0.15f);
             expectEquals(receivedProgram, 9);
         }
 
@@ -183,6 +184,7 @@ public:
 
 static MidiMessageDispatchTest midiMessageDispatchTest;
 
+#if OSCI_RENDER_CORE_ENABLE_MIDI_CC_LEARN
 class MidiCCAssignmentTest : public juce::UnitTest {
 public:
     MidiCCAssignmentTest() : juce::UnitTest("MIDI CC Assignment", "MidiCC") {}
@@ -920,3 +922,48 @@ private:
 };
 
 static MidiCCStressTest midiCCStressTest;
+#else
+class MidiCCDisabledTest : public juce::UnitTest {
+public:
+    MidiCCDisabledTest() : juce::UnitTest("MIDI CC Disabled", "MidiCC") {}
+
+    void runTest() override {
+        ensureMessageManagerExists();
+        osci::MidiManager manager;
+        auto parameter = makeFloat("freeParameter", 0.5f);
+
+        beginTest("Disabled CC learning leaves parameters unchanged");
+        manager.startLearning(parameter.get());
+        expect(!manager.isLearning());
+        manager.processMidiBuffer(makeCCBuffer(10, 127));
+        pumpMessageLoop(100);
+        expectEquals(manager.getAssignedCC(parameter.get()), -1);
+        expectWithinAbsoluteError(parameter->getValueUnnormalised(), 0.5f, 0.001f);
+
+        beginTest("Disabled custom learning never invokes the setter");
+        int setterCalls = 0;
+        manager.startLearningCustom("freeCustom", [&](float) { ++setterCalls; });
+        expect(!manager.isLearningCustom("freeCustom"));
+        manager.processMidiBuffer(makeCCBuffer(10, 127));
+        pumpMessageLoop(100);
+        expectEquals(setterCalls, 0);
+
+        beginTest("Premium CC mappings are ignored when loading free state");
+        juce::XmlElement state("state");
+        auto* assignments = state.createNewChildElement("midiCCAssignments");
+        auto* assignment = assignments->createNewChildElement("assignment");
+        assignment->setAttribute("paramId", "freeParameter");
+        assignment->setAttribute("cc", 10);
+        assignment->setAttribute("channel", 1);
+        manager.load(&state, [&](const juce::String&) {
+            return osci::MidiManager::ParamBinding { parameter.get(), nullptr };
+        });
+        expectEquals(manager.getAssignedCC(parameter.get()), -1);
+        manager.processMidiBuffer(makeCCBuffer(10, 127));
+        pumpMessageLoop(100);
+        expectWithinAbsoluteError(parameter->getValueUnnormalised(), 0.5f, 0.001f);
+    }
+};
+
+static MidiCCDisabledTest midiCCDisabledTest;
+#endif

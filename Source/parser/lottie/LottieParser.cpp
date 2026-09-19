@@ -377,8 +377,8 @@ OsciLottieParser::OsciLottieParser(juce::String jsonContent, std::function<void(
 
     float w = 0.0f, h = 0.0f;
     picture->size(&w, &h);
-    pictureWidth = (w > 0.0f) ? w : 1.0f;
-    pictureHeight = (h > 0.0f) ? h : 1.0f;
+    pictureWidth = (std::isfinite(w) && w > 0.0f) ? w : 1.0f;
+    pictureHeight = (std::isfinite(h) && h > 0.0f) ? h : 1.0f;
 
     int frameCount = std::max(1, (int) std::floor(animation->totalFrame() + 0.5f));
     if (frameCount < 1) frameCount = 1;

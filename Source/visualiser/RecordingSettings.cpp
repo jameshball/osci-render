@@ -68,6 +68,8 @@ void RecordingParameters::load(juce::XmlElement* xml) {
 
     if (settingsXml->hasAttribute("customTextureOutputName")) {
         customTextureOutputName = settingsXml->getStringAttribute("customTextureOutputName");
+    } else if (settingsXml->hasAttribute("customSharedTextureServerName")) {
+        customTextureOutputName = settingsXml->getStringAttribute("customSharedTextureServerName");
     }
 
     if (settingsXml->hasAttribute("videoCodec")) {

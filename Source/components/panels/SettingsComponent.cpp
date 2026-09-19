@@ -242,6 +242,7 @@ SettingsComponent::SettingsComponent(OscirenderAudioProcessor& p, OscirenderAudi
 SettingsComponent::~SettingsComponent() {
     stopTimer();
 #if OSCI_PREMIUM
+    audioProcessor.lfoParameters.onAssignmentAdded = nullptr;
     if (juce::JUCEApplicationBase::isStandaloneApp()) {
         if (auto* holder = juce::StandalonePluginHolder::getInstance())
             holder->deviceManager.removeChangeListener(this);

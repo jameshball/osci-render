@@ -543,9 +543,9 @@ private:
     void testFileFormatRegistry() {
         beginTest("File format registry keeps Lottie capabilities together");
 
-        expect(osci::files::isSupportedSource("animation.lottie"));
-        expect(osci::files::isLottie(".json"));
-        expect(osci::files::isAnimated("lot"));
+        expect(osci::files::isSupportedSource("animation.lottie") == bool(OSCI_PREMIUM));
+        expect(osci::files::isLottie(".json") == bool(OSCI_PREMIUM));
+        expect(osci::files::isAnimated("lot") == bool(OSCI_PREMIUM));
         expect(!osci::files::isCodeEditable("animation.json"));
         expect(osci::files::isCodeEditable("script.lua"));
         expect(osci::files::isAudio("track.WAV"));
@@ -554,9 +554,9 @@ private:
         expect(osci::files::isAudio("track.m4a"));
         expect(osci::files::audioWildcard().contains("*.m4a"));
 #endif
-        expect(osci::files::isImage("clip.mp4"));
-        expect(osci::files::isVideo("clip.mp4"));
-        expect(osci::files::sourceWildcard().contains("*.lottie"));
+        expect(osci::files::isImage("clip.mp4") == bool(OSCI_PREMIUM));
+        expect(osci::files::isVideo("clip.mp4") == bool(OSCI_PREMIUM));
+        expect(osci::files::sourceWildcard().contains("*.lottie") == bool(OSCI_PREMIUM));
         expect(osci::files::isOsciProject(juce::File("/tmp/project.OSCI")));
         expect(!osci::files::isSupportedSource("project.osci"));
     }
