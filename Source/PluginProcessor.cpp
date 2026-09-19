@@ -1509,11 +1509,14 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.startPreview(effectId, toggleableEffects);
+    // Refresh the editor without sending temporary preview values to the host.
+    broadcaster.sendChangeMessage();
 }
 
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.stopPreview();
+    broadcaster.sendChangeMessage();
 }
 
 juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& paramId) const {
