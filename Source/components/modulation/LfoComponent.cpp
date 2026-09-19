@@ -577,7 +577,7 @@ void LfoComponent::setLfoPreset(int lfoIndex, LfoPreset preset) {
     if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
     lfoData[lfoIndex].preset = preset;
     lfoData[lfoIndex].isCustom = false;
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(lfoIndex);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(lfoIndex);
     lfoData[lfoIndex].waveform = createLfoPreset(preset);
     lfoData[lfoIndex].factoryWaveform = lfoData[lfoIndex].waveform;
     audioProcessor.lfoParameters.waveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
@@ -632,7 +632,7 @@ void LfoComponent::applyPreset(LfoPreset preset) {
         shapePreview.setEnabled(false);
     }
 
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
@@ -654,9 +654,28 @@ void LfoComponent::updatePresetLabel() {
         presetSelector.setPresetName(lfoPresetToString(lfoData[idx].preset));
 }
 
+void LfoComponent::timerCallback() {
+    ModulationSourceComponent::timerCallback();
+    auto& parameters = audioProcessor.lfoParameters;
+    for (int i = 0; i < NUM_LFOS; ++i) {
+        const auto selected = parameters.getPreset(i);
+        if (!parameters.getIsCustom(i) && selected != lfoData[i].preset) {
+            lfoData[i].preset = selected;
+            lfoData[i].waveform = parameters.getEffectiveWaveform(i);
+            lfoData[i].factoryWaveform = lfoData[i].waveform;
+            lfoData[i].isCustom = false;
+            lfoData[i].userPresetName.clear();
+            if (i == getActiveSourceIndex()) {
+                syncGraphToActiveLfo();
+                updatePresetLabel();
+            }
+        }
+    }
+}
+
 void LfoComponent::syncFromProcessorState() {
     for (int i = 0; i < NUM_LFOS; ++i) {
-        lfoData[i].waveform = audioProcessor.lfoParameters.getWaveform(i);
+        lfoData[i].waveform = audioProcessor.lfoParameters.getEffectiveWaveform(i);
         lfoData[i].preset = audioProcessor.lfoParameters.getPreset(i);
         lfoData[i].factoryWaveform = createLfoPreset(lfoData[i].preset);
         lfoData[i].isCustom = (lfoData[i].waveform != lfoData[i].factoryWaveform);
@@ -804,7 +823,7 @@ void LfoComponent::pasteWaveformFromClipboard() {
     lfoData[idx].waveform = std::move(waveform);
     lfoData[idx].isCustom = true;
     lfoData[idx].userPresetName.clear();
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     audioProcessor.lfoParameters.setIsCustom(idx, true);
 
@@ -913,7 +932,7 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
     lfoData[idx].isCustom = true;
     lfoData[idx].userPresetName = name;
 
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     audioProcessor.lfoParameters.setIsCustom(idx, true);
 

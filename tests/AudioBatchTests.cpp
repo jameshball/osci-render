@@ -1,9 +1,112 @@
 #include <JuceHeader.h>
 #include "../modules/osci_gui/visualiser/osci_VisualiserRenderer.h"
+#include "../Source/visualiser/OfflineFrameSchedule.h"
 
+#include <limits>
 #include <thread>
 
 namespace {
+
+struct LifecycleState {
+    std::atomic<bool> ready { false };
+    std::atomic<int> preparations { 0 };
+    std::atomic<int> invalidCallbacks { 0 };
+};
+
+// This base is constructed after AudioBackgroundThread, but before the derived
+// vtable/members are ready. Before the fix, this deterministically called a pure
+// virtual prepareTask through the prematurely registered base-class pointer.
+struct LifecyclePreparationHook {
+    explicit LifecyclePreparationHook(osci::AudioBackgroundThreadManager& manager) : manager(manager) {
+        manager.prepare(48000.0, 128);
+    }
+    ~LifecyclePreparationHook() {
+        manager.prepare(48000.0, 128);
+    }
+    osci::AudioBackgroundThreadManager& manager;
+};
+
+class LifecycleProbe final : public osci::AudioBackgroundThread, private LifecyclePreparationHook {
+public:
+    LifecycleProbe(osci::AudioBackgroundThreadManager& manager, LifecycleState& state)
+        : AudioBackgroundThread("LifecycleProbe", manager), LifecyclePreparationHook(manager), state(state) {
+        state.ready = true;
+        setShouldBeRunning(true);
+    }
+    ~LifecycleProbe() override {
+        setShouldBeRunning(false);
+        unregisterFromManager();
+        state.ready = false;
+        LifecyclePreparationHook::manager.prepare(44100.0, 64);
+    }
+    int prepareTask(double, int blockSize) override {
+        ++state.preparations;
+        if (!state.ready) {
+            ++state.invalidCallbacks;
+        }
+        return blockSize;
+    }
+    void runTask(const juce::AudioBuffer<float>&) override {
+        if (!state.ready) {
+            ++state.invalidCallbacks;
+        }
+    }
+    void stopTask() override {}
+private:
+    LifecycleState& state;
+};
+
+class AudioBackgroundLifetimeTest final : public juce::UnitTest {
+public:
+    AudioBackgroundLifetimeTest() : juce::UnitTest("Audio background lifetime", "AudioBackgroundLifetime") {}
+    void runTest() override {
+        beginTest("Construction and teardown cannot expose a partial object to host preparation");
+        {
+            osci::AudioBackgroundThreadManager manager;
+            LifecycleState state;
+            {
+                LifecycleProbe probe(manager, state);
+                expectEquals(state.preparations.load(), 1);
+                probe.setShouldBeRunning(true);
+                manager.prepare(96000.0, 256);
+                expectEquals(state.preparations.load(), 2, "Repeated activation must not duplicate registration");
+                probe.setShouldBeRunning(false);
+                manager.prepare(44100.0, 64);
+                probe.setShouldBeRunning(true);
+                expectEquals(state.preparations.load(), 3, "Paused workers still receive host configuration changes");
+            }
+            const int before = state.preparations;
+            manager.prepare(48000.0, 128);
+            expectEquals(state.preparations.load(), before, "Destroyed workers must no longer receive callbacks");
+            expectEquals(state.invalidCallbacks.load(), 0);
+        }
+
+        beginTest("Concurrent host preparation and audio writes survive repeated worker creation/destruction");
+        {
+            osci::AudioBackgroundThreadManager manager;
+            LifecycleState state;
+            std::atomic<bool> finished { false };
+            std::thread host([&] {
+                juce::AudioBuffer<float> audio(2, 128);
+                audio.clear();
+                while (!finished) {
+                    manager.prepare(48000.0, 128);
+                    manager.write(audio);
+                    std::this_thread::yield();
+                }
+            });
+            for (int i = 0; i < 100; ++i) {
+                LifecycleProbe probe(manager, state);
+                std::this_thread::yield();
+            }
+            finished = true;
+            host.join();
+            expectEquals(state.invalidCallbacks.load(), 0);
+        }
+    }
+};
+
+static AudioBackgroundLifetimeTest audioBackgroundLifetimeTest;
 
 // Exercise the real visualiser sizing and background worker without needing a GPU.
 // Only the existing per-frame rendering callback is replaced with an observer.
@@ -17,6 +120,7 @@ public:
     ~BatchProbe() override {
         releaseFirst.signal();
         setShouldBeRunning(false);
+        unregisterFromManager();
     }
 
     struct Frame {
@@ -364,6 +468,27 @@ public:
             probe.runTask(second);
             checkFrames(probe, {0, 48000}, 48000);
             expect(probe.frames.back().time - probe.frames.front().time < 500.0);
+        }
+
+        beginTest("Offline frame schedule stays aligned at fractional sample ratios");
+        {
+            constexpr double sampleRate = 44100.0;
+            constexpr double frameRate = 240.0;
+            constexpr juce::int64 oneHourSamples = 44100 * 60 * 60;
+            const auto totalFrames = OfflineFrameSchedule::getTotalFrames(oneHourSamples, sampleRate, frameRate);
+            juce::int64 scheduledSamples = 0;
+            int minFrameSamples = std::numeric_limits<int>::max();
+            int maxFrameSamples = 0;
+            for (juce::int64 frame = 0; frame < totalFrames; ++frame) {
+                const int frameSamples = OfflineFrameSchedule::getFrameSamples(frame, sampleRate, frameRate);
+                scheduledSamples += frameSamples;
+                minFrameSamples = juce::jmin(minFrameSamples, frameSamples);
+                maxFrameSamples = juce::jmax(maxFrameSamples, frameSamples);
+            }
+            expectEquals(totalFrames, (juce::int64)(240 * 60 * 60));
+            expectEquals(scheduledSamples, oneHourSamples);
+            expectEquals(minFrameSamples, 183);
+            expectEquals(maxFrameSamples, 184);
         }
     }
 

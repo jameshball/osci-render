@@ -193,7 +193,9 @@ private:
     void sostenutoOn(int channel);
     void sostenutoOff(int channel);
     void allNotesOff();
+    void allNotesOff(int channel);
     void allSoundsOff();
+    void allSoundsOff(int channel);
 
     ManagedVoice* grabVoice(ManagedVoice** restoreSource = nullptr);
     ManagedVoice* grabFreeVoice();

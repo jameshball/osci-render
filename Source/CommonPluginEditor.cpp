@@ -308,6 +308,11 @@ CommonPluginEditor::~CommonPluginEditor() {
         audioProcessor.haltRecording();
     }
 
+    if (offlineRenderPreviousActiveState.has_value()) {
+        audioProcessor.setOfflineRenderActive(*offlineRenderPreviousActiveState);
+        offlineRenderPreviousActiveState.reset();
+    }
+
     if (&tooltipWindow->getLookAndFeel() == &lookAndFeel) {
         tooltipWindow->setLookAndFeel(nullptr);
     }
@@ -600,6 +605,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
 
             // Make the plugin output silent and skip heavy processing during offline render.
+            safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
             safeThis->audioProcessor.setOfflineRenderActive(true);
 
             auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
@@ -649,6 +655,8 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 }
 
                 safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
+                safeThis->offlineRenderPreviousActiveState.reset();
+                safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
                 safeThis->visualiser.setPaused(wasVisualiserPaused, false);
 
                 if (resultHolder != nullptr && resultHolder->has_value()) {
