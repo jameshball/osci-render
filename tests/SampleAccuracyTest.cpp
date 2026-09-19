@@ -135,7 +135,7 @@ public:
 
         // Build param location map
         std::unordered_map<juce::String, ParamLocation> paramMap;
-        paramMap["target"] = { &targetEffect, 0 };
+        paramMap["target"] = { targetEffect.parameters[0], &targetEffect, 0 };
 
         // Create LFO source with a fast triangle LFO
         LfoParameters lfoParams;
@@ -193,6 +193,55 @@ public:
 };
 
 static GlobalModulationSampleAccuracyTest globalModulationSampleAccuracyTest;
+
+class StandaloneParameterModulationTest : public juce::UnitTest {
+public:
+    StandaloneParameterModulationTest() : juce::UnitTest("Standalone Parameter Modulation", "LFO") {}
+
+    void runTest() override {
+        beginTest("Registered float parameters receive per-sample modulation");
+
+        constexpr int blockSize = 256;
+        constexpr double sampleRate = 48000.0;
+        osci::FloatParameter target("Standalone", "standaloneTarget", VERSION_HINT, 0.25f, 0.0f, 1.0f);
+        std::unordered_map<juce::String, ParamLocation> paramMap;
+        paramMap[target.paramID] = { &target, nullptr, -1 };
+
+        LfoParameters lfoParams;
+        lfoParams.rate[0]->setUnnormalisedValueNotifyingHost(200.0f);
+        lfoParams.setPreset(0, LfoPreset::Triangle);
+        lfoParams.setMode(0, LfoMode::Free);
+        lfoParams.addAssignment({ 0, target.paramID, 0.5f, false });
+
+        ModulationEngine engine(paramMap);
+        engine.addSource(&lfoParams);
+        engine.prepareToPlay(sampleRate, blockSize);
+        engine.beginModulationBlock(blockSize);
+
+        juce::MidiBuffer emptyMidi;
+        std::atomic<bool> voiceActive[16] = {};
+        const auto dawPosition = makeDawPosition(sampleRate);
+        lfoParams.fillBlockBuffers<16>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
+        engine.applyAllModulation(blockSize);
+
+        const float* values = target.getModulationReadPointer(blockSize);
+        expect(values != nullptr);
+        if (values != nullptr) {
+            int distinctCount = 0;
+            for (int sample = 1; sample < blockSize; ++sample) {
+                if (std::abs(values[sample] - values[sample - 1]) > 1.0e-7f) {
+                    distinctCount++;
+                }
+            }
+            expect(distinctCount > blockSize / 2);
+            expectWithinAbsoluteError(target.getPreviousModulatedValue(), values[blockSize - 1], 1.0e-7f);
+        }
+
+        testutil::cleanupLfoParams(lfoParams);
+    }
+};
+
+static StandaloneParameterModulationTest standaloneParameterModulationTest;
 
 // ============================================================================
 // Test 3: getAnimatedValuesReadPointer returns per-sample data
@@ -333,6 +382,7 @@ public:
         ramp.smooth = false;
         ramp.nodes = { { 0.0, 0.0, 0.0f }, { 1.0, 1.0, 0.0f } };
         lfoParams.waveformChanged(0, ramp);
+        lfoParams.setIsCustom(0, true);
 
         auto renderFirstSampleAt = [&](double syncStartSeconds) {
             lfoParams.audioStates[0].phase = 0.73f;

@@ -93,7 +93,7 @@ echo "VST3 plugin: $VST3_PATH"
 
 # ── Run pluginval ──────────────────────────────────────────────
 
-PLUGINVAL_LOG_DIR="$ROOT/bin/pluginval-logs"
+PLUGINVAL_LOG_DIR="$ROOT/bin/pluginval-logs/$TARGET"
 mkdir -p "$PLUGINVAL_LOG_DIR"
 
 PLUGINVAL_TIMEOUT="${PLUGINVAL_TIMEOUT:-60000}"
@@ -207,7 +207,7 @@ else
                 --validate "$VST3_PATH" \
             || true
 
-        # Check the pluginval log for SUCCESS instead of trusting procdump's exit code
+        # Check this target's isolated pluginval log for SUCCESS instead of trusting procdump's exit code
         if ! grep -rq '^SUCCESS$' "$PLUGINVAL_LOG_DIR"/ 2>/dev/null; then
             PLUGINVAL_EXIT=1
         fi

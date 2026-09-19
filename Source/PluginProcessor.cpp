@@ -193,6 +193,19 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     }
 #endif
 
+#if !OSCI_PREMIUM
+    // Premium transfers these parameters to AudioProcessor; free must still own them
+    // without exposing premium-only parameters to the host.
+    for (auto* source : std::initializer_list<ModulationSource*> { &lfoParameters, &randomParameters, &sidechainParameters }) {
+        for (auto* parameter : source->getFloatParameters()) {
+            unhostedModulationParameters.add(parameter);
+        }
+        for (auto* parameter : source->getIntParameters()) {
+            unhostedModulationParameters.add(parameter);
+        }
+    }
+#endif
+
     intParameters.push_back(voices);
     intParameters.push_back(fileSelect);
     intParameters.push_back(midiInputChannel);
@@ -349,6 +362,7 @@ void VoiceBuilder::run() {
                 if (targetCount.load(std::memory_order_acquire) > current) {
                     processor.synth.addVoice(voice); // internally locked
                     readyVoiceCount.store(current + 1, std::memory_order_release);
+                    firstVoiceReady.signal();
                 } else {
                     delete voice;
                 }
@@ -392,7 +406,10 @@ void OscirenderAudioProcessor::setAudioThreadCallback(std::function<void(const j
 
 void OscirenderAudioProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
     defaultEnvelopeState.smoothedLevel = 0.0f;
-    synth.handleMidiEvent(juce::MidiMessage::allSoundOff(1));
+    if (voiceBuilder != nullptr) {
+        voiceBuilder->waitForAnyVoice(5000);
+    }
+    synth.resetAllVoices(true);
     synth.setCurrentPlaybackSampleRate(sampleRate);
     retriggerMidi = true;
 
@@ -644,6 +661,8 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
     // Release voices hidden by a new channel filter or MIDI mode.
     if (prevMidiEnabled != usingMidi || (usingMidi && midiChannelChanged)) {
         // Reset before new notes, including notes at the start of a one-sample block.
+        synth.resetAllVoices(true);
+        // Keep the ordered reset event for the LFO/random note trackers too.
         filteredMidiMessages.clear();
         filteredMidiMessages.addEvent(juce::MidiMessage::allSoundOff(1), 0);
         filteredMidiMessages.addEvents(midiMessages, 0, -1, 0);
@@ -722,6 +741,8 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         }
 
 #if OSCI_PREMIUM
+        modulationEngine.beginModulationBlock(numSamples);
+
         // Fill modulation block buffers (type-specific generation)
         lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, blockDawPosition, uiVoiceActive);
         envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
@@ -764,7 +785,11 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
             outputBuffer3d.copyFrom(1, 0, inputBuffer, 0, 0, buffer.getNumSamples());
         }
 
-        // handle all midi messages
+        // Note activation reads the active sound and effect state even in input
+        // mode. Match the synth path's lock order so file edits cannot retire
+        // those objects while MIDI lifecycle callbacks are using them.
+        juce::SpinLock::ScopedLockType fileLock(fileController.lock);
+        juce::SpinLock::ScopedLockType effectLock(effectsLock);
         auto midiIterator = midiMessages.cbegin();
         std::for_each(midiIterator,
             midiMessages.cend(),
@@ -919,8 +944,7 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
 
 void OscirenderAudioProcessor::sendMidiPanic(bool immediate) {
     keyboardState.allNotesOff(0);
-    synth.handleMidiEvent(immediate ? juce::MidiMessage::allSoundOff(1)
-                                    : juce::MidiMessage::allNotesOff(1));
+    synth.resetAllVoices(immediate);
 }
 
 juce::AudioProcessorEditor* OscirenderAudioProcessor::createEditor() {
@@ -1074,9 +1098,13 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
 
         auto floatParametersXml = xml->getChildByName("floatParameters");
         juce::XmlElement* legacyAnimationRateXml = nullptr;
+        bool hasHoldTimeState = false;
         if (floatParametersXml != nullptr) {
             for (auto parameterXml : floatParametersXml->getChildIterator()) {
                 const auto parameterId = parameterXml->getStringAttribute("id");
+                if (parameterId == "holdTime") {
+                    hasHoldTimeState = true;
+                }
                 if (parameterId == "animationRate") {
                     legacyAnimationRateXml = parameterXml;
                     if (serializedLegacyAnimationRateActive) {
@@ -1090,6 +1118,9 @@ void OscirenderAudioProcessor::setStateInformation(const void* data, int sizeInB
                     parameter->load(parameterXml);
                 }
             }
+        }
+        if (!hasHoldTimeState) {
+            envelopeParameters.params[0].holdTime->setUnnormalisedValueNotifyingHost(0.0f);
         }
         if (serializedLegacyAnimationRateActive) {
             legacyAnimationRateActive.store(true, std::memory_order_relaxed);
@@ -1464,7 +1495,7 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
         LfoAssignment assignment;
         assignment.sourceIndex = match.index;
         assignment.paramId = conv.paramId;
-        assignment.depth = std::abs(depth);
+        assignment.depth = depth;
         assignment.bipolar = false;
         lfoParameters.addAssignment(assignment);
 
@@ -1478,11 +1509,14 @@ void OscirenderAudioProcessor::convertFreeProjectLfos(const juce::XmlElement* ef
 void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effectId) {
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.startPreview(effectId, toggleableEffects);
+    // Refresh the editor without sending temporary preview values to the host.
+    broadcaster.sendChangeMessage();
 }
 
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.stopPreview();
+    broadcaster.sendChangeMessage();
 }
 
 juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& paramId) const {
@@ -1516,7 +1550,7 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
             for (int p = 0; p < (int)effect->parameters.size(); ++p) {
                 const auto& pid = effect->parameters[p]->paramID;
                 if (paramLocationMap.find(pid) == paramLocationMap.end())
-                    paramLocationMap[pid] = { effect.get(), p };
+                    paramLocationMap[pid] = { effect->parameters[p], effect.get(), p };
             }
         }
     };
@@ -1524,7 +1558,7 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
         for (int p = 0; p < (int)effect->parameters.size(); ++p) {
             const auto& pid = effect->parameters[p]->paramID;
             if (paramLocationMap.find(pid) == paramLocationMap.end())
-                paramLocationMap[pid] = { effect.get(), p };
+                paramLocationMap[pid] = { effect->parameters[p], effect.get(), p };
         }
     };
     registerEffects(toggleableEffects);
@@ -1532,6 +1566,11 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
     registerEffects(luaEffects);
     registerSingle(frequencyEffect);
     registerSingle(perspective);
+    for (auto* parameter : floatParameters) {
+        if (parameter != nullptr && paramLocationMap.find(parameter->paramID) == paramLocationMap.end()) {
+            paramLocationMap[parameter->paramID] = { parameter, nullptr, -1 };
+        }
+    }
     // NOTE: visualiserParameters.effects and .audioEffects are NOT registered here.
     // They are animated/modulated on the renderer thread, not the audio thread.
     // See visualiserParameters.applyExternalModulation.

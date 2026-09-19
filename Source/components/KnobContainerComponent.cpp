@@ -91,12 +91,16 @@ void KnobContainerComponent::setupMidiCCContextMenu() {
 void KnobContainerComponent::showSettingsPopup() {
     if (!effectParam) return;
 
-    auto settings = std::make_unique<ParameterSettingsComponent>(effectParam, [this]() {
-        knob.setRange(effectParam->min, effectParam->max, effectParam->step);
+    auto safeThis = juce::Component::SafePointer<KnobContainerComponent>(this);
+    auto settings = std::make_unique<ParameterSettingsComponent>(effectParam, [safeThis]() {
+        if (safeThis != nullptr) {
+            safeThis->knob.setRange(safeThis->effectParam->min, safeThis->effectParam->max, safeThis->effectParam->step);
+        }
     });
-    settings->setLookAndFeel(&getLookAndFeel());
     settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
+    auto* parent = getTopLevelComponent();
+    const auto targetBounds = parent->getLocalArea(this, getLocalBounds());
     auto& myBox = juce::CallOutBox::launchAsynchronously(
-        std::move(settings), getScreenBounds(), nullptr);
+        std::move(settings), targetBounds, parent);
     juce::ignoreUnused(myBox);
 }

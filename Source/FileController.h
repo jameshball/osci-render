@@ -110,7 +110,7 @@ private:
     int nextFileId = 0;
 
     ShapeSound::Ptr defaultSound;
-    ShapeSound::Ptr objectServerSound;
+    ShapeSound::Ptr objectServerSound = new ShapeSound();
     std::shared_ptr<FileParser> textureInputParser;
     ShapeSound::Ptr textureInputSound;
     juce::String textureInputName;
