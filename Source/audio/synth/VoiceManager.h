@@ -231,7 +231,7 @@ private:
 
     bool sustainState[kNumMidiChannels] = {};
     bool sostenutoState[kNumMidiChannels] = {};
-    float pitchWheelValues[kNumMidiChannels] = {};
+    int pitchWheelValues[kNumMidiChannels] = {};
 
     juce::ReferenceCountedArray<juce::SynthesiserSound> sounds;
 
