@@ -645,27 +645,11 @@ void LfoComponent::updatePresetLabel() {
         presetSelector.setPresetName(lfoPresetToString(lfoData[idx].preset));
 }
 
-void LfoComponent::timerCallback() {
-    ModulationSourceComponent::timerCallback();
-    auto& parameters = audioProcessor.lfoParameters;
-    for (int i = 0; i < NUM_LFOS; ++i) {
-        const auto selected = parameters.getPreset(i);
-        if (!parameters.getIsCustom(i) && selected != lfoData[i].preset) {
-            lfoData[i].preset = selected;
-            lfoData[i].waveform = parameters.getEffectiveWaveform(i);
-            lfoData[i].factoryWaveform = lfoData[i].waveform;
-            lfoData[i].isCustom = false;
-            lfoData[i].userPresetName.clear();
-            if (i == getActiveSourceIndex()) {
-                syncGraphToActiveLfo();
-                updatePresetLabel();
-            }
-        }
-    }
-}
-
 void LfoComponent::syncFromProcessorState() {
     for (int i = 0; i < NUM_LFOS; ++i) {
+        if (lfoData[i].preset != audioProcessor.lfoParameters.getPreset(i)) {
+            lfoData[i].userPresetName.clear();
+        }
         lfoData[i].waveform = audioProcessor.lfoParameters.getEffectiveWaveform(i);
         lfoData[i].preset = audioProcessor.lfoParameters.getPreset(i);
         lfoData[i].factoryWaveform = createLfoPreset(lfoData[i].preset);

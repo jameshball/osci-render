@@ -3,6 +3,9 @@
 #include <JuceHeader.h>
 #include <cmath>
 
+// Offline export rounds cumulative frame boundaries rather than repeatedly adding
+// a rounded samples-per-frame value, which would accumulate audio/video timing drift
+// when the sample rate is not an exact multiple of the frame rate.
 namespace OfflineFrameSchedule {
 
 inline int getMaxSamplesPerFrame(double sampleRate, double frameRate) {
