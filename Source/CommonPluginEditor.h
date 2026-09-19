@@ -137,6 +137,7 @@ protected:
     juce::Component* topLevelKeyTarget = nullptr;
     std::vector<std::unique_ptr<osci::OverlayComponent>> activeOverlays;
     std::optional<bool> visualiserWasVisibleBeforeOverlay;
+    std::optional<bool> offlineRenderPreviousActiveState;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CommonPluginEditor)
 };

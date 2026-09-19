@@ -9,9 +9,10 @@
 struct AddAssignmentAction : public juce::UndoableAction {
     ModulationAssignmentStore<ModAssignment>& store;
     ModAssignment assignment;
+    std::optional<ModAssignment> previousAssignment;
 
     AddAssignmentAction(ModulationAssignmentStore<ModAssignment>& s, const ModAssignment& a)
-        : store(s), assignment(a) {}
+        : store(s), assignment(a), previousAssignment(s.find(a.sourceIndex, a.paramId)) {}
 
     bool perform() override {
         store.add(assignment);
@@ -19,7 +20,11 @@ struct AddAssignmentAction : public juce::UndoableAction {
     }
 
     bool undo() override {
-        store.remove(assignment.sourceIndex, assignment.paramId);
+        if (previousAssignment.has_value()) {
+            store.add(*previousAssignment);
+        } else {
+            store.remove(assignment.sourceIndex, assignment.paramId);
+        }
         return true;
     }
 };

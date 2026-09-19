@@ -2,6 +2,7 @@
 // Original copyright: Copyright 2013-2019 Matt Tytel.
 
 #include "VoiceManager.h"
+#include <cmath>
 
 VoiceManager::VoiceManager() {
     pressedNotes.reserve(128);
@@ -138,9 +139,9 @@ void VoiceManager::handleMidiEventUnlocked(const juce::MidiMessage& m) {
     } else if (m.isSostenutoPedalOff()) {
         sostenutoOff(m.getChannel() - 1);
     } else if (m.isAllNotesOff()) {
-        allNotesOff();
+        allNotesOff(m.getChannel() - 1);
     } else if (m.isAllSoundOff()) {
-        allSoundsOff();
+        allSoundsOff(m.getChannel() - 1);
     } else if (m.isPitchWheel()) {
         int ch = m.getChannel() - 1;
         if (ch >= 0 && ch < kNumMidiChannels)
@@ -197,6 +198,11 @@ void VoiceManager::noteOn(int note, float velocity, int channel) {
             client->restoreDrawingState(*voice, *restoreSource);
     }
 
+    if (voice->getJuceVoice() != nullptr) {
+        const int rawPitchWheelValue = juce::jlimit(0, 16383, (int)std::lround(pitchWheelValues[channel] * 8192.0f + 8192.0f));
+        voice->getJuceVoice()->pitchWheelMoved(rawPitchWheelValue);
+    }
+
     activeVoices.push_back(voice);
 }
 
@@ -213,7 +219,7 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
     for (int i = static_cast<int>(activeVoices.size()) - 1; i >= 0; --i) {
         auto* voice = activeVoices[i];
         if (voice->getState().midiNote == note && voice->getState().channel == channel) {
-            if (sustainState[channel]) {
+            if (sustainState[channel] || voice->isSostenuto()) {
                 voice->sustain();
                 voice->setLiftVelocity(lift);
             } else {
@@ -282,6 +288,11 @@ void VoiceManager::noteOff(int note, float lift, int channel) {
                         client->voiceActivated(*newVoice, isLegatoNote);
                         if (restoreSource != nullptr)
                             client->restoreDrawingState(*newVoice, *restoreSource);
+                    }
+
+                    if (newVoice->getJuceVoice() != nullptr) {
+                        const int rawPitchWheelValue = juce::jlimit(0, 16383, (int)std::lround(pitchWheelValues[oldChannel] * 8192.0f + 8192.0f));
+                        newVoice->getJuceVoice()->pitchWheelMoved(rawPitchWheelValue);
                     }
 
                     activeVoices.push_back(newVoice);
@@ -356,6 +367,28 @@ void VoiceManager::allNotesOff() {
     std::fill(std::begin(sostenutoState), std::end(sostenutoState), false);
 }
 
+void VoiceManager::allNotesOff(int channel) {
+    pressedNotes.erase(
+        std::remove_if(pressedNotes.begin(), pressedNotes.end(), [channel](int note) { return getChannel(note) == channel; }),
+        pressedNotes.end());
+
+    for (auto* voice : activeVoices) {
+        if (voice->getState().channel == channel) {
+            voice->deactivate();
+            if (client != nullptr) {
+                client->voiceDeactivated(*voice);
+            }
+        }
+    }
+
+    sustainState[channel] = false;
+    sostenutoState[channel] = false;
+    if (pressedNotes.empty()) {
+        lastPlayedNoteFreq.store(0.0, std::memory_order_relaxed);
+        lastPlayedNote = -1.0f;
+    }
+}
+
 void VoiceManager::allSoundsOff() {
     pressedNotes.clear();
     lastPlayedNoteFreq.store(0.0, std::memory_order_relaxed);
@@ -372,6 +405,32 @@ void VoiceManager::allSoundsOff() {
 
     std::fill(std::begin(sustainState), std::end(sustainState), false);
     std::fill(std::begin(sostenutoState), std::end(sostenutoState), false);
+}
+
+void VoiceManager::allSoundsOff(int channel) {
+    pressedNotes.erase(
+        std::remove_if(pressedNotes.begin(), pressedNotes.end(), [channel](int note) { return getChannel(note) == channel; }),
+        pressedNotes.end());
+
+    for (int i = static_cast<int>(activeVoices.size()) - 1; i >= 0; --i) {
+        auto* voice = activeVoices[i];
+        if (voice->getState().channel == channel) {
+            voice->kill();
+            if (client != nullptr) {
+                client->voiceKilled(*voice);
+            }
+            voice->markDead();
+            freeVoices.push_back(voice);
+            activeVoices.erase(activeVoices.begin() + i);
+        }
+    }
+
+    sustainState[channel] = false;
+    sostenutoState[channel] = false;
+    if (pressedNotes.empty()) {
+        lastPlayedNoteFreq.store(0.0, std::memory_order_relaxed);
+        lastPlayedNote = -1.0f;
+    }
 }
 
 ManagedVoice* VoiceManager::grabVoice(ManagedVoice** restoreSource) {

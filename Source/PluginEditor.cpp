@@ -648,17 +648,23 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
             return;
         }
 
-        auto& files = audioProcessor.getFileController();
-        juce::SpinLock::ScopedLockType parserLock(files.lock);
-        auto parser = files.getCurrentParser();
-        if (parser != nullptr) {
-            auto luaParser = parser->getLua();
-            if (luaParser != nullptr) {
-                luaParser->forgetAllStates();
+        if (model->getScriptId() == LuaEffectState::UNIQUE_ID) {
+            if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
+                audioProcessor.luaEffectState->parser->forgetAllStates();
             }
-        }
-        if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
-            audioProcessor.luaEffectState->parser->forgetAllStates();
+        } else {
+            auto& files = audioProcessor.getFileController();
+            juce::SpinLock::ScopedLockType parserLock(files.lock);
+            for (int index = 0; index < files.size(); ++index) {
+                if (files.getFileId(index) == model->getScriptId()) {
+                    auto parser = files.getParser(index);
+                    auto luaParser = parser != nullptr ? parser->getLua() : nullptr;
+                    if (luaParser != nullptr) {
+                        luaParser->forgetAllStates();
+                    }
+                    break;
+                }
+            }
         }
     };
 

@@ -83,6 +83,7 @@ struct DahdsrParams
 {
     double delaySeconds = 0.0;
     double attackSeconds = 0.0;
+    double attackLevel = 1.0;
     double holdSeconds = 0.0;
     double decaySeconds = 0.0;
     double sustainLevel = 0.0; // [0..1]
@@ -146,7 +147,7 @@ public:
                 break;
 
             case Stage::Attack:
-                envValue = osci_audio::evalSegment(0.0f, 1.0f, stageElapsed, params.attackSeconds, params.attackCurve);
+                envValue = osci_audio::evalSegment(0.0f, (float)params.attackLevel, stageElapsed, params.attackSeconds, params.attackCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.attackSeconds)
                 {
@@ -156,7 +157,7 @@ public:
                 break;
 
             case Stage::Hold:
-                envValue = 1.0f;
+                envValue = (float)params.attackLevel;
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.holdSeconds)
                 {
@@ -166,7 +167,7 @@ public:
                 break;
 
             case Stage::Decay:
-                envValue = osci_audio::evalSegment(1.0f, (float) params.sustainLevel, stageElapsed, params.decaySeconds, params.decayCurve);
+                envValue = osci_audio::evalSegment((float)params.attackLevel, (float)params.sustainLevel, stageElapsed, params.decaySeconds, params.decayCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.decaySeconds)
                 {

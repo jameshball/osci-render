@@ -43,7 +43,6 @@ VisualiserComponent::VisualiserComponent(
     audioProcessor.visualiserParameters.transparentBackground->addListener(this);
 #endif
     startTimerHz(30);
-    setShouldBeRunning(active);
 
 #if OSCI_PREMIUM
     restorePopoutPending = true;
@@ -178,6 +177,7 @@ VisualiserComponent::VisualiserComponent(
         stopwatch.addTime(juce::RelativeTime::seconds(1.0 / this->recordingSettings.getFrameRate()));
     };
     framePresenter = FramePresenter::create(*this, openGLContext);
+    setShouldBeRunning(active);
 }
 
 VisualiserComponent::~VisualiserComponent() {
@@ -190,6 +190,7 @@ VisualiserComponent::~VisualiserComponent() {
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
+    unregisterFromManager();
     // Detach while the derived renderer is still alive so OpenGL-owned services
     // are stopped by openGLContextClosing() on the context thread.
     openGLContext.detach();
@@ -241,6 +242,10 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     recordingSampleRate = sampleRate;
 
     return desiredBufferSize;
+}
+
+void VisualiserComponent::restoreAfterOfflineRender(double sampleRate) {
+    prepareTask(sampleRate, -1);
 }
 
 void VisualiserComponent::stopTask() {

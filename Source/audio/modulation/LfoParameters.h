@@ -48,6 +48,9 @@ public:
 
     LfoParameters() {
         previewSavedLfoStates.reserve(NUM_LFOS);
+        for (const auto& entry : getLfoPresetRegistry()) {
+            presetWaveforms.emplace_back(entry.preset, createLfoPreset(entry.preset));
+        }
 
         for (int i = 0; i < NUM_LFOS; ++i) {
             juce::String idx = juce::String(i + 1);
@@ -101,6 +104,33 @@ public:
         juce::SpinLock::ScopedLockType lock(waveformLock);
         return waveforms[index];
     }
+
+    LfoWaveform getEffectiveWaveform(int index) const {
+        if (index < 0 || index >= NUM_LFOS) {
+            return {};
+        }
+        juce::SpinLock::ScopedLockType lock(waveformLock);
+        return effectiveWaveformUnlocked(index);
+    }
+
+private:
+    // Constructed before audio starts; selecting a factory preset never allocates.
+    std::vector<std::pair<LfoPreset, LfoWaveform>> presetWaveforms;
+
+    // Caller holds waveformLock. Custom shapes deliberately ignore preset automation.
+    const LfoWaveform& effectiveWaveformUnlocked(int index) const {
+        if (!getIsCustom(index)) {
+            const auto selected = getPreset(index);
+            for (const auto& entry : presetWaveforms) {
+                if (entry.first == selected) {
+                    return entry.second;
+                }
+            }
+        }
+        return waveforms[index];
+    }
+
+public:
 
     // === Parameter getters (read from DAW parameters atomically) ===
 
@@ -240,7 +270,10 @@ public:
                           const osci::DawPosition& dawPosition, const std::atomic<bool> (&voiceActive)[MaxVoices]) {
         if (numSamples <= 0) return;
 
-        // Process MIDI note events to drive LFO triggering for non-Free modes
+        // Known limitation: events are applied before generating sample zero, so
+        // trigger/release timing is block-accurate rather than honoring each
+        // MidiMessageMetadata::samplePosition. A future fix should generate spans
+        // between event positions and mutate the LFO state at each boundary.
         bool hadNoteOnThisBlock = false;
         for (const auto metadata : midi) {
             auto msg = metadata.getMessage();
@@ -294,6 +327,7 @@ public:
 
             for (int l = 0; l < NUM_LFOS; ++l) {
                 if (!rate[l] || !rateMode[l]) continue;
+                const auto& waveform = effectiveWaveformUnlocked(l);
                 if ((int)blockBuffer[l].size() < numSamples)
                     blockBuffer[l].resize(numSamples);
                 float r;
@@ -319,13 +353,13 @@ public:
                 }
 
                 int delaySkipSamples = 0;
-                float delaySecs = delayAmount[l] ? delayAmount[l]->getValueUnnormalised() : 0.0f;
+                float delaySecs = delayAmount[l] ? delayAmount[l]->getPreviousModulatedValue() : 0.0f;
                 if (delaySecs > 1e-6f) {
                     float elapsed = delayElapsed[l];
                     if (elapsed < delaySecs) {
                         float remainingSec = delaySecs - elapsed;
                         delaySkipSamples = juce::jmin(numSamples, (int)std::ceil(remainingSec * sr));
-                        float heldValue = waveforms[l].evaluate(audioStates[l].phase);
+                        float heldValue = waveform.evaluate(audioStates[l].phase);
                         for (int s = 0; s < delaySkipSamples; ++s)
                             blockBuffer[l][s] = heldValue;
                     }
@@ -339,7 +373,7 @@ public:
                 const bool syncHeldByTransport = md == LfoMode::Sync
                     && dawPosition.hasSyncPosition.load(std::memory_order_relaxed)
                     && !dawPosition.isPlaying.load(std::memory_order_relaxed);
-                float smoothSecs = smoothAmount[l] ? smoothAmount[l]->getValueUnnormalised() : 0.005f;
+                float smoothSecs = smoothAmount[l] ? smoothAmount[l]->getPreviousModulatedValue() : 0.005f;
                 const float alpha = smoothSecs > 1e-6f ? 1.0f - std::exp(-1.0f / (smoothSecs * sr)) : 1.0f;
                 displayBuffers[l].process(numSamples, [&](int offset, int count) {
                     const int end = offset + count;
@@ -351,10 +385,10 @@ public:
                                 const double phase = syncSeconds * (double)r + (double)phaseOff;
                                 const float wrappedPhase = (float)(phase - std::floor(phase));
                                 audioStates[l].phase = wrappedPhase;
-                                blockBuffer[l][s] = waveforms[l].evaluate(wrappedPhase);
+                                blockBuffer[l][s] = waveform.evaluate(wrappedPhase);
                             }
                         } else {
-                            audioStates[l].advanceBlock(blockBuffer[l].data() + start, end - start, r, sr, waveforms[l], md, phaseOff);
+                            audioStates[l].advanceBlock(blockBuffer[l].data() + start, end - start, r, sr, waveform, md, phaseOff);
                         }
                     }
                     if (md == LfoMode::Sync && !effectiveVoiceActive) {
@@ -392,7 +426,8 @@ public:
             for (int i = 0; i < NUM_LFOS; ++i) {
                 auto lfoXml = lfosXml->createNewChildElement("lfo");
                 lfoXml->setAttribute("index", i);
-                waveforms[i].saveToXml(lfoXml);
+                lfoXml->setAttribute("custom", customState[i].load(std::memory_order_relaxed));
+                effectiveWaveformUnlocked(i).saveToXml(lfoXml);
             }
         }
 
@@ -408,13 +443,21 @@ public:
 
     void loadFromXml(const juce::XmlElement* root) override {
         auto lfosXml = root->getChildByName("lfos");
+        for (auto& isCustom : customState) {
+            isCustom.store(false, std::memory_order_relaxed);
+        }
         if (lfosXml != nullptr) {
             activeTab = lfosXml->getIntAttribute("activeTab", 0);
             juce::SpinLock::ScopedLockType wfLock(waveformLock);
             for (auto* lfoXml : lfosXml->getChildWithTagNameIterator("lfo")) {
                 int idx = lfoXml->getIntAttribute("index", -1);
-                if (idx >= 0 && idx < NUM_LFOS)
+                if (idx >= 0 && idx < NUM_LFOS) {
                     waveforms[idx].loadFromXml(lfoXml);
+                    const bool isCustom = lfoXml->hasAttribute("custom")
+                        ? lfoXml->getBoolAttribute("custom")
+                        : waveforms[idx] != createLfoPreset(getPreset(idx));
+                    customState[idx].store(isCustom, std::memory_order_relaxed);
+                }
             }
         }
 

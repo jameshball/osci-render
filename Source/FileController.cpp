@@ -18,7 +18,6 @@ FileController::~FileController() {
 void FileController::initialise() {
     auto defaultParser = std::make_shared<FileParser>(processor);
     defaultSound = new ShapeSound(processor, defaultParser);
-    objectServerSound = new ShapeSound();
     voices.addSound(defaultSound.get());
     activeSound.store(defaultSound.get(), std::memory_order_release);
 
