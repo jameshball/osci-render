@@ -30,6 +30,7 @@ public:
     }
 
     void initialise (const juce::String&) override {
+        osci::Downloader::cleanupDownloadsAsync();
         lookAndFeel = std::make_unique<osci::LookAndFeel> (makeTypefaceData());
         juce::LookAndFeel::setDefaultLookAndFeel (lookAndFeel.get());
         mainWindow = std::make_unique<osci::installer::InstallerWindow> (getApplicationName());

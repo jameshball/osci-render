@@ -75,6 +75,10 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
     globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
 
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        osci::Downloader::cleanupDownloadsAsync();
+    }
+
     const auto licenseCacheResult = licenseManager.loadCachedToken();
     if (licenseCacheResult.failed()) {
         juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());

@@ -151,6 +151,30 @@ public:
         juce::MessageManager::getInstance();
         installTestVerifier();
 
+        beginTest("Download cleanup preserves recent, pending and unrelated files");
+        {
+            const auto directory = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                .getNonexistentChildFile("osci-download-cleanup-test", {}, false);
+            expect(directory.createDirectory().wasOk());
+            const auto old = directory.getChildFile("osci-render-old.pkg");
+            const auto recent = directory.getChildFile("sosci-recent.pkg");
+            const auto pending = directory.getChildFile("sosci-pending.pkg");
+            const auto unrelated = directory.getChildFile("notes.txt");
+            const auto nested = directory.getChildFile("osci-render-folder").getChildFile("osci-render-old.pkg");
+            expect(nested.getParentDirectory().createDirectory().wasOk());
+            for (const auto& file : { old, recent, pending, unrelated, nested }) {
+                expect(file.replaceWithText("test"));
+                expect(file.setLastModificationTime(juce::Time::getCurrentTime() - juce::RelativeTime::days(8)));
+            }
+            expect(recent.setLastModificationTime(juce::Time::getCurrentTime()));
+            osci::Downloader::deleteOldDownloads(directory, { pending });
+            expect(!old.exists());
+            for (const auto& file : { recent, pending, unrelated, nested }) {
+                expect(file.existsAsFile());
+            }
+            expect(directory.deleteRecursively());
+        }
+
         beginTest("Legal documents share acknowledgement without enabling identification");
         {
             const auto options = makeTempSettingsOptions("legal");
