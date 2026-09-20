@@ -11,8 +11,14 @@ if [ "$OS" = "mac" ]; then
   xcodebuild -project "$APP.xcodeproj" \
     -scheme "$APP - App" \
     -configuration Release \
+    ARCHS="arm64 x86_64" \
+    ONLY_ACTIVE_ARCH=NO \
     -parallelizeTargets \
     -jobs "$(sysctl -n hw.logicalcpu)"
+
+  INSTALLER_BINARY="$ROOT/Builds/$APP/MacOSX/build/Release/$APP.app/Contents/MacOS/$APP"
+  lipo "$INSTALLER_BINARY" -verify_arch arm64
+  lipo "$INSTALLER_BINARY" -verify_arch x86_64
 fi
 
 if [ "$OS" = "linux" ]; then
