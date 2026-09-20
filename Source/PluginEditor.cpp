@@ -104,6 +104,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         juce::MessageManagerLock lock;
         audioProcessor.getFileController().addChangeListener(this);
         audioProcessor.broadcaster.addChangeListener(this);
+        audioProcessor.previewBroadcaster.addChangeListener(this);
     }
 
     double codeEditorLayoutPreferredSize = sanitiseCodeEditorMainPanelSize(std::any_cast<double>(audioProcessor.getProperty("codeEditorLayoutPreferredSize", kDefaultCodeEditorMainPanelSize)));
@@ -173,6 +174,7 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     menuBar.setModel(nullptr);
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
+    audioProcessor.previewBroadcaster.removeChangeListener(this);
     audioProcessor.getFileController().removeChangeListener(this);
 }
 
@@ -767,10 +769,13 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 }
 
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
-    if (source == &audioProcessor.broadcaster) {
+    if (source == &audioProcessor.broadcaster || source == &audioProcessor.previewBroadcaster) {
         {
             juce::SpinLock::ScopedLockType fileLock(audioProcessor.getFileController().lock);
-            initialiseCodeEditors();
+            // Preview changes only refresh controls; rebuilding editors briefly collapses the layout.
+            if (source == &audioProcessor.broadcaster) {
+                initialiseCodeEditors();
+            }
             settings.update();
         }
         updateTimelineController();

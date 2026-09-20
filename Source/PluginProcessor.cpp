@@ -1510,13 +1510,13 @@ void OscirenderAudioProcessor::autoAssignLfosForPreview(const juce::String& effe
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.startPreview(effectId, toggleableEffects);
     // Refresh the editor without sending temporary preview values to the host.
-    broadcaster.sendChangeMessage();
+    previewBroadcaster.sendChangeMessage();
 }
 
 void OscirenderAudioProcessor::clearPreviewLfoAssignments() {
     ScopedFlag suppress(undoSuppressed);
     lfoParameters.stopPreview();
-    broadcaster.sendChangeMessage();
+    previewBroadcaster.sendChangeMessage();
 }
 
 juce::String OscirenderAudioProcessor::getParamDisplayName(const juce::String& paramId) const {

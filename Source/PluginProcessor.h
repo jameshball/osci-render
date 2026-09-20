@@ -205,6 +205,7 @@ public:
     osci::DawPosition dawPosition;
 
     juce::ChangeBroadcaster broadcaster;
+    juce::ChangeBroadcaster previewBroadcaster;
 
     // === Envelope modulation state ===
     EnvelopeParameters envelopeParameters;
