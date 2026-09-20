@@ -48,7 +48,7 @@ void NodeGraphComponent::HandleComponent::updateNodeFromPosition() {
 // ============================================================================
 
 NodeGraphComponent::NodeGraphComponent() {
-    setColour(backgroundColourId, Colours::veryDark());
+    setColour(backgroundColourId, osci::Colours::veryDark());
     setColour(gridLineColourId, juce::Colours::white.withAlpha(0.1f));
     setColour(lineColourId, juce::Colour(0xFF00E5FF));
     setColour(fillColourId, juce::Colour(0xFF00E5FF).withAlpha(0.15f));
@@ -1300,16 +1300,23 @@ void NodeGraphComponent::setFlowMarkerDomainPositions(const double* positions, i
 }
 
 void NodeGraphComponent::clearFlowMarkers() {
-    if (flowTrailRenderer)
-        flowTrailRenderer->clear();
+    if (!flowTrailRenderer || !flowTrailRenderer->clear()) {
+        return;
+    }
     ensureFlowRepaintTimerRunning();
     repaint();
 }
 
 void NodeGraphComponent::resetFlowTrail() {
-    if (flowTrailRenderer)
-        flowTrailRenderer->reset();
-    repaint();
+    if (!flowTrailRenderer) {
+        return;
+    }
+    const bool hadTrailData = flowTrailRenderer->hasTrailData();
+    flowTrailRenderer->reset();
+    stopTimer();
+    if (hadTrailData) {
+        repaint();
+    }
 }
 
 void NodeGraphComponent::setFlowTrailWrapping(bool shouldWrap, double domainMin, double domainMax) {

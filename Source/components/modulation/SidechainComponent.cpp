@@ -22,8 +22,7 @@ static ModulationSourceConfig buildSidechainConfig(OscirenderAudioProcessor& pro
     cfg.dragPrefix = "SC";
     cfg.getLabel = [](int) { return juce::String("INPUT"); };
     cfg.getSourceColour = &SidechainComponent::getSidechainColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.sidechainParameters.getCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.sidechainParameters.isActive(i); };
+    cfg.getDisplayBuffer = [&proc](int i) -> ModulationDisplayBuffer& { return proc.sidechainParameters.displayBuffers[i]; };
     cfg.getAssignments = [&proc]() { return proc.sidechainParameters.getAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.sidechainParameters.addAssignment(a); };
     cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.sidechainParameters.removeAssignment(idx, pid); };
@@ -35,7 +34,7 @@ static ModulationSourceConfig buildSidechainConfig(OscirenderAudioProcessor& pro
     cfg.setActiveTab = [&proc](int i) { proc.sidechainParameters.activeTab = i; };
 #if OSCI_PREMIUM
     cfg.typeId = "sc";
-    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.midiManager = &proc.midiManager;
     cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
         return OscirenderAudioProcessor::modDepthCustomId("sc", idx, pid);
     };
@@ -157,15 +156,12 @@ SidechainComponent::SidechainComponent(OscirenderAudioProcessor& processor)
 SidechainComponent::~SidechainComponent() {
 }
 
-void SidechainComponent::timerCallback() {
-    ModulationSourceComponent::timerCallback();
-
-    // Show the current input level as a vertical marker on the graph
-    float inputLevel = audioProcessor.sidechainParameters.getInputLevel(0);
-    bool active = audioProcessor.sidechainParameters.isActive(0);
-
-    if (active) {
-        double pos = (double)inputLevel;
+void SidechainComponent::displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) {
+    if (index != getActiveSourceIndex()) {
+        return;
+    }
+    if (sample.active) {
+        double pos = sample.position;
         graph.setFlowMarkerDomainPositions(&pos, 1);
     } else {
         graph.clearFlowMarkers();
@@ -177,9 +173,9 @@ void SidechainComponent::paint(juce::Graphics& g) {
 
     // Draw a background panel behind the knob area (below the graph)
     if (!knobAreaBounds.isEmpty()) {
-        float r = OscirenderLookAndFeel::RECT_RADIUS;
+        float r = osci::LookAndFeel::RECT_RADIUS;
         auto bf = knobAreaBounds.toFloat();
-        g.setColour(Colours::darker());
+        g.setColour(osci::Colours::darker());
         g.fillRoundedRectangle(bf, r);
     }
 }
@@ -236,10 +232,11 @@ void SidechainComponent::lookAndFeelChanged() {
 }
 
 void SidechainComponent::syncGraphColours() {
-    // Override NodeGraphComponent's constructor defaults with LookAndFeel colours
-    graph.setColour(NodeGraphComponent::backgroundColourId,  getLookAndFeel().findColour(NodeGraphComponent::backgroundColourId));
-    graph.setColour(NodeGraphComponent::gridLineColourId,    getLookAndFeel().findColour(NodeGraphComponent::gridLineColourId));
-    graph.setColour(NodeGraphComponent::nodeOutlineColourId, getLookAndFeel().findColour(NodeGraphComponent::nodeOutlineColourId));
+    auto& inherited = getLookAndFeel();
+    for (int colourId : { NodeGraphComponent::backgroundColourId, NodeGraphComponent::gridLineColourId, NodeGraphComponent::nodeOutlineColourId }) {
+        auto& palette = inherited.isColourSpecified(colourId) ? inherited : PluginLookAndFeel::getSharedInstance();
+        graph.setColour(colourId, palette.findColour(colourId));
+    }
     graph.invalidateGrid();
     graph.repaint();
 }

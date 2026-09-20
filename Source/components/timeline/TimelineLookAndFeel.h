@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
 
-class TimelineLookAndFeel : public OscirenderLookAndFeel {
+class TimelineLookAndFeel : public PluginLookAndFeel {
 public:
     TimelineLookAndFeel() {}
 
@@ -59,7 +59,7 @@ public:
         g.fillRoundedRectangle(thumbRect, 2.0f);
 
         // Add a subtle outline to the thumb
-        g.setColour(slider.findColour(sliderThumbOutlineColourId).withAlpha(0.5f));
+        g.setColour(slider.findColour(osci::sliderThumbOutlineColourId).withAlpha(0.5f));
         g.drawRoundedRectangle(thumbRect, 2.0f, 1.0f);
 
         // Add a subtle highlight at the top of the thumb

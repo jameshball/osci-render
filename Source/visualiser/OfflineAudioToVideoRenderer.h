@@ -2,14 +2,14 @@
 
 #include <JuceHeader.h>
 
-#include "VisualiserRenderer.h"
+#include <osci_gui/visualiser/osci_VisualiserRenderer.h>
 #include "RecordingSettings.h"
 
 #if OSCI_PREMIUM
 
 #include "../CommonPluginProcessor.h"
 #include "../video/FFmpegEncoderManager.h"
-#include "../audio/wav/WavParser.h"
+#include <osci_file_import/osci_file_import.h>
 
 class OfflineAudioToVideoRendererComponent;
 
@@ -28,10 +28,10 @@ public:
     OfflineAudioToVideoRendererComponent(CommonAudioProcessor& processor,
                                         VisualiserParameters& visualiserParameters,
                                         osci::AudioBackgroundThreadManager& threadManager,
-                                        RecordingSettings& recordingSettings,
                                         const juce::File& inputAudioFile,
                                         const juce::File& outputVideoFile,
-                                        VisualiserRenderer::RenderMode initialRenderMode);
+                                        VisualiserRenderer::RenderMode initialRenderMode,
+                                        VideoEncodingConfiguration encodingConfiguration);
 
     ~OfflineAudioToVideoRendererComponent() override;
 
@@ -44,16 +44,6 @@ public:
     void setOnFinished(FinishedCallback cb) { onFinished = std::move(cb); }
 
 private:
-    static juce::String toPercentString(double progress);
-
-    static bool runFfmpegMux(const juce::File& ffmpegExe,
-                             const juce::File& videoInput,
-                             const juce::File& audioInput,
-                             const juce::File& output,
-                             const juce::StringArray& audioCodecArgs,
-                             const std::atomic<bool>& cancelRequested,
-                             juce::String& outError);
-
     class OfflinePreviewRenderer : public VisualiserRenderer
     {
     public:
@@ -62,6 +52,7 @@ private:
                                juce::WaitableEvent& glReadyEventToSignal);
 
         void newOpenGLContextCreated() override;
+        void detach() { openGLContext.detach(); }
 
         void setPostRenderCallback(std::function<void()> cb) { postRenderCallback = std::move(cb); }
         void setPreRenderCallback(std::function<void()> cb) { preRenderCallback = std::move(cb); }
@@ -86,7 +77,7 @@ private:
     void finishAsync(Result r);
 
     CommonAudioProcessor& processor;
-    RecordingSettings& recordingSettings;
+    const VideoEncodingConfiguration encodingConfiguration;
 
     const juce::File inputAudioFile;
     const juce::File outputVideoFile;
@@ -105,6 +96,7 @@ private:
 
     juce::CriticalSection frameLock;
     std::vector<unsigned char> framePixels;
+    std::atomic<int> capturedFrameCount { 0 };
 
     std::atomic<int> lastPostedProgressPercent { -1 };
 

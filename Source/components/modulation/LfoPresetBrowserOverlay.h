@@ -4,6 +4,7 @@
 #include "../../audio/modulation/LfoState.h"
 #include "../../audio/modulation/LfoPresetManager.h"
 #include "../../LookAndFeel.h"
+#include <osci_gui/osci_gui.h>
 
 // Inline LFO preset browser panel.  Shown as a child of LfoComponent,
 // replacing the graph area while the browser is open.
@@ -51,7 +52,7 @@ private:
 
         juce::Viewport viewport;
         juce::Component contentComp;
-        juce::TextEditor saveEditor;
+        osci::TextEditor saveEditor;
         juce::TextButton saveButton;
         int contentHeight = 0;
     };
@@ -59,7 +60,7 @@ private:
     BrowserPanel browserPanel;
     juce::Viewport& viewport = browserPanel.viewport;
     juce::Component& content = browserPanel.contentComp;
-    juce::TextEditor& saveEditor = browserPanel.saveEditor;
+    osci::TextEditor& saveEditor = browserPanel.saveEditor;
     juce::TextButton& saveButton = browserPanel.saveButton;
     int contentHeight = 0;
 

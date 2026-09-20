@@ -165,11 +165,25 @@ public:
     juce::SynthesiserVoice* getVoice(int index) const;
     ManagedVoice* getManagedVoice(int index) const;
 
+    // The callback runs while the manager is locked, so each voice remains alive.
+    // It must not call back into VoiceManager.
+    template <typename Callback>
+    void forEachVoice(Callback&& callback) {
+        juce::SpinLock::ScopedLockType sl(lock);
+        for (const auto& managedVoice : allVoices) {
+            auto* voice = managedVoice->getJuceVoice();
+            if (voice != nullptr) {
+                callback(*voice);
+            }
+        }
+    }
+
     void renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                          const juce::MidiBuffer& midiMessages,
                          int startSample, int numSamples);
 
     void handleMidiEvent(const juce::MidiMessage& m);
+    void resetAllVoices(bool immediate);
 
 private:
     void handleMidiEventUnlocked(const juce::MidiMessage& m);
@@ -179,8 +193,8 @@ private:
     void sustainOff(int channel);
     void sostenutoOn(int channel);
     void sostenutoOff(int channel);
-    void allNotesOff();
-    void allSoundsOff();
+    void allNotesOff(int channel);
+    void allSoundsOff(int channel);
 
     ManagedVoice* grabVoice(ManagedVoice** restoreSource = nullptr);
     ManagedVoice* grabFreeVoice();
@@ -217,7 +231,7 @@ private:
 
     bool sustainState[kNumMidiChannels] = {};
     bool sostenutoState[kNumMidiChannels] = {};
-    float pitchWheelValues[kNumMidiChannels] = {};
+    int pitchWheelValues[kNumMidiChannels] = {};
 
     juce::ReferenceCountedArray<juce::SynthesiserSound> sounds;
 

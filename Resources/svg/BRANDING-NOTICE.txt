@@ -2,9 +2,6 @@ Branding assets notice (osci-render)
 
 This repository's source code is licensed under the GNU GPLv3 (see ../../LICENSE).
 
-Unless stated otherwise, the SVG files in this directory are part of the
-GPLv3-licensed work.
-
 The following file is a branding asset (logo/wordmark) and is NOT licensed under
 the GPLv3. No trademark rights are granted. All rights reserved.
 

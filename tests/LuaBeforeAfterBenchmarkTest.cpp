@@ -174,7 +174,7 @@ private:
         } errors;
 
         LuaParser parser("bench.lua", script, errors.callback());
-        lua_State* L = nullptr;
+        LuaState L;
 
         LuaVariables vars;
         vars.sampleRate = 44100;
@@ -190,7 +190,7 @@ private:
         for (int i = 0; i < iterations; i++) parser.run(L, vars);
         const auto end = juce::Time::getHighResolutionTicks();
 
-        parser.close(L);
+        L.reset();
         return { juce::Time::highResolutionTicksToSeconds(end - start), iterations };
     }
 };

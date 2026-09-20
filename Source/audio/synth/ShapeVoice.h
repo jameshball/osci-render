@@ -4,7 +4,7 @@
 #include "ShapeSound.h"
 #include "../modulation/DahdsrEnvelope.h"
 #include "../modulation/EnvState.h"
-#include "../../lua/LuaParser.h"
+#include <osci_scripting/osci_scripting.h>
 
 class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
@@ -24,7 +24,7 @@ public:
 	void pitchWheelMoved(int newPitchWheelValue) override;
 	void controllerMoved(int controllerNumber, int newControllerValue) override;
 
-	void incrementShapeDrawing();
+	void locateShapeDrawing();
 	double getFrequency();
 
 	// VoiceManager lifecycle callbacks (called by OscirenderAudioProcessor)
@@ -89,7 +89,7 @@ private:
 		double frameDrawn = 0.0;
 	} savedDrawingState;
 
-	lua_State* L = nullptr;
+	LuaState L;
 	LuaVariables vars;
 
 	DahdsrParams dahdsr;

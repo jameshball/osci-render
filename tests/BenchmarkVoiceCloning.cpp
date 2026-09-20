@@ -26,7 +26,7 @@ public:
     }
 };
 
-// Small-state effect (like AutoGainControl, KaleidoscopeEffect, etc.)
+// Small-state effect (like KaleidoscopeEffect, etc.)
 class BenchSmallStateEffect : public EffectApplication {
 public:
     Point apply(int index, Point input, Point externalInput,

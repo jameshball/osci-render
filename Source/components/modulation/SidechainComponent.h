@@ -4,8 +4,7 @@
 #include "NodeGraphComponent.h"
 #include "ModulationSourceComponent.h"
 #include "../KnobContainerComponent.h"
-#include "../ParameterSyncHelper.h"
-#include "../DisabledOverlay.h"
+#include <osci_gui/osci_gui.h>
 #include "../../audio/modulation/SidechainState.h"
 
 class OscirenderAudioProcessor;
@@ -30,7 +29,7 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     void paintOverChildren(juce::Graphics& g) override;
-    void timerCallback() override;
+    void displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) override;
     void lookAndFeelChanged() override;
 
     static juce::Colour getSidechainColour(int index = 0);
