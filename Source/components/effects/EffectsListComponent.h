@@ -1,12 +1,9 @@
 #pragma once
-#include "../DraggableListBox.h"
 #include <JuceHeader.h>
 #include "../../PluginProcessor.h"
 #include "EffectComponent.h"
-#include "../ComponentList.h"
-#include "../SwitchButton.h"
+#include <osci_gui/osci_gui.h>
 #include "EffectTypeGridComponent.h"
-#include "../SvgButton.h"
 #include <random>
 #include <unordered_map>
 
@@ -20,6 +17,7 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
     std::function<void()> onAddNewEffectRequested; // callback hooked by parent to open the grid
 
     AudioEffectListBoxItemData(OscirenderAudioProcessor& p, OscirenderAudioProcessorEditor& editor) : audioProcessor(p), editor(editor) {
+        data.reserve(audioProcessor.toggleableEffects.size());
         resetData();
     }
 
@@ -31,12 +29,22 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         audioProcessor.getUndoManager().beginNewTransaction("Randomise Effects");
         CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
 
+        std::vector<juce::String> beforeOrder;
+
         // Decide which effects to pick (indices into toggleableEffects)
         int total;
         std::vector<int> pickedIndices;
         {
             juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
             total = (int)audioProcessor.toggleableEffects.size();
+            auto effectsInOrder = audioProcessor.toggleableEffects;
+            std::sort(effectsInOrder.begin(), effectsInOrder.end(), [](const auto& a, const auto& b) {
+                return a->getPrecedence() < b->getPrecedence();
+            });
+            beforeOrder.reserve(effectsInOrder.size());
+            for (const auto& effect : effectsInOrder) {
+                beforeOrder.push_back(effect->getId());
+            }
         }
         int maxPick = juce::jmin(5, total);
         int numPick = juce::jmax(1, juce::Random::getSystemRandom().nextInt({1, maxPick + 1}));
@@ -85,15 +93,21 @@ struct AudioEffectListBoxItemData : public DraggableListBoxItemData
         // Refresh local data with only selected effects
         resetData();
         
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            // shuffle precedence of the selected subset
-            std::shuffle(data.begin(), data.end(), g);
-            for (int i = 0; i < (int)data.size(); i++) {
-                data[i]->setPrecedence(i);
-            }
-            audioProcessor.updateEffectPrecedence();
+        std::shuffle(data.begin(), data.end(), g);
+        std::vector<juce::String> afterOrder;
+        afterOrder.reserve(beforeOrder.size());
+        for (const auto& effect : data) {
+            afterOrder.push_back(effect->getId());
         }
+        for (const auto& id : beforeOrder) {
+            if (std::find(afterOrder.begin(), afterOrder.end(), id) == afterOrder.end()) {
+                afterOrder.push_back(id);
+            }
+        }
+
+        audioProcessor.getUndoManager().perform(
+            new PrecedenceChangeAction(audioProcessor, std::move(beforeOrder), std::move(afterOrder)));
+        resetData();
     }
 
     void resetData() {
@@ -230,7 +244,7 @@ protected:
     ComponentListModel listModel { ROW_HEIGHT };
     VListBox list;
     jux::SwitchButton enabled = { effect.enabled };
-    SvgButton closeButton = SvgButton("closeEffect", juce::String::createStringFromData(BinaryData::close_svg, BinaryData::close_svgSize), juce::Colours::white, juce::Colours::white);
+    osci::CloseButton closeButton { "Close effect", juce::Colours::white, juce::Colours::white };
 private:
     OscirenderAudioProcessor& audioProcessor;
     OscirenderAudioProcessorEditor& editor;

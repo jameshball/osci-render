@@ -60,6 +60,7 @@ void ModulationModeComponent::showModePopup() {
         menu.addItem(value + 1, name, true, value == mode);
     }
 
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
         [this](int result) {
             if (result > 0)

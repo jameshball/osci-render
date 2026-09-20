@@ -1,4 +1,6 @@
 #include <JuceHeader.h>
+#include "TestCleanup.h"
+#include "../Source/audio/modulation/LfoParameters.h"
 #include "../Source/audio/modulation/LfoState.h"
 
 // ============================================================================
@@ -679,12 +681,234 @@ public:
             expectWithinAbsoluteError((double)loaded.depth, -0.42, 0.001);
             expect(!loaded.bipolar, "Bipolar should be false");
         }
+
+        beginTest("Custom waveform identity survives a project round-trip");
+        {
+            LfoParameters original;
+            auto waveform = createLfoPreset(LfoPreset::Sine);
+            waveform.nodes[1].value *= 0.5;
+            original.waveformChanged(0, waveform);
+            original.setIsCustom(0, true);
+
+            juce::XmlElement root("state");
+            original.saveToXml(&root);
+
+            LfoParameters loaded;
+            loaded.loadFromXml(&root);
+            expect(loaded.getIsCustom(0));
+
+            testutil::cleanupLfoParams(original);
+            testutil::cleanupLfoParams(loaded);
+        }
+    }
+};
+
+// ============================================================================
+// Test 8: Preview assignments restore the exact pre-preview state
+// ============================================================================
+
+class LfoPreviewAssignmentTest : public juce::UnitTest {
+public:
+    LfoPreviewAssignmentTest() : juce::UnitTest("LFO Preview Assignment Restoration", "LFO") {}
+
+    void runTest() override {
+        beginTest("Stopping preview preserves existing assignments");
+
+        LfoParameters lfoParameters;
+        osci::EffectParameter parameter("Amount", "", "previewAmount", 2, 0.75f, 0.0f, 1.0f, 0.01f,
+                                        osci::LfoType::Sine, 2.0f);
+        auto effect = std::make_shared<osci::SimpleEffect>(&parameter);
+        std::vector<std::shared_ptr<osci::Effect>> effects{effect};
+        const LfoAssignment original{7, parameter.paramID, 0.35f, true};
+        lfoParameters.addAssignment(original);
+
+        lfoParameters.startPreview(effect->getId(), effects);
+        lfoParameters.stopPreview();
+
+        const auto restored = lfoParameters.getAssignments();
+        expectEquals(static_cast<int>(restored.size()), 1);
+        if (restored.size() == 1) {
+            expectEquals(restored[0].sourceIndex, original.sourceIndex);
+            expectEquals(restored[0].paramId, original.paramId);
+            expectWithinAbsoluteError(restored[0].depth, original.depth, 0.0001f);
+            expect(restored[0].bipolar == original.bipolar);
+        }
+        expectWithinAbsoluteError(parameter.getValueUnnormalised(), 0.75f, 0.0001f);
+
+        testutil::cleanupSubParams(parameter);
+        testutil::cleanupLfoParams(lfoParameters);
+    }
+};
+
+class ModulationAssignmentUndoTest : public juce::UnitTest {
+public:
+    ModulationAssignmentUndoTest() : juce::UnitTest("Modulation Assignment Undo", "LFO") {}
+
+    void runTest() override {
+        beginTest("Undoing a depth edit restores the previous assignment");
+
+        LfoParameters lfoParameters;
+        const LfoAssignment original{0, "frequency", 0.25f, false};
+        lfoParameters.addAssignment(original);
+
+        juce::UndoManager undoManager;
+        lfoParameters.setUndoManager(&undoManager);
+        lfoParameters.addAssignment({0, "frequency", -0.75f, true});
+
+        expect(undoManager.undo());
+        const auto restored = lfoParameters.getAssignments();
+        expectEquals((int)restored.size(), 1);
+        if (restored.size() == 1) {
+            expectWithinAbsoluteError(restored[0].depth, original.depth, 0.0001f);
+            expect(restored[0].bipolar == original.bipolar);
+        }
+
+        testutil::cleanupLfoParams(lfoParameters);
     }
 };
 
 // ============================================================================
 // Static registration — JUCE auto-discovers these
 // ============================================================================
+class LfoWaveformUndoTest : public juce::UnitTest {
+public:
+    LfoWaveformUndoTest() : juce::UnitTest("LFO Waveform Undo", "LFO") {}
+
+    void runTest() override {
+        beginTest("Custom/factory undo and redo restore audio and saved identity without an editor");
+        LfoParameters parameters;
+        parameters.prepareToPlay(100.0, 4);
+        auto custom = createLfoPreset(LfoPreset::Triangle);
+        custom.nodes[1].value = 0.37;
+        parameters.waveformChanged(0, custom);
+        parameters.setIsCustom(0, true);
+
+        juce::UndoManager undo;
+        juce::ValueTree tree("state");
+        juce::String lastParameter;
+        bool suppressed = false;
+        bool grouped = true;
+        auto& preset = *parameters.preset[0];
+        preset.bindToValueTree(tree, &undo, &lastParameter, &suppressed, &grouped);
+        struct Listener : juce::ValueTree::Listener {
+            explicit Listener(osci::IntParameter& p) : parameter(p) {}
+            void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override {
+                parameter.applyValueFromTree();
+            }
+            osci::IntParameter& parameter;
+        } listener(preset);
+        tree.addListener(&listener);
+
+        const auto factory = createLfoPreset(LfoPreset::Square);
+        undo.beginNewTransaction("Change LFO Preset");
+        parameters.setPreset(0, LfoPreset::Square);
+        undo.perform(new LfoWaveformChangeAction(parameters.waveforms, parameters.waveformLock, 0, custom, factory,
+                                               parameters.customState[0], true, false, preset));
+        undo.beginNewTransaction();
+
+        auto check = [&](const LfoWaveform& expected, bool isCustom, LfoPreset selected) {
+            expect(parameters.getIsCustom(0) == isCustom);
+            expect(parameters.getPreset(0) == selected);
+            expect(parameters.getEffectiveWaveform(0) == expected);
+            parameters.audioStates[0].phase = 0.13f;
+            juce::MidiBuffer midi;
+            osci::DawPosition position;
+            std::atomic<bool> voices[1] = {};
+            parameters.fillBlockBuffers(4, 100.0, midi, position, voices);
+            expectWithinAbsoluteError(parameters.blockBuffer[0][0], expected.evaluate(0.14f), 0.0001f);
+            juce::XmlElement state("state");
+            parameters.saveToXml(&state);
+            LfoParameters loaded;
+            loaded.setPreset(0, selected);
+            loaded.loadFromXml(&state);
+            expect(loaded.getIsCustom(0) == isCustom);
+            expect(loaded.getEffectiveWaveform(0) == expected);
+            testutil::cleanupLfoParams(loaded);
+        };
+        check(factory, false, LfoPreset::Square);
+        expect(undo.undo());
+        check(custom, true, LfoPreset::Triangle);
+        expect(undo.redo());
+        check(factory, false, LfoPreset::Square);
+
+        beginTest("Identity-only changes are undoable even when the waveform matches a factory preset");
+        undo.beginNewTransaction();
+        undo.perform(new LfoWaveformChangeAction(parameters.waveforms, parameters.waveformLock, 0, factory, factory,
+                                               parameters.customState[0], false, true, preset));
+        expect(parameters.getIsCustom(0));
+        expect(undo.undo());
+        expect(!parameters.getIsCustom(0));
+        expect(undo.redo());
+        expect(parameters.getIsCustom(0));
+
+        undo.clearUndoHistory();
+        tree.removeListener(&listener);
+        testutil::cleanupLfoParams(parameters);
+    }
+};
+
+static LfoWaveformUndoTest lfoWaveformUndoTest;
+
+class LfoPresetAutomationTest : public juce::UnitTest {
+public:
+    LfoPresetAutomationTest() : juce::UnitTest("LFO Preset Automation", "LFO") {}
+
+    void runTest() override {
+        LfoParameters parameters;
+        parameters.prepareToPlay(100.0, 4);
+        parameters.setSmoothAmount(0, 0.0f);
+        juce::MidiBuffer midi;
+        osci::DawPosition position;
+        std::atomic<bool> voices[1] = {};
+
+        beginTest("Host preset writes change audio and the displayed waveform");
+        for (const auto& entry : getLfoPresetRegistry()) {
+            // Use the host-facing setter, not the UI's waveform editing path.
+            parameters.preset[0]->setValue(parameters.preset[0]->getNormalisedValue(static_cast<int>(entry.preset)));
+            parameters.audioStates[0].phase = 0.13f;
+            parameters.fillBlockBuffers(4, 100.0, midi, position, voices);
+            const auto expected = createLfoPreset(entry.preset);
+            expect(parameters.getEffectiveWaveform(0) == expected);
+            for (int s = 0; s < 4; ++s) {
+                expectWithinAbsoluteError(parameters.blockBuffer[0][s], expected.evaluate(0.13f + 0.01f * (s + 1)), 0.0001f);
+            }
+
+            juce::XmlElement root("state");
+            parameters.saveToXml(&root);
+            LfoParameters loaded;
+            loaded.setPreset(0, entry.preset); // Processor restores parameter values separately.
+            loaded.loadFromXml(&root);
+            expect(!loaded.getIsCustom(0));
+            expect(loaded.getWaveform(0) == expected);
+            expect(loaded.getEffectiveWaveform(0) == expected);
+            testutil::cleanupLfoParams(loaded);
+        }
+
+        beginTest("Preset automation preserves custom audio and saved shapes");
+        auto custom = createLfoPreset(LfoPreset::Triangle);
+        custom.nodes[1].value = 0.37;
+        parameters.waveformChanged(0, custom);
+        parameters.setIsCustom(0, true);
+        parameters.preset[0]->setValue(parameters.preset[0]->getNormalisedValue(static_cast<int>(LfoPreset::Square)));
+        parameters.audioStates[0].phase = 0.13f;
+        parameters.fillBlockBuffers(4, 100.0, midi, position, voices);
+        expect(parameters.getEffectiveWaveform(0) == custom);
+        expectWithinAbsoluteError(parameters.blockBuffer[0][0], custom.evaluate(0.14f), 0.0001f);
+        juce::XmlElement root("state");
+        parameters.saveToXml(&root);
+        LfoParameters loaded;
+        loaded.loadFromXml(&root);
+        expect(loaded.getIsCustom(0));
+        expect(loaded.getEffectiveWaveform(0) == custom);
+
+        parameters.setIsCustom(0, false);
+        expect(parameters.getEffectiveWaveform(0) == createLfoPreset(LfoPreset::Square));
+        testutil::cleanupLfoParams(loaded);
+        testutil::cleanupLfoParams(parameters);
+    }
+};
+
+static LfoPresetAutomationTest lfoPresetAutomationTest;
 static LfoAssignmentRaceTest lfoAssignmentRaceTest;
 static LfoWaveformRaceTest lfoWaveformRaceTest;
 static LfoAudioStateStressTest lfoAudioStateStressTest;
@@ -692,3 +916,5 @@ static LfoAssignmentOrderTest lfoAssignmentOrderTest;
 static LfoFullSystemStressTest lfoFullSystemStressTest;
 static LfoWaveformCorrectnessTest lfoWaveformCorrectnessTest;
 static LfoSerializationTest lfoSerializationTest;
+static LfoPreviewAssignmentTest lfoPreviewAssignmentTest;
+static ModulationAssignmentUndoTest modulationAssignmentUndoTest;

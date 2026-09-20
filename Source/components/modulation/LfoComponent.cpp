@@ -16,8 +16,8 @@ LfoComponent::PresetSelector::PresetSelector() {
 void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
 
-    g.setColour(Colours::evenDarker());
-    g.fillRoundedRectangle(bounds, Colours::kPillRadius);
+    g.setColour(osci::Colours::evenDarker());
+    g.fillRoundedRectangle(bounds, osci::Colours::kPillRadius);
 
     // Left chevron
     {
@@ -48,7 +48,7 @@ void LfoComponent::PresetSelector::paint(juce::Graphics& g) {
     }
 
     g.setColour(juce::Colours::white.withAlpha(0.9f));
-    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
     auto textArea = bounds.toNearestInt();
     textArea.removeFromLeft(leftArrowArea.getWidth());
     textArea.removeFromRight(rightArrowArea.getWidth());
@@ -190,8 +190,7 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     cfg.dragPrefix = "LFO";
     cfg.getLabel = [](int i) { return "LFO " + juce::String(i + 1); };
     cfg.getSourceColour = &LfoComponent::getLfoColour;
-    cfg.getCurrentValue = [&proc](int i) { return proc.lfoParameters.getCurrentValue(i); };
-    cfg.isSourceActive = [&proc](int i) { return proc.lfoParameters.isActive(i); };
+    cfg.getDisplayBuffer = [&proc](int i) -> ModulationDisplayBuffer& { return proc.lfoParameters.displayBuffers[i]; };
     cfg.getAssignments = [&proc]() { return proc.lfoParameters.getAssignments(); };
     cfg.addAssignment = [&proc](const ModAssignment& a) { proc.lfoParameters.addAssignment(a); };
     cfg.removeAssignment = [&proc](int idx, const juce::String& pid) { proc.lfoParameters.removeAssignment(idx, pid); };
@@ -203,7 +202,7 @@ static ModulationSourceConfig buildLfoConfig(OscirenderAudioProcessor& proc) {
     cfg.setActiveTab = [&proc](int i) { proc.lfoParameters.activeTab = i; };
 #if OSCI_PREMIUM
     cfg.typeId = "lfo";
-    cfg.midiCCManager = &proc.midiCCManager;
+    cfg.midiManager = &proc.midiManager;
     cfg.buildModDepthCustomId = [](int idx, const juce::String& pid) {
         return OscirenderAudioProcessor::modDepthCustomId("lfo", idx, pid);
     };
@@ -221,7 +220,7 @@ static ModulationRateConfig buildLfoRateConfig(OscirenderAudioProcessor& proc) {
     cfg.setRateMode = [&proc](int i, LfoRateMode m) { proc.lfoParameters.setRateMode(i, m); };
     cfg.getTempoDivision = [&proc](int i) { return proc.lfoParameters.getTempoDivision(i); };
     cfg.setTempoDivision = [&proc](int i, int d) { proc.lfoParameters.setTempoDivision(i, d); };
-    cfg.getCurrentBpm = [&proc]() { return proc.currentBpm.load(std::memory_order_relaxed); };
+    cfg.getCurrentBpm = [&proc]() { return proc.dawPosition.bpm.load(std::memory_order_relaxed); };
     cfg.maxIndex = NUM_LFOS;
     return cfg;
 }
@@ -255,8 +254,8 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
     bool defaultIsFile = false;
     juce::String defaultUserName;
 
-    juce::String defaultFileStr = audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
-    juce::String defaultFactoryStr = audioProcessor.getGlobalStringValue("defaultLfoPreset");
+    juce::String defaultFileStr = audioProcessor.globalSettings.getString("defaultLfoPresetFile");
+    juce::String defaultFactoryStr = audioProcessor.globalSettings.getString("defaultLfoPreset");
 
     if (defaultFileStr.isNotEmpty()) {
         juce::File file(defaultFileStr);
@@ -383,6 +382,7 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
 
     // Register as listener on all LFO parameters so undo/redo triggers a UI sync
     for (int i = 0; i < NUM_LFOS; ++i) {
+        paramSync.track(audioProcessor.lfoParameters.preset[i]);
         paramSync.track(audioProcessor.lfoParameters.rate[i]);
         paramSync.track(audioProcessor.lfoParameters.mode[i]);
         paramSync.track(audioProcessor.lfoParameters.phaseOffset[i]);
@@ -399,26 +399,21 @@ LfoComponent::LfoComponent(OscirenderAudioProcessor& processor)
 LfoComponent::~LfoComponent() {
 }
 
-void LfoComponent::timerCallback() {
-    ModulationSourceComponent::timerCallback();
-
-    int idx = getActiveSourceIndex();
-    bool active = audioProcessor.lfoParameters.isActive(idx);
-
-    if (active) {
-        // Reset the flow trail when transitioning from inactive to active, or when
-        // the LFO was retriggered (new note played while already running) so the
-        // old trail doesn't linger at the previous position
-        if (!wasLfoActive || audioProcessor.lfoParameters.consumeRetriggered(idx))
+void LfoComponent::displaySampleArrived(int index, const ModulationDisplayBuffer::Sample& sample) {
+    if (index != getActiveSourceIndex()) {
+        return;
+    }
+    if (sample.active) {
+        if (!wasLfoActive || sample.reset) {
             graph.resetFlowTrail();
-
-        double phase = (double)audioProcessor.lfoParameters.getCurrentPhase(idx);
+        }
+        double phase = sample.position;
         graph.setFlowMarkerDomainPositions(&phase, 1);
     } else {
         graph.clearFlowMarkers();
     }
 
-    wasLfoActive = active;
+    wasLfoActive = sample.active;
 }
 
 void LfoComponent::paint(juce::Graphics& g) {
@@ -426,8 +421,8 @@ void LfoComponent::paint(juce::Graphics& g) {
 
     // Dark rounded background behind paint + preview controls
     if (!paintControlsBg.isEmpty()) {
-        g.setColour(Colours::darkerer());
-        g.fillRoundedRectangle(paintControlsBg.toFloat(), Colours::kPillRadius);
+        g.setColour(osci::Colours::darkerer());
+        g.fillRoundedRectangle(paintControlsBg.toFloat(), osci::Colours::kPillRadius);
     }
 }
 
@@ -581,16 +576,20 @@ LfoWaveform LfoComponent::getLfoWaveform(int lfoIndex) const {
 
 void LfoComponent::setLfoPreset(int lfoIndex, LfoPreset preset) {
     if (lfoIndex < 0 || lfoIndex >= NUM_LFOS) return;
+    audioProcessor.getUndoManager().beginNewTransaction("Change LFO Preset");
+    CommonAudioProcessor::ScopedFlag grouping(audioProcessor.undoGrouping);
+    const bool customBefore = audioProcessor.lfoParameters.getIsCustom(lfoIndex);
     lfoData[lfoIndex].preset = preset;
     lfoData[lfoIndex].isCustom = false;
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(lfoIndex);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(lfoIndex);
     lfoData[lfoIndex].waveform = createLfoPreset(preset);
     lfoData[lfoIndex].factoryWaveform = lfoData[lfoIndex].waveform;
     audioProcessor.lfoParameters.waveformChanged(lfoIndex, lfoData[lfoIndex].waveform);
+    audioProcessor.lfoParameters.setPreset(lfoIndex, preset);
+    audioProcessor.lfoParameters.setIsCustom(lfoIndex, false);
+    recordLfoUndoableChange(waveformBefore, customBefore, lfoIndex);
     if (lfoIndex == getActiveSourceIndex()) {
-        auto nodesBefore = graph.getNodes();
         syncGraphToActiveLfo();
-        recordLfoUndoableChangeGuarded(nodesBefore, waveformBefore, lfoIndex);
         updatePresetLabel();
     }
 }
@@ -624,12 +623,7 @@ void LfoComponent::applyPreset(LfoPreset preset) {
     if (lfoData[idx].isCustom)
         lfoData[idx].customWaveform = lfoData[idx].waveform;
 
-    lfoData[idx].preset = preset;
-    lfoData[idx].isCustom = false;
     lfoData[idx].userPresetName.clear();
-
-    lfoData[idx].waveform = createLfoPreset(preset);
-    lfoData[idx].factoryWaveform = lfoData[idx].waveform;
 
     // Disable paint mode when switching to a preset
     if (paintToggle.getToggleState()) {
@@ -638,16 +632,7 @@ void LfoComponent::applyPreset(LfoPreset preset) {
         shapePreview.setEnabled(false);
     }
 
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
-    audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
-    auto nodesBefore = graph.getNodes();
-    syncGraphToActiveLfo();
-
-    recordLfoUndoableChangeGuarded(nodesBefore, waveformBefore, idx);
-
-    updatePresetLabel();
-    audioProcessor.lfoParameters.setPreset(idx, preset);
-    audioProcessor.lfoParameters.setIsCustom(idx, false);
+    setLfoPreset(idx, preset);
 }
 
 void LfoComponent::updatePresetLabel() {
@@ -662,10 +647,13 @@ void LfoComponent::updatePresetLabel() {
 
 void LfoComponent::syncFromProcessorState() {
     for (int i = 0; i < NUM_LFOS; ++i) {
-        lfoData[i].waveform = audioProcessor.lfoParameters.getWaveform(i);
+        if (lfoData[i].preset != audioProcessor.lfoParameters.getPreset(i)) {
+            lfoData[i].userPresetName.clear();
+        }
+        lfoData[i].waveform = audioProcessor.lfoParameters.getEffectiveWaveform(i);
         lfoData[i].preset = audioProcessor.lfoParameters.getPreset(i);
         lfoData[i].factoryWaveform = createLfoPreset(lfoData[i].preset);
-        lfoData[i].isCustom = (lfoData[i].waveform != lfoData[i].factoryWaveform);
+        lfoData[i].isCustom = audioProcessor.lfoParameters.getIsCustom(i);
     }
 
     ModulationSourceComponent::syncFromProcessorState();
@@ -688,27 +676,19 @@ void LfoComponent::syncFromProcessorState() {
     delayKnob.rebindParam(audioProcessor.lfoParameters.delayAmount[getActiveSourceIndex()]);
 }
 
-void LfoComponent::recordLfoUndoableChange(const std::vector<GraphNode>& nodesBefore,
-                                            const LfoWaveform& waveformBefore, int lfoIndex) {
-    // Record the UI-level graph node change (no-op after editor destroy/recreate)
-    graph.recordUndoableChange(nodesBefore);
-
-    // Also record the processor-side waveform change so undo works even if
-    // the editor has been destroyed and reopened.
+void LfoComponent::recordLfoUndoableChange(const LfoWaveform& waveformBefore, bool customBefore, int lfoIndex) {
+    // One processor-side action survives editor closure and refreshes the graph
+    // through the preset parameter listener, without a second graph undo action.
     auto& um = audioProcessor.getUndoManager();
     auto waveformAfter = audioProcessor.lfoParameters.getWaveform(lfoIndex);
-    if (waveformBefore != waveformAfter) {
+    const bool customAfter = audioProcessor.lfoParameters.getIsCustom(lfoIndex);
+    if (waveformBefore != waveformAfter || customBefore != customAfter) {
         um.perform(new LfoWaveformChangeAction(
             audioProcessor.lfoParameters.waveforms,
             audioProcessor.lfoParameters.waveformLock,
-            lfoIndex, waveformBefore, waveformAfter));
+            lfoIndex, waveformBefore, waveformAfter, audioProcessor.lfoParameters.customState[lfoIndex],
+            customBefore, customAfter, *audioProcessor.lfoParameters.preset[lfoIndex]));
     }
-}
-
-void LfoComponent::recordLfoUndoableChangeGuarded(const std::vector<GraphNode>& nodesBefore,
-                                                   const LfoWaveform& waveformBefore, int lfoIndex) {
-    juce::ScopedValueSetter<bool> guard(isSyncingGraph, true);
-    recordLfoUndoableChange(nodesBefore, waveformBefore, lfoIndex);
 }
 
 void LfoComponent::applyLfoConstraints(int nodeIndex, double& time, double& value) {
@@ -752,6 +732,7 @@ void LfoComponent::showPaintShapeMenu() {
     addItem("Tri", PS::Tri);
     addItem("Bump", PS::Bump);
 
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options()
         .withTargetComponent(&shapePreview)
         .withMinimumWidth(80));
@@ -761,16 +742,29 @@ void LfoComponent::setMidiEnabled(bool enabled) {
     if (enabled) {
         modeControl.setModes(getAllLfoModePairs());
     } else {
-        // Only Free mode when MIDI is off
-        modeControl.setModes({
+        const bool pluginHost = !juce::JUCEApplicationBase::isStandaloneApp();
+        std::vector<std::pair<int, juce::String>> allowedModes = {
             { static_cast<int>(LfoMode::Free), "Free" },
-        });
-        // Force Free mode on ALL LFO sources, not just the visible one
+        };
+        if (pluginHost) {
+            allowedModes.push_back({ static_cast<int>(LfoMode::Sync), "Sync" });
+        }
+
+        modeControl.setModes(allowedModes);
+        if (pluginHost) {
+            audioProcessor.lfoParameters.switchUnmodifiedFreeToSync();
+        }
+
         for (int i = 0; i < NUM_LFOS; ++i) {
-            if (audioProcessor.lfoParameters.getMode(i) != LfoMode::Free)
-                audioProcessor.lfoParameters.setMode(i, LfoMode::Free);
+            LfoMode mode = audioProcessor.lfoParameters.getMode(i);
+            const bool modeAllowed = mode == LfoMode::Free || (pluginHost && mode == LfoMode::Sync);
+            if (!modeAllowed) {
+                audioProcessor.lfoParameters.setMode(i, pluginHost ? LfoMode::Sync : LfoMode::Free);
+            }
         }
     }
+
+    modeControl.syncFromProcessor();
 }
 
 void LfoComponent::copyWaveformToClipboard() {
@@ -796,13 +790,14 @@ void LfoComponent::pasteWaveformFromClipboard() {
     lfoData[idx].waveform = std::move(waveform);
     lfoData[idx].isCustom = true;
     lfoData[idx].userPresetName.clear();
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
+    audioProcessor.getUndoManager().beginNewTransaction("Paste LFO Waveform");
+    const bool customBefore = audioProcessor.lfoParameters.getIsCustom(idx);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     audioProcessor.lfoParameters.setIsCustom(idx, true);
 
-    auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
-    recordLfoUndoableChangeGuarded(nodesBefore, waveformBefore, idx);
+    recordLfoUndoableChange(waveformBefore, customBefore, idx);
     updatePresetLabel();
 }
 
@@ -905,43 +900,44 @@ void LfoComponent::loadUserPreset(const juce::File& file) {
     lfoData[idx].isCustom = true;
     lfoData[idx].userPresetName = name;
 
-    auto waveformBefore = audioProcessor.lfoParameters.getWaveform(idx);
+    audioProcessor.getUndoManager().beginNewTransaction("Load LFO Preset");
+    const bool customBefore = audioProcessor.lfoParameters.getIsCustom(idx);
+    auto waveformBefore = audioProcessor.lfoParameters.getEffectiveWaveform(idx);
     audioProcessor.lfoParameters.waveformChanged(idx, lfoData[idx].waveform);
     audioProcessor.lfoParameters.setIsCustom(idx, true);
 
-    auto nodesBefore = graph.getNodes();
     syncGraphToActiveLfo();
-    recordLfoUndoableChangeGuarded(nodesBefore, waveformBefore, idx);
+    recordLfoUndoableChange(waveformBefore, customBefore, idx);
     updatePresetLabel();
 }
 
 void LfoComponent::presetBrowserSetDefaultFactory(LfoPreset preset) {
-    audioProcessor.setGlobalValue("defaultLfoPreset", lfoPresetToString(preset));
-    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.set("defaultLfoPreset", lfoPresetToString(preset));
+    audioProcessor.globalSettings.remove("defaultLfoPresetFile");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::presetBrowserSetDefaultFile(const juce::File& file) {
-    audioProcessor.setGlobalValue("defaultLfoPresetFile", file.getFullPathName());
-    audioProcessor.removeGlobalValue("defaultLfoPreset");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.set("defaultLfoPresetFile", file.getFullPathName());
+    audioProcessor.globalSettings.remove("defaultLfoPreset");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 void LfoComponent::presetBrowserClearDefault() {
-    audioProcessor.removeGlobalValue("defaultLfoPreset");
-    audioProcessor.removeGlobalValue("defaultLfoPresetFile");
-    audioProcessor.saveGlobalSettings();
+    audioProcessor.globalSettings.remove("defaultLfoPreset");
+    audioProcessor.globalSettings.remove("defaultLfoPresetFile");
+    audioProcessor.globalSettings.save();
     refreshPresetBrowserIfVisible();
 }
 
 juce::String LfoComponent::getDefaultFactoryName() const {
-    return audioProcessor.getGlobalStringValue("defaultLfoPreset");
+    return audioProcessor.globalSettings.getString("defaultLfoPreset");
 }
 
 juce::String LfoComponent::getDefaultFilePath() const {
-    return audioProcessor.getGlobalStringValue("defaultLfoPresetFile");
+    return audioProcessor.globalSettings.getString("defaultLfoPresetFile");
 }
 
 void LfoComponent::refreshPresetBrowserIfVisible() {

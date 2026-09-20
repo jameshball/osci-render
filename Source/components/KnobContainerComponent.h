@@ -1,9 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "RotaryKnobComponent.h"
-#include "SvgButton.h"
-#include "LabelledTextBox.h"
+#include <osci_gui/osci_gui.h>
 #include "ModulationState.h"
 #include "../LookAndFeel.h"
 #include <osci_render_core/effect/osci_EffectParameter.h>
@@ -57,8 +55,8 @@ public:
         if (boundParam)
             boundParam->addListener(this);
 
-        if (param->midiCCManager != nullptr)
-            wireMidiCC(*param->midiCCManager);
+        if (param->midiManager != nullptr)
+            wireMidiCC(*param->midiManager);
 
         double minVal = param->min.load();
         double maxVal = param->max.load();
@@ -203,7 +201,7 @@ public:
 #endif
 
     void mouseDown(const juce::MouseEvent& event) override {
-        bool onLabel = event.getPosition().getY() >= getHeight() - Colours::kLabelHeight;
+        bool onLabel = event.getPosition().getY() >= getHeight() - osci::Colours::kLabelHeight;
         if (event.mods.isRightButtonDown() || onLabel) {
             knob.showContextMenu(event.getScreenPosition());
         }
@@ -232,23 +230,23 @@ public:
         auto bounds = getLocalBounds().toFloat();
         float alpha = isEnabled() ? 1.0f : 0.3f;
 
-        bool isLearningCC = midiCCManager != nullptr && boundParam != nullptr
-                            && midiCCManager->isLearning(boundParam);
+        bool isLearningCC = midiManager != nullptr && boundParam != nullptr
+                            && midiManager->isLearning(boundParam);
 
         // Faint rounded rectangle behind the label only
-        auto labelArea = bounds.removeFromBottom(Colours::kLabelHeight);
+        auto labelArea = bounds.removeFromBottom(osci::Colours::kLabelHeight);
         auto labelBg = labelArea.reduced(2.0f, 0.0f);
-        auto bgColour = isLearningCC ? Colours::midiLearnBackground()
-                       : Colours::darkerer().withAlpha(alpha);
+        auto bgColour = isLearningCC ? osci::Colours::midiLearnBackground()
+                       : osci::Colours::darkerer().withAlpha(alpha);
         if (labelHovered && !isLearningCC)
             bgColour = bgColour.darker(0.3f);
         g.setColour(bgColour);
-        g.fillRoundedRectangle(labelBg, Colours::kPillRadius);
+        g.fillRoundedRectangle(labelBg, osci::Colours::kPillRadius);
 
         // Label text
-        g.setColour(labelHovered && !isLearningCC ? Colours::accentColor().withAlpha(alpha) : juce::Colours::white.withAlpha(alpha));
+        g.setColour(labelHovered && !isLearningCC ? osci::Colours::accentColor().withAlpha(alpha) : juce::Colours::white.withAlpha(alpha));
         g.setFont(juce::Font(10.0f));
-        g.drawText(isLearningCC ? Colours::midiLearnLabel() : label, labelArea, juce::Justification::centred, false);
+        g.drawText(isLearningCC ? osci::Colours::midiLearnLabel() : label, labelArea, juce::Justification::centred, false);
     }
 
     void paintOverChildren(juce::Graphics& g) override {
@@ -260,7 +258,7 @@ public:
 
     void resized() override {
         auto bounds = getLocalBounds();
-        bounds.removeFromBottom(Colours::kLabelHeight);
+        bounds.removeFromBottom(osci::Colours::kLabelHeight);
         knob.setBounds(bounds);
     }
 
@@ -271,19 +269,19 @@ private:
     osci::EffectParameter* effectParam = nullptr;
     bool modDropHighlight = false;
     bool labelHovered = false;
-    osci::MidiCCManager* midiCCManager = nullptr;
+    osci::MidiManager* midiManager = nullptr;
 
 #ifndef SOSCI
     ModulationUpdateBroadcaster* modBroadcaster = nullptr;
 #endif
 
-    void wireMidiCC(osci::MidiCCManager& manager);
+    void wireMidiCC(osci::MidiManager& manager);
     void setupMidiCCContextMenu();
 
     void showSettingsPopup();
 
     void mouseMoveInternal(const juce::MouseEvent& event) {
-        bool onLabel = event.getPosition().getY() >= getHeight() - Colours::kLabelHeight;
+        bool onLabel = event.getPosition().getY() >= getHeight() - osci::Colours::kLabelHeight;
         setMouseCursor(onLabel ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
         if (onLabel != labelHovered) {
             labelHovered = onLabel;

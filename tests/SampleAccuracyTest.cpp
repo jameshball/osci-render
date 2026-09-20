@@ -6,6 +6,21 @@
 
 using namespace osci;
 
+namespace {
+osci::DawPosition makeDawPosition(double sampleRate, double bpm = 120.0, double syncSeconds = 0.0, bool hasSyncPosition = false, bool isPlaying = true) {
+    osci::DawPosition position;
+    const double secondsPerSample = sampleRate > 0.0 ? 1.0 / sampleRate : 0.0;
+    position.bpm.store(bpm, std::memory_order_relaxed);
+    position.secondsPerSample.store(secondsPerSample, std::memory_order_relaxed);
+    position.beatsPerSample.store(bpm * secondsPerSample / 60.0, std::memory_order_relaxed);
+    position.syncSeconds.store(syncSeconds, std::memory_order_relaxed);
+    position.syncSecondsPerSample.store(isPlaying ? secondsPerSample : 0.0, std::memory_order_relaxed);
+    position.hasSyncPosition.store(hasSyncPosition, std::memory_order_relaxed);
+    position.isPlaying.store(isPlaying, std::memory_order_relaxed);
+    return position;
+}
+}
+
 // ============================================================================
 // Sample-Accuracy Tests — verify that modulated parameters produce distinct
 // per-sample values within a block, not a single value for the whole buffer.
@@ -120,7 +135,7 @@ public:
 
         // Build param location map
         std::unordered_map<juce::String, ParamLocation> paramMap;
-        paramMap["target"] = { &targetEffect, 0 };
+        paramMap["target"] = { targetEffect.parameters[0], &targetEffect, 0 };
 
         // Create LFO source with a fast triangle LFO
         LfoParameters lfoParams;
@@ -147,7 +162,8 @@ public:
         // Step 2: Fill LFO block buffers
         juce::MidiBuffer emptyMidi;
         std::atomic<bool> voiceActive[16] = {};
-        lfoParams.fillBlockBuffers<16>(blockSize, sampleRate, emptyMidi, 120.0, voiceActive);
+        const auto dawPosition = makeDawPosition(sampleRate);
+        lfoParams.fillBlockBuffers<16>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
 
         // Step 3: Apply modulation to animated buffers
         engine.applyAllModulation(blockSize);
@@ -177,6 +193,55 @@ public:
 };
 
 static GlobalModulationSampleAccuracyTest globalModulationSampleAccuracyTest;
+
+class StandaloneParameterModulationTest : public juce::UnitTest {
+public:
+    StandaloneParameterModulationTest() : juce::UnitTest("Standalone Parameter Modulation", "LFO") {}
+
+    void runTest() override {
+        beginTest("Registered float parameters receive per-sample modulation");
+
+        constexpr int blockSize = 256;
+        constexpr double sampleRate = 48000.0;
+        osci::FloatParameter target("Standalone", "standaloneTarget", VERSION_HINT, 0.25f, 0.0f, 1.0f);
+        std::unordered_map<juce::String, ParamLocation> paramMap;
+        paramMap[target.paramID] = { &target, nullptr, -1 };
+
+        LfoParameters lfoParams;
+        lfoParams.rate[0]->setUnnormalisedValueNotifyingHost(200.0f);
+        lfoParams.setPreset(0, LfoPreset::Triangle);
+        lfoParams.setMode(0, LfoMode::Free);
+        lfoParams.addAssignment({ 0, target.paramID, 0.5f, false });
+
+        ModulationEngine engine(paramMap);
+        engine.addSource(&lfoParams);
+        engine.prepareToPlay(sampleRate, blockSize);
+        engine.beginModulationBlock(blockSize);
+
+        juce::MidiBuffer emptyMidi;
+        std::atomic<bool> voiceActive[16] = {};
+        const auto dawPosition = makeDawPosition(sampleRate);
+        lfoParams.fillBlockBuffers<16>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
+        engine.applyAllModulation(blockSize);
+
+        const float* values = target.getModulationReadPointer(blockSize);
+        expect(values != nullptr);
+        if (values != nullptr) {
+            int distinctCount = 0;
+            for (int sample = 1; sample < blockSize; ++sample) {
+                if (std::abs(values[sample] - values[sample - 1]) > 1.0e-7f) {
+                    distinctCount++;
+                }
+            }
+            expect(distinctCount > blockSize / 2);
+            expectWithinAbsoluteError(target.getPreviousModulatedValue(), values[blockSize - 1], 1.0e-7f);
+        }
+
+        testutil::cleanupLfoParams(lfoParams);
+    }
+};
+
+static StandaloneParameterModulationTest standaloneParameterModulationTest;
 
 // ============================================================================
 // Test 3: getAnimatedValuesReadPointer returns per-sample data
@@ -317,17 +382,71 @@ public:
         ramp.smooth = false;
         ramp.nodes = { { 0.0, 0.0, 0.0f }, { 1.0, 1.0, 0.0f } };
         lfoParams.waveformChanged(0, ramp);
+        lfoParams.setIsCustom(0, true);
 
         auto renderFirstSampleAt = [&](double syncStartSeconds) {
             lfoParams.audioStates[0].phase = 0.73f;
-            lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, 120.0,
-                                          voiceActive, syncStartSeconds, true);
+            const auto dawPosition = makeDawPosition(sampleRate, 120.0, syncStartSeconds, true);
+            lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, dawPosition, voiceActive);
             return lfoParams.blockBuffer[0][0];
         };
 
         expectWithinAbsoluteError(renderFirstSampleAt(0.25), 0.5f, 0.01f);
         expectWithinAbsoluteError(renderFirstSampleAt(1.25), 0.5f, 0.01f);
         expectWithinAbsoluteError(renderFirstSampleAt(0.125), 0.25f, 0.01f);
+
+        beginTest("DawPosition only advances synced time while transport is playing");
+        juce::AudioPlayHead::PositionInfo positionInfo;
+        positionInfo.setBpm(120.0);
+        positionInfo.setTimeInSeconds(0.125);
+        positionInfo.setPpqPosition(0.25);
+        positionInfo.setIsPlaying(false);
+        const auto pausedPosition = osci::DawPosition::fromPositionInfo(positionInfo, sampleRate);
+        expectWithinAbsoluteError(pausedPosition.syncSecondsPerSample.load(std::memory_order_relaxed), 0.0, 1.0e-12);
+        positionInfo.setIsPlaying(true);
+        const auto playingPosition = osci::DawPosition::fromPositionInfo(positionInfo, sampleRate);
+        expectWithinAbsoluteError(playingPosition.syncSecondsPerSample.load(std::memory_order_relaxed), 1.0 / sampleRate, 1.0e-12);
+
+        beginTest("Sync mode holds the host timeline value when transport is paused");
+        lfoParams.audioStates[0].phase = 0.73f;
+        const auto pausedDawPosition = makeDawPosition(sampleRate, 120.0, 0.125, true, false);
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, pausedDawPosition, voiceActive);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+
+        beginTest("Paused Sync mode outputs a constant value with smoothing enabled");
+        lfoParams.setSmoothAmount(0, 1.0f);
+        lfoParams.smoothedOutput[0] = 0.75f;
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, emptyMidi, pausedDawPosition, voiceActive);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+        lfoParams.setSmoothAmount(0, 0.0f);
+
+        beginTest("Sync mode is active on a MIDI-disabled note-on block");
+        voiceActive[0].store(false, std::memory_order_relaxed);
+        juce::MidiBuffer midiDisabledTrigger;
+        midiDisabledTrigger.addEvent(juce::MidiMessage::noteOn(1, 60, 1.0f), 0);
+        lfoParams.audioStates[0].phase = 0.73f;
+        lfoParams.fillBlockBuffers<1>(blockSize, sampleRate, midiDisabledTrigger, pausedDawPosition, voiceActive);
+        for (int i = 0; i < blockSize; ++i) {
+            expectWithinAbsoluteError(lfoParams.blockBuffer[0][i], 0.25f, 0.01f);
+        }
+
+        beginTest("Untouched Free LFOs can default to Sync");
+        LfoParameters defaultParams;
+        defaultParams.setIsCustom(1, true);
+        ModAssignment assignment;
+        assignment.sourceIndex = 2;
+        assignment.paramId = "target";
+        defaultParams.addAssignment(assignment);
+        defaultParams.switchUnmodifiedFreeToSync();
+        expect(defaultParams.getMode(0) == LfoMode::Sync);
+        expect(defaultParams.getMode(1) == LfoMode::Free);
+        expect(defaultParams.getMode(2) == LfoMode::Free);
+        testutil::cleanupLfoParams(defaultParams);
 
         testutil::cleanupLfoParams(lfoParams);
     }

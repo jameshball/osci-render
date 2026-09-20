@@ -21,6 +21,7 @@ public:
     struct ParamSet {
         osci::FloatParameter* delayTime = nullptr;
         osci::FloatParameter* attackTime = nullptr;
+        osci::FloatParameter* attackLevel = nullptr;
         osci::FloatParameter* holdTime = nullptr;
         osci::FloatParameter* decayTime = nullptr;
         osci::FloatParameter* sustainLevel = nullptr;
@@ -40,8 +41,8 @@ public:
         }
 
     private:
-        std::array<osci::FloatParameter*, 9> getAllParams() const {
-            return { delayTime, attackTime, holdTime, decayTime, sustainLevel,
+        std::array<osci::FloatParameter*, 10> getAllParams() const {
+            return { delayTime, attackTime, attackLevel, holdTime, decayTime, sustainLevel,
                      releaseTime, attackShape, decayShape, releaseShape };
         }
     };
@@ -65,6 +66,7 @@ public:
         // Envelope 0: legacy parameter IDs for backwards compatibility
         params[0].delayTime    = new osci::FloatParameter("Delay Time",    "delayTime",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
         params[0].attackTime   = new osci::FloatParameter("Attack Time",   "attackTime",   VERSION_HINT, 0.005f, osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
+        params[0].attackLevel  = new osci::FloatParameter("Attack Level",  "attackLevel",  VERSION_HINT, 1.0f, 0.0f, 1.0f, 0.00001f);
         params[0].holdTime     = new osci::FloatParameter("Hold Time",     "holdTime",     VERSION_HINT, 1.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
         params[0].decayTime    = new osci::FloatParameter("Decay Time",    "decayTime",    VERSION_HINT, 0.0f,   osci_audio::kDahdsrTimeMinSeconds, osci_audio::kDahdsrTimeMaxSeconds, osci_audio::kDahdsrTimeStepSeconds);
         params[0].sustainLevel = new osci::FloatParameter("Sustain Level", "sustainLevel", VERSION_HINT, 1.0f, 0.0f, 1.0f, 0.00001f);
@@ -76,6 +78,7 @@ public:
         // Envelope 0 params are always registered
         floatParameters.push_back(params[0].delayTime);
         floatParameters.push_back(params[0].attackTime);
+        floatParameters.push_back(params[0].attackLevel);
         floatParameters.push_back(params[0].holdTime);
         floatParameters.push_back(params[0].decayTime);
         floatParameters.push_back(params[0].sustainLevel);
@@ -120,6 +123,7 @@ public:
         return DahdsrParams{
             .delaySeconds  = ep.delayTime->getValueUnnormalised(),
             .attackSeconds = ep.attackTime->getValueUnnormalised(),
+            .attackLevel   = ep.attackLevel != nullptr ? ep.attackLevel->getValueUnnormalised() : 1.0f,
             .holdSeconds   = ep.holdTime->getValueUnnormalised(),
             .decaySeconds  = ep.decayTime->getValueUnnormalised(),
             .sustainLevel  = ep.sustainLevel->getValueUnnormalised(),

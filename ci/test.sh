@@ -2,11 +2,13 @@
 
 PLUGIN="osci-render-test"
 
+python3 -m unittest discover -s "$ROOT/ci" -p 'test_publish_release.py'
+
 # Build LuaJIT before Projucer resave (the test project needs it but can't
 # use Projucer postExportShellCommand because of its 60-second timeout)
 if [ "$OS" = "win" ]; then
   eval "$($(cygpath "$COMSPEC") /c$(cygpath -w "$ROOT/ci/vcvars_export.bat"))"
-  cd "$ROOT/modules/LuaJIT/src"
+  cd "$ROOT/modules/osci_scripting/third_party/LuaJIT/src"
   cmd //c msvcbuild.bat static
   cp lua51.lib luajit51.lib
   cd "$ROOT"

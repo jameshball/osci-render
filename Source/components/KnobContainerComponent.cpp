@@ -1,5 +1,5 @@
 #include "KnobContainerComponent.h"
-#include "ParameterContextMenu.h"
+#include <osci_gui/osci_gui.h>
 #include "ParameterSettingsComponent.h"
 
 #ifndef SOSCI
@@ -9,8 +9,8 @@
 #endif
 
 KnobContainerComponent::~KnobContainerComponent() {
-    if (midiCCManager)
-        midiCCManager->removeChangeListener(this);
+    if (midiManager)
+        midiManager->removeChangeListener(this);
 #ifndef SOSCI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
@@ -64,8 +64,8 @@ void KnobContainerComponent::wireModulation(OscirenderAudioProcessor& processor)
 
 #endif
 
-void KnobContainerComponent::wireMidiCC(osci::MidiCCManager& manager) {
-    ParameterContextMenu::wireMidiCCListener(midiCCManager, manager, this);
+void KnobContainerComponent::wireMidiCC(osci::MidiManager& manager) {
+    ParameterContextMenu::wireMidiCCListener(midiManager, manager, this);
     setupMidiCCContextMenu();
 }
 
@@ -74,7 +74,7 @@ void KnobContainerComponent::setupMidiCCContextMenu() {
         ParameterContextMenu::Context ctx;
         ctx.param = boundParam;
         ctx.effectParam = effectParam;
-        ctx.midiCCManager = midiCCManager;
+        ctx.midiManager = midiManager;
         ctx.canResetToDefault = knob.isDoubleClickReturnEnabled();
         ctx.ccEffectParam = effectParam;
 
@@ -91,12 +91,16 @@ void KnobContainerComponent::setupMidiCCContextMenu() {
 void KnobContainerComponent::showSettingsPopup() {
     if (!effectParam) return;
 
-    auto settings = std::make_unique<ParameterSettingsComponent>(effectParam, [this]() {
-        knob.setRange(effectParam->min, effectParam->max, effectParam->step);
+    auto safeThis = juce::Component::SafePointer<KnobContainerComponent>(this);
+    auto settings = std::make_unique<ParameterSettingsComponent>(effectParam, [safeThis]() {
+        if (safeThis != nullptr) {
+            safeThis->knob.setRange(safeThis->effectParam->min, safeThis->effectParam->max, safeThis->effectParam->step);
+        }
     });
-    settings->setLookAndFeel(&getLookAndFeel());
     settings->setSize(settings->getDesiredWidth(), settings->getDesiredHeight());
+    auto* parent = getTopLevelComponent();
+    const auto targetBounds = parent->getLocalArea(this, getLocalBounds());
     auto& myBox = juce::CallOutBox::launchAsynchronously(
-        std::move(settings), getScreenBounds(), nullptr);
+        std::move(settings), targetBounds, parent);
     juce::ignoreUnused(myBox);
 }

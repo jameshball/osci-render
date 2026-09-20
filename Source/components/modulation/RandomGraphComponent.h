@@ -19,9 +19,6 @@ public:
     // Push a new value (0..1) and its active state into the history buffer.
     void pushValue(float value, bool isActive);
 
-    // Push without triggering repaint (for batching). Call repaint() manually after.
-    void pushValueSilent(float value, bool isActive);
-
     // Clear all history.
     void clearHistory();
 

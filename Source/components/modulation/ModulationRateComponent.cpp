@@ -1,6 +1,6 @@
 #include "ModulationRateComponent.h"
 #include "../../LookAndFeel.h"
-#include "InlineEditorHelper.h"
+#include <osci_gui/osci_gui.h>
 
 ModulationRateComponent::ModulationRateComponent(const ModulationRateConfig& cfg, int index)
     : config(cfg)
@@ -231,6 +231,7 @@ void ModulationRateComponent::showModePopup() {
     menu.addItem(3, "Tempo Dotted",    true, rateMode == LfoRateMode::TempoDotted);
     menu.addItem(4, "Tempo Triplets",  true, rateMode == LfoRateMode::TempoTriplets);
 
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
         [this](int result) {
             if (result == 0) return;
@@ -269,7 +270,7 @@ void ModulationRateComponent::showInlineEditor() {
     };
     inlineEditor = InlineEditorHelper::create(
         juce::String(hz, 2), valueArea, { commitFn, cancelFn },
-        Colours::veryDark(), juce::Colours::white,
+        osci::Colours::veryDark(), juce::Colours::white,
         juce::Colours::white.withAlpha(0.3f), 12.0f);
     inlineEditor->setJustification(juce::Justification::centredLeft);
     addAndMakeVisible(inlineEditor.get());

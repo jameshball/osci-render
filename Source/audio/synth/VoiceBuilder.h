@@ -23,6 +23,17 @@ public:
         notify();
     }
 
+    bool hasAnyVoiceReady() const noexcept {
+        return readyVoiceCount.load(std::memory_order_acquire) > 0;
+    }
+
+    bool waitForAnyVoice(int timeoutMilliseconds) {
+        if (hasAnyVoiceReady()) {
+            return true;
+        }
+        return firstVoiceReady.wait(timeoutMilliseconds) && hasAnyVoiceReady();
+    }
+
     // Defined out-of-line in PluginProcessor.cpp because run() needs
     // the full OscirenderAudioProcessor definition.
     void run() override;
@@ -30,4 +41,6 @@ public:
 private:
     OscirenderAudioProcessor& processor;
     std::atomic<int> targetCount{0};
+    std::atomic<int> readyVoiceCount{0};
+    juce::WaitableEvent firstVoiceReady;
 };
