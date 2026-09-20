@@ -5,6 +5,8 @@ namespace osci::installer {
 // Resolve these through the same factory as the apps; never delete a settings directory.
 class SettingsRecoveryComponent final : public osci::OverlayComponent {
 public:
+    std::function<void()> onSettingsReset;
+
     explicit SettingsRecoveryComponent(juce::String initialProduct) {
         setOverlayTitle("Repair app settings");
         product.setTitle("App");
@@ -192,6 +194,9 @@ private:
         status.setText(failures.isEmpty() ? "Reset " + juce::String(resetCount) + (resetCount == 1 ? " settings file. " : " settings files. ")
                                                + "You can reopen the apps now. Backups are beside the original files."
                                          : "Could not reset:\n" + failures.joinIntoString("\n"), juce::dontSendNotification);
+        if (resetCount > 0 && onSettingsReset) {
+            onSettingsReset();
+        }
     }
 };
 

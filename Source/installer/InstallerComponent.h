@@ -95,7 +95,12 @@ public:
         addAndMakeVisible(settingsButton);
         settingsButton.onClick = [this] {
             if (!busy) {
-                osci::OverlayComponent::show(*this, std::make_unique<SettingsRecoveryComponent>(productSlug(selectedProduct)));
+                auto recovery = std::make_unique<SettingsRecoveryComponent>(productSlug(selectedProduct));
+                recovery->onSettingsReset = [this] {
+                    loadCachedLicenseState();
+                    refreshUi();
+                };
+                osci::OverlayComponent::show(*this, std::move(recovery));
             }
         };
         addAndMakeVisible (privacyButton);
