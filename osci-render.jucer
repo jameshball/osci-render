@@ -310,6 +310,8 @@
           <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeVoice.cpp"/>
           <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
+          <FILE id="VEffects" name="VoiceEffects.h" compile="0" resource="0"
+                file="Source/audio/synth/VoiceEffects.h"/>
         </GROUP>
         <GROUP id="{AUD_PLATFORM}" name="platform">
           <FILE id="IsrCtl" name="InternalSampleRateController.h" compile="0"

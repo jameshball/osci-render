@@ -1,5 +1,74 @@
 #include <JuceHeader.h>
 #include "../Source/audio/synth/VoiceManager.h"
+#include "../Source/audio/synth/VoiceEffects.h"
+#include "TestCleanup.h"
+
+class ReorderingCloneEffect : public osci::EffectApplication {
+public:
+    std::function<void()> onClone;
+    std::shared_ptr<osci::EffectApplication> clone() const override {
+        if (onClone) {
+            onClone();
+        }
+        return std::make_shared<ReorderingCloneEffect>();
+    }
+    std::shared_ptr<osci::Effect> build() const override { return {}; }
+    osci::Point apply(int, osci::Point input, osci::Point, const std::vector<std::atomic<float>>&, float, float) override {
+        return input;
+    }
+};
+
+class VoiceEffectRestoreTest : public juce::UnitTest {
+public:
+    VoiceEffectRestoreTest() : juce::UnitTest("Voice effects during project restore", "VoiceManager") {}
+    void runTest() override {
+        beginTest("Restoring Scale to the first position while cloning cannot corrupt the fifth voice");
+        juce::SpinLock effectsLock;
+        auto application = std::make_shared<ReorderingCloneEffect>();
+        auto first = std::make_shared<osci::SimpleEffect>(application, new osci::EffectParameter("First", "", "first", 1, 0, 0, 1));
+        auto scale = ScaleEffectApp().build();
+        for (auto* parameter : scale->parameters) {
+            parameter->setUnnormalisedValueNotifyingHost(0);
+        }
+        std::vector<std::shared_ptr<osci::Effect>> effects { first, scale };
+        std::vector<std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>>> voices;
+        for (int i = 0; i < 4; ++i) {
+            voices.push_back(cloneVoiceEffects(effects, effectsLock, 48000));
+        }
+        // Reproduce the restore/build interleaving deterministically, without an actual data race.
+        bool reordered = false;
+        application->onClone = [&] {
+            if (!reordered) {
+                const juce::SpinLock::ScopedLockType lock(effectsLock);
+                std::swap(effects[0], effects[1]);
+                reordered = true;
+            }
+        };
+        voices.push_back(cloneVoiceEffects(effects, effectsLock, 48000));
+        expect(reordered);
+        for (int note = 0; note < 15; ++note) {
+            juce::AudioBuffer<float> buffer(3, 16);
+            for (int channel = 0; channel < 3; ++channel) {
+                juce::FloatVectorOperations::fill(buffer.getWritePointer(channel), 1.0f, 16);
+            }
+            juce::MidiBuffer midi;
+            for (const auto& effect : effects) {
+                auto found = voices[note % 5].find(effect->getId());
+                expect(found != voices[note % 5].end());
+                if (found != voices[note % 5].end()) {
+                    found->second->processBlock(buffer, midi);
+                }
+            }
+            expectWithinAbsoluteError(buffer.getMagnitude(0, 16), 0.0f, 0.00001f, "Note " + juce::String(note + 1));
+        }
+        voices.clear();
+        for (const auto& effect : effects) {
+            testutil::cleanupEffectParams(*effect);
+        }
+    }
+};
+
+static VoiceEffectRestoreTest voiceEffectRestoreTest;
 
 // TestVoice - a minimal juce::SynthesiserVoice used by the test client.
 // Tracks activation/deactivation/kill events and drawing state transfers.
