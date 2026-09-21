@@ -1,5 +1,6 @@
 #include "ShapeVoice.h"
 #include "VoiceManager.h"
+#include "VoiceEffects.h"
 #include "../../PluginProcessor.h"
 #include "../../parser/FileParser.h"
 #include "../AudioThreadGuard.h"
@@ -10,19 +11,7 @@ ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& ext
 }
 
 void ShapeVoice::initializeEffectsFromGlobal() {
-    voiceEffectsMap.clear();
-    for (auto& globalEffect : audioProcessor.toggleableEffects) {
-        auto simpleEffect = std::dynamic_pointer_cast<osci::SimpleEffect>(globalEffect);
-        if (simpleEffect) {
-            auto cloned = simpleEffect->cloneWithSharedParameters();
-            // Initialize the effect with current sample rate
-            const double sampleRate = audioProcessor.getEffectiveSampleRate();
-            if (sampleRate > 0) {
-                cloned->prepareToPlay(sampleRate, 512);
-            }
-            voiceEffectsMap[globalEffect->getId()] = cloned;
-        }
-    }
+    voiceEffectsMap = cloneVoiceEffects(audioProcessor.toggleableEffects, audioProcessor.effectsLock, audioProcessor.getEffectiveSampleRate());
 }
 
 void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
