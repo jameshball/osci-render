@@ -151,6 +151,88 @@ public:
         juce::MessageManager::getInstance();
         installTestVerifier();
 
+        beginTest("Download cleanup preserves recent, pending and unrelated files");
+        {
+            const auto directory = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                .getNonexistentChildFile("osci-download-cleanup-test", {}, false);
+            expect(directory.createDirectory().wasOk());
+            const auto old = directory.getChildFile("osci-render-old.pkg");
+            const auto recent = directory.getChildFile("sosci-recent.pkg");
+            const auto pending = directory.getChildFile("sosci-pending.pkg");
+            const auto unrelated = directory.getChildFile("notes.txt");
+            const auto nested = directory.getChildFile("osci-render-folder").getChildFile("osci-render-old.pkg");
+            expect(nested.getParentDirectory().createDirectory().wasOk());
+            for (const auto& file : { old, recent, pending, unrelated, nested }) {
+                expect(file.replaceWithText("test"));
+                expect(file.setLastModificationTime(juce::Time::getCurrentTime() - juce::RelativeTime::days(8)));
+            }
+            expect(recent.setLastModificationTime(juce::Time::getCurrentTime()));
+            osci::Downloader::deleteOldDownloads(directory, { pending });
+            expect(!old.exists());
+            for (const auto& file : { recent, pending, unrelated, nested }) {
+                expect(file.existsAsFile());
+            }
+            expect(directory.deleteRecursively());
+        }
+
+        beginTest("Legal documents share acknowledgement without enabling identification");
+        {
+            const auto options = makeTempSettingsOptions("legal");
+            auto bundle = juce::JSON::parse(R"({"scope":"osci-products","revision":"test-1","documents":{"privacy":{"revision":"test-1","text":"Test privacy document","change_type":"material"},"terms":{"revision":"test-1","text":"Test terms document","change_type":"material"}}})");
+            for (const auto* kind : {"privacy", "terms"}) {
+                const auto text = bundle["documents"][kind]["text"].toString();
+                bundle["documents"][kind].getDynamicObject()->setProperty("sha256", juce::SHA256(text.toRawUTF8(), text.getNumBytesAsUTF8()).toHexString());
+            }
+            expect(osci::LegalState::valid(bundle));
+            {
+                osci::LegalState state{osci::SettingsStore(options)};
+                expect(!state.hasSeenKind("privacy"));
+                expect(!state.hasAcknowledged(bundle));
+                expect(state.recordShown(bundle));
+                expect(state.hasSeenKind("privacy"));
+                expect(!state.hasSeenOtherRevision(bundle, "privacy"));
+                expect(!state.hasAcknowledged(bundle));
+                expect(!state.acknowledge(bundle, false, true));
+                expect(state.acknowledge(bundle, true, true));
+            }
+            {
+                osci::LegalState otherProduct{osci::SettingsStore(options)};
+                expect(otherProduct.hasAcknowledged(bundle));
+                expect(otherProduct.statisticsDisabled());
+                auto changed = juce::JSON::parse(juce::JSON::toString(bundle));
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("revision", "future");
+                expect(!otherProduct.hasAcknowledged(changed));
+                expect(otherProduct.termsAccepted(changed));
+                expect(otherProduct.statisticsDisabled());
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("change_type", "administrative");
+                expect(otherProduct.hasAcknowledged(changed));
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("change_type", "unexpected");
+                expect(!osci::LegalState::valid(changed));
+                changed["documents"]["privacy"].getDynamicObject()->setProperty("text", "tampered");
+                expect(!osci::LegalState::valid(changed));
+            }
+            {
+                auto administrative = juce::JSON::parse(juce::JSON::toString(bundle));
+                auto* terms = administrative["documents"]["terms"].getDynamicObject();
+                terms->setProperty("revision", "address-update");
+                terms->setProperty("text", "Terms with an updated contact address");
+                terms->setProperty("change_type", "administrative");
+                const auto text = administrative["documents"]["terms"]["text"].toString();
+                terms->setProperty("sha256", juce::SHA256(text.toRawUTF8(), text.getNumBytesAsUTF8()).toHexString());
+
+                osci::LegalState returning{osci::SettingsStore(options)};
+                expect(returning.hasAcknowledged(administrative));
+
+                const auto freshOptions = makeTempSettingsOptions("legal-admin-first-use");
+                osci::LegalState firstUse{osci::SettingsStore(freshOptions)};
+                expect(!firstUse.hasAcknowledged(administrative));
+                expect(!firstUse.acknowledge(administrative, false, true));
+                expect(firstUse.acknowledge(administrative, true, true));
+                deleteTempSettings(freshOptions);
+            }
+            deleteTempSettings(options);
+        }
+
         beginTest ("Premium token validates before expiry");
         {
             const juce::Time now (1'000'000LL * 1000);
@@ -185,12 +267,6 @@ public:
         beginTest ("Release signing message matches backend contract");
         expectEquals (osci::LicenseToken::releaseSigningMessage ("2.8.10.8", "mac-arm64", "ABCDEF"),
                       juce::String ("2.8.10.8|mac-arm64|abcdef"));
-
-        beginTest ("Feedback values match the API contract");
-        expectEquals (osci::FeedbackClient::kindToString (osci::FeedbackKind::bug), juce::String ("bug"));
-        expectEquals (osci::FeedbackClient::kindToString (osci::FeedbackKind::featureRequest), juce::String ("feature_request"));
-        expectEquals (osci::FeedbackClient::attachmentKindToString (osci::FeedbackAttachmentKind::screenshot), juce::String ("screenshot"));
-        expectEquals (osci::FeedbackClient::attachmentKindToString (osci::FeedbackAttachmentKind::project), juce::String ("project"));
 
         beginTest ("Release signature verifier uses configured public key");
         expect (osci::LicenseToken::verifyReleaseSignature ("2.8.10.8", "mac-arm64", "abcdef", makeSignature()));

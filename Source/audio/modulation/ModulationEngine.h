@@ -6,11 +6,13 @@
 #include "ModulationSource.h"
 #include "ModulationTypes.h"
 
-// Maps a parameter ID to its owning effect and position.
-// Used by both ModulationEngine and the processor to resolve modulation targets.
+// Maps a parameter ID to either an effect-owned animated buffer or a standalone
+// FloatParameter modulation buffer. Registered standalone parameters therefore
+// become targets without adding parameter-specific engine code.
 struct ParamLocation {
-    osci::Effect* effect;
-    int paramIndex;
+    osci::FloatParameter* parameter = nullptr;
+    osci::Effect* effect = nullptr;
+    int paramIndex = -1;
 };
 
 // Coordinator that operates on all registered ModulationSource instances
@@ -33,6 +35,21 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) {
         for (auto* source : sources)
             source->prepareToPlay(sampleRate, samplesPerBlock);
+        for (auto& [paramId, location] : paramLocationMap) {
+            juce::ignoreUnused(paramId);
+            if (location.effect == nullptr && location.parameter != nullptr) {
+                location.parameter->prepareModulation(samplesPerBlock);
+            }
+        }
+    }
+
+    void beginModulationBlock(int numSamples) {
+        for (auto& [paramId, location] : paramLocationMap) {
+            juce::ignoreUnused(paramId);
+            if (location.effect == nullptr && location.parameter != nullptr) {
+                location.parameter->beginModulationBlock(numSamples);
+            }
+        }
     }
 
     // Apply all sources' block buffers to animated values.
@@ -47,6 +64,12 @@ public:
             if (buffers == nullptr || srcCount <= 0) continue;
 
             applyModulationBuffers(numSamples, assnCopy, buffers, srcCount);
+        }
+        for (auto& [paramId, location] : paramLocationMap) {
+            juce::ignoreUnused(paramId);
+            if (location.effect == nullptr && location.parameter != nullptr) {
+                location.parameter->finishModulationBlock();
+            }
         }
     }
 
@@ -115,12 +138,15 @@ private:
             if (it == paramLocationMap.end()) continue;
 
             auto& loc = it->second;
-            float* buf = loc.effect->getAnimatedValuesWritePointer(loc.paramIndex, numSamples);
+            if (loc.parameter == nullptr) continue;
+            float* buf = loc.effect != nullptr
+                ? loc.effect->getAnimatedValuesWritePointer(loc.paramIndex, numSamples)
+                : loc.parameter->getModulationWritePointer(numSamples);
             if (buf == nullptr) continue;
 
             const float* modData = sourceBuffers[assignment.sourceIndex].data();
-            float paramMin = loc.effect->parameters[loc.paramIndex]->min;
-            float paramMax = loc.effect->parameters[loc.paramIndex]->max;
+            float paramMin = loc.parameter->min;
+            float paramMax = loc.parameter->max;
             float range = paramMax - paramMin;
             float depth = assignment.depth;
 

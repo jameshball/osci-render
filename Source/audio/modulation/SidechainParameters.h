@@ -114,8 +114,8 @@ public:
     void fillBlockBuffers(int numSamples, double sampleRate, const float* rectifiedIn) {
         if (numSamples <= 0) return;
 
-        float attackVal = attack ? attack->getValueUnnormalised() : 0.2f;
-        float releaseVal = release ? release->getValueUnnormalised() : 0.2f;
+        float attackVal = attack ? attack->getPreviousModulatedValue() : 0.2f;
+        float releaseVal = release ? release->getPreviousModulatedValue() : 0.2f;
 
         {
             juce::SpinLock::ScopedLockType lock(curveLock);

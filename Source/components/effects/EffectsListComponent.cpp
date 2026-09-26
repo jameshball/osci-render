@@ -72,11 +72,7 @@ effect(effect), audioProcessor(data.audioProcessor), editor(data.editor) {
         if (this->effect.enabled) this->effect.enabled->setBoolValueNotifyingHost(false);
         if (this->effect.selected) this->effect.selected->setBoolValueNotifyingHost(false);
 
-        // Reset defaults under lock (quick, non-allocating)
-        {
-            juce::SpinLock::ScopedLockType lock(audioProcessor.effectsLock);
-            this->effect.resetToDefault();
-        }
+        this->effect.resetToDefault();
         }
         // Use SafePointer on the listBox (a Component) so the async callback
         // is a no-op if the parent EffectsComponent is destroyed first.

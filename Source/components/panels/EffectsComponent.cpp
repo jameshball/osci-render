@@ -43,6 +43,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 	{
 	    juce::MessageManagerLock lock;
 	    audioProcessor.broadcaster.addChangeListener(this);
+        audioProcessor.previewBroadcaster.addChangeListener(this);
 	}
 
     listBox.setDragSourceFilter([](const juce::DragAndDropTarget::SourceDetails& details) {
@@ -165,6 +166,7 @@ EffectsComponent::EffectsComponent(OscirenderAudioProcessor& p, OscirenderAudioP
 EffectsComponent::~EffectsComponent() {
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
+    audioProcessor.previewBroadcaster.removeChangeListener(this);
 }
 
 void EffectsComponent::resized() {

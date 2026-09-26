@@ -75,13 +75,21 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
     globalSettings = osci::SettingsStore::forProductGlobals (JucePlugin_Name);
 
+    if (juce::JUCEApplicationBase::isStandaloneApp()) {
+        osci::Downloader::cleanupDownloadsAsync();
+    }
+
     const auto licenseCacheResult = licenseManager.loadCachedToken();
     if (licenseCacheResult.failed()) {
         juce::Logger::writeToLog ("License cache load failed: " + licenseCacheResult.getErrorMessage());
     }
     const auto licenseStatus = licenseManager.status();
-    if (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
-        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline) {
+    osci::LegalState legalState;
+    const auto legalConfig = osci::makeProductUpdateConfig();
+    legalNoticePending.store(!legalState.hasAcknowledged(osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion)));
+    if (legalState.hasAcknowledged(osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion))
+        && (licenseStatus == osci::LicenseManager::Status::PremiumCachedToken
+        || licenseStatus == osci::LicenseManager::Status::ExpiredOffline)) {
         licenseManager.scheduleBackgroundRefresh();
     }
 
@@ -148,15 +156,6 @@ juce::String CommonAudioProcessor::getProductSlug() const
 {
     const juce::String pluginName (JucePlugin_Name);
     return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
-}
-
-void CommonAudioProcessor::getPortableProjectSnapshot(juce::MemoryBlock& destData) {
-    const juce::ScopedValueSetter<bool> snapshotScope(creatingPortableProjectSnapshot, true);
-    getStateInformation(destData);
-}
-
-bool CommonAudioProcessor::isCreatingPortableProjectSnapshot() const {
-    return creatingPortableProjectSnapshot;
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const
@@ -244,9 +243,6 @@ int CommonAudioProcessor::createRecentRecordingsPopupMenuItems(juce::PopupMenu& 
 
 void CommonAudioProcessor::saveStandaloneProjectFilePathToXml(juce::XmlElement& xml) const
 {
-    if (creatingPortableProjectSnapshot) {
-        return;
-    }
     if (!juce::JUCEApplicationBase::isStandaloneApp())
         return;
 
@@ -427,7 +423,7 @@ void CommonAudioProcessor::setCurrentProgram(int index) {
 }
 
 const juce::String CommonAudioProcessor::getProgramName(int index) {
-    return {};
+    return "Default";
 }
 
 void CommonAudioProcessor::changeProgramName(int index, const juce::String& newName) {}
@@ -458,7 +454,7 @@ void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         return;
     }
 
-    if (isSuspended()) {
+    if (isSuspended() || legalNoticePending.load(std::memory_order_relaxed)) {
         buffer.clear();
         midi.clear();
         return;

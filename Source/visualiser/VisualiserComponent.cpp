@@ -43,7 +43,6 @@ VisualiserComponent::VisualiserComponent(
     audioProcessor.visualiserParameters.transparentBackground->addListener(this);
 #endif
     startTimerHz(30);
-    setShouldBeRunning(active);
 
 #if OSCI_PREMIUM
     restorePopoutPending = true;
@@ -108,8 +107,8 @@ VisualiserComponent::VisualiserComponent(
 
 #if OSCI_PREMIUM
     popOutButton.onClick = [this]() {
-        if (popoutVisible) {
-            closePopout();
+        if (popoutVisible && popout != nullptr) {
+            popout->showControlsMenu(&popOutButton);
         } else {
             popoutWindow();
         }
@@ -178,17 +177,20 @@ VisualiserComponent::VisualiserComponent(
         stopwatch.addTime(juce::RelativeTime::seconds(1.0 / this->recordingSettings.getFrameRate()));
     };
     framePresenter = FramePresenter::create(*this, openGLContext);
+    setShouldBeRunning(active);
 }
 
 VisualiserComponent::~VisualiserComponent() {
     stopTimer();
     if (popout != nullptr) {
+        popout->setSourceVisible(false);
         popout->saveWindowState();
     }
     // Stop the background thread while VisualiserComponent's vtable is still live.
     // If deferred to ~VisualiserRenderer, the vptr has already changed and the
     // running thread's virtual run()/runTask() dispatch becomes a data race.
     setShouldBeRunning(false, [this] { renderingSemaphore.release(); });
+    unregisterFromManager();
     // Detach while the derived renderer is still alive so OpenGL-owned services
     // are stopped by openGLContextClosing() on the context thread.
     openGLContext.detach();
@@ -240,6 +242,10 @@ int VisualiserComponent::prepareTask(double sampleRate, int bufferSize) {
     recordingSampleRate = sampleRate;
 
     return desiredBufferSize;
+}
+
+void VisualiserComponent::restoreAfterOfflineRender(double sampleRate) {
+    prepareTask(sampleRate, -1);
 }
 
 void VisualiserComponent::stopTask() {
@@ -500,7 +506,8 @@ void VisualiserComponent::setRecording(bool recording) {
                     }
                     osci::showOverlayMessage(*safeThis.getComponent(),
                                              "Save Recording Failed",
-                                             "Could not write:\n" + destination.getFullPathName());
+                                             "Couldn't save the recording to:\n" + destination.getFullPathName()
+                                                 + "\n\nCheck that the drive has enough free space and that you can save files in this folder.");
                     return;
                 }
                 safeThis->audioProcessor.setLastOpenedDirectory(destination.getParentDirectory());
@@ -597,6 +604,19 @@ void VisualiserComponent::resized() {
     updateFramePresentation();
 }
 
+void VisualiserComponent::setVisible(bool visible) {
+    // JUCE releases the source GL context inside Component::setVisible(false),
+    // before visibilityChanged(). Detach its shared consumer first, not on the
+    // presentation timer after the source native handle has been destroyed.
+    if (!visible && popout != nullptr) {
+        popout->setSourceVisible(false);
+    }
+    juce::Component::setVisible(visible);
+    if (visible && popout != nullptr && popoutVisible) {
+        popout->setSourceVisible(true);
+    }
+}
+
 void VisualiserComponent::updateFramePresentation() {
     if (framePresenter != nullptr) {
         const auto base = osci::Colours::surfaceSunken().interpolatedWith(osci::Colours::shadow(), osci::Theme::isDark() ? 0.86f : 0.38f);
@@ -687,7 +707,8 @@ void VisualiserComponent::popoutUpdated() {
 #if OSCI_PREMIUM
     popOutButton.setVisible(true);
     popOutButton.setToggleState(popoutVisible, juce::NotificationType::dontSendNotification);
-    popOutButton.setTooltip(popoutVisible ? "Close Visualiser Popout." : "Open Visualiser Popout.");
+    popOutButton.setTooltip(popoutVisible ? "Visualiser Popout Controls (including Click-through)."
+                                          : "Open Visualiser Popout.");
 #endif
 #if OSCI_PREMIUM
     editor.ffmpegDownloader.setVisible(!popoutVisible);

@@ -105,6 +105,7 @@ OscirenderAudioProcessorEditor::OscirenderAudioProcessorEditor(OscirenderAudioPr
         juce::MessageManagerLock lock;
         audioProcessor.getFileController().addChangeListener(this);
         audioProcessor.broadcaster.addChangeListener(this);
+        audioProcessor.previewBroadcaster.addChangeListener(this);
     }
 
     double codeEditorLayoutPreferredSize = sanitiseCodeEditorMainPanelSize(std::any_cast<double>(audioProcessor.getProperty("codeEditorLayoutPreferredSize", kDefaultCodeEditorMainPanelSize)));
@@ -175,6 +176,7 @@ OscirenderAudioProcessorEditor::~OscirenderAudioProcessorEditor() {
     menuBar.setModel(nullptr);
     juce::MessageManagerLock lock;
     audioProcessor.broadcaster.removeChangeListener(this);
+    audioProcessor.previewBroadcaster.removeChangeListener(this);
     audioProcessor.getFileController().removeChangeListener(this);
 }
 
@@ -551,17 +553,23 @@ void OscirenderAudioProcessorEditor::addCodeEditor(int index) {
             return;
         }
 
-        auto& files = audioProcessor.getFileController();
-        juce::SpinLock::ScopedLockType parserLock(files.lock);
-        auto parser = files.getCurrentParser();
-        if (parser != nullptr) {
-            auto luaParser = parser->getLua();
-            if (luaParser != nullptr) {
-                luaParser->forgetAllStates();
+        if (model->getScriptId() == LuaEffectState::UNIQUE_ID) {
+            if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
+                audioProcessor.luaEffectState->parser->forgetAllStates();
             }
-        }
-        if (audioProcessor.luaEffectState != nullptr && audioProcessor.luaEffectState->parser != nullptr) {
-            audioProcessor.luaEffectState->parser->forgetAllStates();
+        } else {
+            auto& files = audioProcessor.getFileController();
+            juce::SpinLock::ScopedLockType parserLock(files.lock);
+            for (int index = 0; index < files.size(); ++index) {
+                if (files.getFileId(index) == model->getScriptId()) {
+                    auto parser = files.getParser(index);
+                    auto luaParser = parser != nullptr ? parser->getLua() : nullptr;
+                    if (luaParser != nullptr) {
+                        luaParser->forgetAllStates();
+                    }
+                    break;
+                }
+            }
         }
     };
 
@@ -630,10 +638,13 @@ void OscirenderAudioProcessorEditor::handleAsyncUpdate() {
 }
 
 void OscirenderAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
-    if (source == &audioProcessor.broadcaster) {
+    if (source == &audioProcessor.broadcaster || source == &audioProcessor.previewBroadcaster) {
         {
             juce::SpinLock::ScopedLockType fileLock(audioProcessor.getFileController().lock);
-            initialiseCodeEditors();
+            // Preview changes only refresh controls; rebuilding editors briefly collapses the layout.
+            if (source == &audioProcessor.broadcaster) {
+                initialiseCodeEditors();
+            }
             settings.update();
         }
         updateTimelineController();

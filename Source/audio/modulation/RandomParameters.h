@@ -125,7 +125,10 @@ public:
                           double bpm, const std::atomic<bool> (&voiceActive)[MaxVoices]) {
         if (numSamples <= 0) return;
 
-        // Process MIDI note events (Random sources are always note-dependent)
+        // Known limitation: events are applied before generating sample zero, so
+        // trigger/release timing is block-accurate rather than honoring each
+        // MidiMessageMetadata::samplePosition. Keep this aligned with the LFO
+        // implementation when adding event-segmented modulation generation.
         bool hadNoteOnThisBlock = false;
         for (const auto metadata : midi) {
             auto msg = metadata.getMessage();

@@ -46,6 +46,7 @@ public:
     void setPopoutShownCallback(std::function<void()> callback);
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     void resized() override;
+    void setVisible(bool visible) override;
     void paint(juce::Graphics& g) override;
     void setPaused(bool paused, bool affectAudio = true);
     bool isPaused() const;
@@ -62,6 +63,7 @@ public:
     void prepareOverlayFadeIn();
     void fadeInAfterOverlay();
     void cancelOverlayFadeIn();
+    void restoreAfterOfflineRender(double sampleRate);
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;

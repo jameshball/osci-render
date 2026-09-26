@@ -1,13 +1,13 @@
 schema_version = "1.0.0"
 
 id = "osci_render"
-version = "1.0.3"
+version = "1.1.2"
 name = "osci-render"
-tagline = "Addon to send gpencil frames over to osci-render"
+tagline = "Send Grease Pencil line art to osci-render"
 maintainer = "James H. Ball <https://github.com/jameshball>"
 type = "add-on"
 
-website = "https://github.com/jameshball/osci-render"
+website = "https://osci-render.com/blender/"
 
 tags = ["Animation", "Bake", "Grease Pencil", "Import-Export", "Render"]
 
@@ -16,3 +16,7 @@ blender_version_min = "4.2.0"
 license = [
   "SPDX:GPL-3.0-or-later",
 ]
+
+[permissions]
+files = "Export Grease Pencil line art to GPLA files"
+network = "Send line art to the local osci-render application"

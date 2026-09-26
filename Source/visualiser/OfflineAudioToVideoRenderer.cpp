@@ -1,4 +1,5 @@
 #include "OfflineAudioToVideoRenderer.h"
+#include "OfflineFrameSchedule.h"
 
 #if OSCI_PREMIUM
 
@@ -324,9 +325,9 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
     preview.setRenderMode(derivedRenderMode);
 
-    const int samplesPerFrame = juce::jmax(1, (int) std::llround(fileSampleRate / fps));
     const juce::int64 totalSamples = (juce::int64) wav.totalSamples.load();
-    const juce::int64 totalFrames = std::max<juce::int64>(1, (totalSamples + (juce::int64) samplesPerFrame - 1) / (juce::int64) samplesPerFrame);
+    const int maxSamplesPerFrame = OfflineFrameSchedule::getMaxSamplesPerFrame(fileSampleRate, fps);
+    const juce::int64 totalFrames = OfflineFrameSchedule::getTotalFrames(totalSamples, fileSampleRate, fps);
     const double audioDurationSeconds = fileSampleRate > 0.0 ? (double) totalSamples / fileSampleRate : 0.0;
 
     offlineRenderLog.event(
@@ -335,13 +336,13 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         + ", samples=" + juce::String(totalSamples)
         + ", duration=" + durationSummary(audioDurationSeconds)
         + ", derivedMode=" + renderModeToString(derivedRenderMode)
-        + ", samplesPerFrame=" + juce::String(samplesPerFrame)
+        + ", maxSamplesPerFrame=" + juce::String(maxSamplesPerFrame)
         + ", totalFrames=" + juce::String(totalFrames));
 
     // Configure preview renderer to match Recording Settings.
     preview.setRenderSize(renderSize);
     preview.setFrameRate(fps);
-    preview.prepareTask(fileSampleRate, samplesPerFrame);
+    preview.prepareTask(fileSampleRate, maxSamplesPerFrame);
 
     // Setup ffmpeg video encoder (raw RGBA frames piped to stdin)
     auto ffmpegFile = processor.getFFmpegFile();
@@ -394,18 +395,18 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
     // Prepare audio buffers.
     juce::AudioBuffer<float> decodeBuffer;
-    decodeBuffer.setSize(decodeChannels, samplesPerFrame, false, true, true);
+    decodeBuffer.setSize(decodeChannels, maxSamplesPerFrame, false, true, true);
 
     juce::AudioBuffer<float> renderBuffer;
-    renderBuffer.setSize(6, samplesPerFrame, false, true, true);
+    renderBuffer.setSize(6, maxSamplesPerFrame, false, true, true);
 
     // Fill constant channels once per frame.
-    auto fillConstantChannels = [&]() {
+    auto fillConstantChannels = [&](int frameSamples) {
         // Defaults used when the source file doesn't provide these channels.
-        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(2), 1.0f, samplesPerFrame);
-        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(3), 1.0f, samplesPerFrame);
-        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(4), 1.0f, samplesPerFrame);
-        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(5), 1.0f, samplesPerFrame);
+        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(2), 1.0f, frameSamples);
+        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(3), 1.0f, frameSamples);
+        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(4), 1.0f, frameSamples);
+        juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(5), 1.0f, frameSamples);
     };
 
     juce::int64 framesWritten = 0;
@@ -432,6 +433,10 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
             break;
         }
 
+        const int frameSamples = juce::jlimit(1, maxSamplesPerFrame,
+            OfflineFrameSchedule::getFrameSamples(frameIndex, fileSampleRate, fps));
+        decodeBuffer.setSize(decodeChannels, frameSamples, false, false, true);
+        renderBuffer.setSize(6, frameSamples, false, false, true);
         decodeBuffer.clear();
         wav.processBlock(decodeBuffer);
 
@@ -440,21 +445,21 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         const float* ch0 = decodeBuffer.getReadPointer(0);
         const float* ch1 = (decodeChannels > 1) ? decodeBuffer.getReadPointer(1) : decodeBuffer.getReadPointer(0);
 
-        juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(0), ch0, samplesPerFrame);
-        juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(1), ch1, samplesPerFrame);
+        juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(0), ch0, frameSamples);
+        juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(1), ch1, frameSamples);
 
-        fillConstantChannels();
+        fillConstantChannels(frameSamples);
 
         if (decodeChannels >= 3)
-            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(2), decodeBuffer.getReadPointer(2), samplesPerFrame);
+            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(2), decodeBuffer.getReadPointer(2), frameSamples);
 
         if (decodeChannels >= 5)
         {
             // Use channels 2/3/4 as RGB, and set Z to 1.0 for XYRGB mode.
-            juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(2), 1.0f, samplesPerFrame);
-            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(3), decodeBuffer.getReadPointer(2), samplesPerFrame);
-            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(4), decodeBuffer.getReadPointer(3), samplesPerFrame);
-            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(5), decodeBuffer.getReadPointer(4), samplesPerFrame);
+            juce::FloatVectorOperations::fill(renderBuffer.getWritePointer(2), 1.0f, frameSamples);
+            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(3), decodeBuffer.getReadPointer(2), frameSamples);
+            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(4), decodeBuffer.getReadPointer(3), frameSamples);
+            juce::FloatVectorOperations::copy(renderBuffer.getWritePointer(5), decodeBuffer.getReadPointer(4), frameSamples);
         }
 
         // This blocks until the OpenGL thread has rendered.

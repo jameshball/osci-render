@@ -1,5 +1,6 @@
 #include "ShapeVoice.h"
 #include "VoiceManager.h"
+#include "VoiceEffects.h"
 #include "../../PluginProcessor.h"
 #include "../../parser/FileParser.h"
 #include "../AudioThreadGuard.h"
@@ -10,19 +11,7 @@ ShapeVoice::ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& ext
 }
 
 void ShapeVoice::initializeEffectsFromGlobal() {
-    voiceEffectsMap.clear();
-    for (auto& globalEffect : audioProcessor.toggleableEffects) {
-        auto simpleEffect = std::dynamic_pointer_cast<osci::SimpleEffect>(globalEffect);
-        if (simpleEffect) {
-            auto cloned = simpleEffect->cloneWithSharedParameters();
-            // Initialize the effect with current sample rate
-            const double sampleRate = audioProcessor.getEffectiveSampleRate();
-            if (sampleRate > 0) {
-                cloned->prepareToPlay(sampleRate, 512);
-            }
-            voiceEffectsMap[globalEffect->getId()] = cloned;
-        }
-    }
+    voiceEffectsMap = cloneVoiceEffects(audioProcessor.toggleableEffects, audioProcessor.effectsLock, audioProcessor.getEffectiveSampleRate());
 }
 
 void ShapeVoice::setPreviewEffect(std::shared_ptr<osci::SimpleEffect> effect) {
@@ -131,7 +120,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
     if (audioProcessor.midiEnabled->getBoolValue()) {
         double newFreq = audioProcessor.noteToFrequency(vs.midiNote, vs.channel) + osci_audio::kMacFrequencyEpsilonHz;
 #if OSCI_PREMIUM
-        double glideTimeSec = audioProcessor.glideTime->getValueUnnormalised();
+        double glideTimeSec = audioProcessor.glideTime->getModulatedValue();
 
         // Determine glide source and whether to glide.
 
@@ -193,12 +182,10 @@ void ShapeVoice::voiceKilled() {
     killFadeGain = 1.0f;
 }
 
-void ShapeVoice::incrementShapeDrawing() {
+void ShapeVoice::locateShapeDrawing() {
     if (frame.empty() || frameLength <= 0.0) {
         return;
     }
-    frameDrawn += lengthIncrement;
-    shapeDrawn += lengthIncrement;
     // Nearby edges are cheaper to walk; cap the work before using the index.
     for (int skipped = 0; skipped < 32 && shapeDrawn > frame[currentShape]->len; ++skipped) {
         shapeDrawn -= frame[currentShape]->len;
@@ -455,18 +442,25 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         frequencyBuffer.setSample(0, i, (float) actualFrequency);
 
         if (!renderingSample) {
-            incrementShapeDrawing();
+            frameDrawn += lengthIncrement;
+            shapeDrawn += lengthIncrement;
+            locateShapeDrawing();
         }
 
         if (!renderingSample && frameDrawn >= frameLength) {
-            double prevFrameLength = frameLength;
+            frameDrawn -= frameLength;
             if (currentSound != nullptr && currentlyPlaying) {
                 if (currentSound->updateFrame(frame)) {
+                    double prevFrameLength = frameLength;
                     frameLength = currentSound->getFrameLength();
+                    if (frameLength > 0 && prevFrameLength > 0) {
+                        frameDrawn *= frameLength / prevFrameLength;
+                    }
                 }
             }
-            frameDrawn -= prevFrameLength;
+            shapeDrawn = frameDrawn;
             currentShape = 0;
+            locateShapeDrawing();
 
             // The first sample of the new frame is the *next* sample.
             pendingFrameStart = true;
@@ -493,8 +487,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
     // Add processed samples to output buffer (apply envelope/velocity gain AFTER effects)
     // Velocity tracking: at 0% velocity has no effect (gain=1), at 100% full velocity,
     // at -100% inverted velocity
-    const float velTrack = audioProcessor.velocityTracking->getValueUnnormalised();
-    const float velGain = 1.0f + velTrack * ((float)velocity - 1.0f);
+    const float* velocityTrackingValues = audioProcessor.velocityTracking->getModulationReadPointer(startSample + numSamples);
 
     // Kill-fade: per-sample linear ramp from 1→0 over kKillFadeTimeSec.
     const float killFadeDecPerSample = killFading
@@ -524,6 +517,10 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
             }
         }
 
+        const float velTrack = velocityTrackingValues != nullptr
+            ? velocityTrackingValues[startSample + i]
+            : audioProcessor.velocityTracking->getValueUnnormalised();
+        const float velGain = 1.0f + velTrack * ((float)velocity - 1.0f);
         float gain = velGain * envelopeBuffer.getSample(0, i) * killMul;
 
         int sample = startSample + i;

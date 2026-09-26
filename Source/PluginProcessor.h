@@ -93,6 +93,10 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
                                  public juce::AudioProcessorARAExtension
 #endif
 {
+#if !OSCI_PREMIUM
+    // Declared first so unhosted parameters outlive every modulation source and consumer.
+    juce::OwnedArray<juce::AudioProcessorParameter> unhostedModulationParameters;
+#endif
     friend class VoiceBuilder;
 public:
     OscirenderAudioProcessor();
@@ -201,6 +205,7 @@ public:
     osci::DawPosition dawPosition;
 
     juce::ChangeBroadcaster broadcaster;
+    juce::ChangeBroadcaster previewBroadcaster;
 
     // === Envelope modulation state ===
     EnvelopeParameters envelopeParameters;

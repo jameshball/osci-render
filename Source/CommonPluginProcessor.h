@@ -36,7 +36,6 @@ public:
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
-    void getPortableProjectSnapshot(juce::MemoryBlock& destData);
     void clearRecentProjectFiles();
     void recordingExportCompleted(const juce::File& file);
     juce::File getRecentRecordingFile(int index) const;
@@ -146,6 +145,9 @@ public:
     // When true, processBlock should do minimal work and output silence.
     // Used during offline video rendering so the UI renderer can use CPU/GPU without contention.
     std::atomic<bool> offlineRenderActive { false };
+    // Transient legal-notice gate, not a saved or DAW-automatable audio setting.
+    // Read-only on the realtime thread; acknowledgement is handled by the editor.
+    std::atomic<bool> legalNoticePending { true };
     
     std::atomic<bool> forceDisableBrightnessInput = false;
     std::atomic<bool> forceDisableRgbInput = false;
@@ -198,7 +200,6 @@ public:
     }
     
 protected:
-    bool isCreatingPortableProjectSnapshot() const;
     void notifyAudioFileChanged();
     
     bool brightnessEnabled = false;
@@ -278,7 +279,6 @@ protected:
 
 private:
     InternalSampleRateController internalSampleRate;
-    inline static thread_local bool creatingPortableProjectSnapshot = false;
 
     void startHeartbeat();
     void stopHeartbeat();

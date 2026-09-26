@@ -10,6 +10,8 @@
 #include "../components/InstallFlowHelpers.h"
 #include "InstallCompletionComponent.h"
 #include "LinuxInstallLocationsComponent.h"
+#include "BlenderSetupComponent.h"
+#include "SettingsRecoveryComponent.h"
 
 namespace osci::installer {
 
@@ -43,6 +45,7 @@ namespace osci::installer {
         juce::String licenseKey;
         osci::LinuxInstallLocations locations;
         bool premium = false;
+        std::optional<osci::VersionInfo> reviewedVersion;
     };
 
     juce::String currentInstallerVersionBaseline() {
@@ -75,7 +78,7 @@ public:
     InstallerComponent()
         : osciRenderTile ("osci-render", loadImage (BinaryData::osci_mac_png, BinaryData::osci_mac_pngSize), "osci-render"),
           sosciTile ("sosci", loadImage (BinaryData::sosci_mac_saturated_png, BinaryData::sosci_mac_saturated_pngSize), "sosci"),
-          needLicenseLink ("Need a license key?", juce::URL ("https://osci-render.com/#purchase")),
+          needLicenseLink ("Find my license key", juce::URL()),
           progressBar (progressValue) {
         addAndMakeVisible (headingLabel);
         headingLabel.setText ("Choose what to install", juce::dontSendNotification);
@@ -88,6 +91,35 @@ public:
         helpButton.setTooltip ("Help");
         helpButton.onClick = [this] {
             showSupportOverlay();
+        };
+        addAndMakeVisible(settingsButton);
+        settingsButton.onClick = [this] {
+            if (!busy) {
+                auto recovery = std::make_unique<SettingsRecoveryComponent>(productSlug(selectedProduct));
+                recovery->onSettingsReset = [this] {
+                    loadCachedLicenseState();
+                    refreshUi();
+                };
+                osci::OverlayComponent::show(*this, std::move(recovery));
+            }
+        };
+        addAndMakeVisible (privacyButton);
+        privacyButton.onClick = [this] {
+            privacyButton.setEnabled(false);
+            const juce::Component::SafePointer<InstallerComponent> owner(this);
+            juce::Thread::launch([owner] {
+                juce::var documents;
+                const auto result = osci::BackendClient().getCurrentDocuments("osci-products", documents);
+                juce::MessageManager::callAsync([owner, result, documents] {
+                    if (owner == nullptr) return;
+                    owner->privacyButton.setEnabled(true);
+                    if (result.failed()) {
+                        owner->statusLabel.setText("Could not load Privacy & Terms. Check the connection and try again.", juce::dontSendNotification);
+                        return;
+                    }
+                    osci::OverlayComponent::show(*owner, std::make_unique<osci::LegalOverlay>(documents, std::function<void()>{}, true));
+                });
+            });
         };
 
         addAndMakeVisible (osciRenderTile);
@@ -109,6 +141,10 @@ public:
         };
 
         addAndMakeVisible (panel);
+
+        panel.addAndMakeVisible(blenderButton);
+        blenderButton.setButtonText("Blender integration");
+        blenderButton.onClick = [this] { showBlenderSetup(); };
 
         panel.addAndMakeVisible (choiceLabel);
         choiceLabel.setJustificationType (juce::Justification::centred);
@@ -149,6 +185,9 @@ public:
 
         panel.addAndMakeVisible (needLicenseLink);
         needLicenseLink.setColour (juce::HyperlinkButton::textColourId, osci::Colours::accentColor());
+        needLicenseLink.onClick = [this] {
+            showSupportOverlay();
+        };
 
         panel.addAndMakeVisible (premiumInstallButton);
         premiumInstallButton.onClick = [this] {
@@ -159,11 +198,6 @@ public:
         progressBar.setVisible (false);
 
 #if JUCE_LINUX
-        locationsPanel.onCancel = [this] {
-            if (locationsOverlay != nullptr) {
-                locationsOverlay->requestDismiss();
-            }
-        };
         locationsPanel.onConfirm = [this] (osci::LinuxInstallLocations locations) {
             selectedLocations = std::move (locations);
             installLocationsConfirmed = true;
@@ -208,6 +242,9 @@ public:
     }
 
     void resized() override {
+        if (blenderSetup != nullptr) {
+            blenderSetup->setBounds(getLocalBounds());
+        }
 #if JUCE_LINUX
         if (installationComplete) {
             helpButton.setBounds ({});
@@ -226,6 +263,8 @@ public:
         auto area = getLocalBounds().reduced (40, 16);
 #endif
         helpButton.setBounds (getLocalBounds().reduced (24, 20).removeFromTop (34).removeFromRight (34));
+        settingsButton.setBounds(getLocalBounds().withTrimmedRight(24).removeFromBottom(32).removeFromRight(180));
+        privacyButton.setBounds (getLocalBounds().withTrimmedLeft (24).removeFromBottom (32).removeFromLeft (140));
 
         headingLabel.setBounds (area.removeFromTop (44));
         area.removeFromTop (16);
@@ -345,11 +384,17 @@ private:
     };
 #endif
 
+    juce::TextButton settingsButton { "Repair app settings..." };
     osci::SvgButton helpButton { "installerHelp", juce::String (BinaryData::help_svg), juce::Colours::white };
+    juce::TextButton privacyButton { "Privacy & Terms" };
+    std::optional<osci::VersionInfo> reviewedVersion;
     juce::Label headingLabel;
     ProductTile osciRenderTile;
     ProductTile sosciTile;
     juce::Component panel;
+    juce::TextButton blenderButton;
+    std::unique_ptr<BlenderSetupComponent> blenderSetup;
+    std::vector<juce::Component::SafePointer<juce::Component>> blenderHiddenComponents;
     juce::Label choiceLabel;
     juce::TextButton freeChoiceButton;
     juce::TextButton premiumChoiceButton;
@@ -380,6 +425,46 @@ private:
     bool cachedTokenNeedsRefresh = false;
     juce::String cachedTokenMessage;
     juce::String lastInstalledVersion;
+
+    void showBlenderSetup() {
+        if (busy || blenderSetup != nullptr) {
+            return;
+        }
+        blenderSetup = std::make_unique<BlenderSetupComponent>();
+        blenderSetup->onBusyChanged = [this](bool value) {
+            busy = value;
+            if (onBusyChanged) {
+                onBusyChanged(value);
+            }
+        };
+        blenderSetup->onDismissRequested = [safe = juce::Component::SafePointer<InstallerComponent>(this)] {
+            juce::MessageManager::callAsync([safe] {
+                if (safe != nullptr) {
+                    safe->blenderSetup = nullptr;
+                    for (auto& component : safe->blenderHiddenComponents) {
+                        if (component != nullptr) {
+                            component->setVisible(true);
+                        }
+                    }
+                    safe->blenderHiddenComponents.clear();
+                    safe->refreshUi();
+                    safe->resized();
+                    safe->blenderButton.grabKeyboardFocus();
+                }
+            });
+        };
+        blenderSetup->captureBackdropFrom(*this);
+        for (auto* component : getChildren()) {
+            if (component->isVisible()) {
+                blenderHiddenComponents.emplace_back(component);
+                component->setVisible(false);
+            }
+        }
+        addAndMakeVisible(*blenderSetup);
+        blenderSetup->setBounds(getLocalBounds());
+        blenderSetup->toFront(true);
+        blenderSetup->grabKeyboardFocus();
+    }
 
 #if DEBUG && JUCE_MODULE_AVAILABLE_jucewright
     jucewright::EnvironmentAutomation automation { *this };
@@ -521,6 +606,8 @@ private:
             freeChoiceButton.setBounds (row.removeFromLeft (200));
             row.removeFromLeft (20);
             premiumChoiceButton.setBounds (row.removeFromLeft (200));
+            area.removeFromTop(12);
+            blenderButton.setBounds(area.removeFromTop(32).withSizeKeepingCentre(200, 32));
             choiceLabel.setBounds ({});
             statusLabel.setBounds ({});
             progressBar.setBounds ({});
@@ -639,10 +726,13 @@ private:
     }
 
     void refreshUi() {
+        blenderButton.setEnabled(!busy);
+        settingsButton.setEnabled(!busy);
         const auto selectedOsciRender = selectedProduct == ProductChoice::OsciRender;
         const auto selectedSosci = selectedProduct == ProductChoice::Sosci;
         const auto premiumPath = isPremiumPath (currentPath);
         const auto showOsciChoice = selectedOsciRender && currentPath == InstallPath::None;
+        blenderButton.setVisible(showOsciChoice);
         const auto showPanel = selectedProduct != ProductChoice::None;
         const auto showKeyEntry = premiumPath && !hasCachedPremiumToken;
         const auto showChoiceLabel = showKeyEntry && !busy;
@@ -774,7 +864,46 @@ private:
         }
 
         currentPath = path;
-        const auto request = makeRequest (path);
+        const auto request = makeRequest(path);
+        setBusy(true, "Checking installation details...");
+        const juce::Component::SafePointer<InstallerComponent> owner(this);
+#if DEBUG
+        if (juce::SystemStats::getEnvironmentVariable("OSCI_INSTALLER_AUTOMATION_RESULT", {}).isNotEmpty()) {
+            setBusy(false, {});
+            // Outcome-only UI simulation: the debug worker performs no download or installation.
+            beginAcknowledgedInstall(path);
+            return;
+        }
+#endif
+        juce::Thread::launch([owner, path, request] {
+            osci::UpdateChecker checker;
+            const auto version = checker.checkForUpdate(request.productSlug, currentInstallerVersionBaseline(), osci::ReleaseTrack::Stable, request.variant);
+            const auto result = checker.getLastResult();
+            juce::MessageManager::callAsync([owner, path, result, version] {
+                if (owner == nullptr) { return; }
+                owner->setBusy(false, {});
+                if (result.failed() || !version.has_value()) {
+                    owner->statusLabel.setText("Could not check installation details. Please try again.", juce::dontSendNotification);
+                    return;
+                }
+                const auto documents = version->legal;
+                if (!osci::LegalState::valid(documents)) {
+                    owner->statusLabel.setText("The release documents could not be verified.", juce::dontSendNotification);
+                    return;
+                }
+                owner->reviewedVersion = version;
+                osci::LegalOverlay::ensure(*owner, documents, [owner, path] {
+                    if (owner != nullptr) { owner->beginAcknowledgedInstall(path); }
+                });
+            });
+        });
+    }
+
+    void beginAcknowledgedInstall(InstallPath path) {
+        if (busy) { return; }
+        currentPath = path;
+        auto request = makeRequest(path);
+        request.reviewedVersion = reviewedVersion;
 
         progressValue = 0.0;
         setBusy (true, request.premium ? "Preparing premium install..." : "Preparing free install...");
@@ -816,7 +945,7 @@ private:
 
         juce::Result result = juce::Result::ok();
         juce::String token;
-        std::optional<osci::VersionInfo> version;
+        std::optional<osci::VersionInfo> version = request.reviewedVersion;
         juce::File installerFile;
         osci::LinuxInstaller::Report installReport;
 
@@ -830,7 +959,7 @@ private:
             result = preparePremiumToken (licenseManager, request.licenseKey, token);
         }
 
-        if (result.wasOk()) {
+        if (result.wasOk() && !version.has_value()) {
             juce::MessageManager::callAsync ([safeThis, request] {
                 if (safeThis == nullptr) {
                     return;

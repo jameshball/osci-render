@@ -65,7 +65,6 @@ void MainMenuBarModel::addDiagnosticsMenuItems(int topLevelMenuIndex, CommonAudi
 
 void MainMenuBarModel::addSupportMenuItems(int topLevelMenuIndex, CommonAudioProcessor& processor, CommonPluginEditor& editor) {
     addMenuItem(topLevelMenuIndex, "License and Updates...", [&editor] { editor.openLicenseAndUpdates(); });
-    addMenuItem(topLevelMenuIndex, "Send Feedback...", [&editor] { editor.openFeedback(); });
     addDiagnosticsMenuItems(topLevelMenuIndex, processor);
 }
 

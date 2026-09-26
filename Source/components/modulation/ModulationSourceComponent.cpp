@@ -1,7 +1,6 @@
 #include "ModulationSourceComponent.h"
 #include "../effects/EffectComponent.h"
 #include "../../LookAndFeel.h"
-#include "../../visualiser/FramePresenter.h"
 #include "../../audio/modulation/ModulationTypes.h"
 #include <osci_gui/osci_gui.h>
 #include <osci_render_core/midi/osci_MidiManager.h>
@@ -163,6 +162,7 @@ void ModulationSourceComponent::DepthIndicator::showRightClickMenu() {
 #endif
 
     juce::Component::SafePointer<DepthIndicator> safeThis(this);
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
         [safeThis
 #if OSCI_PREMIUM
@@ -389,7 +389,7 @@ void ModulationSourceComponent::ModTabHandle::mouseDrag(const juce::MouseEvent& 
 
         auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
         if (container != nullptr) {
-            container->startDragging(desc, this, juce::ScaledImage(dragImage), !FramePresenter::usesNativeSurface());
+            container->startDragging(desc, this, juce::ScaledImage(dragImage), true);
             if (owner.onDragActiveChanged) {
                 owner.onDragActiveChanged(true);
             }

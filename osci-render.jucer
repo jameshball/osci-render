@@ -4,7 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginWantsMidiIn"
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="2.9.7.3" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              version="2.9.9.10" companyName="James H Ball" companyWebsite="https://osci-render.com"
               companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
@@ -87,7 +87,10 @@
         <FILE id="hwlzvW" name="card.svg" compile="0" resource="1" file="Resources/svg/card.svg"/>
         <FILE id="GQM3jZ" name="cash.svg" compile="0" resource="1" file="Resources/svg/cash.svg"/>
         <FILE id="HtrsBQ" name="cat.svg" compile="0" resource="1" file="Resources/svg/cat.svg"/>
+        <FILE id="ClkThru" name="click-through.svg" compile="0" resource="1"
+              file="Resources/svg/click-through.svg"/>
         <FILE id="y9tCpG" name="clippy.svg" compile="0" resource="1" file="Resources/svg/clippy.svg"/>
+        <FILE id="Close01" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
         <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
         <FILE id="cPySvg" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
         <FILE id="pTnUPp" name="cube.svg" compile="0" resource="1" file="Resources/svg/cube.svg"/>
@@ -132,7 +135,6 @@
         <FILE id="WnBZf0" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
         <FILE id="Mouse1" name="mouse.svg" compile="0" resource="1" file="Resources/svg/mouse.svg"/>
         <FILE id="rGSPBN" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
-        <FILE id="mGnfSvg" name="magnify.svg" compile="0" resource="1" file="Resources/svg/magnify.svg"/>
         <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
         <FILE id="midi01" name="midi.svg" compile="0" resource="1" file="Resources/svg/midi.svg"/>
         <FILE id="YuYfcJ" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
@@ -187,6 +189,10 @@
         <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
         <FILE id="hH1OSK" name="vortex.svg" compile="0" resource="1" file="Resources/svg/vortex.svg"/>
         <FILE id="Unp5Kx" name="waves.svg" compile="0" resource="1" file="Resources/svg/waves.svg"/>
+        <FILE id="WndFrm1" name="window-framed.svg" compile="0" resource="1"
+              file="Resources/svg/window-framed.svg"/>
+        <FILE id="WndFrml" name="window-frameless.svg" compile="0" resource="1"
+              file="Resources/svg/window-frameless.svg"/>
         <FILE id="LoSvg01" name="lottie_android.svg" compile="0" resource="1"
               file="Resources/svg/lottie_android.svg"/>
         <FILE id="LoSvg06" name="lottie_switch.svg" compile="0" resource="1"
@@ -304,6 +310,8 @@
           <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeVoice.cpp"/>
           <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
+          <FILE id="VEffects" name="VoiceEffects.h" compile="0" resource="0"
+                file="Source/audio/synth/VoiceEffects.h"/>
         </GROUP>
         <GROUP id="{AUD_PLATFORM}" name="platform">
           <FILE id="IsrCtl" name="InternalSampleRateController.h" compile="0"
@@ -669,12 +677,6 @@
         <FILE id="CaPdPD" name="VisualiserSettings.h" compile="0" resource="0"
               file="Source/visualiser/VisualiserSettings.h"/>
       </GROUP>
-      <GROUP id="{B801DAEE-F8DF-49E2-95CB-46F8FC480B33}" name="feedback">
-        <FILE id="FbRptC" name="FeedbackReportBuilder.cpp" compile="1" resource="0"
-              file="Source/feedback/FeedbackReportBuilder.cpp"/>
-        <FILE id="FbRptH" name="FeedbackReportBuilder.h" compile="0" resource="0"
-              file="Source/feedback/FeedbackReportBuilder.h"/>
-      </GROUP>
       <FILE id="fWbyS1" name="CommonPluginEditor.cpp" compile="1" resource="0"
             file="Source/CommonPluginEditor.cpp"/>
       <FILE id="nKwxzJ" name="CommonPluginEditor.h" compile="0" resource="0"
@@ -773,7 +775,7 @@
                        debugInformationFormat="ProgramDatabase" winWarningLevel="2"
                        libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
                        headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
-                       prebuildCommand="call ..\..\..\luajit_win.bat" enablePluginBinaryCopyStep="0"/>
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
@@ -914,7 +916,7 @@
     <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
-    <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_gui" showAllCode="0" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>

@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <vector>
 #include <algorithm>
+#include <optional>
 
 // Generic thread-safe store for modulation assignments (LFO, Random, Sidechain, etc.).
 // Eliminates duplicated add/remove/get/removeIf logic across parameter structs.
@@ -31,6 +32,16 @@ struct ModulationAssignmentStore {
             std::remove_if(items.begin(), items.end(),
                 [&](const AssignmentType& a) { return a.sourceIndex == sourceIndex && a.paramId == paramId; }),
             items.end());
+    }
+
+    std::optional<AssignmentType> find(int sourceIndex, const juce::String& paramId) const {
+        juce::SpinLock::ScopedLockType scopedLock(lock);
+        for (const auto& assignment : items) {
+            if (assignment.sourceIndex == sourceIndex && assignment.paramId == paramId) {
+                return assignment;
+            }
+        }
+        return std::nullopt;
     }
 
     // Snapshot copy all assignments (safe from any thread)
