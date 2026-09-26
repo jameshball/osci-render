@@ -4,13 +4,13 @@
 #include <osci_render_core/osci_render_core.h>
 
 #include "audio/synth/ShapeSound.h"
-#include "scene/Scene.h"
 
 #include <atomic>
 #include <optional>
 #include <vector>
 
 class FileParser;
+class RenderImportServices;
 class OscirenderAudioProcessor;
 class VoiceManager;
 
@@ -29,7 +29,6 @@ public:
     void updateFileById(const juce::String& id, std::shared_ptr<juce::MemoryBlock> data);
     juce::String renameFile(int index, juce::String newName);
     int duplicateFile(int index);
-    int restoreFile(int index, juce::String name, std::shared_ptr<juce::MemoryBlock> data, const juce::XmlElement& scene);
     void removeFile(int index);
     void removeParser(FileParser* parser);
 
@@ -61,16 +60,6 @@ public:
 
     void setFileRemovedCallback(std::function<void(int)> callback);
 
-    scene::Automation sceneAutomation;
-    std::shared_ptr<scene::Scene> getScene(int index) const;
-    std::shared_ptr<scene::Scene> ensureScene(int index);
-    std::shared_ptr<scene::Object> addSceneObject(int index, juce::String name, std::shared_ptr<juce::MemoryBlock> data);
-    std::shared_ptr<scene::Object> addLiveSceneObject(int index, bool blender);
-    void updateSceneObject(const std::shared_ptr<scene::Object>& object, juce::String text);
-    void sceneChanged();
-    void saveScene(const scene::Scene& scene, juce::XmlElement& xml) const;
-    void restoreScene(int index, const juce::XmlElement& xml, bool copy = false);
-
     juce::SpinLock lock;
 
 private:
@@ -94,7 +83,6 @@ private:
 
     int appendFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data,
         std::shared_ptr<FileParser> parser, ShapeSound::Ptr sound);
-    std::shared_ptr<scene::Scene> ensureSceneUnlocked(int index);
     void initialise();
     void clearFiles();
     void updateFileUnlocked(int index, std::shared_ptr<juce::MemoryBlock> data);
@@ -119,6 +107,7 @@ private:
 
     OscirenderAudioProcessor& processor;
     VoiceManager& voices;
+    std::shared_ptr<RenderImportServices> importServices;
     std::vector<File> files;
     int nextFileId = 0;
 
@@ -127,8 +116,6 @@ private:
     std::shared_ptr<FileParser> textureInputParser;
     ShapeSound::Ptr textureInputSound;
     juce::String textureInputName;
-    std::weak_ptr<scene::Object> blenderSceneObject;
-    std::weak_ptr<scene::Object> textureSceneObject;
 
     std::atomic<int> selectedFileIndex { 0 };
     std::atomic<bool> hasSelectedFile { false };

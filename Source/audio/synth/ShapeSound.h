@@ -1,14 +1,11 @@
 #pragma once
 #include <JuceHeader.h>
-#include <osci_file_import/osci_file_import.h>
+#include "PointSource.h"
 
-namespace scene { class Scene; }
-class FileParser;
 class FrameProducer;
-class OscirenderAudioProcessor;
 class ShapeSound : public juce::SynthesiserSound, public FrameConsumer {
 public:
-	ShapeSound(OscirenderAudioProcessor &p, std::shared_ptr<FileParser> parser);
+	explicit ShapeSound(std::shared_ptr<PointSource> source);
 	ShapeSound();
 	~ShapeSound() override;
 
@@ -23,9 +20,7 @@ public:
 	// pushed a fresh frame that the audio thread should grab immediately.
 	bool consumeFreshFrame();
 
-	std::shared_ptr<FileParser> parser;
-    std::shared_ptr<scene::Scene> scene;
-    void enableScene(std::shared_ptr<scene::Scene> value);
+	std::shared_ptr<PointSource> parser;
 
 	using Ptr = juce::ReferenceCountedObjectPtr<ShapeSound>;
 

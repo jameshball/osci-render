@@ -12,7 +12,13 @@ inline ProductUpdateConfig makeProductUpdateConfig (std::function<void()> onUpda
 #else
     config.compiledVariant = "free";
 #endif
-#if defined (SOSCI)
+#if defined(OSCI_MOTION)
+    config.productSlug = "osci-motion";
+    config.productName = "osci-motion";
+    config.productIcon = juce::ImageFileFormat::loadFrom(BinaryData::osci_mac_png, static_cast<size_t>(BinaryData::osci_mac_pngSize));
+    config.linuxIconPng = { BinaryData::osci_mac_png, static_cast<size_t>(BinaryData::osci_mac_pngSize) };
+    config.linuxInstallManifest = { "osci-motion", "osci-motion", "osci-motion", {}, {}, "AudioVideo;Audio;Graphics;" };
+#elif defined(SOSCI)
     config.productSlug = "sosci";
     config.productName = "sosci";
     config.productIcon = juce::ImageFileFormat::loadFrom (BinaryData::sosci_mac_saturated_png,

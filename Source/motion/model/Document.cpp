@@ -1,0 +1,643 @@
+#include "Document.h"
+#include <osci_file_import/osci_file_import.h>
+#include <set>
+#include <cstring>
+#include <exception>
+#include <new>
+#if OSCI_PREMIUM
+#include "../../parser/lottie/LottieParser.h"
+#include "../../parser/lottie/DotLottieArchive.h"
+#endif
+
+namespace motion {
+namespace {
+using ImportShapes = std::vector<std::unique_ptr<osci::Shape>>;
+
+bool importCancelled(const std::atomic<bool>* cancel) {
+    return cancel != nullptr && cancel->load(std::memory_order_relaxed);
+}
+
+juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress) {
+    if (frameCount <= 0 || static_cast<std::size_t>(frameCount) > Document::maximumSourceFrames
+        || !std::isfinite(frameRate) || frameRate <= 0.0 || frameRate > 1000.0
+        || !std::isfinite(frameCount / frameRate)) {
+        return juce::Result::fail("Animation must contain 1-3600 frames with a frame rate between 0 and 1000 fps.");
+    }
+    std::vector<std::shared_ptr<const osci::PreparedDrawing>> frames;
+    frames.reserve(static_cast<std::size_t>(frameCount));
+    std::size_t totalShapes = 0;
+    bool hasGeometry = false;
+    for (int frame = 0; frame < frameCount; ++frame) {
+        if (importCancelled(cancel)) {
+            return juce::Result::fail("Source import cancelled.");
+        }
+        ImportShapes shapes;
+        const auto result = draw(frame, shapes);
+        if (result.failed()) {
+            return result;
+        }
+        totalShapes += shapes.size();
+        if (shapes.size() > Document::maximumShapesPerFrame || totalShapes > Document::maximumSourceShapes) {
+            return juce::Result::fail("Animation exceeds the geometry budget (100000 shapes per frame or 1000000 total). Simplify or shorten the source.");
+        }
+        auto drawing = std::make_shared<osci::PreparedDrawing>(std::move(shapes));
+        hasGeometry = hasGeometry || !drawing->empty();
+        frames.push_back(std::move(drawing));
+        if (progress != nullptr) {
+            progress->store(static_cast<double>(frame + 1) / (frameCount + 1), std::memory_order_relaxed);
+        }
+    }
+    if (importCancelled(cancel)) {
+        return juce::Result::fail("Source import cancelled.");
+    }
+    if (!hasGeometry) {
+        return juce::Result::fail("The source contains no drawable geometry.");
+    }
+    auto prepared = std::make_shared<PreparedSource>(std::move(frames), frameRate);
+    asset.drawing = prepared->firstFrame();
+    asset.source = std::move(prepared);
+    if (progress != nullptr) {
+        progress->store(1.0, std::memory_order_relaxed);
+    }
+    return juce::Result::ok();
+}
+
+bool finiteNumber(const juce::var& value) {
+    return (value.isInt() || value.isInt64() || value.isDouble()) && std::isfinite(static_cast<double>(value));
+}
+
+juce::Result validateGplaFrame(const juce::var& frame, std::size_t& totalVertices) {
+    const auto focalLength = frame.getProperty("focalLength", {});
+    const auto objectsValue = frame.getProperty("objects", {});
+    const auto* objects = objectsValue.getArray();
+    if (!finiteNumber(focalLength) || objects == nullptr) {
+        return juce::Result::fail("GPLA frames require a finite focalLength and an objects array.");
+    }
+    std::size_t frameVertices = 0;
+    for (const auto& object : *objects) {
+        const auto matrixValue = object.getProperty("matrix", {});
+        const auto strokesValue = object.getProperty("vertices", {});
+        const auto* matrix = matrixValue.getArray();
+        const auto* strokes = strokesValue.getArray();
+        if (matrix == nullptr || matrix->size() != 16 || strokes == nullptr || strokes->size() > 4096) {
+            return juce::Result::fail("GPLA objects require a 16-value matrix and at most 4096 strokes.");
+        }
+        for (const auto& value : *matrix) {
+            if (!finiteNumber(value)) {
+                return juce::Result::fail("GPLA matrices must contain finite numbers.");
+            }
+        }
+        for (const auto& strokeValue : *strokes) {
+            const auto* stroke = strokeValue.getArray();
+            if (stroke == nullptr || stroke->size() < 2) {
+                return juce::Result::fail("GPLA strokes must contain at least two vertices.");
+            }
+            frameVertices += static_cast<std::size_t>(stroke->size());
+            totalVertices += static_cast<std::size_t>(stroke->size());
+            if (frameVertices > Document::maximumShapesPerFrame || totalVertices > Document::maximumSourceShapes) {
+                return juce::Result::fail("GPLA exceeds the preparation budget (100000 vertices per frame or 1000000 total). Simplify the source.");
+            }
+            for (const auto& vertex : *stroke) {
+                for (const auto* axis : { "x", "y", "z" }) {
+                    if (!finiteNumber(vertex.getProperty(axis, {}))) {
+                        return juce::Result::fail("GPLA vertices must contain finite X, Y and Z values.");
+                    }
+                }
+            }
+        }
+    }
+    return juce::Result::ok();
+}
+
+// Structural preflight protects the shared binary parser's unchecked matrix
+// and stroke assumptions. Geometry decoding remains in LineArtParser.
+struct GplaBinaryLayout {
+    explicit GplaBinaryLayout(const juce::MemoryBlock& data) : bytes(static_cast<const char*>(data.getData())), size(data.getSize()) {}
+
+    bool tag(const char* value) {
+        if (!peek(value)) {
+            return false;
+        }
+        position += 8;
+        return true;
+    }
+    bool peek(const char* value) const {
+        return size - position >= 8 && std::memcmp(bytes + position, value, 8) == 0;
+    }
+    bool integer(juce::int64& value) {
+        if (size - position < 8) {
+            return false;
+        }
+        value = static_cast<juce::int64>(juce::ByteOrder::littleEndianInt64(bytes + position));
+        position += 8;
+        return true;
+    }
+    bool number() {
+        juce::int64 bits = 0;
+        if (!integer(bits)) {
+            return false;
+        }
+        double value;
+        std::memcpy(&value, &bits, sizeof(value));
+        return std::isfinite(value);
+    }
+
+    bool validate(const std::atomic<bool>* cancel) {
+        juce::int64 ignored = 0;
+        if (size % 8 != 0 || !tag("GPLA    ") || !integer(ignored) || !integer(ignored) || !integer(ignored) || !tag("FILE    ")) {
+            return false;
+        }
+        juce::int64 reportedFrames = 0;
+        while (!peek("DONE    ")) {
+            const bool count = peek("fCount  ");
+            const bool rate = peek("fRate   ");
+            if (!integer(ignored) || !integer(ignored)) {
+                return false;
+            }
+            if (count) {
+                reportedFrames = ignored;
+            }
+            if (rate) {
+                frameRate = static_cast<double>(ignored);
+            }
+        }
+        if (!tag("DONE    ") || reportedFrames <= 0 || reportedFrames > static_cast<juce::int64>(Document::maximumSourceFrames)
+            || frameRate <= 0.0 || frameRate > 1000.0) {
+            return false;
+        }
+        std::size_t totalVertices = 0;
+        while (!peek("END GPLA")) {
+            if (importCancelled(cancel) || frames.size() >= Document::maximumSourceFrames) {
+                return false;
+            }
+            const auto start = position;
+            if (!tag("FRAME   ")) {
+                return false;
+            }
+            bool hasFocalLength = false;
+            while (!peek("OBJECTS ")) {
+                const bool focal = peek("focalLen");
+                if (!integer(ignored) || (focal ? !number() : !integer(ignored))) {
+                    return false;
+                }
+                hasFocalLength = hasFocalLength || focal;
+            }
+            if (!hasFocalLength || !tag("OBJECTS ")) {
+                return false;
+            }
+            std::size_t frameVertices = 0;
+            while (!peek("DONE    ")) {
+                if (!tag("OBJECT  ") || !tag("MATRIX  ")) {
+                    return false;
+                }
+                for (int index = 0; index < 16; ++index) {
+                    if (!number()) {
+                        return false;
+                    }
+                }
+                if (!tag("DONE    ") || !tag("STROKES ")) {
+                    return false;
+                }
+                int strokes = 0;
+                while (!peek("DONE    ")) {
+                    juce::int64 count = 0;
+                    if (++strokes > 4096 || !tag("STROKE  ") || !tag("vertexCt") || !integer(count)
+                        || count < 2 || count > static_cast<juce::int64>(Document::maximumShapesPerFrame) || !tag("VERTICES")) {
+                        return false;
+                    }
+                    frameVertices += static_cast<std::size_t>(count);
+                    totalVertices += static_cast<std::size_t>(count);
+                    if (frameVertices > Document::maximumShapesPerFrame || totalVertices > Document::maximumSourceShapes) {
+                        return false;
+                    }
+                    for (juce::int64 index = 0; index < count * 3; ++index) {
+                        if (!number()) {
+                            return false;
+                        }
+                    }
+                    if (!tag("DONE    ") || !tag("DONE    ")) {
+                        return false;
+                    }
+                }
+                if (!tag("DONE    ") || !tag("DONE    ")) {
+                    return false;
+                }
+            }
+            if (!tag("DONE    ")) {
+                return false;
+            }
+            frames.push_back({ start, position - start });
+        }
+        return tag("END GPLA") && position == size && frames.size() == static_cast<std::size_t>(reportedFrames);
+    }
+
+    const char* bytes;
+    const std::size_t size;
+    std::size_t position = 0;
+    double frameRate = 30.0;
+    std::vector<std::pair<std::size_t, std::size_t>> frames;
+};
+
+juce::Result decodeGpla(Asset& asset, const std::atomic<bool>* cancel, std::atomic<double>* progress) {
+    const bool binary = asset.data.getSize() >= 8 && std::memcmp(asset.data.getData(), "GPLA    ", 8) == 0;
+    if (binary) {
+        GplaBinaryLayout layout(asset.data);
+        if (!layout.validate(cancel)) {
+            return juce::Result::fail(importCancelled(cancel) ? "Source import cancelled."
+                : "Invalid or unsupported binary GPLA structure, or animation exceeds the 3600-frame / 1000000-vertex preparation budget.");
+        }
+        return prepareSourceFrames(asset, static_cast<int>(layout.frames.size()), layout.frameRate,
+            [&](int frame, ImportShapes& shapes) {
+                // Feed one validated frame to the shared parser, bounding its
+                // temporary ownership and allowing cancellation between frames.
+                juce::MemoryOutputStream single;
+                single.write("GPLA    ", 8);
+                single.writeInt64(1);
+                single.writeInt64(0);
+                single.writeInt64(0);
+                single.write("FILE    fCount  ", 16);
+                single.writeInt64(1);
+                single.write("fRate   ", 8);
+                single.writeInt64(static_cast<juce::int64>(layout.frameRate));
+                single.write("DONE    ", 8);
+                const auto range = layout.frames[static_cast<std::size_t>(frame)];
+                single.write(layout.bytes + range.first, range.second);
+                single.write("END GPLA", 8);
+                LineArtParser parser(static_cast<const char*>(single.getData()), static_cast<int>(single.getDataSize()));
+                shapes = parser.draw();
+                return juce::Result::ok();
+            }, cancel, progress);
+    }
+    const auto text = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+    const auto parsed = juce::JSON::parse(text);
+    const auto framesValue = parsed.getProperty("frames", {});
+    const auto* frames = framesValue.getArray();
+    if (frames == nullptr || frames->isEmpty() || static_cast<std::size_t>(frames->size()) > Document::maximumSourceFrames) {
+        return juce::Result::fail("GPLA JSON requires a frames array containing 1-3600 frames.");
+    }
+    std::size_t totalVertices = 0;
+    return prepareSourceFrames(asset, frames->size(), 30.0,
+        [&](int frame, ImportShapes& shapes) {
+            const auto& item = frames->getReference(frame);
+            const auto validated = validateGplaFrame(item, totalVertices);
+            if (validated.failed()) {
+                return validated;
+            }
+            const auto objects = item.getProperty("objects", {});
+            auto lines = LineArtParser::generateFrame(*objects.getArray(), static_cast<double>(item.getProperty("focalLength", {})));
+            shapes.reserve(lines.size());
+            for (auto& line : lines) {
+                shapes.push_back(line.clone());
+            }
+            return juce::Result::ok();
+        }, cancel, progress);
+}
+
+void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& curve) {
+    auto* property = item.createNewChildElement("property");
+    property->setAttribute("name", juce::String(name));
+    property->setAttribute("base", curve.base);
+    for (const auto& key : curve.keyframes()) {
+        auto* point = property->createNewChildElement("key");
+        point->setAttribute("time", key.time);
+        point->setAttribute("value", key.value);
+        point->setAttribute("interpolation", static_cast<int>(key.interpolation));
+        point->setAttribute("in", key.incomingSlope);
+        point->setAttribute("out", key.outgoingSlope);
+    }
+}
+
+juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
+    curve = Curve(property.getDoubleAttribute("base"));
+    if (!std::isfinite(curve.base)) {
+        return juce::Result::fail("Invalid property value.");
+    }
+    for (auto* point : property.getChildWithTagNameIterator("key")) {
+        const auto interpolation = point->getIntAttribute("interpolation");
+        if (interpolation < 0 || interpolation > 3) {
+            return juce::Result::fail("Unknown interpolation.");
+        }
+        try {
+            curve.setKey({ point->getDoubleAttribute("time"), point->getDoubleAttribute("value"),
+                static_cast<Interpolation>(interpolation), point->getDoubleAttribute("in"), point->getDoubleAttribute("out") });
+        } catch (const std::invalid_argument&) {
+            return juce::Result::fail("Invalid animation key.");
+        }
+    }
+    return juce::Result::ok();
+}
+}
+
+struct Document::Change : juce::UndoableAction {
+    Change(Document& owner, Project before, Project after) : owner(owner), before(std::move(before)), after(std::move(after)) {}
+    bool perform() override { owner.apply(after); return true; }
+    bool undo() override { owner.apply(before); return true; }
+    Document& owner;
+    Project before, after;
+};
+
+void Document::apply(Project value) {
+    ++stateRevision;
+    state = std::move(value);
+    if (onChanged) {
+        onChanged();
+    }
+    sendChangeMessage();
+}
+
+void Document::edit(juce::String label, std::function<void(Project&)> operation) {
+    auto after = state;
+    operation(after);
+    undo.beginNewTransaction(label);
+    undo.perform(new Change(*this, state, std::move(after)));
+}
+
+void Document::commit(juce::String label, Project before) {
+    undo.beginNewTransaction(label);
+    undo.perform(new Change(*this, std::move(before), state));
+}
+
+void Document::reset(Project project) {
+    ++projectGeneration;
+    undo.clearUndoHistory();
+    for (const auto& asset : project.assets) {
+        lastId = std::max(lastId, asset->id);
+    }
+    for (const auto& track : project.tracks) {
+        lastId = std::max(lastId, track.id);
+        for (const auto& clip : track.clips) {
+            lastId = std::max(lastId, clip.id);
+        }
+    }
+    for (const auto& camera : project.cameras) {
+        lastId = std::max(lastId, camera.id);
+    }
+    for (const auto& cut : project.cameraCuts) {
+        lastId = std::max(lastId, cut.id);
+    }
+    apply(std::move(project));
+}
+
+Clip Document::makeClip(Id id, const Asset& asset, double time) {
+    Clip clip;
+    clip.id = id;
+    clip.asset = asset.id;
+    clip.name = asset.name.toStdString();
+    clip.start = time;
+    if (asset.source != nullptr && asset.source->frameCount() > 1) {
+        clip.duration = asset.source->duration();
+    }
+    for (const auto* axis : { "x", "y", "z" }) {
+        clip.properties[std::string("position.") + axis] = Curve(0);
+        clip.properties[std::string("rotation.") + axis] = Curve(0);
+        clip.properties[std::string("scale.") + axis] = Curve(1);
+    }
+    clip.properties["red"] = Curve(0.2);
+    clip.properties["green"] = Curve(1);
+    clip.properties["blue"] = Curve(0.35);
+    clip.properties["weight"] = Curve(1);
+    return clip;
+}
+
+juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::atomic<double>* progress) try {
+    if (progress != nullptr) {
+        progress->store(0.0, std::memory_order_relaxed);
+    }
+    if (importCancelled(cancel)) {
+        return juce::Result::fail("Source import cancelled.");
+    }
+    if (asset.data.getSize() == 0 || asset.data.getSize() > maximumSourceBytes) {
+        return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
+    }
+    const auto extension = asset.extension.toLowerCase();
+    if (extension == ".gpla") {
+        return decodeGpla(asset, cancel, progress);
+    }
+    if (extension == ".json" || extension == ".lottie") {
+#if OSCI_PREMIUM
+        const auto content = extension == ".lottie" ? osci::lottie::extractAnimationJsonFromDotLottie(asset.data)
+            : juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+        if (content.isEmpty() || static_cast<std::size_t>(content.getNumBytesAsUTF8()) > maximumSourceBytes) {
+            return juce::Result::fail("The Lottie source must contain an animation JSON no larger than 64 MiB.");
+        }
+        const auto json = juce::JSON::parse(content);
+        const auto frameRate = json.getProperty("fr", {});
+        const auto firstFrame = json.getProperty("ip", {});
+        const auto lastFrame = json.getProperty("op", {});
+        if (json.getDynamicObject() == nullptr || !json.getProperty("layers", {}).isArray()
+            || !finiteNumber(frameRate) || !finiteNumber(firstFrame) || !finiteNumber(lastFrame)) {
+            return juce::Result::fail("The JSON file is not a valid Lottie animation.");
+        }
+        const auto count = std::round(static_cast<double>(lastFrame) - static_cast<double>(firstFrame));
+        if (count < 1.0 || count > maximumSourceFrames || static_cast<double>(frameRate) <= 0.0 || static_cast<double>(frameRate) > 1000.0) {
+            return juce::Result::fail("Lottie animations must contain 1-3600 frames with a frame rate between 0 and 1000 fps.");
+        }
+        if (importCancelled(cancel)) {
+            return juce::Result::fail("Source import cancelled.");
+        }
+        juce::String error;
+        OsciLottieParser parser(content, [&](juce::String message) { error = std::move(message); });
+        if (error.isNotEmpty()) {
+            return juce::Result::fail(error);
+        }
+        return prepareSourceFrames(asset, parser.getNumFrames(), parser.getFrameRate(),
+            [&](int frame, ImportShapes& shapes) {
+                parser.setFrame(frame);
+                shapes = parser.draw();
+                return error.isEmpty() ? juce::Result::ok() : juce::Result::fail(error);
+            }, cancel, progress);
+#else
+        return juce::Result::fail("Lottie import is not available in this build.");
+#endif
+    }
+    ImportShapes shapes;
+    const auto content = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+    if (extension == ".obj") {
+        WorldObject object(content.toStdString());
+        shapes = object.draw();
+    } else if (extension == ".svg") {
+        SvgParser svg(content);
+        shapes = svg.draw();
+    } else if (extension == ".txt") {
+        auto font = juce::Font(juce::FontOptions(30));
+        TextParser text(content, font);
+        shapes = text.draw();
+    } else {
+        return juce::Result::fail("This source type is not connected to the Motion importer yet.");
+    }
+    return prepareSourceFrames(asset, 1, 30.0, [&](int, ImportShapes& frame) {
+        frame = std::move(shapes);
+        return juce::Result::ok();
+    }, cancel, progress);
+} catch (const std::bad_alloc&) {
+    return juce::Result::fail("Not enough memory to prepare this source. Simplify or shorten it.");
+} catch (const std::exception& error) {
+    return juce::Result::fail("Source preparation failed: " + juce::String::fromUTF8(error.what()));
+} catch (...) {
+    return juce::Result::fail("Source preparation failed. Check that the file is valid and try a simpler source.");
+}
+
+juce::XmlElement Document::save() const {
+    juce::XmlElement xml("composition");
+    xml.setAttribute("name", state.name);
+    xml.setAttribute("duration", state.duration);
+    xml.setAttribute("fps", state.frameRate);
+    xml.setAttribute("bpm", state.bpm);
+    for (const auto& asset : state.assets) {
+        auto* item = xml.createNewChildElement("asset");
+        item->setAttribute("id", juce::String(asset->id));
+        item->setAttribute("name", asset->name);
+        item->setAttribute("extension", asset->extension);
+        item->addTextElement(asset->data.toBase64Encoding());
+    }
+    for (const auto& track : state.tracks) {
+        auto* row = xml.createNewChildElement("track");
+        row->setAttribute("id", juce::String(track.id));
+        row->setAttribute("name", juce::String(track.name));
+        for (const auto& clip : track.clips) {
+            auto* item = row->createNewChildElement("clip");
+            item->setAttribute("id", juce::String(clip.id));
+            item->setAttribute("asset", juce::String(clip.asset));
+            item->setAttribute("name", juce::String(clip.name));
+            item->setAttribute("start", clip.start);
+            item->setAttribute("duration", clip.duration);
+            item->setAttribute("offset", clip.offset);
+            item->setAttribute("rate", clip.rate);
+            for (const auto& [name, curve] : clip.properties) {
+                saveProperty(*item, name, curve);
+            }
+        }
+    }
+    for (const auto& camera : state.cameras) {
+        auto* item = xml.createNewChildElement("camera");
+        item->setAttribute("id", juce::String(camera.id));
+        item->setAttribute("name", juce::String(camera.name));
+        for (const auto& [name, curve] : camera.properties) {
+            saveProperty(*item, name, curve);
+        }
+    }
+    for (const auto& cut : state.cameraCuts) {
+        auto* item = xml.createNewChildElement("cameraCut");
+        item->setAttribute("id", juce::String(cut.id));
+        item->setAttribute("camera", juce::String(cut.camera));
+        item->setAttribute("start", cut.start);
+        item->setAttribute("duration", cut.duration);
+    }
+    return xml;
+}
+
+juce::Result Document::load(const juce::XmlElement& xml) {
+    if (!xml.hasTagName("composition")) {
+        return juce::Result::fail("Missing composition.");
+    }
+    Project project;
+    project.name = xml.getStringAttribute("name", "Untitled");
+    project.duration = xml.getDoubleAttribute("duration", 180);
+    project.frameRate = xml.getDoubleAttribute("fps", 30);
+    project.bpm = xml.getDoubleAttribute("bpm", 120);
+    if (!std::isfinite(project.duration) || project.duration <= 0 || !std::isfinite(project.frameRate)
+        || project.frameRate <= 0 || !std::isfinite(project.bpm) || project.bpm <= 0) {
+        return juce::Result::fail("Invalid composition timing.");
+    }
+    std::set<Id> identities;
+    for (auto* item : xml.getChildWithTagNameIterator("asset")) {
+        auto asset = std::make_shared<Asset>();
+        asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
+        asset->name = item->getStringAttribute("name");
+        asset->extension = item->getStringAttribute("extension");
+        const auto encoded = item->getAllSubText();
+        if (static_cast<std::size_t>(encoded.length()) > (maximumSourceBytes / 3 + 1) * 4) {
+            return juce::Result::fail("Embedded source exceeds the 64 MiB import limit.");
+        }
+        if (asset->id == 0 || !identities.insert(asset->id).second || !asset->data.fromBase64Encoding(encoded)) {
+            return juce::Result::fail("Invalid asset data or identity.");
+        }
+        const auto result = decodeAsset(*asset);
+        if (result.failed()) {
+            return result;
+        }
+        project.assets.push_back(std::move(asset));
+    }
+    for (auto* row : xml.getChildWithTagNameIterator("track")) {
+        Track track;
+        track.id = static_cast<Id>(row->getStringAttribute("id").getLargeIntValue());
+        track.name = row->getStringAttribute("name").toStdString();
+        if (track.id == 0 || !identities.insert(track.id).second) {
+            return juce::Result::fail("Invalid track identity.");
+        }
+        for (auto* item : row->getChildWithTagNameIterator("clip")) {
+            Clip clip;
+            clip.id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
+            clip.asset = static_cast<Id>(item->getStringAttribute("asset").getLargeIntValue());
+            clip.name = item->getStringAttribute("name").toStdString();
+            clip.start = item->getDoubleAttribute("start");
+            clip.duration = item->getDoubleAttribute("duration");
+            clip.offset = item->getDoubleAttribute("offset");
+            clip.rate = item->getDoubleAttribute("rate", 1);
+            const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
+            if (found == project.assets.end() || !identities.insert(clip.id).second) {
+                return juce::Result::fail("Invalid clip asset or identity.");
+            }
+            for (auto* property : item->getChildWithTagNameIterator("property")) {
+                Curve curve;
+                const auto result = loadProperty(*property, curve);
+                if (result.failed()) {
+                    return result;
+                }
+                clip.properties[property->getStringAttribute("name").toStdString()] = std::move(curve);
+            }
+            if (!track.insert(std::move(clip))) {
+                return juce::Result::fail("Invalid or overlapping clip range.");
+            }
+        }
+        project.tracks.push_back(std::move(track));
+    }
+    for (auto* item : xml.getChildWithTagNameIterator("camera")) {
+        Camera camera;
+        const auto identity = item->getStringAttribute("id").getLargeIntValue();
+        camera.id = static_cast<Id>(identity);
+        camera.name = item->getStringAttribute("name", "Camera").toStdString();
+        if (identity <= 0 || !identities.insert(camera.id).second) {
+            return juce::Result::fail("Invalid camera identity.");
+        }
+        std::set<std::string> properties;
+        for (auto* property : item->getChildWithTagNameIterator("property")) {
+            const auto name = property->getStringAttribute("name").toStdString();
+            const auto found = camera.properties.find(name);
+            if (found == camera.properties.end() || !properties.insert(name).second) {
+                return juce::Result::fail("Unknown or duplicate camera property.");
+            }
+            const auto result = loadProperty(*property, found->second);
+            if (result.failed()) {
+                return result;
+            }
+        }
+        if (!camera.valid()) {
+            return juce::Result::fail("Invalid camera transform or field of view.");
+        }
+        project.cameras.push_back(std::move(camera));
+    }
+    for (auto* item : xml.getChildWithTagNameIterator("cameraCut")) {
+        CameraCut cut;
+        const auto identity = item->getStringAttribute("id").getLargeIntValue();
+        const auto cameraIdentity = item->getStringAttribute("camera").getLargeIntValue();
+        cut.id = static_cast<Id>(identity);
+        cut.camera = static_cast<Id>(cameraIdentity);
+        cut.start = item->getDoubleAttribute("start");
+        cut.duration = item->getDoubleAttribute("duration");
+        const auto camera = std::find_if(project.cameras.begin(), project.cameras.end(), [&](const auto& value) { return value.id == cut.camera; });
+        if (identity <= 0 || cameraIdentity <= 0 || !cut.valid() || !identities.insert(cut.id).second || camera == project.cameras.end()) {
+            return juce::Result::fail("Invalid camera cut range, reference or identity.");
+        }
+        project.cameraCuts.push_back(cut);
+    }
+    std::sort(project.cameraCuts.begin(), project.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+    for (std::size_t index = 1; index < project.cameraCuts.size(); ++index) {
+        if (project.cameraCuts[index].start < project.cameraCuts[index - 1].end()) {
+            return juce::Result::fail("Camera cuts must not overlap.");
+        }
+    }
+    reset(std::move(project));
+    return juce::Result::ok();
+}
+}

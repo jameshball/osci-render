@@ -4,11 +4,25 @@
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
               cppLanguageStandard="20" projectLineFeed="&#10;" companyName="James H Ball"
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
-              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
+              defines="OSCI_RENDER_MODULATION_UI=1&#10;NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
-    <FILE id="ScnTst" name="SceneTransformTests.cpp" compile="1" resource="0"
-          file="tests/SceneTransformTests.cpp"/>
+    <GROUP id="MotionTests" name="Motion">
+      <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
+            resource="0" file="tests/MotionSignalExportTest.cpp"/>
+      <FILE id="MotionDocT" name="MotionDocumentTest.cpp" compile="1" resource="0"
+            file="tests/MotionDocumentTest.cpp"/>
+      <FILE id="MotionDocC" name="Document.cpp" compile="1" resource="0"
+            file="Source/motion/model/Document.cpp"/>
+    </GROUP>
+    <GROUP id="SharedVoiceTest" name="Shared voice engine">
+      <FILE id="SVEngTest" name="SharedVoiceEngineTest.cpp" compile="1" resource="0"
+            file="tests/SharedVoiceEngineTest.cpp"/>
+      <FILE id="SVEngSound" name="ShapeSound.cpp" compile="1" resource="0"
+            file="Source/audio/synth/ShapeSound.cpp"/>
+      <FILE id="SVEngVoice" name="ShapeVoice.cpp" compile="1" resource="0"
+            file="Source/audio/synth/ShapeVoice.cpp"/>
+    </GROUP>
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{F3A16E09-874D-45F4-A045-20839A1CDB88}" name="video">
         <FILE id="FfEncC" name="FFmpegEncoderManager.cpp" compile="1" resource="0"

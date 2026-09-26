@@ -7,6 +7,7 @@
 */
 
 #include "PluginProcessor.h"
+#include "audio/synth/VoiceEffects.h"
 
 #include "audio/AudioThreadGuard.h"
 #include "PluginEditor.h"
@@ -228,7 +229,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     envelopeParameters.params[0].addListenerToAll(this);
 
     // Start the background voice builder thread.
-    voiceBuilder = std::make_unique<VoiceBuilder>(*this);
+    voiceBuilder = std::make_unique<VoiceBuilder>(*this, synth, inputBuffer);
     int initialVoices = voices->getValueUnnormalised();
     synth.setClient(this);
     synth.setPolyphony(initialVoices);
@@ -243,7 +244,6 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         luaEffects[i]->parameters[0]->addListener(this);
     }
 
-    fileController.sceneAutomation.initialise(floatParameters);
     fileController.initialise();
 
     // Default to MIDI enabled when running as a plugin (VST/AU)
@@ -335,53 +335,9 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     };
 }
 
-// ---------------------------------------------------------------------------
-// VoiceBuilder::run() — defined here because it needs the full
-// OscirenderAudioProcessor definition (header is forward-declared).
-// ---------------------------------------------------------------------------
-
-void VoiceBuilder::run() {
-    while (!threadShouldExit()) {
-        wait(-1);
-        if (threadShouldExit()) break;
-
-        // Build or remove voices one at a time, re-checking the target
-        // between each operation to handle rapid slider changes.
-        while (!threadShouldExit()) {
-            const int target = targetCount.load(std::memory_order_acquire);
-            const int current = processor.synth.getNumVoices();
-
-            if (current == target)
-                break;
-
-            if (current < target) {
-                // Build one voice (the expensive part — runs off the
-                // message and audio threads).
-                auto* voice = new ShapeVoice(processor, processor.inputBuffer, current);
-
-                // Re-check: is this voice still needed?
-                if (targetCount.load(std::memory_order_acquire) > current) {
-                    processor.synth.addVoice(voice); // internally locked
-                    readyVoiceCount.store(current + 1, std::memory_order_release);
-                    firstVoiceReady.signal();
-                } else {
-                    delete voice;
-                }
-            } else {
-                // Removal is cheap — just do it directly.
-                processor.synth.removeVoice(current - 1); // internally locked
-                readyVoiceCount.store(current - 1, std::memory_order_release);
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     // Stop the voice builder before tearing down any processor state it references.
     voiceBuilder.reset();
-    undoManager.clearUndoHistory();
 
     for (int i = luaEffects.size() - 1; i >= 0; i--) {
         luaEffects[i]->parameters[0]->removeListener(this);
@@ -837,10 +793,7 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         {
             juce::SpinLock::ScopedLockType lock1(fileController.lock);
             const auto parser = fileController.getCurrentParser();
-            const auto scene = fileController.getScene(fileController.getCurrentFileIndex().value_or(-1));
-            if (scene != nullptr) {
-                nativeRate = scene->frameRate();
-            } else if (parser != nullptr) {
+            if (parser != nullptr) {
                 nativeRate = parser->getFrameRate();
             }
         }
@@ -867,10 +820,7 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         juce::SpinLock::ScopedLockType lock1(fileController.lock);
         juce::SpinLock::ScopedLockType lock2(effectsLock);
         const auto parser = fileController.getCurrentParser();
-        const auto scene = fileController.getScene(fileController.getCurrentFileIndex().value_or(-1));
-        if (scene != nullptr) {
-            scene->setFrame(animationFrame.load(), loopAnimation->getBoolValue());
-        } else if (parser != nullptr && parser->isAnimatable) {
+        if (parser != nullptr && parser->isAnimatable) {
             const int totalFrames = parser->getNumFrames();
             if (totalFrames > 0) {
             if (loopAnimation->getBoolValue()) {
@@ -1655,4 +1605,22 @@ double OscirenderAudioProcessor::noteToFrequency(int note, int channel) {
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
     return new OscirenderAudioProcessor();
+}
+
+VoiceParameters OscirenderAudioProcessor::getVoiceParameters() {
+    return { midiEnabled, frequencyEffect.get(), velocityTracking
+#if OSCI_PREMIUM
+        , pitchBendRange, glideTime, glideSlope, alwaysGlide, octaveScale
+#endif
+    };
+}
+
+VoiceEffectMap OscirenderAudioProcessor::cloneVoiceEffectInstances() {
+    return cloneVoiceEffects(toggleableEffects, effectsLock, getEffectiveSampleRate());
+}
+
+void OscirenderAudioProcessor::processVoiceEffects(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& envelope,
+    juce::AudioBuffer<float>& frequency, juce::AudioBuffer<float>& frameSync,
+    const VoiceEffectMap& effects, const std::shared_ptr<osci::SimpleEffect>& preview) {
+    applyToggleableEffectsToBuffer(buffer, &inputBuffer, &envelope, &frequency, &frameSync, &effects, preview);
 }

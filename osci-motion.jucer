@@ -1,0 +1,613 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="OsciMotion01" name="osci-motion" projectType="audioplug"
+              useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
+              pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscimotion"
+              cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
+              version="0.1.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
+              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;&#10;OSCI_MOTION=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1"
+              pluginManufacturerCode="Jhba" pluginCode="Osmo" pluginAUMainType="'aufx'"
+              bundleIdentifier="sh.ball.oscimotion" pluginFormats="buildStandalone"
+              pluginCharacteristicsValue="pluginWantsMidiIn" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
+  <MAINGROUP id="j5Ge2T" name="osci-motion">
+    <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
+      <GROUP id="{42A9EAA7-6D00-065D-0F8B-755E9B552173}" name="audio">
+        <FILE id="bv80Wk" name="sosci.flac" compile="0" resource="1" file="Resources/audio/sosci.flac"/>
+        <FILE id="MotPrepState" name="PreparedState.h" compile="0" resource="0"
+              file="Source/audio/PreparedState.h"/>
+      </GROUP>
+      <GROUP id="{1C0FC3AA-01F6-8768-381C-200ED18AB5F2}" name="fonts">
+        <FILE id="R0Gs1t" name="FiraSans-Bold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Bold.ttf"/>
+        <FILE id="IueZb0" name="FiraSans-Italic.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Italic.ttf"/>
+        <FILE id="arLp4R" name="FiraSans-Regular.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-Regular.ttf"/>
+        <FILE id="SBWt8K" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
+              file="Resources/fonts/FiraSans-SemiBold.ttf"/>
+      </GROUP>
+      <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
+        <FILE id="vNhqT4" name="sosci_logo.png" compile="0" resource="1" file="Resources/images/sosci_logo.png"/>
+        <FILE id="CeSRLV" name="sosci_mac_saturated.png" compile="0" resource="1"
+              file="Resources/images/sosci_mac_saturated.png"/>
+        <FILE id="KigaoN" name="sosci_win_saturated.png" compile="0" resource="1"
+              file="Resources/images/sosci_win_saturated.png"/>
+      </GROUP>
+      <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
+        <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
+        <FILE id="ZgcesA" name="no_reflection.jpg" compile="0" resource="1"
+              file="Resources/oscilloscope/no_reflection.jpg"/>
+        <FILE id="dNtZYs" name="noise.jpg" compile="0" resource="1" file="Resources/oscilloscope/noise.jpg"/>
+        <FILE id="LAmlcm" name="real.png" compile="0" resource="1" file="Resources/oscilloscope/real.png"/>
+        <FILE id="FKUOID" name="real_reflection.png" compile="0" resource="1"
+              file="Resources/oscilloscope/real_reflection.png"/>
+        <FILE id="P9kYdq" name="vector_display.png" compile="0" resource="1"
+              file="Resources/oscilloscope/vector_display.png"/>
+        <FILE id="IiqBke" name="vector_display_reflection.png" compile="0"
+              resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
+      </GROUP>
+      <GROUP id="{08DE8F94-4A00-7C71-4AF3-4C34C821A5DF}" name="sosci">
+        <FILE id="jtOYDo" name="clean.sosci" compile="0" resource="1" file="Resources/sosci/clean.sosci"/>
+        <FILE id="AHn0sU" name="default.sosci" compile="0" resource="1" file="Resources/sosci/default.sosci"/>
+        <FILE id="nisXT4" name="rainbow.sosci" compile="0" resource="1" file="Resources/sosci/rainbow.sosci"/>
+        <FILE id="OxpU7u" name="real_oscilloscope.sosci" compile="0" resource="1"
+              file="Resources/sosci/real_oscilloscope.sosci"/>
+        <FILE id="LDoLqS" name="vector_display.sosci" compile="0" resource="1"
+              file="Resources/sosci/vector_display.sosci"/>
+      </GROUP>
+      <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
+        <FILE id="YzPzNV" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
+        <FILE id="CHkskO" name="bulge.svg" compile="0" resource="1" file="Resources/svg/bulge.svg"/>
+        <FILE id="ClkThru" name="click-through.svg" compile="0" resource="1"
+              file="Resources/svg/click-through.svg"/>
+        <FILE id="Close01" name="close.svg" compile="0" resource="1" file="Resources/svg/close.svg"/>
+        <FILE id="rl17ZK" name="cog.svg" compile="0" resource="1" file="Resources/svg/cog.svg"/>
+        <FILE id="XC04mb" name="dash.svg" compile="0" resource="1" file="Resources/svg/dash.svg"/>
+        <FILE id="qIMww8" name="delay.svg" compile="0" resource="1" file="Resources/svg/delay.svg"/>
+        <FILE id="sDajXu" name="delete.svg" compile="0" resource="1" file="Resources/svg/delete.svg"/>
+        <FILE id="IqXIZW" name="demo.svg" compile="0" resource="1" file="Resources/svg/demo.svg"/>
+        <FILE id="kTJy4S" name="distort.svg" compile="0" resource="1" file="Resources/svg/distort.svg"/>
+        <FILE id="copy01" name="copy.svg" compile="0" resource="1" file="Resources/svg/copy.svg"/>
+        <FILE id="eye002" name="eye.svg" compile="0" resource="1" file="Resources/svg/eye.svg"/>
+        <FILE id="eyeOf2" name="eye-off.svg" compile="0" resource="1" file="Resources/svg/eye-off.svg"/>
+        <FILE id="YwkQpy" name="fixed_rotate.svg" compile="0" resource="1"
+              file="Resources/svg/fixed_rotate.svg"/>
+        <FILE id="WIkl6l" name="fullscreen.svg" compile="0" resource="1" file="Resources/svg/fullscreen.svg"/>
+        <FILE id="help02" name="help.svg" compile="0" resource="1" file="Resources/svg/help.svg"/>
+        <FILE id="n1esUp" name="left_arrow.svg" compile="0" resource="1" file="Resources/svg/left_arrow.svg"/>
+        <FILE id="Q2mSgZ" name="link.svg" compile="0" resource="1" file="Resources/svg/link.svg"/>
+        <FILE id="LockS1" name="lock.svg" compile="0" resource="1" file="Resources/svg/lock.svg"/>
+        <FILE id="MouseS" name="mouse.svg" compile="0" resource="1" file="Resources/svg/mouse.svg"/>
+        <FILE id="e19TQV" name="lua.svg" compile="0" resource="1" file="Resources/svg/lua.svg"/>
+        <FILE id="PxYKbt" name="microphone.svg" compile="0" resource="1" file="Resources/svg/microphone.svg"/>
+        <FILE id="uEmfHD" name="multiplex.svg" compile="0" resource="1" file="Resources/svg/multiplex.svg"/>
+        <FILE id="WoY9r2" name="mute.svg" compile="0" resource="1" file="Resources/svg/mute.svg"/>
+        <FILE id="hJHxFY" name="open_in_new.svg" compile="0" resource="1" file="Resources/svg/open_in_new.svg"/>
+        <FILE id="pSc1mq" name="osci.svg" compile="0" resource="1" file="Resources/svg/osci.svg"/>
+        <FILE id="f2D5tv" name="pause.svg" compile="0" resource="1" file="Resources/svg/pause.svg"/>
+        <FILE id="D2AI1b" name="pencil.svg" compile="0" resource="1" file="Resources/svg/pencil.svg"/>
+        <FILE id="PushPS" name="push-pin.svg" compile="0" resource="1" file="Resources/svg/push-pin.svg"/>
+        <FILE id="Tf7MT4" name="play.svg" compile="0" resource="1" file="Resources/svg/play.svg"/>
+        <FILE id="PFc2q2" name="random.svg" compile="0" resource="1" file="Resources/svg/random.svg"/>
+        <FILE id="CE6di2" name="range.svg" compile="0" resource="1" file="Resources/svg/range.svg"/>
+        <FILE id="n79IAy" name="record.svg" compile="0" resource="1" file="Resources/svg/record.svg"/>
+        <FILE id="sRed01" name="redo.svg" compile="0" resource="1" file="Resources/svg/redo.svg"/>
+        <FILE id="WDxwSi" name="repeat.svg" compile="0" resource="1" file="Resources/svg/repeat.svg"/>
+        <FILE id="OaqZb1" name="right_arrow.svg" compile="0" resource="1" file="Resources/svg/right_arrow.svg"/>
+        <FILE id="gmY7I3" name="ripple.svg" compile="0" resource="1" file="Resources/svg/ripple.svg"/>
+        <FILE id="hmbfOe" name="rotate.svg" compile="0" resource="1" file="Resources/svg/rotate.svg"/>
+        <FILE id="JlQNYG" name="scale.svg" compile="0" resource="1" file="Resources/svg/scale.svg"/>
+        <FILE id="cPSI5m" name="smoothing.svg" compile="0" resource="1" file="Resources/svg/smoothing.svg"/>
+        <FILE id="z3A7FT" name="spout.svg" compile="0" resource="1" file="Resources/svg/spout.svg"/>
+        <FILE id="wD6mre" name="stop.svg" compile="0" resource="1" file="Resources/svg/stop.svg"/>
+        <FILE id="xs9WHW" name="swirl.svg" compile="0" resource="1" file="Resources/svg/swirl.svg"/>
+        <FILE id="rXjNlx" name="threshold.svg" compile="0" resource="1" file="Resources/svg/threshold.svg"/>
+        <FILE id="rFYmV8" name="timer.svg" compile="0" resource="1" file="Resources/svg/timer.svg"/>
+        <FILE id="xcg1tN" name="trace.svg" compile="0" resource="1" file="Resources/svg/trace.svg"/>
+        <FILE id="JOyYQQ" name="translate.svg" compile="0" resource="1" file="Resources/svg/translate.svg"/>
+        <FILE id="sUnd01" name="undo.svg" compile="0" resource="1" file="Resources/svg/undo.svg"/>
+        <FILE id="km6nQQ" name="vector-cancelling.svg" compile="0" resource="1"
+              file="Resources/svg/vector-cancelling.svg"/>
+        <FILE id="qC6QiP" name="volume.svg" compile="0" resource="1" file="Resources/svg/volume.svg"/>
+        <FILE id="Zc5gBX" name="wobble.svg" compile="0" resource="1" file="Resources/svg/wobble.svg"/>
+        <FILE id="WndFrm1" name="window-framed.svg" compile="0" resource="1"
+              file="Resources/svg/window-framed.svg"/>
+        <FILE id="WndFrml" name="window-frameless.svg" compile="0" resource="1"
+              file="Resources/svg/window-frameless.svg"/>
+      </GROUP>
+    </GROUP>
+    <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
+      <GROUP id="{B1C2D3E4-5F67-8901-2345-678901234567}" name="gifdec">
+        <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="modules/gifdec/gifdec.c"/>
+        <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="modules/gifdec/gifdec.h"/>
+      </GROUP>
+      <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456789}" name="thorvg">
+        <FILE id="tvgHdrA" name="thorvg.h" compile="0" resource="0" file="modules/thorvg/inc/thorvg.h"/>
+        <FILE id="tvgCfg1" name="config.h" compile="0" resource="0" file="Source/thorvg-config/config.h"/>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456790}" name="common">
+          <FILE id="tvgCm01" name="tvgColor.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/common/tvgColor.cpp"/>
+          <FILE id="tvgCm02" name="tvgCompressor.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/common/tvgCompressor.cpp"/>
+          <FILE id="tvgCm03" name="tvgMath.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/common/tvgMath.cpp"/>
+          <FILE id="tvgCm04" name="tvgStr.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/common/tvgStr.cpp"/>
+        </GROUP>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456791}" name="renderer">
+          <FILE id="tvgRn01" name="tvgAccessor.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgAccessor.cpp"/>
+          <FILE id="tvgRn02" name="tvgAnimation.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/renderer/tvgAnimation.cpp"/>
+          <FILE id="tvgRn03" name="tvgCanvas.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgCanvas.cpp"/>
+          <FILE id="tvgRn04" name="tvgFill.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgFill.cpp"/>
+          <FILE id="tvgRn05" name="tvgInitializer.cpp" compile="1" skipPCH="1"
+                resource="0" file="Source/thorvg-config/tvgInitializer.cpp"/>
+          <FILE id="tvgRn07" name="tvgLoaderMgr.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/renderer/tvgLoaderMgr.cpp"/>
+          <FILE id="tvgRn08" name="tvgPaint.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgPaint.cpp"/>
+          <FILE id="tvgRn09" name="tvgPicture.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgPicture.cpp"/>
+          <FILE id="tvgRn10" name="tvgRender.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgRender.cpp"/>
+          <FILE id="tvgRn11" name="tvgSaver.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgSaver.cpp"/>
+          <FILE id="tvgRn12" name="tvgScene.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgScene.cpp"/>
+          <FILE id="tvgRn13" name="tvgShape.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgShape.cpp"/>
+          <FILE id="tvgRn14" name="tvgTaskScheduler.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/renderer/tvgTaskScheduler.cpp"/>
+          <FILE id="tvgRn15" name="tvgText.cpp" compile="1" skipPCH="1" resource="0"
+                file="modules/thorvg/src/renderer/tvgText.cpp"/>
+        </GROUP>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456792}" name="lottie-loader">
+          <FILE id="tvgLt01" name="tvgLottieAnimation.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieAnimation.cpp"/>
+          <FILE id="tvgLt02" name="tvgLottieBuilder.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieBuilder.cpp"/>
+          <FILE id="tvgLt03" name="tvgLottieExpressions.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieExpressions.cpp"/>
+          <FILE id="tvgLt04" name="tvgLottieInterpolator.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieInterpolator.cpp"/>
+          <FILE id="tvgLt05" name="tvgLottieLoader.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieLoader.cpp"/>
+          <FILE id="tvgLt06" name="tvgLottieModel.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieModel.cpp"/>
+          <FILE id="tvgLt07" name="tvgLottieModifier.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieModifier.cpp"/>
+          <FILE id="tvgLt08" name="tvgLottieParser.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieParser.cpp"/>
+          <FILE id="tvgLt09" name="tvgLottieParserHandler.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/lottie/tvgLottieParserHandler.cpp"/>
+        </GROUP>
+        <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456793}" name="raw-loader">
+          <FILE id="tvgRw01" name="tvgRawLoader.cpp" compile="1" skipPCH="1"
+                resource="0" file="modules/thorvg/src/loaders/raw/tvgRawLoader.cpp"/>
+        </GROUP>
+      </GROUP>
+      <GROUP id="{C1B2A3D4-5E6F-7890-1234-5678ABCD0001}" name="Clipper2">
+        <FILE id="Clp2001" name="clipper.engine.cpp" compile="1" skipPCH="1"
+              resource="0" file="modules/Clipper2/CPP/Clipper2Lib/src/clipper.engine.cpp"/>
+        <FILE id="Clp2002" name="clipper.offset.cpp" compile="1" skipPCH="1"
+              resource="0" file="modules/Clipper2/CPP/Clipper2Lib/src/clipper.offset.cpp"/>
+        <FILE id="Clp2003" name="clipper.rectclip.cpp" compile="1" skipPCH="1"
+              resource="0" file="modules/Clipper2/CPP/Clipper2Lib/src/clipper.rectclip.cpp"/>
+      </GROUP>
+      <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
+        <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
+        <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
+        <FILE id="FmtReg1" name="FileFormatRegistry.h" compile="0" resource="0"
+              file="Source/parser/FileFormatRegistry.h"/>
+        <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla"/>
+        <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
+          <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
+          <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
+        </GROUP>
+        <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg"/>
+        <GROUP id="{9A3C1F4E-4B12-4E6B-8A7D-2F6E11C5D901}" name="lottie">
+          <FILE id="DotLot1" name="DotLottieArchive.cpp" compile="1" resource="0"
+                file="Source/parser/lottie/DotLottieArchive.cpp"/>
+          <FILE id="DotLot2" name="DotLottieArchive.h" compile="0" resource="0"
+                file="Source/parser/lottie/DotLottieArchive.h"/>
+          <FILE id="LotPr01" name="LottieParser.cpp" compile="1" resource="0"
+                file="Source/parser/lottie/LottieParser.cpp"/>
+          <FILE id="LotPr02" name="LottieParser.h" compile="0" resource="0" file="Source/parser/lottie/LottieParser.h"/>
+        </GROUP>
+        <GROUP id="{E81B1D7B-B0F7-1967-B271-71B3F838720F}" name="txt"/>
+        <FILE id="MotImpSvc" name="ImportServices.h" compile="0" resource="0"
+              file="Source/parser/ImportServices.h"/>
+        <FILE id="MotPointSrc" name="PointSource.h" compile="0" resource="0"
+              file="Source/audio/synth/PointSource.h"/>
+      </GROUP>
+      <GROUP id="{34BCEBE9-062C-27E1-5661-B33652D8F4F5}" name="video">
+        <FILE id="pmHHqY" name="FFmpegEncoderManager.cpp" compile="1" resource="0"
+              file="Source/video/FFmpegEncoderManager.cpp"/>
+        <FILE id="oKPzgR" name="FFmpegEncoderManager.h" compile="0" resource="0"
+              file="Source/video/FFmpegEncoderManager.h"/>
+        <FILE id="MotFFInfo" name="FFmpegMediaInfo.h" compile="0" resource="0"
+              file="Source/video/FFmpegMediaInfo.h"/>
+      </GROUP>
+      <GROUP id="{B082C1E5-36BA-4625-9BAF-E8A0C83EB660}" name="recording">
+        <FILE id="SLvRcC" name="LiveRecordingSession.cpp" compile="1" resource="0"
+              file="Source/recording/LiveRecordingSession.cpp"/>
+        <FILE id="SLvRcH" name="LiveRecordingSession.h" compile="0" resource="0"
+              file="Source/recording/LiveRecordingSession.h"/>
+        <FILE id="SRcExC" name="RecordingExporter.cpp" compile="1" resource="0"
+              file="Source/recording/RecordingExporter.cpp"/>
+        <FILE id="SRcExH" name="RecordingExporter.h" compile="0" resource="0"
+              file="Source/recording/RecordingExporter.h"/>
+      </GROUP>
+      <FILE id="qJ122J" name="CommonPluginEditor.cpp" compile="1" resource="0"
+            file="Source/CommonPluginEditor.cpp"/>
+      <FILE id="ANZRtQ" name="CommonPluginEditor.h" compile="0" resource="0"
+            file="Source/CommonPluginEditor.h"/>
+      <FILE id="bR8U39" name="CommonPluginProcessor.cpp" compile="1" resource="0"
+            file="Source/CommonPluginProcessor.cpp"/>
+      <FILE id="r2FzhS" name="CommonPluginProcessor.h" compile="0" resource="0"
+            file="Source/CommonPluginProcessor.h"/>
+      <FILE id="JwAu02" name="JucewrightAutomation.h" compile="0" resource="0"
+            file="Source/JucewrightAutomation.h"/>
+      <GROUP id="{85A33213-D880-BD92-70D8-1901DA6D23F0}" name="audio">
+        <FILE id="UVcqLN" name="AudioRecorder.h" compile="0" resource="0" file="Source/audio/AudioRecorder.h"/>
+        <FILE id="OutCl2" name="OutputClip.h" compile="0" resource="0" file="Source/audio/OutputClip.h"/>
+        <FILE id="ATGrd3" name="AudioThreadGuard.h" compile="0" resource="0"
+              file="Source/audio/AudioThreadGuard.h"/>
+        <FILE id="ATGrd4" name="AudioThreadGuard.cpp" compile="1" resource="0"
+              file="Source/audio/AudioThreadGuard.cpp"/>
+        <GROUP id="{AUD_EFFECTS}" name="effects"/>
+        <GROUP id="{AUD_PLATFORM}" name="platform"/>
+        <GROUP id="{AUD_WAV_S}" name="wav"/>
+      </GROUP>
+      <GROUP id="{CD81913A-7F0E-5898-DA77-5EBEB369DEB1}" name="components">
+        <FILE id="ProdUpdS" name="ProductUpdateConfig.h" compile="0" resource="0"
+              file="Source/components/ProductUpdateConfig.h"/>
+        <FILE id="URb7Ok" name="AboutComponent.cpp" compile="1" resource="0"
+              file="Source/components/AboutComponent.cpp"/>
+        <FILE id="FtOv3F" name="AboutComponent.h" compile="0" resource="0"
+              file="Source/components/AboutComponent.h"/>
+        <FILE id="OffOvS" name="OfflineRenderOverlay.h" compile="0" resource="0"
+              file="Source/components/OfflineRenderOverlay.h"/>
+        <FILE id="RecOvS" name="RecordingSettingsOverlay.h" compile="0" resource="0"
+              file="Source/components/RecordingSettingsOverlay.h"/>
+        <GROUP id="{CMP_EFFECTS}" name="effects">
+          <FILE id="xLAEHK" name="EffectComponent.cpp" compile="1" resource="0"
+                file="Source/components/effects/EffectComponent.cpp"/>
+          <FILE id="u4UCwb" name="EffectComponent.h" compile="0" resource="0"
+                file="Source/components/effects/EffectComponent.h"/>
+        </GROUP>
+        <GROUP id="{CMP_TIMELINE}" name="timeline">
+          <FILE id="eCxWbl" name="TimelineComponent.cpp" compile="1" resource="0"
+                file="Source/components/timeline/TimelineComponent.cpp"/>
+          <FILE id="fkK0KF" name="TimelineComponent.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineComponent.h"/>
+          <FILE id="sTlCtr" name="TimelineController.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineController.h"/>
+          <FILE id="sAuTlC" name="AudioTimelineController.cpp" compile="1" resource="0"
+                file="Source/components/timeline/AudioTimelineController.cpp"/>
+          <FILE id="sAuTlH" name="AudioTimelineController.h" compile="0" resource="0"
+                file="Source/components/timeline/AudioTimelineController.h"/>
+          <FILE id="mtvQQS" name="TimelineLookAndFeel.h" compile="0" resource="0"
+                file="Source/components/timeline/TimelineLookAndFeel.h"/>
+        </GROUP>
+        <GROUP id="{CMP_MENU}" name="menu">
+          <FILE id="ka6rAh" name="MainMenuBarModel.cpp" compile="1" resource="0"
+                file="Source/components/menu/MainMenuBarModel.cpp"/>
+          <FILE id="t6oUhv" name="MainMenuBarModel.h" compile="0" resource="0"
+                file="Source/components/menu/MainMenuBarModel.h"/>
+        </GROUP>
+        <FILE id="ModStH" name="ModulationState.h" compile="0" resource="0"
+              file="Source/components/ModulationState.h"/>
+        <FILE id="PrStSc" name="ParameterSettingsComponent.h" compile="0" resource="0"
+              file="Source/components/ParameterSettingsComponent.h"/>
+        <FILE id="KnCnHs" name="KnobContainerComponent.h" compile="0" resource="0"
+              file="Source/components/KnobContainerComponent.h"/>
+        <FILE id="KnCnCs" name="KnobContainerComponent.cpp" compile="1" resource="0"
+              file="Source/components/KnobContainerComponent.cpp"/>
+        <FILE id="ModStC" name="ModulationState.cpp" compile="1" resource="0"
+              file="Source/components/ModulationState.cpp"/>
+      </GROUP>
+      <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
+        <FILE id="Hw3RUp" name="RecordingSettings.cpp" compile="1" resource="0"
+              file="Source/visualiser/RecordingSettings.cpp"/>
+        <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"
+              file="Source/visualiser/RecordingSettings.h"/>
+        <FILE id="oAVr2a" name="OfflineAudioToVideoRenderer.cpp" compile="1"
+              resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
+        <FILE id="oAVr2b" name="OfflineAudioToVideoRenderer.h" compile="0"
+              resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
+        <FILE id="pxVOD9" name="VisualiserComponent.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserComponent.cpp"/>
+        <FILE id="sFrmPr0" name="FramePresenter.h" compile="0" resource="0"
+              file="Source/visualiser/FramePresenter.h"/>
+        <FILE id="sFrmPr1" name="FramePresenter.cpp" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter.cpp"/>
+        <FILE id="sFrmPr2" name="FramePresenter_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/FramePresenter_mac.mm"/>
+        <FILE id="MH6n0v" name="VisualiserComponent.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserComponent.h"/>
+        <FILE id="SViRcC" name="VisualiserRecordingController.cpp" compile="1"
+              resource="0" file="Source/visualiser/VisualiserRecordingController.cpp"/>
+        <FILE id="SViRcH" name="VisualiserRecordingController.h" compile="0"
+              resource="0" file="Source/visualiser/VisualiserRecordingController.h"/>
+        <FILE id="SViTxC" name="VisualiserTextureOutputController.cpp" compile="1"
+              resource="0" file="Source/visualiser/VisualiserTextureOutputController.cpp"/>
+        <FILE id="SViTxH" name="VisualiserTextureOutputController.h" compile="0"
+              resource="0" file="Source/visualiser/VisualiserTextureOutputController.h"/>
+        <FILE id="SosPopC" name="VisualiserPopout.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserPopout.cpp"/>
+        <FILE id="SosPopH" name="VisualiserPopout.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserPopout.h"/>
+        <FILE id="TrWinInt2" name="TransparentWindowInteraction.h" compile="0"
+              resource="0" file="Source/visualiser/TransparentWindowInteraction.h"/>
+        <FILE id="sW1nDo" name="TransparentWindow.h" compile="0" resource="0"
+              file="Source/visualiser/TransparentWindow.h"/>
+        <FILE id="sW1Cpp" name="TransparentWindow.cpp" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow.cpp"/>
+        <FILE id="sW2Mac" name="TransparentWindow_mac.mm" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow_mac.mm"/>
+        <FILE id="sW2Win" name="TransparentWindow_windows.cpp" compile="1"
+              resource="0" file="Source/visualiser/TransparentWindow_windows.cpp"/>
+        <FILE id="sGlLnx" name="OpenGL_linux.cpp" compile="1" resource="0"
+              file="Source/visualiser/OpenGL_linux.cpp"/>
+        <FILE id="sGlLnh" name="OpenGL_linux.h" compile="0" resource="0" file="Source/visualiser/OpenGL_linux.h"/>
+        <FILE id="sW2Lnx" name="TransparentWindow_linux.cpp" compile="1" resource="0"
+              file="Source/visualiser/TransparentWindow_linux.cpp"/>
+        <FILE id="sW2Oth" name="TransparentWindow_fallback.cpp" compile="1"
+              resource="0" file="Source/visualiser/TransparentWindow_fallback.cpp"/>
+        <FILE id="VTA002" name="VisualiserTextureAssets.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserTextureAssets.h"/>
+        <FILE id="wdZb9U" name="VisualiserSettings.cpp" compile="1" resource="0"
+              file="Source/visualiser/VisualiserSettings.cpp"/>
+        <FILE id="v3pCdC" name="VisualiserSettings.h" compile="0" resource="0"
+              file="Source/visualiser/VisualiserSettings.h"/>
+      </GROUP>
+      <FILE id="d2zFqF" name="LookAndFeel.cpp" compile="1" resource="0" file="Source/LookAndFeel.cpp"/>
+      <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
+    </GROUP>
+    <GROUP id="MotionSrc" name="Motion">
+      <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
+      <FILE id="MotionMotionProcessorh" name="MotionProcessor.h" compile="0"
+            resource="0" file="Source/motion/MotionProcessor.h"/>
+      <FILE id="MotionMotionProcessorcpp" name="MotionProcessor.cpp" compile="1"
+            resource="0" file="Source/motion/MotionProcessor.cpp"/>
+      <FILE id="MotionMotionEditorh" name="MotionEditor.h" compile="0" resource="0"
+            file="Source/motion/MotionEditor.h"/>
+      <FILE id="MotionMotionEditorcpp" name="MotionEditor.cpp" compile="1"
+            resource="0" file="Source/motion/MotionEditor.cpp"/>
+      <FILE id="MotionIcon" name="osci_mac.png" compile="0" resource="1"
+            file="Resources/images/osci_mac.png"/>
+      <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
+            file="Source/motion/model/Animation.h"/>
+      <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
+      <FILE id="MotTimeline" name="Timeline.h" compile="0" resource="0" file="Source/motion/model/Timeline.h"/>
+      <FILE id="MotCompositionRenderer" name="CompositionRenderer.h" compile="0"
+            resource="0" file="Source/motion/render/CompositionRenderer.h"/>
+      <FILE id="MotAssetLibrary" name="AssetLibrary.h" compile="0" resource="0"
+            file="Source/motion/ui/AssetLibrary.h"/>
+      <FILE id="MotCameraPanel" name="CameraPanel.h" compile="0" resource="0"
+            file="Source/motion/ui/CameraPanel.h"/>
+      <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"
+            file="Source/motion/model/PropertyTarget.h"/>
+      <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
+            file="Source/motion/model/PreparedSource.h"/>
+      <FILE id="MotSampleClock" name="SampleClock.h" compile="0" resource="0"
+            file="Source/motion/render/SampleClock.h"/>
+      <FILE id="MotSignalExport" name="SignalExporter.h" compile="0" resource="0"
+            file="Source/motion/export/SignalExporter.h"/>
+      <FILE id="MotCurveEditor" name="CurveEditor.h" compile="0" resource="0"
+            file="Source/motion/ui/CurveEditor.h"/>
+      <FILE id="MotCameraModel" name="Camera.h" compile="0" resource="0"
+            file="Source/motion/model/Camera.h"/>
+      <FILE id="MotCompositionView" name="CompositionView.h" compile="0"
+            resource="0" file="Source/motion/ui/CompositionView.h"/>
+      <FILE id="MotTimelineView" name="TimelineView.h" compile="0" resource="0"
+            file="Source/motion/ui/TimelineView.h"/>
+    </GROUP>
+  </MAINGROUP>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
+               JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"
+               JUCE_USE_XRENDER="1"/>
+  <EXPORTFORMATS>
+    <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="KigaoN"
+                bigIcon="KigaoN" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender"
+                extraLinkerFlags="-Wl,--wrap=eglChooseConfig,--wrap=eglInitialize,--wrap=eglTerminate">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
+        <MODULEPATH id="jucewright" path="modules/jucewright"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
+      </MODULEPATHS>
+    </LINUX_MAKE>
+    <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="KigaoN"
+            bigIcon="KigaoN" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
+            externalLibraries="luajit51.lib" extraLinkerFlags="/IGNORE:4006">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="osci-motion" alwaysGenerateDebugSymbols="1"
+                       debugInformationFormat="ProgramDatabase" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
+                       libraryPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src"
+                       prebuildCommand="call ..\..\..\luajit_win.bat"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
+        <MODULEPATH id="jucewright" path="modules/jucewright"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
+      </MODULEPATHS>
+    </VS2022>
+    <XCODE_MAC targetFolder="Builds/osci-motion/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak -framework IOSurface"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="CeSRLV"
+               bigIcon="CeSRLV" applicationCategory="public.app-category.music"
+               microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
+               iosDevelopmentTeamID="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;"
+               externalLibraries="luajit">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+                       usePrecompiledHeaderFile="1" precompiledHeaderFile="Source/pch.h"
+                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+        <CONFIGURATION name="Release" targetName="osci-motion" customXcodeFlags="CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO,OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+        <CONFIGURATION name="Release (Development)" targetName="osci-motion" customXcodeFlags="OTHER_CODE_SIGN_FLAGS = --timestamp --force --deep,CLANG_X86_VECTOR_INSTRUCTIONS=avx"
+                       codeSigningIdentity="Developer ID Application: James Ball (D86A3M3H2L)"
+                       headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
+                       libraryPath="../../../modules/osci_scripting/third_party/LuaJIT/src"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_cryptography" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_opengl" path="../../../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../JUCE/modules"/>
+        <MODULEPATH id="juce_animation" path="../../../JUCE/modules"/>
+        <MODULEPATH id="chowdsp_dsp_utils" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_filters" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_dsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_simd" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_buffers" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_math" path="modules/osci_gui/third_party/chowdsp_utils/modules/dsp"/>
+        <MODULEPATH id="chowdsp_core" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="chowdsp_data_structures" path="modules/osci_gui/third_party/chowdsp_utils/modules/common"/>
+        <MODULEPATH id="osci_licensing" path="modules"/>
+        <MODULEPATH id="osci_gui" path="modules"/>
+        <MODULEPATH id="osci_audio_devices" path="modules"/>
+        <MODULEPATH id="osci_file_import" path="modules"/>
+        <MODULEPATH id="osci_render_core" path="modules"/>
+        <MODULEPATH id="osci_texture_interop" path="modules"/>
+        <MODULEPATH id="osci_standalone" path="modules"/>
+        <MODULEPATH id="jucewright" path="modules/jucewright"/>
+        <MODULEPATH id="melatonin_blur" path="modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../JUCE/modules"/>
+        <MODULEPATH id="osci_scripting" path="modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+  <MODULES>
+    <MODULE id="chowdsp_buffers" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_data_structures" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="chowdsp_dsp_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_filters" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_math" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="chowdsp_simd" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="jucewright" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_animation" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="melatonin_blur" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_file_import" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_gui" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_licensing" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_render_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_scripting" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_standalone" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="osci_texture_interop" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+  </MODULES>
+</JUCERPROJECT>

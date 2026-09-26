@@ -2,14 +2,14 @@
 #include <JuceHeader.h>
 #include "VoiceManager.h"
 #include "ShapeSound.h"
+#include "VoiceContext.h"
 #include "../modulation/DahdsrEnvelope.h"
 #include "../modulation/EnvState.h"
 #include <osci_scripting/osci_scripting.h>
 
-class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
 public:
-	ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio, int voiceIndex);
+	ShapeVoice(VoiceContext& context, juce::AudioSampleBuffer& externalAudio, int voiceIndex);
 
 	void prepareToPlay(double sampleRate, int samplesPerBlock);
 	bool canPlaySound(juce::SynthesiserSound* sound) override;
@@ -51,7 +51,9 @@ public:
 private:
 	const double MIN_LENGTH_INCREMENT = 0.000001;
 
-	OscirenderAudioProcessor& audioProcessor;
+	VoiceContext& context;
+    VoiceParameters parameters;
+    VoiceTelemetry& telemetry;
 	const int voiceIndex = 0;
 	std::vector<std::unique_ptr<osci::Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
@@ -62,7 +64,6 @@ private:
 	double frameDrawn = 0.0;
 	double lengthIncrement = 0.0;
 
-    double scenePhase = 0.0;
     bool currentlyPlaying = false;
 	int currentMidiNote = -1;
 

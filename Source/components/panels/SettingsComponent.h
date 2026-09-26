@@ -22,8 +22,6 @@
 #include "../modulation/SidechainComponent.h"
 
 class OscirenderAudioProcessorEditor;
-class SceneEditor;
-namespace scene { struct Object; }
 class SettingsComponent : public juce::Component, public juce::AudioProcessorParameter::Listener, public juce::ChangeListener, private juce::Timer {
 public:
     SettingsComponent(OscirenderAudioProcessor&, OscirenderAudioProcessorEditor&);
@@ -39,12 +37,6 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     // Show or hide the example files grid panel on the right-hand side
     void showExamples(bool shouldShow);
-    void showScene();
-    void showEditor();
-    void showEffects();
-    bool isEditorVisible() const { return editorVisible; }
-    std::shared_ptr<scene::Object> selectedSceneObject() const;
-    bool importSceneSource(const juce::String&, const juce::MemoryBlock&);
     void changeListenerCallback(juce::ChangeBroadcaster* source) override;
     void resetLayoutToDefault();
 
@@ -71,12 +63,6 @@ private:
     juce::CustomMidiKeyboardComponent keyboard;
 
     bool examplesVisible = false;
-    bool sceneVisible = false;
-    bool editorVisible = false;
-    bool sceneImportContext = false;
-    juce::Label editorEmpty{{}, "Select a text, SVG or Lua source to edit."};
-    std::unique_ptr<SceneEditor> sceneEditor;
-    osci::TabBar panelTabs;
 
     // Horizontal layout for top section: visColumn | resizer | effectsColumn
     juce::StretchableLayoutManager mainLayout;

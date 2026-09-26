@@ -6,7 +6,7 @@
 #include "../LookAndFeel.h"
 #include <osci_render_core/effect/osci_EffectParameter.h>
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 #include "../audio/modulation/ModulationTypes.h"
 class OscirenderAudioProcessor;
 class ModulationUpdateBroadcaster;
@@ -127,7 +127,7 @@ public:
 
     // --- DragAndDropTarget for modulation assignment ---
     bool isInterestedInDragSource(const SourceDetails& details) override {
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
         return ModDrag::isModDrag(details.description.toString());
 #else
         return false;
@@ -148,7 +148,7 @@ public:
         modDropHighlight = false;
         ModulationState::anyDragActive.store(false, std::memory_order_relaxed);
         repaint();
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
         if (!boundParam) return;
         juce::String desc = details.description.toString();
         juce::String paramId = boundParam->paramID;
@@ -165,7 +165,7 @@ public:
 #endif
     }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     // Modulation binding (same as EffectComponent::ModBinding)
     struct ModBinding {
         juce::String dragPrefix;
@@ -250,7 +250,7 @@ public:
     }
 
     void paintOverChildren(juce::Graphics& g) override {
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
         if (!boundParam) return;
         ModulationState::paintModHighlight(g, *this, modDropHighlight, boundParam->paramID);
 #endif
@@ -271,7 +271,7 @@ private:
     bool labelHovered = false;
     osci::MidiManager* midiManager = nullptr;
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     ModulationUpdateBroadcaster* modBroadcaster = nullptr;
 #endif
 

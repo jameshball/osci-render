@@ -46,6 +46,7 @@ class BrowserSession:
 
         app_path_env = os.environ.get("APP_PATH") or os.environ.get("APP_BUNDLE")
         self.app_path = Path(args.app_path or app_path_env or default_app_path(self.root_dir)).resolve()
+        self.app_name = self.app_path.stem
         self.app_executable = Path(args.app_executable or os.environ.get("APP_EXECUTABLE", default_app_executable(self.app_path))).resolve()
         self.audio_output = (args.audio_output or os.environ.get("AUTOMATION_AUDIO_OUTPUT", "")).strip() or None
         self.jucewright = Path(args.jucewright or os.environ.get("JUCEWRIGHT", "")).resolve() if (args.jucewright or os.environ.get("JUCEWRIGHT")) else None
@@ -242,27 +243,30 @@ class BrowserSession:
         if not projucer.exists():
             self.die(f"Projucer not found: {projucer}. Set PROJUCER to override.")
 
-        self.log("Resaving osci-render.jucer")
-        subprocess.check_call([str(projucer), "--resave", "osci-render.jucer"], cwd=self.root_dir)
-        self.log("Building osci-render Debug standalone")
+        product = self.app_name
+        if product not in {"osci-render", "osci-motion", "sosci"}:
+            self.die(f"Automatic build is not configured for {product}; supply an already built app.")
+        self.log(f"Resaving {product}.jucer")
+        subprocess.check_call([str(projucer), "--resave", f"{product}.jucer"], cwd=self.root_dir)
+        self.log(f"Building {product} Debug standalone")
 
         if is_macos():
             subprocess.check_call([
                 "xcodebuild",
                 "-project",
-                "osci-render.xcodeproj",
+                f"{product}.xcodeproj",
                 "-scheme",
-                "osci-render - Standalone Plugin",
+                f"{product} - Standalone Plugin",
                 "-configuration",
                 "Debug",
                 "-arch",
-                "arm64",
+                platform.machine(),
                 "build",
-            ], cwd=self.root_dir / "Builds" / "osci-render" / "MacOSX")
+            ], cwd=self.root_dir / "Builds" / product / "MacOSX")
         elif is_windows():
             subprocess.check_call([
                 self.find_msbuild(),
-                str(self.root_dir / "Builds" / "osci-render" / "VisualStudio2022" / "osci-render.sln"),
+                str(self.root_dir / "Builds" / product / "VisualStudio2022" / f"{product}.sln"),
                 "/p:Configuration=Debug",
                 "/p:Platform=x64",
                 "/m",
@@ -271,7 +275,7 @@ class BrowserSession:
             subprocess.check_call([
                 "make",
                 "-C",
-                str(self.root_dir / "Builds" / "osci-render" / "LinuxMakefile"),
+                str(self.root_dir / "Builds" / product / "LinuxMakefile"),
                 "CONFIG=Debug",
                 "Standalone",
                 f"-j{os.cpu_count() or 4}",
@@ -285,7 +289,7 @@ class BrowserSession:
             "--home",
             launch_home,
             "--app-name",
-            "osci-render",
+            self.app_name,
             "--source-home",
             self.source_home,
             "--copy-setting",
@@ -524,13 +528,13 @@ end clickDenyButton
         if not profile.get("disabledAudioInput"):
             self.die("Internal error: refusing to launch before disabling profile audio input.")
 
-        self.log(f"Launching osci-render ({label})")
+        self.log(f"Launching {self.app_name} ({label})")
         command = self.jw(
             "launch",
             "--app",
             self.app_path,
             "--app-name",
-            "osci-render",
+            self.app_name,
             "--session",
             self.session,
             "--artifact-dir",

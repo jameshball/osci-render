@@ -7,7 +7,7 @@
 #include <osci_gui/osci_gui.h>
 #include <osci_gui/visualiser/osci_VisualiserParameters.h>
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 class OscirenderAudioProcessor;
 #endif
 class RecordingParameters;
@@ -35,7 +35,7 @@ public:
         }
     }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     void wireModulation(OscirenderAudioProcessor& processor) {
         for (auto& effect : effects)
             effect->wireModulation(processor);
@@ -71,7 +71,7 @@ public:
     VisualiserSettings(VisualiserParameters&, int numChannels, RecordingParameters& recordingParameters);
     ~VisualiserSettings();
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     void wireModulation(OscirenderAudioProcessor& processor);
 #endif
     void setTransparencyControlEnabled(bool enabled);

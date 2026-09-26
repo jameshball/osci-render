@@ -41,14 +41,6 @@ OpenFileComponent::OpenFileComponent(OscirenderAudioProcessor& processor)
     addCat(lottieCat);
 #endif
 
-    int inputKind = 0;
-    for (auto* button : { &blenderInput, &textureInput, &audioInput }) {
-        addChildComponent(*button);
-        button->onClick = [this, kind = inputKind++] {
-            if (onImportLive) { onImportLive(kind); }
-            if (onClosed) { onClosed(); }
-        };
-    }
     populate();
 }
 
@@ -74,13 +66,6 @@ void OpenFileComponent::resized()
     startImportButton.setBounds(inner.removeFromTop(60).withSizeKeepingCentre(buttonWidth, buttonHeight));
     chooseExampleLabel.setBounds(inner.removeFromTop(30));
 
-    if (blenderInput.isVisible()) {
-        auto inputs = inner.removeFromTop(40).reduced(10, 4);
-        const int width = inputs.getWidth() / 3;
-        for (auto* button : { &blenderInput, &textureInput, &audioInput }) {
-            button->setBounds(inputs.removeFromLeft(width).reduced(4, 0));
-        }
-    }
     viewport.setBounds(inner);
     viewport.setFadeVisible(true);
 
@@ -88,15 +73,15 @@ void OpenFileComponent::resized()
     int y = 0;
 
     auto layCat = [&](CategoryViews& cat) {
-        const int headerHeight = osci::PanelHeader::height;
+        const int headerHeight = 20;
         const int padding = 10;
         const int horizontalInset = 10;
         const int gridWidth = juce::jmax(1, contentArea.getWidth() - 2 * horizontalInset);
         const int gridHeight = cat.grid.calculateRequiredHeight(gridWidth);
 
-        auto categoryBounds = juce::Rectangle<int>(contentArea.getX(), contentArea.getY() + y, contentArea.getWidth(), gridHeight + headerHeight + padding);
-        y += categoryBounds.getHeight() + osci::PanelHeader::panelGap;
-        categoryBounds.reduce(horizontalInset, 0);
+        auto categoryBounds = juce::Rectangle<int>(contentArea.getX(), contentArea.getY() + y, contentArea.getWidth(), gridHeight + headerHeight + 3 * padding);
+        y += categoryBounds.getHeight();
+        categoryBounds.reduce(horizontalInset, padding);
 
         cat.group.setBounds(categoryBounds);
         cat.grid.setBounds(categoryBounds.removeFromBottom(gridHeight));    
@@ -136,12 +121,7 @@ void OpenFileComponent::addExample(CategoryViews& cat, const juce::String& fileN
         iconSize = BinaryData::random_svgSize;
     }
     auto* item = new osci::GridItemComponent(displayName, juce::String::createStringFromData(iconData, iconSize), fileName);
-    item->setName(fileName);
     item->onItemSelected = [this, fileName, data, size](const juce::String&) {
-        if (onImportSource && onImportSource(fileName, juce::MemoryBlock(data, size))) {
-            if (onClosed) { onClosed(); }
-            return;
-        }
         auto& files = audioProcessor.getFileController();
         const int fileIndex = files.addFile(fileName, data, size);
         if (fileName.equalsIgnoreCase("shape_generator.lua"))
@@ -230,14 +210,12 @@ void OpenFileComponent::openFileChooser()
         auto& files = audioProcessor.getFileController();
         auto results = chooserRef.getResults();
         if (results.isEmpty()) return;
-        
+
+        if (onClosed) onClosed();
+
         for (auto& file : results) {
             if (file != juce::File()) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());
-                juce::MemoryBlock data;
-                if (file.loadFileAsData(data) && onImportSource && onImportSource(file.getFileName(), data)) {
-                    continue;
-                }
                 const int fileIndex = files.addFile(file);
                 juce::String fileName = file.getFileName();
                 if (fileName.equalsIgnoreCase("shape_generator.lua"))
@@ -245,6 +223,5 @@ void OpenFileComponent::openFileChooser()
                 if (onFileOpened) onFileOpened(fileName, shouldOpenEditorFor(fileName), fileIndex);
             }
         }
-        if (onClosed) { onClosed(); }
     });
 }

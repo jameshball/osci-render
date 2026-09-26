@@ -1,7 +1,7 @@
 #include "VisualiserSettings.h"
 #include "VisualiserComponent.h"
 #include "RecordingSettings.h"
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 #include "../PluginProcessor.h"
 #endif
 
@@ -134,7 +134,7 @@ VisualiserSettings::~VisualiserSettings() {
     recordingParameters.canvasHeight.removeListener(this);
 }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 void VisualiserSettings::wireModulation(OscirenderAudioProcessor& processor) {
     lineColour.wireModulation(processor);
     lightEffects.wireModulation(processor);

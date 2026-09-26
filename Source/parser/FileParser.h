@@ -1,6 +1,8 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../audio/synth/PointSource.h"
+#include "ImportServices.h"
 #include "img/ImageParser.h"
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
@@ -8,16 +10,15 @@
 #include "lottie/LottieParser.h"
 #endif
 
-class OscirenderAudioProcessor;
-class FileParser : public FrameSource, public std::enable_shared_from_this<FileParser> {
+class FileParser : public PointSource, public std::enable_shared_from_this<FileParser> {
 public:
-	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
+	FileParser(std::shared_ptr<ImportServices> services, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
 	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
 	void prepareLiveImageInput(int width, int height);
 	void updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
 	std::vector<std::unique_ptr<osci::Shape>> nextFrame() override;
-	osci::Point nextSample(LuaState& L, LuaVariables& vars);
+	osci::Point nextSample(LuaState& L, LuaVariables& vars) override;
 
 	bool isSample() override;
 	bool isActive() override;
@@ -42,7 +43,7 @@ public:
 	std::shared_ptr<OsciLottieParser> getLottie();
 #endif
 
-	std::atomic<bool> isAnimatable {false};
+	bool isAnimatable = false;
 
 private:
 	void clearLoadedSource();
@@ -50,10 +51,10 @@ private:
 	void showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
 		juce::String fileType, std::function<void()> callback);
 
-	OscirenderAudioProcessor& audioProcessor;
+	std::shared_ptr<ImportServices> services;
 
-	std::atomic<bool> active {true};
-	std::atomic<bool> sampleSource {false};
+	bool active = true;
+	bool sampleSource = false;
 	std::atomic<double> frameRate{30.0};
 	std::atomic<uint64_t> sourceGeneration{0};
 	juce::SpinLock lock;

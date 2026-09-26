@@ -2,7 +2,7 @@
 #include <osci_gui/osci_gui.h>
 #include "ParameterSettingsComponent.h"
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 #include "../PluginProcessor.h"
 #include "modulation/ModulationHelper.h"
 #include "ModulationState.h"
@@ -11,7 +11,7 @@
 KnobContainerComponent::~KnobContainerComponent() {
     if (midiManager)
         midiManager->removeChangeListener(this);
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
 #endif
@@ -19,7 +19,7 @@ KnobContainerComponent::~KnobContainerComponent() {
         boundParam->removeListener(this);
 }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 
 void KnobContainerComponent::wireModulation(OscirenderAudioProcessor& processor) {
     modBindings.clear();

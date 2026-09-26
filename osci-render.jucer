@@ -5,7 +5,7 @@
               pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscirender"
               cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
               version="2.9.9.10" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
+              companyEmail="james@ball.sh" defines="OSCI_RENDER_MODULATION_UI=1&#10;NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;"
               pluginAUMainType="'aumf'" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-render">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
@@ -309,6 +309,10 @@
           <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/synth/ShapeSound.h"/>
           <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeVoice.cpp"/>
           <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
+          <FILE id="VcBldC" name="VoiceBuilder.cpp" compile="1" resource="0"
+                file="Source/audio/synth/VoiceBuilder.cpp"/>
+          <FILE id="VcCtx1" name="VoiceContext.h" compile="0" resource="0" file="Source/audio/synth/VoiceContext.h"/>
+          <FILE id="PtSrc1" name="PointSource.h" compile="0" resource="0" file="Source/audio/synth/PointSource.h"/>
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
           <FILE id="VEffects" name="VoiceEffects.h" compile="0" resource="0"
                 file="Source/audio/synth/VoiceEffects.h"/>
@@ -685,12 +689,6 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
-      <GROUP id="ScnEdG" name="scene">
-        <FILE id="ScnNavH" name="NavigationMotion.h" compile="0" resource="0"
-              file="Source/scene/NavigationMotion.h"/>
-        <FILE id="ScnMdH" name="Scene.h" compile="0" resource="0" file="Source/scene/Scene.h"/>
-        <FILE id="ScnEdH" name="SceneEditor.h" compile="0" resource="0" file="Source/scene/SceneEditor.h"/>
-      </GROUP>
       <FILE id="FSlMnC" name="FileController.cpp" compile="1" resource="0"
             file="Source/FileController.cpp"/>
       <FILE id="FSlMnH" name="FileController.h" compile="0" resource="0"

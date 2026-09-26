@@ -3,14 +3,13 @@
 #include <JuceHeader.h>
 #include "ShapeVoice.h"
 
-class OscirenderAudioProcessor;
 
 // Builds ShapeVoice objects on a background thread so the message/audio
 // threads are never blocked by heavy allocations (e.g. DelayEffect buffers).
 class VoiceBuilder : public juce::Thread {
 public:
-    VoiceBuilder(OscirenderAudioProcessor& p)
-        : juce::Thread("Voice Builder"), processor(p) {}
+    VoiceBuilder(VoiceContext& context, VoiceManager& voices, juce::AudioBuffer<float>& externalAudio)
+        : juce::Thread("Voice Builder"), context(context), voices(voices), externalAudio(externalAudio) {}
 
     ~VoiceBuilder() override {
         signalThreadShouldExit();
@@ -34,12 +33,12 @@ public:
         return firstVoiceReady.wait(timeoutMilliseconds) && hasAnyVoiceReady();
     }
 
-    // Defined out-of-line in PluginProcessor.cpp because run() needs
-    // the full OscirenderAudioProcessor definition.
     void run() override;
 
 private:
-    OscirenderAudioProcessor& processor;
+    VoiceContext& context;
+    VoiceManager& voices;
+    juce::AudioBuffer<float>& externalAudio;
     std::atomic<int> targetCount{0};
     std::atomic<int> readyVoiceCount{0};
     juce::WaitableEvent firstVoiceReady;

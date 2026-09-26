@@ -3,7 +3,7 @@
 #include "../../LookAndFeel.h"
 #include <osci_gui/osci_gui.h>
 #include "../ParameterSettingsComponent.h"
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 #include "../../PluginProcessor.h"
 #include "../modulation/ModulationHelper.h"
 #include "../../audio/modulation/ModulationTypes.h"
@@ -197,7 +197,7 @@ void EffectComponent::setupComponent() {
 EffectComponent::~EffectComponent() {
     if (midiManager)
         midiManager->removeChangeListener(this);
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     if (modBroadcaster)
         modBroadcaster->removeListener(this);
 #endif
@@ -359,7 +359,7 @@ void EffectComponent::handleAsyncUpdate() {
     }
 }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 void EffectComponent::updateModulationDisplay() {
     juce::String paramId = effect.parameters[index]->paramID;
     auto& props = slider.getProperties();
@@ -400,7 +400,7 @@ void EffectComponent::setComponent(std::shared_ptr<juce::Component> component) {
 // === DragAndDropTarget for LFO assignment ===
 
 bool EffectComponent::isInterestedInDragSource(const SourceDetails& dragSourceDetails) {
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     return ModDrag::isModDrag(dragSourceDetails.description.toString());
 #else
     return false;
@@ -422,7 +422,7 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
     modAnyDragActive.store(false, std::memory_order_relaxed);
     repaint();
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
     juce::String desc = dragSourceDetails.description.toString();
     juce::String paramId = effect.parameters[index]->paramID;
 
@@ -438,7 +438,7 @@ void EffectComponent::itemDropped(const SourceDetails& dragSourceDetails) {
 #endif
 }
 
-#ifndef SOSCI
+#if OSCI_RENDER_MODULATION_UI
 void EffectComponent::wireModulation(OscirenderAudioProcessor& processor) {
     undoGroupingFlag = &processor.undoGrouping;
     lastChangedParamIdPtr = &processor.lastUndoParamId;

@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "../ImportServices.h"
 
 #include <osci_file_import/osci_file_import.h>
 
@@ -8,13 +9,10 @@
 #include <cstdint>
 #include <limits>
 
-class OscirenderAudioProcessor;
-class CommonPluginEditor;
-
 class ImageParser {
 public:
-    ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image);
-    ImageParser(OscirenderAudioProcessor& p, int initialWidth, int initialHeight);
+    ImageParser(std::shared_ptr<ImportServices> services, juce::String extension, juce::MemoryBlock image);
+    ImageParser(std::shared_ptr<ImportServices> services, int initialWidth, int initialHeight);
     ~ImageParser();
 
     void setFrame(int index);
@@ -49,7 +47,7 @@ private:
     bool loadAllVideoFrames(const juce::File& file, const juce::File& ffmpegFile);
 #endif
 
-    OscirenderAudioProcessor& audioProcessor;
+    std::shared_ptr<ImportServices> services;
     juce::SpinLock pendingLiveFrameLock;
     juce::Random rng;
     struct ThresholdEntry {

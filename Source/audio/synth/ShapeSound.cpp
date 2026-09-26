@@ -1,13 +1,10 @@
 #include "ShapeSound.h"
-#include "../../parser/FileParser.h"
 
-ShapeSound::ShapeSound(OscirenderAudioProcessor &p, std::shared_ptr<FileParser> parser) : parser(parser) {
-    if (parser->isSample()) {
-        producer = std::make_unique<FrameProducer>(*this, std::make_shared<FileParser>(p));
-    } else {
+ShapeSound::ShapeSound(std::shared_ptr<PointSource> source) : parser(std::move(source)) {
+    if (!parser->isSample()) {
         producer = std::make_unique<FrameProducer>(*this, parser);
+        producer->startThread();
     }
-    producer->startThread();
 }
 
 ShapeSound::ShapeSound() {}
@@ -57,13 +54,4 @@ double ShapeSound::getFrameLength() const {
 
 bool ShapeSound::consumeFreshFrame() {
     return freshFrameAvailable.exchange(false, std::memory_order_acquire);
-}
-
-void ShapeSound::enableScene(std::shared_ptr<scene::Scene> value) {
-    frames.kill();
-    if (producer != nullptr) {
-        producer->stopThread(-1);
-        producer.reset();
-    }
-    scene = std::move(value);
 }

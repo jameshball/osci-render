@@ -4,20 +4,150 @@
 #include "audio/synth/ShapeVoice.h"
 #include "audio/synth/VoiceManager.h"
 #include "parser/FileParser.h"
+#include "CommonPluginEditor.h"
+#include "components/OverlayDialogHelpers.h"
 
 #include <algorithm>
 
+// Parsers can outlive FileController because synth retains their ShapeSounds.
+// FileController is destroyed before synth and the source parameter members.
+// Detach waits for complete runtime reads; surviving FrameProducer workers then
+// see defaults until their sounds stop them. UI operations retain the existing
+// message-thread serialization with controller teardown, without holding the
+// runtime lock across dialogs, imports, or callbacks.
+class RenderImportServices final : public ImportServices, public std::enable_shared_from_this<RenderImportServices> {
+public:
+    explicit RenderImportServices(OscirenderAudioProcessor& owner) : processor(&owner), ffmpegFile(getFFmpegPath(owner)) {}
+
+    void detach() {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        processor = nullptr;
+    }
+
+    double getSampleRate() const override {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        return processor != nullptr ? processor->currentSampleRate.load() : 44100.0;
+    }
+
+    float getImageThreshold(int blockSampleIndex) const override {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        return processor != nullptr ? processor->imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) : 0.0f;
+    }
+
+    int getImageStride(int blockSampleIndex) const override {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        return processor != nullptr ? processor->imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) : 1;
+    }
+
+    bool getImageInverted() const override {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        return processor != nullptr && processor->invertImage->getValue();
+    }
+
+    int getFractalDepth() const override {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+#if OSCI_PREMIUM
+        return processor != nullptr ? juce::roundToInt(processor->fractalDepthEffect->getActualValue()) : 1;
+#else
+        return 1;
+#endif
+    }
+
+    juce::File getFFmpegFile() const override {
+        return ffmpegFile;
+    }
+
+    void ensureFFmpegExists(std::function<void()> ready) override {
+#if OSCI_PREMIUM
+        auto* owner = getMessageThreadOwner();
+        if (owner != nullptr) {
+            owner->ensureFFmpegExists(nullptr, std::move(ready));
+        }
+#endif
+    }
+
+    void showError(juce::String title, juce::String message) override {
+        juce::MessageManager::callAsync([services = shared_from_this(), title = std::move(title), message = std::move(message)] {
+            juce::Component::SafePointer<CommonPluginEditor> editor;
+            {
+                juce::SpinLock::ScopedLockType scope(services->ownerLock);
+                if (services->processor == nullptr) {
+                    return;
+                }
+                editor = dynamic_cast<CommonPluginEditor*>(services->processor->getActiveEditor());
+            }
+            osci::showOverlayMessageOrAlert(editor.getComponent(), title, message,
+                osci::ErrorOverlay::Icon::Warning, juce::MessageBoxIconType::WarningIcon, { 500, 260 });
+        });
+    }
+
+    void confirmLargeFile(juce::String message, std::function<void()> accepted, std::function<void()> cancelled) override {
+        auto* owner = getMessageThreadOwner();
+        if (owner == nullptr) {
+            return;
+        }
+        auto* editor = dynamic_cast<CommonPluginEditor*>(owner->getActiveEditor());
+        osci::showOverlayConfirmationOrAlert(editor, "Large File", message, "Continue", "Cancel",
+            std::move(accepted), std::move(cancelled), osci::ErrorOverlay::Icon::Warning, { 520, 330 });
+    }
+
+    void performDeferredLoad(std::function<bool()> load) override {
+        auto* owner = getMessageThreadOwner();
+        if (owner == nullptr) {
+            return;
+        }
+        bool loaded = false;
+        {
+            juce::SpinLock::ScopedLockType fileLock(owner->getFileController().lock);
+            juce::SpinLock::ScopedLockType effectLock(owner->effectsLock);
+            loaded = load();
+        }
+        if (loaded) {
+            owner->getFileController().sendChangeMessage();
+        }
+    }
+
+    void removeSource(FileParser* parser) override {
+        auto* owner = getMessageThreadOwner();
+        if (owner != nullptr) {
+            owner->getFileController().removeParser(parser);
+        }
+    }
+
+private:
+    static juce::File getFFmpegPath(OscirenderAudioProcessor& owner) {
+#if OSCI_PREMIUM
+        return owner.getFFmpegFile();
+#else
+        juce::ignoreUnused(owner);
+        return {};
+#endif
+    }
+
+    OscirenderAudioProcessor* getMessageThreadOwner() const {
+        // Callers and controller teardown are serialized by the message thread.
+        // Snapshot under the runtime lock so detach also synchronizes this read.
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        return processor;
+    }
+
+    mutable juce::SpinLock ownerLock;
+    OscirenderAudioProcessor* processor;
+    const juce::File ffmpegFile;
+};
+
 FileController::FileController(OscirenderAudioProcessor& processor, VoiceManager& voices)
-    : processor(processor), voices(voices) {}
+    : processor(processor), voices(voices), importServices(std::make_shared<RenderImportServices>(processor)) {}
 
 FileController::~FileController() {
+    importServices->detach();
     processor.midiManager.setMessageHandler(osci::MidiManager::MessageType::programChange, {});
     cancelPendingUpdate();
 }
 
 void FileController::initialise() {
-    auto defaultParser = std::make_shared<FileParser>(processor);
-    defaultSound = new ShapeSound(processor, defaultParser);
+    auto defaultParser = std::make_shared<FileParser>(importServices);
+    defaultSound = new ShapeSound(defaultParser);
     voices.addSound(defaultSound.get());
     activeSound.store(defaultSound.get(), std::memory_order_release);
 
@@ -50,8 +180,8 @@ int FileController::addFile(juce::String name, const char* data, int size) {
 int FileController::addFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
-    ShapeSound::Ptr sound = new ShapeSound(processor, parser);
+    auto parser = std::make_shared<FileParser>(importServices, processor.errorCallback);
+    ShapeSound::Ptr sound = new ShapeSound(parser);
     const int index = appendFile(std::move(name), std::move(data), std::move(parser), std::move(sound));
     selectFileUnlocked(index);
     return index;
@@ -86,13 +216,6 @@ void FileController::updateFileUnlocked(int index, std::shared_ptr<juce::MemoryB
         return;
     }
     files[index].data = std::move(data);
-    const auto scene = getScene(index);
-    if (scene != nullptr) {
-        juce::SpinLock::ScopedLockType guard(scene->lock);
-        for (const auto& object : scene->objects) {
-            if (object->parser == files[index].parser) { object->data = files[index].data; }
-        }
-    }
     parseFile(index);
 }
 
@@ -125,33 +248,14 @@ int FileController::duplicateFile(int index) {
         return -1;
     }
 
-    const auto source = juce::File::getCurrentWorkingDirectory().getChildFile(files[index].name);
+    const juce::File source(files[index].name);
     auto data = std::make_shared<juce::MemoryBlock>(*files[index].data);
-    auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
-    ShapeSound::Ptr sound = new ShapeSound(processor, parser);
+    auto parser = std::make_shared<FileParser>(importServices, processor.errorCallback);
+    ShapeSound::Ptr sound = new ShapeSound(parser);
     const int duplicateIndex = appendFile(source.getFileNameWithoutExtension() + " copy" + source.getFileExtension(),
         std::move(data), std::move(parser), std::move(sound));
-    const auto originalScene = getScene(index);
-    if (originalScene != nullptr) {
-        juce::XmlElement xml("scene");
-        saveScene(*originalScene, xml);
-        restoreScene(duplicateIndex, xml, true);
-    }
     selectFileUnlocked(duplicateIndex);
     return duplicateIndex;
-}
-
-int FileController::restoreFile(int index, juce::String name, std::shared_ptr<juce::MemoryBlock> data, const juce::XmlElement& scene) {
-    juce::SpinLock::ScopedLockType fileLock(lock);
-    juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    index = juce::jlimit(0, size(), index);
-    auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
-    ShapeSound::Ptr sound = new ShapeSound(processor, parser);
-    files.insert(files.begin() + index, { nextFileId++, std::move(name), std::move(data), std::move(parser), std::move(sound) });
-    parseFile(index);
-    restoreScene(index, scene);
-    selectFileUnlocked(index, true);
-    return index;
 }
 
 void FileController::removeFile(int index) {
@@ -165,8 +269,6 @@ void FileController::removeFileUnlocked(int index) {
         return;
     }
 
-    const auto scene = getScene(index);
-    if (scene != nullptr) { scene->preparing.store(false); }
     files.erase(files.begin() + index);
     if (files.empty()) {
         clearSelection();
@@ -339,18 +441,12 @@ void FileController::startTextureInput(juce::String sourceName, int width, int h
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     if (textureInputParser == nullptr) {
-        textureInputParser = std::make_shared<FileParser>(processor, processor.errorCallback);
-        textureInputSound = new ShapeSound(processor, textureInputParser);
+        textureInputParser = std::make_shared<FileParser>(importServices, processor.errorCallback);
+        textureInputSound = new ShapeSound(textureInputParser);
     }
     textureInputParser->prepareLiveImageInput(width, height);
 
     textureInputName = sourceName.trim().isNotEmpty() ? sourceName : "Texture Input";
-    if (!textureSceneObject.expired()) {
-        activeSource.store(ActiveSource::files, std::memory_order_release);
-        updateActiveSound(false);
-        notifySelectionChanged();
-        return;
-    }
     const auto previousSource = activeSource.exchange(ActiveSource::textureInput, std::memory_order_acq_rel);
     if (previousSource != ActiveSource::textureInput) {
         updateActiveSound(false);
@@ -363,7 +459,7 @@ void FileController::updateTextureInputFrame(
     std::shared_ptr<FileParser> parser;
     {
         juce::SpinLock::ScopedLockType fileLock(lock);
-        if ((!isTextureInputActive() && textureSceneObject.expired()) || textureInputParser == nullptr) {
+        if (!isTextureInputActive() || textureInputParser == nullptr) {
             return;
         }
         parser = textureInputParser;
@@ -393,10 +489,6 @@ juce::String FileController::getTextureInputName() const {
 void FileController::setObjectServerActive(bool active) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    if (!blenderSceneObject.expired()) {
-        notifySelectionChanged();
-        return;
-    }
     const auto previousSource = activeSource.load(std::memory_order_acquire);
     if (active) {
         activeSource.store(ActiveSource::objectServer, std::memory_order_release);
@@ -415,16 +507,7 @@ bool FileController::isObjectServerActive() const noexcept {
 }
 
 void FileController::addObjectServerFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force) {
-    std::shared_ptr<scene::Object> object;
-    {
-        juce::SpinLock::ScopedLockType guard(lock);
-        object = blenderSceneObject.lock();
-    }
-    if (object != nullptr) {
-        object->replaceGeometry(std::move(frame));
-    } else {
-        objectServerSound->addFrame(frame, force);
-    }
+    objectServerSound->addFrame(frame, force);
 }
 
 ShapeSound* FileController::getActiveSound() const noexcept {
@@ -453,19 +536,6 @@ void FileController::setProgramChangeChannel(int channel) {
 
 void FileController::saveState(juce::XmlElement& xml) const {
     xml.setAttribute("programChangeChannel", getProgramChangeChannel());
-    auto* slotsXml = xml.createNewChildElement("sceneSlots");
-    for (int i = 0; i < scene::slotCount; ++i) {
-        slotsXml->setAttribute("slot" + juce::String(i), sceneAutomation.targets[i]);
-    }
-    auto* scenesXml = xml.createNewChildElement("scenes");
-    for (int i = 0; i < size(); ++i) {
-        const auto scene = getScene(i);
-        if (scene != nullptr) {
-            auto* sceneXml = scenesXml->createNewChildElement("scene");
-            sceneXml->setAttribute("file", i);
-            saveScene(*scene, *sceneXml);
-        }
-    }
     auto* filesXml = xml.createNewChildElement("files");
     for (const auto& file : files) {
         auto* fileXml = filesXml->createNewChildElement("file");
@@ -483,18 +553,6 @@ void FileController::restoreState(const juce::XmlElement& xml, bool legacyFileEn
     }
 
     clearFiles();
-    for (int i = 0; i < scene::slotCount; ++i) {
-        sceneAutomation.generations[i].fetch_add(1);
-        sceneAutomation.targets[i].clear();
-    }
-    const auto* slotsXml = xml.getChildByName("sceneSlots");
-    if (slotsXml != nullptr) {
-        for (int i = 0; i < scene::slotCount; ++i) {
-            sceneAutomation.targets[i] = slotsXml->getStringAttribute("slot" + juce::String(i));
-        }
-    }
-    blenderSceneObject.reset();
-    textureSceneObject.reset();
     auto* filesXml = xml.getChildByName("files");
     if (filesXml != nullptr) {
         for (auto* fileXml : filesXml->getChildIterator()) {
@@ -507,8 +565,8 @@ void FileController::restoreState(const juce::XmlElement& xml, bool legacyFileEn
             } else {
                 data->fromBase64Encoding(encodedData);
             }
-            auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
-            ShapeSound::Ptr sound = new ShapeSound(processor, parser);
+            auto parser = std::make_shared<FileParser>(importServices, processor.errorCallback);
+            ShapeSound::Ptr sound = new ShapeSound(parser);
             appendFile(fileXml->getStringAttribute("name"), std::move(data), std::move(parser), std::move(sound));
         }
         juce::Logger::writeToLog("setStateInformation: restored " + juce::String(size()) + " files");
@@ -516,12 +574,6 @@ void FileController::restoreState(const juce::XmlElement& xml, bool legacyFileEn
         juce::Logger::writeToLog("setStateInformation: no files section found");
     }
 
-    const auto* scenesXml = xml.getChildByName("scenes");
-    if (scenesXml != nullptr) {
-        for (const auto* sceneXml : scenesXml->getChildIterator()) {
-            restoreScene(sceneXml->getIntAttribute("file", -1), *sceneXml);
-        }
-    }
     clearPendingSelection();
     if (files.empty()) {
         clearSelection();
@@ -564,9 +616,6 @@ void FileController::updateActiveSound(bool forceUpdate) {
     }
 
     auto* previousSound = activeSound.exchange(sound, std::memory_order_acq_rel);
-    for (const auto& file : files) {
-        if (file.sound->scene != nullptr) { file.sound->scene->preparing.store(file.sound.get() == sound); }
-    }
     if (sound != previousSound || forceUpdate) {
         for (int i = 0; i < voices.getNumVoices(); ++i) {
             auto* voice = dynamic_cast<ShapeVoice*>(voices.getVoice(i));
@@ -585,172 +634,4 @@ void FileController::notifySelectionChanged() {
 
 void FileController::handleAsyncUpdate() {
     sendChangeMessage();
-}
-
-std::shared_ptr<scene::Scene> FileController::getScene(int index) const {
-    return contains(index) ? files[index].sound->scene : nullptr;
-}
-
-std::shared_ptr<scene::Scene> FileController::ensureScene(int index) {
-    juce::SpinLock::ScopedLockType fileLock(lock);
-    juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    return ensureSceneUnlocked(index);
-}
-
-std::shared_ptr<scene::Scene> FileController::ensureSceneUnlocked(int index) {
-    if (!contains(index)) {
-        return {};
-    }
-    auto& file = files[index];
-    if (file.sound->scene == nullptr) {
-        auto scene = std::make_shared<scene::Scene>(sceneAutomation);
-        auto object = std::make_shared<scene::Object>(sceneAutomation, file.name, file.data, file.parser);
-        if (!file.parser->isSample()) {
-            object->replaceGeometry(file.parser->nextFrame());
-        }
-        {
-            juce::SpinLock::ScopedLockType sceneLock(scene->lock);
-            scene->objects.push_back(std::move(object));
-        }
-        file.sound->enableScene(std::move(scene));
-        updateActiveSound(true);
-    }
-    return file.sound->scene;
-}
-
-std::shared_ptr<scene::Object> FileController::addSceneObject(int index, juce::String name, std::shared_ptr<juce::MemoryBlock> data) {
-    auto scene = ensureScene(index);
-    if (scene == nullptr) {
-        return {};
-    }
-    auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
-    auto object = std::make_shared<scene::Object>(sceneAutomation, name, data, parser);
-    parser->parse(object->transform.id, name, name.fromLastOccurrenceOf(".", true, false).toLowerCase(),
-        std::make_unique<juce::MemoryInputStream>(*data, false), processor.font);
-    if (!parser->isSample()) {
-        object->replaceGeometry(parser->nextFrame());
-    }
-    {
-        juce::SpinLock::ScopedLockType guard(scene->lock);
-        scene->objects.push_back(object);
-    }
-    notifySelectionChanged();
-    return object;
-}
-
-void FileController::sceneChanged() {
-    notifySelectionChanged();
-}
-
-void FileController::saveScene(const scene::Scene& scene, juce::XmlElement& xml) const {
-    auto& mutableScene = const_cast<scene::Scene&>(scene);
-    juce::SpinLock::ScopedLockType guard(mutableScene.lock);
-    scene.camera.save(*xml.createNewChildElement("camera"));
-    for (const auto& object : scene.objects) {
-        auto* child = xml.createNewChildElement("object");
-        child->setAttribute("name", object->name);
-        child->setAttribute("live", object->liveKind);
-        bool primary = false;
-        for (const auto& file : files) {
-            if (file.sound->scene.get() == &scene && file.parser == object->parser) { primary = true; }
-        }
-        child->setAttribute("primary", primary);
-        object->transform.save(*child);
-        if (object->data != nullptr) {
-            child->addTextElement(object->data->toBase64Encoding());
-        }
-    }
-}
-
-void FileController::restoreScene(int index, const juce::XmlElement& xml, bool copy) {
-    if (!contains(index)) {
-        return;
-    }
-    auto scene = ensureSceneUnlocked(index);
-    const auto* camera = xml.getChildByName("camera");
-    if (camera != nullptr) {
-        scene->camera.load(*camera, copy);
-    }
-    std::vector<std::shared_ptr<scene::Object>> oldObjects;
-    {
-        juce::SpinLock::ScopedLockType guard(scene->lock);
-        scene->objects.swap(oldObjects);
-    }
-    for (const auto* child : xml.getChildIterator()) {
-        if (child->hasTagName("object")) {
-            auto data = std::make_shared<juce::MemoryBlock>();
-            data->fromBase64Encoding(child->getAllSubText());
-            const auto name = child->getStringAttribute("name");
-            auto parser = child->getBoolAttribute("primary", false) ? files[index].parser : std::make_shared<FileParser>(processor, processor.errorCallback);
-            auto object = std::make_shared<scene::Object>(sceneAutomation, name, data, parser);
-            object->transform.load(*child, copy);
-            object->liveKind = child->getStringAttribute("live");
-            if (object->liveKind == "blender") {
-                object->liveGeometry = true;
-                object->parser = nullptr;
-                object->liveSource = blenderSceneObject.lock();
-                if (object->liveSource == nullptr) { blenderSceneObject = object; }
-            } else if (object->liveKind == "texture") {
-                if (textureInputParser == nullptr) {
-                    textureInputParser = std::make_shared<FileParser>(processor, processor.errorCallback);
-                    textureInputParser->prepareLiveImageInput(1, 1);
-                }
-                object->parser = textureInputParser;
-                if (textureSceneObject.expired()) { textureSceneObject = object; }
-            } else {
-                parser->parse(object->transform.id, name, name.fromLastOccurrenceOf(".", true, false).toLowerCase(),
-                    std::make_unique<juce::MemoryInputStream>(*data, false), processor.font);
-                if (!parser->isSample()) {
-                    object->replaceGeometry(parser->nextFrame());
-                }
-            }
-            juce::SpinLock::ScopedLockType guard(scene->lock);
-            scene->objects.push_back(std::move(object));
-        }
-    }
-}
-
-std::shared_ptr<scene::Object> FileController::addLiveSceneObject(int index, bool blender) {
-    auto scene = ensureScene(index);
-    if (scene == nullptr) {
-        return {};
-    }
-    juce::SpinLock::ScopedLockType guard(lock);
-    auto& connection = blender ? blenderSceneObject : textureSceneObject;
-    auto existing = connection.lock();
-    if (!blender && textureInputParser == nullptr) {
-        textureInputParser = std::make_shared<FileParser>(processor, processor.errorCallback);
-        textureInputParser->prepareLiveImageInput(1, 1);
-    }
-    auto object = std::make_shared<scene::Object>(sceneAutomation, blender ? "Blender input" : "Texture input",
-        std::make_shared<juce::MemoryBlock>(), blender ? nullptr : textureInputParser);
-    object->liveGeometry = blender;
-    if (blender) { object->liveSource = existing; }
-    object->liveKind = blender ? "blender" : "texture";
-    if (existing == nullptr) { connection = object; }
-    {
-        juce::SpinLock::ScopedLockType sceneLock(scene->lock);
-        scene->objects.push_back(object);
-    }
-    activeSource.store(ActiveSource::files, std::memory_order_release);
-    {
-        juce::SpinLock::ScopedLockType effectsGuard(processor.effectsLock);
-        updateActiveSound(true);
-    }
-    notifySelectionChanged();
-    return object;
-}
-
-void FileController::updateSceneObject(const std::shared_ptr<scene::Object>& object, juce::String text) {
-    if (object == nullptr || object->parser == nullptr || object->liveKind.isNotEmpty()) {
-        return;
-    }
-    auto data = std::make_shared<juce::MemoryBlock>(text.toRawUTF8(), text.getNumBytesAsUTF8());
-    object->parser->parse(object->transform.id, object->name, object->name.fromLastOccurrenceOf(".", true, false).toLowerCase(),
-        std::make_unique<juce::MemoryInputStream>(*data, false), processor.font);
-    object->data = data;
-    for (auto& file : files) {
-        if (file.parser == object->parser) { file.data = data; }
-    }
-    notifySelectionChanged();
 }

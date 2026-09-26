@@ -87,7 +87,7 @@ private:
 
 /**
  */
-class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient, public VoiceContext, public VoiceTelemetry
 #if JucePlugin_Enable_ARA
     ,
                                  public juce::AudioProcessorARAExtension
@@ -97,7 +97,6 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
     // Declared first so unhosted parameters outlive every modulation source and consumer.
     juce::OwnedArray<juce::AudioProcessorParameter> unhostedModulationParameters;
 #endif
-    friend class VoiceBuilder;
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
@@ -164,15 +163,15 @@ public:
     DahdsrParams getCurrentDahdsrParams() const;
     DahdsrParams getCurrentDahdsrParams(int envIndex) const;
 
-    // UI telemetry for per-voice envelope visualization (written on audio thread, read on message thread)
-    static constexpr int kMaxUiVoices = 16;
-    std::atomic<double> uiVoiceEnvelopeTimeSeconds[kMaxUiVoices]{};
-    std::atomic<bool> uiVoiceActive[kMaxUiVoices]{};
-    // Per-envelope UI telemetry for flow markers (same as envelope 0 for backward compat)
-    std::atomic<double> uiVoiceEnvTimeSeconds[NUM_ENVELOPES][kMaxUiVoices]{};
-    std::atomic<bool> uiVoiceEnvActive[NUM_ENVELOPES][kMaxUiVoices]{};
-    // Per-voice per-envelope current values for modulation (written by audio-thread voices)
-    std::atomic<float> uiVoiceEnvValue[NUM_ENVELOPES][kMaxUiVoices]{};
+    VoiceParameters getVoiceParameters() override;
+    VoiceTelemetry& getVoiceTelemetry() override { return *this; }
+    VoiceEffectMap cloneVoiceEffectInstances() override;
+    double getVoiceSampleRate() override { return getEffectiveSampleRate(); }
+    const osci::DawPosition& getVoiceTransport() const override { return dawPosition; }
+    const std::vector<std::shared_ptr<osci::Effect>>& getVoiceScriptParameters() const override { return luaEffects; }
+    void processVoiceEffects(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& envelope,
+        juce::AudioBuffer<float>& frequency, juce::AudioBuffer<float>& frameSync,
+        const VoiceEffectMap& effects, const std::shared_ptr<osci::SimpleEffect>& preview) override;
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;

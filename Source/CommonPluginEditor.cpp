@@ -1,5 +1,6 @@
 #include "CommonPluginProcessor.h"
 #include "CommonPluginEditor.h"
+#include "ProductIdentity.h"
 #include "components/OfflineRenderOverlay.h"
 #include "components/OverlayDialogHelpers.h"
 #include "components/RecordingSettingsOverlay.h"
@@ -123,11 +124,19 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     // Enable keyboard focus so F11 key works immediately
     setWantsKeyboardFocus(true);
 
-    updatePrompt.showPendingInstallStatusIfNeeded();
+    if (osci::currentProduct().hostedServicesAvailable) {
+        updatePrompt.showPendingInstallStatusIfNeeded();
+    }
     const juce::Component::SafePointer<CommonPluginEditor> legalOwner(this);
     const auto legalConfig = osci::makeProductUpdateConfig();
     juce::MessageManager::callAsync([legalOwner, legalConfig] {
         if (legalOwner == nullptr) { return; }
+        if (!osci::currentProduct().hostedServicesAvailable) {
+            // Motion is a new, unreleased product with no hosted legal/update
+            // registration. Do not query another product or record acceptance.
+            legalOwner->audioProcessor.legalNoticePending.store(false);
+            return;
+        }
         osci::LegalOverlay::ensure(*legalOwner, osci::LegalState::documentsFor(legalConfig.productSlug, legalConfig.currentVersion), [legalOwner, legalConfig] {
             if (legalOwner == nullptr) { return; }
             legalOwner->audioProcessor.legalNoticePending.store(false);

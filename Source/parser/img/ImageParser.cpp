@@ -1,12 +1,9 @@
 #include "ImageParser.h"
 #include "../../../modules/gifdec/gifdec.h"
-#include "../../PluginProcessor.h"
-#include "../../CommonPluginEditor.h"
-#include "../../components/OverlayDialogHelpers.h"
 #include "../../video/FFmpegMediaInfo.h"
 #include "../FileFormatRegistry.h"
 
-ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, juce::MemoryBlock image) : audioProcessor(p) {
+ImageParser::ImageParser(std::shared_ptr<ImportServices> services, juce::String extension, juce::MemoryBlock image) : services(std::move(services)) {
     juce::File file = temp.getFile();
 
     {
@@ -50,7 +47,7 @@ ImageParser::ImageParser(OscirenderAudioProcessor& p, juce::String extension, ju
     setFrame(0);
 }
 
-ImageParser::ImageParser(OscirenderAudioProcessor& p, int initialWidth, int initialHeight) : audioProcessor(p) {
+ImageParser::ImageParser(std::shared_ptr<ImportServices> services, int initialWidth, int initialHeight) : services(std::move(services)) {
     int safeWidth = juce::jmax(1, initialWidth);
     int safeHeight = juce::jmax(1, initialHeight);
     const int largestDimension = juce::jmax(safeWidth, safeHeight);
@@ -248,7 +245,7 @@ void ImageParser::processVideoFile(juce::File& file) {
         return;
     }
 
-    const auto ffmpegFile = audioProcessor.getFFmpegFile();
+    const auto ffmpegFile = services->getFFmpegFile();
     if (!ffmpegFile.existsAsFile() || !loadAllVideoFrames(file, ffmpegFile)) {
         handleError("Could not read video frames. Please ensure FFmpeg is installed and the video file is valid.");
     }
@@ -373,15 +370,7 @@ ImageParser::~ImageParser() {
 }
 
 void ImageParser::handleError(juce::String message) {
-    juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor()));
-    juce::MessageManager::callAsync([editor, message] {
-        osci::showOverlayMessageOrAlert(editor.getComponent(),
-            "Error",
-            message,
-            osci::ErrorOverlay::Icon::Warning,
-            juce::MessageBoxIconType::WarningIcon,
-            { 500, 260 });
-    });
+    services->showError("Error", std::move(message));
 
     width = 1;
     height = 1;
@@ -473,7 +462,7 @@ void ImageParser::findWhite(double thresholdPow, bool invert) {
 }
 
 int ImageParser::jumpFrequency() {
-    return audioProcessor.currentSampleRate * 0.005;
+    return services->getSampleRate() * 0.005;
 }
 
 void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert) {
@@ -526,8 +515,8 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
         std::fill(visited.begin(), visited.end(), false);
     }
 
-    float thresholdPow = audioProcessor.imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) * 10 + 1;
-    findNearestNeighbour(10, thresholdPow, audioProcessor.imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)), audioProcessor.invertImage->getValue());
+    float thresholdPow = services->getImageThreshold(blockSampleIndex) * 10 + 1;
+    findNearestNeighbour(10, thresholdPow, services->getImageStride(blockSampleIndex), services->getImageInverted());
     float maxDim = juce::jmax(width, height);
     count = (count + 1) % resetInterval;
     float widthDiff = (maxDim - width) / 2;

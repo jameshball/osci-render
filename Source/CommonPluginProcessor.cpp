@@ -7,6 +7,7 @@
 */
 
 #include "CommonPluginProcessor.h"
+#include "ProductIdentity.h"
 #include "CommonPluginEditor.h"
 #include "JucewrightAutomation.h"
 #include "audio/OutputClip.h"
@@ -18,8 +19,7 @@ namespace
 {
     osci::LicenseManager::Config makeLicenseManagerConfig() {
         osci::LicenseManager::Config config;
-        const juce::String pluginName (JucePlugin_Name);
-        config.productSlug = pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+        config.productSlug = osci::currentProduct().slug;
         return config;
     }
 }
@@ -154,8 +154,7 @@ CommonAudioProcessor::CommonAudioProcessor(const BusesProperties& busesPropertie
 
 juce::String CommonAudioProcessor::getProductSlug() const
 {
-    const juce::String pluginName (JucePlugin_Name);
-    return pluginName.equalsIgnoreCase ("sosci") ? "sosci" : "osci-render";
+    return osci::currentProduct().slug;
 }
 
 int CommonAudioProcessor::getNumRecentProjectFiles() const
