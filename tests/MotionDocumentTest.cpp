@@ -100,9 +100,119 @@ public:
         testEffects(document.project());
         testTrackStates(document.project());
         testGroups(document.project());
+        testModulation(document.project());
     }
 
 private:
+    void testModulation(const motion::Project& sourceProject) {
+        beginTest("Prepared modulation uses clip-local and project clocks with project tempo");
+        auto project = sourceProject;
+        project.bpm = 60;
+        auto& clip = project.tracks[0].clips[0];
+        clip.start = 2;
+        clip.duration = 10;
+        clip.offset = 0.125;
+        clip.rate = 2;
+        clip.properties["position.x"] = motion::Curve(0);
+        auto& local = clip.properties["position.x"].modulation;
+        local.enabled = true;
+        local.tempoSync = true;
+        local.amount = 0.1;
+        auto clipEffect = motion::makeEffect(900, *motion::effectDefinition("translate"));
+        clipEffect.properties["translateX"] = motion::Curve(0);
+        clipEffect.properties["translateX"].modulation = local;
+        clip.effects.push_back(clipEffect);
+        auto trackEffect = clipEffect;
+        trackEffect.id = 901;
+        project.tracks[0].effects.push_back(trackEffect);
+        motion::Group group;
+        group.id = 902;
+        group.properties["position.x"].modulation = local;
+        auto groupEffect = clipEffect;
+        groupEffect.id = 903;
+        group.effects.push_back(groupEffect);
+        project.groups.push_back(group);
+        project.tracks[0].group = group.id;
+        auto compositionEffect = clipEffect;
+        compositionEffect.id = 904;
+        project.effects.push_back(compositionEffect);
+        motion::Camera camera;
+        camera.id = 905;
+        camera.properties["position.x"].modulation = local;
+        project.cameras.push_back(camera);
+        const double time = 2.25;
+        const double localTime = clip.localTime(time);
+        const auto localMovement = 0.1 * std::sin(localTime * 2 * std::numbers::pi);
+        const auto projectMovement = 0.1 * std::sin(time * 2 * std::numbers::pi);
+        motion::PreparedComposition prepared(project);
+        const auto raw = sourceProject.assets[0]->source->sample(localTime, 0.2);
+        const auto world = prepared.clips[0].sample(time, 0.2);
+        expectWithinAbsoluteError(world.x, static_cast<float>(raw.x + 2 * localMovement + 3 * projectMovement), 0.00001f);
+        // Equal project modulation on composition translation and camera
+        // translation cancels, independently of the clip's slipped clock.
+        expectWithinAbsoluteError(prepared.projectPoint(world, time).x, world.x, 0.00001f);
+        expectWithinAbsoluteError(prepared.applyCompositionEffects(world, time).x, static_cast<float>(world.x + projectMovement), 0.00001f);
+        const auto original = prepared.sample(time, 0.2);
+        for (int index = 20; index >= 0; --index) {
+            prepared.sample(index * 0.2, 0.2);
+        }
+        expectEquals(prepared.sample(time, 0.2).x, original.x);
+
+        beginTest("Modulated drawing weight, colour and effect parameters remain bounded");
+        auto bounded = project;
+        auto& boundedClip = bounded.tracks[0].clips[0];
+        boundedClip.properties["weight"] = motion::Curve(0.5);
+        boundedClip.properties["weight"].modulation = local;
+        boundedClip.properties["weight"].modulation.amount = 1000000;
+        boundedClip.properties["red"] = motion::Curve(0.5);
+        boundedClip.properties["red"].modulation = boundedClip.properties["weight"].modulation;
+        boundedClip.effects[0].properties["translateX"].modulation.amount = 1000000;
+        const motion::PreparedComposition boundedPrepared(bounded);
+        expectEquals(boundedPrepared.clips[0].weight(time), 0.0);
+        expectEquals(boundedPrepared.clips[0].sample(time, 0.2).r, 0.0f);
+        const auto highTime = 2.0625;
+        expect(boundedPrepared.clips[0].weight(highTime) <= 1000000);
+        expectEquals(boundedPrepared.clips[0].sample(highTime, 0.2).r, 1.0f);
+
+        beginTest("Curve modulation settings round trip and invalid settings reject atomically");
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(project);
+        const auto xml = document.save();
+        juce::UndoManager loadedUndo;
+        motion::Document loaded(loadedUndo);
+        const auto result = loaded.load(xml);
+        expect(result.wasOk(), result.getErrorMessage());
+        if (result.failed()) {
+            return;
+        }
+        expect(loaded.project().tracks[0].clips[0].properties.at("position.x").modulation == local);
+        expect(loaded.project().groups[0].properties.at("position.x").modulation == local);
+        expect(loaded.project().cameras[0].properties.at("position.x").modulation == local);
+        expectWithinAbsoluteError(motion::PreparedComposition(loaded.project()).sample(time, 0.2).x, original.x, 0.00001f);
+        const auto unchanged = loaded.save().toString();
+        for (const auto* attribute : { "waveform", "amount", "rateHz", "phase", "beatsPerCycle", "mode", "seed" }) {
+            auto invalid = xml;
+            auto* modulation = invalid.getChildByName("effect")->getChildByName("property")->getChildByName("modulation");
+            modulation->setAttribute(attribute, juce::String(attribute) == "seed" ? "4294967296" : "-1000001");
+            expect(loaded.load(invalid).failed());
+            expectEquals(loaded.save().toString(), unchanged);
+        }
+        auto duplicate = xml;
+        auto* property = duplicate.getChildByName("group")->getChildByName("property");
+        property->addChildElement(new juce::XmlElement(*property->getChildByName("modulation")));
+        expect(loaded.load(duplicate).failed());
+        auto invalidOwner = project;
+        invalidOwner.groups[0].properties["position.x"].modulation.phase = -1;
+        expect(!invalidOwner.groups[0].valid());
+        invalidOwner.cameras[0].properties["position.x"].modulation.phase = -1;
+        expect(!invalidOwner.cameras[0].valid());
+        invalidOwner.tracks[0].clips[0].properties["position.x"].modulation.phase = -1;
+        expect(!invalidOwner.tracks[0].clips[0].valid());
+        invalidOwner.effects[0].properties["strength"].modulation.phase = -1;
+        expect(!invalidOwner.effects[0].valid());
+    }
+
     void testGroups(const motion::Project& sourceProject) {
         beginTest("Nested groups apply inner-to-outer in project time after track effects");
         auto project = sourceProject;

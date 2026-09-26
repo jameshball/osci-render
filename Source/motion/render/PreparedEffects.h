@@ -32,13 +32,13 @@ struct PreparedEffect {
         }
     }
 
-    osci::Point apply(osci::Point input, double time) const {
+    osci::Point apply(osci::Point input, double time, double bpm = 120) const {
         if (!enabled || !std::isfinite(time) || (range.has_value() && (time < range->start || time >= range->end()))) {
             return input;
         }
         std::array<double, 4> values {};
         for (std::size_t index = 0; index < count; ++index) {
-            const auto value = curves[index].evaluate(time);
+            const auto value = curves[index].evaluate(time, bpm);
             if (!std::isfinite(value)) {
                 return input;
             }
@@ -77,9 +77,9 @@ inline std::vector<PreparedEffect> prepareEffects(const std::vector<EffectInstan
     return prepared;
 }
 
-inline osci::Point applyEffects(const std::vector<PreparedEffect>& effects, osci::Point point, double time) {
+inline osci::Point applyEffects(const std::vector<PreparedEffect>& effects, osci::Point point, double time, double bpm = 120) {
     for (const auto& effect : effects) {
-        point = effect.apply(point, time);
+        point = effect.apply(point, time, bpm);
     }
     return point;
 }

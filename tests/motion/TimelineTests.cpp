@@ -1,6 +1,7 @@
 #include "../../Source/motion/model/Timeline.h"
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace {
 void check(bool condition, const char* description) {
@@ -59,5 +60,54 @@ int main() {
     smooth.setKeyValue(0, 2);
     check(smooth.keyframes()[0].interpolation == motion::Interpolation::cubic
         && near(smooth.keyframes()[0].outgoingSlope, 1), "value edits retain the authored interpolation and tangents");
+    motion::Curve modulated(2);
+    auto& modulation = modulated.modulation;
+    modulation.enabled = true;
+    modulation.amount = 0.5;
+    check(near(modulated.evaluateBase(0.25), 2) && near(modulated.evaluate(0.25), 2.5), "sine modulation preserves authored base");
+    modulation.mode = motion::ModulationMode::multiply;
+    check(near(modulated.evaluate(0.25), 3), "multiplicative modulation scales the authored value");
+    modulation.mode = motion::ModulationMode::add;
+    modulation.tempoSync = true;
+    check(near(modulated.evaluate(0.125, 120), 2.5) && near(modulated.evaluate(0.25, 60), 2.5), "tempo sync follows project beats");
+    modulation.beatsPerCycle = 2;
+    check(near(modulated.evaluate(0.25, 120), 2.5), "beat division controls modulation cycle duration");
+    modulation.tempoSync = false;
+    modulation.waveform = motion::ModulationWaveform::noiseHold;
+    modulation.seed = 123;
+    const auto held = modulated.evaluate(-0.75);
+    check(held == modulated.evaluate(-0.25), "held noise is constant inside negative cycles");
+    modulation.waveform = motion::ModulationWaveform::noiseSmooth;
+    const auto smoothNoise = modulated.evaluate(-0.375);
+    for (int index = 20; index >= -20; --index) {
+        const auto ignored = modulated.evaluate(index * 0.17);
+        check(std::isfinite(ignored), "noise remains finite while reverse scrubbing");
+    }
+    check(smoothNoise == modulated.evaluate(-0.375), "noise evaluation is independent of playback history");
+    auto changedSeed = modulated;
+    changedSeed.modulation.seed = 124;
+    check(changedSeed.evaluate(-0.375) != smoothNoise, "noise seeds produce independent motion");
+    check(near(modulated.evaluate(1 - 1.0e-10), modulated.evaluate(1 + 1.0e-10)), "smooth noise joins adjacent cycles continuously");
+    for (int waveform = 0; waveform <= 5; ++waveform) {
+        modulation.waveform = static_cast<motion::ModulationWaveform>(waveform);
+        for (int index = -20; index <= 20; ++index) {
+            const auto value = modulation.value(index * 0.137);
+            check(std::isfinite(value) && value >= -1 && value <= 1, "every waveform stays bounded at positive and negative times");
+        }
+    }
+    modulation.waveform = motion::ModulationWaveform::sine;
+    modulation.phase = 0.25;
+    check(near(modulated.evaluate(0), 2.5), "phase is measured in cycles");
+    modulation.rateHz = 0;
+    check(!modulation.valid() && !modulated.valid(), "invalid modulation settings invalidate their curve");
+    check(modulated.evaluate(0) == 2, "invalid modulation fails safely to authored output");
+    modulation.rateHz = 1000;
+    check(std::isfinite(modulated.evaluate(std::numeric_limits<double>::max())), "extreme time products do not emit non-finite samples");
+    modulation.rateHz = 1;
+    modulation.phase = 0.25;
+    modulation.amount = 1000000;
+    modulation.mode = motion::ModulationMode::multiply;
+    modulated.base = std::numeric_limits<double>::max();
+    check(std::isfinite(modulated.evaluate(0)), "multiplication overflow falls back to finite authored output");
     std::cout << "Motion timeline contracts passed\n";
 }

@@ -184,7 +184,7 @@ public:
                 const auto* label = dynamic_cast<juce::Label*>(child);
                 editing = editing || (label != nullptr && label->isBeingEdited());
             }
-            if (!gesture.has_value() && !editing) { row->value.setValue(curve->evaluate(local), juce::dontSendNotification); }
+            if (!gesture.has_value() && !editing) { row->value.setValue(curve->evaluateBase(local), juce::dontSendNotification); }
             const auto& keys = curve->keyframes();
             const bool keyed = std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return std::abs(key.time - local) < 1.0e-6; });
             row->key.setState(keyed ? osci::KeyframeButton::State::keyed : (curve->animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
@@ -311,14 +311,14 @@ private:
         const auto* curve = target.has_value() ? target->curve(property) : nullptr;
         if (curve == nullptr) { return; }
         const auto local = target->localTime(time);
-        if (key) { value = curve->evaluate(local); }
+        if (key) { value = curve->evaluateBase(local); }
         const auto* effect = motion::findEffect(processor.document.project(), id);
         const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
         if (definition == nullptr || !std::isfinite(value)) { return; }
         for (const auto& parameter : definition->parameters) {
             if (parameter.id == property) { value = std::clamp(value, parameter.min, parameter.max); }
         }
-        if (!key && !gesture.has_value() && value == curve->evaluate(local)) { return; }
+        if (!key && !gesture.has_value() && value == curve->evaluateBase(local)) { return; }
         const auto operation = [id, property, value, local, key](motion::Project& project) {
             auto* changed = motion::findPropertyCurve(project, id, property);
             if (changed == nullptr) { return; }
@@ -329,7 +329,7 @@ private:
             operation(project);
             const auto previous = motion::findPropertyTarget(gesture->before, id);
             const auto* original = previous.has_value() ? previous->curve(property) : nullptr;
-            gesture->changed = original != nullptr && original->evaluate(local) != value;
+            gesture->changed = original != nullptr && original->evaluateBase(local) != value;
             if (!gesture->changed) { project = gesture->before; }
             processor.document.preview(std::move(project));
             gesture->revision = processor.document.revision();

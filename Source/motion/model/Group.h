@@ -30,7 +30,7 @@ struct Group {
         }
         for (std::size_t index = 0; index < propertyNames.size(); ++index) {
             const auto found = properties.find(propertyNames[index]);
-            if (found == properties.end()) {
+            if (found == properties.end() || !found->second.valid()) {
                 return false;
             }
             const auto validValue = [index](double value) {

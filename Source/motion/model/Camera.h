@@ -31,7 +31,7 @@ struct Camera {
         }
         for (const auto* property : cameraPropertyNames) {
             const auto found = properties.find(property);
-            if (found == properties.end() || !std::isfinite(found->second.base)) {
+            if (found == properties.end() || !found->second.valid()) {
                 return false;
             }
             const bool fieldOfView = found->first == "fov";

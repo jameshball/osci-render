@@ -63,7 +63,7 @@ struct EffectInstance {
         }
         for (const auto& parameter : definition->parameters) {
             const auto found = properties.find(parameter.id);
-            if (found == properties.end()) {
+            if (found == properties.end() || !found->second.valid()) {
                 return false;
             }
             const auto validValue = [&](double value) { return std::isfinite(value) && value >= parameter.min && value <= parameter.max; };

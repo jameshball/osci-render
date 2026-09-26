@@ -27,6 +27,11 @@ struct Clip {
     bool contains(double projectTime) const { return projectTime >= start && projectTime < end(); }
     double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
     bool valid() const {
+        for (const auto& [name, curve] : properties) {
+            if (!curve.valid()) {
+                return false;
+            }
+        }
         return id != 0 && std::isfinite(start) && start >= 0.0 && std::isfinite(duration)
             && duration > 0.0 && std::isfinite(end()) && std::isfinite(offset)
             && std::isfinite(rate) && rate > 0.0;

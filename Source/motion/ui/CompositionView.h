@@ -97,7 +97,7 @@ public:
                     const auto time = clip.localTime(editTime);
                     for (const auto& [name, offset] : { std::pair { "position.x", delta.x }, std::pair { "position.y", -delta.y } }) {
                         auto& curve = clip.properties[name];
-                        const auto value = curve.evaluate(time) + offset;
+                        const auto value = curve.evaluateBase(time) + offset;
                         if (curve.animated()) {
                             curve.setKeyValue(time, value);
                         } else {

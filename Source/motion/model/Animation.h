@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Modulation.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -23,7 +24,21 @@ public:
     Curve() = default;
     explicit Curve(double initialValue) : base(initialValue) {}
 
-    double evaluate(double time) const {
+    double evaluate(double time, double bpm = 120) const {
+        const auto authored = evaluateBase(time);
+        const auto baseValue = std::isfinite(authored) ? authored : (std::isfinite(base) ? base : 0.0);
+        if (!modulation.enabled || !modulation.valid()) {
+            return baseValue;
+        }
+        const auto movement = modulation.amount * modulation.value(time, bpm);
+        const auto value = modulation.mode == ModulationMode::add ? baseValue + movement : baseValue * (1 + movement);
+        return std::isfinite(value) ? value : baseValue;
+    }
+
+    double evaluateBase(double time) const {
+        if (!std::isfinite(time)) {
+            return base;
+        }
         if (keys.empty()) {
             return base;
         }
@@ -87,9 +102,22 @@ public:
         setKey(key);
     }
 
+    bool valid() const {
+        if (!std::isfinite(base) || !modulation.valid()) {
+            return false;
+        }
+        for (const auto& key : keys) {
+            if (!std::isfinite(key.time) || !std::isfinite(key.value) || !std::isfinite(key.incomingSlope)
+                || !std::isfinite(key.outgoingSlope) || static_cast<int>(key.interpolation) < 0 || static_cast<int>(key.interpolation) > 3) {
+                return false;
+            }
+        }
+        return true;
+    }
     bool animated() const { return !keys.empty(); }
     const std::vector<Keyframe>& keyframes() const { return keys; }
     double base = 0.0;
+    Modulation modulation;
 
 private:
     std::vector<Keyframe> keys;

@@ -9,6 +9,7 @@
 #include "ui/CameraPanel.h"
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
+#include "ui/ModulationPanel.h"
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
 public:
@@ -38,6 +39,7 @@ private:
     MotionCameraPanel cameraPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectsPanel effectsPanel;
+    MotionModulationPanel modulationPanel;
     osci::TabBar libraryTabs;
     osci::TabBar inspectorTabs;
     osci::TabBar timelineTabs;
@@ -50,6 +52,7 @@ private:
     juce::TextButton playButton { "Play" };
     juce::TextButton splitButton { "Split" };
     juce::Label timeLabel;
+    juce::Label tempoValue, tempoLabel;
     juce::Label selectionLabel;
     std::array<juce::Label, 13> values;
     std::array<osci::KeyframeButton, 13> keyButtons;

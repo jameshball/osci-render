@@ -382,6 +382,8 @@
             file="Resources/images/osci_mac.png"/>
       <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
             file="Source/motion/model/Animation.h"/>
+      <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
+            file="Source/motion/model/Modulation.h"/>
       <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
       <FILE id="MotTimeline" name="Timeline.h" compile="0" resource="0" file="Source/motion/model/Timeline.h"/>
       <FILE id="motgroupmodel" name="Group.h" compile="0" resource="0" file="Source/motion/model/Group.h"/>
@@ -400,6 +402,8 @@
             file="Source/motion/ui/EffectLibrary.h"/>
       <FILE id="MotEffectsPanel" name="EffectsPanel.h" compile="0" resource="0"
             file="Source/motion/ui/EffectsPanel.h"/>
+      <FILE id="motmodpanel" name="ModulationPanel.h" compile="0" resource="0"
+            file="Source/motion/ui/ModulationPanel.h"/>
       <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
             file="Source/motion/model/PreparedSource.h"/>
       <FILE id="MotSampleClock" name="SampleClock.h" compile="0" resource="0"

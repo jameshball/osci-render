@@ -61,7 +61,13 @@ public:
         }
         const auto& curve = drag.has_value() ? drag->preview : *storedCurve;
         const auto area = plot();
-        g.drawText(juce::String(propertyName) + " | " + juce::String(clip->name.data(), clip->name.size()), 12, 3, getWidth() - 24, 22, juce::Justification::centredLeft);
+        g.drawText(juce::String(propertyName) + " | " + juce::String(clip->name.data(), clip->name.size()), 12, 3, getWidth() - 180, 22, juce::Justification::centredLeft);
+        if (curve.modulation.enabled) {
+            g.setColour(juce::Colour(0xff70da91));
+            g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
+            g.setColour(juce::Colour(0xff80baff));
+            g.drawText("Result", getWidth() - 90, 3, 65, 22, juce::Justification::centredLeft);
+        }
         g.setFont(11.0f);
         for (int i = 0; i <= 4; ++i) {
             const auto fraction = i / 4.0;
@@ -77,7 +83,7 @@ public:
             g.drawText(juce::String(value, 2), 2, juce::roundToInt(y) - 8, 53, 16, juce::Justification::centredRight);
         }
         g.setColour(osci::Colours::text().withAlpha(0.5f));
-        g.drawText("Double-click: add | Right-click: interpolation | Cmd+wheel: time zoom | Wheel: value zoom | F: fit", 12, getHeight() - 19, getWidth() - 24, 17, juce::Justification::centredLeft);
+        g.drawText("Double-click: key | Drag: move | Right-click: curve | Cmd+wheel: time zoom | F: fit", 12, getHeight() - 19, getWidth() - 24, 17, juce::Justification::centredLeft);
         {
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(area.toNearestInt().expanded(5));
@@ -85,7 +91,7 @@ public:
             const auto steps = std::max(2, juce::roundToInt(area.getWidth()));
             for (int i = 0; i <= steps; ++i) {
                 const auto time = viewStart + (viewEnd - viewStart) * i / steps;
-                const auto y = valueY(curve.evaluate(clip->localTime(time)));
+                const auto y = valueY(curve.evaluateBase(clip->localTime(time)));
                 if (i == 0) {
                     path.startNewSubPath(timeX(time), y);
                 } else {
@@ -94,6 +100,16 @@ public:
             }
             g.setColour(juce::Colour(0xff70da91));
             g.strokePath(path, juce::PathStrokeType(1.7f));
+            if (curve.modulation.enabled) {
+                juce::Path result;
+                for (int i = 0; i <= steps; ++i) {
+                    const auto time = viewStart + (viewEnd - viewStart) * i / steps;
+                    const auto value = constrainedValue(*clip, curve.evaluate(clip->localTime(time), processor.document.project().bpm));
+                    if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
+                }
+                g.setColour(juce::Colour(0xff80baff));
+                g.strokePath(result, juce::PathStrokeType(1.4f));
+            }
             if (selectedTime.has_value()) {
                 const auto* selected = findKey(curve, *selectedTime);
                 if (selected != nullptr) {
@@ -360,7 +376,7 @@ private:
     }
 
     static bool sameCurve(const motion::Curve& a, const motion::Curve& b) {
-        return a.base == b.base && a.keyframes().size() == b.keyframes().size()
+        return a.base == b.base && a.modulation == b.modulation && a.keyframes().size() == b.keyframes().size()
             && std::equal(a.keyframes().begin(), a.keyframes().end(), b.keyframes().begin(), [](const auto& x, const auto& y) {
                 return x.time == y.time && x.value == y.value && x.interpolation == y.interpolation
                     && x.incomingSlope == y.incomingSlope && x.outgoingSlope == y.outgoingSlope;
@@ -464,10 +480,13 @@ private:
         const auto padding = clip->duration * 0.04;
         viewStart = clip->start - padding;
         viewEnd = clip->end() + padding;
-        low = high = curve->evaluate(clip->offset);
+        low = high = curve->evaluateBase(clip->offset);
         // Include sampled extrema of cubic segments as well as exact key values.
         for (int i = 0; i <= 256; ++i) {
-            const auto value = curve->evaluate(clip->localTime(clip->start + clip->duration * i / 256.0));
+            const auto local = clip->localTime(clip->start + clip->duration * i / 256.0);
+            const auto base = curve->evaluateBase(local);
+            low = std::min(low, base); high = std::max(high, base);
+            const auto value = constrainedValue(*clip, curve->evaluate(local, processor.document.project().bpm));
             low = std::min(low, value);
             high = std::max(high, value);
         }

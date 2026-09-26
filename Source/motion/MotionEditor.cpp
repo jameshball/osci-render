@@ -9,7 +9,7 @@ bool canSplitClip(const motion::Clip* clip, double time) {
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
     menus.addTopLevelMenu("File");
     menus.addProjectMenuItems(0, processor, *this);
     menus.addMenuSeparator(0);
@@ -29,6 +29,26 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     }
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
+    addChildComponent(modulationPanel);
+    addAndMakeVisible(tempoValue);
+    addAndMakeVisible(tempoLabel);
+    tempoLabel.setText("BPM", juce::dontSendNotification);
+    tempoValue.setName("Project tempo");
+    tempoValue.setEditable(false, true);
+    tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
+    tempoValue.setJustificationType(juce::Justification::centred);
+    tempoValue.onTextChange = [this] {
+        const auto text = tempoValue.getText().trim();
+        char* end = nullptr;
+        const auto value = std::strtod(text.toRawUTF8(), &end);
+        if (text.isEmpty() || end == nullptr || *end != '\0' || !std::isfinite(value) || value < 1 || value > 1000) {
+            tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
+            return;
+        }
+        if (value != processor.document.project().bpm) {
+            processor.document.edit("Change tempo", [value](motion::Project& project) { project.bpm = value; });
+        }
+    };
     addChildComponent(effectLibrary);
     addChildComponent(effectsPanel);
     libraryHeader.setVisible(false);
@@ -74,6 +94,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timelineTabs.onSelectionChanged = [this](int index) {
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
+        modulationPanel.setVisible(index == 1);
         curveProperty.setVisible(index == 1);
         resized();
     };
@@ -90,6 +111,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         if (index >= curveProperties.size()) { return; }
         curvePropertyName = curveProperties[index];
         curveEditor.setSelection(curveTarget, curvePropertyName);
+        modulationPanel.setTarget(curveTarget, curvePropertyName);
     };
     cameraPanel.onPropertySelected = [this](motion::Id id, std::string property) {
         selectCurveTarget(id, property, true);
@@ -207,19 +229,24 @@ void MotionEditor::resized() {
     menuBar.setBounds(top);
     area.removeFromTop(3);
     workspaceHeight = area.getHeight();
-    timelineBounds = area.removeFromBottom(std::clamp(juce::roundToInt(workspaceHeight * timelineFraction), 200, workspaceHeight - 370));
+    timelineBounds = area.removeFromBottom(std::clamp(juce::roundToInt(workspaceHeight * timelineFraction), 240, workspaceHeight - 370));
     auto timeline = timelineBounds;
     auto transport = timeline.removeFromTop(30);
     timelineHeader.setBounds(transport);
     timelineTabs.setBounds(transport.removeFromLeft(205));
     playButton.setBounds(transport.removeFromLeft(65).reduced(2));
     splitButton.setBounds(transport.removeFromLeft(65).reduced(2));
-    timeLabel.setBounds(transport.removeFromLeft(110));
+    timeLabel.setBounds(transport.removeFromLeft(90));
+    tempoValue.setBounds(transport.removeFromLeft(56).reduced(1, 3));
+    tempoLabel.setBounds(transport.removeFromLeft(34));
     curveProperty.setBounds(transport.removeFromLeft(195).reduced(2));
     cancelExport.setBounds(transport.removeFromRight(62).reduced(2));
     exportBar.setBounds(transport.removeFromRight(180).reduced(2));
     this->timeline.setBounds(timeline.withTrimmedTop(3));
-    curveEditor.setBounds(timeline.withTrimmedTop(3));
+    auto graph = timeline.withTrimmedTop(3);
+    modulationPanel.setBounds(graph.removeFromRight(285));
+    graph.removeFromRight(3);
+    curveEditor.setBounds(graph);
     timelineDivider.setBounds(area.removeFromBottom(7));
     libraryBounds = area.removeFromLeft(190);
     auto library = libraryBounds;
@@ -364,6 +391,7 @@ void MotionEditor::timerCallback() {
     if (exportState != nullptr) { exportProgress = exportState->progress.load(); }
     playButton.setButtonText(processor.playing.load() ? "Pause" : "Play");
     timeLabel.setText(juce::String(processor.position.load(), 2) + " s", juce::dontSendNotification);
+    if (!tempoValue.isBeingEdited()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
     timeline.repaint();
     curveEditor.repaint();
     composition.repaint();
@@ -378,6 +406,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     assetLibrary.refresh();
     timeline.refreshTracks();
     effectsPanel.refresh();
+    modulationPanel.refresh();
     curveEditor.refresh();
     composition.refresh();
     refreshInspector();
@@ -418,7 +447,7 @@ void MotionEditor::refreshInspector() {
         if (editable && !values[index].isBeingEdited()) {
             const auto found = target->properties->find(motion::propertyNames[index]);
             if (found != target->properties->end()) {
-                values[index].setText(juce::String(found->second.evaluate(target->localTime(processor.position.load())), 2), juce::dontSendNotification);
+                values[index].setText(juce::String(found->second.evaluateBase(target->localTime(processor.position.load())), 2), juce::dontSendNotification);
                 const auto time = target->localTime(processor.position.load());
                 const auto& keys = found->second.keyframes();
                 const auto keyed = std::any_of(keys.begin(), keys.end(), [time](const auto& key) { return std::abs(key.time - time) < 1.0e-6; });
@@ -438,7 +467,7 @@ void MotionEditor::setProperty(int index, bool keyframe) {
     if (existing == nullptr) {
         return;
     }
-    auto value = existing->evaluate(target->localTime(time));
+    auto value = existing->evaluateBase(target->localTime(time));
     if (!keyframe) {
         const auto text = values[index].getText().trim();
         char* end = nullptr;
@@ -528,4 +557,5 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curveProperty.setSelectedId(selectedIndex + 1, juce::dontSendNotification);
     curvePropertyName = curveProperties[static_cast<std::size_t>(selectedIndex)];
     curveEditor.setSelection(id, curvePropertyName);
+    modulationPanel.setTarget(id, curvePropertyName);
 }

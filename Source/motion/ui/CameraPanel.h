@@ -116,7 +116,7 @@ public:
             values[i].setEnabled(available);
             keys[i].setEnabled(available);
             if (!values[i].isBeingEdited()) {
-                values[i].setText(available ? juce::String(property->second.evaluate(time), 3) : "—", juce::dontSendNotification);
+                values[i].setText(available ? juce::String(property->second.evaluateBase(time), 3) : "—", juce::dontSendNotification);
             }
             auto state = osci::KeyframeButton::State::unanimated;
             if (available && property->second.animated()) {
@@ -215,7 +215,7 @@ private:
         }
         const auto* camera = findCamera(processor.document.project(), target.id);
         const auto property = std::string(motion::cameraPropertyNames[index]);
-        if (camera == nullptr || !camera->properties.contains(property) || camera->properties.at(property).evaluate(target.time) == value) {
+        if (camera == nullptr || !camera->properties.contains(property) || camera->properties.at(property).evaluateBase(target.time) == value) {
             refresh();
             return;
         }
@@ -245,7 +245,7 @@ private:
             auto* camera = findCamera(project, id);
             if (camera != nullptr) {
                 auto& curve = camera->properties.at(property);
-                curve.setKeyValue(time, curve.evaluate(time));
+                curve.setKeyValue(time, curve.evaluateBase(time));
             }
         });
         refresh();

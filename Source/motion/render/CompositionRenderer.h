@@ -6,17 +6,17 @@
 #include <numbers>
 
 namespace motion {
-inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time) {
-    point.scale(curves[6].evaluate(time), curves[7].evaluate(time), curves[8].evaluate(time));
+inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120) {
+    point.scale(curves[6].evaluate(time, bpm), curves[7].evaluate(time, bpm), curves[8].evaluate(time, bpm));
     constexpr auto radians = std::numbers::pi / 180.0;
-    point.rotate(curves[3].evaluate(time) * radians, curves[4].evaluate(time) * radians, curves[5].evaluate(time) * radians);
-    point.translate(curves[0].evaluate(time), curves[1].evaluate(time), curves[2].evaluate(time));
+    point.rotate(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
+    point.translate(curves[0].evaluate(time, bpm), curves[1].evaluate(time, bpm), curves[2].evaluate(time, bpm));
     const auto sourceRed = point.r < 0 ? 1.0f : point.r;
     const auto sourceGreen = point.r < 0 ? 1.0f : point.g;
     const auto sourceBlue = point.r < 0 ? 1.0f : point.b;
-    point.r = std::clamp(static_cast<float>(sourceRed * curves[9].evaluate(time)), 0.0f, 1.0f);
-    point.g = std::clamp(static_cast<float>(sourceGreen * curves[10].evaluate(time)), 0.0f, 1.0f);
-    point.b = std::clamp(static_cast<float>(sourceBlue * curves[11].evaluate(time)), 0.0f, 1.0f);
+    point.r = std::clamp(static_cast<float>(sourceRed * curves[9].evaluate(time, bpm)), 0.0f, 1.0f);
+    point.g = std::clamp(static_cast<float>(sourceGreen * curves[10].evaluate(time, bpm)), 0.0f, 1.0f);
+    point.b = std::clamp(static_cast<float>(sourceBlue * curves[11].evaluate(time, bpm)), 0.0f, 1.0f);
     if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
         || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
         return { 0, 0, 0, 0, 0, 0 };
@@ -35,12 +35,12 @@ struct PreparedGroup {
             curves[index] = found == group.properties.end() ? Curve(index >= 6 ? 1 : 0) : found->second;
         }
     }
-    double weight(double time) const {
-        const auto value = curves[12].evaluate(time);
+    double weight(double time, double bpm = 120) const {
+        const auto value = curves[12].evaluate(time, bpm);
         return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
     }
-    osci::Point apply(osci::Point point, double time) const {
-        return applyEffects(effects, applyTransform(point, curves, time), time);
+    osci::Point apply(osci::Point point, double time, double bpm = 120) const {
+        return applyEffects(effects, applyTransform(point, curves, time, bpm), time, bpm);
     }
 };
 
@@ -51,14 +51,15 @@ struct PreparedClip {
     std::array<Curve, 13> curves;
     std::vector<PreparedEffect> effects, trackEffects;
     std::vector<PreparedGroup> groups;
+    double bpm = 120;
 
     double localTime(double time) const { return offset + (time - start) * rate; }
     bool active(double time) const { return time >= start && time < end; }
     double weight(double time) const {
-        const auto value = curves[12].evaluate(localTime(time));
+        const auto value = curves[12].evaluate(localTime(time), bpm);
         double weight = std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
         for (const auto& group : groups) {
-            weight *= group.weight(time);
+            weight *= group.weight(time, bpm);
         }
         // At most 32 ancestors, each bounded to 1e6, keeps this product
         // below 1e198. Saturate only after outer attenuation is applied.
@@ -67,11 +68,11 @@ struct PreparedClip {
 
     osci::Point sample(double time, double phase) const {
         const auto local = localTime(time);
-        auto point = applyEffects(effects, source->sample(local, phase), local);
-        point = applyTransform(point, curves, local);
-        point = applyEffects(trackEffects, point, time);
+        auto point = applyEffects(effects, source->sample(local, phase), local, bpm);
+        point = applyTransform(point, curves, local, bpm);
+        point = applyEffects(trackEffects, point, time, bpm);
         for (const auto& group : groups) {
-            point = group.apply(point, time);
+            point = group.apply(point, time, bpm);
         }
         return point;
     }
@@ -80,11 +81,12 @@ struct PreparedClip {
 struct PreparedCamera {
     Id id;
     std::array<Curve, 7> curves;
+    double bpm = 120;
 
     osci::Point projectPoint(osci::Point point, double time) const {
         std::array<double, 7> values;
         for (std::size_t index = 0; index < values.size(); ++index) {
-            values[index] = curves[index].evaluate(time);
+            values[index] = curves[index].evaluate(time, bpm);
             if (!std::isfinite(values[index])) {
                 return { 0, 0, 0, 0, 0, 0 };
             }
@@ -117,7 +119,7 @@ struct PreparedCamera {
 };
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project) : duration(project.duration), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project) : duration(project.duration), bpm(project.bpm), effects(prepareEffects(project.effects)) {
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;
@@ -125,6 +127,7 @@ struct PreparedComposition {
                 const auto found = camera.properties.find(cameraPropertyNames[index]);
                 item.curves[index] = found != camera.properties.end() ? found->second : defaults.properties.at(cameraPropertyNames[index]);
             }
+            item.bpm = project.bpm;
             cameras.push_back(std::move(item));
         }
         for (const auto& cut : project.cameraCuts) {
@@ -153,6 +156,7 @@ struct PreparedComposition {
                     const auto curve = clip.properties.find(propertyNames[i]);
                     item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
                 }
+                item.bpm = project.bpm;
                 item.effects = prepareEffects(clip.effects);
                 item.trackEffects = prepareEffects(track.effects);
                 auto groupId = track.group;
@@ -211,7 +215,7 @@ struct PreparedComposition {
     }
 
     osci::Point applyCompositionEffects(osci::Point point, double time) const {
-        return applyEffects(effects, point, time);
+        return applyEffects(effects, point, time, bpm);
     }
 
     osci::Point projectPoint(osci::Point point, double time) const {
@@ -238,6 +242,7 @@ struct PreparedComposition {
     }
 
     double duration;
+    double bpm = 120;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
 
