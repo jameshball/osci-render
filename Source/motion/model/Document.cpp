@@ -585,6 +585,10 @@ juce::XmlElement Document::save() const {
     xml.setAttribute("duration", state.duration);
     xml.setAttribute("fps", state.frameRate);
     xml.setAttribute("bpm", state.bpm);
+    xml.setAttribute("timeDisplay", static_cast<int>(state.timeDisplay));
+    xml.setAttribute("beatsPerBar", state.beatsPerBar);
+    xml.setAttribute("snapBeats", state.snapBeats);
+    xml.setAttribute("gridSnap", state.gridSnap);
     saveEffects(xml, state.effects);
     for (const auto& group : state.groups) {
         auto* item = xml.createNewChildElement("group");
@@ -656,8 +660,16 @@ juce::Result Document::load(const juce::XmlElement& xml) {
     project.duration = xml.getDoubleAttribute("duration", 180);
     project.frameRate = xml.getDoubleAttribute("fps", 30);
     project.bpm = xml.getDoubleAttribute("bpm", 120);
+    const auto display = xml.getIntAttribute("timeDisplay", 0);
+    const auto snap = xml.getIntAttribute("gridSnap", 1);
+    project.timeDisplay = static_cast<TimeDisplay>(display);
+    project.beatsPerBar = xml.getIntAttribute("beatsPerBar", 4);
+    project.snapBeats = xml.getDoubleAttribute("snapBeats", 0.25);
+    project.gridSnap = snap != 0;
     if (!std::isfinite(project.duration) || project.duration <= 0 || !std::isfinite(project.frameRate)
-        || project.frameRate <= 0 || !std::isfinite(project.bpm) || project.bpm <= 0) {
+        || project.frameRate < 0.001 || project.frameRate > 1000 || !std::isfinite(project.bpm) || project.bpm < 1 || project.bpm > 1000
+        || display < 0 || display > 2 || snap < 0 || snap > 1 || project.beatsPerBar < 1 || project.beatsPerBar > 32
+        || !std::isfinite(project.snapBeats) || project.snapBeats < 1.0 / 64 || project.snapBeats > 64) {
         return juce::Result::fail("Invalid composition timing.");
     }
     std::set<Id> identities;

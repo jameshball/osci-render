@@ -32,7 +32,14 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addChildComponent(modulationPanel);
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
+    addAndMakeVisible(timingButton);
+    timingButton.setName("Time and grid");
+    timingButton.setTitle("Time and grid");
+    timingButton.setTooltip("Time display, snapping, meter and frame rate. Alt temporarily bypasses snapping.");
+    timingButton.onClick = [this] { showTimingMenu(); };
+    refreshTiming();
     tempoLabel.setText("BPM", juce::dontSendNotification);
+    timeLabel.setName("Timeline position");
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
     tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
@@ -236,10 +243,11 @@ void MotionEditor::resized() {
     timelineTabs.setBounds(transport.removeFromLeft(205));
     playButton.setBounds(transport.removeFromLeft(65).reduced(2));
     splitButton.setBounds(transport.removeFromLeft(65).reduced(2));
-    timeLabel.setBounds(transport.removeFromLeft(90));
+    timeLabel.setBounds(transport.removeFromLeft(110));
     tempoValue.setBounds(transport.removeFromLeft(56).reduced(1, 3));
     tempoLabel.setBounds(transport.removeFromLeft(34));
-    curveProperty.setBounds(transport.removeFromLeft(195).reduced(2));
+    timingButton.setBounds(transport.removeFromLeft(150).reduced(2));
+    curveProperty.setBounds(transport.removeFromLeft(165).reduced(2));
     cancelExport.setBounds(transport.removeFromRight(62).reduced(2));
     exportBar.setBounds(transport.removeFromRight(180).reduced(2));
     this->timeline.setBounds(timeline.withTrimmedTop(3));
@@ -390,7 +398,7 @@ void MotionEditor::timerCallback() {
     }
     if (exportState != nullptr) { exportProgress = exportState->progress.load(); }
     playButton.setButtonText(processor.playing.load() ? "Pause" : "Play");
-    timeLabel.setText(juce::String(processor.position.load(), 2) + " s", juce::dontSendNotification);
+    timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
     if (!tempoValue.isBeingEdited()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
     timeline.repaint();
     curveEditor.repaint();
@@ -404,6 +412,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
         if (task->generation != processor.document.generation()) { task->cancelled.store(true); }
     }
     assetLibrary.refresh();
+    refreshTiming();
     timeline.refreshTracks();
     effectsPanel.refresh();
     modulationPanel.refresh();
@@ -558,4 +567,72 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curvePropertyName = curveProperties[static_cast<std::size_t>(selectedIndex)];
     curveEditor.setSelection(id, curvePropertyName);
     modulationPanel.setTarget(id, curvePropertyName);
+}
+
+
+void MotionEditor::refreshTiming() {
+    const auto& project = processor.document.project();
+    const auto display = project.timeDisplay == motion::TimeDisplay::beats ? "Beats" : (project.timeDisplay == motion::TimeDisplay::frames ? "Frames" : "Seconds");
+    juce::String grid = "Free";
+    if (project.gridSnap) {
+        if (project.timeDisplay != motion::TimeDisplay::beats) { grid = "Frame"; }
+        else if (std::abs(project.snapBeats - project.beatsPerBar) < 1.0e-9) { grid = "Bar"; }
+        else if (std::abs(project.snapBeats - 1) < 1.0e-9) { grid = "Beat"; }
+        else if (std::abs(project.snapBeats - 1.0 / 3) < 1.0e-9) { grid = "1/8 T"; }
+        else if (std::abs(project.snapBeats - 1.0 / 6) < 1.0e-9) { grid = "1/16 T"; }
+        else { grid = "1/" + juce::String(4.0 / project.snapBeats, 0); }
+    }
+    timingButton.setButtonText(juce::String(display) + " / " + grid + " " + juce::String::charToString(0x25be));
+    timeline.repaint();
+    curveEditor.repaint();
+}
+
+void MotionEditor::showTimingMenu() {
+    const auto& project = processor.document.project();
+    juce::PopupMenu menu;
+    menu.setLookAndFeel(&getLookAndFeel());
+    menu.addSectionHeader("Time display");
+    menu.addItem(101, "Seconds", true, project.timeDisplay == motion::TimeDisplay::seconds);
+    menu.addItem(102, "Frames", true, project.timeDisplay == motion::TimeDisplay::frames);
+    menu.addItem(103, "Bars / beats", true, project.timeDisplay == motion::TimeDisplay::beats);
+    menu.addSeparator();
+    menu.addItem(200, "Snap to grid", true, project.gridSnap);
+    const std::array<double, 7> divisions { static_cast<double>(project.beatsPerBar), 1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6 };
+    const std::array<const char*, 7> names { "1 bar", "1 beat", "1/8 note", "1/16 note", "1/32 note", "1/8 triplet", "1/16 triplet" };
+    juce::PopupMenu beatGrid;
+    for (std::size_t i = 0; i < divisions.size(); ++i) { beatGrid.addItem(300 + static_cast<int>(i), names[i], true, std::abs(project.snapBeats - divisions[i]) < 1.0e-9); }
+    menu.addSubMenu("Beat grid", beatGrid, project.timeDisplay == motion::TimeDisplay::beats);
+    juce::PopupMenu meter;
+    for (const auto beats : { 2, 3, 4, 5, 6, 7 }) { meter.addItem(400 + beats, juce::String(beats) + "/4", true, project.beatsPerBar == beats); }
+    menu.addSubMenu("Meter", meter);
+    const std::array<double, 8> rates { 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120 };
+    const std::array<const char*, 8> rateNames { "23.976 fps", "24 fps", "25 fps", "29.97 fps", "30 fps", "50 fps", "60 fps", "120 fps" };
+    juce::PopupMenu frames;
+    for (std::size_t i = 0; i < rates.size(); ++i) { frames.addItem(500 + static_cast<int>(i), rateNames[i], true, std::abs(project.frameRate - rates[i]) < 1.0e-9); }
+    menu.addSubMenu("Frame rate", frames);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const auto generation = processor.document.generation();
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(timingButton), [owner, generation, divisions, rates](int result) {
+        if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
+        const auto& current = owner->processor.document.project();
+        const auto subdivision = result == 300 ? static_cast<double>(current.beatsPerBar)
+            : (result > 300 && result < 307 ? divisions[static_cast<std::size_t>(result - 300)] : current.snapBeats);
+        if (result >= 101 && result <= 103 && static_cast<int>(current.timeDisplay) == result - 101) { return; }
+        if (result >= 300 && result < 307 && current.gridSnap && std::abs(current.snapBeats - subdivision) < 1.0e-9) { return; }
+        if (result >= 402 && result <= 407 && current.beatsPerBar == result - 400) { return; }
+        if (result >= 500 && result < 508 && std::abs(current.frameRate - rates[static_cast<std::size_t>(result - 500)]) < 1.0e-9) { return; }
+        owner->processor.document.edit("Change timeline grid", [result, subdivision, rates](motion::Project& state) {
+            if (result >= 101 && result <= 103) {
+                state.timeDisplay = static_cast<motion::TimeDisplay>(result - 101);
+            } else if (result == 200) {
+                state.gridSnap = !state.gridSnap;
+            } else if (result >= 300 && result < 307) {
+                state.snapBeats = subdivision;
+                state.gridSnap = true;
+            } else if (result >= 402 && result <= 407) {
+                if (std::abs(state.snapBeats - state.beatsPerBar) < 1.0e-9) { state.snapBeats = result - 400; }
+                state.beatsPerBar = result - 400;
+            } else if (result >= 500 && result < 508) { state.frameRate = rates[static_cast<std::size_t>(result - 500)]; }
+        });
+    });
 }

@@ -91,7 +91,7 @@ public:
         newSeed.setVisible(noise);
         rate.setTooltip(settings.tempoSync ? "Beats per cycle; follows project tempo" : "Cycles per second in the property's time domain");
         phase.setTooltip("Phase offset in degrees");
-        amount.setTooltip(settings.mode == motion::ModulationMode::multiply ? "Multiply the keyed value by 1 + amount × waveform" : "Add amount × waveform to the keyed value");
+        amount.setTooltip(settings.mode == motion::ModulationMode::multiply ? "Multiply the keyed value by 1 + amount * waveform" : "Add amount * waveform to the keyed value");
         updating = false;
         repaint();
     }

@@ -101,9 +101,51 @@ public:
         testTrackStates(document.project());
         testGroups(document.project());
         testModulation(document.project());
+        testTiming(document.project());
     }
 
 private:
+    void testTiming(const motion::Project& source) {
+        beginTest("Musical grid settings round trip without retiming object clips or keys");
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(source);
+        const auto start = document.project().tracks[0].clips[0].start;
+        const auto keyTime = document.project().tracks[0].clips[0].properties.at("position.x").keyframes().back().time;
+        document.edit("Timing", [](motion::Project& project) {
+            project.timeDisplay = motion::TimeDisplay::beats;
+            project.bpm = 90;
+            project.beatsPerBar = 3;
+            project.snapBeats = 1.0 / 3;
+            project.gridSnap = false;
+            project.frameRate = 24;
+        });
+        expectEquals(document.project().tracks[0].clips[0].start, start);
+        expectEquals(document.project().tracks[0].clips[0].properties.at("position.x").keyframes().back().time, keyTime);
+        const auto xml = document.save();
+        juce::UndoManager loadedUndo;
+        motion::Document loaded(loadedUndo);
+        expect(loaded.load(xml).wasOk());
+        expect(loaded.project().timeDisplay == motion::TimeDisplay::beats);
+        expectEquals(loaded.project().beatsPerBar, 3);
+        expectEquals(loaded.project().bpm, 90.0);
+        expectEquals(loaded.project().frameRate, 24.0);
+        expectWithinAbsoluteError(loaded.project().snapBeats, 1.0 / 3, 1.0e-12);
+        expect(!loaded.project().gridSnap);
+        expect(undo.undo());
+        expect(document.project().timeDisplay == source.timeDisplay);
+        expect(undo.redo());
+        expect(document.project().timeDisplay == motion::TimeDisplay::beats);
+        beginTest("Invalid timing settings reject atomically");
+        const auto unchanged = loaded.save().toString();
+        for (const auto* attribute : { "timeDisplay", "beatsPerBar", "snapBeats", "gridSnap", "bpm", "fps" }) {
+            auto invalid = xml;
+            invalid.setAttribute(attribute, -1);
+            expect(loaded.load(invalid).failed());
+            expectEquals(loaded.save().toString(), unchanged);
+        }
+    }
+
     void testModulation(const motion::Project& sourceProject) {
         beginTest("Prepared modulation uses clip-local and project clocks with project tempo");
         auto project = sourceProject;

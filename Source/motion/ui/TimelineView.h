@@ -136,7 +136,7 @@ public:
             return;
         }
         const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
-        const auto snapped = std::round(time * project.frameRate) / project.frameRate;
+        const auto snapped = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
         const auto row = trackAtY(y);
         const auto group = groupAtY(y);
         auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
@@ -175,11 +175,18 @@ public:
         pixelsPerSecond = std::isfinite(pixelsPerSecond) ? std::clamp(pixelsPerSecond, 0.000001, 500.0) : 70.0;
         scrollTime = std::isfinite(scrollTime) ? std::max(0.0, scrollTime) : 0.0;
         const auto visibleSeconds = std::max(0, getWidth() - namesWidth) / pixelsPerSecond;
-        const auto rawStep = 70.0 / pixelsPerSecond;
-        const auto magnitude = std::pow(10.0, std::floor(std::log10(rawStep)));
-        const auto normalizedStep = rawStep / magnitude;
-        const double step = magnitude * (normalizedStep <= 1 ? 1 : (normalizedStep <= 2 ? 2 : (normalizedStep <= 5 ? 5 : 10)));
-        const auto decimals = std::max(0, static_cast<int>(std::ceil(-std::log10(step))));
+        const auto grid = processor.document.project().timeGrid();
+        const auto step = grid.tickStep(pixelsPerSecond);
+        const auto minorStep = grid.display == motion::TimeDisplay::beats ? grid.snapBeats * 60.0 / grid.bpm : 1.0 / grid.frameRate;
+        if (grid.snapping && minorStep * pixelsPerSecond >= 9 && minorStep < step) {
+            const auto first = std::floor(scrollTime / minorStep) * minorStep;
+            const auto count = std::clamp(static_cast<int>(std::ceil(visibleSeconds / minorStep)) + 2, 0, 1000);
+            g.setColour(juce::Colours::white.withAlpha(0.035f));
+            for (int tick = 0; tick < count; ++tick) {
+                const auto x = timeX(first + tick * minorStep);
+                if (x >= namesWidth) { g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight())); }
+            }
+        }
         const auto firstTick = std::floor(scrollTime / step) * step;
         const auto tickCount = std::clamp(static_cast<int>(std::ceil(visibleSeconds / step)) + 2, 0, 1000);
         for (int tick = 0; tick < tickCount; ++tick) {
@@ -191,7 +198,7 @@ public:
             g.setColour(juce::Colours::white.withAlpha(0.06f));
             g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
             g.setColour(osci::Colours::text().withAlpha(0.7f));
-            g.drawText(juce::String(time, decimals) + "s", x + 5, 0, 50, rulerHeight, juce::Justification::centredLeft);
+            g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, rulerHeight, juce::Justification::centredLeft);
         }
         g.setColour(osci::Colours::dark());
         g.fillRect(0, 0, namesWidth, rulerHeight);
@@ -278,10 +285,10 @@ public:
             }
         } else if (dropPosition.has_value()) {
             const auto row = trackAtY(dropPosition->y);
-            const auto time = std::max(0.0, scrollTime + (dropPosition->x - namesWidth) / pixelsPerSecond);
+            const auto time = dropPosition->x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (dropPosition->x - namesWidth) / pixelsPerSecond);
             motion::Clip candidate;
             candidate.id = std::numeric_limits<motion::Id>::max();
-            candidate.start = std::round(time * processor.document.project().frameRate) / processor.document.project().frameRate;
+            candidate.start = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
             const auto& assets = processor.document.project().assets;
             const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == dropAssetId; });
             if (asset != assets.end()) {
@@ -332,7 +339,7 @@ public:
         }
         if (event.y < rulerHeight && event.x >= namesWidth) {
             scrubbing = true;
-            seek(event.x);
+            seek(event.x, event.mods);
             return;
         }
         const auto group = groupAtY(event.y);
@@ -370,7 +377,7 @@ public:
 
     void mouseDrag(const juce::MouseEvent& event) override {
         if (scrubbing) {
-            seek(event.x);
+            seek(event.x, event.mods);
             return;
         }
         if (!gestureIsCurrent()) {
@@ -378,8 +385,10 @@ public:
         }
         auto candidate = original;
         auto delta = (event.x - downX) / pixelsPerSecond;
-        if (!event.mods.isAltDown()) {
-            delta = std::round(delta * before->frameRate) / before->frameRate;
+        if (delta != 0.0 && !event.mods.isAltDown()) {
+            const auto anchor = mode == Mode::right || mode == Mode::stretch ? original.end()
+                : (mode == Mode::slip ? original.offset / original.rate : original.start);
+            delta = before->timeGrid().snap(anchor + delta) - anchor;
         }
         if (delta != 0.0) {
             if (mode == Mode::move) {
@@ -811,8 +820,11 @@ private:
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const {
         return { timeX(clip.start), trackY(row), std::max(2, boundedPixel(clip.duration * pixelsPerSecond)), rowHeight };
     }
-    void seek(int x) {
-        processor.seek(std::clamp(scrollTime + (x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration));
+    double snapTime(double time, juce::ModifierKeys modifiers) const {
+        return modifiers.isAltDown() ? time : processor.document.project().timeGrid().snap(time);
+    }
+    void seek(int x, juce::ModifierKeys modifiers) {
+        processor.seek(std::clamp(snapTime(scrollTime + (x - namesWidth) / pixelsPerSecond, modifiers), 0.0, processor.document.project().duration));
         repaint();
     }
     juce::TextButton addTrack;

@@ -3,6 +3,7 @@
 #include "../MotionProcessor.h"
 #include "../model/PropertyTarget.h"
 #include <optional>
+#include <limits>
 
 // Keys retain content-local times; the ruler and snapping use project time.
 // Drags preview locally and commit through Document once on release, so an
@@ -71,16 +72,26 @@ public:
         g.setFont(11.0f);
         for (int i = 0; i <= 4; ++i) {
             const auto fraction = i / 4.0;
-            const auto time = viewStart + fraction * (viewEnd - viewStart);
             const auto value = low + fraction * (high - low);
-            const auto x = timeX(time);
             const auto y = valueY(value);
             g.setColour(juce::Colours::white.withAlpha(0.07f));
-            g.drawLine(x, area.getY(), x, area.getBottom());
             g.drawLine(area.getX(), y, area.getRight(), y);
             g.setColour(osci::Colours::text().withAlpha(0.65f));
-            g.drawText(juce::String(time, 2) + "s", juce::roundToInt(x) - 30, juce::roundToInt(area.getBottom()) + 3, 60, 17, juce::Justification::centred);
             g.drawText(juce::String(value, 2), 2, juce::roundToInt(y) - 8, 53, 16, juce::Justification::centredRight);
+        }
+        const auto grid = processor.document.project().timeGrid();
+        const auto step = grid.tickStep(area.getWidth() / (viewEnd - viewStart));
+        const auto firstTick = std::ceil(viewStart / step) * step;
+        const auto rawCount = std::ceil((viewEnd - viewStart) / step) + 1.0;
+        const auto count = std::isfinite(rawCount) ? static_cast<int>(std::clamp(rawCount, 0.0, 1000.0)) : 0;
+        for (int index = 0; index < count; ++index) {
+            const auto time = firstTick + index * step;
+            if (!std::isfinite(time) || time > viewEnd) { break; }
+            const auto x = timeX(time);
+            g.setColour(juce::Colours::white.withAlpha(0.07f));
+            g.drawLine(x, area.getY(), x, area.getBottom());
+            g.setColour(osci::Colours::text().withAlpha(0.65f));
+            g.drawText(juce::String(grid.label(time, step)), juce::roundToInt(x) - 34, juce::roundToInt(area.getBottom()) + 3, 68, 17, juce::Justification::centred);
         }
         g.setColour(osci::Colours::text().withAlpha(0.5f));
         g.drawText("Double-click: key | Drag: move | Right-click: curve | Cmd+wheel: time zoom | F: fit", 12, getHeight() - 19, getWidth() - 24, 17, juce::Justification::centredLeft);
@@ -90,7 +101,7 @@ public:
             juce::Path path;
             const auto steps = std::max(2, juce::roundToInt(area.getWidth()));
             for (int i = 0; i <= steps; ++i) {
-                const auto time = viewStart + (viewEnd - viewStart) * i / steps;
+                const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
                 const auto y = valueY(curve.evaluateBase(clip->localTime(time)));
                 if (i == 0) {
                     path.startNewSubPath(timeX(time), y);
@@ -103,7 +114,7 @@ public:
             if (curve.modulation.enabled) {
                 juce::Path result;
                 for (int i = 0; i <= steps; ++i) {
-                    const auto time = viewStart + (viewEnd - viewStart) * i / steps;
+                    const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
                     const auto value = constrainedValue(*clip, curve.evaluate(clip->localTime(time), processor.document.project().bpm));
                     if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
                 }
@@ -196,6 +207,7 @@ public:
         motion::Keyframe key;
         key.time = clip->localTime(snappedTime(*clip, projectTime(event.position.x), event.mods));
         key.value = constrainedValue(*clip, valueAt(event.position.y));
+        if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
         const auto id = targetId;
         const auto property = propertyName;
         processor.document.edit("Add animation key", [id, property, key](motion::Project& project) {
@@ -247,6 +259,7 @@ public:
             }
         }
         key.value = constrainedValue(*clip, key.value);
+        if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
         drag->preview = drag->originalCurve;
         drag->preview.removeKey(drag->original.time);
         drag->preview.setKey(key);
@@ -321,19 +334,21 @@ public:
         if (event.mods.isCommandDown()) {
             const auto anchor = projectTime(event.position.x);
             const auto ratio = (anchor - viewStart) / (viewEnd - viewStart);
-            const auto span = std::clamp((viewEnd - viewStart) * std::exp(-wheel.deltaY * 3.0), 1.0 / std::max(1.0, processor.document.project().frameRate), std::max(1.0, processor.document.project().duration * 4.0));
-            viewStart = anchor - span * ratio;
-            viewEnd = viewStart + span;
+            const auto duration = processor.document.project().duration;
+            const auto maximumSpan = duration >= viewLimit / 2 ? viewLimit * 2 : std::max(1.0, duration * 4.0);
+            const auto span = std::clamp((viewEnd - viewStart) * std::exp(-wheel.deltaY * 3.0), 1.0 / std::max(1.0, processor.document.project().frameRate), maximumSpan);
+            const auto start = anchor - span * ratio;
+            setView(start, start + span);
         } else if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY)) {
             const auto shift = -(wheel.deltaX + wheel.deltaY) * (viewEnd - viewStart) * 0.2;
-            viewStart += shift;
-            viewEnd += shift;
+            setView(viewStart + shift, viewEnd + shift);
         } else {
             const auto anchor = valueAt(event.position.y);
             const auto ratio = (anchor - low) / (high - low);
             const auto span = std::clamp((high - low) * std::exp(-wheel.deltaY * 3.0), 0.0001, 1.0e9);
             low = anchor - span * ratio;
             high = low + span;
+            normalizeValueRange();
         }
         repaint();
     }
@@ -391,13 +406,42 @@ private:
     juce::Rectangle<float> plot() const {
         return { 62.0f, 34.0f, std::max(1.0f, getWidth() - 82.0f), std::max(1.0f, getHeight() - 78.0f) };
     }
-    float timeX(double time) const { return plot().getX() + static_cast<float>((time - viewStart) / (viewEnd - viewStart)) * plot().getWidth(); }
+    // Reserve enough headroom for subtracting both viewport endpoints. This
+    // bounds only the displayed window, never the authored project or keys.
+    static constexpr double viewLimit = std::numeric_limits<double>::max() / 2;
+    void setView(double start, double end) {
+        if (std::isnan(start) || std::isnan(end)) { return; }
+        start = std::clamp(start, -viewLimit, viewLimit);
+        end = std::clamp(end, -viewLimit, viewLimit);
+        const auto minimumSpan = std::max(1.0e-9, std::abs(start) * std::numeric_limits<double>::epsilon() * 4);
+        if (end - start < minimumSpan) {
+            end = std::min(viewLimit, start + minimumSpan);
+            start = std::max(-viewLimit, end - minimumSpan);
+        }
+        viewStart = start;
+        viewEnd = end;
+    }
+    void normalizeValueRange() {
+        if (!std::isfinite(low) || !std::isfinite(high) || !std::isfinite(high - low) || high <= low) {
+            low = -1.0;
+            high = 1.0;
+        }
+    }
+    float timeX(double time) const {
+        auto normalized = (time - viewStart) / (viewEnd - viewStart);
+        if (!std::isfinite(normalized)) { normalized = time < viewStart ? -10.0 : 11.0; }
+        return plot().getX() + static_cast<float>(std::clamp(normalized, -10.0, 11.0)) * plot().getWidth();
+    }
     float valueY(double value) const {
         const auto normalized = (value - low) / (high - low);
         const auto bounded = std::isfinite(normalized) ? std::clamp(normalized, -10.0, 11.0) : 0.0;
         return plot().getBottom() - static_cast<float>(bounded) * plot().getHeight();
     }
-    double projectTime(float x) const { return viewStart + (x - plot().getX()) / plot().getWidth() * (viewEnd - viewStart); }
+    double projectTime(float x) const {
+        const auto fraction = static_cast<double>((x - plot().getX()) / plot().getWidth());
+        if (!std::isfinite(fraction)) { return viewStart; }
+        return std::clamp(std::lerp(viewStart, viewEnd, fraction), -viewLimit, viewLimit);
+    }
     double valueAt(float y) const { return low + (plot().getBottom() - y) / plot().getHeight() * (high - low); }
     juce::Point<float> keyPoint(const motion::PropertyTarget& clip, const motion::Keyframe& key) const {
         return { timeX(clip.start + (key.time - clip.offset) / clip.rate), valueY(key.value) };
@@ -424,9 +468,10 @@ private:
         // Slopes remain value per content-local second, including stretched clips.
         const auto slope = mode == DragMode::incoming ? key.incomingSlope : key.outgoingSlope;
         auto delta = span / 3.0;
-        const auto xScale = plot().getWidth() / ((viewEnd - viewStart) * clip.rate);
+        const auto xScale = (plot().getWidth() / (viewEnd - viewStart)) / clip.rate;
         const auto yScale = plot().getHeight() / (high - low);
         const auto length = std::hypot(delta * xScale, slope * delta * yScale);
+        if (!std::isfinite(length)) { return std::nullopt; }
         if (length > 48.0) {
             delta *= 48.0 / length;
         }
@@ -451,9 +496,8 @@ private:
     }
 
     double snappedTime(const motion::PropertyTarget& clip, double time, juce::ModifierKeys modifiers) const {
-        const auto fps = processor.document.project().frameRate;
-        if (!modifiers.isAltDown() && fps > 0.0) {
-            time = std::round(time * fps) / fps;
+        if (!modifiers.isAltDown()) {
+            time = processor.document.project().timeGrid().snap(time);
         }
         return std::clamp(time, clip.start, clip.end());
     }
@@ -478,12 +522,11 @@ private:
             return;
         }
         const auto padding = clip->duration * 0.04;
-        viewStart = clip->start - padding;
-        viewEnd = clip->end() + padding;
+        setView(clip->start - padding, clip->end() + padding);
         low = high = curve->evaluateBase(clip->offset);
         // Include sampled extrema of cubic segments as well as exact key values.
         for (int i = 0; i <= 256; ++i) {
-            const auto local = clip->localTime(clip->start + clip->duration * i / 256.0);
+            const auto local = clip->localTime(std::lerp(clip->start, clip->end(), i / 256.0));
             const auto base = curve->evaluateBase(local);
             low = std::min(low, base); high = std::max(high, base);
             const auto value = constrainedValue(*clip, curve->evaluate(local, processor.document.project().bpm));
@@ -498,17 +541,14 @@ private:
         }
         const auto minimumSpan = propertyName.starts_with("rotation.") ? 90.0 : 1.0;
         if (high - low < minimumSpan) {
-            const auto middle = (high + low) * 0.5;
+            const auto middle = low * 0.5 + high * 0.5;
             low = middle - minimumSpan * 0.5;
             high = middle + minimumSpan * 0.5;
         }
         const auto margin = (high - low) * 0.15;
         low -= margin;
         high += margin;
-        if (!std::isfinite(low) || !std::isfinite(high) || !std::isfinite(high - low) || high <= low) {
-            low = -1.0;
-            high = 1.0;
-        }
+        normalizeValueRange();
     }
 
     bool deleteSelected() {

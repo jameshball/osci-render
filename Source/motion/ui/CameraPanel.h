@@ -116,7 +116,7 @@ public:
             values[i].setEnabled(available);
             keys[i].setEnabled(available);
             if (!values[i].isBeingEdited()) {
-                values[i].setText(available ? juce::String(property->second.evaluateBase(time), 3) : "—", juce::dontSendNotification);
+                values[i].setText(available ? juce::String(property->second.evaluateBase(time), 3) : juce::String::charToString(0x2014), juce::dontSendNotification);
             }
             auto state = osci::KeyframeButton::State::unanimated;
             if (available && property->second.animated()) {

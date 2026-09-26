@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "Timeline.h"
+#include "TimeGrid.h"
 #include "Camera.h"
 #include "Group.h"
 #include "PreparedSource.h"
@@ -23,6 +24,20 @@ struct Project {
     double duration = 180.0;
     double frameRate = 30.0;
     double bpm = 120.0;
+    TimeDisplay timeDisplay = TimeDisplay::seconds;
+    int beatsPerBar = 4;
+    double snapBeats = 0.25;
+    bool gridSnap = true;
+    TimeGrid timeGrid() const {
+        TimeGrid grid;
+        grid.display = timeDisplay;
+        grid.bpm = bpm;
+        grid.frameRate = frameRate;
+        grid.beatsPerBar = beatsPerBar;
+        grid.snapBeats = snapBeats;
+        grid.snapping = gridSnap;
+        return grid;
+    }
     std::vector<std::shared_ptr<const Asset>> assets;
     std::vector<Track> tracks;
     std::vector<Camera> cameras;
