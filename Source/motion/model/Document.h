@@ -6,6 +6,7 @@
 #include "Camera.h"
 #include "Group.h"
 #include "PreparedSource.h"
+#include "../render/PreparedAudio.h"
 #include <atomic>
 #include "../../audio/synth/PreparedDrawing.h"
 
@@ -17,6 +18,7 @@ struct Asset {
     juce::MemoryBlock data;
     std::shared_ptr<const osci::PreparedDrawing> drawing;
     std::shared_ptr<const PreparedSource> source;
+    std::shared_ptr<const PreparedAudio> audio;
 };
 
 struct Project {

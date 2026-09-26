@@ -101,6 +101,7 @@ public:
         testTrackStates(document.project());
         testGroups(document.project());
         testModulation(document.project());
+        testAudioImports(document.project());
         testTiming(document.project());
     }
 
@@ -144,6 +145,150 @@ private:
             expect(loaded.load(invalid).failed());
             expectEquals(loaded.save().toString(), unchanged);
         }
+    }
+
+    static motion::Asset wavAsset(int channels) {
+        juce::MemoryOutputStream wav;
+        const int frameCount = 4;
+        const int dataBytes = frameCount * channels * 2;
+        wav.write("RIFF", 4);
+        wav.writeInt(36 + dataBytes);
+        wav.write("WAVEfmt ", 8);
+        wav.writeInt(16);
+        wav.writeShort(1);
+        wav.writeShort(static_cast<short>(channels));
+        wav.writeInt(8000);
+        wav.writeInt(8000 * channels * 2);
+        wav.writeShort(static_cast<short>(channels * 2));
+        wav.writeShort(16);
+        wav.write("data", 4);
+        wav.writeInt(dataBytes);
+        const std::array<short, 4> samples { 0, 16384, -16384, 32767 };
+        for (int frame = 0; frame < frameCount; ++frame) {
+            for (int channel = 0; channel < channels; ++channel) {
+                wav.writeShort(channel == 0 ? samples[frame] : static_cast<short>(-samples[frame] / 2));
+            }
+        }
+        motion::Asset asset;
+        asset.id = 9000;
+        asset.name = "Soundtrack.wav";
+        asset.extension = ".wav";
+        asset.data = wav.getMemoryBlock();
+        return asset;
+    }
+
+    void testAudioImports(const motion::Project& sourceProject) {
+        beginTest("Audio assets decode embedded PCM with stereo and mono boundary semantics");
+        auto audio = std::make_shared<motion::Asset>(wavAsset(2));
+        std::atomic<double> progress { -1 };
+        const auto result = motion::Document::decodeAsset(*audio, nullptr, &progress);
+        expect(result.wasOk(), result.getErrorMessage());
+        if (result.failed()) {
+            return;
+        }
+        expectEquals(progress.load(), 1.0);
+        expect(audio->source == nullptr && audio->drawing == nullptr);
+        expectEquals(static_cast<int>(audio->audio->channelCount()), 2);
+        expectEquals(static_cast<int>(audio->audio->frameCount()), 4);
+        expectWithinAbsoluteError(audio->audio->sample(1.0 / 8000).left, 0.5f, 0.00001f);
+        expectWithinAbsoluteError(audio->audio->sample(1.0 / 8000).right, -0.25f, 0.00001f);
+        expectWithinAbsoluteError(audio->audio->sample(0.5 / 8000).left, 0.25f, 0.00001f);
+        expectEquals(audio->audio->sample(-1).left, 0.0f);
+        expectEquals(audio->audio->sample(audio->audio->duration()).right, 0.0f);
+        auto mono = wavAsset(1);
+        const auto monoResult = motion::Document::decodeAsset(mono);
+        expect(monoResult.wasOk(), monoResult.getErrorMessage());
+        if (monoResult.wasOk()) {
+            expectEquals(mono.audio->sample(1.0 / 8000).left, mono.audio->sample(1.0 / 8000).right);
+        }
+        auto multichannel = wavAsset(3);
+        expect(motion::Document::decodeAsset(multichannel).failed());
+        expect(multichannel.audio == nullptr);
+        auto malformed = textAsset(".wav", "not audio");
+        expect(motion::Document::decodeAsset(malformed).failed());
+        const auto retained = audio->audio;
+        std::atomic<bool> cancelled { true };
+        expect(motion::Document::decodeAsset(*audio, &cancelled, &progress).failed());
+        expect(audio->audio == retained);
+        expectEquals(progress.load(), 0.0);
+
+        beginTest("Soundtrack clips retain source duration, timing, gain and pan in project state");
+        auto project = sourceProject;
+        project.assets.push_back(audio);
+        auto clip = motion::Document::makeClip(9002, *audio, 1);
+        expectEquals(clip.duration, audio->audio->duration());
+        expectEquals(static_cast<int>(clip.properties.size()), 2);
+        expectEquals(clip.properties.at("gain").base, 1.0);
+        expectEquals(clip.properties.at("pan").base, 0.0);
+        clip.properties["gain"].setKey({ 0, 0.5, motion::Interpolation::linear });
+        clip.properties["gain"].setKey({ clip.duration, 1 });
+        clip.properties["pan"] = motion::Curve(-0.25);
+        clip.offset = 0.0001;
+        clip.rate = 1.5;
+        motion::Track track;
+        track.id = 9001;
+        track.name = "Soundtrack";
+        track.kind = motion::TrackKind::audio;
+        expect(track.insert(clip));
+        project.tracks.push_back(track);
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(sourceProject);
+        document.edit("Import soundtrack", [&](motion::Project& value) { value = project; });
+        expect(undo.undo());
+        expectEquals(static_cast<int>(document.project().tracks.size()), static_cast<int>(sourceProject.tracks.size()));
+        expect(undo.redo());
+        expect(document.project().assets.back() == audio);
+        juce::UndoManager loadedUndo;
+        motion::Document loaded(loadedUndo);
+        const auto xml = document.save();
+        const auto restored = loaded.load(xml);
+        expect(restored.wasOk(), restored.getErrorMessage());
+        if (restored.failed()) {
+            return;
+        }
+        const auto& restoredTrack = loaded.project().tracks.back();
+        expect(restoredTrack.kind == motion::TrackKind::audio);
+        expectWithinAbsoluteError(restoredTrack.clips[0].offset, clip.offset, 1.0e-12);
+        expectEquals(restoredTrack.clips[0].rate, clip.rate);
+        expectEquals(restoredTrack.clips[0].properties.at("pan").base, -0.25);
+        expect(loaded.project().assets.back()->data == audio->data);
+        expectWithinAbsoluteError(loaded.project().assets.back()->audio->sample(1.0 / 8000).left, 0.5f, 0.00001f);
+        expect(loaded.newId() > clip.id);
+        const auto unchanged = loaded.save().toString();
+        const auto reject = [&](juce::XmlElement invalid) {
+            expect(loaded.load(invalid).failed());
+            expectEquals(loaded.save().toString(), unchanged);
+        };
+        auto wrongVisualKind = xml;
+        wrongVisualKind.getChildByName("track")->setAttribute("kind", "audio");
+        reject(wrongVisualKind);
+        auto wrongAudioKind = xml;
+        for (auto* row : wrongAudioKind.getChildWithTagNameIterator("track")) {
+            if (row->getStringAttribute("kind") == "audio") {
+                row->setAttribute("kind", "visual");
+            }
+        }
+        reject(wrongAudioKind);
+        auto unknownKind = xml;
+        unknownKind.getChildByName("track")->setAttribute("kind", "unknown");
+        reject(unknownKind);
+        auto badGain = xml;
+        for (auto* row : badGain.getChildWithTagNameIterator("track")) {
+            if (row->getStringAttribute("kind") == "audio") {
+                row->getChildByName("clip")->getChildByName("property")->setAttribute("base", 5);
+            }
+        }
+        reject(badGain);
+        document.edit("Invalid audio effect", [](motion::Project& value) {
+            value.tracks.back().effects.push_back(motion::makeEffect(9010, *motion::effectDefinition("bulge")));
+        });
+        reject(document.save());
+        document.edit("Invalid clip effect", [](motion::Project& value) {
+            value.tracks.back().effects.clear();
+            value.tracks.back().clips[0].effects.push_back(motion::makeEffect(9011, *motion::effectDefinition("bulge")));
+        });
+        reject(document.save());
     }
 
     void testModulation(const motion::Project& sourceProject) {

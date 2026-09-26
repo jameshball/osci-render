@@ -56,6 +56,7 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
     auto prepared = std::make_shared<PreparedSource>(std::move(frames), frameRate);
     asset.drawing = prepared->firstFrame();
     asset.source = std::move(prepared);
+    asset.audio.reset();
     if (progress != nullptr) {
         progress->store(1.0, std::memory_order_relaxed);
     }
@@ -486,6 +487,12 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
     clip.asset = asset.id;
     clip.name = asset.name.toStdString();
     clip.start = time;
+    if (asset.audio != nullptr) {
+        clip.duration = asset.audio->duration();
+        clip.properties["gain"] = Curve(1);
+        clip.properties["pan"] = Curve(0);
+        return clip;
+    }
     if (asset.source != nullptr && asset.source->frameCount() > 1) {
         clip.duration = asset.source->duration();
     }
@@ -512,6 +519,39 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     const auto extension = asset.extension.toLowerCase();
+    if (extension == ".wav" || extension == ".wave" || extension == ".aif" || extension == ".aiff" || extension == ".flac" || extension == ".ogg") {
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        auto input = std::make_unique<juce::MemoryInputStream>(asset.data, false);
+        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(std::move(input)));
+        if (reader == nullptr || reader->lengthInSamples <= 0) {
+            return juce::Result::fail("Cannot decode this audio file. Check its contents and whether its codec is enabled in this build.");
+        }
+        const auto prepared = PreparedAudio::create(reader->sampleRate, reader->numChannels, static_cast<std::uint64_t>(reader->lengthInSamples),
+            [&](float* const* channels, std::size_t channelCount, std::size_t first, std::size_t frames) {
+                if (importCancelled(cancel)) {
+                    return false;
+                }
+                const bool read = reader->read(channels, static_cast<int>(channelCount), static_cast<juce::int64>(first), static_cast<int>(frames));
+                if (read && progress != nullptr) {
+                    progress->store(0.9 * static_cast<double>(first + frames) / reader->lengthInSamples, std::memory_order_relaxed);
+                }
+                return read;
+            });
+        if (importCancelled(cancel)) {
+            return juce::Result::fail("Source import cancelled.");
+        }
+        if (!prepared) {
+            return juce::Result::fail(juce::String(prepared.error));
+        }
+        asset.audio = prepared.audio;
+        asset.source.reset();
+        asset.drawing.reset();
+        if (progress != nullptr) {
+            progress->store(1.0, std::memory_order_relaxed);
+        }
+        return juce::Result::ok();
+    }
     if (extension == ".gpla") {
         return decodeGpla(asset, cancel, progress);
     }
@@ -617,6 +657,7 @@ juce::XmlElement Document::save() const {
         row->setAttribute("solo", track.solo);
         row->setAttribute("locked", track.locked);
         row->setAttribute("group", juce::String(track.group));
+        row->setAttribute("kind", track.kind == TrackKind::audio ? "audio" : "visual");
         saveEffects(*row, track.effects);
         for (const auto& clip : track.clips) {
             auto* item = row->createNewChildElement("clip");
@@ -732,6 +773,11 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         Track track;
         track.id = static_cast<Id>(row->getStringAttribute("id").getLargeIntValue());
         track.name = row->getStringAttribute("name").toStdString();
+        const auto kind = row->getStringAttribute("kind");
+        if (kind != "visual" && kind != "audio") {
+            return juce::Result::fail("Track kind must be visual or audio.");
+        }
+        track.kind = kind == "audio" ? TrackKind::audio : TrackKind::visual;
         track.muted = row->getBoolAttribute("muted", false);
         track.solo = row->getBoolAttribute("solo", false);
         track.locked = row->getBoolAttribute("locked", false);
@@ -747,6 +793,9 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         if (trackEffects.failed()) {
             return trackEffects;
         }
+        if (track.kind == TrackKind::audio && !track.effects.empty()) {
+            return juce::Result::fail("Audio tracks cannot contain visual effects.");
+        }
         for (auto* item : row->getChildWithTagNameIterator("clip")) {
             Clip clip;
             clip.id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
@@ -760,6 +809,9 @@ juce::Result Document::load(const juce::XmlElement& xml) {
             if (found == project.assets.end() || !identities.insert(clip.id).second) {
                 return juce::Result::fail("Invalid clip asset or identity.");
             }
+            if ((track.kind == TrackKind::audio) != ((*found)->audio != nullptr)) {
+                return juce::Result::fail("The clip source type does not match its audio or visual track.");
+            }
             for (auto* property : item->getChildWithTagNameIterator("property")) {
                 Curve curve;
                 const auto result = loadProperty(*property, curve);
@@ -771,6 +823,19 @@ juce::Result Document::load(const juce::XmlElement& xml) {
             const auto clipEffects = loadEffects(*item, clip.effects, identities);
             if (clipEffects.failed()) {
                 return clipEffects;
+            }
+            if (track.kind == TrackKind::audio) {
+                if (!clip.effects.empty() || clip.properties.size() != 2 || !clip.properties.contains("gain") || !clip.properties.contains("pan")) {
+                    return juce::Result::fail("Audio clips require gain and pan curves and cannot contain visual effects or properties.");
+                }
+                for (const auto* name : { "gain", "pan" }) {
+                    const auto& curve = clip.properties.at(name);
+                    const bool gain = std::string_view(name) == "gain";
+                    const auto validValue = [gain](double value) { return std::isfinite(value) && value >= (gain ? 0.0 : -1.0) && value <= (gain ? 4.0 : 1.0); };
+                    if (!curve.valid() || !validValue(curve.base) || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [&](const auto& key) { return !validValue(key.value); })) {
+                        return juce::Result::fail("Audio gain must be between 0 and 4, and pan between -1 and 1.");
+                    }
+                }
             }
             if (!track.insert(std::move(clip))) {
                 return juce::Result::fail("Invalid or overlapping clip range.");

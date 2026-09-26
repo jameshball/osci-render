@@ -2,6 +2,7 @@
 
 #include "../model/Document.h"
 #include "PreparedEffects.h"
+#include "PreparedSoundtrack.h"
 #include <array>
 #include <numbers>
 
@@ -119,7 +120,7 @@ struct PreparedCamera {
 };
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project) : duration(project.duration), bpm(project.bpm), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project) : duration(project.duration), bpm(project.bpm), soundtrack(project), effects(prepareEffects(project.effects)) {
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;
@@ -138,7 +139,7 @@ struct PreparedComposition {
         }
         std::sort(cameraCuts.begin(), cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
         for (const auto& track : project.tracks) {
-            if (!trackIsAudible(project, track)) {
+            if (track.kind != TrackKind::visual || !trackIsAudible(project, track)) {
                 continue;
             }
             for (const auto& clip : track.clips) {
@@ -243,6 +244,7 @@ struct PreparedComposition {
 
     double duration;
     double bpm = 120;
+    PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
 

@@ -139,13 +139,14 @@ public:
         const auto snapped = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
         const auto row = trackAtY(y);
         const auto group = groupAtY(y);
+        const auto kind = (*asset)->audio != nullptr ? motion::TrackKind::audio : motion::TrackKind::visual;
         auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
         const auto id = clip.id;
-        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && !project.tracks[row].canPlace(clip)) {
+        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip))) {
             return;
         }
         const auto trackId = processor.document.newId();
-        processor.document.edit("Add object clip", [&](motion::Project& updated) {
+        processor.document.edit(kind == motion::TrackKind::audio ? "Add audio clip" : "Add object clip", [&](motion::Project& updated) {
             updated.duration = std::max(updated.duration, clip.end());
             if (row >= 0 && row < static_cast<int>(updated.tracks.size())) {
                 updated.tracks[row].insert(std::move(clip));
@@ -154,6 +155,7 @@ public:
                 track.id = trackId;
                 track.group = group;
                 track.name = clip.name;
+                track.kind = kind;
                 track.insert(std::move(clip));
                 updated.tracks.push_back(std::move(track));
             }
@@ -246,7 +248,8 @@ public:
             for (const auto& clip : tracks[index].clips) {
                 const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 4);
                 const auto active = clip.id == selected;
-                g.setColour((active ? juce::Colour(0xff347b52) : juce::Colour(0xff354c45)).withAlpha(opacity));
+                const bool audio = tracks[index].kind == motion::TrackKind::audio;
+                g.setColour((audio ? (active ? juce::Colour(0xff365e80) : juce::Colour(0xff304451)) : (active ? juce::Colour(0xff347b52) : juce::Colour(0xff354c45))).withAlpha(opacity));
                 g.fillRoundedRectangle(bounds, 4);
                 g.setColour((active ? juce::Colour(0xff70da91) : juce::Colour(0xff647d71)).withAlpha(opacity));
                 g.drawRoundedRectangle(bounds, 4, 1);
@@ -262,7 +265,28 @@ public:
                 } else if (active && tool == Tool::stretch) {
                     label += "  " + juce::String(clip.rate, 2) + "x";
                 }
-                const auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f);
+                auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f);
+                if (audio) {
+                    const auto& assets = processor.document.project().assets;
+                    const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == clip.asset; });
+                    if (asset != assets.end() && (*asset)->audio != nullptr) {
+                        const auto left = std::max(namesWidth, static_cast<int>(bounds.getX()) + 2);
+                        const auto right = std::min(getWidth(), static_cast<int>(bounds.getRight()) - 2);
+                        const auto centre = bounds.getBottom() - 8.5f;
+                        g.setColour(juce::Colour(0xff97c7df).withAlpha(opacity));
+                        for (int x = left; x < right; ++x) {
+                            const auto time = scrollTime + (x - namesWidth) / pixelsPerSecond;
+                            const auto end = time + 1.0 / pixelsPerSecond;
+                            const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time), clip.localTime(end));
+                            const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time), clip.localTime(end));
+                            const auto low = std::clamp(std::min(a.minimum, b.minimum), -1.0f, 1.0f);
+                            const auto high = std::clamp(std::max(a.maximum, b.maximum), -1.0f, 1.0f);
+                            g.drawVerticalLine(x, centre - high * 8, centre - low * 8 + 0.5f);
+                        }
+                    }
+                    labelBounds = labelBounds.withHeight(15);
+                }
+                g.setColour(juce::Colours::white.withAlpha(opacity));
                 g.drawText(label, labelBounds, juce::Justification::centredLeft);
             }
         }
@@ -278,7 +302,7 @@ public:
             if (group != 0) {
                 g.setColour(osci::Colours::accentColor());
                 g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), rowHeight, 2);
-            } else if (row >= 0 && row < static_cast<int>(tracks.size()) && (clip != nullptr || dropPosition->x < namesWidth)) {
+            } else if (row >= 0 && row < static_cast<int>(tracks.size()) && tracks[row].kind == motion::TrackKind::visual && (clip != nullptr || dropPosition->x < namesWidth)) {
                 const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, rowHeight);
                 g.setColour(osci::Colours::accentColor());
                 g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
@@ -294,7 +318,10 @@ public:
             if (asset != assets.end()) {
                 candidate = motion::Document::makeClip(candidate.id, **asset, candidate.start);
             }
-            const auto allowed = asset != assets.end() && (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate));
+            const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
+            const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+            const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
+            const auto allowed = asset != assets.end() && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate));
             const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), rowHeight)).toFloat().reduced(1, 4);
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
@@ -302,7 +329,7 @@ public:
             g.fillRoundedRectangle(bounds, 4);
             g.setColour(allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080));
             g.drawRoundedRectangle(bounds, 4, 1);
-            g.drawText(allowed ? "Add object" : "Clips cannot overlap", bounds.reduced(8, 0), juce::Justification::centredLeft);
+            g.drawText(allowed ? (audio ? "Add audio" : "Add object") : (correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
         }
         const auto playhead = timeX(processor.position.load());
         if (playhead >= namesWidth && playhead <= getWidth()) {
@@ -314,7 +341,7 @@ public:
         }
         if (tracks.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.55f));
-            g.drawText("Import an object to start your composition", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
+            g.drawText("Import media to start your composition", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
         }
     }
 
@@ -413,6 +440,7 @@ public:
         }
         const auto target = mode == Mode::move
             ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : originalRow) : originalRow;
+        if (before->tracks[target].kind != before->tracks[originalRow].kind) { return; }
         const bool candidateChanged = candidate.start != original.start || candidate.duration != original.duration
             || candidate.offset != original.offset || candidate.rate != original.rate || target != originalRow;
         if (!candidateChanged) {

@@ -82,6 +82,8 @@ struct Clip {
     }
 };
 
+enum class TrackKind { visual, audio };
+
 struct Track {
     Id id = 0;
     std::string name;
@@ -91,6 +93,7 @@ struct Track {
     bool solo = false;
     bool locked = false;
     Id group = 0;
+    TrackKind kind = TrackKind::visual;
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.

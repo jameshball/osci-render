@@ -28,11 +28,14 @@ private:
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void select(motion::Id id);
     void refreshInspector();
+    bool audioSelected() const;
+    const char* inspectorProperty(std::size_t index) const;
     void setProperty(int index, bool keyframe);
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera);
     void exportSignal();
     void showTimingMenu();
     void refreshTiming();
+    void refreshOutputChoices();
     MotionProcessor& processor;
     MotionTimelineView timeline;
     MotionCompositionView composition;
@@ -56,6 +59,7 @@ private:
     juce::Label timeLabel;
     juce::Label tempoValue, tempoLabel;
     juce::TextButton timingButton;
+    juce::ComboBox monitorOutput;
     juce::Label selectionLabel;
     std::array<juce::Label, 13> values;
     std::array<osci::KeyframeButton, 13> keyButtons;

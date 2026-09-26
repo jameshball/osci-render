@@ -33,6 +33,27 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
     addAndMakeVisible(timingButton);
+    addAndMakeVisible(monitorOutput);
+    monitorOutput.setName("Audio output mode");
+    monitorOutput.addItem("Music monitor", 1);
+    monitorOutput.addItem("XY signal", 2);
+    monitorOutput.addItem("XYRGB signal (5 ch)", 3);
+    refreshOutputChoices();
+    monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
+    monitorOutput.setTooltip("Physical audio output. The visualiser always receives the beam signal. XYRGB requires five enabled output channels.");
+    monitorOutput.onChange = [this] {
+        const auto mode = static_cast<MotionProcessor::OutputMode>(monitorOutput.getSelectedId() - 1);
+        if (mode == MotionProcessor::OutputMode::xyrgb) {
+            auto* holder = juce::StandalonePluginHolder::getInstance();
+            const auto result = holder != nullptr ? holder->configureOutputChannels(5) : juce::Result::fail("Five-channel output requires the standalone audio device.");
+            if (result.failed()) {
+                assetLibrary.setError(result.getErrorMessage());
+                monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
+                return;
+            }
+        }
+        processor.setOutputMode(mode);
+    };
     timingButton.setName("Time and grid");
     timingButton.setTitle("Time and grid");
     timingButton.setTooltip("Time display, snapping, meter and frame rate. Alt temporarily bypasses snapping.");
@@ -91,7 +112,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         selectionLabel.setVisible(index == 0);
         for (auto& value : values) { value.setVisible(index == 0); }
         for (auto& button : keyButtons) { button.setVisible(index == 0); }
-        cameraPanel.refresh();
+        refreshInspector();
         if (index == 1) { effectsPanel.activate(); } else { selectCurveTarget(index == 2 ? cameraPanel.selectedCameraId() : selection, curvePropertyName, index == 2); }
         repaint();
     };
@@ -145,7 +166,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import object", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.gpla;*.json;*.lottie");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -272,12 +293,12 @@ void MotionEditor::resized() {
     effectsPanel.setBounds(inspector);
     selectionLabel.setBounds(inspector.removeFromTop(36).reduced(10, 0));
     inspector.reduce(10, 0);
-    for (int group = 0; group < 5; ++group) {
+    for (int group = 0; group < (audioSelected() ? 2 : 5); ++group) {
         inspector.removeFromTop(22);
         auto row = inspector.removeFromTop(28);
-        for (int axis = 0; axis < (group == 4 ? 1 : 3); ++axis) {
-            const auto index = group * 3 + axis;
-            auto field = row.removeFromLeft(group == 4 ? row.getWidth() : inspector.getWidth() / 3);
+        for (int axis = 0; axis < (audioSelected() || group == 4 ? 1 : 3); ++axis) {
+            const auto index = audioSelected() ? group : group * 3 + axis;
+            auto field = row.removeFromLeft(audioSelected() || group == 4 ? row.getWidth() : inspector.getWidth() / 3);
             keyButtons[index].setBounds(field.removeFromRight(18).reduced(1));
             values[index].setBounds(field.reduced(2, 0));
         }
@@ -289,6 +310,7 @@ void MotionEditor::resized() {
     previewDivider.setBounds(area.removeFromLeft(7));
     auto output = area;
     outputHeader.setBounds(output.removeFromTop(30));
+    monitorOutput.setBounds(outputHeader.getBounds().withTrimmedLeft(68).reduced(4, 3));
     output.removeFromTop(3);
     visualiser.setBounds(output);
     viewportBounds = editing;
@@ -308,6 +330,13 @@ void MotionEditor::paint(juce::Graphics& graphics) {
         return;
     }
     auto labelArea = inspectorBounds.withTrimmedTop(66).reduced(12, 0);
+    if (audioSelected()) {
+        for (const auto* label : { "Gain", "Pan   Left / Right" }) {
+            graphics.drawText(label, labelArea.removeFromTop(22), juce::Justification::centredLeft);
+            labelArea.removeFromTop(36);
+        }
+        return;
+    }
     for (const auto* label : { "Position   X / Y / Z", "Rotation   X / Y / Z", "Scale   X / Y / Z", "Color   R / G / B", "Drawing weight" }) {
         graphics.drawText(label, labelArea.removeFromTop(22), juce::Justification::centredLeft);
         labelArea.removeFromTop(36);
@@ -324,7 +353,8 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
 bool MotionEditor::openSourceFile(const juce::File& file) {
     const auto extension = file.getFileExtension().toLowerCase();
     if (extension != ".obj" && extension != ".svg" && extension != ".txt"
-        && extension != ".gpla" && extension != ".json" && extension != ".lottie") {
+        && extension != ".gpla" && extension != ".json" && extension != ".lottie"
+        && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
         importError = "This source type is not connected yet.";
         assetLibrary.setError(importError);
         repaint();
@@ -373,8 +403,9 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
             motion::Track track;
             track.id = document.newId();
             track.name = asset->name.toStdString();
+            track.kind = asset->audio != nullptr ? motion::TrackKind::audio : motion::TrackKind::visual;
             track.insert(clip);
-            document.edit("Import object", [&](motion::Project& project) {
+            document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import object", [&](motion::Project& project) {
                 project.assets.push_back(asset);
                 project.tracks.push_back(track);
                 project.duration = std::max(project.duration, clip.end());
@@ -388,6 +419,7 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
 }
 
 void MotionEditor::timerCallback() {
+    refreshOutputChoices();
     processor.collectPreparedState();
     if (pendingImports.empty()) {
         assetLibrary.setImportStatus({});
@@ -419,6 +451,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     curveEditor.refresh();
     composition.refresh();
     refreshInspector();
+    resized();
     repaint();
 }
 
@@ -430,7 +463,17 @@ void MotionEditor::select(motion::Id id) {
     composition.selected = id;
     selectCurveTarget(id, curvePropertyName, false);
     refreshInspector();
+    resized();
     repaint();
+}
+
+bool MotionEditor::audioSelected() const {
+    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
+    return target.has_value() && target->isAudio;
+}
+
+const char* MotionEditor::inspectorProperty(std::size_t index) const {
+    return audioSelected() && index < 2 ? (index == 0 ? "gain" : "pan") : motion::propertyNames[index];
 }
 
 void MotionEditor::refreshInspector() {
@@ -447,14 +490,23 @@ void MotionEditor::refreshInspector() {
     const auto target = motion::findPropertyTarget(processor.document.project(), selection);
     const bool editable = target.has_value() && !target->camera && !target->isEffect;
     selectionLabel.setText(editable ? juce::String(target->name.data(), target->name.size()) : "No object selected", juce::dontSendNotification);
-    const auto tabName = editable && target->isGroup ? "Group" : "Object";
+    const auto tabName = editable && target->isGroup ? "Group" : (audioSelected() ? "Audio" : "Object");
     if (inspectorTabs.getTabNames()[0] != tabName) { inspectorTabs.setTabName(0, tabName); }
     updatingInspector = true;
     for (std::size_t index = 0; index < values.size(); ++index) {
+        const bool visible = inspectorTabs.getCurrentTabIndex() == 0 && (!audioSelected() || index < 2);
+        values[index].setVisible(visible);
+        keyButtons[index].setVisible(visible);
+        const auto property = inspectorProperty(index);
+        values[index].setName(property);
+        values[index].setTitle(property);
+        values[index].setComponentID("motion." + juce::String(property));
+        keyButtons[index].setName("Key " + juce::String(property));
+        keyButtons[index].setButtonText(keyButtons[index].getName());
         values[index].setEnabled(editable);
         keyButtons[index].setEnabled(editable);
         if (editable && !values[index].isBeingEdited()) {
-            const auto found = target->properties->find(motion::propertyNames[index]);
+            const auto found = target->properties->find(property);
             if (found != target->properties->end()) {
                 values[index].setText(juce::String(found->second.evaluateBase(target->localTime(processor.position.load())), 2), juce::dontSendNotification);
                 const auto time = target->localTime(processor.position.load());
@@ -469,10 +521,12 @@ void MotionEditor::refreshInspector() {
 }
 
 void MotionEditor::setProperty(int index, bool keyframe) {
-    selectCurveTarget(selection, motion::propertyNames[static_cast<std::size_t>(index)], false);
+    if (audioSelected() && index >= 2) { return; }
+    const std::string property = inspectorProperty(static_cast<std::size_t>(index));
+    selectCurveTarget(selection, property, false);
     const auto time = processor.position.load();
     const auto target = motion::findPropertyTarget(processor.document.project(), selection);
-    const auto* existing = target.has_value() ? target->curve(motion::propertyNames[index]) : nullptr;
+    const auto* existing = target.has_value() ? target->curve(property) : nullptr;
     if (existing == nullptr) {
         return;
     }
@@ -489,10 +543,11 @@ void MotionEditor::setProperty(int index, bool keyframe) {
     if (!std::isfinite(value)) {
         return;
     }
-    if (index >= 9) { value = std::clamp(value, 0.0, index == 12 ? 1000000.0 : 1.0); }
+    if (audioSelected()) { value = index == 0 ? std::clamp(value, 0.0, 4.0) : std::clamp(value, -1.0, 1.0); }
+    if (!audioSelected() && index >= 9) { value = std::clamp(value, 0.0, index == 12 ? 1000000.0 : 1.0); }
     processor.document.edit(keyframe ? "Set keyframe" : "Change property", [&](motion::Project& project) {
         const auto updated = motion::findPropertyTarget(project, selection);
-        auto* curve = updated.has_value() ? updated->curve(motion::propertyNames[index]) : nullptr;
+        auto* curve = updated.has_value() ? updated->curve(property) : nullptr;
         if (curve == nullptr) { return; }
         if (keyframe || curve->animated()) {
             curve->setKeyValue(updated->localTime(time), value);
@@ -553,10 +608,12 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curveProperties.clear();
     const auto* effect = motion::findEffect(processor.document.project(), id);
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
-    const auto count = definition != nullptr ? definition->parameters.size() : (camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size());
+    const auto target = motion::findPropertyTarget(processor.document.project(), id);
+    const bool audio = target.has_value() && target->isAudio;
+    const auto count = audio ? 2 : definition != nullptr ? definition->parameters.size() : (camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size());
     int selectedIndex = 0;
     for (std::size_t index = 0; index < count; ++index) {
-        const std::string name = definition != nullptr ? definition->parameters[index].id : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
+        const std::string name = audio ? (index == 0 ? "gain" : "pan") : definition != nullptr ? definition->parameters[index].id : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
         curveProperties.push_back(name);
         curveProperty.addItem(definition != nullptr ? juce::String(definition->parameters[index].name) : juce::String(name).replace(".", " "), static_cast<int>(index) + 1);
         if (property == name) {
@@ -635,4 +692,10 @@ void MotionEditor::showTimingMenu() {
             } else if (result >= 500 && result < 508) { state.frameRate = rates[static_cast<std::size_t>(result - 500)]; }
         });
     });
+}
+
+void MotionEditor::refreshOutputChoices() {
+    auto* holder = juce::StandalonePluginHolder::getInstance();
+    auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
+    monitorOutput.setItemEnabled(3, device != nullptr && device->getOutputChannelNames().size() >= 5);
 }

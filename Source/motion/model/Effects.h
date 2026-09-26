@@ -102,6 +102,7 @@ auto findEffectOwner(ProjectType& project, std::uint64_t ownerId) -> std::condit
         }
     }
     for (auto& track : project.tracks) {
+        if (track.kind == decltype(track.kind)::audio) { continue; }
         if (track.id == ownerId) {
             return &track.effects;
         }

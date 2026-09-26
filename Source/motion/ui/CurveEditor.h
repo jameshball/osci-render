@@ -479,6 +479,7 @@ private:
         return juce::Point<float>(centre.x + static_cast<float>(delta * xScale), centre.y - static_cast<float>(slope * delta * yScale));
     }
     double constrainedValue(const motion::PropertyTarget& target, double value) const {
+        if (target.isAudio) { return propertyName == "pan" ? std::clamp(value, -1.0, 1.0) : std::clamp(value, 0.0, 4.0); }
         if (target.isEffect) {
             const auto* effect = motion::findEffect(processor.document.project(), target.id);
             const auto* definition = effect != nullptr ? motion::effectDefinition(effect->type) : nullptr;

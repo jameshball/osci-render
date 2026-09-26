@@ -382,6 +382,10 @@
             file="Resources/images/osci_mac.png"/>
       <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
             file="Source/motion/model/Animation.h"/>
+      <FILE id="motpreparedaudio" name="PreparedAudio.h" compile="0" resource="0"
+            file="Source/motion/render/PreparedAudio.h"/>
+      <FILE id="motsoundtrack" name="PreparedSoundtrack.h" compile="0" resource="0"
+            file="Source/motion/render/PreparedSoundtrack.h"/>
       <FILE id="mottimegrid" name="TimeGrid.h" compile="0" resource="0" file="Source/motion/model/TimeGrid.h"/>
       <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
             file="Source/motion/model/Modulation.h"/>

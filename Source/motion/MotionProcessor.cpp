@@ -17,6 +17,11 @@ MotionProcessor::~MotionProcessor() {
     getUndoManager().clearUndoHistory();
 }
 
+bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
+    const auto channels = layouts.getMainOutputChannelSet().size();
+    return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 5);
+}
+
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
     signal.setSize(6, samplesPerBlock);
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
@@ -45,12 +50,24 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     if (running && audioSample >= durationSamples) {
         audioSample = 0;
     }
+    const auto mode = outputMode.load();
+    const auto audible = !muteParameter->getBoolValue();
+    const auto* volumes = volumeEffect->getAnimatedValuesReadPointer(0, count);
+    const auto fallbackVolume = volumeEffect->getValue();
     for (int i = 0; i < count; ++i) {
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) {
             phase = std::fmod(static_cast<double>(audioSample) * 60.0 / sampleRate, 1.0);
         }
         const auto point = drawing ? prepared->sample(audioTime, phase) : osci::Point(0, 0, 0, 0, 0, 0);
+        if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
+            const auto audio = prepared->soundtrack.sample(audioTime);
+            const auto volume = volumes != nullptr ? volumes[i] : fallbackVolume;
+            const auto gain = std::isfinite(volume) ? static_cast<double>(volume) : 0.0;
+            constexpr auto limit = static_cast<double>(std::numeric_limits<float>::max());
+            buffer.setSample(0, i, static_cast<float>(std::clamp(audio.left * gain, -limit, limit)));
+            buffer.setSample(1, i, static_cast<float>(std::clamp(audio.right * gain, -limit, limit)));
+        }
         signal.setSample(0, i, point.x);
         signal.setSample(1, i, point.y);
         signal.setSample(2, i, point.z);
@@ -69,8 +86,9 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     position.store(audioTime);
     juce::AudioBuffer<float> block(signal.getArrayOfWritePointers(), 6, count);
     threadManager.write(block, "VisualiserRenderer");
-    if (!muteParameter->getBoolValue()) {
-        for (int channel = 0; channel < std::min(5, buffer.getNumChannels()); ++channel) {
+    const auto requiredChannels = mode == OutputMode::xyrgb ? 5 : 2;
+    if (audible && (mode == OutputMode::xy || mode == OutputMode::xyrgb) && buffer.getNumChannels() >= requiredChannels) {
+        for (int channel = 0; channel < requiredChannels; ++channel) {
             const auto source = channel < 2 ? channel : channel + 1;
             buffer.copyFrom(channel, 0, signal, source, 0, count);
         }

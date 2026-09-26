@@ -22,6 +22,7 @@ struct BasicPropertyTarget {
     bool camera = false;
     bool isEffect = false;
     bool isGroup = false;
+    bool isAudio = false;
 
     double end() const { return start + duration; }
     double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
@@ -73,7 +74,7 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
                 }
             }
             if (clip.id == id) {
-                return Target { clip.id, clip.name, clip.start, clip.duration, clip.offset, clip.rate, &clip.properties, false };
+                return Target { clip.id, clip.name, clip.start, clip.duration, clip.offset, clip.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio };
             }
         }
     }

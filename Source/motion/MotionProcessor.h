@@ -7,6 +7,10 @@
 
 class MotionProcessor : public CommonAudioProcessor {
 public:
+    enum class OutputMode { soundtrack, xy, xyrgb };
+    OutputMode getOutputMode() const { return outputMode.load(); }
+    void setOutputMode(OutputMode value) { outputMode.store(value); }
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     MotionProcessor();
     ~MotionProcessor() override;
     void prepareToPlayInternal(double sampleRate, int samplesPerBlock) override;
@@ -22,6 +26,7 @@ public:
     }
 
 private:
+    std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
     osci::PreparedState<motion::PreparedComposition> composition;
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };
