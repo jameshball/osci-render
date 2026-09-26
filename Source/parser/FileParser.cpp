@@ -94,7 +94,7 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 	});
 }
 
-void FileParser::parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
+void FileParser::parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font& font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
