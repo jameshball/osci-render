@@ -29,7 +29,7 @@ public:
     motion::Id selected = 0;
     double pixelsPerSecond = 70;
     double scrollTime = 0;
-    int scrollRows = 0;
+    mutable int scrollRows = 0;
     static constexpr int namesWidth = 170;
     static constexpr int rulerHeight = 26;
     static constexpr int rowHeight = 40;
@@ -75,10 +75,12 @@ public:
             updateHeader(display, true);
         }
         rows = motion::trackRows(project, collapsedGroups);
+        layoutRevision = processor.document.revision();
         resized();
         repaint();
     }
     void resized() override {
+        ensureTrackRows();
         addTrack.setBounds(namesWidth - 27, 2, 24, rulerHeight - 4);
         scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
         for (auto& header : headers) {
@@ -164,6 +166,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
+        ensureTrackRows();
         g.fillAll(osci::Colours::veryDark());
         auto area = getLocalBounds();
         g.setColour(osci::Colours::dark());
@@ -439,6 +442,7 @@ public:
     }
 
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override {
+        ensureTrackRows();
         if (before.has_value() || scrubbing) {
             return;
         }
@@ -767,7 +771,28 @@ private:
         }
         return juce::roundToInt(std::clamp(value, -limit, limit));
     }
-    int visualRowAt(int y) const { return y < rulerHeight ? -1 : (y - rulerHeight) / rowHeight + scrollRows; }
+    // ChangeBroadcaster delivery is deferred. Undo/delete may replace the
+    // document before the next paint or pointer event, so cached indices must
+    // be rebuilt synchronously before any row lookup. Keep header creation and
+    // destruction in refreshTracks(), outside paint and hit testing.
+    void ensureTrackRows() const {
+        const auto generation = processor.document.generation();
+        const auto revision = processor.document.revision();
+        if (layoutGeneration != generation) {
+            collapsedGroups.clear();
+            layoutGeneration = generation;
+            layoutRevision.reset();
+        }
+        if (!layoutRevision.has_value() || *layoutRevision != revision) {
+            rows = motion::trackRows(processor.document.project(), collapsedGroups);
+            layoutRevision = revision;
+        }
+        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+    }
+    int visualRowAt(int y) const {
+        ensureTrackRows();
+        return y < rulerHeight ? -1 : (y - rulerHeight) / rowHeight + scrollRows;
+    }
     int trackAtY(int y) const {
         const auto row = visualRowAt(y);
         return row >= 0 && row < static_cast<int>(rows.size()) ? rows[row].track : -1;
@@ -777,6 +802,7 @@ private:
         return row >= 0 && row < static_cast<int>(rows.size()) && rows[row].group() ? rows[row].id : 0;
     }
     int trackY(int track) const {
+        ensureTrackRows();
         const auto found = std::find_if(rows.begin(), rows.end(), [track](const auto& row) { return row.track == track; });
         return found == rows.end() ? -rowHeight : rowY(static_cast<int>(found - rows.begin()));
     }
@@ -792,9 +818,10 @@ private:
     juce::TextButton addTrack;
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
     bool dropTrack = false;
-    std::vector<motion::TrackRow> rows;
-    std::set<motion::Id> collapsedGroups;
-    std::uint64_t layoutGeneration = 0;
+    mutable std::vector<motion::TrackRow> rows;
+    mutable std::set<motion::Id> collapsedGroups;
+    mutable std::uint64_t layoutGeneration = 0;
+    mutable std::optional<std::uint64_t> layoutRevision;
     MotionProcessor& processor;
     std::optional<motion::Project> before;
     motion::Clip original;
