@@ -77,6 +77,8 @@ private:
     juce::TextButton playButton { "Play" };
     juce::TextButton splitButton { "Split" };
     juce::Label timeLabel;
+    motion::TimeGrid positionEditGrid;
+    std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
     juce::Label tempoValue, tempoLabel;
     juce::TextButton timingButton;
     juce::ComboBox monitorOutput;

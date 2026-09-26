@@ -65,6 +65,16 @@ public:
         if (expanded) { refreshTracks(); } else { resized(); repaint(); }
     }
 
+    void revealTime(double seconds) {
+        cancelGesture();
+        if (!std::isfinite(seconds) || seconds < 0) { return; }
+        const auto visible = std::max(1, getWidth() - namesWidth - 20) / pixelsPerSecond;
+        if (seconds < scrollTime || seconds > scrollTime + visible) {
+            scrollTime = std::max(0.0, seconds - visible * .5);
+            repaint();
+        }
+    }
+
     void refreshTracks() {
         const auto& project = processor.document.project();
         if (layoutGeneration != processor.document.generation()) { collapsedGroups.clear(); layoutGeneration = processor.document.generation(); }

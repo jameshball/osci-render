@@ -5,8 +5,11 @@
 #include <iomanip>
 #include <limits>
 #include <locale>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace motion {
 enum class TimeDisplay { seconds, frames, beats };
@@ -67,6 +70,96 @@ struct TimeGrid {
         if (display == TimeDisplay::frames) { return frameLabel(seconds); }
         if (display == TimeDisplay::beats) { return beatLabel(seconds, true); }
         return number(seconds, 3, std::abs(seconds) >= 1.0e12) + "s";
+    }
+
+    // Parsing is an authoring operation. Invalid clock settings reject input;
+    // unlike ruler rendering, entry must not silently substitute different units.
+    std::optional<double> parsePosition(const std::string& input) const {
+        if (input.size() > 128) { return std::nullopt; }
+        auto text = std::string_view(input);
+        const auto whitespace = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'; };
+        const auto trim = [&]() {
+            while (!text.empty() && whitespace(text.front())) { text.remove_prefix(1); }
+            while (!text.empty() && whitespace(text.back())) { text.remove_suffix(1); }
+        };
+        trim();
+        if (text.empty()) { return std::nullopt; }
+        auto mode = display;
+        if (text.back() == 's' || text.back() == 'f') {
+            mode = text.back() == 's' ? TimeDisplay::seconds : TimeDisplay::frames;
+            text.remove_suffix(1); trim();
+        }
+        const auto numeric = [](std::string_view part, bool integer, bool exponent = true) -> std::optional<long double> {
+            if (part.empty()) { return std::nullopt; }
+            std::size_t i = 0, digits = 0;
+            const auto digit = [](char c) { return c >= '0' && c <= '9'; };
+            while (i < part.size() && digit(part[i])) { ++i; ++digits; }
+            if (!integer && i < part.size() && part[i] == '.') {
+                ++i;
+                while (i < part.size() && digit(part[i])) { ++i; ++digits; }
+            }
+            if (digits == 0) { return std::nullopt; }
+            if (!integer && exponent && i < part.size() && (part[i] == 'e' || part[i] == 'E')) {
+                ++i;
+                if (i < part.size() && (part[i] == '+' || part[i] == '-')) { ++i; }
+                const auto start = i;
+                while (i < part.size() && digit(part[i])) { ++i; }
+                if (i == start) { return std::nullopt; }
+            }
+            if (i != part.size()) { return std::nullopt; }
+            std::istringstream stream{std::string(part)};
+            stream.imbue(std::locale::classic());
+            long double value = 0;
+            stream >> std::noskipws >> value;
+            if (stream.fail() || !std::isfinite(value) || value < 0) { return std::nullopt; }
+            if (value == 0) {
+                const auto mantissa = part.substr(0, part.find_first_of("eE"));
+                if (mantissa.find_first_of("123456789") != std::string_view::npos) { return std::nullopt; }
+            }
+            return value;
+        };
+        const auto split = [](std::string_view value, char delimiter) {
+            std::vector<std::string_view> parts;
+            std::size_t first = 0;
+            for (std::size_t i = 0; i <= value.size(); ++i) {
+                if (i == value.size() || value[i] == delimiter) {
+                    parts.push_back(value.substr(first, i - first)); first = i + 1;
+                }
+            }
+            return parts;
+        };
+        long double seconds = 0;
+        if (mode == TimeDisplay::seconds) {
+            if (text.find(':') == std::string_view::npos) {
+                const auto value = numeric(text, false);
+                if (!value) { return std::nullopt; }
+                seconds = *value;
+            } else {
+                const auto parts = split(text, ':');
+                if (parts.size() < 2 || parts.size() > 3) { return std::nullopt; }
+                for (std::size_t i = 0; i < parts.size(); ++i) {
+                    const auto value = numeric(parts[i], i + 1 != parts.size(), false);
+                    if (!value || (i != 0 && *value >= 60)) { return std::nullopt; }
+                    seconds = seconds * 60 + *value;
+                }
+            }
+        } else if (mode == TimeDisplay::frames) {
+            const auto frames = numeric(text, true);
+            if (!frames || !std::isfinite(frameRate) || frameRate <= 0) { return std::nullopt; }
+            seconds = *frames / frameRate;
+        } else if (mode == TimeDisplay::beats) {
+            if (!std::isfinite(bpm) || bpm <= 0 || beatsPerBar <= 0) { return std::nullopt; }
+            const auto parts = split(text, '.');
+            if (parts.size() < 2 || parts.size() > 3) { return std::nullopt; }
+            const auto bar = numeric(parts[0], true), beat = numeric(parts[1], true);
+            const auto tick = parts.size() == 3 ? numeric(parts[2], true) : std::optional<long double>(0);
+            if (!bar || !beat || !tick || *bar < 1 || *beat < 1 || *beat > beatsPerBar || *tick > 959) { return std::nullopt; }
+            seconds = ((*bar - 1) * beatsPerBar + (*beat - 1) + *tick / 960) * (60.0L / bpm);
+        } else { return std::nullopt; }
+        if (!std::isfinite(seconds) || seconds > std::numeric_limits<double>::max()) { return std::nullopt; }
+        const auto result = static_cast<double>(seconds);
+        if (!std::isfinite(result) || (seconds > 0 && result == 0)) { return std::nullopt; }
+        return result;
     }
 
 private:

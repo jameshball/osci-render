@@ -58,7 +58,22 @@ def choose(item, submenu=None):
 
 
 def position(expected):
-    command("wait-for-locator", "--name", expected, "--role", "label", "--exact")
+    command("wait-for-locator", "--name", expected, "--class", "juce::Label", "--exact")
+
+
+def enter_position(value, expected=None, reject=False, cancel=False):
+    target = find(snapshot(), lambda n: n.get("componentName") == "Timeline position")
+    step("open position entry", "click", target["ref"], "--click-count", "2")
+    target = find(snapshot(), lambda n: n.get("componentName") == "Timeline position")
+    editor = find(target, lambda n: n.get("class") == "juce::TextEditor")
+    assert editor is not None, "Position did not enter text edit mode"
+    step("type position " + value, "fill", editor["ref"], value)
+    step("finish position entry", "press", "Escape" if cancel else "Return")
+    if reject:
+        command("wait-for-locator", "--name", "Cannot go to position", "--exact")
+        step("dismiss invalid position", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
+    if expected is not None:
+        position(expected)
 
 
 try:
@@ -66,6 +81,19 @@ try:
     step("resize workspace", "resize-window", "--w", 1100, "--h", 800)
     step("import object", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "cube.obj", "--role", "label", "--exact")
+    enter_position("90s", "90.000s")
+    enter_position("1:30.25", "90.250s")
+    enter_position("181s", "90.250s", reject=True)
+    enter_position("30s", "90.250s", cancel=True)
+    choose("Frames")
+    enter_position("240", "240f")
+    enter_position("48f", "48f")
+    choose("Bars / beats")
+    enter_position("3.2.480", "3.2.480")
+    enter_position("240f", "5.1.000")
+    enter_position("0.2.000", "5.1.000", reject=True)
+    choose("Seconds")
+    enter_position("0s", "0.000s")
     choose("Bars / beats")
     choose("1 beat", "Beat grid")
     step("seek to snapped beat", "click", "--class", "MotionTimelineView", "--position", "200,12")

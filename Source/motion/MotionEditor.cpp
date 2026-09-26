@@ -147,6 +147,28 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     refreshTiming();
     tempoLabel.setText("BPM", juce::dontSendNotification);
     timeLabel.setName("Timeline position");
+    timeLabel.setEditable(false, true);
+    timeLabel.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
+    timeLabel.setTooltip("Double-click to go to a position. Use the current display, or append s for seconds / f for frames. Musical positions use bar.beat.tick (960 ticks per beat).");
+    timeLabel.onEditorShow = [this] {
+        positionEditGrid = processor.document.project().timeGrid();
+        positionEditGeneration = processor.document.generation();
+        positionEditRevision = processor.document.revision();
+    };
+    timeLabel.onTextChange = [this] {
+        const auto& project = processor.document.project();
+        const auto requested = positionEditGrid.parsePosition(timeLabel.getText().toStdString());
+        const bool current = positionEditGeneration == processor.document.generation() && positionEditRevision == processor.document.revision();
+        timeLabel.setText(juce::String(project.timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
+        if (!current) { return; }
+        if (!requested.has_value() || *requested > project.duration) {
+            osci::showOverlayMessage(*this, "Cannot go to position", "Enter a position from 0 to " + juce::String(project.duration, 3)
+                + " seconds. Use seconds (90s or 1:30s), frames (240f), or bar.beat.tick in the musical display.");
+            return;
+        }
+        processor.seek(*requested);
+        timeline.revealTime(*requested);
+    };
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
     tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
@@ -373,7 +395,7 @@ void MotionEditor::resized() {
     timelineTabs.setBounds(transport.removeFromLeft(270));
     playButton.setBounds(transport.removeFromLeft(65).reduced(2));
     splitButton.setBounds(transport.removeFromLeft(65).reduced(2));
-    timeLabel.setBounds(transport.removeFromLeft(110));
+    timeLabel.setBounds(transport.removeFromLeft(110).reduced(2, 3));
     tempoValue.setBounds(transport.removeFromLeft(56).reduced(1, 3));
     tempoLabel.setBounds(transport.removeFromLeft(34));
     timingButton.setBounds(transport.removeFromLeft(150).reduced(2));
@@ -665,7 +687,8 @@ void MotionEditor::timerCallback() {
             : exportState->progress.load();
     }
     playButton.setButtonText(processor.playing.load() ? "Pause" : "Play");
-    timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
+    if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.generation() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
+    if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
     if (!tempoValue.isBeingEdited()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
     timeline.repaint();
     if (notesEditor.isVisible()) { notesEditor.repaint(); }

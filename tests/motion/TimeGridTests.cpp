@@ -8,6 +8,37 @@ bool close(double a, double b) { return std::abs(a - b) <= 1.0e-10 * std::max({ 
 
 int main() {
     motion::TimeGrid grid;
+    const auto parses = [&](const std::string& text, double expected) {
+        const auto result = grid.parsePosition(text);
+        assert(result.has_value() && close(*result, expected));
+    };
+    const auto rejects = [&](const std::string& text) { assert(!grid.parsePosition(text).has_value()); };
+    parses("0", 0); parses(" \t1.25s\r\n", 1.25); parses(".5", .5);
+    parses("1e3s", 1000); parses("01:02.5", 62.5); parses("1:02:03.25", 3723.25);
+    parses("90:59.999", 5459.999); parses("30 f", 1);
+    parses(grid.positionLabel(12.345), 12.345); parses(grid.positionLabel(1e15), 1e15);
+    for (const auto* text : {"", " ", "-1", "-0", "+1", "NaN", "inf", "1junk", "1,5", "1 2", "1e", "1e+", "1e309", "1e-9999", "1e-400", "1:60", "1:60:00", "1:2:60", "1::2", ":2", "1:", "1:2:3:4", "1.5:20", "1:2e1", "1.5f", "1sf", "s", "f"}) { rejects(text); }
+    rejects(std::string(129, '0'));
+    rejects(std::string("1\0s", 3));
+    parses(std::string(127, '0') + "1", 1);
+    grid.display = motion::TimeDisplay::frames;
+    for (const double fps : {24.0, 29.97}) {
+        grid.frameRate = fps;
+        parses("24", 24 / fps); parses("24f", 24 / fps);
+        parses(grid.positionLabel(300 / fps), 300 / fps);
+        parses("1.25s", 1.25); parses("1:02s", 62);
+    }
+    rejects("1.0"); rejects("1e2"); rejects("1:02");
+    grid.frameRate = 0; rejects("1f"); parses("1s", 1);
+    grid.frameRate = std::numeric_limits<double>::denorm_min(); rejects(std::string(128, '9') + "f"); rejects("100000f");
+    grid.display = motion::TimeDisplay::beats; grid.bpm = 120; grid.beatsPerBar = 3; grid.frameRate = 24;
+    parses("1.1", 0); parses("2.1.000", 1.5); parses("1.3.959", 1 + 959.0 / 1920);
+    parses("2.2.480", 2.25); parses(grid.positionLabel(2.25), 2.25);
+    parses(grid.label(1.5, .5), 1.5); parses("48f", 2); parses("1.25s", 1.25);
+    for (const auto* text : {"1", "0.1", "1.0", "1.4", "1.1.960", "1.1.-1", "1.1.1.1", "1..1", "1.1.", "1e2.1", "1. 1"}) { rejects(text); }
+    grid.bpm = 0; rejects("1.1"); parses("1s", 1);
+    grid.bpm = 120; grid.beatsPerBar = 0; rejects("1.1");
+    grid = motion::TimeGrid();
     assert(close(grid.snap(0.049), 1.0 / 30));
     assert(close(grid.snap(0.051), 2.0 / 30));
     assert(close(grid.snap(-0.051), -2.0 / 30));
