@@ -35,10 +35,10 @@ public:
             if (!clip.active(time)) {
                 continue;
             }
-            auto previous = projected(clip.sample(time, 0));
+            auto previous = projected(clip.sample(time, 0), time);
             for (int i = 1; i <= 512; ++i) {
                 const auto point = clip.sample(time, static_cast<double>(i) / 512);
-                const auto next = projected(point);
+                const auto next = projected(point, time);
                 const auto distance = previous.getDistanceFrom(next);
                 const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
                 const auto colour = clip.id == selected ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
@@ -63,7 +63,7 @@ public:
                 continue;
             }
             for (int i = 0; i < 256; ++i) {
-                const auto distance = projected(clip.sample(time, i / 256.0)).getDistanceFrom(event.position);
+                const auto distance = projected(clip.sample(time, i / 256.0), time).getDistanceFrom(event.position);
                 if (distance < nearest) {
                     nearest = distance;
                     hit = clip.id;
@@ -141,7 +141,8 @@ private:
         const auto size = std::max(10, std::min(getWidth(), getHeight()) - 48);
         return getLocalBounds().toFloat().withSizeKeepingCentre(size, size);
     }
-    juce::Point<float> projected(osci::Point point) const {
+    juce::Point<float> projected(osci::Point point, double time) const {
+        if (prepared != nullptr) { point = prepared->applyCompositionEffects(point, time); }
         const auto scale = 4.0f / std::max(0.05f, 4.0f - point.z);
         const auto frame = outputFrame();
         return { frame.getCentreX() + point.x * scale * frame.getWidth() / 2,

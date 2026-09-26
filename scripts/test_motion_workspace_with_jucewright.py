@@ -85,13 +85,13 @@ try:
     step("undo graph deletion", "click", "--name", "Undo", "--exact")
     before_resize = json.loads(command("snapshot", "--json", "--full"))
     preview_before = find_node(before_resize, lambda node: node.get("class") == "MotionCompositionView")["bounds"]
-    step("resize preview panes", "drag", "--name", "Resize preview panels", "--class", "osci::PanelDivider", "--exact", "--dx", 60, "--dy", 0)
+    step("resize preview panes", "drag", "--name", "Resize preview panels", "--class", "osci::PanelDivider", "--exact", "--position", "3,20", "--dx", 60, "--dy", 0)
     after_resize = json.loads(command("snapshot", "--json", "--full"))
     preview_after = find_node(after_resize, lambda node: node.get("class") == "MotionCompositionView")["bounds"]
     if preview_after["w"] <= preview_before["w"] + 40:
         raise RuntimeError("Preview divider did not resize the composition panel")
     graph_before = find_node(after_resize, lambda node: node.get("class") == "MotionCurveEditor")["bounds"]
-    step("resize timeline pane", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--dx", 0, "--dy", -30)
+    step("resize timeline pane", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -30)
     after_resize = json.loads(command("snapshot", "--json", "--full"))
     graph_after = find_node(after_resize, lambda node: node.get("class") == "MotionCurveEditor")["bounds"]
     if graph_after["h"] <= graph_before["h"] + 20:

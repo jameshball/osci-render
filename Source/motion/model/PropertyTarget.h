@@ -19,6 +19,7 @@ struct BasicPropertyTarget {
     double rate = 1.0;
     Map* properties = nullptr;
     bool camera = false;
+    bool isEffect = false;
 
     double end() const { return start + duration; }
     double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
@@ -42,8 +43,23 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
     if (id == 0) {
         return std::nullopt;
     }
+    for (auto& effect : project.effects) {
+        if (effect.id == id) {
+            return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+        }
+    }
     for (auto& track : project.tracks) {
+        for (auto& effect : track.effects) {
+            if (effect.id == id) {
+                return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+            }
+        }
         for (auto& clip : track.clips) {
+            for (auto& effect : clip.effects) {
+                if (effect.id == id) {
+                    return Target { effect.id, effect.name, clip.start, clip.duration, clip.offset, clip.rate, &effect.properties, false, true };
+                }
+            }
             if (clip.id == id) {
                 return Target { clip.id, clip.name, clip.start, clip.duration, clip.offset, clip.rate, &clip.properties, false };
             }

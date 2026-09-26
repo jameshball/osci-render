@@ -418,6 +418,15 @@ private:
         return juce::Point<float>(centre.x + static_cast<float>(delta * xScale), centre.y - static_cast<float>(slope * delta * yScale));
     }
     double constrainedValue(const motion::PropertyTarget& target, double value) const {
+        if (target.isEffect) {
+            const auto* effect = motion::findEffect(processor.document.project(), target.id);
+            const auto* definition = effect != nullptr ? motion::effectDefinition(effect->type) : nullptr;
+            if (definition != nullptr) {
+                for (const auto& parameter : definition->parameters) {
+                    if (parameter.id == propertyName) { return std::clamp(value, parameter.min, parameter.max); }
+                }
+            }
+        }
         return target.camera && propertyName == "fov" ? std::clamp(value, 0.001, 179.999) : value;
     }
 

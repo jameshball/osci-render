@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
+#include "../Source/motion/model/PropertyTarget.h"
 
 class MotionDocumentTest : public juce::UnitTest {
 public:
@@ -96,9 +97,137 @@ public:
         expectEquals(static_cast<int>(restored.project().assets.size()), 1);
         testCameras(document);
         testAnimatedSources();
+        testEffects(document.project());
     }
 
 private:
+    void testEffects(const motion::Project& sourceProject) {
+        beginTest("Effect catalog uses shared stateless geometry and preserves RGB");
+        const osci::Point input(0.25f, 0.5f, -0.2f, 0.3f, 0.6f, 0.9f);
+        for (const auto& definition : motion::effectCatalog()) {
+            auto effect = motion::makeEffect(100, definition);
+            expect(effect.valid());
+            motion::PreparedEffect prepared(effect);
+            const auto output = prepared.apply(input, 0.4);
+            const auto repeated = prepared.apply(input, 0.4);
+            expect(std::isfinite(output.x) && std::isfinite(output.y) && std::isfinite(output.z));
+            expectEquals(output.x, repeated.x);
+            expectEquals(output.r, input.r);
+            expectEquals(output.g, input.g);
+            expectEquals(output.b, input.b);
+            effect.properties["strength"] = motion::Curve(0);
+            expectEquals(motion::PreparedEffect(effect).apply(input, 0.4).x, input.x);
+            effect.enabled = false;
+            effect.properties["strength"] = motion::Curve(1);
+            expectEquals(motion::PreparedEffect(effect).apply(input, 0.4).x, input.x);
+        }
+        auto translate = motion::makeEffect(101, *motion::effectDefinition("translate"));
+        translate.properties["translateX"] = motion::Curve(0.5);
+        expectWithinAbsoluteError(motion::PreparedEffect(translate).apply(input, 0).x, 0.75f, 0.000001f);
+        auto rotate = motion::makeEffect(102, *motion::effectDefinition("rotate"));
+        rotate.properties["rotateZ"] = motion::Curve(0.5);
+        const auto rotated = motion::PreparedEffect(rotate).apply(input, 0);
+        expectWithinAbsoluteError(rotated.x, -input.y, 0.000001f);
+        expectWithinAbsoluteError(rotated.y, input.x, 0.000001f);
+        auto scale = motion::makeEffect(103, *motion::effectDefinition("scale"));
+        scale.properties["scaleX"] = motion::Curve(2);
+        scale.properties["scaleY"] = motion::Curve(1);
+        scale.properties["scaleZ"] = motion::Curve(1);
+        const auto firstOrder = motion::applyEffects(motion::prepareEffects({ translate, scale }), input, 0);
+        const auto reverseOrder = motion::applyEffects(motion::prepareEffects({ scale, translate }), input, 0);
+        expectWithinAbsoluteError(firstOrder.x, 1.5f, 0.000001f);
+        expectWithinAbsoluteError(reverseOrder.x, 1.0f, 0.000001f);
+        translate.range = motion::EffectRange { -1, 2 };
+        const motion::PreparedEffect ranged(translate);
+        expectEquals(ranged.apply(input, -1.01).x, input.x);
+        expectWithinAbsoluteError(ranged.apply(input, -1).x, 0.75f, 0.000001f);
+        expectEquals(ranged.apply(input, 1).x, input.x);
+
+        beginTest("Clip, track and composition stacks run in scope order with owner clocks");
+        auto project = sourceProject;
+        auto& clip = project.tracks[0].clips[0];
+        clip.start = 2;
+        clip.duration = 8;
+        clip.offset = 0.5;
+        clip.rate = 2;
+        clip.properties["position.x"] = motion::Curve(0.25);
+        clip.properties["scale.x"] = motion::Curve(2);
+        translate.range.reset();
+        translate.properties["translateX"] = motion::Curve(0);
+        translate.properties["translateX"].setKey({0, 0, motion::Interpolation::linear});
+        translate.properties["translateX"].setKey({10, 1});
+        clip.effects = { translate };
+        scale.id = 104;
+        project.tracks[0].effects = { scale };
+        auto global = motion::makeEffect(105, *motion::effectDefinition("translate"));
+        global.properties["translateX"] = motion::Curve(0.1);
+        project.effects = { global };
+        motion::PreparedComposition composition(project);
+        const auto local = clip.localTime(3);
+        const auto raw = sourceProject.assets[0]->source->sample(local, 0.2);
+        const auto expectedWorldX = ((raw.x + local / 10.0) * 2 + 0.25) * 2;
+        const auto world = composition.clips[0].sample(3, 0.2);
+        expectWithinAbsoluteError(world.x, static_cast<float>(expectedWorldX), 0.00001f);
+        const auto output = composition.projectPoint(world, 3);
+        expectWithinAbsoluteError(output.x, static_cast<float>((expectedWorldX + 0.1) * 4 / (4 - world.z)), 0.00001f);
+        const auto clipTarget = motion::findPropertyTarget(project, translate.id);
+        expect(clipTarget.has_value() && clipTarget->isEffect && !clipTarget->camera);
+        if (clipTarget.has_value()) {
+            expectEquals(clipTarget->localTime(3), local);
+        }
+        const auto trackTarget = motion::findPropertyTarget(project, scale.id);
+        expect(trackTarget.has_value() && trackTarget->isEffect);
+        if (trackTarget.has_value()) {
+            expectEquals(trackTarget->localTime(3), 3.0);
+        }
+        expect(motion::findEffectOwner(project, 0) == &project.effects);
+        expect(motion::findEffectOwner(project, project.tracks[0].id) == &project.tracks[0].effects);
+        expect(motion::findEffect(project, global.id) == &project.effects[0]);
+
+        beginTest("Effect order, curves and time ranges round trip, sharing assets through undo");
+        clip.effects[0].range = motion::EffectRange { -0.5, 6 };
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(sourceProject);
+        document.edit("Add effects", [&](motion::Project& value) { value = project; });
+        expect(undo.undo());
+        expect(document.project().effects.empty());
+        expect(document.project().assets[0] == sourceProject.assets[0]);
+        expect(undo.redo());
+        expect(document.project().assets[0] == sourceProject.assets[0]);
+        juce::UndoManager loadedUndo;
+        motion::Document loaded(loadedUndo);
+        const auto xml = document.save();
+        const auto result = loaded.load(xml);
+        expect(result.wasOk(), result.getErrorMessage());
+        if (result.failed()) {
+            return;
+        }
+        expect(loaded.newId() > global.id);
+        const auto* restoredEffect = motion::findEffect(loaded.project(), translate.id);
+        expect(restoredEffect != nullptr && restoredEffect->range.has_value());
+        motion::PreparedComposition restored(loaded.project());
+        expectWithinAbsoluteError(restored.sample(3, 0.2).x, composition.sample(3, 0.2).x, 0.00001f);
+        const auto before = loaded.save().toString();
+        const auto reject = [&](juce::XmlElement invalid) {
+            expect(loaded.load(invalid).failed());
+            expectEquals(loaded.save().toString(), before);
+        };
+        auto duplicate = xml;
+        duplicate.getChildByName("effect")->setAttribute("id", juce::String(sourceProject.assets[0]->id));
+        reject(duplicate);
+        auto unknown = xml;
+        unknown.getChildByName("effect")->setAttribute("type", "not-an-effect");
+        reject(unknown);
+        auto badRange = xml;
+        badRange.getChildByName("effect")->setAttribute("start", 0);
+        badRange.getChildByName("effect")->setAttribute("duration", -1);
+        reject(badRange);
+        auto badParameter = xml;
+        badParameter.getChildByName("effect")->getChildByName("property")->setAttribute("base", 10000);
+        reject(badParameter);
+    }
+
     static motion::Asset textAsset(const juce::String& extension, const juce::String& text) {
         motion::Asset asset;
         asset.id = 1;

@@ -7,6 +7,7 @@ struct Project {
     double duration = 120.0;
     std::vector<motion::Track> tracks;
     std::vector<motion::Camera> cameras;
+    std::vector<motion::EffectInstance> effects;
 };
 void check(bool passed, const char* message) {
     if (!passed) {
@@ -50,5 +51,35 @@ int main() {
     check(project.tracks[0].clips[0].properties.at("position.x").base == 4, "camera mutation leaves object curves untouched");
     project.cameras.clear();
     check(motion::findPropertyCurve(project, 20, "position.x") == nullptr, "lookup after deletion does not retain a stale map");
+    auto localEffect = motion::makeEffect(30, *motion::effectDefinition("ripple"));
+    check(localEffect.valid(), "factory populates every bounded parameter");
+    project.tracks[0].clips[0].effects.push_back(localEffect);
+    auto trackEffect = motion::makeEffect(31, *motion::effectDefinition("bulge"));
+    project.tracks[0].effects.push_back(trackEffect);
+    project.effects.push_back(motion::makeEffect(32, *motion::effectDefinition("swirl")));
+    const auto localTarget = motion::findPropertyTarget(readOnly, 30);
+    const auto trackTarget = motion::findPropertyTarget(readOnly, 31);
+    const auto globalTarget = motion::findPropertyTarget(readOnly, 32);
+    check(localTarget->isEffect && !localTarget->camera && localTarget->localTime(10) == 7, "clip effects inherit slip/stretch clocks");
+    check(trackTarget->isEffect && globalTarget->isEffect && trackTarget->localTime(10) == 10 && globalTarget->localTime(10) == 10, "track and composition effects use project time");
+    check(motion::findEffectOwner(project, 10) == &project.tracks[0].clips[0].effects, "clip effect ownership lookup");
+    check(motion::findEffectOwner(project, 1) == &project.tracks[0].effects, "track effect ownership lookup");
+    check(motion::findEffectOwner(project, 0) == &project.effects, "composition effect ownership lookup");
+    check(motion::findEffectOwner(project, 999) == nullptr, "unknown owners cannot receive effects");
+    motion::findPropertyCurve(project, 30, "strength")->setKey({ 7, 0.25 });
+    check(motion::findEffect(readOnly, 30)->properties.at("strength").evaluate(7) == 0.25, "effect graph edits update owner storage");
+    auto invalidEffect = localEffect;
+    invalidEffect.range = motion::EffectRange { 1, -1 };
+    check(!invalidEffect.valid(), "negative effect duration is rejected");
+    invalidEffect.range = motion::EffectRange { -1, 2 };
+    check(invalidEffect.valid(), "negative clip-local range is supported");
+    invalidEffect.properties["rippleDepth"] = motion::Curve(2);
+    check(!invalidEffect.valid(), "out-of-range effect values are rejected");
+    const auto split = project.tracks[0].clips[0].split(10, 40);
+    check(split.has_value() && split->second.effects.size() == 1, "split retains an independent effect stack value");
+    auto right = split->second;
+    right.effects[0].id = 41;
+    right.effects[0].properties["strength"] = motion::Curve(0.75);
+    check(project.tracks[0].clips[0].effects[0].properties.at("strength").evaluate(7) == 0.25, "split effect curves remain independent");
     std::cout << "Property target contracts passed\n";
 }

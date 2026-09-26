@@ -12,6 +12,7 @@ public:
         setTooltip("V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit.");
     }
     std::function<void(motion::Id)> onSelection;
+    std::function<void(motion::Id, motion::Id)> onEffectAdded;
     motion::Id selected = 0;
     double pixelsPerSecond = 70;
     double scrollTime = 0;
@@ -21,12 +22,14 @@ public:
     static constexpr int rowHeight = 40;
 
     bool isInterestedInDragSource(const SourceDetails& details) override {
-        return details.description.toString().startsWith("motion-asset:");
+        const auto description = details.description.toString();
+        return description.startsWith("motion-asset:") || description.startsWith("motion-effect:");
     }
 
     void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
     void itemDragMove(const SourceDetails& details) override {
         dropPosition = details.localPosition;
+        dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
         dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
         repaint();
     }
@@ -37,6 +40,11 @@ public:
 
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
+        if (details.description.toString().startsWith("motion-effect:")) {
+            insertEffect(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), details.localPosition);
+            repaint();
+            return;
+        }
         insertAsset(static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), details.localPosition.x, details.localPosition.y);
         repaint();
     }
@@ -130,16 +138,31 @@ public:
                 g.setColour(active ? juce::Colour(0xff70da91) : juce::Colour(0xff647d71));
                 g.drawRoundedRectangle(bounds, 4, 1);
                 g.setColour(juce::Colours::white);
+                if (!clip.effects.empty() && bounds.getWidth() > 90) {
+                    g.setColour(juce::Colours::white.withAlpha(0.7f));
+                    g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38), juce::Justification::centred);
+                    g.setColour(juce::Colours::white);
+                }
                 auto label = juce::String(clip.name);
                 if (active && tool == Tool::slip) {
                     label += "  offset " + juce::String(clip.offset, 2) + "s";
                 } else if (active && tool == Tool::stretch) {
                     label += "  " + juce::String(clip.rate, 2) + "x";
                 }
-                g.drawText(label, bounds.reduced(8, 0), juce::Justification::centredLeft);
+                const auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f);
+                g.drawText(label, labelBounds, juce::Justification::centredLeft);
             }
         }
-        if (dropPosition.has_value()) {
+        if (dropPosition.has_value() && !dropEffect.empty()) {
+            int row = 0;
+            const auto* clip = clipAt(*dropPosition, row);
+            if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = (dropPosition->y - rulerHeight) / rowHeight + scrollRows; }
+            if (row >= 0 && row < static_cast<int>(tracks.size()) && (clip != nullptr || dropPosition->x < namesWidth)) {
+                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, rowY(row), namesWidth, rowHeight);
+                g.setColour(osci::Colours::accentColor());
+                g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
+            }
+        } else if (dropPosition.has_value()) {
             const auto row = std::clamp((dropPosition->y - rulerHeight) / rowHeight + scrollRows, 0, static_cast<int>(tracks.size()));
             const auto time = std::max(0.0, scrollTime + (dropPosition->x - namesWidth) / pixelsPerSecond);
             motion::Clip candidate;
@@ -366,6 +389,25 @@ public:
     }
 
 private:
+    void insertEffect(const std::string& type, juce::Point<int> position) {
+        const auto* definition = motion::effectDefinition(type);
+        if (definition == nullptr || position.y < rulerHeight) { return; }
+        int row = 0;
+        const auto* clip = clipAt(position, row);
+        const auto& tracks = processor.document.project().tracks;
+        if (position.x < namesWidth) { row = (position.y - rulerHeight) / rowHeight + scrollRows; }
+        if (row < 0 || row >= static_cast<int>(tracks.size()) || (clip == nullptr && position.x >= namesWidth)) { return; }
+        const auto owner = clip != nullptr ? clip->id : tracks[row].id;
+        const auto* effects = motion::findEffectOwner(processor.document.project(), owner);
+        if (effects == nullptr || effects->size() >= motion::maximumEffectsPerOwner) { return; }
+        if (clip != nullptr) { selectClip(clip->id); }
+        const auto effect = motion::makeEffect(processor.document.newId(), *definition);
+        processor.document.edit("Add " + juce::String(definition->name), [owner, effect](motion::Project& project) {
+            auto* destination = motion::findEffectOwner(project, owner);
+            if (destination != nullptr) { destination->push_back(effect); }
+        });
+        if (onEffectAdded) { onEffectAdded(owner, effect.id); }
+    }
     enum class Tool { move, slip, stretch };
     enum class Mode { move, left, right, slip, stretch };
 
@@ -493,4 +535,5 @@ private:
     bool changed = false;
     std::optional<juce::Point<int>> dropPosition;
     motion::Id dropAssetId = 0;
+    std::string dropEffect;
 };

@@ -1,0 +1,354 @@
+#pragma once
+
+#include "../MotionProcessor.h"
+#include "../model/PropertyTarget.h"
+
+// The stack stays visible while the selected effect exposes its controls below.
+// Property edits use the same owner clock and undo model as the graph editor.
+class MotionEffectsPanel : public juce::Component, private juce::ListBoxModel, public juce::DragAndDropTarget {
+public:
+    explicit MotionEffectsPanel(MotionProcessor& ownerProcessor) : processor(ownerProcessor), stack("Effect stack", this) {
+        setName("Effects inspector");
+        scope.setName("Effect scope");
+        scope.addItem("Clip", 1);
+        scope.addItem("Track", 2);
+        scope.addItem("Composition", 3);
+        scope.setSelectedId(1, juce::dontSendNotification);
+        scope.onChange = [this] { cancelGesture(); selected = 0; refresh(); notifySelection(); };
+        stack.setRowHeight(30);
+        stack.setColour(juce::ListBox::backgroundColourId, osci::Colours::veryDark());
+        stack.setOutlineThickness(0);
+        addButton.setButtonText("Add effect");
+        addButton.onClick = [this] { showAddMenu(); };
+        removeButton.setButtonText("Remove");
+        removeButton.onClick = [this] { removeSelected(); };
+        enabled.setButtonText("Enabled");
+        enabled.onClick = [this] {
+            const auto id = selected;
+            const auto value = enabled.getToggleState();
+            processor.document.edit(value ? "Enable effect" : "Bypass effect", [id, value](motion::Project& project) {
+                auto* effect = motion::findEffect(project, id);
+                if (effect != nullptr) { effect->enabled = value; }
+            });
+        };
+        for (auto* component : std::initializer_list<juce::Component*> { &scope, &stack, &addButton, &removeButton, &enabled, &title, &viewport }) {
+            addAndMakeVisible(component);
+        }
+        title.setJustificationType(juce::Justification::centredLeft);
+        viewport.setViewedComponent(&controls, false);
+        viewport.setScrollBarsShown(true, false);
+        refresh();
+    }
+    ~MotionEffectsPanel() override { cancelGesture(); }
+    std::function<void(motion::Id, std::string)> onPropertySelected;
+
+    void setSelectedClip(motion::Id id) {
+        if (clipId == id && !explicitTrack) { return; }
+        cancelGesture();
+        explicitTrack = false;
+        clipId = id;
+        trackId = 0;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.id == id) { trackId = track.id; } }
+        }
+        selected = 0;
+        refresh();
+    }
+    motion::Id ownerId() const {
+        if (scope.getSelectedId() == 3) { return 0; }
+        if (scope.getSelectedId() == 1) { return clipId; }
+        if (explicitTrack) { return trackId; }
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.id == clipId) { return track.id; } }
+        }
+        return 0;
+    }
+    bool validOwner() const { return scope.getSelectedId() == 3 || (ownerId() != 0 && motion::findEffectOwner(processor.document.project(), ownerId()) != nullptr); }
+    void showOwner(motion::Id id, motion::Id effectId) {
+        cancelGesture();
+        const auto& project = processor.document.project();
+        int choice = 3;
+        explicitTrack = false;
+        for (const auto& track : project.tracks) {
+            if (track.id == id) {
+                choice = 2;
+                explicitTrack = true;
+                trackId = id;
+                clipId = track.clips.empty() ? 0 : track.clips.front().id;
+            }
+            for (const auto& clip : track.clips) {
+                if (clip.id == id) { choice = 1; clipId = id; trackId = track.id; }
+            }
+        }
+        scope.setSelectedId(choice, juce::dontSendNotification);
+        selected = effectId;
+        refresh();
+        notifySelection();
+    }
+    void activate() { refresh(); notifySelection(); }
+    void addEffect(const std::string& type) {
+        if (!validOwner()) { return; }
+        const auto* existing = motion::findEffectOwner(processor.document.project(), ownerId());
+        if (existing == nullptr || existing->size() >= motion::maximumEffectsPerOwner) { return; }
+        const auto* definition = motion::effectDefinition(type);
+        if (definition == nullptr) { return; }
+        auto effect = motion::makeEffect(processor.document.newId(), *definition);
+        const auto id = effect.id;
+        const auto owner = ownerId();
+        processor.document.edit("Add " + juce::String(definition->name), [owner, effect](motion::Project& project) {
+            auto* effects = motion::findEffectOwner(project, owner);
+            if (effects != nullptr) { effects->push_back(effect); }
+        });
+        selected = id;
+        refresh();
+        notifySelection();
+    }
+
+    void refresh() {
+        const auto previousSelection = selected;
+        const auto* effects = validOwner() ? motion::findEffectOwner(processor.document.project(), ownerId()) : nullptr;
+        std::vector<motion::Id> next;
+        if (effects != nullptr) { for (const auto& effect : *effects) { next.push_back(effect.id); } }
+        ids = std::move(next);
+        if (std::find(ids.begin(), ids.end(), selected) == ids.end()) { selected = ids.empty() ? 0 : ids.front(); }
+        updating = true;
+        stack.updateContent();
+        const auto found = std::find(ids.begin(), ids.end(), selected);
+        if (found == ids.end()) { stack.deselectAllRows(); } else { stack.selectRow(static_cast<int>(found - ids.begin())); }
+        updating = false;
+        addButton.setEnabled(validOwner() && ids.size() < motion::maximumEffectsPerOwner);
+        removeButton.setEnabled(selected != 0);
+        const auto* effect = motion::findEffect(processor.document.project(), selected);
+        enabled.setEnabled(effect != nullptr);
+        enabled.setToggleState(effect != nullptr && effect->enabled, juce::dontSendNotification);
+        title.setText(effect == nullptr ? (validOwner() ? "Drop an effect here" : "Select an object clip") : juce::String(effect->name), juce::dontSendNotification);
+        const auto type = effect == nullptr ? std::string() : effect->type;
+        if (builtFor != selected || builtType != type) {
+            cancelGesture();
+            rows.clear();
+            cancelledGesture = false;
+            builtFor = selected;
+            builtType = type;
+            const auto* definition = motion::effectDefinition(type);
+            if (definition != nullptr) {
+                for (const auto& parameter : definition->parameters) {
+                    auto row = std::make_unique<Row>();
+                    row->id = parameter.id;
+                    row->label.setText(juce::String(parameter.name), juce::dontSendNotification);
+                    row->label.setFont(12);
+                    row->value.setName("Effect " + juce::String(parameter.id));
+                    row->value.setSliderStyle(juce::Slider::LinearHorizontal);
+                    row->value.setTextBoxStyle(juce::Slider::TextBoxRight, false, 62, 22);
+                    row->value.setRange(parameter.min, parameter.max, 0.0001);
+                    row->key.setButtonText("Key effect " + juce::String(parameter.id));
+                    row->value.onDragStart = [this, name = row->id] { beginGesture(name); };
+                    row->value.onValueChange = [this, pointer = row.get()] { setValue(pointer->id, pointer->value.getValue(), false); };
+                    row->value.onDragEnd = [this] { finishGesture(); };
+                    row->key.onClick = [this, name = row->id] { setValue(name, 0, true); };
+                    controls.addAndMakeVisible(row->label);
+                    controls.addAndMakeVisible(row->value);
+                    controls.addAndMakeVisible(row->key);
+                    rows.push_back(std::move(row));
+                }
+            }
+        }
+        updateValues();
+        resized();
+        repaint();
+        if (previousSelection != selected && isShowing()) { notifySelection(); }
+    }
+    void updateValues() {
+        const auto target = motion::findPropertyTarget(processor.document.project(), selected);
+        if (!target.has_value()) { return; }
+        const auto local = target->localTime(frameTime());
+        for (const auto& row : rows) {
+            const auto* curve = target->curve(row->id);
+            if (curve == nullptr) { continue; }
+            bool editing = false;
+            for (auto* child : row->value.getChildren()) {
+                const auto* label = dynamic_cast<juce::Label*>(child);
+                editing = editing || (label != nullptr && label->isBeingEdited());
+            }
+            if (!gesture.has_value() && !editing) { row->value.setValue(curve->evaluate(local), juce::dontSendNotification); }
+            const auto& keys = curve->keyframes();
+            const bool keyed = std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return std::abs(key.time - local) < 1.0e-6; });
+            row->key.setState(keyed ? osci::KeyframeButton::State::keyed : (curve->animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
+        }
+    }
+    void resized() override {
+        auto area = getLocalBounds().reduced(6, 3);
+        scope.setBounds(area.removeFromTop(28));
+        area.removeFromTop(3);
+        stack.setBounds(area.removeFromTop(std::min(120, 30 * std::max(2, static_cast<int>(ids.size())))));
+        area.removeFromTop(3);
+        auto buttons = area.removeFromTop(28);
+        removeButton.setBounds(buttons.removeFromRight(68));
+        addButton.setBounds(buttons.withTrimmedRight(3));
+        area.removeFromTop(3);
+        auto header = area.removeFromTop(30);
+        enabled.setBounds(header.removeFromRight(80));
+        title.setBounds(header);
+        viewport.setBounds(area);
+        controls.setSize(std::max(1, viewport.getMaximumVisibleWidth()), static_cast<int>(rows.size()) * 48);
+        int y = 0;
+        for (const auto& row : rows) {
+            auto line = juce::Rectangle<int>(0, y, controls.getWidth(), 45);
+            row->label.setBounds(line.removeFromTop(18));
+            row->key.setBounds(line.removeFromRight(22));
+            row->value.setBounds(line);
+            y += 48;
+        }
+    }
+    bool keyPressed(const juce::KeyPress& key) override {
+        if (key == juce::KeyPress::escapeKey && gesture.has_value()) { cancelGesture(); updateValues(); return true; }
+        return false;
+    }
+    bool isInterestedInDragSource(const SourceDetails& details) override {
+        const auto value = details.description.toString();
+        return value.startsWith("motion-effect:") || (value.startsWith("motion-effect-instance:") && std::find(ids.begin(), ids.end(), instanceId(value)) != ids.end());
+    }
+    void itemDropped(const SourceDetails& details) override {
+        const auto value = details.description.toString();
+        if (value.startsWith("motion-effect:")) { addEffect(value.fromFirstOccurrenceOf(":", false, false).toStdString()); return; }
+        const auto id = instanceId(value);
+        const auto target = std::clamp((details.localPosition.y - stack.getY()) / 30, 0, std::max(0, static_cast<int>(ids.size()) - 1));
+        reorder(id, target);
+    }
+
+private:
+    struct Row { std::string id; juce::Label label; juce::Slider value; osci::KeyframeButton key; };
+    struct Gesture { motion::Project before; std::uint64_t revision; motion::Id effect; std::string property; double time; bool changed = false; };
+    int getNumRows() override { return static_cast<int>(ids.size()); }
+    juce::String getNameForRow(int row) override {
+        const auto* effect = row >= 0 && row < getNumRows() ? motion::findEffect(processor.document.project(), ids[static_cast<std::size_t>(row)]) : nullptr;
+        return effect == nullptr ? juce::String() : juce::String(effect->name);
+    }
+    void paintListBoxItem(int row, juce::Graphics& g, int width, int height, bool active) override {
+        if (row < 0 || row >= getNumRows()) { return; }
+        const auto* effect = motion::findEffect(processor.document.project(), ids[static_cast<std::size_t>(row)]);
+        if (effect == nullptr) { return; }
+        if (active) { g.setColour(osci::Colours::accentColor().withAlpha(0.2f)); g.fillRoundedRectangle(juce::Rectangle<float>(1, 1, width - 2, height - 2), 3); }
+        g.setColour(osci::Colours::text().withAlpha(effect->enabled ? 1.0f : 0.4f));
+        g.setFont(13);
+        g.drawText(juce::String(row + 1) + "  " + juce::String(effect->name), 8, 0, width - 16, height, juce::Justification::centredLeft);
+    }
+    void selectedRowsChanged(int row) override {
+        if (updating || row < 0 || row >= getNumRows()) { return; }
+        cancelGesture(); selected = ids[static_cast<std::size_t>(row)]; refresh(); notifySelection();
+    }
+    void deleteKeyPressed(int) override { removeSelected(); }
+    juce::var getDragSourceDescription(const juce::SparseSet<int>& selection) override {
+        if (selection.size() == 0 || selection[0] < 0 || selection[0] >= getNumRows()) { return {}; }
+        return "motion-effect-instance:" + juce::String(ids[static_cast<std::size_t>(selection[0])]);
+    }
+    static motion::Id instanceId(const juce::String& value) { return static_cast<motion::Id>(value.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()); }
+    void notifySelection() { if (onPropertySelected) { onPropertySelected(selected, "strength"); } }
+    void showAddMenu() {
+        juce::PopupMenu menu;
+        int id = 1;
+        for (const auto& definition : motion::effectCatalog()) { menu.addItem(id++, juce::String(definition.name)); }
+        const juce::Component::SafePointer<MotionEffectsPanel> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton), [owner](int result) {
+            if (owner != nullptr && result > 0 && result <= static_cast<int>(motion::effectCatalog().size())) { owner->addEffect(motion::effectCatalog()[static_cast<std::size_t>(result - 1)].id); }
+        });
+    }
+    void removeSelected() {
+        if (selected == 0) { return; }
+        cancelGesture();
+        const auto id = selected, owner = ownerId();
+        processor.document.edit("Remove effect", [id, owner](motion::Project& project) {
+            auto* effects = motion::findEffectOwner(project, owner);
+            if (effects != nullptr) { std::erase_if(*effects, [id](const auto& effect) { return effect.id == id; }); }
+        });
+        selected = 0; refresh(); notifySelection();
+    }
+    void reorder(motion::Id id, int destination) {
+        const auto found = std::find(ids.begin(), ids.end(), id);
+        if (found == ids.end() || found - ids.begin() == destination) { return; }
+        const auto owner = ownerId();
+        processor.document.edit("Reorder effects", [owner, id, destination](motion::Project& project) {
+            auto* effects = motion::findEffectOwner(project, owner);
+            if (effects == nullptr) { return; }
+            const auto source = std::find_if(effects->begin(), effects->end(), [id](const auto& effect) { return effect.id == id; });
+            if (source == effects->end()) { return; }
+            auto effect = std::move(*source);
+            effects->erase(source);
+            effects->insert(effects->begin() + std::min(destination, static_cast<int>(effects->size())), std::move(effect));
+        });
+        refresh();
+    }
+    double frameTime() const {
+        const auto& project = processor.document.project();
+        return std::clamp(std::round(processor.position.load() * project.frameRate) / project.frameRate, 0.0, project.duration);
+    }
+    void beginGesture(const std::string& property) {
+        cancelGesture();
+        cancelledGesture = false;
+        gesture = Gesture { processor.document.project(), processor.document.revision(), selected, property, frameTime() };
+        if (onPropertySelected) { onPropertySelected(selected, property); }
+    }
+    void setValue(const std::string& property, double value, bool key) {
+        if (cancelledGesture) { return; }
+        if (gesture.has_value() && gesture->revision != processor.document.revision()) { gesture.reset(); cancelledGesture = true; return; }
+        const auto id = selected;
+        const auto time = gesture.has_value() ? gesture->time : frameTime();
+        const auto target = motion::findPropertyTarget(processor.document.project(), id);
+        const auto* curve = target.has_value() ? target->curve(property) : nullptr;
+        if (curve == nullptr) { return; }
+        const auto local = target->localTime(time);
+        if (key) { value = curve->evaluate(local); }
+        const auto* effect = motion::findEffect(processor.document.project(), id);
+        const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
+        if (definition == nullptr || !std::isfinite(value)) { return; }
+        for (const auto& parameter : definition->parameters) {
+            if (parameter.id == property) { value = std::clamp(value, parameter.min, parameter.max); }
+        }
+        if (!key && !gesture.has_value() && value == curve->evaluate(local)) { return; }
+        const auto operation = [id, property, value, local, key](motion::Project& project) {
+            auto* changed = motion::findPropertyCurve(project, id, property);
+            if (changed == nullptr) { return; }
+            if (key || changed->animated()) { changed->setKeyValue(local, value); } else { changed->base = value; }
+        };
+        if (gesture.has_value()) {
+            auto project = gesture->before;
+            operation(project);
+            const auto previous = motion::findPropertyTarget(gesture->before, id);
+            const auto* original = previous.has_value() ? previous->curve(property) : nullptr;
+            gesture->changed = original != nullptr && original->evaluate(local) != value;
+            if (!gesture->changed) { project = gesture->before; }
+            processor.document.preview(std::move(project));
+            gesture->revision = processor.document.revision();
+        } else {
+            processor.document.edit(key ? "Key effect parameter" : "Change effect parameter", operation);
+        }
+        if (onPropertySelected) { onPropertySelected(id, property); }
+    }
+    void finishGesture() {
+        cancelledGesture = false;
+        if (!gesture.has_value()) { return; }
+        auto done = std::move(*gesture); gesture.reset();
+        if (done.changed && done.revision == processor.document.revision()) { processor.document.commit("Change effect parameter", std::move(done.before)); }
+    }
+    void cancelGesture() {
+        if (!gesture.has_value()) { return; }
+        cancelledGesture = true;
+        auto done = std::move(*gesture); gesture.reset();
+        if (done.changed && done.revision == processor.document.revision()) { processor.document.preview(std::move(done.before)); }
+    }
+    MotionProcessor& processor;
+    motion::Id clipId = 0, trackId = 0, selected = 0, builtFor = 0;
+    std::string builtType;
+    std::vector<motion::Id> ids;
+    juce::ComboBox scope;
+    juce::ListBox stack;
+    juce::TextButton addButton, removeButton;
+    juce::ToggleButton enabled;
+    juce::Label title;
+    juce::Viewport viewport;
+    juce::Component controls;
+    std::vector<std::unique_ptr<Row>> rows;
+    std::optional<Gesture> gesture;
+    bool updating = false;
+    bool cancelledGesture = false;
+    bool explicitTrack = false;
+};

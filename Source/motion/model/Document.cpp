@@ -326,6 +326,62 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
     }
     return juce::Result::ok();
 }
+void saveEffects(juce::XmlElement& owner, const std::vector<EffectInstance>& effects) {
+    for (const auto& effect : effects) {
+        auto* item = owner.createNewChildElement("effect");
+        item->setAttribute("id", juce::String(effect.id));
+        item->setAttribute("type", juce::String(effect.type));
+        item->setAttribute("name", juce::String(effect.name));
+        item->setAttribute("enabled", effect.enabled);
+        if (effect.range.has_value()) {
+            item->setAttribute("start", effect.range->start);
+            item->setAttribute("duration", effect.range->duration);
+        }
+        for (const auto& [name, curve] : effect.properties) {
+            saveProperty(*item, name, curve);
+        }
+    }
+}
+
+juce::Result loadEffects(const juce::XmlElement& owner, std::vector<EffectInstance>& effects, std::set<Id>& identities) {
+    for (auto* item : owner.getChildWithTagNameIterator("effect")) {
+        const auto identity = item->getStringAttribute("id").getLargeIntValue();
+        const auto* definition = effectDefinition(item->getStringAttribute("type").toStdString());
+        if (identity <= 0 || definition == nullptr || !identities.insert(static_cast<Id>(identity)).second) {
+            return juce::Result::fail("Unknown effect type or invalid / duplicate effect identity.");
+        }
+        if (effects.size() >= maximumEffectsPerOwner) {
+            return juce::Result::fail("Each clip, track or composition supports at most 64 effects.");
+        }
+        auto effect = makeEffect(static_cast<Id>(identity), *definition);
+        effect.name = item->getStringAttribute("name", juce::String(definition->name)).toStdString();
+        effect.enabled = item->getBoolAttribute("enabled", true);
+        if (item->hasAttribute("start") || item->hasAttribute("duration")) {
+            if (!item->hasAttribute("start") || !item->hasAttribute("duration")) {
+                return juce::Result::fail("Effect time ranges require both start and duration.");
+            }
+            effect.range = EffectRange { item->getDoubleAttribute("start"), item->getDoubleAttribute("duration") };
+        }
+        std::set<std::string> properties;
+        for (auto* property : item->getChildWithTagNameIterator("property")) {
+            const auto name = property->getStringAttribute("name").toStdString();
+            const auto found = effect.properties.find(name);
+            if (found == effect.properties.end() || !properties.insert(name).second) {
+                return juce::Result::fail("Unknown or duplicate effect parameter.");
+            }
+            const auto result = loadProperty(*property, found->second);
+            if (result.failed()) {
+                return result;
+            }
+        }
+        if (properties.size() != effect.properties.size() || !effect.valid()) {
+            return juce::Result::fail("Invalid effect range or parameter value.");
+        }
+        effects.push_back(std::move(effect));
+    }
+    return juce::Result::ok();
+}
+
 }
 
 struct Document::Change : juce::UndoableAction {
@@ -360,13 +416,21 @@ void Document::commit(juce::String label, Project before) {
 void Document::reset(Project project) {
     ++projectGeneration;
     undo.clearUndoHistory();
+    const auto updateEffects = [&](const auto& effects) {
+        for (const auto& effect : effects) {
+            lastId = std::max(lastId, effect.id);
+        }
+    };
+    updateEffects(project.effects);
     for (const auto& asset : project.assets) {
         lastId = std::max(lastId, asset->id);
     }
     for (const auto& track : project.tracks) {
         lastId = std::max(lastId, track.id);
+        updateEffects(track.effects);
         for (const auto& clip : track.clips) {
             lastId = std::max(lastId, clip.id);
+            updateEffects(clip.effects);
         }
     }
     for (const auto& camera : project.cameras) {
@@ -483,6 +547,7 @@ juce::XmlElement Document::save() const {
     xml.setAttribute("duration", state.duration);
     xml.setAttribute("fps", state.frameRate);
     xml.setAttribute("bpm", state.bpm);
+    saveEffects(xml, state.effects);
     for (const auto& asset : state.assets) {
         auto* item = xml.createNewChildElement("asset");
         item->setAttribute("id", juce::String(asset->id));
@@ -494,6 +559,7 @@ juce::XmlElement Document::save() const {
         auto* row = xml.createNewChildElement("track");
         row->setAttribute("id", juce::String(track.id));
         row->setAttribute("name", juce::String(track.name));
+        saveEffects(*row, track.effects);
         for (const auto& clip : track.clips) {
             auto* item = row->createNewChildElement("clip");
             item->setAttribute("id", juce::String(clip.id));
@@ -503,6 +569,7 @@ juce::XmlElement Document::save() const {
             item->setAttribute("duration", clip.duration);
             item->setAttribute("offset", clip.offset);
             item->setAttribute("rate", clip.rate);
+            saveEffects(*item, clip.effects);
             for (const auto& [name, curve] : clip.properties) {
                 saveProperty(*item, name, curve);
             }
@@ -540,6 +607,10 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         return juce::Result::fail("Invalid composition timing.");
     }
     std::set<Id> identities;
+    const auto projectEffects = loadEffects(xml, project.effects, identities);
+    if (projectEffects.failed()) {
+        return projectEffects;
+    }
     for (auto* item : xml.getChildWithTagNameIterator("asset")) {
         auto asset = std::make_shared<Asset>();
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
@@ -565,6 +636,10 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         if (track.id == 0 || !identities.insert(track.id).second) {
             return juce::Result::fail("Invalid track identity.");
         }
+        const auto trackEffects = loadEffects(*row, track.effects, identities);
+        if (trackEffects.failed()) {
+            return trackEffects;
+        }
         for (auto* item : row->getChildWithTagNameIterator("clip")) {
             Clip clip;
             clip.id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
@@ -585,6 +660,10 @@ juce::Result Document::load(const juce::XmlElement& xml) {
                     return result;
                 }
                 clip.properties[property->getStringAttribute("name").toStdString()] = std::move(curve);
+            }
+            const auto clipEffects = loadEffects(*item, clip.effects, identities);
+            if (clipEffects.failed()) {
+                return clipEffects;
             }
             if (!track.insert(std::move(clip))) {
                 return juce::Result::fail("Invalid or overlapping clip range.");

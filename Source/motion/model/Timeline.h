@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Animation.h"
+#include "Effects.h"
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -20,6 +21,7 @@ struct Clip {
     double offset = 0.0;
     double rate = 1.0;
     std::map<std::string, Curve> properties;
+    std::vector<EffectInstance> effects;
 
     double end() const { return start + duration; }
     bool contains(double projectTime) const { return projectTime >= start && projectTime < end(); }
@@ -79,6 +81,7 @@ struct Track {
     Id id = 0;
     std::string name;
     std::vector<Clip> clips;
+    std::vector<EffectInstance> effects;
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.

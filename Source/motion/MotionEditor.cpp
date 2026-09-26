@@ -9,7 +9,7 @@ bool canSplitClip(const motion::Clip* clip, double time) {
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraPanel(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor) {
     menus.addTopLevelMenu("File");
     menus.addProjectMenuItems(0, processor, *this);
     menus.addMenuSeparator(0);
@@ -28,18 +28,44 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         addAndMakeVisible(component);
     }
     addChildComponent(exportBar);
+    addAndMakeVisible(libraryTabs);
+    addChildComponent(effectLibrary);
+    addChildComponent(effectsPanel);
+    libraryHeader.setVisible(false);
+    libraryTabs.setName("Library tabs");
+    inspectorTabs.setName("Inspector tabs");
+    inspectorTabs.setMinimumTabScaleFactor(0.7);
+    libraryTabs.addTab("Assets");
+    libraryTabs.addTab("Effects");
+    libraryTabs.onSelectionChanged = [this](int index) {
+        assetLibrary.setVisible(index == 0);
+        importButton.setVisible(index == 0);
+        effectLibrary.setVisible(index == 1);
+        resized();
+    };
+    effectLibrary.onInsert = [this](const std::string& type) {
+        inspectorTabs.setSelectedIndex(1);
+        effectsPanel.addEffect(type);
+    };
+    effectsPanel.onPropertySelected = [this](motion::Id id, std::string property) { selectCurveTarget(id, property, false); };
+    timeline.onEffectAdded = [this](motion::Id owner, motion::Id effect) {
+        effectsPanel.showOwner(owner, effect);
+        inspectorTabs.setSelectedIndex(1);
+    };
     addChildComponent(cancelExport);
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
     inspectorTabs.addTab("Object");
+    inspectorTabs.addTab("Effects");
     inspectorTabs.addTab("Camera");
     inspectorTabs.onSelectionChanged = [this](int index) {
-        cameraPanel.setVisible(index == 1);
+        cameraPanel.setVisible(index == 2);
+        effectsPanel.setVisible(index == 1);
         selectionLabel.setVisible(index == 0);
         for (auto& value : values) { value.setVisible(index == 0); }
         for (auto& button : keyButtons) { button.setVisible(index == 0); }
         cameraPanel.refresh();
-        selectCurveTarget(index == 1 ? cameraPanel.selectedCameraId() : selection, curvePropertyName, index == 1);
+        if (index == 1) { effectsPanel.activate(); } else { selectCurveTarget(index == 2 ? cameraPanel.selectedCameraId() : selection, curvePropertyName, index == 2); }
         repaint();
     };
     cameraPanel.setVisible(false);
@@ -55,12 +81,14 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     curveProperty.setVisible(false);
     curveProperty.setName("Animated property");
     for (std::size_t index = 0; index < motion::propertyNames.size(); ++index) {
+        curveProperties.emplace_back(motion::propertyNames[index]);
         curveProperty.addItem(juce::String(motion::propertyNames[index]).replace(".", " "), static_cast<int>(index) + 1);
     }
     curveProperty.setSelectedId(1, juce::dontSendNotification);
     curveProperty.onChange = [this] {
         const auto index = static_cast<std::size_t>(std::max(0, curveProperty.getSelectedId() - 1));
-        curvePropertyName = cameraCurve ? motion::cameraPropertyNames[index] : motion::propertyNames[index];
+        if (index >= curveProperties.size()) { return; }
+        curvePropertyName = curveProperties[index];
         curveEditor.setSelection(curveTarget, curvePropertyName);
     };
     cameraPanel.onPropertySelected = [this](motion::Id id, std::string property) {
@@ -69,20 +97,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     curveEditor.onPreview = [this](const motion::Curve* curve) {
         auto preview = processor.document.project();
         if (curve != nullptr) {
-            for (auto& track : preview.tracks) {
-                for (auto& clip : track.clips) {
-                    if (clip.id == curveTarget) {
-                        clip.properties[curvePropertyName] = *curve;
-                    }
-                }
-            }
-        }
-        if (curve != nullptr) {
-            for (auto& camera : preview.cameras) {
-                if (camera.id == curveTarget) {
-                    camera.properties[curvePropertyName] = *curve;
-                }
-            }
+            auto* target = motion::findPropertyCurve(preview, curveTarget, curvePropertyName);
+            if (target != nullptr) { *target = *curve; }
         }
         processor.previewComposition(preview);
         composition.preview(preview);
@@ -128,6 +144,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                     if (track.clips[index].id == selection) {
                         auto parts = track.clips[index].split(time, id);
                         if (parts.has_value()) {
+                            for (auto& effect : parts->second.effects) { effect.id = processor.document.newId(); }
                             track.clips[index] = std::move(parts->first);
                             track.insert(std::move(parts->second));
                         }
@@ -206,6 +223,8 @@ void MotionEditor::resized() {
     libraryBounds = area.removeFromLeft(190);
     auto library = libraryBounds;
     libraryHeader.setBounds(library.removeFromTop(30));
+    libraryTabs.setBounds(libraryHeader.getBounds());
+    effectLibrary.setBounds(library.reduced(4, 0));
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
@@ -214,6 +233,7 @@ void MotionEditor::resized() {
     inspectorHeader.setBounds(inspector.removeFromTop(30));
     inspectorTabs.setBounds(inspectorHeader.getBounds());
     cameraPanel.setBounds(inspector);
+    effectsPanel.setBounds(inspector);
     selectionLabel.setBounds(inspector.removeFromTop(36).reduced(10, 0));
     inspector.reduce(10, 0);
     for (int group = 0; group < 5; ++group) {
@@ -248,7 +268,7 @@ void MotionEditor::paint(juce::Graphics& graphics) {
     }
     graphics.setColour(juce::Colours::white.withAlpha(0.5f));
     graphics.setFont(14.0f);
-    if (cameraPanel.isVisible()) {
+    if (inspectorTabs.getCurrentTabIndex() != 0) {
         return;
     }
     auto labelArea = inspectorBounds.withTrimmedTop(66).reduced(12, 0);
@@ -347,6 +367,7 @@ void MotionEditor::timerCallback() {
     curveEditor.repaint();
     composition.repaint();
     refreshInspector();
+    if (effectsPanel.isVisible()) { effectsPanel.updateValues(); }
 }
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
@@ -354,6 +375,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
         if (task->generation != processor.document.generation()) { task->cancelled.store(true); }
     }
     assetLibrary.refresh();
+    effectsPanel.refresh();
     curveEditor.refresh();
     composition.refresh();
     refreshInspector();
@@ -362,6 +384,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
 
 void MotionEditor::select(motion::Id id) {
     selection = id;
+    effectsPanel.setSelectedClip(id);
     inspectorTabs.setSelectedIndex(0);
     timeline.selected = id;
     composition.selected = id;
@@ -486,16 +509,20 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curveTarget = id;
     cameraCurve = camera;
     curveProperty.clear(juce::dontSendNotification);
-    const auto count = camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size();
+    curveProperties.clear();
+    const auto* effect = motion::findEffect(processor.document.project(), id);
+    const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
+    const auto count = definition != nullptr ? definition->parameters.size() : (camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size());
     int selectedIndex = 0;
     for (std::size_t index = 0; index < count; ++index) {
-        const auto* name = camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index];
-        curveProperty.addItem(juce::String(name).replace(".", " "), static_cast<int>(index) + 1);
+        const std::string name = definition != nullptr ? definition->parameters[index].id : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
+        curveProperties.push_back(name);
+        curveProperty.addItem(definition != nullptr ? juce::String(definition->parameters[index].name) : juce::String(name).replace(".", " "), static_cast<int>(index) + 1);
         if (property == name) {
             selectedIndex = static_cast<int>(index);
         }
     }
     curveProperty.setSelectedId(selectedIndex + 1, juce::dontSendNotification);
-    curvePropertyName = camera ? motion::cameraPropertyNames[static_cast<std::size_t>(selectedIndex)] : motion::propertyNames[static_cast<std::size_t>(selectedIndex)];
+    curvePropertyName = curveProperties[static_cast<std::size_t>(selectedIndex)];
     curveEditor.setSelection(id, curvePropertyName);
 }

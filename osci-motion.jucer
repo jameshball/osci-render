@@ -392,6 +392,13 @@
             file="Source/motion/ui/CameraPanel.h"/>
       <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"
             file="Source/motion/model/PropertyTarget.h"/>
+      <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
+      <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
+            resource="0" file="Source/motion/render/PreparedEffects.h"/>
+      <FILE id="MotEffectLibrary" name="EffectLibrary.h" compile="0" resource="0"
+            file="Source/motion/ui/EffectLibrary.h"/>
+      <FILE id="MotEffectsPanel" name="EffectsPanel.h" compile="0" resource="0"
+            file="Source/motion/ui/EffectsPanel.h"/>
       <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
             file="Source/motion/model/PreparedSource.h"/>
       <FILE id="MotSampleClock" name="SampleClock.h" compile="0" resource="0"

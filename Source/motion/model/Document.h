@@ -26,6 +26,7 @@ struct Project {
     std::vector<Track> tracks;
     std::vector<Camera> cameras;
     std::vector<CameraCut> cameraCuts;
+    std::vector<EffectInstance> effects;
 };
 
 // Editable state belongs to the message thread. Undo copies clip/curve values

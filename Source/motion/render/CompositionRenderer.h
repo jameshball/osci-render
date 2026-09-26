@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/Document.h"
+#include "PreparedEffects.h"
 #include <array>
 #include <numbers>
 
@@ -15,6 +16,7 @@ struct PreparedClip {
     double start, end, offset, rate;
     std::shared_ptr<const PreparedSource> source;
     std::array<Curve, 13> curves;
+    std::vector<PreparedEffect> effects, trackEffects;
 
     double localTime(double time) const { return offset + (time - start) * rate; }
     bool active(double time) const { return time >= start && time < end; }
@@ -25,7 +27,7 @@ struct PreparedClip {
 
     osci::Point sample(double time, double phase) const {
         const auto local = localTime(time);
-        auto point = source->sample(local, phase);
+        auto point = applyEffects(effects, source->sample(local, phase), local);
         point.scale(curves[6].evaluate(local), curves[7].evaluate(local), curves[8].evaluate(local));
         constexpr auto radians = std::numbers::pi / 180.0;
         point.rotate(curves[3].evaluate(local) * radians, curves[4].evaluate(local) * radians, curves[5].evaluate(local) * radians);
@@ -40,7 +42,7 @@ struct PreparedClip {
             || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
             return { 0, 0, 0, 0, 0, 0 };
         }
-        return point;
+        return applyEffects(trackEffects, point, time);
     }
 };
 
@@ -84,7 +86,7 @@ struct PreparedCamera {
 };
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project) : duration(project.duration) {
+    explicit PreparedComposition(const Project& project) : duration(project.duration), effects(prepareEffects(project.effects)) {
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;
@@ -117,6 +119,8 @@ struct PreparedComposition {
                     const auto curve = clip.properties.find(propertyNames[i]);
                     item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
                 }
+                item.effects = prepareEffects(clip.effects);
+                item.trackEffects = prepareEffects(track.effects);
                 clips.push_back(std::move(item));
             }
         }
@@ -163,10 +167,15 @@ struct PreparedComposition {
         return &cameras.front();
     }
 
+    osci::Point applyCompositionEffects(osci::Point point, double time) const {
+        return applyEffects(effects, point, time);
+    }
+
     osci::Point projectPoint(osci::Point point, double time) const {
         if (!std::isfinite(time) || !std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
             return { 0, 0, 0, 0, 0, 0 };
         }
+        point = applyCompositionEffects(point, time);
         const auto* camera = activeCamera(time);
         if (camera != nullptr) {
             return camera->projectPoint(point, time);
@@ -195,5 +204,6 @@ private:
         std::size_t cameraIndex;
     };
     std::vector<PreparedCameraCut> cameraCuts;
+    std::vector<PreparedEffect> effects;
 };
 }

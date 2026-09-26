@@ -7,6 +7,8 @@
 #include "ui/AssetLibrary.h"
 #include "ui/CurveEditor.h"
 #include "ui/CameraPanel.h"
+#include "ui/EffectLibrary.h"
+#include "ui/EffectsPanel.h"
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
 public:
@@ -34,6 +36,9 @@ private:
     MotionAssetLibrary assetLibrary;
     MotionCurveEditor curveEditor;
     MotionCameraPanel cameraPanel;
+    MotionEffectLibrary effectLibrary;
+    MotionEffectsPanel effectsPanel;
+    osci::TabBar libraryTabs;
     osci::TabBar inspectorTabs;
     osci::TabBar timelineTabs;
     juce::ComboBox curveProperty;
@@ -51,6 +56,7 @@ private:
     motion::Id selection = 0;
     motion::Id curveTarget = 0;
     std::string curvePropertyName = "position.x";
+    std::vector<std::string> curveProperties;
     bool cameraCurve = false;
     bool updatingInspector = false;
     juce::ThreadPool imports { 1 };
