@@ -101,9 +101,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     for (int i = 0; i < count; ++i) {
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
-        const auto oscillatorTime = static_cast<double>(oscillatorSample) / sampleRate;
-        const auto phase = std::fmod(static_cast<double>(oscillatorSample) * 60.0 / sampleRate, 1.0);
-        auto point = drawing ? prepared->sample(audioTime, phase, 60.0 / sampleRate, running ? 1.0 / sampleRate : 0.0, oscillatorTime) : osci::Point(0, 0, 0, 0, 0, 0);
+        auto point = drawing ? prepared->sampleAtClock(audioTime, oscillatorSample, sampleRate, running) : osci::Point(0, 0, 0, 0, 0, 0);
         point = transitionGuard.apply(point);
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);

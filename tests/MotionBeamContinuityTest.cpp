@@ -23,6 +23,79 @@ public:
         }
         expect(!dark(multiple.sample(0.25, 0.25, phaseStep, step)));
 
+        beginTest("Sample-clock aligned allocations keep both endpoints of every jump dark");
+        auto alignedProject = makeProject();
+        for (int i = 1; i < 3; ++i) {
+            auto layer = alignedProject.tracks.front();
+            layer.id = 10 + i;
+            layer.clips.front().id = 20 + i;
+            layer.clips.front().properties["position.x"] = motion::Curve(i * 0.5);
+            alignedProject.tracks.push_back(layer);
+        }
+        for (const double rate : {44100.0, 48000.0, 96000.0}) {
+            motion::PreparedComposition aligned(alignedProject, rate);
+            osci::Point previous;
+            int visibleJumps = 0;
+            for (int i = 0; i < static_cast<int>(rate); ++i) {
+                const auto point = aligned.sampleAtClock(0.25, i, rate, false);
+                if (i > 0 && std::abs(point.x - previous.x) > 0.1 && (!dark(point) || !dark(previous))) {
+                    ++visibleJumps;
+                }
+                previous = point;
+            }
+            expectEquals(visibleJumps, 0, "Paused live clock at " + juce::String(rate) + " Hz");
+            juce::TemporaryFile exported(".wav");
+            const std::atomic<bool> cancel {false};
+            const auto result = motion::SignalExporter::write(aligned, exported.getFile(), rate, cancel);
+            expect(result.wasOk(), result.getErrorMessage());
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::AudioFormatReader> reader(format.createReaderFor(exported.getFile().createInputStream().release(), true));
+            expect(reader != nullptr);
+            if (reader != nullptr) {
+                juce::AudioBuffer<float> samples(5, static_cast<int>(rate));
+                expect(reader->read(samples.getArrayOfWritePointers(), 5, 0, samples.getNumSamples()));
+                int exportedJumps = 0;
+                for (int i = 1; i < samples.getNumSamples(); ++i) {
+                    if (std::abs(samples.getSample(0, i) - samples.getSample(0, i - 1)) <= 0.1) { continue; }
+                    for (int channel = 2; channel < 5; ++channel) {
+                        if (samples.getSample(channel, i) != 0 || samples.getSample(channel, i - 1) != 0) { ++exportedJumps; }
+                    }
+                }
+                expectEquals(exportedJumps, 0, "Exported XYRGB endpoints at " + juce::String(rate) + " Hz");
+            }
+        }
+
+        beginTest("Exact transport-clock boundaries blank both adjacent clip and camera samples");
+        for (const double rate : {44100.0, 48000.0}) {
+            const auto boundaryIndex = rate == 44100 ? 13 : 5;
+            const auto boundary = boundaryIndex / rate;
+            auto sequential = makeProject();
+            sequential.tracks[0].clips[0].duration = boundary;
+            auto after = sequential.tracks[0].clips[0];
+            after.id = 4;
+            after.start = boundary;
+            after.duration = 1 - boundary;
+            after.properties["position.x"] = motion::Curve(1);
+            expect(sequential.tracks[0].insert(after));
+            motion::PreparedComposition clips(sequential, rate);
+            for (int index : {boundaryIndex - 1, boundaryIndex}) {
+                expect(dark(clips.sampleAtClock(index / rate, index, rate)));
+            }
+            auto cameraProject = makeProject();
+            motion::Camera one, two;
+            one.id = 10;
+            two.id = 11;
+            two.properties["position.x"] = motion::Curve(1);
+            cameraProject.cameras = {one, two};
+            cameraProject.cameraCuts.push_back({12, 11, boundary, 1 - boundary});
+            motion::PreparedComposition cameras(cameraProject, rate);
+            for (int index : {boundaryIndex - 1, boundaryIndex}) {
+                expect(dark(cameras.sampleAtClock(index / rate, index, rate)));
+            }
+            expect(dark(cameras.sampleAtClock(0, -1, rate)));
+            expect(dark(cameras.sampleAtClock(0, 0, std::numeric_limits<double>::infinity())));
+        }
+
         beginTest("Tiny positive drawing weights remain finite and preserve raw zero-span sampling");
         auto tinyProject = makeProject();
         tinyProject.tracks.front().clips.front().properties["weight"] = motion::Curve(std::numeric_limits<double>::denorm_min());

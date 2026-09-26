@@ -4,6 +4,7 @@
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
 #include "PreparedMidiPerformance.h"
+#include "SampleClock.h"
 #include <array>
 #include <numbers>
 
@@ -194,7 +195,23 @@ struct PreparedComposition {
     // A signal sample is evaluated with both adjacent sample positions. This
     // stays stateless for seeking/export, while accounting for animated beam
     // allocation instead of assuming each clip's phase speed remains constant.
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1) const {
+    struct SamplingNeighbours {
+        double previousPhase, nextPhase, previousTime, nextTime, previousOscillatorTime, nextOscillatorTime;
+    };
+
+    osci::Point sampleAtClock(double time, std::int64_t index, double clockRate, bool advancing = true) const {
+        if (index < 0 || !std::isfinite(clockRate) || clockRate <= 0) { return {0, 0, 0, 0, 0, 0}; }
+        const auto phaseAt = [clockRate](double frame) { return std::fmod(frame * 60.0 / clockRate, 1.0); };
+        const auto frame = static_cast<double>(index);
+        const auto timeFrame = std::round(time * clockRate);
+        const SamplingNeighbours neighbours { phaseAt(frame - 1), phaseAt(frame + 1),
+            advancing ? (timeFrame - 1) / clockRate : time, advancing ? (timeFrame + 1) / clockRate : time,
+            (frame - 1) / clockRate, (frame + 1) / clockRate };
+        return sample(time, phaseAt(static_cast<double>(index)), 60.0 / clockRate, advancing ? 1.0 / clockRate : 0.0,
+            static_cast<double>(index) / clockRate, &neighbours);
+    }
+
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const SamplingNeighbours* clockNeighbours = nullptr) const {
         if (oscillatorTime < 0) { oscillatorTime = time; }
         if (!std::isfinite(time) || !std::isfinite(phase)) { return {0, 0, 0, 0, 0, 0}; }
         const auto current = selectBeam(time, phase, oscillatorTime);
@@ -204,12 +221,27 @@ struct PreparedComposition {
         if (!blank && (phaseSpan > 0 || timeSpan > 0)) {
             const auto wrap = [](double value) { return value - std::floor(value); };
             const auto oscillatorStep = 1 / sampleRate;
-            const auto previous = selectBeam(time - timeSpan, wrap(phase - phaseSpan), oscillatorTime - oscillatorStep);
-            const auto next = selectBeam(time + timeSpan, wrap(phase + phaseSpan), oscillatorTime + oscillatorStep);
+            // At exact allocation boundaries, subtracting a phase increment can
+            // round to the other side of the sample actually emitted by the clock.
+            // Live and exported signals compare the actual adjacent clock phases.
+            const auto previousPhase = clockNeighbours != nullptr ? clockNeighbours->previousPhase : phase - phaseSpan;
+            const auto nextPhase = clockNeighbours != nullptr ? clockNeighbours->nextPhase : phase + phaseSpan;
+            const auto previousTime = clockNeighbours != nullptr ? clockNeighbours->previousTime : time - timeSpan;
+            const auto nextTime = clockNeighbours != nullptr ? clockNeighbours->nextTime : time + timeSpan;
+            const auto previousOscillator = clockNeighbours != nullptr ? clockNeighbours->previousOscillatorTime : oscillatorTime - oscillatorStep;
+            const auto nextOscillator = clockNeighbours != nullptr ? clockNeighbours->nextOscillatorTime : oscillatorTime + oscillatorStep;
+            const auto previous = selectBeam(previousTime, wrap(previousPhase), previousOscillator);
+            const auto next = selectBeam(nextTime, wrap(nextPhase), nextOscillator);
             blank = previous.clip != current.clip || next.clip != current.clip
                 || previous.note != current.note || next.note != current.note
-                || activeCamera(time - timeSpan) != activeCamera(time)
-                || activeCamera(time + timeSpan) != activeCamera(time);
+                || activeCamera(previousTime) != activeCamera(time)
+                || activeCamera(nextTime) != activeCamera(time);
+            if (!blank && clockNeighbours != nullptr && current.clip->source->frameCount() > 1) {
+                const auto& source = *current.clip->source;
+                const auto frame = source.frameIndex(current.clip->localTime(time));
+                blank = source.frameIndex(current.clip->localTime(previousTime)) != frame
+                    || source.frameIndex(current.clip->localTime(nextTime)) != frame;
+            }
             if (!blank) {
                 localSpan = std::max({localSpan, std::abs(previous.phase - current.phase), std::abs(next.phase - current.phase)});
             }
