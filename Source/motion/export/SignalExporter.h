@@ -23,7 +23,7 @@ public:
         return WavExporter::write<5>(composition.duration, destination, sampleRate, cancel, progress,
             [&](double index, double time) {
                 const auto phase = std::fmod(index * 60.0 / sampleRate, 1.0);
-                const auto point = composition.sample(time, phase, 60.0 / sampleRate);
+                const auto point = composition.sample(time, phase, 60.0 / sampleRate, 1.0 / sampleRate);
                 return std::array<float, 5> { point.x, point.y, point.r, point.g, point.b };
             }, "Signal", "The composition produced a non-finite signal sample. Check its transforms and camera animation.");
     }

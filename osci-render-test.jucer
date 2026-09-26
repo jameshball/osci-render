@@ -8,6 +8,10 @@
               headerPath="./include">
   <MAINGROUP id="ztPpnM" name="osci-render-test">
     <GROUP id="MotionTests" name="Motion">
+      <FILE id="MotionContinuityT" name="MotionBeamContinuityTest.cpp" compile="1"
+            resource="0" file="tests/MotionBeamContinuityTest.cpp"/>
+      <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
+            resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
       <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
             resource="0" file="tests/MotionSignalExportTest.cpp"/>
       <FILE id="MotionRasterDecoderT" name="MotionRasterDecoderTest.cpp"

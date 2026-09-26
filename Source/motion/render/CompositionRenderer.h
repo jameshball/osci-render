@@ -67,9 +67,9 @@ struct PreparedClip {
         return std::clamp(weight, 0.0, 1000000.0);
     }
 
-    osci::Point sample(double time, double phase, double phaseSpan = 0) const {
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
         const auto local = localTime(time);
-        auto point = applyEffects(effects, source->sample(local, phase, phaseSpan), local, bpm);
+        auto point = applyEffects(effects, source->sample(local, phase, phaseSpan, std::abs(rate) * timeSpan), local, bpm);
         point = applyTransform(point, curves, local, bpm);
         point = applyEffects(trackEffects, point, time, bpm);
         for (const auto& group : groups) {
@@ -174,30 +174,51 @@ struct PreparedComposition {
         }
     }
 
-    osci::Point sample(double time, double phase, double phaseSpan = 0) const {
+    // A signal sample is evaluated with both adjacent sample positions. This
+    // stays stateless for seeking/export, while accounting for animated beam
+    // allocation instead of assuming each clip's phase speed remains constant.
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
+        if (!std::isfinite(time) || !std::isfinite(phase)) { return {0, 0, 0, 0, 0, 0}; }
+        const auto current = selectBeam(time, phase);
+        if (current.clip == nullptr) { return {0, 0, 0, 0, 0, 0}; }
+        bool blank = !std::isfinite(phaseSpan) || phaseSpan < 0 || !std::isfinite(timeSpan) || timeSpan < 0;
+        auto localSpan = phaseSpan == 0 ? 0.0 : phaseSpan * current.phaseScale;
+        if (!blank && (phaseSpan > 0 || timeSpan > 0)) {
+            const auto wrap = [](double value) { return value - std::floor(value); };
+            const auto previous = selectBeam(time - timeSpan, wrap(phase - phaseSpan));
+            const auto next = selectBeam(time + timeSpan, wrap(phase + phaseSpan));
+            blank = previous.clip != current.clip || next.clip != current.clip
+                || activeCamera(time - timeSpan) != activeCamera(time)
+                || activeCamera(time + timeSpan) != activeCamera(time);
+            if (!blank) {
+                localSpan = std::max({localSpan, std::abs(previous.phase - current.phase), std::abs(next.phase - current.phase)});
+            }
+        }
+        auto point = projectPoint(current.clip->sample(time, current.phase, localSpan, timeSpan), time);
+        if (blank) { point.r = point.g = point.b = 0; }
+        return point;
+    }
+
+    struct BeamSelection {
+        const PreparedClip* clip = nullptr;
+        double phase = 0, phaseScale = 0;
+    };
+
+    BeamSelection selectBeam(double time, double phase) const {
         double allocation = 0.0;
         for (const auto& clip : clips) {
-            if (clip.active(time)) {
-                allocation += std::max(1.0, clip.weight(time));
-            }
+            if (clip.active(time)) { allocation += std::max(1.0, clip.weight(time)); }
         }
-        if (allocation <= 0.0) {
-            return { 0, 0, 0, 0, 0, 0 };
-        }
+        if (allocation <= 0.0) { return {}; }
         auto cursor = phase * allocation;
         for (const auto& clip : clips) {
-            if (!clip.active(time)) {
-                continue;
-            }
+            if (!clip.active(time)) { continue; }
             const auto weight = clip.weight(time);
-            if (cursor < weight) {
-                return projectPoint(clip.sample(time, cursor / weight, phaseSpan * allocation / weight), time);
-            }
+            if (cursor < weight) { return {&clip, cursor / weight, allocation / weight}; }
             cursor -= weight;
         }
-        // Unused allocation is explicitly dark; normalizing it away would
-        // cancel a fade when the composition has only one visible object.
-        return { 0, 0, 0, 0, 0, 0 };
+        // Unused allocation stays dark rather than normalizing away a fade.
+        return {};
     }
 
     const PreparedCamera* activeCamera(double time) const {

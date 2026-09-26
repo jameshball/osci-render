@@ -36,6 +36,8 @@ public:
     }
     std::size_t frameCount() const { return ends.size(); }
     double duration() const { return static_cast<double>(ends.back()) / 1000; }
+    double frameStart(std::size_t index) const { return index == 0 ? 0 : static_cast<double>(ends.at(index - 1)) / 1000; }
+    double frameEnd(std::size_t index) const { return static_cast<double>(ends.at(index)) / 1000; }
     double averageFrameRate() const { return static_cast<double>(ends.size()) / duration(); }
     std::size_t frameIndex(double seconds) const {
         if (!std::isfinite(seconds)) { return 0; }

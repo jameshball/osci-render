@@ -42,9 +42,12 @@ public:
             const auto phase = std::fmod(index * 60.0 / sampleRate, 1.0);
             expectWithinAbsoluteError(samples.getSample(0, index), 2.0f + static_cast<float>(phase), 0.000001f);
             expectWithinAbsoluteError(samples.getSample(1, index), -3.0f + static_cast<float>(phase), 0.000001f);
-            expectWithinAbsoluteError(samples.getSample(2, index), 0.2f, 0.000001f);
-            expectWithinAbsoluteError(samples.getSample(3, index), 0.4f, 0.000001f);
-            expectWithinAbsoluteError(samples.getSample(4, index), 0.8f, 0.000001f);
+            // This open line jumps from (3,-2) back to (2,-3) each cycle.
+            // Its adjacent output samples must be dark without altering XY.
+            const bool travel = index == 0 || index == 1 || index == 799 || index == 800;
+            expectWithinAbsoluteError(samples.getSample(2, index), travel ? 0.0f : 0.2f, 0.000001f);
+            expectWithinAbsoluteError(samples.getSample(3, index), travel ? 0.0f : 0.4f, 0.000001f);
+            expectWithinAbsoluteError(samples.getSample(4, index), travel ? 0.0f : 0.8f, 0.000001f);
         }
         reader.reset();
 

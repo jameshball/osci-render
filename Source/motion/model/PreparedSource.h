@@ -27,6 +27,7 @@ public:
     std::size_t frameCount() const { return points != nullptr ? points->frameCount() : frames.size(); }
     double frameRate() const { return framesPerSecond; }
     std::size_t previewSampleCount() const { return points != nullptr ? points->pointsPerFrame() : 512; }
+    double previewPhaseSpan() const { return points != nullptr ? 0.0 : 1.0 / 512; }
     bool hasExplicitColour() const { return points != nullptr && points->hasExplicitColour(); }
     double duration() const {
         if (timing != nullptr) { return timing->duration(); }
@@ -57,20 +58,35 @@ public:
 
     std::shared_ptr<const osci::PreparedDrawing> firstFrame() const { return frames.empty() ? nullptr : frames.front(); }
 
-    osci::Point sample(double localSeconds, double phase, double phaseSpan = 0) const {
+    osci::Point sample(double localSeconds, double phase, double phaseSpan = 0, double timeSpan = 0) const {
         if (points != nullptr) {
             if (!std::isfinite(localSeconds)) { return {0, 0, 0, 0, 0, 0}; }
             const auto point = points->sampleFrame(frameIndex(localSeconds), phase, phaseSpan);
-            return {point.x, point.y, point.z, point.r, point.g, point.b};
+            const bool blank = crossesFrameBoundary(localSeconds, timeSpan);
+            return {point.x, point.y, point.z, blank ? 0 : point.r, blank ? 0 : point.g, blank ? 0 : point.b};
         }
         if (frames.empty() || !std::isfinite(localSeconds)) {
             return { 0, 0, 0, 0, 0, 0 };
         }
         const auto& frame = frames[frameIndex(localSeconds)];
-        return frame != nullptr ? frame->sample(phase) : osci::Point(0, 0, 0, 0, 0, 0);
+        auto point = frame != nullptr ? frame->sample(phase, phaseSpan) : osci::Point(0, 0, 0, 0, 0, 0);
+        if (crossesFrameBoundary(localSeconds, timeSpan)) { point.r = point.g = point.b = 0; }
+        return point;
     }
 
 private:
+    bool crossesFrameBoundary(double seconds, double span) const {
+        if (!std::isfinite(span) || span < 0) { return true; }
+        if (span == 0 || frameCount() <= 1) { return false; }
+        const auto length = duration();
+        if (!(length > 0) || span >= length) { return true; }
+        auto wrapped = std::fmod(seconds, length);
+        if (wrapped < 0) { wrapped += length; }
+        const auto index = frameIndex(seconds);
+        const auto start = timing != nullptr ? timing->frameStart(index) : static_cast<double>(index) / framesPerSecond;
+        const auto end = timing != nullptr ? timing->frameEnd(index) : static_cast<double>(index + 1) / framesPerSecond;
+        return wrapped - span <= start || wrapped + span >= end;
+    }
     const std::vector<std::shared_ptr<const osci::PreparedDrawing>> frames;
     const double framesPerSecond;
     const std::shared_ptr<const PreparedPointFrames> points;

@@ -109,11 +109,12 @@ public:
             // Walk stored point frames at their native density so short lit
             // runs remain visible in the editing view. Output uses its audio rate.
             const auto sampleCount = clip.source->previewSampleCount();
-            const auto firstPoint = clip.sample(time, 0);
+            const auto previewSpan = clip.source->previewPhaseSpan();
+            const auto firstPoint = clip.sample(time, 0, previewSpan);
             auto previous = projected(firstPoint, time);
             bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
             for (std::size_t i = 1; i <= sampleCount; ++i) {
-                const auto point = clip.sample(time, static_cast<double>(i) / sampleCount);
+                const auto point = clip.sample(time, static_cast<double>(i) / sampleCount, previewSpan);
                 const auto next = projected(point, time);
                 const bool lit = point.r != 0 || point.g != 0 || point.b != 0;
                 if (!previous.has_value() || !next.has_value() || !previousLit || !lit) {
