@@ -57,7 +57,7 @@ bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
     menus.addTopLevelMenu("File");
     menus.addProjectMenuItems(0, processor, *this);
@@ -172,7 +172,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     libraryHeader.setVisible(false);
     libraryTabs.setName("Library tabs");
     inspectorTabs.setName("Inspector tabs");
-    inspectorTabs.setMinimumTabScaleFactor(0.7);
+    inspectorTabs.setTabSpacing(58, 8);
     libraryTabs.addTab("Assets");
     libraryTabs.addTab("Effects");
     libraryTabs.onSelectionChanged = [this](int index) {
@@ -196,8 +196,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     inspectorTabs.addTab("Object");
     inspectorTabs.addTab("Effects");
     inspectorTabs.addTab("Camera");
+    inspectorTabs.addTab("Clip");
+    addChildComponent(clipTimingPanel);
     inspectorTabs.onSelectionChanged = [this](int index) {
         cameraPanel.setVisible(index == 2);
+        clipTimingPanel.setVisible(index == 3);
         effectsPanel.setVisible(index == 1);
         selectionLabel.setVisible(index == 0);
         for (auto& value : values) { value.setVisible(index == 0); }
@@ -397,6 +400,7 @@ void MotionEditor::resized() {
     inspectorHeader.setBounds(inspector.removeFromTop(30));
     inspectorTabs.setBounds(inspectorHeader.getBounds());
     cameraPanel.setBounds(inspector);
+    clipTimingPanel.setBounds(inspector);
     effectsPanel.setBounds(inspector);
     selectionLabel.setBounds(inspector.removeFromTop(36).reduced(10, 0));
     inspector.reduce(10, 0);
@@ -691,8 +695,9 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
 void MotionEditor::select(motion::Id id) {
     selection = id;
     notesEditor.setSelection(id);
+    clipTimingPanel.setSelection(id);
     effectsPanel.setSelectedClip(id);
-    inspectorTabs.setSelectedIndex(0);
+    if (inspectorTabs.getCurrentTabIndex() != 3) { inspectorTabs.setSelectedIndex(0); }
     timeline.selected = id;
     timeline.revealSelection();
     composition.selected = id;
@@ -713,6 +718,7 @@ const char* MotionEditor::inspectorProperty(std::size_t index) const {
 
 void MotionEditor::refreshInspector() {
     cameraPanel.refresh();
+    clipTimingPanel.refresh();
     const motion::Clip* selected = nullptr;
     for (const auto& track : processor.document.project().tracks) {
         for (const auto& clip : track.clips) {

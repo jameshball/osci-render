@@ -132,6 +132,97 @@ public:
             expect(undo.undo()); expect(current().timeBase == motion::ClipTimeBase::seconds);
             expect(undo.redo()); expect(current().midi == midi->midi);
         }
+
+        beginTest("Timing commands preserve content, sort tracks and undo in seconds and beats");
+        for (const bool beats : {false, true}) {
+            for (const bool audio : {false, true}) {
+                auto timingProject = initial;
+                timingProject.duration = 12;
+                timingProject.tracks[0].kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+                auto& authored = timingProject.tracks[0].clips[0];
+                authored.midi = audio ? nullptr : midi->midi;
+                authored.midiAsset = audio ? 0 : midi->id;
+                if (beats) { expect(authored.anchorToBeats(timingProject.bpm)); }
+                document.reset(timingProject);
+                const auto findClip = [&]() -> const motion::Clip& {
+                    const auto& clips = document.project().tracks[0].clips;
+                    return *std::find_if(clips.begin(), clips.end(), [&](const auto& candidate) { return candidate.id == clip.id; });
+                };
+                const auto original = findClip();
+                const auto originalTiming = original.timing(timingProject.bpm);
+                revision = document.revision();
+                expect(document.setClipTiming(clip.id, originalTiming).wasOk());
+                expect(document.revision() == revision && !undo.canUndo());
+                auto moved = originalTiming; moved.moveTo(20);
+                expect(document.setClipTiming(clip.id, moved).wasOk());
+                expect(document.project().tracks[0].clips.back().id == clip.id);
+                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).start, 20.0, 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).duration(), originalTiming.duration(), 1e-12);
+                expectEquals(findClip().offset, original.offset);
+                expectEquals(findClip().rate, original.rate);
+                expectEquals(document.project().duration, findClip().timing(timingProject.bpm).end());
+                expect(findClip().asset == original.asset && findClip().midi == original.midi && findClip().midiAsset == original.midiAsset);
+                expect(findClip().timeBase == original.timeBase && findClip().contentBpm == original.contentBpm);
+                expectEquals(findClip().properties.at("position.x").evaluate(.75), 2.0);
+                expect(document.project().assets[0] == geometry);
+                expect(undo.undo()); expectEquals(findClip().start, original.start);
+                expectEquals(document.project().duration, 12.0);
+                expect(undo.redo()); expect(document.project().tracks[0].clips.back().id == clip.id);
+
+                auto edited = findClip().timing(timingProject.bpm);
+                edited.setDuration(1.5);
+                expect(document.setClipTiming(clip.id, edited).wasOk());
+                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).duration(), 1.5, 1e-12);
+                expectEquals(findClip().rate, original.rate);
+                expectEquals(findClip().offset, original.offset);
+                edited = findClip().timing(timingProject.bpm); edited.offset = -1.25;
+                expect(document.setClipTiming(clip.id, edited).wasOk());
+                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).offset, -1.25, 1e-12);
+                edited = findClip().timing(timingProject.bpm); edited.rate = 2.5;
+                expect(document.setClipTiming(clip.id, edited).wasOk());
+                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).rate, 2.5, 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).duration(), 1.5, 1e-12);
+                expect(undo.undo()); expectEquals(findClip().rate, original.rate);
+                expect(undo.undo()); expectEquals(findClip().offset, original.offset);
+                expect(undo.undo()); expectEquals(findClip().duration, original.duration);
+
+                beginTest("Invalid, overlapping and locked timing requests leave document and undo untouched");
+                const auto stable = findClip().timing(timingProject.bpm);
+                revision = document.revision();
+                const auto undoName = undo.getUndoDescription();
+                auto overlap = stable; overlap.moveTo(8.5);
+                expect(document.setClipTiming(clip.id, overlap).failed());
+                auto invalidTiming = stable; invalidTiming.rate = std::numeric_limits<double>::infinity();
+                expect(document.setClipTiming(clip.id, invalidTiming).failed());
+                invalidTiming = stable; invalidTiming.offset = std::numeric_limits<double>::quiet_NaN();
+                expect(document.setClipTiming(clip.id, invalidTiming).failed());
+                invalidTiming = stable; invalidTiming.setDuration(0);
+                expect(document.setClipTiming(clip.id, invalidTiming).failed());
+                invalidTiming = stable; invalidTiming.moveTo(-1);
+                expect(document.setClipTiming(clip.id, invalidTiming).failed());
+                expect(document.setClipTiming(999999, stable).failed());
+                expect(document.revision() == revision && undo.getUndoDescription() == undoName);
+                auto locked = document.project(); locked.tracks[0].locked = true; document.reset(locked);
+                revision = document.revision();
+                expect(document.setClipTiming(clip.id, originalTiming).failed());
+                expect(document.revision() == revision && !undo.canUndo());
+            }
+        }
+        beginTest("Beat timing converts resolved speed and offset at a different project tempo");
+        auto slower = initial;
+        expect(slower.tracks[0].clips[0].anchorToBeats(150));
+        slower.bpm = 75; slower.tracks[0].clips[1].start = 20;
+        document.reset(slower);
+        auto slowTiming = current().timing(75);
+        slowTiming.moveTo(12); slowTiming.offset = 2; slowTiming.rate = .75;
+        expect(document.setClipTiming(clip.id, slowTiming).wasOk());
+        expectWithinAbsoluteError(current().timing(75).start, 12.0, 1e-12);
+        expectWithinAbsoluteError(current().timing(75).duration(), 6.0, 1e-12);
+        expectWithinAbsoluteError(current().timing(75).offset, 2.0, 1e-12);
+        expectWithinAbsoluteError(current().timing(75).rate, .75, 1e-12);
+        expectEquals(current().contentBpm, 150.0);
+        expect(undo.undo()); expectEquals(current().start, slower.tracks[0].clips[0].start);
+        expect(undo.redo()); expectWithinAbsoluteError(current().timing(75).rate, .75, 1e-12);
     }
 };
 

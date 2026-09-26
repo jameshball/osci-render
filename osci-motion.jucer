@@ -396,6 +396,8 @@
             resource="0" file="Source/motion/render/CompositionRenderer.h"/>
       <FILE id="MotAssetLibrary" name="AssetLibrary.h" compile="0" resource="0"
             file="Source/motion/ui/AssetLibrary.h"/>
+      <FILE id="MotClipTiming" name="ClipTimingPanel.h" compile="0" resource="0"
+            file="Source/motion/ui/ClipTimingPanel.h"/>
       <FILE id="MotCameraPanel" name="CameraPanel.h" compile="0" resource="0"
             file="Source/motion/ui/CameraPanel.h"/>
       <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"

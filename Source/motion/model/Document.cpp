@@ -529,6 +529,36 @@ juce::Result Document::changeTempo(double bpm) {
     return juce::Result::ok();
 }
 
+juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
+    if (!resolvedSeconds.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
+    for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
+        const auto& track = state.tracks[trackIndex];
+        for (std::size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex) {
+            const auto& original = track.clips[clipIndex];
+            if (original.id != clipId) { continue; }
+            if (track.locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
+            auto changed = original;
+            if (!changed.setTiming(resolvedSeconds, state.bpm) || !track.canPlace(changed, clipId, state.bpm)) {
+                return juce::Result::fail("The requested timing is invalid or overlaps another clip on this track.");
+            }
+            if (changed.start == original.start && changed.duration == original.duration
+                && changed.offset == original.offset && changed.rate == original.rate) {
+                return juce::Result::ok();
+            }
+            edit("Change clip timing", [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
+                auto& clips = project.tracks[trackIndex].clips;
+                project.duration = std::max(project.duration, changed.timing(project.bpm).end());
+                clips[clipIndex] = changed;
+                std::sort(clips.begin(), clips.end(), [bpm = project.bpm](const auto& a, const auto& b) {
+                    return a.timing(bpm).start < b.timing(bpm).start;
+                });
+            });
+            return juce::Result::ok();
+        }
+    }
+    return juce::Result::fail("The selected clip no longer exists.");
+}
+
 juce::Result Document::editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation) {
     for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
         const auto& track = state.tracks[trackIndex];

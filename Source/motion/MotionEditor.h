@@ -8,6 +8,7 @@
 #include "ui/CurveEditor.h"
 #include "ui/NotesEditor.h"
 #include "ui/CameraPanel.h"
+#include "ui/ClipTimingPanel.h"
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
 #include "ui/ModulationPanel.h"
@@ -57,6 +58,7 @@ private:
     MotionCurveEditor curveEditor;
     MotionNotesEditor notesEditor;
     MotionCameraPanel cameraPanel;
+    MotionClipTimingPanel clipTimingPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectsPanel effectsPanel;
     MotionModulationPanel modulationPanel;
