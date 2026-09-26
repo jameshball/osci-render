@@ -4,6 +4,7 @@
 #include "ui/VideoExportSettings.h"
 #include "ui/BakeSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
+#include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
 namespace {
@@ -50,8 +51,8 @@ struct MotionVideoTemporaryFiles {
     juce::File signal() const { return directory.getChildFile("beam.wav"); }
     juce::File soundtrack() const { return directory.getChildFile("soundtrack.wav"); }
 };
-bool canSplitClip(const motion::Clip* clip, double time) {
-    return clip != nullptr && clip->valid() && std::isfinite(time) && time > clip->start && time < clip->end();
+bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
+    return clip != nullptr && clip->valid() && std::isfinite(time) && time > clip->timing(bpm).start && time < clip->timing(bpm).end();
 }
 }
 
@@ -159,7 +160,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             return;
         }
         if (value != processor.document.project().bpm) {
-            processor.document.edit("Change tempo", [value](motion::Project& project) { project.bpm = value; });
+            const auto result = processor.document.changeTempo(value);
+            if (result.failed()) {
+                tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
+                osci::showOverlayMessage(*this, "Cannot change tempo", result.getErrorMessage());
+            }
         }
     };
     addChildComponent(effectLibrary);
@@ -266,7 +271,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto& tracks = processor.document.project().tracks;
         const bool canSplit = std::any_of(tracks.begin(), tracks.end(), [&](const motion::Track& track) {
             return std::any_of(track.clips.begin(), track.clips.end(), [&](const motion::Clip& clip) {
-                return clip.id == selection && canSplitClip(&clip, time);
+                return clip.id == selection && canSplitClip(&clip, time, processor.document.project().bpm);
             });
         });
         if (!canSplit) {
@@ -277,11 +282,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             for (auto& track : project.tracks) {
                 for (std::size_t index = 0; index < track.clips.size(); ++index) {
                     if (track.clips[index].id == selection) {
-                        auto parts = track.clips[index].split(time, id);
+                        auto parts = track.clips[index].split(time, id, project.bpm);
                         if (parts.has_value()) {
                             for (auto& effect : parts->second.effects) { effect.id = processor.document.newId(); }
                             track.clips[index] = std::move(parts->first);
-                            track.insert(std::move(parts->second));
+                            track.insert(std::move(parts->second), project.bpm);
                         }
                         return;
                     }
@@ -612,7 +617,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import object", [&](motion::Project& project) {
                 project.assets.push_back(asset);
                 project.tracks.push_back(track);
-                project.duration = std::max(project.duration, clip.end());
+                project.duration = std::max(project.duration, clip.timing(project.bpm).end());
             });
             owner->assetLibrary.refresh();
             owner->assetLibrary.selectAsset(asset->id);
@@ -693,7 +698,7 @@ void MotionEditor::refreshInspector() {
             }
         }
     }
-    splitButton.setEnabled(canSplitClip(selected, processor.position.load()));
+    splitButton.setEnabled(canSplitClip(selected, processor.position.load(), processor.document.project().bpm));
     const auto target = motion::findPropertyTarget(processor.document.project(), selection);
     const bool editable = target.has_value() && !target->camera && !target->isEffect;
     selectionLabel.setText(editable ? juce::String(target->name.data(), target->name.size()) : "No object selected", juce::dontSendNotification);

@@ -22,9 +22,10 @@ public:
                 }
                 const auto gain = clip.properties.find("gain");
                 const auto pan = clip.properties.find("pan");
-                clips.push_back({ clip.start, clip.end(), clip.offset, clip.rate, (*asset)->audio,
+                const auto timing = clip.timing(project.bpm);
+                clips.push_back({ timing.start, timing.end(), timing.offset, timing.rate, (*asset)->audio,
                     gain == clip.properties.end() ? Curve(1) : gain->second,
-                    pan == clip.properties.end() ? Curve(0) : pan->second });
+                    pan == clip.properties.end() ? Curve(0) : pan->second, clip.curveBpm(project.bpm) });
             }
         }
     }
@@ -42,8 +43,8 @@ public:
             if (!std::isfinite(local)) {
                 continue;
             }
-            const auto gainValue = clip.gain.evaluate(local, bpm);
-            const auto panValue = clip.pan.evaluate(local, bpm);
+            const auto gainValue = clip.gain.evaluate(local, clip.contentBpm);
+            const auto panValue = clip.pan.evaluate(local, clip.contentBpm);
             if (!std::isfinite(gainValue) || !std::isfinite(panValue)) {
                 continue;
             }
@@ -65,6 +66,7 @@ private:
         double start, end, offset, rate;
         std::shared_ptr<const PreparedAudio> audio;
         Curve gain, pan;
+        double contentBpm;
     };
     double bpm;
     std::vector<ClipSource> clips;

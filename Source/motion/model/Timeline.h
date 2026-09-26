@@ -13,6 +13,29 @@ namespace motion {
 
 using Id = std::uint64_t;
 
+enum class ClipTimeBase { seconds, beats };
+
+struct ClipTiming {
+    ClipTiming(double first = 0, double last = 0, double sourceOffset = 0, double speed = 1)
+        : start(first), offset(sourceOffset), rate(speed), finish(last), length(last - first) {}
+    double start, offset, rate;
+    double end() const { return finish; }
+    double duration() const { return length; }
+    void moveTo(double value) { start = value; finish = value + length; }
+    void setStart(double value) { start = value; length = finish - start; }
+    void setEnd(double value) { finish = value; length = finish - start; }
+    void setDuration(double value) { length = value; finish = start + value; }
+    double localTime(double time) const { return offset + (time - start) * rate; }
+    bool valid() const {
+        return std::isfinite(start) && start >= 0 && std::isfinite(length) && length > 0
+            && std::isfinite(finish) && finish > start && std::isfinite(offset) && std::isfinite(rate) && rate > 0;
+    }
+private:
+    // Keep the converted boundary itself: start + (end - start) can round to
+    // a different value and invent overlaps between exactly adjacent clips.
+    double finish, length;
+};
+
 struct Clip {
     Id id = 0;
     Id asset = 0;
@@ -28,27 +51,72 @@ struct Clip {
     Id midiAsset = 0;
     std::shared_ptr<const MidiNotes> midi;
 
+    ClipTimeBase timeBase = ClipTimeBase::seconds;
+    double contentBpm = 120;
+
+    // Canonical fields above use beats for musical clips, seconds otherwise.
+    // Resolved content remains seconds so visual curves and their tangents are
+    // never rewritten when the project tempo changes.
+    ClipTiming timing(double projectBpm) const {
+        if (timeBase == ClipTimeBase::seconds) { return {start, end(), offset, rate}; }
+        const auto scale = 60 / projectBpm;
+        const auto first = start * scale;
+        const auto last = end() * scale;
+        return {first, last, offset * (60 / contentBpm), rate * (projectBpm / contentBpm)};
+    }
+    double curveBpm(double projectBpm) const { return timeBase == ClipTimeBase::beats ? contentBpm : projectBpm; }
+    bool setTiming(ClipTiming value, double projectBpm) {
+        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000 || !value.valid()) { return false; }
+        auto next = *this;
+        const auto before = timing(projectBpm);
+        const auto placementScale = timeBase == ClipTimeBase::beats ? projectBpm / 60 : 1;
+        const auto contentScale = timeBase == ClipTimeBase::beats ? contentBpm / 60 : 1;
+        if (value.start != before.start) { next.start = value.start * placementScale; }
+        if (value.duration() != before.duration()) { next.duration = value.duration() * placementScale; }
+        if (value.offset != before.offset) { next.offset = value.offset * contentScale; }
+        if (value.rate != before.rate) { next.rate = value.rate * (contentScale / placementScale); }
+        if (!next.valid() || !next.timing(projectBpm).valid()) { return false; }
+        start = next.start; duration = next.duration; offset = next.offset; rate = next.rate;
+        return true;
+    }
+    bool anchorToBeats(double projectBpm) {
+        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000 || !valid()) { return false; }
+        if (timeBase == ClipTimeBase::beats) { return true; }
+        const auto before = timing(projectBpm);
+        auto next = *this;
+        next.timeBase = ClipTimeBase::beats; next.contentBpm = projectBpm;
+        next.start = before.start * (projectBpm / 60);
+        next.duration = before.duration() * (projectBpm / 60);
+        next.offset = before.offset * (projectBpm / 60);
+        if (!next.valid() || !next.timing(projectBpm).valid()) { return false; }
+        *this = std::move(next);
+        return true;
+    }
     double end() const { return start + duration; }
-    bool contains(double projectTime) const { return projectTime >= start && projectTime < end(); }
-    double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
+    bool contains(double projectTime, double projectBpm = 120) const { const auto t = timing(projectBpm); return projectTime >= t.start && projectTime < t.end(); }
+    double localTime(double projectTime, double projectBpm = 120) const { return timing(projectBpm).localTime(projectTime); }
     bool valid() const {
         for (const auto& [name, curve] : properties) {
             if (!curve.valid()) {
                 return false;
             }
         }
-        return id != 0 && std::isfinite(start) && start >= 0.0 && std::isfinite(duration)
-            && duration > 0.0 && std::isfinite(end()) && std::isfinite(offset)
+        return (timeBase == ClipTimeBase::seconds || timeBase == ClipTimeBase::beats)
+            && std::isfinite(contentBpm) && contentBpm >= 1 && contentBpm <= 1000
+            && id != 0 && std::isfinite(start) && start >= 0.0 && std::isfinite(duration)
+            && duration > 0.0 && std::isfinite(end()) && end() > start && std::isfinite(offset)
             && std::isfinite(rate) && rate > 0.0;
     }
 
     // Model mutations run on the editor thread. The renderer receives prepared
     // snapshots, never these growing containers.
-    bool trim(double newStart, double newEnd) {
+    bool trim(double newStart, double newEnd, double projectBpm = 120) {
+        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return false; }
+        if (timeBase == ClipTimeBase::beats) { newStart *= projectBpm / 60; newEnd *= projectBpm / 60; }
         if (!std::isfinite(newStart) || !std::isfinite(newEnd) || newStart < 0.0 || newEnd <= newStart) {
             return false;
         }
-        const auto newOffset = localTime(newStart);
+        const auto newOffset = offset + (newStart - start) * rate;
         if (!std::isfinite(newOffset)) {
             return false;
         }
@@ -58,7 +126,9 @@ struct Clip {
         return true;
     }
 
-    bool stretch(double newDuration) {
+    bool stretch(double newDuration, double projectBpm = 120) {
+        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return false; }
+        if (timeBase == ClipTimeBase::beats) { newDuration *= projectBpm / 60; }
         if (!std::isfinite(newDuration) || newDuration <= 0.0) {
             return false;
         }
@@ -71,7 +141,9 @@ struct Clip {
         return true;
     }
 
-    std::optional<std::pair<Clip, Clip>> split(double projectTime, Id rightId) const {
+    std::optional<std::pair<Clip, Clip>> split(double projectTime, Id rightId, double projectBpm = 120) const {
+        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return std::nullopt; }
+        if (timeBase == ClipTimeBase::beats) { projectTime *= projectBpm / 60; }
         if (!valid() || rightId == 0 || rightId == id || !std::isfinite(projectTime)
             || projectTime <= start || projectTime >= end()) {
             return std::nullopt;
@@ -80,7 +152,7 @@ struct Clip {
         auto right = *this;
         left.duration = projectTime - start;
         right.id = rightId;
-        right.offset = localTime(projectTime);
+        right.offset = offset + (projectTime - start) * rate;
         right.start = projectTime;
         right.duration = end() - projectTime;
         return std::make_pair(std::move(left), std::move(right));
@@ -102,37 +174,38 @@ struct Track {
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.
-    bool canPlace(const Clip& candidate, Id replacing = 0) const {
-        if (!candidate.valid()) {
+    bool canPlace(const Clip& candidate, Id replacing = 0, double projectBpm = 120) const {
+        if (!candidate.valid() || !std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) {
             return false;
         }
+        const auto proposed = candidate.timing(projectBpm);
+        if (!proposed.valid()) { return false; }
         for (const auto& clip : clips) {
+            const auto existing = clip.timing(projectBpm);
             if (clip.id != replacing && (clip.id == candidate.id
-                || (candidate.start < clip.end() && clip.start < candidate.end()))) {
+                || (proposed.start < existing.end() && existing.start < proposed.end()))) {
                 return false;
             }
         }
         return true;
     }
 
-    bool insert(Clip clip) {
-        if (!canPlace(clip)) {
+    bool insert(Clip clip, double projectBpm = 120) {
+        if (!canPlace(clip, 0, projectBpm)) {
             return false;
         }
-        const auto position = std::lower_bound(clips.begin(), clips.end(), clip.start,
-            [](const Clip& existing, double time) { return existing.start < time; });
+        const auto position = std::lower_bound(clips.begin(), clips.end(), clip.timing(projectBpm).start,
+            [projectBpm](const Clip& existing, double time) { return existing.timing(projectBpm).start < time; });
         clips.insert(position, std::move(clip));
         return true;
     }
 
-    const Clip* at(double projectTime) const {
-        const auto next = std::upper_bound(clips.begin(), clips.end(), projectTime,
-            [](double time, const Clip& clip) { return time < clip.start; });
-        if (next == clips.begin()) {
-            return nullptr;
+    const Clip* at(double projectTime, double projectBpm = 120) const {
+        // Tempo can change the ordering of mixed beat/seconds clips.
+        for (const auto& clip : clips) {
+            if (clip.contains(projectTime, projectBpm)) { return &clip; }
         }
-        const auto& clip = *(next - 1);
-        return clip.contains(projectTime) ? &clip : nullptr;
+        return nullptr;
     }
 };
 

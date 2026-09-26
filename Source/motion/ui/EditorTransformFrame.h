@@ -93,9 +93,9 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
         if (track.kind != TrackKind::visual) { continue; }
         for (const auto& clip : track.clips) {
             if (clip.id != clipId) { continue; }
-            const auto local = clip.localTime(projectTime);
+            const auto local = clip.localTime(projectTime, project.bpm);
             if (!std::isfinite(local)) { return std::nullopt; }
-            const auto own = transform_detail::evaluate(clip.properties, local, project.bpm);
+            const auto own = transform_detail::evaluate(clip.properties, local, clip.curveBpm(project.bpm));
             if (!own.has_value()) { return std::nullopt; }
             TransformFrame frame;
             frame.worldOrigin = own->position;
@@ -204,7 +204,7 @@ std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id 
         if (track.kind != TrackKind::visual) { continue; }
         for (const auto& clip : track.clips) {
             if (clip.id != clipId) { continue; }
-            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime), project.bpm);
+            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime, project.bpm), clip.curveBpm(project.bpm));
             if (!transform.has_value()) { return std::nullopt; }
             return EulerGizmoFrame { *parent, transform->rotation, transform->scale };
         }

@@ -115,7 +115,7 @@ public:
                 juce::Path result;
                 for (int i = 0; i <= steps; ++i) {
                     const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-                    const auto value = constrainedValue(*clip, curve.evaluate(clip->localTime(time), processor.document.project().bpm));
+                    const auto value = constrainedValue(*clip, curve.evaluate(clip->localTime(time), clip->curveBpm(processor.document.project().bpm)));
                     if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
                 }
                 g.setColour(juce::Colour(0xff80baff));
@@ -530,7 +530,7 @@ private:
             const auto local = clip->localTime(std::lerp(clip->start, clip->end(), i / 256.0));
             const auto base = curve->evaluateBase(local);
             low = std::min(low, base); high = std::max(high, base);
-            const auto value = constrainedValue(*clip, curve->evaluate(local, processor.document.project().bpm));
+            const auto value = constrainedValue(*clip, curve->evaluate(local, clip->curveBpm(processor.document.project().bpm)));
             low = std::min(low, value);
             high = std::max(high, value);
         }

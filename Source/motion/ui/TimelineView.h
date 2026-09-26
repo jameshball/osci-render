@@ -142,21 +142,21 @@ public:
         const auto kind = (*asset)->audio != nullptr ? motion::TrackKind::audio : motion::TrackKind::visual;
         auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
         const auto id = clip.id;
-        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip))) {
+        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip, 0, project.bpm))) {
             return;
         }
         const auto trackId = processor.document.newId();
         processor.document.edit(kind == motion::TrackKind::audio ? "Add audio clip" : "Add object clip", [&](motion::Project& updated) {
-            updated.duration = std::max(updated.duration, clip.end());
+            updated.duration = std::max(updated.duration, clip.timing(updated.bpm).end());
             if (row >= 0 && row < static_cast<int>(updated.tracks.size())) {
-                updated.tracks[row].insert(std::move(clip));
+                updated.tracks[row].insert(std::move(clip), updated.bpm);
             } else {
                 motion::Track track;
                 track.id = trackId;
                 track.group = group;
                 track.name = clip.name;
                 track.kind = kind;
-                track.insert(std::move(clip));
+                track.insert(std::move(clip), updated.bpm);
                 updated.tracks.push_back(std::move(track));
             }
         });
@@ -232,7 +232,8 @@ public:
                         if (parent == rows[visible].id) {
                             g.setColour(osci::Colours::accentColor().withAlpha(motion::trackIsAudible(processor.document.project(), track) ? 0.35f : 0.1f));
                             for (const auto& clip : track.clips) {
-                                g.fillRoundedRectangle(static_cast<float>(timeX(clip.start)), y + rowHeight * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(clip.duration * pixelsPerSecond))), 6, 2);
+                                const auto timing = clip.timing(processor.document.project().bpm);
+                                g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + rowHeight * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
                             }
                             break;
                         }
@@ -261,9 +262,9 @@ public:
                 }
                 auto label = juce::String(clip.name);
                 if (active && tool == Tool::slip) {
-                    label += "  offset " + juce::String(clip.offset, 2) + "s";
+                    label += "  offset " + juce::String(clip.timing(processor.document.project().bpm).offset, 2) + "s";
                 } else if (active && tool == Tool::stretch) {
-                    label += "  " + juce::String(clip.rate, 2) + "x";
+                    label += "  " + juce::String(clip.timing(processor.document.project().bpm).rate, 2) + "x";
                 }
                 auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f);
                 if (audio) {
@@ -277,8 +278,8 @@ public:
                         for (int x = left; x < right; ++x) {
                             const auto time = scrollTime + (x - namesWidth) / pixelsPerSecond;
                             const auto end = time + 1.0 / pixelsPerSecond;
-                            const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time), clip.localTime(end));
-                            const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time), clip.localTime(end));
+                            const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time, processor.document.project().bpm), clip.localTime(end, processor.document.project().bpm));
+                            const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time, processor.document.project().bpm), clip.localTime(end, processor.document.project().bpm));
                             const auto low = std::clamp(std::min(a.minimum, b.minimum), -1.0f, 1.0f);
                             const auto high = std::clamp(std::max(a.maximum, b.maximum), -1.0f, 1.0f);
                             g.drawVerticalLine(x, centre - high * 8, centre - low * 8 + 0.5f);
@@ -321,7 +322,7 @@ public:
             const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
             const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
             const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
-            const auto allowed = asset != assets.end() && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate));
+            const auto allowed = asset != assets.end() && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate, 0, processor.document.project().bpm));
             const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), rowHeight)).toFloat().reduced(1, 4);
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
@@ -411,32 +412,29 @@ public:
             return;
         }
         auto candidate = original;
+        const auto timing = original.timing(before->bpm);
+        auto edited = timing;
         auto delta = (event.x - downX) / pixelsPerSecond;
         if (delta != 0.0 && !event.mods.isAltDown()) {
-            const auto anchor = mode == Mode::right || mode == Mode::stretch ? original.end()
-                : (mode == Mode::slip ? original.offset / original.rate : original.start);
+            const auto anchor = mode == Mode::right || mode == Mode::stretch ? timing.end()
+                : (mode == Mode::slip ? timing.offset / timing.rate : timing.start);
             delta = before->timeGrid().snap(anchor + delta) - anchor;
         }
         if (delta != 0.0) {
             if (mode == Mode::move) {
-                candidate.start = std::max(0.0, original.start + delta);
+                edited.moveTo(std::max(0.0, timing.start + delta));
             } else if (mode == Mode::left) {
-                if (!candidate.trim(std::max(0.0, original.start + delta), original.end())) {
-                    return;
-                }
+                edited.setStart(std::max(0.0, timing.start + delta));
+                edited.offset = timing.localTime(edited.start);
             } else if (mode == Mode::right) {
-                if (!candidate.trim(original.start, original.end() + delta)) {
-                    return;
-                }
+                edited.setEnd(edited.end() + delta);
             } else if (mode == Mode::slip) {
-                // Offset is content time; preserve placement, duration and speed.
-                candidate.offset = original.offset + delta * original.rate;
-                if (!std::isfinite(candidate.offset)) {
-                    return;
-                }
-            } else if (!candidate.stretch(original.duration + delta)) {
-                return;
+                edited.offset += delta * timing.rate;
+            } else {
+                edited.setEnd(edited.end() + delta);
+                edited.rate *= timing.duration() / edited.duration();
             }
+            if (!candidate.setTiming(edited, before->bpm)) { return; }
         }
         const auto target = mode == Mode::move
             ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : originalRow) : originalRow;
@@ -455,8 +453,8 @@ public:
         auto updated = *before;
         auto& source = updated.tracks[originalRow].clips;
         source.erase(std::remove_if(source.begin(), source.end(), [&](const auto& clip) { return clip.id == original.id; }), source.end());
-        if (updated.tracks[target].insert(candidate)) {
-            updated.duration = std::max(updated.duration, candidate.end());
+        if (updated.tracks[target].insert(candidate, updated.bpm)) {
+            updated.duration = std::max(updated.duration, candidate.timing(updated.bpm).end());
             changed = true;
             processor.document.preview(std::move(updated));
             expectedRevision = processor.document.revision();
@@ -741,7 +739,7 @@ private:
         auto end = project.duration;
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
-                end = std::max(end, clip.end());
+                end = std::max(end, clip.timing(project.bpm).end());
             }
         }
         const auto duration = std::isfinite(end) ? std::max(0.001, end) : 1.0;
@@ -846,7 +844,8 @@ private:
     int timeX(double time) const { return namesWidth + boundedPixel((time - scrollTime) * pixelsPerSecond); }
     int rowY(int row) const { return rulerHeight + (row - scrollRows) * rowHeight; }
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const {
-        return { timeX(clip.start), trackY(row), std::max(2, boundedPixel(clip.duration * pixelsPerSecond)), rowHeight };
+        const auto timing = clip.timing(processor.document.project().bpm);
+        return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), rowHeight };
     }
     double snapTime(double time, juce::ModifierKeys modifiers) const {
         return modifiers.isAltDown() ? time : processor.document.project().timeGrid().snap(time);

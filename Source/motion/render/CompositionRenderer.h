@@ -52,12 +52,12 @@ struct PreparedClip {
     std::array<Curve, 13> curves;
     std::vector<PreparedEffect> effects, trackEffects;
     std::vector<PreparedGroup> groups;
-    double bpm = 120;
+    double bpm = 120, contentBpm = 120;
 
     double localTime(double time) const { return offset + (time - start) * rate; }
     bool active(double time) const { return time >= start && time < end; }
     double weight(double time) const {
-        const auto value = curves[12].evaluate(localTime(time), bpm);
+        const auto value = curves[12].evaluate(localTime(time), contentBpm);
         double weight = std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
         for (const auto& group : groups) {
             weight *= group.weight(time, bpm);
@@ -69,8 +69,8 @@ struct PreparedClip {
 
     osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
         const auto local = localTime(time);
-        auto point = applyEffects(effects, source->sample(local, phase, phaseSpan, std::abs(rate) * timeSpan), local, bpm);
-        point = applyTransform(point, curves, local, bpm);
+        auto point = applyEffects(effects, source->sample(local, phase, phaseSpan, std::abs(rate) * timeSpan), local, contentBpm);
+        point = applyTransform(point, curves, local, contentBpm);
         point = applyEffects(trackEffects, point, time, bpm);
         for (const auto& group : groups) {
             point = group.apply(point, time, bpm);
@@ -152,12 +152,14 @@ struct PreparedComposition {
                 if (source == nullptr) {
                     source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> { (*asset)->drawing }, 30.0);
                 }
-                PreparedClip item { clip.id, clip.start, clip.end(), clip.offset, clip.rate, std::move(source), {} };
+                const auto timing = clip.timing(project.bpm);
+                PreparedClip item { clip.id, timing.start, timing.end(), timing.offset, timing.rate, std::move(source), {} };
                 for (std::size_t i = 0; i < propertyNames.size(); ++i) {
                     const auto curve = clip.properties.find(propertyNames[i]);
                     item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
                 }
                 item.bpm = project.bpm;
+                item.contentBpm = clip.curveBpm(project.bpm);
                 item.effects = prepareEffects(clip.effects);
                 item.trackEffects = prepareEffects(track.effects);
                 auto groupId = track.group;

@@ -1,5 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/render/CompositionRenderer.h"
+#include "../Source/motion/model/PropertyTarget.h"
 
 class MotionMidiDocumentTest : public juce::UnitTest {
 public:
@@ -27,6 +29,7 @@ public:
         auto clip = motion::Document::makeClip(document.newId(), *source, 0);
         clip.midiAsset = midi->id; clip.midi = midi->midi;
         auto sibling = clip; sibling.id = document.newId(); sibling.start = 10;
+        expect(clip.anchorToBeats(170));
         auto note = clip.midi->notes()[0];
         note.id = std::numeric_limits<std::uint64_t>::max();
         note.start = 1.0 / 7; note.duration = 11.0 / 13; note.pitch = 71;
@@ -54,6 +57,44 @@ public:
         expectEquals(actual.pitch, 71);
         expectEquals(restoredClips[1].midi->notes()[0].pitch, 60);
         expect(restoredClips[0].midiAsset == midi->id);
+        expect(restoredClips[0].timeBase == motion::ClipTimeBase::beats);
+        expectEquals(restoredClips[0].contentBpm, 170.0);
+        expectEquals(restoredClips[0].duration, clip.duration);
+
+        beginTest("Tempo transactions preserve musical content and reject mixed-domain overlaps atomically");
+        const auto originalStart = restoredClips[0].start;
+        const auto originalDuration = restoredClips[0].duration;
+        expect(restored.changeTempo(200).wasOk());
+        expectEquals(restored.project().tracks[0].clips[0].start, originalStart);
+        expectEquals(restored.project().tracks[0].clips[0].duration, originalDuration);
+        expect(restored.changeTempo(170).wasOk());
+        const auto beforeRejected = restored.save().toString();
+        expect(restored.changeTempo(60).failed());
+        expect(restored.save().toString() == beforeRejected);
+        expect(restoredUndo.undo());
+        expectEquals(restored.project().bpm, 200.0);
+        expect(restoredUndo.redo());
+        expectEquals(restored.project().bpm, 170.0);
+
+        beginTest("Rendering and curve editing share the musical content clock");
+        auto slowProject = document.project(); slowProject.bpm = 170;
+        auto& authored = slowProject.tracks[0].clips[0];
+        authored.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
+        authored.properties["position.x"].setKey({5, 2, motion::Interpolation::linear});
+        auto& red = authored.properties["red"];
+        red.modulation.enabled = true; red.modulation.tempoSync = true;
+        red.modulation.amount = .1; red.modulation.beatsPerCycle = 4;
+        auto fastProject = slowProject; fastProject.bpm = 340;
+        const motion::PreparedComposition slow(slowProject), fast(fastProject);
+        const auto slowPoint = slow.sample(1.1, .2), fastPoint = fast.sample(.55, .2);
+        expectWithinAbsoluteError(slowPoint.x, fastPoint.x, 1e-6f);
+        expectWithinAbsoluteError(slowPoint.r, fastPoint.r, 1e-6f);
+        const auto target = motion::findPropertyTarget(fastProject, authored.id);
+        expect(target.has_value());
+        if (target) {
+            expectWithinAbsoluteError(target->localTime(.55), 1.1, 1e-12);
+            expectEquals(target->curveBpm(fastProject.bpm), 170.0);
+        }
 
         beginTest("Undo shares original pattern without touching sibling instances");
         const auto before = document.project().tracks[0].clips[0].midi;

@@ -508,6 +508,27 @@ void Document::reset(Project project) {
     apply(std::move(project));
 }
 
+juce::Result Document::changeTempo(double bpm) {
+    if (!std::isfinite(bpm) || bpm < 1 || bpm > 1000) { return juce::Result::fail("Tempo must be between 1 and 1000 BPM."); }
+    if (bpm == state.bpm) { return juce::Result::ok(); }
+    auto next = state;
+    next.bpm = bpm;
+    for (auto& track : next.tracks) {
+        std::sort(track.clips.begin(), track.clips.end(), [bpm](const auto& a, const auto& b) { return a.timing(bpm).start < b.timing(bpm).start; });
+        double previousEnd = 0;
+        for (const auto& clip : track.clips) {
+            const auto timing = clip.timing(bpm);
+            if (!clip.valid() || !timing.valid() || timing.start < previousEnd) {
+                return juce::Result::fail("Tempo change would overlap clips on " + juce::String(track.name) + ". Move the clips apart or onto separate tracks first.");
+            }
+            previousEnd = timing.end();
+            next.duration = std::max(next.duration, previousEnd);
+        }
+    }
+    edit("Change tempo", [next = std::move(next)](Project& project) { project = next; });
+    return juce::Result::ok();
+}
+
 Clip Document::makeClip(Id id, const Asset& asset, double time) {
     Clip clip;
     clip.id = id;
@@ -768,10 +789,12 @@ juce::XmlElement Document::save() const {
             item->setAttribute("id", juce::String(clip.id));
             item->setAttribute("asset", juce::String(clip.asset));
             item->setAttribute("name", juce::String(clip.name));
-            item->setAttribute("start", clip.start);
-            item->setAttribute("duration", clip.duration);
-            item->setAttribute("offset", clip.offset);
-            item->setAttribute("rate", clip.rate);
+            item->setAttribute("timeBase", clip.timeBase == ClipTimeBase::beats ? "beats" : "seconds");
+            item->setAttribute("contentBpm", exactBakeNumber(clip.contentBpm));
+            item->setAttribute("start", exactBakeNumber(clip.start));
+            item->setAttribute("duration", exactBakeNumber(clip.duration));
+            item->setAttribute("offset", exactBakeNumber(clip.offset));
+            item->setAttribute("rate", exactBakeNumber(clip.rate));
             if (clip.midi != nullptr) {
                 auto* pattern = item->createNewChildElement("midi");
                 pattern->setAttribute("asset", juce::String(clip.midiAsset));
@@ -955,6 +978,10 @@ juce::Result Document::load(const juce::XmlElement& xml) {
             clip.id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
             clip.asset = static_cast<Id>(item->getStringAttribute("asset").getLargeIntValue());
             clip.name = item->getStringAttribute("name").toStdString();
+            const auto timeBase = item->getStringAttribute("timeBase");
+            if (timeBase != "seconds" && timeBase != "beats") { return juce::Result::fail("Clip timing must be seconds or beats."); }
+            clip.timeBase = timeBase == "beats" ? ClipTimeBase::beats : ClipTimeBase::seconds;
+            clip.contentBpm = item->getDoubleAttribute("contentBpm", 0);
             clip.start = item->getDoubleAttribute("start");
             clip.duration = item->getDoubleAttribute("duration");
             clip.offset = item->getDoubleAttribute("offset");
@@ -1031,7 +1058,7 @@ juce::Result Document::load(const juce::XmlElement& xml) {
                     }
                 }
             }
-            if (!track.insert(std::move(clip))) {
+            if (!track.insert(std::move(clip), project.bpm)) {
                 return juce::Result::fail("Invalid or overlapping clip range.");
             }
         }

@@ -5,6 +5,7 @@
 namespace {
 struct Project {
     double duration = 120.0;
+    double bpm = 120.0;
     std::vector<motion::Track> tracks;
     std::vector<motion::Camera> cameras;
     std::vector<motion::EffectInstance> effects;

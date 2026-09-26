@@ -23,6 +23,8 @@ struct BasicPropertyTarget {
     bool isEffect = false;
     bool isGroup = false;
     bool isAudio = false;
+    double contentBpm = 0;
+    double curveBpm(double projectBpm) const { return contentBpm > 0 ? contentBpm : projectBpm; }
 
     double end() const { return start + duration; }
     double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
@@ -68,13 +70,14 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
             }
         }
         for (auto& clip : track.clips) {
+            const auto timing = clip.timing(project.bpm);
             for (auto& effect : clip.effects) {
                 if (effect.id == id) {
-                    return Target { effect.id, effect.name, clip.start, clip.duration, clip.offset, clip.rate, &effect.properties, false, true };
+                    return Target { effect.id, effect.name, timing.start, timing.duration(), timing.offset, timing.rate, &effect.properties, false, true, false, false, clip.curveBpm(project.bpm) };
                 }
             }
             if (clip.id == id) {
-                return Target { clip.id, clip.name, clip.start, clip.duration, clip.offset, clip.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio };
+                return Target { clip.id, clip.name, timing.start, timing.duration(), timing.offset, timing.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio, clip.curveBpm(project.bpm) };
             }
         }
     }

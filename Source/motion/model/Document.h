@@ -69,6 +69,7 @@ public:
     Id newId() { return ++lastId; }
     void edit(juce::String label, std::function<void(Project&)> operation);
     void reset(Project project);
+    juce::Result changeTempo(double bpm);
     void preview(Project project) { apply(std::move(project)); }
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;

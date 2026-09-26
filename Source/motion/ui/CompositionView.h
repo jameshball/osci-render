@@ -332,7 +332,7 @@ private:
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.id != selected) { continue; }
-                if (track.locked || !motion::trackIsAudible(project, track) || !clip.contains(time)) { return false; }
+                if (track.locked || !motion::trackIsAudible(project, track) || !clip.contains(time, project.bpm)) { return false; }
                 const auto prefix = tool == MotionTransformTool::move ? "position." : tool == MotionTransformTool::rotate ? "rotation." : "scale.";
                 for (const auto axis : std::string("xyz")) {
                     const auto found = clip.properties.find(std::string(prefix) + axis);
