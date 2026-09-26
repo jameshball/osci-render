@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Camera.h"
+#include "Group.h"
 #include <string_view>
 #include <type_traits>
 
@@ -20,6 +21,7 @@ struct BasicPropertyTarget {
     Map* properties = nullptr;
     bool camera = false;
     bool isEffect = false;
+    bool isGroup = false;
 
     double end() const { return start + duration; }
     double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
@@ -46,6 +48,16 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
     for (auto& effect : project.effects) {
         if (effect.id == id) {
             return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+        }
+    }
+    for (auto& group : project.groups) {
+        if (group.id == id) {
+            return Target { group.id, group.name, 0.0, project.duration, 0.0, 1.0, &group.properties, false, false, true };
+        }
+        for (auto& effect : group.effects) {
+            if (effect.id == id) {
+                return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+            }
         }
     }
     for (auto& track : project.tracks) {

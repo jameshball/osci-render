@@ -8,6 +8,7 @@ struct Project {
     std::vector<motion::Track> tracks;
     std::vector<motion::Camera> cameras;
     std::vector<motion::EffectInstance> effects;
+    std::vector<motion::Group> groups;
 };
 void check(bool passed, const char* message) {
     if (!passed) {
@@ -81,5 +82,25 @@ int main() {
     right.effects[0].id = 41;
     right.effects[0].properties["strength"] = motion::Curve(0.75);
     check(project.tracks[0].clips[0].effects[0].properties.at("strength").evaluate(7) == 0.25, "split effect curves remain independent");
+    motion::Group outer;
+    outer.id = 50;
+    motion::Group inner;
+    inner.id = 51;
+    inner.parent = 50;
+    inner.effects.push_back(motion::makeEffect(52, *motion::effectDefinition("scale")));
+    project.groups = { outer, inner };
+    project.tracks[0].group = 51;
+    check(motion::validGroupHierarchy(project), "nested group references are valid");
+    const auto groupTarget = motion::findPropertyTarget(readOnly, 51);
+    check(groupTarget->isGroup && !groupTarget->isEffect && groupTarget->localTime(10) == 10, "group curves use project time");
+    check(motion::findPropertyTarget(readOnly, 52)->isEffect, "group effects are graph targets");
+    check(motion::findEffectOwner(project, 51) == &project.groups[1].effects, "group effect owner lookup");
+    project.groups[0].solo = true;
+    check(motion::trackIsAudible(project, project.tracks[0]), "ancestor solo includes descendants");
+    project.groups[0].muted = true;
+    project.tracks[0].solo = true;
+    check(!motion::trackIsAudible(project, project.tracks[0]), "ancestor mute wins over track solo");
+    project.groups[0].parent = 51;
+    check(!motion::validGroupHierarchy(project), "group cycles are rejected");
     std::cout << "Property target contracts passed\n";
 }

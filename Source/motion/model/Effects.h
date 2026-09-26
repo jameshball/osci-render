@@ -96,6 +96,11 @@ auto findEffectOwner(ProjectType& project, std::uint64_t ownerId) -> std::condit
     if (ownerId == 0) {
         return &project.effects;
     }
+    for (auto& group : project.groups) {
+        if (group.id == ownerId) {
+            return &group.effects;
+        }
+    }
     for (auto& track : project.tracks) {
         if (track.id == ownerId) {
             return &track.effects;
@@ -114,6 +119,13 @@ auto findEffect(ProjectType& project, std::uint64_t id) -> std::conditional_t<st
     for (auto& effect : project.effects) {
         if (effect.id == id) {
             return &effect;
+        }
+    }
+    for (auto& group : project.groups) {
+        for (auto& effect : group.effects) {
+            if (effect.id == id) {
+                return &effect;
+            }
         }
     }
     for (auto& track : project.tracks) {

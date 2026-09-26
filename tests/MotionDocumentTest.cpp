@@ -99,9 +99,161 @@ public:
         testAnimatedSources();
         testEffects(document.project());
         testTrackStates(document.project());
+        testGroups(document.project());
     }
 
 private:
+    void testGroups(const motion::Project& sourceProject) {
+        beginTest("Nested groups apply inner-to-outer in project time after track effects");
+        auto project = sourceProject;
+        auto& clip = project.tracks[0].clips[0];
+        clip.start = 2;
+        clip.duration = 10;
+        clip.offset = 4;
+        clip.rate = 2;
+        clip.properties["position.x"] = motion::Curve(0);
+        clip.properties["red"] = motion::Curve(1);
+        motion::Group outer;
+        outer.id = 700;
+        outer.name = "Outer";
+        outer.properties["scale.x"] = motion::Curve(2);
+        outer.properties["red"] = motion::Curve(0.5);
+        outer.properties["weight"] = motion::Curve(0.5);
+        motion::Group inner;
+        inner.id = 701;
+        inner.parent = outer.id;
+        inner.properties["position.x"].setKey({ 0, 0, motion::Interpolation::linear });
+        inner.properties["position.x"].setKey({ 10, 1 });
+        inner.properties["red"] = motion::Curve(0.5);
+        inner.properties["weight"] = motion::Curve(0.5);
+        auto innerEffect = motion::makeEffect(702, *motion::effectDefinition("translate"));
+        innerEffect.properties["translateX"] = motion::Curve(0.1);
+        inner.effects.push_back(innerEffect);
+        auto trackEffect = motion::makeEffect(703, *motion::effectDefinition("translate"));
+        trackEffect.properties["translateX"] = motion::Curve(0.2);
+        project.tracks[0].effects.push_back(trackEffect);
+        project.groups = { outer, inner };
+        project.tracks[0].group = inner.id;
+        expect(motion::validGroupHierarchy(project));
+        motion::PreparedComposition nested(project);
+        const auto raw = sourceProject.assets[0]->source->sample(clip.localTime(3), 0.2);
+        const auto world = nested.clips[0].sample(3, 0.2);
+        expectWithinAbsoluteError(world.x, (raw.x + 0.2f + 0.3f + 0.1f) * 2, 0.00001f);
+        expectWithinAbsoluteError(world.r, 0.25f, 0.000001f);
+        expectEquals(nested.clips[0].weight(3), 0.25);
+        auto amplified = project;
+        amplified.tracks[0].clips[0].properties["weight"] = motion::Curve(1000000);
+        amplified.groups[1].properties["weight"] = motion::Curve(2);
+        amplified.groups[0].properties["weight"] = motion::Curve(0.5);
+        expectEquals(motion::PreparedComposition(amplified).clips[0].weight(3), 1000000.0);
+        amplified.tracks[0].clips[0].properties["weight"] = motion::Curve(1);
+        amplified.groups[1].properties["weight"] = motion::Curve(1000000);
+        amplified.groups[0].properties["weight"] = motion::Curve(1000000);
+        motion::Group attenuator;
+        attenuator.id = 706;
+        attenuator.properties["weight"] = motion::Curve(0.000001);
+        amplified.groups[0].parent = attenuator.id;
+        amplified.groups.push_back(attenuator);
+        expectWithinAbsoluteError(motion::PreparedComposition(amplified).clips[0].weight(3), 1000000.0, 0.000001);
+
+        int lit = 0;
+        for (int index = 0; index < 1000; ++index) {
+            lit += nested.sample(3, index / 1000.0).r > 0 ? 1 : 0;
+        }
+        expectEquals(lit, 250);
+        const auto target = motion::findPropertyTarget(project, inner.id);
+        expect(target.has_value() && target->isGroup && !target->isEffect && !target->camera);
+        if (target.has_value()) {
+            expectEquals(target->localTime(3), 3.0);
+        }
+        const auto effectTarget = motion::findPropertyTarget(project, innerEffect.id);
+        expect(effectTarget.has_value() && effectTarget->isEffect && effectTarget->localTime(3) == 3);
+        expect(motion::findEffectOwner(project, inner.id) == &project.groups[1].effects);
+        expect(motion::findEffect(project, innerEffect.id) == &project.groups[1].effects[0]);
+
+        beginTest("Solo groups include descendants and ancestor mute wins over every solo");
+        auto outsider = project.tracks[0];
+        outsider.id = 704;
+        outsider.clips[0].id = 705;
+        outsider.group = 0;
+        outsider.effects.clear();
+        project.tracks.push_back(outsider);
+        project.groups[0].solo = true;
+        expect(motion::trackIsAudible(project, project.tracks[0]));
+        expect(!motion::trackIsAudible(project, project.tracks[1]));
+        expectEquals(static_cast<int>(motion::PreparedComposition(project).clips.size()), 1);
+        project.groups[0].muted = true;
+        project.tracks[0].solo = true;
+        expect(!motion::trackIsAudible(project, project.tracks[0]));
+        expect(motion::PreparedComposition(project).clips.empty());
+        project.groups[0].muted = false;
+        project.groups[0].solo = false;
+        project.tracks[0].solo = false;
+        project.groups[1].solo = true;
+        expect(motion::trackIsAudible(project, project.tracks[0]));
+        expect(!motion::trackIsAudible(project, project.tracks[1]));
+
+        beginTest("Group persistence and undo preserve nested values, IDs and shared assets");
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(sourceProject);
+        document.edit("Group tracks", [&](motion::Project& value) { value = project; });
+        expect(undo.undo());
+        expect(document.project().groups.empty());
+        expect(undo.redo());
+        expect(document.project().assets[0] == sourceProject.assets[0]);
+        juce::UndoManager restoredUndo;
+        motion::Document restored(restoredUndo);
+        const auto xml = document.save();
+        const auto loaded = restored.load(xml);
+        expect(loaded.wasOk(), loaded.getErrorMessage());
+        if (loaded.failed()) {
+            return;
+        }
+        expect(restored.newId() > outsider.clips[0].id);
+        expectEquals(static_cast<int>(restored.project().groups.size()), 2);
+        expectEquals(static_cast<int>(restored.project().tracks[0].group), static_cast<int>(inner.id));
+        expect(restored.project().groups[1].solo);
+        motion::PreparedComposition reloaded(restored.project());
+        expectWithinAbsoluteError(reloaded.clips[0].sample(3, 0.2).x, world.x, 0.00001f);
+        const auto unchanged = restored.save().toString();
+        const auto reject = [&](juce::XmlElement invalid) {
+            expect(restored.load(invalid).failed());
+            expectEquals(restored.save().toString(), unchanged);
+        };
+        auto cyclic = xml;
+        cyclic.getChildByName("group")->setAttribute("parent", juce::String(inner.id));
+        reject(cyclic);
+        auto missing = xml;
+        missing.getChildByName("group")->setAttribute("parent", "9999");
+        reject(missing);
+        auto missingTrackGroup = xml;
+        missingTrackGroup.getChildByName("track")->setAttribute("group", "9999");
+        reject(missingTrackGroup);
+        auto duplicate = xml;
+        duplicate.getChildByName("group")->setAttribute("id", juce::String(sourceProject.assets[0]->id));
+        reject(duplicate);
+        auto badCurve = xml;
+        badCurve.getChildByName("group")->getChildByName("property")->setAttribute("name", "unknown");
+        reject(badCurve);
+
+        beginTest("Group nesting is bounded and malformed snapshots fail closed");
+        auto deep = sourceProject;
+        for (motion::Id index = 1; index <= 33; ++index) {
+            motion::Group group;
+            group.id = 1000 + index;
+            group.parent = index == 1 ? 0 : group.id - 1;
+            deep.groups.push_back(group);
+        }
+        deep.tracks[0].group = deep.groups.back().id;
+        expect(!motion::validGroupHierarchy(deep));
+        expect(motion::PreparedComposition(deep).clips.empty());
+        deep.groups.pop_back();
+        deep.tracks[0].group = deep.groups.back().id;
+        expect(motion::validGroupHierarchy(deep));
+        expectEquals(static_cast<int>(motion::PreparedComposition(deep).clips.size()), 1);
+    }
+
     void testTrackStates(const motion::Project& sourceProject) {
         beginTest("Mute and solo exclude tracks from signal and drawing allocation");
         auto project = sourceProject;

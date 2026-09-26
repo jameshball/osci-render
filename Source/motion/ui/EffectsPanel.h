@@ -13,6 +13,7 @@ public:
         scope.addItem("Clip", 1);
         scope.addItem("Track", 2);
         scope.addItem("Composition", 3);
+        scope.addItem("Group", 4);
         scope.setSelectedId(1, juce::dontSendNotification);
         scope.onChange = [this] { cancelGesture(); selected = 0; refresh(); notifySelection(); };
         stack.setRowHeight(30);
@@ -48,6 +49,8 @@ public:
         explicitTrack = false;
         clipId = id;
         trackId = 0;
+        const auto* group = motion::findGroup(processor.document.project(), id);
+        if (group != nullptr) { scope.setSelectedId(4, juce::dontSendNotification); }
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) { if (clip.id == id) { trackId = track.id; } }
         }
@@ -56,7 +59,18 @@ public:
     }
     motion::Id ownerId() const {
         if (scope.getSelectedId() == 3) { return 0; }
-        if (scope.getSelectedId() == 1) { return clipId; }
+        if (scope.getSelectedId() == 1) { return motion::findGroup(processor.document.project(), clipId) == nullptr ? clipId : 0; }
+        if (scope.getSelectedId() == 4) {
+            if (explicitTrack) {
+                for (const auto& track : processor.document.project().tracks) { if (track.id == trackId) { return track.group; } }
+                return 0;
+            }
+            if (motion::findGroup(processor.document.project(), clipId) != nullptr) { return clipId; }
+            for (const auto& track : processor.document.project().tracks) {
+                for (const auto& clip : track.clips) { if (clip.id == clipId) { return track.group; } }
+            }
+            return 0;
+        }
         if (explicitTrack) { return trackId; }
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) { if (clip.id == clipId) { return track.id; } }
@@ -80,6 +94,7 @@ public:
                 if (clip.id == id) { choice = 1; clipId = id; trackId = track.id; }
             }
         }
+        if (motion::findGroup(project, id) != nullptr) { choice = 4; clipId = id; }
         scope.setSelectedId(choice, juce::dontSendNotification);
         selected = effectId;
         refresh();

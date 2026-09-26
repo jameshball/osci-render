@@ -2,6 +2,7 @@
 
 #include "../MotionProcessor.h"
 #include "TrackHeader.h"
+#include "TrackLayout.h"
 #include <optional>
 #include <limits>
 
@@ -34,21 +35,30 @@ public:
     static constexpr int rowHeight = 40;
 
     void refreshTracks() {
-        const auto& tracks = processor.document.project().tracks;
+        const auto& project = processor.document.project();
+        if (layoutGeneration != processor.document.generation()) { collapsedGroups.clear(); layoutGeneration = processor.document.generation(); }
         std::erase_if(headers, [&](const auto& header) {
-            return std::none_of(tracks.begin(), tracks.end(), [&](const auto& track) { return track.id == header->id; });
+            return motion::findGroup(project, header->id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) { return track.id == header->id; });
         });
-        for (const auto& track : tracks) {
+        const auto updateHeader = [&](const motion::Track& track, bool group) {
             auto found = std::find_if(headers.begin(), headers.end(), [&](const auto& header) { return header->id == track.id; });
             if (found == headers.end()) {
                 auto header = std::make_unique<MotionTrackHeader>(track.id);
                 header->onRename = [this](motion::Id id, std::string name) {
                     if (name.empty()) { refreshTracks(); return; }
                     processor.document.edit("Rename track", [id, name](motion::Project& project) {
+                        auto* group = motion::findGroup(project, id);
+                        if (group != nullptr) { group->name = name; }
                         for (auto& item : project.tracks) { if (item.id == id) { item.name = name; } }
                     });
                 };
                 header->onMenu = [this](motion::Id id) { showTrackMenu(id); };
+                header->onSelect = [this](motion::Id id) { if (motion::findGroup(processor.document.project(), id) != nullptr) { selectClip(id); } };
+                header->onCollapse = [this](motion::Id id) {
+                    if (collapsedGroups.contains(id)) { collapsedGroups.erase(id); } else { collapsedGroups.insert(id); }
+                    refreshTracks();
+                    selectClip(id);
+                };
                 header->onDragRevision = [this] { return processor.document.revision(); };
                 header->onMute = [this](motion::Id id) { toggleTrack(id, false); };
                 header->onSolo = [this](motion::Id id) { toggleTrack(id, true); };
@@ -56,21 +66,28 @@ public:
                 headers.push_back(std::move(header));
                 found = headers.end() - 1;
             }
-            (*found)->update(track);
+            (*found)->update(track, group, collapsedGroups.contains(track.id));
+        };
+        for (const auto& track : project.tracks) { updateHeader(track, false); }
+        for (const auto& group : project.groups) {
+            motion::Track display;
+            display.id = group.id; display.name = group.name; display.muted = group.muted; display.solo = group.solo;
+            updateHeader(display, true);
         }
+        rows = motion::trackRows(project, collapsedGroups);
         resized();
         repaint();
     }
     void resized() override {
         addTrack.setBounds(namesWidth - 27, 2, 24, rulerHeight - 4);
-        const auto& tracks = processor.document.project().tracks;
-        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(tracks.size()) - 1));
+        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
         for (auto& header : headers) {
-            const auto found = std::find_if(tracks.begin(), tracks.end(), [&](const auto& track) { return track.id == header->id; });
-            const auto row = static_cast<int>(found - tracks.begin());
+            const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id; });
+            const auto row = static_cast<int>(found - rows.begin());
             const auto y = rowY(row);
-            header->setVisible(found != tracks.end() && y >= rulerHeight && y < getHeight());
-            header->setBounds(0, y, namesWidth - 1, rowHeight - 1);
+            header->setVisible(found != rows.end() && y >= rulerHeight && y < getHeight());
+            const auto indent = found != rows.end() ? std::min(48, found->depth * 8) : 0;
+            header->setBounds(indent, y, namesWidth - 1 - indent, rowHeight - 1);
         }
     }
     bool isInterestedInDragSource(const SourceDetails& details) override {
@@ -82,6 +99,7 @@ public:
     void itemDragMove(const SourceDetails& details) override {
         dropPosition = details.localPosition;
         dropTrack = details.description.toString().startsWith("motion-track:");
+        if (dropTrack && details.localPosition.y < rulerHeight) { dropPosition.reset(); repaint(); return; }
         dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
         dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
         repaint();
@@ -94,6 +112,7 @@ public:
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
         if (details.description.toString().startsWith("motion-track:")) {
+            if (details.localPosition.y < rulerHeight) { repaint(); return; }
             const auto revision = static_cast<std::uint64_t>(details.description.toString().fromLastOccurrenceOf(":", false, false).getLargeIntValue());
             if (revision != processor.document.revision()) { repaint(); return; }
             reorderTrack(static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), details.localPosition.y);
@@ -114,9 +133,10 @@ public:
         if (asset == project.assets.end()) {
             return;
         }
-        const auto time = x < 0 ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
+        const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
         const auto snapped = std::round(time * project.frameRate) / project.frameRate;
-        const auto row = y < rulerHeight ? -1 : (y - rulerHeight) / rowHeight + scrollRows;
+        const auto row = trackAtY(y);
+        const auto group = groupAtY(y);
         auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
         const auto id = clip.id;
         if (row >= 0 && row < static_cast<int>(project.tracks.size()) && !project.tracks[row].canPlace(clip)) {
@@ -130,6 +150,7 @@ public:
             } else {
                 motion::Track track;
                 track.id = trackId;
+                track.group = group;
                 track.name = clip.name;
                 track.insert(std::move(clip));
                 updated.tracks.push_back(std::move(track));
@@ -177,10 +198,9 @@ public:
         toolArrow.addTriangle(namesWidth - 47.0f, 11.0f, namesWidth - 39.0f, 11.0f, namesWidth - 43.0f, 15.0f);
         g.fillPath(toolArrow);
         const auto& tracks = processor.document.project().tracks;
-        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(tracks.size()) - 1));
-        const auto anySolo = std::any_of(tracks.begin(), tracks.end(), [](const auto& track) { return track.solo; });
-        for (int index = scrollRows; index < static_cast<int>(tracks.size()); ++index) {
-            const auto y = rowY(index);
+        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+        for (int visible = scrollRows; visible < static_cast<int>(rows.size()); ++visible) {
+            const auto y = rowY(visible);
             if (y >= getHeight()) {
                 break;
             }
@@ -188,9 +208,31 @@ public:
             g.fillRect(0, y, namesWidth - 1, rowHeight - 1);
             g.setColour(osci::Colours::text());
 
+            const auto index = rows[visible].track;
+            if (index < 0) {
+                g.setColour(osci::Colours::dark().withAlpha(0.25f));
+                g.fillRect(namesWidth, y, getWidth() - namesWidth, rowHeight - 1);
+                juce::Graphics::ScopedSaveState summaryScope(g);
+                g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, rowHeight);
+                for (const auto& track : tracks) {
+                    auto parent = track.group;
+                    for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
+                        if (parent == rows[visible].id) {
+                            g.setColour(osci::Colours::accentColor().withAlpha(motion::trackIsAudible(processor.document.project(), track) ? 0.35f : 0.1f));
+                            for (const auto& clip : track.clips) {
+                                g.fillRoundedRectangle(static_cast<float>(timeX(clip.start)), y + rowHeight * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(clip.duration * pixelsPerSecond))), 6, 2);
+                            }
+                            break;
+                        }
+                        const auto* group = motion::findGroup(processor.document.project(), parent);
+                        parent = group != nullptr ? group->parent : 0;
+                    }
+                }
+                continue;
+            }
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, rowHeight);
-            const auto opacity = tracks[index].muted || (anySolo && !tracks[index].solo) ? 0.38f : 1.0f;
+            const auto opacity = !motion::trackIsAudible(processor.document.project(), tracks[index]) ? 0.38f : 1.0f;
             for (const auto& clip : tracks[index].clips) {
                 const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 4);
                 const auto active = clip.id == selected;
@@ -216,19 +258,23 @@ public:
         }
         if (dropPosition.has_value() && dropTrack) {
             g.setColour(osci::Colours::accentColor());
-            const auto boundary = std::clamp((dropPosition->y - rulerHeight + rowHeight / 2) / rowHeight + scrollRows, 0, static_cast<int>(tracks.size()));
-            g.fillRect(0, rowY(boundary) - 1, getWidth(), 2);
+            const auto boundary = std::clamp((dropPosition->y - rulerHeight + rowHeight / 2) / rowHeight + scrollRows, 0, static_cast<int>(rows.size()));
+            if (groupAtY(dropPosition->y) != 0) { g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), rowHeight, 2); } else { g.fillRect(0, rowY(boundary) - 1, getWidth(), 2); }
         } else if (dropPosition.has_value() && !dropEffect.empty()) {
             int row = 0;
             const auto* clip = clipAt(*dropPosition, row);
-            if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = (dropPosition->y - rulerHeight) / rowHeight + scrollRows; }
-            if (row >= 0 && row < static_cast<int>(tracks.size()) && (clip != nullptr || dropPosition->x < namesWidth)) {
-                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, rowY(row), namesWidth, rowHeight);
+            if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = trackAtY(dropPosition->y); }
+            const auto group = groupAtY(dropPosition->y);
+            if (group != 0) {
+                g.setColour(osci::Colours::accentColor());
+                g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), rowHeight, 2);
+            } else if (row >= 0 && row < static_cast<int>(tracks.size()) && (clip != nullptr || dropPosition->x < namesWidth)) {
+                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, rowHeight);
                 g.setColour(osci::Colours::accentColor());
                 g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
             }
         } else if (dropPosition.has_value()) {
-            const auto row = std::clamp((dropPosition->y - rulerHeight) / rowHeight + scrollRows, 0, static_cast<int>(tracks.size()));
+            const auto row = trackAtY(dropPosition->y);
             const auto time = std::max(0.0, scrollTime + (dropPosition->x - namesWidth) / pixelsPerSecond);
             motion::Clip candidate;
             candidate.id = std::numeric_limits<motion::Id>::max();
@@ -238,8 +284,8 @@ public:
             if (asset != assets.end()) {
                 candidate = motion::Document::makeClip(candidate.id, **asset, candidate.start);
             }
-            const auto allowed = asset != assets.end() && (row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate));
-            const auto bounds = clipBounds(candidate, row).toFloat().reduced(1, 4);
+            const auto allowed = asset != assets.end() && (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate));
+            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), rowHeight)).toFloat().reduced(1, 4);
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
             g.setColour((allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080)).withAlpha(0.2f));
@@ -286,6 +332,8 @@ public:
             seek(event.x);
             return;
         }
+        const auto group = groupAtY(event.y);
+        if (group != 0) { selectClip(group); return; }
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
         if (clip == nullptr) {
@@ -352,7 +400,7 @@ public:
             }
         }
         const auto target = mode == Mode::move
-            ? std::clamp((event.y - rulerHeight) / rowHeight + scrollRows, 0, static_cast<int>(before->tracks.size()) - 1) : originalRow;
+            ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : originalRow) : originalRow;
         const bool candidateChanged = candidate.start != original.start || candidate.duration != original.duration
             || candidate.offset != original.offset || candidate.rate != original.rate || target != originalRow;
         if (!candidateChanged) {
@@ -402,7 +450,7 @@ public:
         } else if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY)) {
             scrollTime = std::max(0.0, scrollTime - (wheel.deltaX + wheel.deltaY) * 8);
         } else {
-            const auto last = std::max(0, static_cast<int>(processor.document.project().tracks.size()) - 1);
+            const auto last = std::max(0, static_cast<int>(rows.size()) - 1);
             scrollRows = std::clamp(scrollRows + (wheel.deltaY < 0 ? 1 : -1), 0, last);
         }
         resized();
@@ -455,39 +503,110 @@ public:
     }
 
 private:
+    void createGroup(motion::Id trackId, motion::Id parent) {
+        motion::Group group;
+        group.id = processor.document.newId();
+        group.name = "Group " + std::to_string(processor.document.project().groups.size() + 1);
+        group.parent = parent;
+        auto candidate = processor.document.project();
+        candidate.groups.push_back(group);
+        if (!motion::validGroupHierarchy(candidate)) { return; }
+        processor.document.edit("Create group", [group, trackId](motion::Project& project) {
+            project.groups.push_back(group);
+            for (auto& track : project.tracks) { if (track.id == trackId) { track.group = group.id; } }
+        });
+        refreshTracks();
+        selectClip(group.id);
+    }
+    void showGroupMenu(motion::Id id) {
+        const auto* group = motion::findGroup(processor.document.project(), id);
+        if (group == nullptr) { return; }
+        juce::PopupMenu menu;
+        menu.addSectionHeader(juce::String(group->name));
+        menu.addItem(1, "Edit group");
+        menu.addItem(2, "Add track to group");
+        menu.addItem(3, "Add nested group");
+        menu.addSeparator();
+        menu.addItem(4, "Delete group and its tracks");
+        const auto generation = processor.document.generation();
+        const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
+            if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || motion::findGroup(owner->processor.document.project(), id) == nullptr) { return; }
+            owner->cancelGesture();
+            if (result == 1) { owner->selectClip(id); return; }
+            if (result == 3) { owner->createGroup(0, id); return; }
+            if (result == 2) {
+                motion::Track track;
+                track.id = owner->processor.document.newId(); track.group = id; track.name = "New track";
+                owner->processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
+            } else if (result == 4) {
+                owner->processor.document.edit("Delete group", [id](motion::Project& project) {
+                    std::set<motion::Id> removed { id };
+                    for (std::size_t depth = 0; depth < motion::maximumGroupDepth; ++depth) {
+                        for (const auto& group : project.groups) { if (removed.contains(group.parent)) { removed.insert(group.id); } }
+                    }
+                    std::erase_if(project.tracks, [&](const auto& track) { return removed.contains(track.group); });
+                    std::erase_if(project.groups, [&](const auto& group) { return removed.contains(group.id); });
+                });
+            }
+            owner->refreshTracks();
+        });
+    }
     void showTrackMenu(motion::Id id) {
+        if (motion::findGroup(processor.document.project(), id) != nullptr) { showGroupMenu(id); return; }
         const auto& tracks = processor.document.project().tracks;
         const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
         if (found == tracks.end()) { return; }
         juce::PopupMenu menu;
         menu.addSectionHeader(juce::String(found->name));
-        menu.addItem(1, "Move track up", found != tracks.begin());
-        menu.addItem(2, "Move track down", found + 1 != tracks.end());
+        menu.addItem(1, "Move track up", std::any_of(tracks.begin(), found, [&](const auto& track) { return track.group == found->group; }));
+        menu.addItem(2, "Move track down", std::any_of(found + 1, tracks.end(), [&](const auto& track) { return track.group == found->group; }));
+        menu.addItem(4, "Group track");
+        std::vector<motion::Id> groups { 0 };
+        juce::PopupMenu destinations;
+        destinations.addItem(100, "Root", true, found->group == 0);
+        for (const auto& group : processor.document.project().groups) {
+            groups.push_back(group.id);
+            destinations.addItem(100 + static_cast<int>(groups.size()) - 1, juce::String(group.name), true, found->group == group.id);
+        }
+        menu.addSubMenu("Move to group", destinations);
         menu.addSeparator();
         menu.addItem(3, "Delete track");
         const auto generation = processor.document.generation();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, groups](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
             owner->cancelGesture();
             const auto& current = owner->processor.document.project().tracks;
             const auto track = std::find_if(current.begin(), current.end(), [id](const auto& item) { return item.id == id; });
             if (track == current.end()) { return; }
             const auto index = static_cast<int>(track - current.begin());
-            if (result == 3) {
+            if (result == 4) { owner->createGroup(id, track->group); return; }
+            if (result >= 100 && result - 100 < static_cast<int>(groups.size())) {
+                owner->placeTrack(id, index, groups[result - 100]);
+            } else if (result == 3) {
                 owner->processor.document.edit("Delete track", [id](motion::Project& project) {
                     std::erase_if(project.tracks, [id](const auto& item) { return item.id == id; });
                 });
                 owner->refreshTracks();
             } else {
-                const auto boundary = result == 1 ? index - 1 : index + 2;
-                owner->reorderTrack(id, owner->rowY(boundary));
+                const auto direction = result == 1 ? -1 : 1;
+                for (int candidate = index + direction; candidate >= 0 && candidate < static_cast<int>(current.size()); candidate += direction) {
+                    if (current[candidate].group == track->group) {
+                        owner->placeTrack(id, candidate + (direction > 0 ? 1 : 0), track->group);
+                        break;
+                    }
+                }
             }
         });
     }
     void toggleTrack(motion::Id id, bool solo) {
         cancelGesture();
         processor.document.edit(solo ? "Toggle track solo" : "Toggle track mute", [id, solo](motion::Project& project) {
+            auto* group = motion::findGroup(project, id);
+            if (group != nullptr) {
+                if (solo) { group->solo = !group->solo; } else { group->muted = !group->muted; }
+            }
             for (auto& track : project.tracks) {
                 if (track.id == id) {
                     if (solo) { track.solo = !track.solo; } else { track.muted = !track.muted; }
@@ -495,21 +614,32 @@ private:
             }
         });
     }
-    void reorderTrack(motion::Id id, int y) {
+    void placeTrack(motion::Id id, int boundary, motion::Id group) {
         cancelGesture();
-        const auto& tracks = processor.document.project().tracks;
+        const auto& project = processor.document.project();
+        if (group != 0 && motion::findGroup(project, group) == nullptr) { return; }
+        const auto& tracks = project.tracks;
         const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
         if (found == tracks.end()) { return; }
         const auto source = static_cast<int>(found - tracks.begin());
-        auto destination = std::clamp((y - rulerHeight + rowHeight / 2) / rowHeight + scrollRows, 0, static_cast<int>(tracks.size()));
+        auto destination = std::clamp(boundary, 0, static_cast<int>(tracks.size()));
         if (destination > source) { --destination; }
-        if (source == destination) { return; }
-        processor.document.edit("Reorder track", [source, destination](motion::Project& project) {
+        if (source == destination && found->group == group) { return; }
+        processor.document.edit("Reorder track", [source, destination, group](motion::Project& project) {
             auto track = std::move(project.tracks[source]);
+            track.group = group;
             project.tracks.erase(project.tracks.begin() + source);
             project.tracks.insert(project.tracks.begin() + destination, std::move(track));
         });
+        collapsedGroups.erase(group);
         refreshTracks();
+    }
+    void reorderTrack(motion::Id id, int y) {
+        const auto& tracks = processor.document.project().tracks;
+        const auto row = trackAtY(y);
+        const auto group = groupAtY(y);
+        const auto boundary = row >= 0 ? row + (y - trackY(row) >= rowHeight / 2 ? 1 : 0) : static_cast<int>(tracks.size());
+        placeTrack(id, boundary, group != 0 ? group : (row >= 0 ? tracks[row].group : 0));
     }
     void insertEffect(const std::string& type, juce::Point<int> position) {
         const auto* definition = motion::effectDefinition(type);
@@ -517,9 +647,10 @@ private:
         int row = 0;
         const auto* clip = clipAt(position, row);
         const auto& tracks = processor.document.project().tracks;
-        if (position.x < namesWidth) { row = (position.y - rulerHeight) / rowHeight + scrollRows; }
-        if (row < 0 || row >= static_cast<int>(tracks.size()) || (clip == nullptr && position.x >= namesWidth)) { return; }
-        const auto owner = clip != nullptr ? clip->id : tracks[row].id;
+        if (position.x < namesWidth) { row = trackAtY(position.y); }
+        const auto group = groupAtY(position.y);
+        if (group == 0 && (row < 0 || row >= static_cast<int>(tracks.size()) || (clip == nullptr && position.x >= namesWidth))) { return; }
+        const auto owner = group != 0 ? group : (clip != nullptr ? clip->id : tracks[row].id);
         const auto* effects = motion::findEffectOwner(processor.document.project(), owner);
         if (effects == nullptr || effects->size() >= motion::maximumEffectsPerOwner) { return; }
         if (clip != nullptr) { selectClip(clip->id); }
@@ -617,7 +748,7 @@ private:
         if (position.x < namesWidth || position.y < rulerHeight) {
             return nullptr;
         }
-        row = (position.y - rulerHeight) / rowHeight + scrollRows;
+        row = trackAtY(position.y);
         const auto& tracks = processor.document.project().tracks;
         if (row < 0 || row >= static_cast<int>(tracks.size())) {
             return nullptr;
@@ -636,10 +767,23 @@ private:
         }
         return juce::roundToInt(std::clamp(value, -limit, limit));
     }
+    int visualRowAt(int y) const { return y < rulerHeight ? -1 : (y - rulerHeight) / rowHeight + scrollRows; }
+    int trackAtY(int y) const {
+        const auto row = visualRowAt(y);
+        return row >= 0 && row < static_cast<int>(rows.size()) ? rows[row].track : -1;
+    }
+    motion::Id groupAtY(int y) const {
+        const auto row = visualRowAt(y);
+        return row >= 0 && row < static_cast<int>(rows.size()) && rows[row].group() ? rows[row].id : 0;
+    }
+    int trackY(int track) const {
+        const auto found = std::find_if(rows.begin(), rows.end(), [track](const auto& row) { return row.track == track; });
+        return found == rows.end() ? -rowHeight : rowY(static_cast<int>(found - rows.begin()));
+    }
     int timeX(double time) const { return namesWidth + boundedPixel((time - scrollTime) * pixelsPerSecond); }
     int rowY(int row) const { return rulerHeight + (row - scrollRows) * rowHeight; }
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const {
-        return { timeX(clip.start), rowY(row), std::max(2, boundedPixel(clip.duration * pixelsPerSecond)), rowHeight };
+        return { timeX(clip.start), trackY(row), std::max(2, boundedPixel(clip.duration * pixelsPerSecond)), rowHeight };
     }
     void seek(int x) {
         processor.seek(std::clamp(scrollTime + (x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration));
@@ -648,6 +792,9 @@ private:
     juce::TextButton addTrack;
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
     bool dropTrack = false;
+    std::vector<motion::TrackRow> rows;
+    std::set<motion::Id> collapsedGroups;
+    std::uint64_t layoutGeneration = 0;
     MotionProcessor& processor;
     std::optional<motion::Project> before;
     motion::Clip original;

@@ -422,6 +422,10 @@ void Document::reset(Project project) {
         }
     };
     updateEffects(project.effects);
+    for (const auto& group : project.groups) {
+        lastId = std::max(lastId, group.id);
+        updateEffects(group.effects);
+    }
     for (const auto& asset : project.assets) {
         lastId = std::max(lastId, asset->id);
     }
@@ -548,6 +552,18 @@ juce::XmlElement Document::save() const {
     xml.setAttribute("fps", state.frameRate);
     xml.setAttribute("bpm", state.bpm);
     saveEffects(xml, state.effects);
+    for (const auto& group : state.groups) {
+        auto* item = xml.createNewChildElement("group");
+        item->setAttribute("id", juce::String(group.id));
+        item->setAttribute("name", juce::String(group.name));
+        item->setAttribute("parent", juce::String(group.parent));
+        item->setAttribute("muted", group.muted);
+        item->setAttribute("solo", group.solo);
+        saveEffects(*item, group.effects);
+        for (const auto& [name, curve] : group.properties) {
+            saveProperty(*item, name, curve);
+        }
+    }
     for (const auto& asset : state.assets) {
         auto* item = xml.createNewChildElement("asset");
         item->setAttribute("id", juce::String(asset->id));
@@ -562,6 +578,7 @@ juce::XmlElement Document::save() const {
         row->setAttribute("muted", track.muted);
         row->setAttribute("solo", track.solo);
         row->setAttribute("locked", track.locked);
+        row->setAttribute("group", juce::String(track.group));
         saveEffects(*row, track.effects);
         for (const auto& clip : track.clips) {
             auto* item = row->createNewChildElement("clip");
@@ -614,6 +631,39 @@ juce::Result Document::load(const juce::XmlElement& xml) {
     if (projectEffects.failed()) {
         return projectEffects;
     }
+    for (auto* item : xml.getChildWithTagNameIterator("group")) {
+        Group group;
+        const auto identity = item->getStringAttribute("id").getLargeIntValue();
+        const auto parent = item->getStringAttribute("parent", "0").getLargeIntValue();
+        if (identity <= 0 || parent < 0 || !identities.insert(static_cast<Id>(identity)).second) {
+            return juce::Result::fail("Invalid or duplicate group identity.");
+        }
+        group.id = static_cast<Id>(identity);
+        group.parent = static_cast<Id>(parent);
+        group.name = item->getStringAttribute("name", "Group").toStdString();
+        group.muted = item->getBoolAttribute("muted", false);
+        group.solo = item->getBoolAttribute("solo", false);
+        const auto effects = loadEffects(*item, group.effects, identities);
+        if (effects.failed()) {
+            return effects;
+        }
+        std::set<std::string> properties;
+        for (auto* property : item->getChildWithTagNameIterator("property")) {
+            const auto name = property->getStringAttribute("name").toStdString();
+            const auto found = group.properties.find(name);
+            if (found == group.properties.end() || !properties.insert(name).second) {
+                return juce::Result::fail("Unknown or duplicate group property.");
+            }
+            const auto result = loadProperty(*property, found->second);
+            if (result.failed()) {
+                return result;
+            }
+        }
+        if (!group.valid()) {
+            return juce::Result::fail("Invalid group transform, tint or drawing weight.");
+        }
+        project.groups.push_back(std::move(group));
+    }
     for (auto* item : xml.getChildWithTagNameIterator("asset")) {
         auto asset = std::make_shared<Asset>();
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
@@ -639,6 +689,11 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         track.muted = row->getBoolAttribute("muted", false);
         track.solo = row->getBoolAttribute("solo", false);
         track.locked = row->getBoolAttribute("locked", false);
+        const auto groupIdentity = row->getStringAttribute("group", "0").getLargeIntValue();
+        if (groupIdentity < 0) {
+            return juce::Result::fail("Invalid track group identity.");
+        }
+        track.group = static_cast<Id>(groupIdentity);
         if (track.id == 0 || !identities.insert(track.id).second) {
             return juce::Result::fail("Invalid track identity.");
         }
@@ -721,6 +776,9 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         if (project.cameraCuts[index].start < project.cameraCuts[index - 1].end()) {
             return juce::Result::fail("Camera cuts must not overlap.");
         }
+    }
+    if (!validGroupHierarchy(project)) {
+        return juce::Result::fail("Groups require existing parents and track references, no cycles, and at most 32 nesting levels.");
     }
     reset(std::move(project));
     return juce::Result::ok();

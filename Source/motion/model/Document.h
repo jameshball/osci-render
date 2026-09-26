@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "Timeline.h"
 #include "Camera.h"
+#include "Group.h"
 #include "PreparedSource.h"
 #include <atomic>
 #include "../../audio/synth/PreparedDrawing.h"
@@ -27,6 +28,7 @@ struct Project {
     std::vector<Camera> cameras;
     std::vector<CameraCut> cameraCuts;
     std::vector<EffectInstance> effects;
+    std::vector<Group> groups;
 };
 
 // Editable state belongs to the message thread. Undo copies clip/curve values

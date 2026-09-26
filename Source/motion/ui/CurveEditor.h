@@ -427,6 +427,10 @@ private:
                 }
             }
         }
+        if (!target.isEffect && !target.camera) {
+            if (propertyName == "red" || propertyName == "green" || propertyName == "blue") { return std::clamp(value, 0.0, 1.0); }
+            if (propertyName == "weight") { return std::clamp(value, 0.0, 1000000.0); }
+        }
         return target.camera && propertyName == "fov" ? std::clamp(value, 0.001, 179.999) : value;
     }
 

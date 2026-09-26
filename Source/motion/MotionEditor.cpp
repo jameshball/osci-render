@@ -406,16 +406,20 @@ void MotionEditor::refreshInspector() {
         }
     }
     splitButton.setEnabled(canSplitClip(selected, processor.position.load()));
-    selectionLabel.setText(selected == nullptr ? "No object selected" : juce::String(selected->name), juce::dontSendNotification);
+    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
+    const bool editable = target.has_value() && !target->camera && !target->isEffect;
+    selectionLabel.setText(editable ? juce::String(target->name.data(), target->name.size()) : "No object selected", juce::dontSendNotification);
+    const auto tabName = editable && target->isGroup ? "Group" : "Object";
+    if (inspectorTabs.getTabNames()[0] != tabName) { inspectorTabs.setTabName(0, tabName); }
     updatingInspector = true;
     for (std::size_t index = 0; index < values.size(); ++index) {
-        values[index].setEnabled(selected != nullptr);
-        keyButtons[index].setEnabled(selected != nullptr);
-        if (selected != nullptr && !values[index].isBeingEdited()) {
-            const auto found = selected->properties.find(motion::propertyNames[index]);
-            if (found != selected->properties.end()) {
-                values[index].setText(juce::String(found->second.evaluate(selected->localTime(processor.position.load())), 2), juce::dontSendNotification);
-                const auto time = selected->localTime(processor.position.load());
+        values[index].setEnabled(editable);
+        keyButtons[index].setEnabled(editable);
+        if (editable && !values[index].isBeingEdited()) {
+            const auto found = target->properties->find(motion::propertyNames[index]);
+            if (found != target->properties->end()) {
+                values[index].setText(juce::String(found->second.evaluate(target->localTime(processor.position.load())), 2), juce::dontSendNotification);
+                const auto time = target->localTime(processor.position.load());
                 const auto& keys = found->second.keyframes();
                 const auto keyed = std::any_of(keys.begin(), keys.end(), [time](const auto& key) { return std::abs(key.time - time) < 1.0e-6; });
                 keyButtons[index].setState(keyed ? osci::KeyframeButton::State::keyed
@@ -447,18 +451,15 @@ void MotionEditor::setProperty(int index, bool keyframe) {
     if (!std::isfinite(value)) {
         return;
     }
+    if (index >= 9) { value = std::clamp(value, 0.0, index == 12 ? 1000000.0 : 1.0); }
     processor.document.edit(keyframe ? "Set keyframe" : "Change property", [&](motion::Project& project) {
-        for (auto& track : project.tracks) {
-            for (auto& clip : track.clips) {
-                if (clip.id == selection) {
-                    auto& curve = clip.properties[motion::propertyNames[index]];
-                    if (keyframe || curve.animated()) {
-                        curve.setKeyValue(clip.localTime(time), value);
-                    } else {
-                        curve.base = value;
-                    }
-                }
-            }
+        const auto updated = motion::findPropertyTarget(project, selection);
+        auto* curve = updated.has_value() ? updated->curve(motion::propertyNames[index]) : nullptr;
+        if (curve == nullptr) { return; }
+        if (keyframe || curve->animated()) {
+            curve->setKeyValue(updated->localTime(time), value);
+        } else {
+            curve->base = value;
         }
     });
 }
