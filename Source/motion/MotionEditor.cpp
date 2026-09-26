@@ -76,6 +76,21 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &splitButton, &timeLabel, &selectionLabel, &curveEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
         addAndMakeVisible(component);
     }
+    addAndMakeVisible(navigateView);
+    addAndMakeVisible(frameView);
+    navigateView.setName("Navigate composition view");
+    navigateView.setWantsKeyboardFocus(false);
+    navigateView.setMouseClickGrabsKeyboardFocus(false);
+    navigateView.setTooltip("Explore the scene with the mouse and WASD or arrow keys. Esc finishes. This does not change the output camera. Shortcut: N.");
+    navigateView.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
+    navigateView.onClick = [this] { composition.setNavigating(!composition.isNavigating()); };
+    composition.onNavigationChanged = [this](bool active) {
+        navigateView.setToggleState(active, juce::dontSendNotification);
+        navigateView.setButtonText(active ? "Done" : viewportHeader.getWidth() >= 230 ? "Navigate" : "3D");
+    };
+    frameView.setName("Frame composition selection");
+    frameView.setTooltip("Frame the selected object, or all visible objects. Shortcut: F. Press 0 in the preview to reset the view.");
+    frameView.onClick = [this] { composition.frameSelection(); };
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
     addChildComponent(modulationPanel);
@@ -372,6 +387,12 @@ void MotionEditor::resized() {
     visualiser.setBounds(output);
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
+    auto viewControls = viewportHeader.getBounds().reduced(5, 3);
+    const auto fullViewControls = viewportHeader.getWidth() >= 230;
+    frameView.setVisible(fullViewControls);
+    if (fullViewControls) { frameView.setBounds(viewControls.removeFromRight(36)); viewControls.removeFromRight(3); }
+    navigateView.setBounds(viewControls.removeFromRight(fullViewControls ? 76 : 40));
+    navigateView.setButtonText(composition.isNavigating() ? "Done" : fullViewControls ? "Navigate" : "3D");
     composition.setBounds(editing.withTrimmedTop(3));
 }
 

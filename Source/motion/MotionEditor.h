@@ -55,6 +55,7 @@ private:
     double timelineFraction = 0.34, previewFraction = 0.5;
     double dividerStart = 0;
     int previewWidth = 1, workspaceHeight = 1;
+    juce::TextButton navigateView { "Navigate" }, frameView { "Fit" };
     juce::TextButton importButton { "Import" };
     juce::TextButton playButton { "Play" };
     juce::TextButton splitButton { "Split" };
