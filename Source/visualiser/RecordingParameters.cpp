@@ -1,6 +1,16 @@
 #include "RecordingParameters.h"
 #include "RecordingStateMigration.h"
 
+int RecordingParameters::getCRF() const {
+    if (losslessVideo.getBoolValue()) {
+        return 0;
+    }
+    const double quality = juce::jlimit(0.0f, 1.0f, qualityEffect->getValue());
+    // Round canonical CRF values back to themselves despite float storage error.
+    // CRF 0 remains reserved for the explicit lossless setting.
+    return juce::roundToInt(50.0 * (1.0 - quality) + 1.0);
+}
+
 RecordingParameters::RecordingParameters() {
     qualityParameter.disableLfo();
     qualityParameter.disableSidechain();

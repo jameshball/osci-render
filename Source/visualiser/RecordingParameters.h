@@ -7,6 +7,7 @@
 class RecordingParameters {
 public:
     RecordingParameters();
+    int getCRF() const;
 
 private:
 

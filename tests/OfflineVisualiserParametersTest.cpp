@@ -7,6 +7,26 @@ public:
     OfflineVisualiserParametersTest() : juce::UnitTest("Offline beam parameter ownership", "Motion") {}
 
     void runTest() override {
+        beginTest("Every canonical CRF survives quality conversion and binary serialization");
+        {
+            RecordingParameters recording, restored;
+            for (int crf = 0; crf <= 51; ++crf) {
+                recording.losslessVideo.setBoolValue(crf == 0);
+                const auto quality = crf == 0 ? .37f : static_cast<float>((51.0 - crf) / 50.0);
+                recording.qualityParameter.setUnnormalisedValueNotifyingHost(quality);
+                expectEquals(recording.getCRF(), crf, "Before save, CRF " + juce::String(crf));
+                juce::XmlElement state("recording-state");
+                recording.save(&state);
+                juce::MemoryBlock binary;
+                juce::AudioProcessor::copyXmlToBinary(state, binary);
+                const auto decoded = juce::AudioProcessor::getXmlFromBinary(binary.getData(), static_cast<int>(binary.getSize()));
+                expect(decoded != nullptr);
+                if (decoded != nullptr) {
+                    restored.load(decoded.get());
+                    expectEquals(restored.getCRF(), crf, "After load, CRF " + juce::String(crf));
+                }
+            }
+        }
         beginTest("Beam and recording settings survive actual binary project serialization");
         {
             OfflineVisualiserParameters source, restored;
