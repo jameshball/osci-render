@@ -224,4 +224,41 @@ struct Track {
     }
 };
 
+// Editor-thread operation: apply a shared project-time displacement atomically.
+// Track displacement is in model rows; callers with collapsed groups translate
+// their visible-row gesture before invoking this operation.
+inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, double bpm) {
+    if (ids.empty() || !std::isfinite(seconds) || !std::isfinite(bpm) || bpm < 1 || bpm > 1000) { return false; }
+    auto unique = ids;
+    std::sort(unique.begin(), unique.end());
+    if (unique.front() == 0 || std::adjacent_find(unique.begin(), unique.end()) != unique.end()) { return false; }
+    struct Placement { std::size_t row; Clip clip; };
+    std::vector<Placement> moving;
+    moving.reserve(ids.size());
+    for (std::size_t row = 0; row < tracks.size(); ++row) {
+        for (const auto& clip : tracks[row].clips) {
+            if (!std::binary_search(unique.begin(), unique.end(), clip.id)) { continue; }
+            const auto destination = static_cast<std::int64_t>(row) + trackDelta;
+            if (tracks[row].locked || destination < 0 || destination >= static_cast<std::int64_t>(tracks.size())) { return false; }
+            const auto target = static_cast<std::size_t>(destination);
+            if (tracks[target].locked || tracks[target].kind != tracks[row].kind) { return false; }
+            auto candidate = clip;
+            auto timing = candidate.timing(bpm);
+            timing.moveTo(timing.start + seconds);
+            if (!candidate.setTiming(timing, bpm)) { return false; }
+            moving.push_back({target, std::move(candidate)});
+        }
+    }
+    if (moving.size() != ids.size()) { return false; }
+    auto updated = tracks;
+    for (auto& track : updated) {
+        std::erase_if(track.clips, [&](const auto& clip) { return std::binary_search(unique.begin(), unique.end(), clip.id); });
+    }
+    for (auto& placement : moving) {
+        if (!updated[placement.row].insert(std::move(placement.clip), bpm)) { return false; }
+    }
+    tracks = std::move(updated);
+    return true;
+}
+
 }
