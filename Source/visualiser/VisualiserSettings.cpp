@@ -159,7 +159,18 @@ void VisualiserSettings::setTransparencyControlEnabled(bool enabled) {
 }
 
 void VisualiserSettings::paint(juce::Graphics& g) {
-    g.fillAll(osci::Colours::darker());
+    g.fillAll(backgroundColour);
+}
+
+void VisualiserSettings::setSurfaceColours(juce::Colour background, juce::Colour section) {
+    backgroundColour = background;
+    for (auto* child : getChildren()) {
+        auto* settingsSection = dynamic_cast<SettingsSection*>(child);
+        if (settingsSection != nullptr) {
+            settingsSection->setColour(osci::groupComponentBackgroundColourId, section);
+        }
+    }
+    repaint();
 }
 
 void VisualiserSettings::updateScreenOverlayItemsEnabled() {

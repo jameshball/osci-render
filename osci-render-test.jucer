@@ -36,6 +36,10 @@
             resource="0" file="tests/LuaOfflinePolicyTest.cpp"/>
       <FILE id="MotionDocT" name="MotionDocumentTest.cpp" compile="1" resource="0"
             file="tests/MotionDocumentTest.cpp"/>
+      <FILE id="RecParamsH" name="RecordingParameters.h" compile="0" resource="0"
+            file="Source/visualiser/RecordingParameters.h"/>
+      <FILE id="RecParamsC" name="RecordingParameters.cpp" compile="1" resource="0"
+            file="Source/visualiser/RecordingParameters.cpp"/>
       <FILE id="OfflineBeamT" name="OfflineVisualiserParametersTest.cpp"
             compile="1" resource="0" file="tests/OfflineVisualiserParametersTest.cpp"/>
       <FILE id="MotionDocC" name="Document.cpp" compile="1" resource="0"

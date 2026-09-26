@@ -1,11 +1,67 @@
 #include <JuceHeader.h>
 #include "../Source/visualiser/OfflineVisualiserParameters.h"
+#include "../Source/visualiser/VisualiserState.h"
 
 class OfflineVisualiserParametersTest : public juce::UnitTest {
 public:
     OfflineVisualiserParametersTest() : juce::UnitTest("Offline beam parameter ownership", "Motion") {}
 
     void runTest() override {
+        beginTest("Beam and recording settings survive actual binary project serialization");
+        {
+            OfflineVisualiserParameters source, restored;
+            RecordingParameters recording, restoredRecording;
+            source.params.intensityEffect->setValue(7.5f);
+            source.params.hueEffect->setValue(240.0f);
+            source.params.audioEffects.front()->parameters.front()->setValue(.35f);
+            source.params.sweepEnabled->setBoolValue(true);
+            source.params.integers.front()->setUnnormalisedValueNotifyingHost(1);
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
+            source.params.upsamplingEnabled->setBoolValue(true);
+            restored.params.upsamplingEnabled->setBoolValue(false);
+#endif
+            recording.setCanvasSize({1920, 1080});
+            recording.qualityParameter.setUnnormalisedValueNotifyingHost(.83f);
+            recording.frameRate.setUnnormalisedValueNotifyingHost(24);
+            recording.compressionPreset = "slow";
+            recording.losslessAudio.setBoolValue(true);
+            recording.recordAudio.setBoolValue(false);
+            juce::XmlElement project("motion-project");
+            VisualiserState::save(project, source.params, recording);
+            expect(project.getChildByName("beam") != nullptr && project.getChildByName("recording") != nullptr);
+            expect(project.getChildByName("effects") == nullptr && project.getChildByName("floatParameters") == nullptr);
+            juce::MemoryBlock binary;
+            juce::AudioProcessor::copyXmlToBinary(project, binary);
+            const auto decoded = juce::AudioProcessor::getXmlFromBinary(binary.getData(), static_cast<int>(binary.getSize()));
+            expect(decoded != nullptr);
+            if (decoded != nullptr) {
+                VisualiserState::load(*decoded, restored.params, restoredRecording);
+                expectEquals(restored.params.intensityEffect->getValue(), 7.5f);
+                expectEquals(restored.params.hueEffect->getValue(), 240.0f);
+                expectWithinAbsoluteError(restored.params.audioEffects.front()->parameters.front()->getValue(), .35f, 1e-6f);
+                expect(restored.params.sweepEnabled->getBoolValue());
+                expectEquals(restored.params.integers.front()->getValueUnnormalised(), 1);
+#if OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING
+                expect(restored.params.upsamplingEnabled->getBoolValue());
+#endif
+                expectEquals(restoredRecording.getCanvasSize().width, 1920);
+                expectEquals(restoredRecording.getCanvasSize().height, 1080);
+                expectWithinAbsoluteError(restoredRecording.qualityParameter.getValueUnnormalised(), .83f, 1e-6f);
+                expectEquals(restoredRecording.frameRate.getValueUnnormalised(), 24.0f);
+                expect(restoredRecording.losslessAudio.getBoolValue() && !restoredRecording.recordAudio.getBoolValue());
+                expectEquals(restoredRecording.compressionPreset, juce::String("slow"));
+                // Loading snaps values to the parameter step; normalized defaults
+                // may differ by a float ULP even when the authored value is intact.
+                for (std::size_t effect = 0; effect < source.params.effects.size(); ++effect) {
+                    const auto& before = source.params.effects[effect]->parameters;
+                    const auto& after = restored.params.effects[effect]->parameters;
+                    expectEquals(static_cast<int>(before.size()), static_cast<int>(after.size()));
+                    for (std::size_t parameter = 0; parameter < std::min(before.size(), after.size()); ++parameter) {
+                        expectWithinAbsoluteError(after[parameter]->getValueUnnormalised(), before[parameter]->getValueUnnormalised(), 1e-5f);
+                    }
+                }
+            }
+        }
         beginTest("Offline snapshots copy authored effects and LFOs into independently owned storage");
         std::shared_ptr<OfflineVisualiserParameters> snapshot;
         {

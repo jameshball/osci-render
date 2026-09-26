@@ -30,7 +30,7 @@ public:
         quality.setRange(1, 100, 1);
         quality.setValue(std::clamp(100.0 - (config.crf - 1) * 2.0, 1.0, 100.0));
         soundtrack.setButtonText("Include stereo soundtrack");
-        soundtrack.setToggleState(true, juce::dontSendNotification);
+        soundtrack.setToggleState(config.includeAudio, juce::dontSendNotification);
         note.setText(config.preserveAlpha ? "Transparent background: ProRes 4444 with alpha."
                                          : "Renders the complete composition with the current beam style.", juce::dontSendNotification);
         note.setJustificationType(juce::Justification::topLeft);

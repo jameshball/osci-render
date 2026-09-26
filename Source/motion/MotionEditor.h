@@ -52,6 +52,7 @@ private:
     void refreshTiming();
     void refreshOutputChoices();
     MotionProcessor& processor;
+    SettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, 550, 500, 1500 };
     MotionTimelineView timeline;
     MotionCompositionView composition;
     MotionAssetLibrary assetLibrary;

@@ -311,6 +311,10 @@
               file="Source/components/ModulationState.cpp"/>
       </GROUP>
       <GROUP id="{04ACA01B-2ADE-8356-BF1E-32942E0F3CFA}" name="visualiser">
+        <FILE id="RecParamsH" name="RecordingParameters.h" compile="0" resource="0"
+              file="Source/visualiser/RecordingParameters.h"/>
+        <FILE id="RecParamsC" name="RecordingParameters.cpp" compile="1" resource="0"
+              file="Source/visualiser/RecordingParameters.cpp"/>
         <FILE id="Hw3RUp" name="RecordingSettings.cpp" compile="1" resource="0"
               file="Source/visualiser/RecordingSettings.cpp"/>
         <FILE id="dAhaYq" name="RecordingSettings.h" compile="0" resource="0"

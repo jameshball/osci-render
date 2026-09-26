@@ -59,6 +59,18 @@ bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
+    visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
+    beamSettingsWindow.setLookAndFeel(&lookAndFeel);
+    beamSettingsWindow.setBackgroundColour(osci::Colours::veryDark());
+    visualiser.openSettings = [this] {
+        beamSettingsWindow.setVisible(true);
+        beamSettingsWindow.toFront(true);
+    };
+    visualiser.closeSettings = [this] { beamSettingsWindow.setVisible(false); };
+    beamSettingsWindow.addKeyListener(this);
+#if JUCE_MAC || JUCE_WINDOWS
+    beamSettingsWindow.setUsingNativeTitleBar(true);
+#endif
     menus.addTopLevelMenu("File");
     menus.addProjectMenuItems(0, processor, *this);
     menus.addMenuSeparator(0);
@@ -371,6 +383,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
 
 MotionEditor::~MotionEditor() {
     stopTimer();
+    visualiser.openSettings = {};
+    visualiser.closeSettings = {};
+    beamSettingsWindow.removeKeyListener(this);
+    beamSettingsWindow.setLookAndFeel(nullptr);
     curveEditor.onPreview = {};
     processor.previewComposition(processor.document.project());
     processor.document.removeChangeListener(this);
@@ -877,6 +893,14 @@ void MotionEditor::exportVideo() {
                     return;
                 }
                 owner->processor.setLastOpenedDirectory(destination.getParentDirectory());
+                auto& recording = owner->processor.recordingParameters;
+                recording.setCanvasSize(config.renderSize);
+                recording.frameRate.setUnnormalisedValueNotifyingHost(static_cast<float>(config.frameRate));
+                recording.qualityParameter.setUnnormalisedValueNotifyingHost(static_cast<float>((51.0 - config.crf) / 50.0));
+                recording.losslessVideo.setBoolValue(config.crf == 0);
+                recording.recordAudio.setBoolValue(config.includeAudio);
+                recording.videoCodec = config.codec;
+                recording.compressionPreset = config.compressionPreset;
                 juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, destination] {
                     if (owner == nullptr) { return; }
                     state->videoWithAudio = config.includeAudio;

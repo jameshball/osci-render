@@ -1,6 +1,7 @@
 #include "MotionProcessor.h"
 #include "MotionEditor.h"
 #include "render/SampleClock.h"
+#include "../visualiser/VisualiserState.h"
 
 MotionProcessor::MotionProcessor()
     : CommonAudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
@@ -155,6 +156,7 @@ void MotionProcessor::getStateInformation(juce::MemoryBlock& destination) {
     project.setAttribute("schema", 1);
     saveStandaloneProjectFilePathToXml(project);
     saveProperties(project);
+    VisualiserState::save(project, visualiserParameters, recordingParameters);
     project.addChildElement(new juce::XmlElement(document.save()));
     copyXmlToBinary(project, destination);
 }
@@ -165,12 +167,10 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
         return;
     }
     const auto* compositionXml = project->getChildByName("composition");
-    if (compositionXml != nullptr) {
-        const auto result = document.load(*compositionXml);
-        if (result.failed()) {
-            return;
-        }
-    }
+    if (compositionXml == nullptr) { return; }
+    const auto result = document.load(*compositionXml);
+    if (result.failed()) { return; }
+    VisualiserState::load(*project, visualiserParameters, recordingParameters);
     restoreStandaloneProjectFilePathFromXml(*project);
     loadProperties(*project);
     getUndoManager().clearUndoHistory();

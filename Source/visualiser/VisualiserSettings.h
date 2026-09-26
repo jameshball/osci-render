@@ -75,6 +75,7 @@ public:
     void wireModulation(OscirenderAudioProcessor& processor);
 #endif
     void setTransparencyControlEnabled(bool enabled);
+    void setSurfaceColours(juce::Colour background, juce::Colour section);
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -90,6 +91,7 @@ public:
     std::function<void()> onUpgradeRequested;
 
 private:
+    juce::Colour backgroundColour = osci::Colours::darker();
     struct LayoutItem {
         juce::Component* component;
         int height;
