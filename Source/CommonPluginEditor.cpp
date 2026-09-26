@@ -535,7 +535,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
         juce::FileBrowserComponent::canSelectFiles;
 
     juce::Component::SafePointer<CommonPluginEditor> safeThis(this);
-    offlineRenderLog.event("input selection opened");
+    offlineRenderLog.event("input selection requested");
     chooser->launchAsync(openFlags, [safeThis](const juce::FileChooser& inputChooser) {
         if (safeThis == nullptr) {
             offlineRenderLog.cancelled("input selection because editor closed");
@@ -552,126 +552,139 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
         safeThis->audioProcessor.setLastOpenedDirectory(inputFile.getParentDirectory());
 
-        // Step 2: choose output video file (default: inputName + codec extension)
-        const auto encodingConfiguration = safeThis->recordingSettings.createVideoEncodingConfiguration();
-        const auto& ext = encodingConfiguration.fileExtension;
-        const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
-            inputFile.getFileNameWithoutExtension() + "." + ext);
-
-        safeThis->chooser = std::make_unique<juce::FileChooser>(
-            "Choose an output video file",
-            suggestedOutput,
-            "*." + ext);
-
-        auto saveFlags = juce::FileBrowserComponent::saveMode |
-            juce::FileBrowserComponent::canSelectFiles |
-            juce::FileBrowserComponent::warnAboutOverwriting;
-
-        offlineRenderLog.event("output selection opened");
-        safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, encodingConfiguration](const juce::FileChooser& outputChooser) {
+        // Defer the next native dialog until the input callback has returned, avoiding
+        // overlapping its launch with JUCE's modal-dialog teardown on Windows.
+        juce::MessageManager::callAsync([safeThis, inputFile] {
             if (safeThis == nullptr) {
                 offlineRenderLog.cancelled("output selection because editor closed");
                 return;
             }
 
-            auto outputFile = outputChooser.getResult();
-            if (outputFile == juce::File()) {
-                offlineRenderLog.cancelled("output selection");
-                return;
-            }
+            // Step 2: choose output video file (default: inputName + codec extension)
+            const auto encodingConfiguration = safeThis->recordingSettings.createVideoEncodingConfiguration();
+            const auto& ext = encodingConfiguration.fileExtension;
+            const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
+                inputFile.getFileNameWithoutExtension() + "." + ext);
 
-            if (encodingConfiguration.preserveAlpha) {
-                outputFile = outputFile.withFileExtension("mov");
-            } else if (outputFile.getFileExtension().isEmpty()) {
-                outputFile = outputFile.withFileExtension(ext);
-            }
+            safeThis->chooser = std::make_unique<juce::FileChooser>(
+                "Choose an output video file",
+                suggestedOutput,
+                "*." + ext);
 
-            offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
-            safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
+            auto saveFlags = juce::FileBrowserComponent::saveMode |
+                juce::FileBrowserComponent::canSelectFiles |
+                juce::FileBrowserComponent::warnAboutOverwriting;
 
-            // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
-            if (!safeThis->audioProcessor.ensureFFmpegExists()) {
-                offlineRenderLog.event("render deferred", "FFmpeg unavailable");
-                return;
-            }
-
-            offlineRenderLog.event("FFmpeg ready");
-
-            // Stop any live recording and pause the main visualiser.
-            if (safeThis->audioProcessor.haltRecording != nullptr)
-                safeThis->audioProcessor.haltRecording();
-
-            const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
-            const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
-
-            // Make the plugin output silent and skip heavy processing during offline render.
-            safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
-            safeThis->audioProcessor.setOfflineRenderActive(true);
-
-            auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
-            auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
-
-            auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
-                safeThis->audioProcessor,
-                safeThis->audioProcessor.visualiserParameters,
-                safeThis->audioProcessor.threadManager,
-                inputFile,
-                outputFile,
-                safeThis->visualiser.getRenderMode(),
-                encodingConfiguration);
-
-            content->setSize(700, 520);
-
-            content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile](OfflineAudioToVideoRendererComponent::Result r) {
+            offlineRenderLog.event("output selection requested", "file=" + suggestedOutput.getFileName()
+                + " parentExists=" + juce::String(suggestedOutput.getParentDirectory().isDirectory() ? "yes" : "no"));
+            const auto selectionStarted = juce::Time::getMillisecondCounterHiRes();
+            safeThis->chooser->launchAsync(saveFlags, [safeThis, inputFile, ext, encodingConfiguration, selectionStarted](const juce::FileChooser& outputChooser) {
+                offlineRenderLog.event("output selection returned", "elapsedMs=" + juce::String(juce::Time::getMillisecondCounterHiRes() - selectionStarted, 0));
                 if (safeThis == nullptr) {
-                    offlineRenderLog.cancelled("result delivery because editor closed");
+                    offlineRenderLog.cancelled("output selection because editor closed");
                     return;
                 }
 
-                *resultHolder = r;
-
-                if (r.success) {
-                    offlineRenderLog.completed();
-                    safeThis->audioProcessor.recordingExportCompleted(outputFile);
-                } else if (r.cancelled) {
-                    offlineRenderLog.cancelled("render");
-                } else {
-                    offlineRenderLog.failed("render", r.errorMessage);
-                }
-
-                if (auto* overlay = overlayHolder->getComponent()) {
-                    overlay->requestDismiss();
-                }
-            });
-
-            auto* contentPtr = content.get();
-            const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
-            auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
-            *overlayHolder = overlay.get();
-
-            overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
-                if (safeThis == nullptr) {
+                auto outputFile = outputChooser.getResult();
+                if (outputFile == juce::File()) {
+                    offlineRenderLog.event("output selection ended", "no file returned (cancelled or native dialog failed)");
                     return;
                 }
 
-                safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
-                safeThis->offlineRenderPreviousActiveState.reset();
-                safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
-                safeThis->visualiser.setPaused(wasVisualiserPaused, false);
+                if (encodingConfiguration.preserveAlpha) {
+                    outputFile = outputFile.withFileExtension("mov");
+                } else if (outputFile.getFileExtension().isEmpty()) {
+                    outputFile = outputFile.withFileExtension(ext);
+                }
 
-                if (resultHolder != nullptr && resultHolder->has_value()) {
-                    const auto& r = resultHolder->value();
-                    if (!r.success && !r.cancelled) {
-                        osci::showOverlayMessage(*safeThis.getComponent(),
-                                                 "Render Failed",
-                                                 r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+                offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
+                safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
+
+                // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
+                if (!safeThis->audioProcessor.ensureFFmpegExists()) {
+                    offlineRenderLog.event("render deferred", "FFmpeg unavailable");
+                    return;
+                }
+
+                offlineRenderLog.event("FFmpeg ready");
+
+                // Stop any live recording and pause the main visualiser.
+                if (safeThis->audioProcessor.haltRecording != nullptr) {
+                    safeThis->audioProcessor.haltRecording();
+                }
+
+                const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
+                const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
+
+                // Make the plugin output silent and skip heavy processing during offline render.
+                safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
+                safeThis->audioProcessor.setOfflineRenderActive(true);
+
+                auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
+                auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
+
+                auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
+                    safeThis->audioProcessor,
+                    safeThis->audioProcessor.visualiserParameters,
+                    safeThis->audioProcessor.threadManager,
+                    inputFile,
+                    outputFile,
+                    safeThis->visualiser.getRenderMode(),
+                    encodingConfiguration);
+
+                content->setSize(700, 520);
+
+                content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile](OfflineAudioToVideoRendererComponent::Result r) {
+                    if (safeThis == nullptr) {
+                        offlineRenderLog.cancelled("result delivery because editor closed");
+                        return;
                     }
-                }
-            };
 
-            safeThis->showOverlay(std::move(overlay));
-            offlineRenderLog.event("render UI opened");
-            contentPtr->start();
+                    *resultHolder = r;
+
+                    if (r.success) {
+                        offlineRenderLog.completed();
+                        safeThis->audioProcessor.recordingExportCompleted(outputFile);
+                    } else if (r.cancelled) {
+                        offlineRenderLog.cancelled("render");
+                    } else {
+                        offlineRenderLog.failed("render", r.errorMessage);
+                    }
+
+                    if (auto* overlay = overlayHolder->getComponent()) {
+                        overlay->requestDismiss();
+                    }
+                });
+
+                auto* contentPtr = content.get();
+                const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
+                auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
+                *overlayHolder = overlay.get();
+
+                overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
+                    if (safeThis == nullptr) {
+                        return;
+                    }
+
+                    safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
+                    safeThis->offlineRenderPreviousActiveState.reset();
+                    safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
+                    safeThis->visualiser.setPaused(wasVisualiserPaused, false);
+
+                    if (resultHolder != nullptr && resultHolder->has_value()) {
+                        const auto& r = resultHolder->value();
+                        if (!r.success && !r.cancelled) {
+                            osci::showOverlayMessage(*safeThis.getComponent(),
+                                                     "Render Failed",
+                                                     r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+                        }
+                    }
+                };
+
+                safeThis->showOverlay(std::move(overlay));
+                offlineRenderLog.event("render UI opened");
+                contentPtr->start();
+            });
         });
     });
 #endif
