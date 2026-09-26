@@ -294,6 +294,51 @@ private:
             expect(document.newId() == marker + 1);
             expect(document.project().tracks[0].clips.size() == 2);
         }
+        beginTest("Selection duplication preserves relative seconds across tracks and time bases");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            auto project = initial;
+            project.tracks[0].clips.resize(1);
+            project.tracks[0].clips[0].start = 1;
+            project.tracks[0].clips[0].duration = 2;
+            auto second = project.tracks[0];
+            second.id = 300;
+            second.clips[0].id = 301;
+            second.clips[0].start = 2;
+            second.clips[0].duration = 3;
+            second.clips[0].anchorToBeats(project.bpm);
+            second.clips[0].effects.push_back(motion::makeEffect(302, *motion::effectDefinition("rotate")));
+            project.tracks.push_back(second);
+            document.reset(project);
+            std::vector<motion::Id> copies;
+            expect(document.duplicateClips({project.tracks[0].clips[0].id, 301}, copies).wasOk());
+            expectEquals(static_cast<int>(copies.size()), 2);
+            const auto& firstCopy = document.project().tracks[0].clips.back();
+            const auto& secondCopy = document.project().tracks[1].clips.back();
+            expectWithinAbsoluteError(firstCopy.timing(project.bpm).start, 5.0, 1e-12);
+            expectWithinAbsoluteError(secondCopy.timing(project.bpm).start, 6.0, 1e-12);
+            expect(secondCopy.timeBase == second.clips[0].timeBase);
+            expect(secondCopy.effects[0].id != 302 && secondCopy.id != firstCopy.id);
+            expectEquals(firstCopy.properties.at("position.x").evaluate(.75), 2.0);
+            expect(undo.undo());
+            expect(document.project().tracks[0].clips.size() == 1 && document.project().tracks[1].clips.size() == 1);
+            expect(undo.redo());
+            expect(document.project().tracks[1].clips.back().id == copies[1]);
+            // A collision on the second track must not publish the first copy,
+            // consume IDs, or create an undo action.
+            undo.clearUndoHistory();
+            project.tracks[1].clips.push_back(second.clips[0]);
+            project.tracks[1].clips.back().id = 303;
+            project.tracks[1].clips.back().start += project.tracks[1].clips.back().duration;
+            document.reset(project);
+            const auto revision = document.revision();
+            const auto marker = document.newId();
+            expect(document.duplicateClips({project.tracks[0].clips[0].id, 301}, copies).failed());
+            expect(copies.empty() && document.revision() == revision && !undo.canUndo());
+            expect(document.project().tracks[0].clips.size() == 1);
+            expect(document.newId() == marker + 1);
+        }
         beginTest("Identity exhaustion rejects duplication without wrapping IDs");
         juce::UndoManager undo;
         motion::Document document(undo);

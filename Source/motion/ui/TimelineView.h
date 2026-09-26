@@ -423,7 +423,11 @@ public:
             const auto* clip = clipAt(event.getPosition(), row);
             if (clip != nullptr) {
                 const auto id = clip->id;
-                selectClip(id);
+                if (!selectedClips.contains(id)) {
+                    selectClip(id);
+                } else {
+                    notifySelection(id);
+                }
                 showClipMenu(id);
             } else { showToolMenu(); }
             return;
@@ -658,10 +662,13 @@ public:
 private:
     void duplicateClip(motion::Id id) {
         cancelGesture();
-        motion::Id duplicate = 0;
-        const auto result = processor.document.duplicateClip(id, duplicate);
+        std::vector<motion::Id> duplicates;
+        const auto sources = selectedClips.contains(id) ? std::vector<motion::Id>(selectedClips.begin(), selectedClips.end()) : std::vector<motion::Id>{id};
+        const auto result = processor.document.duplicateClips(sources, duplicates);
         if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
-        selectClip(duplicate);
+        selectedClips = {duplicates.begin(), duplicates.end()};
+        const auto duplicate = duplicates.front();
+        notifySelection(duplicate);
         revealSelection();
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) {
@@ -671,7 +678,7 @@ private:
     }
     void showClipMenu(motion::Id id) {
         juce::PopupMenu menu;
-        menu.addItem(1, "Duplicate clip");
+        menu.addItem(1, selectedClips.size() > 1 ? "Duplicate clips" : "Duplicate clip");
         menu.addItem(2, "Edit clip timing");
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();

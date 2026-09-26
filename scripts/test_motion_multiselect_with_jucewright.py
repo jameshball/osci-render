@@ -64,6 +64,21 @@ try:
     assert not saved_clips()
     step("undo both deletions", "click", "--name", "Undo", "--exact")
     assert len(saved_clips()) == 2
-    print("Multi-clip move/delete/undo UI workflow passed", flush=True)
+    step("select originals for duplication", "click", "--class", "MotionTimelineView", "--position", "230,46")
+    step("extend duplicate selection", "click", "--class", "MotionTimelineView", "--position", "230,86", "--modifiers", "shift")
+    original_ids = {c.get("id") for c in saved_clips()}
+    step("duplicate selection", "press", "command + d", "--class", "MotionTimelineView")
+    duplicated = saved_clips()
+    assert len(duplicated) == 4
+    copies = [c for c in duplicated if c.get("id") not in original_ids]
+    assert len(copies) == 2 and all(float(c.get("start")) == 5 for c in copies)
+    step("duplicated selection", "screenshot", "--file", session.artifact_dir / "selection-duplicated.png")
+    step("delete just the copies", "press", "Backspace", "--class", "MotionTimelineView")
+    assert {c.get("id") for c in saved_clips()} == original_ids
+    step("undo copy deletion", "click", "--name", "Undo", "--exact")
+    assert len(saved_clips()) == 4
+    step("undo selection duplication", "click", "--name", "Undo", "--exact")
+    assert {c.get("id") for c in saved_clips()} == original_ids
+    print("Multi-clip move/duplicate/delete/undo UI workflow passed", flush=True)
 finally:
     session.stop_app()
