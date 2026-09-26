@@ -506,7 +506,8 @@ void VisualiserComponent::setRecording(bool recording) {
                     }
                     osci::showOverlayMessage(*safeThis.getComponent(),
                                              "Save Recording Failed",
-                                             "Could not write:\n" + destination.getFullPathName());
+                                             "Couldn't save the recording to:\n" + destination.getFullPathName()
+                                                 + "\n\nCheck that the drive has enough free space and that you can save files in this folder.");
                     return;
                 }
                 safeThis->audioProcessor.setLastOpenedDirectory(destination.getParentDirectory());
