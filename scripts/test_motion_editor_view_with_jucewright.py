@@ -95,7 +95,34 @@ try:
     assert [property_value("position." + axis) for axis in "xyz"] == initial
     step("independent view screenshot", "screenshot", "--file", session.artifact_dir / "independent-view.png")
     step("reset view after zoom", "press", "0", "--class", "MotionCompositionView")
+    tree = snapshot()
+    bounds = next(n["bounds"] for n in nodes(tree) if n.get("class") == "MotionCompositionView")
+    cx, cy = bounds["x"] + bounds["w"] / 2, bounds["y"] + bounds["h"] / 2
+    radius = min(72, max(35, bounds["w"] * 0.2))
+    step("choose scale tool", "press", "S", "--class", "MotionCompositionView")
+    step("scale all axes", "drag-xy", round(cx), round(cy), round(cx + 100), round(cy), "--steps", 15)
+    assert all(abs(property_value("scale." + axis) - 2) < 0.02 for axis in "xyz")
+    step("undo uniform scale", "click", "--name", "Undo", "--exact")
+    assert all(property_value("scale." + axis) == 1 for axis in "xyz")
+    step("scale X only", "drag-xy", round(cx + radius), round(cy), round(cx + radius + 50), round(cy), "--steps", 12)
+    assert abs(property_value("scale.x") - 2 ** 0.5) < 0.02
+    assert property_value("scale.y") == property_value("scale.z") == 1
+    step("undo axis scale", "click", "--name", "Undo", "--exact")
+    step("choose rotation tool", "press", "R", "--class", "MotionCompositionView")
+    step("rotate Z quarter turn", "drag-xy", round(cx + radius), round(cy), round(cx), round(cy - radius), "--steps", 24)
+    assert abs(property_value("rotation.z") - 90) < 1
+    assert property_value("rotation.x") == property_value("rotation.y") == 0
+    step("rotation screenshot", "screenshot", "--file", session.artifact_dir / "rotation.png")
+    step("undo rotation", "click", "--name", "Undo", "--exact")
+    step("choose move tool", "press", "G", "--class", "MotionCompositionView")
+    step("move along X handle", "drag-xy", round(cx + radius), round(cy), round(cx + radius + 30), round(cy), "--steps", 12)
+    assert property_value("position.x") > 0.05
+    assert property_value("position.y") == property_value("position.z") == 0
+    step("undo constrained move", "click", "--name", "Undo", "--exact")
+    command("wait", "--ms", 600)
     step("final workspace screenshot", "screenshot", "--file", session.artifact_dir / "workspace.png")
+    step("compact workspace", "resize-window", "--w", 1100, "--h", 700)
+    step("compact workspace screenshot", "screenshot", "--file", session.artifact_dir / "compact.png")
     print("Motion editor view workflow passed", flush=True)
 finally:
     session.stop_app()

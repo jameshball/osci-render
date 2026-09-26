@@ -3,6 +3,8 @@
 #include "../MotionProcessor.h"
 #include "EditorCamera.h"
 #include "EditorTransformFrame.h"
+#include "CompositionGizmo.h"
+#include "TransformGizmo.h"
 #include "../model/PropertyTarget.h"
 
 class MotionCompositionView : public juce::Component, private juce::Timer {
@@ -18,6 +20,15 @@ public:
     }
     motion::Id selected = 0;
     std::function<void(bool)> onNavigationChanged;
+    std::function<void(MotionTransformTool)> onToolChanged;
+    void setTool(MotionTransformTool value) {
+        cancelGesture();
+        tool = value;
+        hoverHandle = -1;
+        dragHint.clear();
+        if (onToolChanged) { onToolChanged(tool); }
+        repaint();
+    }
     bool isNavigating() const { return navigating; }
     void setNavigating(bool enabled) {
         if (navigating == enabled) { return; }
@@ -73,10 +84,14 @@ public:
             drawWorldLine(g, { static_cast<double>(line), -5, 0 }, { static_cast<double>(line), 5, 0 });
             drawWorldLine(g, { -5, static_cast<double>(line), 0 }, { 5, static_cast<double>(line), 0 });
         }
+        g.setColour(osci::Colours::veryDark());
+        g.fillRect(getLocalBounds().removeFromBottom(30));
         g.setColour(osci::Colours::textMuted());
         g.setFont(12.0f);
         const auto help = navigating ? "WASD / arrows | Q E up/down | Shift faster | Esc finish"
-            : dragHint.isNotEmpty() ? dragHint : "Editor view | Alt-drag orbit | Scroll zoom | F frame";
+            : dragHint.isNotEmpty() ? dragHint : tool == MotionTransformTool::scale ? "Drag centre to scale all axes | S scale | Esc cancel"
+            : tool == MotionTransformTool::rotate ? "Drag a coloured ring | R rotate | Esc cancel"
+            : "Drag arrows to move | G move | Alt-drag orbit";
         g.drawFittedText(help, getLocalBounds().removeFromBottom(30).reduced(10, 0), juce::Justification::centredLeft, 2);
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
@@ -84,6 +99,8 @@ public:
             g.drawText(processor.document.project().tracks.empty() ? "Drop an object here" : "No visible objects", getLocalBounds(), juce::Justification::centred);
             return;
         }
+        juce::Graphics::ScopedSaveState sceneState(g);
+        g.reduceClipRegion(getLocalBounds().withTrimmedBottom(30));
         const auto time = processor.position.load();
         for (const auto& clip : prepared->clips) {
             if (!clip.active(time)) {
@@ -102,6 +119,7 @@ public:
                 previous = next;
             }
         }
+        currentGizmo().paint(g, before.has_value() ? dragAxis : hoverHandle);
     }
 
     void mouseDown(const juce::MouseEvent& event) override {
@@ -109,12 +127,32 @@ public:
         grabKeyboardFocus();
         cancelGesture();
         dragHint.clear();
+        if (event.position.y >= getHeight() - 30) { repaint(); return; }
         navigationDrag = event.mods.isAltDown() || event.mods.isMiddleButtonDown();
         panDrag = event.mods.isShiftDown();
         cameraAtDown = camera;
         down = event.position;
         if (navigationDrag) { return; }
         if (!event.mods.isLeftButtonDown() || prepared == nullptr) {
+            return;
+        }
+        const auto gizmo = currentGizmo();
+        const auto handle = gizmo.hitTest(event.position);
+        if (handle >= 0) {
+            dragAnchor = gizmoFrame->parent.worldOrigin;
+            if (beginGesture(processor.position.load())) {
+                dragAxis = handle;
+                gesture = tool == MotionTransformTool::move ? (handle == 3 ? Gesture::plane : Gesture::moveAxis)
+                    : tool == MotionTransformTool::rotate ? Gesture::rotateAxis
+                    : handle == 3 ? Gesture::uniformScale : Gesture::scaleAxis;
+                if (handle < 3) {
+                    dragDirection = gizmo.axes[handle].direction;
+                    if (!gizmo.axes[handle].points.empty()) { scaleScreenAxis = gizmo.axes[handle].points.back() - gizmo.origin; }
+                }
+                lastRotationPointer = normalized(event.position);
+                rotationDelta = 0;
+            }
+            repaint();
             return;
         }
         float nearest = 18;
@@ -139,37 +177,10 @@ public:
         if (onSelection) {
             onSelection(hit);
         }
-        if (hit != 0) {
-            for (const auto& track : processor.document.project().tracks) {
-                if (track.locked && std::any_of(track.clips.begin(), track.clips.end(), [hit](const auto& clip) { return clip.id == hit; })) {
-                    dragHint = "This object's track is locked";
-                    repaint();
-                    return;
-                }
-            }
-            transformFrame = motion::editor::clipTransformFrame(processor.document.project(), hit, time);
-            if (!transformFrame.has_value() || transformFrame->hasPostTransformEffects) {
-                dragHint = "Use Position controls for this transformed result";
-                repaint();
-                return;
-            }
-            const auto clip = motion::findPropertyTarget(processor.document.project(), hit);
-            if (!clip.has_value()) { return; }
-            for (const auto* property : { "position.x", "position.y", "position.z" }) {
-                const auto* curve = clip->curve(property);
-                if (curve != nullptr && curve->modulation.enabled) {
-                    dragHint = "Use Position controls while position is modulated";
-                    repaint();
-                    return;
-                }
-            }
-            processor.playing.store(false);
-            editTime = time;
-            editSelection = selected;
-            before = processor.document.project();
-            editRevision = processor.document.revision();
-            down = event.position;
-            changed = false;
+        if (hit != 0 && tool == MotionTransformTool::move) {
+            gesture = Gesture::plane;
+            dragAxis = 3;
+            beginGesture(time);
         }
         repaint();
     }
@@ -184,31 +195,67 @@ public:
             repaint();
             return;
         }
-        if (!validGesture() || !transformFrame.has_value()) { return; }
-        const auto worldDelta = camera.translationOnFacingPlane(normalized(down), normalized(event.position), dragAnchor);
-        if (!worldDelta.has_value()) { return; }
-        const auto delta = transformFrame->positionDelta(*worldDelta);
-        if (!delta.has_value()) { return; }
-        auto project = *before;
-        for (auto& track : project.tracks) {
-            for (auto& clip : track.clips) {
-                if (clip.id == editSelection) {
-                    const auto time = clip.localTime(editTime);
-                    for (const auto& [name, offset] : { std::pair { "position.x", delta->x }, std::pair { "position.y", delta->y }, std::pair { "position.z", delta->z } }) {
-                        if (offset == 0) { continue; }
-                        auto& curve = clip.properties[name];
-                        const auto value = curve.evaluateBase(time) + offset;
-                        if (!std::isfinite(value)) { return; }
-                        if (curve.animated()) {
-                            curve.setKeyValue(time, value);
-                        } else {
-                            curve.base = value;
-                        }
-                    }
-                }
+        if (!validGesture() || !gizmoAtDown.has_value()) { return; }
+        std::array<double, 3> offsets { 0, 0, 0 };
+        double scaleFactor = 1;
+        if (gesture == Gesture::plane || gesture == Gesture::moveAxis) {
+            std::optional<motion::editor::Vec3> worldDelta;
+            if (gesture == Gesture::plane) {
+                worldDelta = cameraAtDown.translationOnFacingPlane(normalized(down), normalized(event.position), dragAnchor);
+            } else {
+                const auto distance = motion::editor::gizmo::axisDragDistance(cameraAtDown, normalized(down), normalized(event.position), gizmoAtDown->parent.worldOrigin, dragDirection);
+                if (distance.has_value()) { worldDelta = dragDirection * *distance; }
             }
+            if (!worldDelta.has_value()) { return; }
+            const auto delta = gizmoAtDown->parent.positionDelta(*worldDelta);
+            if (!delta.has_value()) { return; }
+            offsets = { delta->x, delta->y, delta->z };
+            // An axis handle edits only its authored position channel, avoiding
+            // numerical cross-axis keys after inverse rotated parent transforms.
+            if (gesture == Gesture::moveAxis) {
+                for (int axis = 0; axis < 3; ++axis) { if (axis != dragAxis) { offsets[axis] = 0; } }
+            }
+        } else if (gesture == Gesture::rotateAxis) {
+            const auto first = cameraAtDown.ray(lastRotationPointer), last = cameraAtDown.ray(normalized(event.position));
+            if (!first.has_value() || !last.has_value()) { return; }
+            const auto firstLocal = gizmoAtDown->rotationRay(*first, dragAxis), lastLocal = gizmoAtDown->rotationRay(*last, dragAxis);
+            if (!firstLocal.has_value() || !lastLocal.has_value()) { return; }
+            const std::array<motion::editor::Vec3, 3> axes { motion::editor::Vec3 { 1, 0, 0 }, motion::editor::Vec3 { 0, 1, 0 }, motion::editor::Vec3 { 0, 0, 1 } };
+            const auto delta = motion::editor::gizmo::rotationDragAngle(*firstLocal, *lastLocal, {}, axes[dragAxis]);
+            if (!delta.has_value()) { return; }
+            rotationDelta += *delta;
+            lastRotationPointer = normalized(event.position);
+            offsets[dragAxis] = rotationDelta * 180 / std::numbers::pi;
+        } else {
+            const auto screenDelta = event.position - down;
+            const auto distance = gesture == Gesture::uniformScale ? screenDelta.x - screenDelta.y
+                : (screenDelta.x * scaleScreenAxis.x + screenDelta.y * scaleScreenAxis.y) / scaleScreenAxis.getDistanceFromOrigin();
+            const auto factor = motion::editor::gizmo::uniformScaleFactor(distance);
+            if (!factor.has_value()) { return; }
+            scaleFactor = *factor;
         }
-        changed = delta->length() > 0;
+        auto project = *before;
+        const auto target = motion::findPropertyTarget(project, editSelection);
+        if (!target.has_value()) { return; }
+        bool anyChange = false;
+        for (int axis = 0; axis < 3; ++axis) {
+            const auto scaling = gesture == Gesture::uniformScale || gesture == Gesture::scaleAxis;
+            if (scaling && gesture == Gesture::scaleAxis && axis != dragAxis) { continue; }
+            const auto prefix = scaling ? "scale." : gesture == Gesture::rotateAxis ? "rotation." : "position.";
+            const auto property = std::string(prefix) + "xyz"[axis];
+            auto* curve = target->curve(property);
+            if (curve == nullptr) { continue; }
+            const auto localTime = target->localTime(editTime);
+            const auto base = curve->evaluateBase(localTime);
+            // A zero scale can be recovered by dragging; negative scales keep their sign.
+            const auto value = scaling ? (base == 0 ? scaleFactor - 1 : base * scaleFactor) : base + offsets[axis];
+            if (!std::isfinite(value)) { return; }
+            if (std::abs(value - base) <= 1e-10) { continue; }
+            if (curve->animated()) { curve->setKeyValue(localTime, value); }
+            else { curve->base = value; }
+            anyChange = true;
+        }
+        changed = anyChange;
         processor.document.preview(std::move(project));
         editRevision = processor.document.revision();
     }
@@ -217,7 +264,7 @@ public:
         navigationDrag = false;
         if (validGesture()) {
             if (changed) {
-                processor.document.commit("Move object", std::move(*before));
+                processor.document.commit(tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object", std::move(*before));
             } else {
                 processor.document.preview(std::move(*before));
             }
@@ -231,7 +278,11 @@ public:
         repaint();
     }
     void mouseMove(const juce::MouseEvent& event) override {
-        if (!navigating) { return; }
+        if (!navigating) {
+            const auto hit = event.position.y < getHeight() - 30 ? currentGizmo().hitTest(event.position) : -1;
+            if (hit != hoverHandle) { hoverHandle = hit; repaint(); }
+            return;
+        }
         const auto delta = event.position - getLocalBounds().getCentre().toFloat();
         if (delta.getDistanceFromOrigin() < 0.5f) { return; }
         camera.look(delta.x * 0.003, -delta.y * 0.003);
@@ -253,6 +304,9 @@ public:
         }
         if (navigating) { return true; }
         if (key.getModifiers().isAltDown()) { return false; }
+        if (key.getKeyCode() == 'G') { setTool(MotionTransformTool::move); return true; }
+        if (key.getKeyCode() == 'R') { setTool(MotionTransformTool::rotate); return true; }
+        if (key.getKeyCode() == 'S') { setTool(MotionTransformTool::scale); return true; }
         if (key.getKeyCode() == 'F') { frameSelection(); return true; }
         if (key.getKeyCode() == 'N') { setNavigating(true); return true; }
         if (key.getKeyCode() == '0') { resetView(); return true; }
@@ -260,6 +314,51 @@ public:
     }
 
 private:
+    enum class Gesture { plane, moveAxis, rotateAxis, scaleAxis, uniformScale };
+    bool editable(double time) const {
+        const auto& project = processor.document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != selected) { continue; }
+                if (track.locked || !motion::trackIsAudible(project, track) || !clip.contains(time)) { return false; }
+                const auto prefix = tool == MotionTransformTool::move ? "position." : tool == MotionTransformTool::rotate ? "rotation." : "scale.";
+                for (const auto axis : std::string("xyz")) {
+                    const auto found = clip.properties.find(std::string(prefix) + axis);
+                    if (found != clip.properties.end() && found->second.modulation.enabled) { return false; }
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+    MotionCompositionGizmo currentGizmo() const {
+        const auto time = processor.position.load();
+        gizmoFrame = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
+        if (navigating || !editable(time) || !gizmoFrame.has_value() || gizmoFrame->parent.hasPostTransformEffects) { return {}; }
+        return MotionCompositionGizmo::layout(*gizmoFrame, camera, tool, std::clamp(getWidth() * 0.2, 35.0, 72.0), outputFrame().getHeight(),
+            [this](motion::editor::Vec3 point) { return screenPoint(point); });
+    }
+    bool beginGesture(double time) {
+        for (const auto& track : processor.document.project().tracks) {
+            if (track.locked && std::any_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return clip.id == selected; })) {
+                dragHint = "This object's track is locked";
+                return false;
+            }
+        }
+        gizmoAtDown = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
+        if (!editable(time) || !gizmoAtDown.has_value() || gizmoAtDown->parent.hasPostTransformEffects) {
+            dragHint = "Use the inspector for modulated or effected results";
+            return false;
+        }
+        processor.playing.store(false);
+        processor.seek(time);
+        editTime = time;
+        editSelection = selected;
+        before = processor.document.project();
+        editRevision = processor.document.revision();
+        changed = false;
+        return true;
+    }
     void timerCallback() override {
         if (!navigating || !hasKeyboardFocus(true) || !isShowing() || !juce::Process::isForegroundProcess()) {
             setNavigating(false);
@@ -322,7 +421,15 @@ private:
     juce::Point<float> down;
     motion::editor::Camera camera, cameraAtDown;
     motion::editor::Vec3 dragAnchor;
-    std::optional<motion::editor::TransformFrame> transformFrame;
+    mutable std::optional<motion::editor::EulerGizmoFrame> gizmoFrame;
+    std::optional<motion::editor::EulerGizmoFrame> gizmoAtDown;
+    MotionTransformTool tool = MotionTransformTool::move;
+    Gesture gesture = Gesture::plane;
+    int dragAxis = 3, hoverHandle = -1;
+    motion::editor::Vec3 dragDirection;
+    motion::editor::Vec2 lastRotationPointer;
+    juce::Point<float> scaleScreenAxis;
+    double rotationDelta = 0;
     juce::Point<float> savedCursor;
     juce::String dragHint;
     bool navigating = false, navigationDrag = false, panDrag = false;

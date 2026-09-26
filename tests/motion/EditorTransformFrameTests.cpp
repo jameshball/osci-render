@@ -123,5 +123,58 @@ int main() {
     check(!clipTransformFrame(project, 2, 0), "missing ancestors are unavailable");
     project.tracks[0].kind = TrackKind::audio;
     check(!clipTransformFrame(project, 2, 0), "audio clips have no visual transform frame");
+    project = fixture();
+    project.tracks[0].group = 3;
+    inner.properties["rotation.x"] = Curve(24);
+    inner.properties["rotation.y"] = Curve(-37);
+    outer.properties["rotation.z"] = Curve(16);
+    outer.properties["scale.x"] = Curve(-1.7);
+    project.groups = { inner, outer };
+    auto& rotatedClip = project.tracks[0].clips[0];
+    rotatedClip.properties["rotation.x"] = Curve(31);
+    rotatedClip.properties["rotation.y"] = Curve(49);
+    rotatedClip.properties["rotation.z"] = Curve(-23);
+    rotatedClip.properties["scale.x"] = Curve(-2);
+    auto gizmo = gizmoFrameForClip(project, 2, 0);
+    check(gizmo.has_value() && gizmo->evaluatedScale.x == -2, "gizmo exposes evaluated negative scale for handle orientation");
+    check(gizmo.has_value(), "mirrored nonuniform ancestors support Euler gizmos");
+    constexpr double radians = std::numbers::pi / 180;
+    check(near(gizmo->eulerRadians, {31 * radians, 49 * radians, -23 * radians}), "gizmo retains evaluated radians");
+    for (int axis = 0; axis < 3; ++axis) {
+        const Vec3 normal = axis == 0 ? Vec3 {1, 0, 0} : (axis == 1 ? Vec3 {0, 1, 0} : Vec3 {0, 0, 1});
+        const auto worldAxis = gizmo->axisDirection(axis, true);
+        check(worldAxis.has_value(), "rotation axis remains usable under mirrors");
+        for (const auto angle : {0.0, 0.7, 2.9, -2.8}) {
+            const auto ring = gizmo->rotationRingPoint(axis, angle, 0.8);
+            check(ring.has_value(), "world ring point remains finite");
+            const auto ray = gizmo->rotationRay({*ring + *worldAxis * 2, *worldAxis * -1}, axis);
+            check(ray.has_value() && near(ray->direction, normal * -1), "inverse ray preserves direction and affine parameter");
+            const auto hit = ray->origin + ray->direction * 2;
+            const auto expected = axis == 0 ? Vec3 {0, std::cos(angle) * 0.8, std::sin(angle) * 0.8}
+                : (axis == 1 ? Vec3 {std::sin(angle) * 0.8, 0, std::cos(angle) * 0.8} : Vec3 {std::cos(angle) * 0.8, std::sin(angle) * 0.8, 0});
+            check(near(hit, expected), "inverse parent and post-Euler maps every ring back to canonical plane");
+            const auto initial = axis == 0 ? Vec3 {0, 1, 0} : (axis == 1 ? Vec3 {0, 0, 1} : Vec3 {1, 0, 0});
+            const auto signedAngle = std::atan2(normal.dot(initial.cross(hit)), initial.dot(hit));
+            check(std::abs(signedAngle - angle) < 1.0e-9, "mirrored parents preserve canonical signed-angle orientation without a sign correction");
+        }
+    }
+    const auto xScale = gizmo->axisDirection(0, false);
+    const auto xRotate = gizmo->axisDirection(0, true);
+    check(xScale.has_value() && near(*xScale, *xRotate), "X scale and rotation axis agree because Rx preserves X");
+    const auto yScale = gizmo->axisDirection(1, false);
+    const auto yRotate = gizmo->axisDirection(1, true);
+    check(yScale.has_value() && yRotate.has_value() && !near(*yScale, *yRotate), "Y scale includes earlier Rx while Y parameter rotation excludes it");
+    check(!gizmo->axisDirection(-1, true) && !gizmo->axisDirection(3, false), "invalid gizmo axes are unavailable");
+    check(!gizmo->rotationRingPoint(0, 0, 0) && !gizmo->rotationRingPoint(0, 0, -1), "degenerate ring radii are rejected");
+    check(!gizmo->rotationRay({{}, {}}, 0), "zero direction ray is rejected");
+    check(!gizmo->rotationRingPoint(0, std::numeric_limits<double>::infinity(), 1), "nonfinite ring angles are rejected");
+    rotatedClip.start = 1;
+    rotatedClip.offset = 2;
+    rotatedClip.rate = 3;
+    rotatedClip.properties["rotation.x"].setKeyValue(0, 0);
+    rotatedClip.properties["rotation.x"].setKeyValue(10, 90);
+    gizmo = gizmoFrameForClip(project, 2, 2);
+    check(gizmo.has_value() && std::abs(gizmo->eulerRadians.x - 45 * radians) < 1.0e-9, "gizmo Euler animation uses clip-local offset/rate time");
+    check(!gizmoFrameForClip(project, 999, 0), "missing clip has no gizmo");
     std::cout << "Editor transform frame tests passed\n";
 }

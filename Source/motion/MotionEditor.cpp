@@ -76,6 +76,20 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &splitButton, &timeLabel, &selectionLabel, &curveEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
         addAndMakeVisible(component);
     }
+    addAndMakeVisible(compositionTitle);
+    compositionTitle.setText("Composition", juce::dontSendNotification);
+    compositionTitle.setFont(juce::FontOptions(15.0f));
+    compositionTitle.setBorderSize(juce::BorderSize<int>(0));
+    addAndMakeVisible(transformTool);
+    transformTool.setName("Composition transform tool");
+    transformTool.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
+    transformTool.addItem("Move", 1);
+    transformTool.addItem("Rotate", 2);
+    transformTool.addItem("Scale", 3);
+    transformTool.setSelectedId(1, juce::dontSendNotification);
+    transformTool.setTooltip("Transform the selected object. Preview shortcuts: G move, R rotate, S scale. Scale's centre handle changes all axes.");
+    transformTool.onChange = [this] { composition.setTool(static_cast<MotionTransformTool>(transformTool.getSelectedId() - 1)); };
+    composition.onToolChanged = [this](MotionTransformTool tool) { transformTool.setSelectedId(static_cast<int>(tool) + 1, juce::dontSendNotification); };
     addAndMakeVisible(navigateView);
     addAndMakeVisible(frameView);
     navigateView.setName("Navigate composition view");
@@ -86,7 +100,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     navigateView.onClick = [this] { composition.setNavigating(!composition.isNavigating()); };
     composition.onNavigationChanged = [this](bool active) {
         navigateView.setToggleState(active, juce::dontSendNotification);
-        navigateView.setButtonText(active ? "Done" : viewportHeader.getWidth() >= 230 ? "Navigate" : "3D");
+        navigateView.setButtonText(active ? "Done" : viewportHeader.getWidth() >= 260 ? "Navigate" : "3D");
     };
     frameView.setName("Frame composition selection");
     frameView.setTooltip("Frame the selected object, or all visible objects. Shortcut: F. Press 0 in the preview to reset the view.");
@@ -388,11 +402,16 @@ void MotionEditor::resized() {
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
     auto viewControls = viewportHeader.getBounds().reduced(5, 3);
-    const auto fullViewControls = viewportHeader.getWidth() >= 230;
+    const auto fullViewControls = viewportHeader.getWidth() >= 310;
+    compositionTitle.setVisible(fullViewControls);
+    if (fullViewControls) { compositionTitle.setBounds(viewControls.removeFromLeft(100)); }
     frameView.setVisible(fullViewControls);
     if (fullViewControls) { frameView.setBounds(viewControls.removeFromRight(36)); viewControls.removeFromRight(3); }
-    navigateView.setBounds(viewControls.removeFromRight(fullViewControls ? 76 : 40));
-    navigateView.setButtonText(composition.isNavigating() ? "Done" : fullViewControls ? "Navigate" : "3D");
+    const auto namedNavigation = viewportHeader.getWidth() >= 260;
+    navigateView.setBounds(viewControls.removeFromRight(namedNavigation ? 76 : 40));
+    viewControls.removeFromRight(3);
+    transformTool.setBounds(viewControls.removeFromLeft(std::min(86, viewControls.getWidth())));
+    navigateView.setButtonText(composition.isNavigating() ? "Done" : namedNavigation ? "Navigate" : "3D");
     composition.setBounds(editing.withTrimmedTop(3));
 }
 

@@ -134,4 +134,81 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
     }
     return std::nullopt;
 }
+
+// Parameter-aligned gizmo frame. Rotation rings exclude the edited axis and
+// all earlier Euler rotations; scale axes include the full authored rotation.
+struct EulerGizmoFrame {
+    TransformFrame parent;
+    Vec3 eulerRadians;
+    Vec3 evaluatedScale { 1, 1, 1 };
+
+    std::optional<Vec3> axisDirection(int axis, bool rotationRing) const {
+        if (!validAxis(axis) || !eulerRadians.finite()) { return std::nullopt; }
+        auto direction = canonicalAxis(axis);
+        direction = rotationRing ? postRotate(direction, axis)
+            : transform_detail::rotateZ(transform_detail::rotateY(transform_detail::rotateX(direction, eulerRadians.x), eulerRadians.y), eulerRadians.z);
+        const auto world = parentDirection(direction);
+        return world.finite() && world.length() > 0 && std::isfinite(world.length()) ? std::optional<Vec3>(world) : std::nullopt;
+    }
+
+    // The canonical ray uses the same forward parameter as the supplied world
+    // ray. Do not transform a plane normal as a direction under a scaled parent.
+    std::optional<Ray> rotationRay(Ray world, int axis) const {
+        if (!validAxis(axis) || !eulerRadians.finite() || !world.origin.finite() || !world.direction.finite()) {
+            return std::nullopt;
+        }
+        const auto origin = parent.positionDelta(world.origin - parent.worldOrigin);
+        const auto direction = parent.positionDelta(world.direction);
+        if (!origin.has_value() || !direction.has_value()) { return std::nullopt; }
+        const Ray result { undoPostRotate(*origin, axis), undoPostRotate(*direction, axis) };
+        const auto length = result.direction.length();
+        return result.origin.finite() && result.direction.finite() && std::isfinite(length) && length > 0
+            ? std::optional<Ray>(result) : std::nullopt;
+    }
+
+    // Positive angles follow right-handed YZ, ZX, XY circles respectively.
+    std::optional<Vec3> rotationRingPoint(int axis, double angleRadians, double radius) const {
+        if (!validAxis(axis) || !eulerRadians.finite() || !std::isfinite(angleRadians) || !std::isfinite(radius) || radius <= 0) {
+            return std::nullopt;
+        }
+        const auto c = std::cos(angleRadians) * radius;
+        const auto s = std::sin(angleRadians) * radius;
+        const auto canonical = axis == 0 ? Vec3 { 0, c, s } : (axis == 1 ? Vec3 { s, 0, c } : Vec3 { c, s, 0 });
+        const auto result = parent.worldOrigin + parentDirection(postRotate(canonical, axis));
+        return result.finite() ? std::optional<Vec3>(result) : std::nullopt;
+    }
+
+private:
+    static bool validAxis(int axis) { return axis >= 0 && axis < 3; }
+    static Vec3 canonicalAxis(int axis) { return axis == 0 ? Vec3 { 1, 0, 0 } : (axis == 1 ? Vec3 { 0, 1, 0 } : Vec3 { 0, 0, 1 }); }
+    Vec3 parentDirection(Vec3 value) const {
+        return parent.parentBasis[0] * value.x + parent.parentBasis[1] * value.y + parent.parentBasis[2] * value.z;
+    }
+    Vec3 postRotate(Vec3 value, int axis) const {
+        if (axis == 0) { value = transform_detail::rotateY(value, eulerRadians.y); }
+        if (axis <= 1) { value = transform_detail::rotateZ(value, eulerRadians.z); }
+        return value;
+    }
+    Vec3 undoPostRotate(Vec3 value, int axis) const {
+        if (axis <= 1) { value = transform_detail::rotateZ(value, -eulerRadians.z); }
+        if (axis == 0) { value = transform_detail::rotateY(value, -eulerRadians.y); }
+        return value;
+    }
+};
+
+template <typename ProjectType>
+std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id clipId, double projectTime) {
+    const auto parent = clipTransformFrame(project, clipId, projectTime);
+    if (!parent.has_value()) { return std::nullopt; }
+    for (const auto& track : project.tracks) {
+        if (track.kind != TrackKind::visual) { continue; }
+        for (const auto& clip : track.clips) {
+            if (clip.id != clipId) { continue; }
+            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime), project.bpm);
+            if (!transform.has_value()) { return std::nullopt; }
+            return EulerGizmoFrame { *parent, transform->rotation, transform->scale };
+        }
+    }
+    return std::nullopt;
+}
 }

@@ -55,6 +55,8 @@ private:
     double timelineFraction = 0.34, previewFraction = 0.5;
     double dividerStart = 0;
     int previewWidth = 1, workspaceHeight = 1;
+    juce::Label compositionTitle;
+    juce::ComboBox transformTool;
     juce::TextButton navigateView { "Navigate" }, frameView { "Fit" };
     juce::TextButton importButton { "Import" };
     juce::TextButton playButton { "Play" };
@@ -95,7 +97,7 @@ private:
 
     MainMenuBarModel menus;
     osci::PanelHeader libraryHeader { "Assets" };
-    osci::PanelHeader viewportHeader { "Composition" };
+    osci::PanelHeader viewportHeader;
     osci::PanelHeader outputHeader { "Output" };
     osci::PanelHeader inspectorHeader { "Inspector" };
     osci::PanelHeader timelineHeader { "Timeline" };
