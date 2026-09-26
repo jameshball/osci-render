@@ -103,7 +103,11 @@ struct PreparedComposition {
             }
         }
         std::sort(cameraCuts.begin(), cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+        const bool anySolo = std::any_of(project.tracks.begin(), project.tracks.end(), [](const auto& track) { return track.solo; });
         for (const auto& track : project.tracks) {
+            if (track.muted || (anySolo && !track.solo)) {
+                continue;
+            }
             for (const auto& clip : track.clips) {
                 const auto asset = std::find_if(project.assets.begin(), project.assets.end(),
                     [&](const auto& item) { return item->id == clip.asset; });

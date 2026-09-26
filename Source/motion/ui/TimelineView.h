@@ -1,13 +1,25 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "TrackHeader.h"
 #include <optional>
 #include <limits>
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
 public:
-    explicit MotionTimelineView(MotionProcessor& processor) : processor(processor) {
+    explicit MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
         setName("Composition timeline");
+        addTrack.setButtonText("+");
+        addTrack.setName("Add track");
+        addTrack.setTitle("Add track");
+        addTrack.setTooltip("Add an empty track");
+        addTrack.onClick = [this] {
+            motion::Track track;
+            track.id = processor.document.newId();
+            track.name = "Track " + std::to_string(processor.document.project().tracks.size() + 1);
+            processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
+        };
+        addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
         setTooltip("V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit.");
     }
@@ -21,14 +33,55 @@ public:
     static constexpr int rulerHeight = 26;
     static constexpr int rowHeight = 40;
 
+    void refreshTracks() {
+        const auto& tracks = processor.document.project().tracks;
+        std::erase_if(headers, [&](const auto& header) {
+            return std::none_of(tracks.begin(), tracks.end(), [&](const auto& track) { return track.id == header->id; });
+        });
+        for (const auto& track : tracks) {
+            auto found = std::find_if(headers.begin(), headers.end(), [&](const auto& header) { return header->id == track.id; });
+            if (found == headers.end()) {
+                auto header = std::make_unique<MotionTrackHeader>(track.id);
+                header->onRename = [this](motion::Id id, std::string name) {
+                    if (name.empty()) { refreshTracks(); return; }
+                    processor.document.edit("Rename track", [id, name](motion::Project& project) {
+                        for (auto& item : project.tracks) { if (item.id == id) { item.name = name; } }
+                    });
+                };
+                header->onMenu = [this](motion::Id id) { showTrackMenu(id); };
+                header->onDragRevision = [this] { return processor.document.revision(); };
+                header->onMute = [this](motion::Id id) { toggleTrack(id, false); };
+                header->onSolo = [this](motion::Id id) { toggleTrack(id, true); };
+                addAndMakeVisible(*header);
+                headers.push_back(std::move(header));
+                found = headers.end() - 1;
+            }
+            (*found)->update(track);
+        }
+        resized();
+        repaint();
+    }
+    void resized() override {
+        addTrack.setBounds(namesWidth - 27, 2, 24, rulerHeight - 4);
+        const auto& tracks = processor.document.project().tracks;
+        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(tracks.size()) - 1));
+        for (auto& header : headers) {
+            const auto found = std::find_if(tracks.begin(), tracks.end(), [&](const auto& track) { return track.id == header->id; });
+            const auto row = static_cast<int>(found - tracks.begin());
+            const auto y = rowY(row);
+            header->setVisible(found != tracks.end() && y >= rulerHeight && y < getHeight());
+            header->setBounds(0, y, namesWidth - 1, rowHeight - 1);
+        }
+    }
     bool isInterestedInDragSource(const SourceDetails& details) override {
         const auto description = details.description.toString();
-        return description.startsWith("motion-asset:") || description.startsWith("motion-effect:");
+        return description.startsWith("motion-asset:") || description.startsWith("motion-effect:") || description.startsWith("motion-track:");
     }
 
     void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
     void itemDragMove(const SourceDetails& details) override {
         dropPosition = details.localPosition;
+        dropTrack = details.description.toString().startsWith("motion-track:");
         dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
         dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
         repaint();
@@ -40,6 +93,12 @@ public:
 
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
+        if (details.description.toString().startsWith("motion-track:")) {
+            const auto revision = static_cast<std::uint64_t>(details.description.toString().fromLastOccurrenceOf(":", false, false).getLargeIntValue());
+            if (revision != processor.document.revision()) { repaint(); return; }
+            reorderTrack(static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), details.localPosition.y);
+            return;
+        }
         if (details.description.toString().startsWith("motion-effect:")) {
             insertEffect(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), details.localPosition);
             repaint();
@@ -113,12 +172,13 @@ public:
         g.setColour(osci::Colours::dark());
         g.fillRect(0, 0, namesWidth, rulerHeight);
         g.setColour(osci::Colours::text());
-        g.drawText(toolName(), 12, 0, namesWidth - 34, rulerHeight, juce::Justification::centredLeft);
+        g.drawText(toolName(), 12, 0, namesWidth - 54, rulerHeight, juce::Justification::centredLeft);
         juce::Path toolArrow;
-        toolArrow.addTriangle(namesWidth - 21.0f, 11.0f, namesWidth - 13.0f, 11.0f, namesWidth - 17.0f, 15.0f);
+        toolArrow.addTriangle(namesWidth - 47.0f, 11.0f, namesWidth - 39.0f, 11.0f, namesWidth - 43.0f, 15.0f);
         g.fillPath(toolArrow);
         const auto& tracks = processor.document.project().tracks;
         scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(tracks.size()) - 1));
+        const auto anySolo = std::any_of(tracks.begin(), tracks.end(), [](const auto& track) { return track.solo; });
         for (int index = scrollRows; index < static_cast<int>(tracks.size()); ++index) {
             const auto y = rowY(index);
             if (y >= getHeight()) {
@@ -127,15 +187,16 @@ public:
             g.setColour(osci::Colours::dark());
             g.fillRect(0, y, namesWidth - 1, rowHeight - 1);
             g.setColour(osci::Colours::text());
-            g.drawText(juce::String(tracks[index].name), 12, y, namesWidth - 22, rowHeight, juce::Justification::centredLeft);
+
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, rowHeight);
+            const auto opacity = tracks[index].muted || (anySolo && !tracks[index].solo) ? 0.38f : 1.0f;
             for (const auto& clip : tracks[index].clips) {
                 const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 4);
                 const auto active = clip.id == selected;
-                g.setColour(active ? juce::Colour(0xff347b52) : juce::Colour(0xff354c45));
+                g.setColour((active ? juce::Colour(0xff347b52) : juce::Colour(0xff354c45)).withAlpha(opacity));
                 g.fillRoundedRectangle(bounds, 4);
-                g.setColour(active ? juce::Colour(0xff70da91) : juce::Colour(0xff647d71));
+                g.setColour((active ? juce::Colour(0xff70da91) : juce::Colour(0xff647d71)).withAlpha(opacity));
                 g.drawRoundedRectangle(bounds, 4, 1);
                 g.setColour(juce::Colours::white);
                 if (!clip.effects.empty() && bounds.getWidth() > 90) {
@@ -153,7 +214,11 @@ public:
                 g.drawText(label, labelBounds, juce::Justification::centredLeft);
             }
         }
-        if (dropPosition.has_value() && !dropEffect.empty()) {
+        if (dropPosition.has_value() && dropTrack) {
+            g.setColour(osci::Colours::accentColor());
+            const auto boundary = std::clamp((dropPosition->y - rulerHeight + rowHeight / 2) / rowHeight + scrollRows, 0, static_cast<int>(tracks.size()));
+            g.fillRect(0, rowY(boundary) - 1, getWidth(), 2);
+        } else if (dropPosition.has_value() && !dropEffect.empty()) {
             int row = 0;
             const auto* clip = clipAt(*dropPosition, row);
             if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = (dropPosition->y - rulerHeight) / rowHeight + scrollRows; }
@@ -340,6 +405,7 @@ public:
             const auto last = std::max(0, static_cast<int>(processor.document.project().tracks.size()) - 1);
             scrollRows = std::clamp(scrollRows + (wheel.deltaY < 0 ? 1 : -1), 0, last);
         }
+        resized();
         repaint();
     }
 
@@ -389,6 +455,62 @@ public:
     }
 
 private:
+    void showTrackMenu(motion::Id id) {
+        const auto& tracks = processor.document.project().tracks;
+        const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
+        if (found == tracks.end()) { return; }
+        juce::PopupMenu menu;
+        menu.addSectionHeader(juce::String(found->name));
+        menu.addItem(1, "Move track up", found != tracks.begin());
+        menu.addItem(2, "Move track down", found + 1 != tracks.end());
+        menu.addSeparator();
+        menu.addItem(3, "Delete track");
+        const auto generation = processor.document.generation();
+        const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
+            if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
+            owner->cancelGesture();
+            const auto& current = owner->processor.document.project().tracks;
+            const auto track = std::find_if(current.begin(), current.end(), [id](const auto& item) { return item.id == id; });
+            if (track == current.end()) { return; }
+            const auto index = static_cast<int>(track - current.begin());
+            if (result == 3) {
+                owner->processor.document.edit("Delete track", [id](motion::Project& project) {
+                    std::erase_if(project.tracks, [id](const auto& item) { return item.id == id; });
+                });
+                owner->refreshTracks();
+            } else {
+                const auto boundary = result == 1 ? index - 1 : index + 2;
+                owner->reorderTrack(id, owner->rowY(boundary));
+            }
+        });
+    }
+    void toggleTrack(motion::Id id, bool solo) {
+        cancelGesture();
+        processor.document.edit(solo ? "Toggle track solo" : "Toggle track mute", [id, solo](motion::Project& project) {
+            for (auto& track : project.tracks) {
+                if (track.id == id) {
+                    if (solo) { track.solo = !track.solo; } else { track.muted = !track.muted; }
+                }
+            }
+        });
+    }
+    void reorderTrack(motion::Id id, int y) {
+        cancelGesture();
+        const auto& tracks = processor.document.project().tracks;
+        const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
+        if (found == tracks.end()) { return; }
+        const auto source = static_cast<int>(found - tracks.begin());
+        auto destination = std::clamp((y - rulerHeight + rowHeight / 2) / rowHeight + scrollRows, 0, static_cast<int>(tracks.size()));
+        if (destination > source) { --destination; }
+        if (source == destination) { return; }
+        processor.document.edit("Reorder track", [source, destination](motion::Project& project) {
+            auto track = std::move(project.tracks[source]);
+            project.tracks.erase(project.tracks.begin() + source);
+            project.tracks.insert(project.tracks.begin() + destination, std::move(track));
+        });
+        refreshTracks();
+    }
     void insertEffect(const std::string& type, juce::Point<int> position) {
         const auto* definition = motion::effectDefinition(type);
         if (definition == nullptr || position.y < rulerHeight) { return; }
@@ -523,6 +645,9 @@ private:
         processor.seek(std::clamp(scrollTime + (x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration));
         repaint();
     }
+    juce::TextButton addTrack;
+    std::vector<std::unique_ptr<MotionTrackHeader>> headers;
+    bool dropTrack = false;
     MotionProcessor& processor;
     std::optional<motion::Project> before;
     motion::Clip original;

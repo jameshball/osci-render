@@ -27,7 +27,7 @@ public:
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
             g.setFont(14);
-            g.drawText("Drop an object here", getLocalBounds(), juce::Justification::centred);
+            g.drawText(processor.document.project().tracks.empty() ? "Drop an object here" : "No visible objects", getLocalBounds(), juce::Justification::centred);
             return;
         }
         const auto time = processor.position.load();

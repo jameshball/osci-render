@@ -82,6 +82,9 @@ struct Track {
     std::string name;
     std::vector<Clip> clips;
     std::vector<EffectInstance> effects;
+    bool muted = false;
+    bool solo = false;
+    bool locked = false;
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.

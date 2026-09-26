@@ -180,6 +180,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     }
     processor.document.addChangeListener(this);
     composition.refresh();
+    timeline.refreshTracks();
     refreshInspector();
     startTimerHz(30);
     setResizeLimits(1100, 700, 4096, 2160);
@@ -375,6 +376,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
         if (task->generation != processor.document.generation()) { task->cancelled.store(true); }
     }
     assetLibrary.refresh();
+    timeline.refreshTracks();
     effectsPanel.refresh();
     curveEditor.refresh();
     composition.refresh();

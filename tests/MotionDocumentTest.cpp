@@ -98,9 +98,90 @@ public:
         testCameras(document);
         testAnimatedSources();
         testEffects(document.project());
+        testTrackStates(document.project());
     }
 
 private:
+    void testTrackStates(const motion::Project& sourceProject) {
+        beginTest("Mute and solo exclude tracks from signal and drawing allocation");
+        auto project = sourceProject;
+        auto& original = project.tracks[0].clips[0];
+        original.properties["red"] = motion::Curve(1);
+        original.properties["green"] = motion::Curve(0);
+        original.properties["blue"] = motion::Curve(0);
+        auto secondTrack = project.tracks[0];
+        secondTrack.id = 500;
+        secondTrack.name = "Second";
+        secondTrack.clips[0].id = 501;
+        secondTrack.clips[0].properties["red"] = motion::Curve(0);
+        secondTrack.clips[0].properties["green"] = motion::Curve(1);
+        project.tracks.push_back(secondTrack);
+        const motion::PreparedComposition both(project);
+        expectEquals(static_cast<int>(both.clips.size()), 2);
+        expectEquals(both.sample(1, 0.25).r, 1.0f);
+        expectEquals(both.sample(1, 0.75).g, 1.0f);
+        project.tracks[1].muted = true;
+        const motion::PreparedComposition muted(project);
+        expectEquals(static_cast<int>(muted.clips.size()), 1);
+        expectEquals(muted.sample(1, 0.75).r, 1.0f);
+        expectEquals(muted.sample(1, 0.75).g, 0.0f);
+        expectEquals(both.sample(1, 0.75).g, 1.0f);
+
+        project.tracks[1].muted = false;
+        project.tracks[1].solo = true;
+        const motion::PreparedComposition solo(project);
+        expectEquals(static_cast<int>(solo.clips.size()), 1);
+        expectEquals(solo.sample(1, 0.25).g, 1.0f);
+        project.tracks[1].muted = true;
+        const motion::PreparedComposition mutedSolo(project);
+        expect(mutedSolo.clips.empty());
+        const auto dark = mutedSolo.sample(1, 0.25);
+        expectEquals(dark.r + dark.g + dark.b, 0.0f);
+        project.tracks[0].solo = true;
+        const motion::PreparedComposition multipleSolo(project);
+        expectEquals(static_cast<int>(multipleSolo.clips.size()), 1);
+        expectEquals(multipleSolo.sample(1, 0.75).r, 1.0f);
+
+        beginTest("Lock leaves playback unchanged and excluded tracks consume no fade budget");
+        project.tracks[0].locked = true;
+        project.tracks[0].clips[0].properties["weight"] = motion::Curve(0.25);
+        const motion::PreparedComposition locked(project);
+        int litSamples = 0;
+        for (int index = 0; index < 1000; ++index) {
+            litSamples += locked.sample(1, index / 1000.0).r > 0 ? 1 : 0;
+        }
+        expectEquals(litSamples, 250);
+        project.tracks[1].muted = false;
+        const motion::PreparedComposition bothSolo(project);
+        expectEquals(static_cast<int>(bothSolo.clips.size()), 2);
+
+        beginTest("Track state survives save, load, undo and redo without copying assets");
+        project.tracks[1].muted = true;
+        const motion::PreparedComposition savedSignal(project);
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(sourceProject);
+        document.edit("Track controls", [&](motion::Project& value) { value = project; });
+        expect(undo.undo());
+        expect(!document.project().tracks[0].muted && !document.project().tracks[0].solo && !document.project().tracks[0].locked);
+        expect(document.project().assets[0] == sourceProject.assets[0]);
+        expect(undo.redo());
+        expect(document.project().tracks[0].solo && document.project().tracks[0].locked);
+        expect(document.project().assets[0] == sourceProject.assets[0]);
+        juce::UndoManager restoredUndo;
+        motion::Document restored(restoredUndo);
+        const auto loaded = restored.load(document.save());
+        expect(loaded.wasOk(), loaded.getErrorMessage());
+        if (loaded.wasOk()) {
+            expect(restored.project().tracks[0].solo && restored.project().tracks[0].locked);
+            expect(!restored.project().tracks[0].muted && !restored.project().tracks[1].locked);
+            expect(restored.project().tracks[1].solo && restored.project().tracks[1].muted);
+            const motion::PreparedComposition reloaded(restored.project());
+            expectEquals(reloaded.sample(1, 0.1).r, savedSignal.sample(1, 0.1).r);
+            expectEquals(reloaded.sample(1, 0.5).g, savedSignal.sample(1, 0.5).g);
+        }
+    }
+
     void testEffects(const motion::Project& sourceProject) {
         beginTest("Effect catalog uses shared stateless geometry and preserves RGB");
         const osci::Point input(0.25f, 0.5f, -0.2f, 0.3f, 0.6f, 0.9f);

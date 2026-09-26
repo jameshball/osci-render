@@ -559,6 +559,9 @@ juce::XmlElement Document::save() const {
         auto* row = xml.createNewChildElement("track");
         row->setAttribute("id", juce::String(track.id));
         row->setAttribute("name", juce::String(track.name));
+        row->setAttribute("muted", track.muted);
+        row->setAttribute("solo", track.solo);
+        row->setAttribute("locked", track.locked);
         saveEffects(*row, track.effects);
         for (const auto& clip : track.clips) {
             auto* item = row->createNewChildElement("clip");
@@ -633,6 +636,9 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         Track track;
         track.id = static_cast<Id>(row->getStringAttribute("id").getLargeIntValue());
         track.name = row->getStringAttribute("name").toStdString();
+        track.muted = row->getBoolAttribute("muted", false);
+        track.solo = row->getBoolAttribute("solo", false);
+        track.locked = row->getBoolAttribute("locked", false);
         if (track.id == 0 || !identities.insert(track.id).second) {
             return juce::Result::fail("Invalid track identity.");
         }
