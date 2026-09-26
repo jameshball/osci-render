@@ -337,7 +337,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     timeline.onSelection = [this](motion::Id id) { select(id); };
     timeline.onMidiAssigned = [this](motion::Id id) { select(id); timelineTabs.setSelectedIndex(2); notesEditor.fitContents(); };
-    timeline.onError = [this](const juce::String& message) { assetLibrary.setError(message); };
+    timeline.onTimingRequested = [this](motion::Id id) { select(id); inspectorTabs.setSelectedIndex(3); };
+    timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
     composition.onSelection = timeline.onSelection;
     selectionLabel.setColour(juce::Label::textColourId, osci::Colours::text());
     selectionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold));

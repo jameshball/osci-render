@@ -529,6 +529,56 @@ juce::Result Document::changeTempo(double bpm) {
     return juce::Result::ok();
 }
 
+juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
+    duplicateId = 0;
+    for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
+        const auto& track = state.tracks[trackIndex];
+        for (const auto& original : track.clips) {
+            if (original.id != sourceId) { continue; }
+            if (track.locked) { return juce::Result::fail("Unlock the track before duplicating a clip."); }
+            if (!original.valid() || !original.timing(state.bpm).valid() || original.effects.size() > maximumEffectsPerOwner
+                || std::any_of(original.effects.begin(), original.effects.end(), [](const auto& effect) { return !effect.valid(); })) {
+                return juce::Result::fail("The selected clip has invalid timing, properties or effects.");
+            }
+            // Include published identities as well as previously allocated IDs.
+            // Provisional IDs do not advance the allocator on rejected placement.
+            auto highest = lastId;
+            const auto effects = [&](const auto& values) { for (const auto& value : values) { highest = std::max(highest, value.id); } };
+            effects(state.effects);
+            for (const auto& asset : state.assets) { if (asset != nullptr) { highest = std::max(highest, asset->id); } }
+            for (const auto& group : state.groups) { highest = std::max(highest, group.id); effects(group.effects); }
+            for (const auto& item : state.tracks) {
+                highest = std::max(highest, item.id); effects(item.effects);
+                for (const auto& clip : item.clips) { highest = std::max(highest, clip.id); effects(clip.effects); }
+            }
+            for (const auto& camera : state.cameras) { highest = std::max(highest, camera.id); }
+            for (const auto& cut : state.cameraCuts) { highest = std::max(highest, cut.id); }
+            const auto required = static_cast<Id>(original.effects.size()) + 1;
+            if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for a duplicated clip."); }
+            auto copy = original;
+            copy.start = original.end();
+            copy.id = highest + 1;
+            auto effectId = copy.id;
+            for (auto& effect : copy.effects) { effect.id = ++effectId; }
+            if (!track.canPlace(copy, 0, state.bpm)) {
+                return juce::Result::fail("There is not enough free space immediately after this clip. Move the following clip or shorten this one first.");
+            }
+            const auto id = copy.id;
+            lastId = highest + required;
+            edit("Duplicate clip", [trackIndex, copy = std::move(copy)](Project& project) {
+                auto& clips = project.tracks[trackIndex].clips;
+                project.duration = std::max(project.duration, copy.timing(project.bpm).end());
+                const auto position = std::lower_bound(clips.begin(), clips.end(), copy.timing(project.bpm).start,
+                    [bpm = project.bpm](const auto& clip, double start) { return clip.timing(bpm).start < start; });
+                clips.insert(position, copy);
+            });
+            duplicateId = id;
+            return juce::Result::ok();
+        }
+    }
+    return juce::Result::fail("The selected clip no longer exists.");
+}
+
 juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
     if (!resolvedSeconds.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
     for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {

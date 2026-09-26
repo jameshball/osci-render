@@ -71,6 +71,7 @@ public:
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
+    juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
     juce::Result clearMidi(Id clipId);

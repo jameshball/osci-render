@@ -132,6 +132,43 @@ try:
     result, clips = saved()
     assert float(clips['4'].get('duration')) == 5
     assert float(result.find('composition').get('duration')) == 180
-    print("Clip timing UI/save/rejection/undo workflow passed.", flush=True)
+    # Repeat a complete clip using both the keyboard and its context menu.
+    step("duplicate selected clip", "press", "command + d", "--class", "MotionTimelineView")
+    result, clips = saved()
+    assert len(clips) == 3
+    duplicate = next(c for id_, c in clips.items() if id_ not in ('3', '4'))
+    duplicate_id = duplicate.get('id')
+    assert [float(duplicate.get(k)) for k in ('start', 'duration', 'offset', 'rate')] == [15, 5, 0, 1]
+    assert [ET.tostring(p) for p in duplicate.findall('property')] == [ET.tostring(p) for p in clips['4'].findall('property')]
+    step("undo duplicate", "click", "--name", "Undo", "--exact")
+    _, clips = saved()
+    assert len(clips) == 2
+    step("redo duplicate", "click", "--name", "Redo", "--exact")
+    _, clips = saved()
+    assert duplicate_id in clips
+    # Fit restores a known viewport after revealing an offscreen duplicate.
+    step("fit repeated arrangement", "press", "F", "--class", "MotionTimelineView")
+    # The 1100px workspace gives 904px for 180 seconds plus the 20px margin.
+    tree = json.loads(command("snapshot", "--json", "--full"))
+    area = find(tree, "MotionTimelineView")["bounds"]
+    pps = (area["w"] - 170 - 20) / 180
+    at_duplicate = 170 + round(17.5 * pps)
+    step("open duplicate clip menu", "click", "--class", "MotionTimelineView", "--position", f"{at_duplicate},46", "--button", "right")
+    step("duplicate from menu", "click", "--name", "Duplicate clip", "--role", "menuItem", "--exact")
+    _, clips = saved()
+    assert len(clips) == 4 and sorted(float(c.get('start')) for c in clips.values()) == [2, 10, 15, 20]
+    first_x = 170 + round(6 * pps)
+    step("select occupied repeat target", "click", "--class", "MotionTimelineView", "--position", f"{first_x},46")
+    step("reject overlapping duplicate", "press", "command + d", "--class", "MotionTimelineView")
+    command("wait-for-locator", "--name", "Cannot edit timeline", "--exact")
+    step("dismiss duplicate collision", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
+    _, unchanged = saved()
+    assert [c.attrib for c in clips.values()] == [c.attrib for c in unchanged.values()]
+    step("show object inspector", "click", "--name", "Object", "--class", "osci::TabBar::Tab", "--exact")
+    step("open timing shortcut menu", "click", "--class", "MotionTimelineView", "--position", f"{first_x},46", "--button", "right")
+    step("edit timing from menu", "click", "--name", "Edit clip timing", "--role", "menuItem", "--exact")
+    command("wait-for-locator", "--name", "Clip timing inspector", "--exact")
+    step("repeated arrangement", "screenshot", "--file", session.artifact_dir / "repeated.png")
+    print("Clip timing and duplication UI/save/rejection/undo workflow passed.", flush=True)
 finally:
     session.stop_app()

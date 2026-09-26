@@ -223,6 +223,90 @@ public:
         expectEquals(current().contentBpm, 150.0);
         expect(undo.undo()); expectEquals(current().start, slower.tracks[0].clips[0].start);
         expect(undo.redo()); expectWithinAbsoluteError(current().timing(75).rate, .75, 1e-12);
+        testDuplication(initial);
+    }
+
+private:
+    void testDuplication(const motion::Project& initial) {
+        beginTest("Adjacent duplication preserves content with fresh clip and effect identities");
+        for (const bool beats : {false, true}) {
+            for (const bool audio : {false, true}) {
+                juce::UndoManager undo;
+                motion::Document document(undo);
+                auto project = initial;
+                project.tracks[0].clips.resize(1);
+                project.tracks[0].kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+                auto& clip = project.tracks[0].clips[0];
+                const auto pattern = motion::MidiNotes::create({{1, 0, 1, 60, 100, 1}}).source;
+                if (!audio) {
+                    clip.midi = pattern;
+                    clip.effects.push_back(motion::makeEffect(100, *motion::effectDefinition("rotate")));
+                    clip.effects.back().properties["rotateZ"].setKey({1, .5, motion::Interpolation::linear});
+                }
+                if (beats) { expect(clip.anchorToBeats(project.bpm)); project.bpm = 75; }
+                project.duration = clip.timing(project.bpm).end();
+                const auto original = clip;
+                const auto duration = project.duration;
+                document.reset(project);
+                motion::Id duplicate = 0;
+                expect(document.duplicateClip(original.id, duplicate).wasOk());
+                expect(duplicate != 0 && duplicate != original.id);
+                const auto& copied = document.project().tracks[0].clips.back();
+                expect(copied.id == duplicate && copied.start == original.end());
+                expect(copied.timeBase == original.timeBase && copied.duration == original.duration && copied.offset == original.offset && copied.rate == original.rate);
+                expect(copied.asset == original.asset && copied.midi == original.midi && copied.midiAsset == original.midiAsset);
+                expectEquals(copied.properties.at("position.x").evaluate(.75), 2.0);
+                expectEquals(document.project().duration, copied.timing(project.bpm).end());
+                expect(document.project().assets[0] == initial.assets[0]);
+                if (!audio) {
+                    expect(copied.effects[0].id != original.effects[0].id && copied.effects[0].id != copied.id);
+                    expectEquals(copied.effects[0].properties.at("rotateZ").evaluate(1), .5);
+                }
+                expect(undo.undo());
+                expect(document.project().tracks[0].clips.size() == 1 && document.project().duration == duration);
+                expect(undo.redo());
+                expect(document.project().tracks[0].clips.back().id == duplicate);
+                if (!audio) {
+                    auto note = pattern->notes()[0]; note.pitch = 72;
+                    const auto changed = motion::MidiNotes::create({note}).source;
+                    expect(document.setMidiNotes(duplicate, changed, "Edit duplicate").wasOk());
+                    expect(document.project().tracks[0].clips.front().midi == pattern);
+                    expect(document.project().tracks[0].clips.back().midi == changed);
+                    expect(undo.undo()); expect(document.project().tracks[0].clips.back().midi == pattern);
+                }
+            }
+        }
+        beginTest("Rejected duplicates do not alter the document or consume identities");
+        for (int reason = 0; reason < 4; ++reason) {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            auto project = initial;
+            const auto source = project.tracks[0].clips[0].id;
+            if (reason == 0) { project.tracks[0].clips[1].start = project.tracks[0].clips[0].end(); }
+            if (reason == 1) { project.tracks[0].locked = true; }
+            if (reason == 2) { project.tracks[0].clips[0].duration = std::numeric_limits<double>::infinity(); }
+            document.reset(project);
+            const auto marker = document.newId();
+            const auto revision = document.revision();
+            motion::Id duplicate = 999;
+            expect(document.duplicateClip(reason == 3 ? 999999 : source, duplicate).failed());
+            expect(duplicate == 0 && document.revision() == revision && !undo.canUndo());
+            expect(document.newId() == marker + 1);
+            expect(document.project().tracks[0].clips.size() == 2);
+        }
+        beginTest("Identity exhaustion rejects duplication without wrapping IDs");
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        auto project = initial;
+        project.tracks[0].clips.resize(1);
+        auto& clip = project.tracks[0].clips[0];
+        clip.effects.push_back(motion::makeEffect(std::numeric_limits<motion::Id>::max() - 1, *motion::effectDefinition("rotate")));
+        document.reset(project);
+        const auto revision = document.revision();
+        motion::Id duplicate = 999;
+        expect(document.duplicateClip(clip.id, duplicate).failed());
+        expect(duplicate == 0 && document.revision() == revision && !undo.canUndo());
+        expect(document.newId() == std::numeric_limits<motion::Id>::max());
     }
 };
 

@@ -22,9 +22,9 @@ public:
         };
         addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
-        setTooltip("V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit.");
+        setTooltip("V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip.");
     }
-    std::function<void(motion::Id)> onSelection, onMidiAssigned;
+    std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested;
     std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
     motion::Id selected = 0;
@@ -416,9 +416,10 @@ public:
             int row = 0;
             const auto* clip = clipAt(event.getPosition(), row);
             if (clip != nullptr) {
-                selectClip(clip->id);
-            }
-            showToolMenu();
+                const auto id = clip->id;
+                selectClip(id);
+                showClipMenu(id);
+            } else { showToolMenu(); }
             return;
         }
         if (!event.mods.isLeftButtonDown()) {
@@ -556,6 +557,10 @@ public:
     }
 
     bool keyPressed(const juce::KeyPress& key) override {
+        if (selected != 0 && key.getModifiers().isCommandDown() && key.getKeyCode() == 'D') {
+            duplicateClip(selected);
+            return true;
+        }
         if (key == juce::KeyPress::escapeKey && (before.has_value() || scrubbing)) {
             cancelGesture();
             return true;
@@ -601,6 +606,32 @@ public:
     }
 
 private:
+    void duplicateClip(motion::Id id) {
+        cancelGesture();
+        motion::Id duplicate = 0;
+        const auto result = processor.document.duplicateClip(id, duplicate);
+        if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
+        selectClip(duplicate);
+        revealSelection();
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id == duplicate) { revealTime(clip.timing(processor.document.project().bpm).start); return; }
+            }
+        }
+    }
+    void showClipMenu(motion::Id id) {
+        juce::PopupMenu menu;
+        menu.addItem(1, "Duplicate clip");
+        menu.addItem(2, "Edit clip timing");
+        const auto generation = processor.document.generation();
+        const auto revision = processor.document.revision();
+        const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, revision](int result) {
+            if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
+            if (result == 1) { owner->duplicateClip(id); }
+            else if (result == 2 && owner->onTimingRequested) { owner->onTimingRequested(id); }
+        });
+    }
     void createGroup(motion::Id trackId, motion::Id parent) {
         motion::Group group;
         group.id = processor.document.newId();
