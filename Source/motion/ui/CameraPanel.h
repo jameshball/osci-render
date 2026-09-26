@@ -55,6 +55,7 @@ public:
             value.setEditable(false, true);
             value.setJustificationType(juce::Justification::centredRight);
             value.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
+            value.setFont(juce::FontOptions(13.0f));
             value.onEditorShow = [this, i] {
                 editing[i] = EditTarget { selected, frameTime() };
                 selectProperty(i);
@@ -153,11 +154,11 @@ public:
             if (i == 3 || i == 6) {
                 area.removeFromTop(21);
             }
-            auto row = area.removeFromTop(23);
+            auto row = area.removeFromTop(26);
             captions[i].setBounds(row.removeFromLeft(i == 6 ? 91 : 23));
             keys[i].setBounds(row.removeFromRight(23));
             row.removeFromRight(4);
-            values[i].setBounds(row);
+            values[i].setBounds(row.reduced(0, 1));
         }
         area.removeFromTop(7);
         auto footer = area.removeFromTop(24);
@@ -170,8 +171,8 @@ public:
         g.setColour(osci::Colours::text().withAlpha(0.65f));
         g.setFont(11.0f);
         g.drawText("POSITION", 14, 66, getWidth() - 28, 19, juce::Justification::centredLeft);
-        g.drawText("ROTATION | degrees", 14, 156, getWidth() - 28, 19, juce::Justification::centredLeft);
-        g.drawText("LENS", 14, 246, getWidth() - 28, 19, juce::Justification::centredLeft);
+        g.drawText("ROTATION | degrees", 14, 165, getWidth() - 28, 19, juce::Justification::centredLeft);
+        g.drawText("LENS", 14, 264, getWidth() - 28, 19, juce::Justification::centredLeft);
     }
 
 private:

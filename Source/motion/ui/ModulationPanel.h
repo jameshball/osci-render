@@ -13,7 +13,7 @@ public:
         enabled.setButtonText("Enabled");
         enabled.setName("Enable modulation");
         enabled.setTitle("Enable modulation");
-        enabled.setColour(juce::TextButton::buttonColourId, osci::Colours::dark());
+        enabled.setColour(juce::TextButton::buttonColourId, osci::Colours::surface());
         waveform.setName("Modulation waveform");
         waveform.addItemList({ "Sine", "Triangle", "Saw", "Square", "Smooth random", "Random steps" }, 1);
         sync.setName("Modulation clock");
@@ -125,7 +125,7 @@ public:
         seed.setBounds(noise);
     }
     void paint(juce::Graphics& g) override {
-        g.setColour(osci::Colours::dark());
+        g.setColour(osci::Colours::surface());
         g.fillRoundedRectangle(getLocalBounds().toFloat(), 5);
         osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(30).toFloat(), osci::Colours::veryDark());
         g.setColour(osci::Colours::text());

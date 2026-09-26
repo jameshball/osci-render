@@ -9,6 +9,9 @@
 #include "components/menu/SosciMainMenuBarModel.h"
 #include <osci_gui/osci_gui.h>
 #include "components/ProductUpdateConfig.h"
+#if OSCI_PREMIUM
+#include "visualiser/OfflineVisualiserParameters.h"
+#endif
 
 #if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright
     #include <jucewright/jucewright.h>
@@ -60,6 +63,12 @@ public:
     void parentHierarchyChanged() override;
 
 protected:
+#if OSCI_PREMIUM
+    // Completion retains caller resources until the worker and OpenGL renderer
+    // have stopped. It also runs on failed launch/editor teardown: cleanup only.
+    std::shared_ptr<OfflineVisualiserParameters> captureOfflineVisualiserParameters();
+    bool startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void()> completion = {}, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot = nullptr);
+#endif
     virtual bool openSourceFile(const juce::File& file) = 0;
 
 private:

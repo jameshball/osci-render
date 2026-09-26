@@ -317,6 +317,10 @@ CommonPluginEditor::~CommonPluginEditor() {
         audioProcessor.haltRecording();
     }
 
+    // Destroy offline render content (joining its worker) before restoring
+    // processor output or releasing visualiser/editor dependencies.
+    activeOverlays.clear();
+
     if (offlineRenderPreviousActiveState.has_value()) {
         audioProcessor.setOfflineRenderActive(*offlineRenderPreviousActiveState);
         offlineRenderPreviousActiveState.reset();
@@ -609,95 +613,128 @@ void CommonPluginEditor::renderAudioFileToVideo() {
                 offlineRenderLog.event("output selected", "file=" + outputFile.getFileName());
                 safeThis->audioProcessor.setLastOpenedDirectory(outputFile.getParentDirectory());
 
-                // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
-                if (!safeThis->audioProcessor.ensureFFmpegExists()) {
-                    offlineRenderLog.event("render deferred", "FFmpeg unavailable");
-                    return;
-                }
-
-                offlineRenderLog.event("FFmpeg ready");
-
-                // Stop any live recording and pause the main visualiser.
-                if (safeThis->audioProcessor.haltRecording != nullptr) {
-                    safeThis->audioProcessor.haltRecording();
-                }
-
-                const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
-                const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
-
-                // Make the plugin output silent and skip heavy processing during offline render.
-                safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
-                safeThis->audioProcessor.setOfflineRenderActive(true);
-
-                auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
-                auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
-
-                auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
-                    safeThis->audioProcessor,
-                    safeThis->audioProcessor.visualiserParameters,
-                    safeThis->audioProcessor.threadManager,
-                    inputFile,
-                    outputFile,
-                    safeThis->visualiser.getRenderMode(),
-                    encodingConfiguration);
-
-                content->setSize(700, 520);
-
-                content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile](OfflineAudioToVideoRendererComponent::Result r) {
-                    if (safeThis == nullptr) {
-                        offlineRenderLog.cancelled("result delivery because editor closed");
-                        return;
-                    }
-
-                    *resultHolder = r;
-
-                    if (r.success) {
-                        offlineRenderLog.completed();
-                        safeThis->audioProcessor.recordingExportCompleted(outputFile);
-                    } else if (r.cancelled) {
-                        offlineRenderLog.cancelled("render");
-                    } else {
-                        offlineRenderLog.failed("render", r.errorMessage);
-                    }
-
-                    if (auto* overlay = overlayHolder->getComponent()) {
-                        overlay->requestDismiss();
-                    }
-                });
-
-                auto* contentPtr = content.get();
-                const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
-                auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
-                *overlayHolder = overlay.get();
-
-                overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
-                    if (safeThis == nullptr) {
-                        return;
-                    }
-
-                    safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
-                    safeThis->offlineRenderPreviousActiveState.reset();
-                    safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
-                    safeThis->visualiser.setPaused(wasVisualiserPaused, false);
-
-                    if (resultHolder != nullptr && resultHolder->has_value()) {
-                        const auto& r = resultHolder->value();
-                        if (!r.success && !r.cancelled) {
-                            osci::showOverlayMessage(*safeThis.getComponent(),
-                                                     "Render Failed",
-                                                     r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
-                        }
-                    }
-                };
-
-                safeThis->showOverlay(std::move(overlay));
-                offlineRenderLog.event("render UI opened");
-                contentPtr->start();
+                safeThis->startOfflineVideoRender(inputFile, inputFile, outputFile, encodingConfiguration, safeThis->visualiser.getRenderMode());
             });
         });
     });
 #endif
 }
+
+
+#if OSCI_PREMIUM
+std::shared_ptr<OfflineVisualiserParameters> CommonPluginEditor::captureOfflineVisualiserParameters() {
+    return std::make_shared<OfflineVisualiserParameters>(audioProcessor.visualiserParameters);
+}
+
+bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void()> completion, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot) {
+    // The renderer owns its onFinished closure until after its destructor has
+    // joined the worker and detached GL. This guard therefore safely retains
+    // temporary signal/soundtrack files through success, cancellation or close.
+    auto completionGuard = std::shared_ptr<void>(nullptr, [completion = std::move(completion)](void*) noexcept {
+        if (completion) {
+            try {
+                completion();
+            } catch (...) {
+                // Resource cleanup must not throw out of component destruction.
+            }
+        }
+    });
+    auto* existing = findActiveOverlay<OfflineRenderOverlay>();
+    if (existing != nullptr) {
+        existing->toFront(true);
+        return false;
+    }
+    const auto safeThis = juce::Component::SafePointer<CommonPluginEditor>(this);
+    // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
+    if (!safeThis->audioProcessor.ensureFFmpegExists()) {
+        offlineRenderLog.event("render deferred", "FFmpeg unavailable");
+        return false;
+    }
+
+    offlineRenderLog.event("FFmpeg ready");
+
+    // Stop any live recording and pause the main visualiser.
+    if (safeThis->audioProcessor.haltRecording != nullptr) {
+        safeThis->audioProcessor.haltRecording();
+    }
+
+    const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
+    const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
+
+    // Make the plugin output silent and skip heavy processing during offline render.
+    safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
+    safeThis->audioProcessor.setOfflineRenderActive(true);
+
+    auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
+    auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
+
+    auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
+        safeThis->audioProcessor,
+        safeThis->audioProcessor.visualiserParameters,
+        safeThis->audioProcessor.threadManager,
+        inputSignal,
+        muxAudio,
+        outputFile,
+        initialRenderMode,
+        encodingConfiguration,
+        std::move(beamSnapshot));
+
+    content->setSize(700, 520);
+
+    content->setOnFinished([safeThis, resultHolder, overlayHolder, outputFile, completionGuard](OfflineAudioToVideoRendererComponent::Result r) {
+        if (safeThis == nullptr) {
+            offlineRenderLog.cancelled("result delivery because editor closed");
+            return;
+        }
+
+        *resultHolder = r;
+
+        if (r.success) {
+            offlineRenderLog.completed();
+            safeThis->audioProcessor.recordingExportCompleted(outputFile);
+        } else if (r.cancelled) {
+            offlineRenderLog.cancelled("render");
+        } else {
+            offlineRenderLog.failed("render", r.errorMessage);
+        }
+
+        auto* overlay = overlayHolder->getComponent();
+        if (overlay != nullptr) {
+            overlay->requestDismiss();
+        }
+    });
+
+    auto* contentPtr = content.get();
+    const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
+    auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
+    *overlayHolder = overlay.get();
+
+    overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {
+        if (safeThis == nullptr) {
+            return;
+        }
+
+        safeThis->audioProcessor.setOfflineRenderActive(wasOfflineRenderActive);
+        safeThis->offlineRenderPreviousActiveState.reset();
+        safeThis->visualiser.restoreAfterOfflineRender(safeThis->audioProcessor.getEffectiveSampleRate());
+        safeThis->visualiser.setPaused(wasVisualiserPaused, false);
+
+        if (resultHolder != nullptr && resultHolder->has_value()) {
+            const auto& r = resultHolder->value();
+            if (!r.success && !r.cancelled) {
+                osci::showOverlayMessage(*safeThis.getComponent(),
+                                         "Render Failed",
+                                         r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+            }
+        }
+    };
+
+    safeThis->showOverlay(std::move(overlay));
+    offlineRenderLog.event("render UI opened");
+    contentPtr->start();
+    return true;
+}
+#endif
 
 void CommonPluginEditor::resetToDefault() {
     juce::StandaloneFilterWindow* window = findParentComponentOfClass<juce::StandaloneFilterWindow>();

@@ -26,8 +26,12 @@ private:
     void paintListBoxItem(int row, juce::Graphics& g, int width, int height, bool selected) override {
         if (row < 0 || row >= getNumRows()) { return; }
         auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(4, 2);
-        g.setColour(selected ? osci::Colours::accentColor().withAlpha(0.2f) : osci::Colours::veryDark());
-        g.fillRoundedRectangle(bounds.toFloat(), 4);
+        g.setColour(selected ? osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), 0.08f) : osci::Colours::veryDark());
+        g.fillRoundedRectangle(bounds.toFloat(), 3);
+        if (selected) {
+            g.setColour(osci::Colours::accentColor().withAlpha(0.65f));
+            g.fillRect(bounds.withWidth(2).reduced(0, 5));
+        }
         g.setColour(osci::Colours::text());
         g.setFont(14);
         g.drawText(getNameForRow(row), bounds.reduced(10, 0), juce::Justification::centredLeft);

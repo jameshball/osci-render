@@ -1,8 +1,53 @@
 #include "MotionEditor.h"
 #include "export/SignalExporter.h"
+#include "export/SoundtrackExporter.h"
+#include "ui/VideoExportSettings.h"
 #include <cstdlib>
 
 namespace {
+class MotionVideoPreparation final : public juce::Component, private juce::Timer {
+public:
+    MotionVideoPreparation(std::function<double()> readProgress, std::function<void()> cancel, bool includeAudio)
+        : readProgress(std::move(readProgress)), cancelWork(std::move(cancel)) {
+        addAndMakeVisible(status);
+        addAndMakeVisible(bar);
+        addAndMakeVisible(cancelButton);
+        status.setText(includeAudio ? "Preparing beam signal and soundtrack..." : "Preparing beam signal...", juce::dontSendNotification);
+        status.setJustificationType(juce::Justification::centred);
+        bar.setName("Preparing video media");
+        cancelButton.setName("Cancel video preparation");
+        cancelButton.onClick = [this] {
+            cancelWork();
+            cancelButton.setEnabled(false);
+            status.setText("Cancelling...", juce::dontSendNotification);
+        };
+        startTimerHz(20);
+    }
+    void resized() override {
+        auto area = getLocalBounds().reduced(12);
+        status.setBounds(area.removeFromTop(28));
+        area.removeFromTop(8);
+        bar.setBounds(area.removeFromTop(24));
+        area.removeFromTop(16);
+        cancelButton.setBounds(area.removeFromTop(30).withSizeKeepingCentre(100, 30));
+    }
+private:
+    void timerCallback() override { progress = readProgress(); }
+    std::function<double()> readProgress;
+    std::function<void()> cancelWork;
+    double progress = 0;
+    juce::ProgressBar bar { progress };
+    juce::Label status;
+    juce::TextButton cancelButton { "Cancel" };
+};
+
+struct MotionVideoTemporaryFiles {
+    const juce::File directory = juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getChildFile("osci-motion-video-" + juce::Uuid().toString());
+    ~MotionVideoTemporaryFiles() { directory.deleteRecursively(); }
+    juce::File signal() const { return directory.getChildFile("beam.wav"); }
+    juce::File soundtrack() const { return directory.getChildFile("soundtrack.wav"); }
+};
 bool canSplitClip(const motion::Clip* clip, double time) {
     return clip != nullptr && clip->valid() && std::isfinite(time) && time > clip->start && time < clip->end();
 }
@@ -10,10 +55,14 @@ bool canSplitClip(const motion::Clip* clip, double time) {
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
+    lookAndFeel.setControlCornerRadius(3.0f);
     menus.addTopLevelMenu("File");
     menus.addProjectMenuItems(0, processor, *this);
     menus.addMenuSeparator(0);
     menus.addMenuItem(0, "Export XYRGB signal...", [this] { exportSignal(); });
+#if OSCI_PREMIUM
+    menus.addMenuItem(0, "Export video...", [this] { exportVideo(); });
+#endif
     menus.addTopLevelMenu("Edit");
     menus.addEditMenuItems(1, processor);
     menus.addTopLevelMenu("Audio");
@@ -35,6 +84,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(timingButton);
     addAndMakeVisible(monitorOutput);
     monitorOutput.setName("Audio output mode");
+    monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
+    monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
     monitorOutput.addItem("Music monitor", 1);
     monitorOutput.addItem("XY signal", 2);
     monitorOutput.addItem("XYRGB signal (5 ch)", 3);
@@ -54,6 +105,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         }
         processor.setOutputMode(mode);
     };
+    timingButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
+    playButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
+    curveProperty.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     timingButton.setName("Time and grid");
     timingButton.setTitle("Time and grid");
     timingButton.setTooltip("Time display, snapping, meter and frame rate. Alt temporarily bypasses snapping.");
@@ -63,7 +117,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timeLabel.setName("Timeline position");
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
-    tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
+    tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
     tempoValue.setJustificationType(juce::Justification::centred);
     tempoValue.onTextChange = [this] {
         const auto text = tempoValue.getText().trim();
@@ -211,13 +265,15 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timeline.onSelection = [this](motion::Id id) { select(id); };
     composition.onSelection = timeline.onSelection;
     selectionLabel.setColour(juce::Label::textColourId, osci::Colours::text());
+    selectionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold));
     for (std::size_t index = 0; index < values.size(); ++index) {
         auto& value = values[index];
         value.setEditable(false, true);
         value.setName(motion::propertyNames[index]);
         value.setTitle(motion::propertyNames[index]);
         value.setComponentID("motion." + juce::String(motion::propertyNames[index]));
-        value.setJustificationType(juce::Justification::centred);
+        value.setJustificationType(juce::Justification::centredRight);
+        value.setFont(juce::FontOptions(13.0f));
         value.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
         value.onTextChange = [this, index] { if (!updatingInspector) { setProperty(static_cast<int>(index), false); } };
         addAndMakeVisible(value);
@@ -285,7 +341,7 @@ void MotionEditor::resized() {
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
-    inspectorBounds = area.removeFromRight(230);
+    inspectorBounds = area.removeFromRight(260);
     auto inspector = inspectorBounds;
     inspectorHeader.setBounds(inspector.removeFromTop(30));
     inspectorTabs.setBounds(inspectorHeader.getBounds());
@@ -295,12 +351,12 @@ void MotionEditor::resized() {
     inspector.reduce(10, 0);
     for (int group = 0; group < (audioSelected() ? 2 : 5); ++group) {
         inspector.removeFromTop(22);
-        auto row = inspector.removeFromTop(28);
+        auto row = inspector.removeFromTop(26);
         for (int axis = 0; axis < (audioSelected() || group == 4 ? 1 : 3); ++axis) {
             const auto index = audioSelected() ? group : group * 3 + axis;
             auto field = row.removeFromLeft(audioSelected() || group == 4 ? row.getWidth() : inspector.getWidth() / 3);
             keyButtons[index].setBounds(field.removeFromRight(18).reduced(1));
-            values[index].setBounds(field.reduced(2, 0));
+            values[index].setBounds(field.reduced(2, 1));
         }
         inspector.removeFromTop(8);
     }
@@ -310,7 +366,8 @@ void MotionEditor::resized() {
     previewDivider.setBounds(area.removeFromLeft(7));
     auto output = area;
     outputHeader.setBounds(output.removeFromTop(30));
-    monitorOutput.setBounds(outputHeader.getBounds().withTrimmedLeft(68).reduced(4, 3));
+    auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(68).reduced(4, 3);
+    monitorOutput.setBounds(monitorBounds.withWidth(std::min(190, monitorBounds.getWidth())));
     output.removeFromTop(3);
     visualiser.setBounds(output);
     viewportBounds = editing;
@@ -318,28 +375,41 @@ void MotionEditor::resized() {
     composition.setBounds(editing.withTrimmedTop(3));
 }
 
+void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
+    if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
+    graphics.setColour(osci::Colours::outlineSubtle());
+    for (const auto x : { splitButton.getRight() + 1, timingButton.getRight() + 1 }) {
+        graphics.drawVerticalLine(x, static_cast<float>(timelineHeader.getY() + 8), static_cast<float>(timelineHeader.getBottom() - 8));
+    }
+}
+
 void MotionEditor::paint(juce::Graphics& graphics) {
     graphics.fillAll(osci::Colours::veryDark());
-    graphics.setColour(osci::Colours::dark());
+    graphics.setColour(osci::Colours::surface());
     for (const auto& panel : { libraryBounds, viewportBounds, inspectorBounds, timelineBounds }) {
         graphics.fillRoundedRectangle(panel.toFloat(), 5.0f);
     }
-    graphics.setColour(juce::Colours::white.withAlpha(0.5f));
-    graphics.setFont(14.0f);
+    graphics.setColour(osci::Colours::textMuted());
+    graphics.setFont(12.0f);
     if (inspectorTabs.getCurrentTabIndex() != 0) {
         return;
     }
     auto labelArea = inspectorBounds.withTrimmedTop(66).reduced(12, 0);
+    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
+    if (!target.has_value() || target->camera || target->isEffect) {
+        graphics.drawFittedText("Select an object in the composition or a clip on the timeline to edit its properties.", labelArea.removeFromTop(70), juce::Justification::topLeft, 4);
+        return;
+    }
     if (audioSelected()) {
         for (const auto* label : { "Gain", "Pan   Left / Right" }) {
             graphics.drawText(label, labelArea.removeFromTop(22), juce::Justification::centredLeft);
-            labelArea.removeFromTop(36);
+            labelArea.removeFromTop(34);
         }
         return;
     }
     for (const auto* label : { "Position   X / Y / Z", "Rotation   X / Y / Z", "Scale   X / Y / Z", "Color   R / G / B", "Drawing weight" }) {
         graphics.drawText(label, labelArea.removeFromTop(22), juce::Justification::centredLeft);
-        labelArea.removeFromTop(36);
+        labelArea.removeFromTop(34);
     }
 
 }
@@ -428,7 +498,11 @@ void MotionEditor::timerCallback() {
         assetLibrary.setImportStatus(task->cancelled.load() ? "Cancelling import..." : "Preparing " + task->name + "\n" + juce::String(juce::roundToInt(task->progress.load() * 100)) + "%"
             + (pendingImports.size() > 1 ? "  (" + juce::String(static_cast<int>(pendingImports.size() - 1)) + " queued)" : ""));
     }
-    if (exportState != nullptr) { exportProgress = exportState->progress.load(); }
+    if (exportState != nullptr) {
+        exportProgress = exportState->videoWithAudio
+            ? (exportState->progress.load() + exportState->soundtrackProgress.load()) * 0.5
+            : exportState->progress.load();
+    }
     playButton.setButtonText(processor.playing.load() ? "Pause" : "Play");
     timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
     if (!tempoValue.isBeingEdited()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
@@ -494,7 +568,7 @@ void MotionEditor::refreshInspector() {
     if (inspectorTabs.getTabNames()[0] != tabName) { inspectorTabs.setTabName(0, tabName); }
     updatingInspector = true;
     for (std::size_t index = 0; index < values.size(); ++index) {
-        const bool visible = inspectorTabs.getCurrentTabIndex() == 0 && (!audioSelected() || index < 2);
+        const bool visible = editable && inspectorTabs.getCurrentTabIndex() == 0 && (!audioSelected() || index < 2);
         values[index].setVisible(visible);
         keyButtons[index].setVisible(visible);
         const auto property = inspectorProperty(index);
@@ -565,22 +639,137 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     return CommonPluginEditor::keyPressed(key);
 }
 
+void MotionEditor::exportVideo() {
+#if OSCI_PREMIUM
+    if (exportState != nullptr) { return; }
+    if (!processor.ensureFFmpegExists()) { return; }
+    std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
+    try {
+        beamSnapshot = captureOfflineVisualiserParameters();
+    } catch (const std::exception& error) {
+        assetLibrary.setError("Cannot capture the beam settings: " + juce::String(error.what()));
+        return;
+    }
+    auto config = recordingSettings.createVideoEncodingConfiguration();
+    const auto project = processor.document.project();
+    config.frameRate = project.frameRate;
+    const auto renderMode = visualiser.getRenderMode();
+    auto state = std::make_shared<ExportState>();
+    exportState = state;
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    auto settings = std::make_unique<MotionVideoExportSettings>(config);
+    auto* settingsPointer = settings.get();
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), "Export video", juce::Point<int>(440, 352), true);
+    const juce::Component::SafePointer<osci::ComponentOverlay> settingsOverlay(overlay.get());
+    auto accepted = std::make_shared<bool>(false);
+    overlay->onDismissRequested = [owner, state, accepted] {
+        if (!*accepted && owner != nullptr && owner->exportState == state) { owner->exportState.reset(); }
+    };
+    settingsPointer->onExport = [owner, state, project, beamSnapshot, renderMode, settingsOverlay, accepted](VideoEncodingConfiguration config) {
+        if (owner == nullptr || *accepted) { return; }
+        *accepted = true;
+        juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, settingsOverlay] {
+            // Dismiss only after the settings button callback has returned: the
+            // overlay owns that callback and its captured project snapshot.
+            if (settingsOverlay != nullptr) { settingsOverlay->requestDismiss(); }
+            if (owner == nullptr) { return; }
+            owner->chooser = std::make_unique<juce::FileChooser>("Export composition video",
+                owner->processor.getLastOpenedDirectory().getChildFile("composition." + config.fileExtension), "*." + config.fileExtension);
+            owner->chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state, project, beamSnapshot, renderMode, config](const juce::FileChooser& selected) {
+                if (owner == nullptr) { return; }
+                if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
+                const auto destination = selected.getResult();
+                if (!destination.getFileExtension().equalsIgnoreCase("." + config.fileExtension)) {
+                    owner->exportState.reset();
+                    owner->assetLibrary.setError("Video export requires a ." + config.fileExtension + " filename. Choose Export video again and use that extension.");
+                    return;
+                }
+                owner->processor.setLastOpenedDirectory(destination.getParentDirectory());
+                juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, destination] {
+                    if (owner == nullptr) { return; }
+                    state->videoWithAudio = config.includeAudio;
+                    auto content = std::make_unique<MotionVideoPreparation>([state] {
+                        return state->videoWithAudio ? (state->progress.load() + state->soundtrackProgress.load()) * 0.5 : state->progress.load();
+                    }, [state] { state->cancelled.store(true); }, config.includeAudio);
+                    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Preparing video", juce::Point<int>(440, 130), true);
+                    overlay->setDismissible(false);
+                    const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(overlay.get());
+                    owner->showOverlay(std::move(overlay));
+                    // The worker owns one immutable prepared snapshot for both WAVs.
+                    owner->exports.addJob([owner, state, project, beamSnapshot, renderMode, config, destination, preparationOverlay] {
+                        std::shared_ptr<MotionVideoTemporaryFiles> temporary;
+                        auto result = juce::Result::ok();
+                        try {
+                            temporary = std::make_shared<MotionVideoTemporaryFiles>();
+                            result = temporary->directory.createDirectory();
+                            if (result.wasOk() && !state->cancelled.load()) {
+                                const motion::PreparedComposition prepared(project);
+                                result = motion::SignalExporter::write(prepared, temporary->signal(), 48000.0, state->cancelled, &state->progress);
+                                if (result.wasOk() && config.includeAudio) {
+                                    result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), 48000.0, state->cancelled, &state->soundtrackProgress);
+                                }
+                            }
+                        } catch (...) {
+                            result = juce::Result::fail("Could not prepare the composition for video export.");
+                        }
+                        // Native save-dialog callbacks have returned before this starts
+                        // the shared GL renderer and its own cancellable progress overlay.
+                        juce::MessageManager::callAsync([owner, state, temporary, result, beamSnapshot, renderMode, config, destination, preparationOverlay] {
+                            if (owner == nullptr) { return; }
+                            if (state->cancelled.load() || result.failed()) {
+                                if (preparationOverlay != nullptr) { owner->dismissOverlay(preparationOverlay.getComponent()); }
+                                owner->exportState.reset();
+                                if (!state->cancelled.load()) { owner->assetLibrary.setError(result.getErrorMessage()); }
+                                return;
+                            }
+                            auto startRender = [owner, state, temporary, config, destination, renderMode, beamSnapshot] {
+                                if (owner == nullptr) { return; }
+                                owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
+                                destination, config, renderMode, [owner, state, temporary] {
+                                    // Completion can run from base-editor destruction;
+                                    // touch derived UI only in a later safe callback.
+                                    juce::MessageManager::callAsync([owner, state] {
+                                        if (owner != nullptr && owner->exportState == state) { owner->exportState.reset(); }
+                                    });
+                                }, beamSnapshot);
+                            };
+                            if (preparationOverlay != nullptr) {
+                                owner->dismissOverlay(preparationOverlay.getComponent(), std::move(startRender));
+                            } else {
+                                startRender();
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    };
+    showOverlay(std::move(overlay));
+#endif
+}
+
 void MotionEditor::exportSignal() {
     if (exportState != nullptr) {
         return;
     }
+    auto state = std::make_shared<ExportState>();
+    exportState = state;
     chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal - 48 kHz float WAV",
         processor.getLastOpenedDirectory().getChildFile("composition.wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-        | juce::FileBrowserComponent::warnAboutOverwriting, [owner](const juce::FileChooser& selected) {
-        if (owner == nullptr || selected.getResult() == juce::File()) {
+        | juce::FileBrowserComponent::warnAboutOverwriting, [owner, state](const juce::FileChooser& selected) {
+        if (owner == nullptr) { return; }
+        if (selected.getResult() == juce::File()) { owner->exportState.reset(); return; }
+        const auto destination = selected.getResult();
+        if (!destination.getFileExtension().equalsIgnoreCase(".wav")) {
+            owner->exportState.reset();
+            owner->assetLibrary.setError("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
             return;
         }
-        const auto destination = selected.getResult().withFileExtension("wav");
         const auto project = owner->processor.document.project();
-        auto state = std::make_shared<ExportState>();
-        owner->exportState = state;
+        owner->exportBar.setName("Signal export progress");
         owner->exportProgress = 0;
         owner->exportBar.setVisible(true);
         owner->cancelExport.setVisible(true);

@@ -242,7 +242,12 @@ private:
         if (row < 0 || row >= getNumRows()) { return; }
         const auto* effect = motion::findEffect(processor.document.project(), ids[static_cast<std::size_t>(row)]);
         if (effect == nullptr) { return; }
-        if (active) { g.setColour(osci::Colours::accentColor().withAlpha(0.2f)); g.fillRoundedRectangle(juce::Rectangle<float>(1, 1, width - 2, height - 2), 3); }
+        if (active) {
+            g.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), 0.08f));
+            g.fillRoundedRectangle(juce::Rectangle<float>(1, 1, width - 2, height - 2), 3);
+            g.setColour(osci::Colours::accentColor().withAlpha(0.65f));
+            g.fillRect(1, 5, 2, height - 10);
+        }
         g.setColour(osci::Colours::text().withAlpha(effect->enabled ? 1.0f : 0.4f));
         g.setFont(13);
         g.drawText(juce::String(row + 1) + "  " + juce::String(effect->name), 8, 0, width - 16, height, juce::Justification::centredLeft);

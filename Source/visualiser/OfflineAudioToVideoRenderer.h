@@ -8,6 +8,7 @@
 #if OSCI_PREMIUM
 
 #include "../CommonPluginProcessor.h"
+#include "OfflineVisualiserParameters.h"
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
 
@@ -29,9 +30,11 @@ public:
                                         VisualiserParameters& visualiserParameters,
                                         osci::AudioBackgroundThreadManager& threadManager,
                                         const juce::File& inputAudioFile,
+                                        const juce::File& muxAudioFile,
                                         const juce::File& outputVideoFile,
                                         VisualiserRenderer::RenderMode initialRenderMode,
-                                        VideoEncodingConfiguration encodingConfiguration);
+                                        VideoEncodingConfiguration encodingConfiguration,
+                                        std::shared_ptr<OfflineVisualiserParameters> beamSnapshot = nullptr);
 
     ~OfflineAudioToVideoRendererComponent() override;
 
@@ -80,8 +83,11 @@ private:
     const VideoEncodingConfiguration encodingConfiguration;
 
     const juce::File inputAudioFile;
+    const juce::File muxAudioFile;
     const juce::File outputVideoFile;
 
+    // Must outlive preview: its effects/parameter references belong here.
+    const std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
     juce::WaitableEvent glReadyEvent;
     OfflinePreviewRenderer preview;
 

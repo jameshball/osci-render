@@ -171,7 +171,7 @@ public:
         ensureTrackRows();
         g.fillAll(osci::Colours::veryDark());
         auto area = getLocalBounds();
-        g.setColour(osci::Colours::dark());
+        g.setColour(osci::Colours::surfaceRaised());
         g.fillRect(area.removeFromTop(rulerHeight));
         g.setFont(12.0f);
         pixelsPerSecond = std::isfinite(pixelsPerSecond) ? std::clamp(pixelsPerSecond, 0.000001, 500.0) : 70.0;
@@ -202,7 +202,7 @@ public:
             g.setColour(osci::Colours::text().withAlpha(0.7f));
             g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, rulerHeight, juce::Justification::centredLeft);
         }
-        g.setColour(osci::Colours::dark());
+        g.setColour(osci::Colours::surfaceRaised());
         g.fillRect(0, 0, namesWidth, rulerHeight);
         g.setColour(osci::Colours::text());
         g.drawText(toolName(), 12, 0, namesWidth - 54, rulerHeight, juce::Justification::centredLeft);
@@ -216,13 +216,13 @@ public:
             if (y >= getHeight()) {
                 break;
             }
-            g.setColour(osci::Colours::dark());
+            g.setColour(osci::Colours::surfaceRaised());
             g.fillRect(0, y, namesWidth - 1, rowHeight - 1);
             g.setColour(osci::Colours::text());
 
             const auto index = rows[visible].track;
             if (index < 0) {
-                g.setColour(osci::Colours::dark().withAlpha(0.25f));
+                g.setColour(osci::Colours::surfaceRaised().withAlpha(0.25f));
                 g.fillRect(namesWidth, y, getWidth() - namesWidth, rowHeight - 1);
                 juce::Graphics::ScopedSaveState summaryScope(g);
                 g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, rowHeight);
@@ -249,7 +249,7 @@ public:
                 const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 4);
                 const auto active = clip.id == selected;
                 const bool audio = tracks[index].kind == motion::TrackKind::audio;
-                g.setColour((audio ? (active ? juce::Colour(0xff365e80) : juce::Colour(0xff304451)) : (active ? juce::Colour(0xff347b52) : juce::Colour(0xff354c45))).withAlpha(opacity));
+                g.setColour((audio ? (active ? juce::Colour(0xff365e80) : juce::Colour(0xff304451)) : (active ? juce::Colour(0xff305742) : juce::Colour(0xff354c45))).withAlpha(opacity));
                 g.fillRoundedRectangle(bounds, 4);
                 g.setColour((active ? juce::Colour(0xff70da91) : juce::Colour(0xff647d71)).withAlpha(opacity));
                 g.drawRoundedRectangle(bounds, 4, 1);

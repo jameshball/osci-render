@@ -94,8 +94,10 @@ private:
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(4, 2);
         if (selected) {
-            graphics.setColour(osci::Colours::accentColor().withAlpha(0.22f));
-            graphics.fillRoundedRectangle(bounds.toFloat(), 4.0f);
+            graphics.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), 0.08f));
+            graphics.fillRoundedRectangle(bounds.toFloat(), 3.0f);
+            graphics.setColour(osci::Colours::accentColor().withAlpha(0.65f));
+            graphics.fillRect(bounds.withWidth(2).reduced(0, 5));
         }
         bounds.reduce(8, 3);
         graphics.setColour(osci::Colours::text());

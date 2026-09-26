@@ -75,16 +75,19 @@ OfflineAudioToVideoRendererComponent::OfflineAudioToVideoRendererComponent(Commo
                                                                           VisualiserParameters& visualiserParameters,
                                                                           osci::AudioBackgroundThreadManager& threadManager,
                                                                           const juce::File& inputAudioFile,
+                                                                          const juce::File& muxAudioFile,
                                                                           const juce::File& outputVideoFile,
                                                                           VisualiserRenderer::RenderMode initialRenderMode,
-                                                                          VideoEncodingConfiguration encodingConfiguration)
+                                                                          VideoEncodingConfiguration encodingConfiguration,
+                                                                          std::shared_ptr<OfflineVisualiserParameters> beamSnapshot)
     : processor(processor),
       encodingConfiguration(std::move(encodingConfiguration)),
       inputAudioFile(inputAudioFile),
+      muxAudioFile(muxAudioFile),
       outputVideoFile(outputVideoFile),
-      preview(visualiserParameters, threadManager, glReadyEvent),
-      initialRenderMode(initialRenderMode)
-{
+      beamSnapshot(std::move(beamSnapshot)),
+      preview(this->beamSnapshot != nullptr ? this->beamSnapshot->params : visualiserParameters, threadManager, glReadyEvent),
+      initialRenderMode(initialRenderMode) {
     setOpaque(false);
 
     addAndMakeVisible(preview);
@@ -223,7 +226,17 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         return result;
     }
 
+    if (encodingConfiguration.includeAudio && !muxAudioFile.existsAsFile()) {
+        result.errorMessage = "The separate audio file selected for the video soundtrack was not found.";
+        return result;
+    }
+
     const auto fps = encodingConfiguration.frameRate;
+    if (!std::isfinite(fps) || fps <= 0.0) {
+        offlineRenderLog.event("render failed: invalid frame rate " + juce::String(fps, 2));
+        result.errorMessage = "Choose a finite positive frame rate in Recording Settings.";
+        return result;
+    }
     const auto renderSize = encodingConfiguration.renderSize;
     const auto codec = encodingConfiguration.codec;
     const auto crf = encodingConfiguration.crf;
@@ -273,13 +286,6 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
         const double waitedMs = juce::Time::getMillisecondCounterHiRes() - glWaitStartedMs;
         offlineRenderLog.event("offline preview OpenGL context ready after " + juce::String(waitedMs, 0) + " ms");
-    }
-
-    if (fps <= 0.0)
-    {
-        offlineRenderLog.event("render failed: invalid frame rate " + juce::String(fps, 2));
-        result.errorMessage = "Invalid frame rate in Recording Settings.";
-        return result;
     }
 
     // Decode via WavParser (AudioFormatManager-backed), but lock it to the file sample rate.
@@ -617,7 +623,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
         juce::String muxError;
         const auto& audioCodecArgs = encodingConfiguration.audioCodecArgs;
         offlineRenderLog.event("muxing audio into final video: audioCodecArgs=" + audioCodecArgs.joinIntoString(" "));
-        if (!ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile, inputAudioFile, tempFinal.getFile(), audioCodecArgs, muxError, &cancelRequested))
+        if (!ffmpegEncoderManager.muxAudioAndVideo(tempVideoFile, muxAudioFile, tempFinal.getFile(), audioCodecArgs, muxError, &cancelRequested))
         {
             tempFinal.getFile().deleteFile();
             tempVideoFile.deleteFile();
@@ -647,6 +653,12 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
             result.errorMessage = "Failed to write output video file.";
             return result;
         }
+    }
+
+    if (shouldCancel()) {
+        tempVideoFile.deleteFile();
+        result.cancelled = true;
+        return result;
     }
 
     // Atomically replace the destination.

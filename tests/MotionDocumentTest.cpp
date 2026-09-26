@@ -2,6 +2,7 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
+#include "../Source/motion/export/SoundtrackExporter.h"
 
 class MotionDocumentTest : public juce::UnitTest {
 public:
@@ -102,6 +103,7 @@ public:
         testGroups(document.project());
         testModulation(document.project());
         testAudioImports(document.project());
+        testAudioExports(document.project());
         testTiming(document.project());
     }
 
@@ -145,6 +147,113 @@ private:
             expect(loaded.load(invalid).failed());
             expectEquals(loaded.save().toString(), unchanged);
         }
+    }
+
+    void testAudioExports(const motion::Project& sourceProject) {
+        beginTest("Soundtrack WAV export writes exact stereo clock, gain and pan without visual signal");
+        juce::TemporaryFile directory(".motion-soundtrack-export-tests");
+        const auto created = directory.getFile().createDirectory();
+        expect(created.wasOk(), created.getErrorMessage());
+        if (created.failed()) {
+            return;
+        }
+        auto asset = std::make_shared<motion::Asset>(wavAsset(2));
+        const auto decoded = motion::Document::decodeAsset(*asset);
+        expect(decoded.wasOk(), decoded.getErrorMessage());
+        if (decoded.failed()) {
+            return;
+        }
+        constexpr double rate = 16000;
+        auto project = sourceProject;
+        project.duration = 10.6 / rate;
+        project.assets.push_back(asset);
+        motion::Track track;
+        track.id = 9901;
+        track.kind = motion::TrackKind::audio;
+        auto clip = motion::Document::makeClip(9902, *asset, 2 / rate);
+        clip.properties["gain"] = motion::Curve(0.5);
+        clip.properties["pan"] = motion::Curve(0.5);
+        track.clips.push_back(clip);
+        project.tracks.push_back(track);
+        std::atomic<bool> cancel { false };
+        std::atomic<double> progress { -1 };
+        const auto output = directory.getFile().getChildFile("soundtrack.wav");
+        const auto exported = motion::SoundtrackExporter::write(project, output, rate, cancel, &progress);
+        expect(exported.wasOk(), exported.getErrorMessage());
+        if (exported.failed()) {
+            return;
+        }
+        expectEquals(progress.load(), 1.0);
+        const auto read = [](const juce::File& file) {
+            juce::WavAudioFormat format;
+            auto input = file.createInputStream();
+            return std::unique_ptr<juce::AudioFormatReader>(input == nullptr ? nullptr : format.createReaderFor(input.release(), true));
+        };
+        auto reader = read(output);
+        expect(reader != nullptr);
+        if (reader == nullptr) {
+            return;
+        }
+        expectEquals(static_cast<int>(reader->numChannels), 2);
+        expectEquals(static_cast<int>(reader->bitsPerSample), 32);
+        expect(reader->usesFloatingPointData);
+        expectEquals(reader->sampleRate, rate);
+        expectEquals(reader->lengthInSamples, static_cast<juce::int64>(11));
+        juce::AudioBuffer<float> samples(2, 11);
+        expect(reader->read(samples.getArrayOfWritePointers(), 2, 0, 11));
+        motion::PreparedComposition prepared(project);
+        for (int index = 0; index < 11; ++index) {
+            const auto expected = prepared.soundtrack.sample(index / rate);
+            expectWithinAbsoluteError(samples.getSample(0, index), expected.left, 0.000001f);
+            expectWithinAbsoluteError(samples.getSample(1, index), expected.right, 0.000001f);
+        }
+        expectWithinAbsoluteError(samples.getSample(0, 4), 0.125f, 0.000001f);
+        expectWithinAbsoluteError(samples.getSample(1, 4), -0.125f, 0.000001f);
+        expectEquals(samples.getSample(0, 0), 0.0f);
+        expectEquals(samples.getSample(0, 10), 0.0f);
+        reader.reset();
+        juce::MemoryBlock original;
+        expect(output.loadFileAsData(original));
+        const auto repeatedFile = directory.getFile().getChildFile("repeated.wav");
+        expect(motion::SoundtrackExporter::write(prepared, repeatedFile, rate, cancel).wasOk());
+        juce::MemoryBlock repeated;
+        expect(repeatedFile.loadFileAsData(repeated));
+        expect(original == repeated);
+
+        beginTest("Projects without audio tracks export stereo silence for the whole duration");
+        project.tracks.pop_back();
+        const auto silentFile = directory.getFile().getChildFile("silent.wav");
+        expect(motion::SoundtrackExporter::write(project, silentFile, rate, cancel).wasOk());
+        reader = read(silentFile);
+        expect(reader != nullptr);
+        if (reader != nullptr) {
+            samples.clear();
+            expect(reader->read(samples.getArrayOfWritePointers(), 2, 0, 11));
+            expectEquals(samples.getMagnitude(0, 11), 0.0f);
+        }
+        reader.reset();
+
+        beginTest("Cancellation and invalid samples preserve an existing destination WAV");
+        cancel.store(true);
+        expect(motion::SoundtrackExporter::write(prepared, output, rate, cancel, &progress).failed());
+        expectEquals(progress.load(), 0.0);
+        cancel.store(false);
+        const auto midCancel = motion::WavExporter::write<2>(4096 / rate, output, rate, cancel, &progress,
+            [&](double index, double) {
+                if (index == 8) {
+                    cancel.store(true);
+                }
+                return std::array<float, 2> { 0.5f, -0.5f };
+            }, "Soundtrack", "Non-finite soundtrack sample.");
+        expect(midCancel.failed());
+        cancel.store(false);
+        expect(motion::WavExporter::write<2>(11 / rate, output, rate, cancel, nullptr,
+            [](double, double) { return std::array<float, 2> { std::numeric_limits<float>::quiet_NaN(), 0 }; },
+            "Soundtrack", "Non-finite soundtrack sample.").failed());
+        expect(motion::SoundtrackExporter::write(prepared, output, -1, cancel).failed());
+        juce::MemoryBlock unchanged;
+        expect(output.loadFileAsData(unchanged));
+        expect(unchanged == original);
     }
 
     static motion::Asset wavAsset(int channels) {

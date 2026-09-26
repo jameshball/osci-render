@@ -16,6 +16,7 @@ public:
     explicit MotionEditor(MotionProcessor& processor);
     ~MotionEditor() override;
     void paint(juce::Graphics& graphics) override;
+    void paintOverChildren(juce::Graphics& graphics) override;
     void resized() override;
     bool isInterestedInFileDrag(const juce::StringArray&) override { return true; }
     void filesDropped(const juce::StringArray& files, int, int) override;
@@ -33,6 +34,7 @@ private:
     void setProperty(int index, bool keyframe);
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera);
     void exportSignal();
+    void exportVideo();
     void showTimingMenu();
     void refreshTiming();
     void refreshOutputChoices();
@@ -80,6 +82,8 @@ private:
     struct ExportState {
         std::atomic<bool> cancelled { false };
         std::atomic<double> progress { 0.0 };
+        std::atomic<double> soundtrackProgress { 0.0 };
+        bool videoWithAudio = false;
     };
     std::shared_ptr<ExportState> exportState;
     juce::ThreadPool exports { 1 };
