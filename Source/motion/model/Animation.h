@@ -58,6 +58,9 @@ public:
             case Interpolation::linear: return left.value + (right->value - left.value) * t;
             case Interpolation::smooth: return left.value + (right->value - left.value) * t * t * (3.0 - 2.0 * t);
             case Interpolation::cubic: {
+                // A flat Hermite segment is exactly constant. Avoid tiny
+                // cancellation differences that can move integer beam slots.
+                if (left.value == right->value && left.outgoingSlope == 0 && right->incomingSlope == 0) { return left.value; }
                 const auto t2 = t * t;
                 const auto t3 = t2 * t;
                 return (2.0 * t3 - 3.0 * t2 + 1.0) * left.value

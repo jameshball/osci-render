@@ -39,11 +39,14 @@ public:
         juce::AudioBuffer<float> samples(5, frames);
         expect(reader->read(samples.getArrayOfWritePointers(), 5, 0, frames));
         for (const auto index : { 0, 1, 799, 800, 4095, 4096, frames - 1 }) {
-            const auto phase = std::fmod(index * 60.0 / sampleRate, 1.0);
+            // Interior complete cycles reserve dark endpoints and sample both
+            // lit ends of the line. Boundary cycles retain continuous sampling.
+            const auto phase = index == 4095 || index == 4096 ? static_cast<double>(index % 800 - 1) / 797
+                : std::fmod(index * 60.0 / sampleRate, 1.0);
             expectWithinAbsoluteError(samples.getSample(0, index), 2.0f + static_cast<float>(phase), 0.000001f);
             expectWithinAbsoluteError(samples.getSample(1, index), -3.0f + static_cast<float>(phase), 0.000001f);
             // This open line jumps from (3,-2) back to (2,-3) each cycle.
-            // Its adjacent output samples must be dark without altering XY.
+            // Its adjacent output samples must be dark.
             const bool travel = index == 0 || index == 1 || index == 799 || index == 800;
             expectWithinAbsoluteError(samples.getSample(2, index), travel ? 0.0f : 0.2f, 0.000001f);
             expectWithinAbsoluteError(samples.getSample(3, index), travel ? 0.0f : 0.4f, 0.000001f);
