@@ -86,6 +86,29 @@ public:
             expect(maximumColour(*restored.project().assets[1]->source, 0.4)[2] > 0.99f);
         }
 
+        beginTest("PNG and animated GIF survive the standalone binary project writer");
+        juce::XmlElement binaryProject("motion-project");
+        binaryProject.setAttribute("schema", 1);
+        binaryProject.addChildElement(new juce::XmlElement(document.save()));
+        juce::MemoryBlock binary;
+        juce::AudioProcessor::copyXmlToBinary(binaryProject, binary);
+        const auto decodedXml = juce::AudioProcessor::getXmlFromBinary(binary.getData(), static_cast<int>(binary.getSize()));
+        expect(decodedXml != nullptr);
+        if (decodedXml != nullptr) {
+            const auto* composition = decodedXml->getChildByName("composition");
+            expect(composition != nullptr);
+            if (composition != nullptr) {
+                const auto result = restored.load(*composition);
+                expect(result.wasOk(), result.getErrorMessage());
+                if (result.wasOk()) {
+                    expect(restored.project().assets[0]->data == png->data);
+                    expect(restored.project().assets[1]->data == gif->data);
+                    expectEquals(restored.project().assets[1]->source->duration(), 0.5);
+                    expect(maximumColour(*restored.project().assets[1]->source, 0.4)[2] > 0.99f);
+                }
+            }
+        }
+
         beginTest("Invalid settings and cancellation retain the prior prepared source");
         const auto previous = png->source;
         png->rasterSettings.threshold = -1;

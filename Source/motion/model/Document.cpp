@@ -928,7 +928,6 @@ juce::XmlElement Document::save() const {
             bake->setAttribute("key", asset->bakeKey);
             bake->addTextElement(asset->bakedData.toBase64Encoding());
         } else {
-            item->addTextElement(asset->data.toBase64Encoding());
             if (isRasterSource(asset->extension)) {
                 auto* raster = item->createNewChildElement("raster");
                 raster->setAttribute("mode", asset->rasterSettings.mode == RasterSettings::Mode::contours ? "contours" : "scanlines");
@@ -937,6 +936,10 @@ juce::XmlElement Document::save() const {
                 raster->setAttribute("resolution", asset->rasterSettings.resolution);
                 raster->setAttribute("pointsPerFrame", static_cast<int>(asset->rasterSettings.pointsPerFrame));
             }
+            // Keep mixed-content payloads last. JUCE's single-line binary XML
+            // writer can attempt a null newline when wrapping attributes on an
+            // element following a text node.
+            item->addTextElement(asset->data.toBase64Encoding());
         }
     }
     for (const auto& track : state.tracks) {
