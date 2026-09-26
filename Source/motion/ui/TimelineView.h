@@ -5,6 +5,7 @@
 #include "TrackLayout.h"
 #include <optional>
 #include <limits>
+#include <set>
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
 public:
@@ -22,12 +23,20 @@ public:
         };
         addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
-        setTooltip("V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip.");
+        setTooltip("Shift-click: select multiple clips. V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip.");
     }
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested;
     std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
-    motion::Id selected = 0;
+    mutable motion::Id selected = 0;
+    void setSelection(motion::Id id) {
+        selected = id;
+        if (!notifyingSelection) {
+            selectedClips.clear();
+            if (isClip(id)) { selectedClips.insert(id); }
+        }
+        repaint();
+    }
     double pixelsPerSecond = 70;
     double scrollTime = 0;
     mutable int scrollRows = 0;
@@ -77,7 +86,7 @@ public:
 
     void refreshTracks() {
         const auto& project = processor.document.project();
-        if (layoutGeneration != processor.document.generation()) { collapsedGroups.clear(); layoutGeneration = processor.document.generation(); }
+        ensureTrackRows();
         std::erase_if(headers, [&](const auto& header) {
             return motion::findGroup(project, header->id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) { return track.id == header->id; });
         });
@@ -210,11 +219,7 @@ public:
                 updated.tracks.push_back(std::move(track));
             }
         });
-        selected = id;
-        if (onSelection) {
-            onSelection(id);
-        }
-        repaint();
+        selectClip(id);
     }
 
     void paint(juce::Graphics& g) override {
@@ -298,7 +303,7 @@ public:
             const auto opacity = !motion::trackIsAudible(processor.document.project(), tracks[index]) ? 0.38f : 1.0f;
             for (const auto& clip : tracks[index].clips) {
                 const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 4);
-                const auto active = clip.id == selected;
+                const auto active = selectedClips.contains(clip.id);
                 const bool audio = tracks[index].kind == motion::TrackKind::audio;
                 g.setColour((audio ? (active ? juce::Colour(0xff365e80) : juce::Colour(0xff304451)) : (active ? juce::Colour(0xff305742) : juce::Colour(0xff354c45))).withAlpha(opacity));
                 g.fillRoundedRectangle(bounds, 4);
@@ -407,6 +412,7 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override {
         grabKeyboardFocus();
+        ensureTrackRows();
         cancelGesture();
         if (event.y < rulerHeight && event.x < namesWidth) {
             showToolMenu(true);
@@ -435,8 +441,16 @@ public:
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
         if (clip == nullptr) {
+            selectClip(0);
             return;
         }
+        if (event.mods.isShiftDown() || event.mods.isCommandDown()) {
+            if (selectedClips.contains(clip->id)) { selectedClips.erase(clip->id); }
+            else { selectedClips.insert(clip->id); }
+            notifySelection(selectedClips.contains(clip->id) ? clip->id : (selectedClips.empty() ? 0 : *selectedClips.begin()));
+            return;
+        }
+        if (processor.document.project().tracks[row].locked) { selectClip(clip->id); return; }
         original = *clip;
         originalRow = row;
         downX = event.x;
@@ -446,7 +460,8 @@ public:
         before = processor.document.project();
         expectedRevision = processor.document.revision();
         changed = false;
-        selectClip(original.id);
+        if (!selectedClips.contains(original.id) || mode != Mode::move) { selectClip(original.id); }
+        else { notifySelection(original.id); }
     }
 
     void mouseMove(const juce::MouseEvent& event) override {
@@ -480,6 +495,37 @@ public:
                 : (mode == Mode::slip ? timing.offset / timing.rate : timing.start);
             delta = before->timeGrid().snap(anchor + delta) - anchor;
         }
+        if (mode == Mode::move && selectedClips.size() > 1) {
+            auto updated = *before;
+            double earliest = timing.start;
+            for (const auto& track : updated.tracks) {
+                for (const auto& item : track.clips) {
+                    if (selectedClips.contains(item.id)) { earliest = std::min(earliest, item.timing(updated.bpm).start); }
+                }
+            }
+            delta = std::max(delta, -earliest);
+            const auto row = trackAtY(event.y);
+            const auto rows = row >= 0 ? row - originalRow : 0;
+            if (rows != 0) {
+                const auto sourceY = trackY(originalRow);
+                const auto visibleDelta = trackY(row) - sourceY;
+                for (int index = 0; index < static_cast<int>(updated.tracks.size()); ++index) {
+                    const auto& track = updated.tracks[index];
+                    if (!std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& item) { return selectedClips.contains(item.id); })) { continue; }
+                    const auto y = trackY(index);
+                    if (y < rulerHeight || trackAtY(y + visibleDelta) != index + rows) { return; }
+                }
+            }
+            if (!motion::moveClips(updated.tracks, {selectedClips.begin(), selectedClips.end()}, delta, rows, updated.bpm)) { return; }
+            for (const auto& track : updated.tracks) {
+                for (const auto& item : track.clips) { updated.duration = std::max(updated.duration, item.timing(updated.bpm).end()); }
+            }
+            changed = delta != 0 || rows != 0;
+            processor.document.preview(std::move(updated));
+            expectedRevision = processor.document.revision();
+            repaint();
+            return;
+        }
         if (delta != 0.0) {
             if (mode == Mode::move) {
                 edited.moveTo(std::max(0.0, timing.start + delta));
@@ -498,7 +544,7 @@ public:
         }
         const auto target = mode == Mode::move
             ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : originalRow) : originalRow;
-        if (before->tracks[target].kind != before->tracks[originalRow].kind) { return; }
+        if (before->tracks[target].locked || before->tracks[target].kind != before->tracks[originalRow].kind) { return; }
         const bool candidateChanged = candidate.start != original.start || candidate.duration != original.duration
             || candidate.offset != original.offset || candidate.rate != original.rate || target != originalRow;
         if (!candidateChanged) {
@@ -530,7 +576,7 @@ public:
         auto originalProject = std::move(*before);
         before.reset();
         if (changed) {
-            const auto label = mode == Mode::move ? "Move clip" : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
+            const auto label = mode == Mode::move ? (selectedClips.size() > 1 ? "Move clips" : "Move clip") : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
             processor.document.commit(label, std::move(originalProject));
         }
         changed = false;
@@ -557,6 +603,7 @@ public:
     }
 
     bool keyPressed(const juce::KeyPress& key) override {
+        ensureTrackRows();
         if (selected != 0 && key.getModifiers().isCommandDown() && key.getKeyCode() == 'D') {
             duplicateClip(selected);
             return true;
@@ -586,20 +633,23 @@ public:
             cancelGesture();
             const auto& tracks = processor.document.project().tracks;
             const auto exists = std::any_of(tracks.begin(), tracks.end(), [&](const auto& track) {
-                return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return clip.id == selected; });
+                return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return selectedClips.contains(clip.id); });
             });
             if (!exists) {
                 return false;
             }
-            processor.document.edit("Delete clip", [&](motion::Project& project) {
+            for (const auto& track : tracks) {
+                if (track.locked && std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return selectedClips.contains(clip.id); })) {
+                    if (onError) { onError("Unlock selected tracks before deleting clips."); }
+                    return true;
+                }
+            }
+            processor.document.edit(selectedClips.size() > 1 ? "Delete clips" : "Delete clip", [&](motion::Project& project) {
                 for (auto& track : project.tracks) {
-                    std::erase_if(track.clips, [&](const auto& clip) { return clip.id == selected; });
+                    std::erase_if(track.clips, [&](const auto& clip) { return selectedClips.contains(clip.id); });
                 }
             });
-            selected = 0;
-            if (onSelection) {
-                onSelection(0);
-            }
+            selectClip(0);
             return true;
         }
         return false;
@@ -866,12 +916,24 @@ private:
         repaint();
     }
 
-    void selectClip(motion::Id id) {
-        selected = id;
-        if (onSelection) {
-            onSelection(id);
+    bool isClip(motion::Id id) const {
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.id == id) { return true; } }
         }
+        return false;
+    }
+    mutable std::set<motion::Id> selectedClips;
+    bool notifyingSelection = false;
+    void notifySelection(motion::Id id) {
+        selected = id;
+        const juce::ScopedValueSetter<bool> notification(notifyingSelection, true);
+        if (onSelection) { onSelection(id); }
         repaint();
+    }
+    void selectClip(motion::Id id) {
+        selectedClips.clear();
+        if (isClip(id)) { selectedClips.insert(id); }
+        notifySelection(id);
     }
 
     const motion::Clip* clipAt(juce::Point<int> position, int& row) const {
@@ -906,11 +968,14 @@ private:
         const auto revision = processor.document.revision();
         if (layoutGeneration != generation) {
             collapsedGroups.clear();
+            selectedClips.clear();
+            selected = 0;
             layoutGeneration = generation;
             layoutRevision.reset();
         }
         if (!layoutRevision.has_value() || *layoutRevision != revision) {
             rows = motion::trackRows(processor.document.project(), collapsedGroups);
+            std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });
             layoutRevision = revision;
         }
         scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());

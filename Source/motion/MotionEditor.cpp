@@ -738,7 +738,7 @@ void MotionEditor::select(motion::Id id) {
     clipTimingPanel.setSelection(id);
     effectsPanel.setSelectedClip(id);
     if (inspectorTabs.getCurrentTabIndex() != 3) { inspectorTabs.setSelectedIndex(0); }
-    timeline.selected = id;
+    timeline.setSelection(id);
     timeline.revealSelection();
     composition.selected = id;
     selectCurveTarget(id, curvePropertyName, false);
