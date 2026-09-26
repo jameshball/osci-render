@@ -67,9 +67,9 @@ struct PreparedClip {
         return std::clamp(weight, 0.0, 1000000.0);
     }
 
-    osci::Point sample(double time, double phase) const {
+    osci::Point sample(double time, double phase, double phaseSpan = 0) const {
         const auto local = localTime(time);
-        auto point = applyEffects(effects, source->sample(local, phase), local, bpm);
+        auto point = applyEffects(effects, source->sample(local, phase, phaseSpan), local, bpm);
         point = applyTransform(point, curves, local, bpm);
         point = applyEffects(trackEffects, point, time, bpm);
         for (const auto& group : groups) {
@@ -174,7 +174,7 @@ struct PreparedComposition {
         }
     }
 
-    osci::Point sample(double time, double phase) const {
+    osci::Point sample(double time, double phase, double phaseSpan = 0) const {
         double allocation = 0.0;
         for (const auto& clip : clips) {
             if (clip.active(time)) {
@@ -191,7 +191,7 @@ struct PreparedComposition {
             }
             const auto weight = clip.weight(time);
             if (cursor < weight) {
-                return projectPoint(clip.sample(time, cursor / weight), time);
+                return projectPoint(clip.sample(time, cursor / weight, phaseSpan * allocation / weight), time);
             }
             cursor -= weight;
         }

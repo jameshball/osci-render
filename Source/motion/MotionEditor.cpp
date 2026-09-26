@@ -3,6 +3,7 @@
 #include "export/SoundtrackExporter.h"
 #include "ui/VideoExportSettings.h"
 #include "ui/BakeSettingsPanel.h"
+#include "ui/RasterSettingsPanel.h"
 #include <cstdlib>
 
 namespace {
@@ -250,7 +251,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.png;*.jpg;*.jpeg;*.gif;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -292,9 +293,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     assetLibrary.onBake = [this](motion::Id id) {
         const auto& assets = processor.document.project().assets;
         const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-        if (found == assets.end() || !(*found)->extension.equalsIgnoreCase(".lua")) { return; }
-        bakeRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
-        showNextBakeSettings();
+        if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !motion::Document::isRasterSource((*found)->extension))) { return; }
+        preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
+        showNextPreparationSettings();
     };
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
@@ -470,7 +471,7 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
 
 bool MotionEditor::openSourceFile(const juce::File& file) {
     const auto extension = file.getFileExtension().toLowerCase();
-    if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua"
+    if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua" && !motion::Document::isRasterSource(extension)
         && extension != ".gpla" && extension != ".json" && extension != ".lottie"
         && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
         importError = "This source type is not connected yet.";
@@ -479,61 +480,76 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
         return false;
     }
     SourceRequest request {file, processor.position.load(), processor.document.generation(), {}};
-    if (extension == ".lua") {
-        bakeRequests.push_back(std::move(request));
-        showNextBakeSettings();
+    if (extension == ".lua" || motion::Document::isRasterSource(extension)) {
+        preparationRequests.push_back(std::move(request));
+        showNextPreparationSettings();
     } else {
         beginSourceImport(std::move(request));
     }
     return true;
 }
 
-void MotionEditor::showNextBakeSettings() {
-    if (bakeSettingsOpen) { return; }
-    while (!bakeRequests.empty() && bakeRequests.front().generation != processor.document.generation()) { bakeRequests.pop_front(); }
-    if (bakeRequests.empty()) { return; }
-    auto request = std::move(bakeRequests.front());
-    bakeRequests.pop_front();
-    motion::BakeSettings initial;
-    initial.bpm = processor.document.project().bpm;
-    initial.frameRate = processor.document.project().frameRate;
-    if (request.replacement != nullptr) { initial = request.replacement->bakeSettings; }
-    auto content = std::make_unique<MotionBakeSettingsPanel>(initial);
-    auto* panel = content.get();
+void MotionEditor::showNextPreparationSettings() {
+    if (preparationSettingsOpen) { return; }
+    while (!preparationRequests.empty() && preparationRequests.front().generation != processor.document.generation()) { preparationRequests.pop_front(); }
+    if (preparationRequests.empty()) { return; }
+    auto request = std::move(preparationRequests.front());
+    preparationRequests.pop_front();
     const auto name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Bake " + name, juce::Point<int>(440, 400), true);
+    const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
+    const bool raster = motion::Document::isRasterSource(extension);
+    std::unique_ptr<juce::Component> content;
+    MotionBakeSettingsPanel* luaPanel = nullptr;
+    MotionRasterSettingsPanel* imagePanel = nullptr;
+    if (raster) {
+        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings());
+        imagePanel = panel.get();
+        content = std::move(panel);
+    } else {
+        motion::BakeSettings initial;
+        initial.bpm = processor.document.project().bpm;
+        initial.frameRate = processor.document.project().frameRate;
+        if (request.replacement != nullptr) { initial = request.replacement->bakeSettings; }
+        auto panel = std::make_unique<MotionBakeSettingsPanel>(initial);
+        luaPanel = panel.get();
+        content = std::move(panel);
+    }
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (raster ? "Prepare " : "Bake ") + name, juce::Point<int>(440, 400), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
-    bakeSettingsOpen = true;
+    preparationSettingsOpen = true;
     overlay->onDismissRequested = [owner] {
         if (owner != nullptr) {
-            owner->bakeSettingsOpen = false;
-            owner->showNextBakeSettings();
+            owner->preparationSettingsOpen = false;
+            owner->showNextPreparationSettings();
         }
     };
-    panel->onBake = [owner, overlayPointer, request](motion::BakeSettings settings) {
-        juce::MessageManager::callAsync([owner, overlayPointer, request, settings] {
+    const auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings) {
+        juce::MessageManager::callAsync([owner, overlayPointer, request, settings, rasterSettings] {
             if (owner == nullptr || overlayPointer == nullptr) { return; }
-            owner->dismissOverlay(overlayPointer.getComponent(), [owner, request, settings] {
+            owner->dismissOverlay(overlayPointer.getComponent(), [owner, request, settings, rasterSettings] {
                 if (owner == nullptr) { return; }
-                owner->bakeSettingsOpen = false;
+                owner->preparationSettingsOpen = false;
                 if (owner->processor.document.generation() == request.generation) {
-                    owner->beginSourceImport(request, settings);
+                    owner->beginSourceImport(request, settings, rasterSettings);
                 }
-                owner->showNextBakeSettings();
+                owner->showNextPreparationSettings();
             });
         });
     };
+    if (luaPanel != nullptr) { luaPanel->onBake = [submit](motion::BakeSettings settings) { submit(settings, {}); }; }
+    if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) { submit({}, settings); }; }
     showOverlay(std::move(overlay));
 }
 
-void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings settings) {
+void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings settings, motion::RasterSettings rasterSettings) {
     importError.clear();
     assetLibrary.setError({});
     auto asset = std::make_shared<motion::Asset>();
     asset->name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
     asset->bakeSettings = settings;
+    asset->rasterSettings = rasterSettings;
     const auto time = request.time;
     const auto generation = request.generation;
     auto task = std::make_shared<ImportState>();

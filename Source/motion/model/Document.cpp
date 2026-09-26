@@ -1,6 +1,7 @@
 #include "Document.h"
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
+#include "../import/RasterSourcePreparer.h"
 #include <osci_file_import/osci_file_import.h>
 #include <set>
 #include <cstring>
@@ -544,6 +545,16 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     const auto extension = asset.extension.toLowerCase();
+    if (isRasterSource(extension)) {
+        const auto prepared = RasterSourcePreparer::prepare(asset.data.getData(), asset.data.getSize(), asset.rasterSettings, cancel, progress);
+        if (!prepared) { return juce::Result::fail(prepared.error); }
+        if (importCancelled(cancel)) { return juce::Result::fail("Image preparation cancelled."); }
+        asset.source = prepared.source;
+        asset.drawing.reset();
+        asset.audio.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
+    }
     if (extension == ".lua") {
         const auto settingsError = asset.bakeSettings.validate();
         if (!settingsError.empty()) { return juce::Result::fail(settingsError); }
@@ -717,6 +728,14 @@ juce::XmlElement Document::save() const {
             bake->addTextElement(asset->bakedData.toBase64Encoding());
         } else {
             item->addTextElement(asset->data.toBase64Encoding());
+            if (isRasterSource(asset->extension)) {
+                auto* raster = item->createNewChildElement("raster");
+                raster->setAttribute("mode", asset->rasterSettings.mode == RasterSettings::Mode::contours ? "contours" : "scanlines");
+                raster->setAttribute("threshold", exactBakeNumber(asset->rasterSettings.threshold));
+                raster->setAttribute("invert", asset->rasterSettings.invert);
+                raster->setAttribute("resolution", asset->rasterSettings.resolution);
+                raster->setAttribute("pointsPerFrame", static_cast<int>(asset->rasterSettings.pointsPerFrame));
+            }
         }
     }
     for (const auto& track : state.tracks) {
@@ -835,6 +854,19 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         }
         if (asset->id == 0 || !identities.insert(asset->id).second || !asset->data.fromBase64Encoding(encoded)) {
             return juce::Result::fail("Invalid asset data or identity.");
+        }
+        if (isRasterSource(asset->extension)) {
+            const auto* raster = item->getChildByName("raster");
+            if (raster == nullptr) { return juce::Result::fail("Image asset is missing its preparation settings."); }
+            const auto mode = raster->getStringAttribute("mode");
+            if (mode != "contours" && mode != "scanlines") { return juce::Result::fail("Unknown image preparation mode."); }
+            asset->rasterSettings.mode = mode == "contours" ? RasterSettings::Mode::contours : RasterSettings::Mode::scanlines;
+            asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", -1);
+            asset->rasterSettings.invert = raster->getBoolAttribute("invert");
+            asset->rasterSettings.resolution = raster->getIntAttribute("resolution", 0);
+            const auto points = raster->getIntAttribute("pointsPerFrame", 0);
+            if (points <= 0) { return juce::Result::fail("Invalid image sample count."); }
+            asset->rasterSettings.pointsPerFrame = static_cast<std::size_t>(points);
         }
         if (luaSource) {
             auto* bake = item->getChildByName("bake");

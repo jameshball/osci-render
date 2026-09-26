@@ -58,6 +58,52 @@ public:
         expect(secondFile.loadFileAsData(secondBytes));
         expect(firstBytes == secondBytes);
 
+        beginTest("Subsampled point-source travel is blanked in live composition sampling and XYRGB export");
+        std::vector<motion::PointSample> points(4096, {0.25f, -0.25f, 0, 1, 1, 1});
+        points[103].r = points[103].g = points[103].b = 0;
+        const auto pointFrames = motion::PreparedPointFrames::create(60, 1, 4096, std::move(points));
+        expect(static_cast<bool>(pointFrames), juce::String(pointFrames.error));
+        if (pointFrames) {
+            auto guardedProject = makeProject(1.0 / 60);
+            auto pointAsset = std::make_shared<motion::Asset>(*guardedProject.assets.front());
+            pointAsset->source = std::make_shared<motion::PreparedSource>(pointFrames.source);
+            guardedProject.assets.front() = pointAsset;
+            motion::PreparedComposition guarded(guardedProject);
+            // Raw samples at 20/800 and 21/800 miss source sample 103.
+            // Both neighbours must be dark, while distant drawing stays lit.
+            expect(guarded.sample(0, 20.0 / 800).r > 0);
+            for (const int index : {20, 21}) {
+                const auto point = guarded.sample(0, index / 800.0, 1.0 / 800);
+                expectEquals(point.r, 0.0f);
+                expectEquals(point.g, 0.0f);
+                expectEquals(point.b, 0.0f);
+                expectEquals(point.x, 0.25f);
+            }
+            const auto guardFile = directory.getFile().getChildFile("guard.wav");
+            const auto guardExport = motion::SignalExporter::write(guarded, guardFile, sampleRate, cancel);
+            expect(guardExport.wasOk(), guardExport.getErrorMessage());
+            auto guardReader = read(guardFile);
+            expect(guardReader != nullptr);
+            if (guardReader != nullptr) {
+                juce::AudioBuffer<float> guardSamples(5, 800);
+                expect(guardReader->read(guardSamples.getArrayOfWritePointers(), 5, 0, 800));
+                for (const int index : {20, 21}) {
+                    for (int channel = 2; channel < 5; ++channel) { expectEquals(guardSamples.getSample(channel, index), 0.0f); }
+                }
+                expectWithinAbsoluteError(guardSamples.getSample(2, 100), 0.2f, 0.000001f);
+            }
+            guardReader.reset();
+            expect(guardFile.deleteFile());
+            // A second visible track halves each object's phase allocation.
+            auto secondTrack = guardedProject.tracks.front();
+            secondTrack.id = 4;
+            secondTrack.clips.front().id = 5;
+            guardedProject.tracks.push_back(std::move(secondTrack));
+            motion::PreparedComposition shared(guardedProject);
+            expectEquals(shared.sample(0, 10.0 / 800, 1.0 / 800).r, 0.0f);
+            expectEquals(shared.sample(0, 11.0 / 800, 1.0 / 800).r, 0.0f);
+        }
+
         beginTest("Cancellation before export preserves an existing destination");
         cancel.store(true);
         const auto cancelled = motion::SignalExporter::write(project, firstFile, sampleRate, cancel, &progress);

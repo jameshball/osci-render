@@ -32,10 +32,10 @@ private:
         std::uint64_t generation = 0;
         std::shared_ptr<const motion::Asset> replacement;
     };
-    void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {});
-    void showNextBakeSettings();
-    std::deque<SourceRequest> bakeRequests;
-    bool bakeSettingsOpen = false;
+    void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
+    void showNextPreparationSettings();
+    std::deque<SourceRequest> preparationRequests;
+    bool preparationSettingsOpen = false;
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void select(motion::Id id);

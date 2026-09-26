@@ -106,17 +106,28 @@ public:
             if (!clip.active(time)) {
                 continue;
             }
-            auto previous = projected(clip.sample(time, 0), time);
-            for (int i = 1; i <= 512; ++i) {
-                const auto point = clip.sample(time, static_cast<double>(i) / 512);
+            // Walk stored point frames at their native density so short lit
+            // runs remain visible in the editing view. Output uses its audio rate.
+            const auto sampleCount = clip.source->previewSampleCount();
+            const auto firstPoint = clip.sample(time, 0);
+            auto previous = projected(firstPoint, time);
+            bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
+            for (std::size_t i = 1; i <= sampleCount; ++i) {
+                const auto point = clip.sample(time, static_cast<double>(i) / sampleCount);
                 const auto next = projected(point, time);
-                if (!previous.has_value() || !next.has_value()) { previous = next; continue; }
+                const bool lit = point.r != 0 || point.g != 0 || point.b != 0;
+                if (!previous.has_value() || !next.has_value() || !previousLit || !lit) {
+                    previous = next;
+                    previousLit = lit;
+                    continue;
+                }
                 const auto distance = previous->getDistanceFrom(*next);
                 const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
                 const auto colour = clip.id == selected ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
                 g.setColour(colour.withAlpha(alpha * 0.8f));
                 g.drawLine({ *previous, *next }, clip.id == selected ? 1.4f : 1.0f);
                 previous = next;
+                previousLit = lit;
             }
         }
         currentGizmo().paint(g, before.has_value() ? dragAxis : hoverHandle);

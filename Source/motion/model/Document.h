@@ -7,6 +7,7 @@
 #include "Group.h"
 #include "PreparedSource.h"
 #include "BakeSettings.h"
+#include "RasterSettings.h"
 #include "../render/PreparedAudio.h"
 #include <atomic>
 #include "../../audio/synth/PreparedDrawing.h"
@@ -18,6 +19,7 @@ struct Asset {
     juce::String extension;
     juce::MemoryBlock data;
     BakeSettings bakeSettings;
+    RasterSettings rasterSettings;
     juce::MemoryBlock bakedData;
     juce::String bakeKey;
     std::shared_ptr<const osci::PreparedDrawing> drawing;
@@ -74,6 +76,9 @@ public:
     static constexpr std::size_t maximumShapesPerFrame = 100000;
     static constexpr std::size_t maximumSourceShapes = 1000000;
     static juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr);
+    static bool isRasterSource(const juce::String& extension) {
+        return extension.equalsIgnoreCase(".png") || extension.equalsIgnoreCase(".jpg") || extension.equalsIgnoreCase(".jpeg") || extension.equalsIgnoreCase(".gif");
+    }
     static Clip makeClip(Id id, const Asset& asset, double time);
 
 private:

@@ -60,16 +60,27 @@ public:
         if (points.capacity() > maximumBytes / sizeof(PointSample)) {
             return { nullptr, "Reserved point storage exceeds the 256 MiB payload limit." };
         }
-        bool explicitColour = false;
+        bool explicitColour = false, anyDark = false;
         for (const auto& point : points) {
             if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
                 || !validColour(point)) { return { nullptr, "Point samples require finite XYZ and RGB in [0,1], or RGB all -1." }; }
             explicitColour = explicitColour || point.r != -1;
+            anyDark = anyDark || dark(point);
         }
         try {
             // Allocate shared ownership before moving the caller's vector so an
             // allocation failure leaves that vector intact.
             auto result = std::shared_ptr<PreparedPointFrames>(new PreparedPointFrames(frameRate, static_cast<std::size_t>(frames), pointsPerFrame, explicitColour));
+            // One global prefix count permits independent per-frame range
+            // queries without per-frame allocations. Only needed for blanking
+            // guards: at most 42.67 MiB + 4 bytes beyond the 256 MiB raw payload.
+            // Build before moving input so allocation failure retains ownership.
+            if (anyDark) {
+                result->darkPrefix.resize(points.size() + 1);
+                for (std::size_t i = 0; i < points.size(); ++i) {
+                    result->darkPrefix[i + 1] = result->darkPrefix[i] + (dark(points[i]) ? 1u : 0u);
+                }
+            }
             result->points = std::move(points);
             return { std::move(result), {} };
         } catch (const std::bad_alloc&) {
@@ -97,22 +108,35 @@ public:
     // final sample toward sample zero within this frame, never into another frame.
     // Sentinel colour remains sentinel across a mixed sentinel/explicit segment;
     // exact point samples retain their own colour. Invalid runtime inputs are dark.
-    PointSample sample(double seconds, double phase) const {
+    // phaseSpan is the caller's phase travel per output sample. Expanding dark
+    // guards in both directions prevents decimation from skipping travel blanks.
+    // Zero retains legacy interpolation; no temporal sampling state is stored.
+    PointSample sample(double seconds, double phase, double phaseSpan = 0) const {
         if (!std::isfinite(seconds) || !std::isfinite(phase)) { return {}; }
+        return sampleFrame(frameIndex(seconds), phase, phaseSpan);
+    }
+
+    PointSample sampleFrame(std::size_t frame, double phase, double phaseSpan = 0) const {
+        if (frame >= frames || !std::isfinite(phase)) { return {}; }
         const auto position = std::clamp(phase, 0.0, std::nextafter(1.0, 0.0)) * static_cast<double>(stride);
         const auto first = std::min(stride - 1, static_cast<std::size_t>(position));
         const auto next = (first + 1) % stride;
         const auto fraction = std::clamp(position - static_cast<double>(first), 0.0, 1.0);
-        const auto offset = frameIndex(seconds) * stride;
+        const auto offset = frame * stride;
         const auto& a = points[offset + first];
         const auto& b = points[offset + next];
-        if (fraction == 0) { return a; }
+
         const auto interpolate = [fraction](float a, float b) {
             return static_cast<float>(static_cast<double>(a) * (1 - fraction) + static_cast<double>(b) * fraction);
         };
         const bool sentinel = a.r == -1 || b.r == -1;
-        return { interpolate(a.x, b.x), interpolate(a.y, b.y), interpolate(a.z, b.z),
+        auto result = fraction == 0 ? a : PointSample { interpolate(a.x, b.x), interpolate(a.y, b.y), interpolate(a.z, b.z),
             sentinel ? -1 : interpolate(a.r, b.r), sentinel ? -1 : interpolate(a.g, b.g), sentinel ? -1 : interpolate(a.b, b.b) };
+        if (!std::isfinite(phaseSpan) || phaseSpan < 0
+            || (phaseSpan > 0 && hasDarkInSpan(frame, position, phaseSpan))) {
+            result.r = result.g = result.b = 0;
+        }
+        return result;
     }
 
 private:
@@ -122,9 +146,29 @@ private:
         const auto valid = [](float value) { return std::isfinite(value) && value >= 0 && value <= 1; };
         return valid(point.r) && valid(point.g) && valid(point.b);
     }
+    static bool dark(const PointSample& point) { return point.r == 0 && point.g == 0 && point.b == 0; }
+    bool hasDarkInSpan(std::size_t frame, double position, double phaseSpan) const {
+        if (darkPrefix.empty()) { return false; }
+        const auto offset = frame * stride;
+        if (darkPrefix[offset + stride] == darkPrefix[offset]) { return false; }
+        if (phaseSpan >= 0.5) { return true; }
+        // Values are bounded by [-stride/2, 1.5*stride] before conversion.
+        // Floor/ceil conservatively include both interpolation support points.
+        const auto radius = phaseSpan * static_cast<double>(stride);
+        const auto low = static_cast<std::ptrdiff_t>(std::floor(position - radius));
+        const auto high = static_cast<std::ptrdiff_t>(std::ceil(position + radius));
+        const auto count = static_cast<std::size_t>(high - low + 1);
+        if (count >= stride) { return true; }
+        const auto start = static_cast<std::size_t>((low + static_cast<std::ptrdiff_t>(stride)) % static_cast<std::ptrdiff_t>(stride));
+        const auto end = start + count;
+        if (end <= stride) { return darkPrefix[offset + end] != darkPrefix[offset + start]; }
+        return darkPrefix[offset + stride] != darkPrefix[offset + start]
+            || darkPrefix[offset + end - stride] != darkPrefix[offset];
+    }
     const double rate;
     const std::size_t frames, stride;
     const bool explicitColour;
     std::vector<PointSample> points;
+    std::vector<std::uint32_t> darkPrefix;
 };
 }

@@ -90,7 +90,9 @@ public:
 
 private:
     void selectedRowsChanged(int row) override {
-        bakeSettings.setVisible(validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua"));
+        const bool raster = validRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
+        bakeSettings.setButtonText(raster ? "Image settings..." : "Bake settings...");
+        bakeSettings.setVisible(raster || (validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
         resized();
     }
     int getNumRows() override { return static_cast<int>(assets.size()); }

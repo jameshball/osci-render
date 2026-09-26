@@ -10,6 +10,10 @@
     <GROUP id="MotionTests" name="Motion">
       <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
             resource="0" file="tests/MotionSignalExportTest.cpp"/>
+      <FILE id="MotionRasterDecoderT" name="MotionRasterDecoderTest.cpp"
+            compile="1" resource="0" file="tests/MotionRasterDecoderTest.cpp"/>
+      <FILE id="MotionRasterImportT" name="MotionRasterImportTest.cpp" compile="1"
+            resource="0" file="tests/MotionRasterImportTest.cpp"/>
       <FILE id="MotionBakeArchiveT" name="MotionBakeArchiveTest.cpp" compile="1"
             resource="0" file="tests/MotionBakeArchiveTest.cpp"/>
       <FILE id="MotionLuaBakeT" name="MotionLuaBakerTest.cpp" compile="1"
