@@ -57,7 +57,7 @@ bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
     menus.addTopLevelMenu("File");
     menus.addProjectMenuItems(0, processor, *this);
@@ -76,7 +76,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &splitButton, &timeLabel, &selectionLabel, &curveEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &splitButton, &timeLabel, &selectionLabel, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
         addAndMakeVisible(component);
     }
     addAndMakeVisible(compositionTitle);
@@ -209,14 +209,19 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     cameraPanel.setVisible(false);
     timelineTabs.addTab("Timeline");
     timelineTabs.addTab("Graph");
+    timelineTabs.addTab("Notes");
     timelineTabs.onSelectionChanged = [this](int index) {
+        if (index == 2) { timelineFraction = std::max(timelineFraction, .42); }
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
+        notesEditor.setVisible(index == 2);
         modulationPanel.setVisible(index == 1);
         curveProperty.setVisible(index == 1);
         resized();
+        if (index == 2) { notesEditor.fitContents(); }
     };
     curveEditor.setVisible(false);
+    notesEditor.setVisible(false);
     curveProperty.setVisible(false);
     curveProperty.setName("Animated property");
     for (std::size_t index = 0; index < motion::propertyNames.size(); ++index) {
@@ -256,7 +261,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.png;*.jpg;*.jpeg;*.gif;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.png;*.jpg;*.jpeg;*.gif;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -306,6 +311,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
     };
     timeline.onSelection = [this](motion::Id id) { select(id); };
+    timeline.onMidiAssigned = [this](motion::Id id) { select(id); timelineTabs.setSelectedIndex(2); notesEditor.fitContents(); };
+    timeline.onError = [this](const juce::String& message) { assetLibrary.setError(message); };
     composition.onSelection = timeline.onSelection;
     selectionLabel.setColour(juce::Label::textColourId, osci::Colours::text());
     selectionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold));
@@ -360,7 +367,7 @@ void MotionEditor::resized() {
     auto timeline = timelineBounds;
     auto transport = timeline.removeFromTop(30);
     timelineHeader.setBounds(transport);
-    timelineTabs.setBounds(transport.removeFromLeft(205));
+    timelineTabs.setBounds(transport.removeFromLeft(270));
     playButton.setBounds(transport.removeFromLeft(65).reduced(2));
     splitButton.setBounds(transport.removeFromLeft(65).reduced(2));
     timeLabel.setBounds(transport.removeFromLeft(110));
@@ -371,6 +378,7 @@ void MotionEditor::resized() {
     cancelExport.setBounds(transport.removeFromRight(62).reduced(2));
     exportBar.setBounds(transport.removeFromRight(180).reduced(2));
     this->timeline.setBounds(timeline.withTrimmedTop(3));
+    notesEditor.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
     modulationPanel.setBounds(graph.removeFromRight(285));
     graph.removeFromRight(3);
@@ -477,7 +485,7 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
 bool MotionEditor::openSourceFile(const juce::File& file) {
     const auto extension = file.getFileExtension().toLowerCase();
     if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua" && !motion::Document::isRasterSource(extension)
-        && extension != ".gpla" && extension != ".json" && extension != ".lottie"
+        && !motion::Document::isMidiSource(extension) && extension != ".gpla" && extension != ".json" && extension != ".lottie"
         && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
         importError = "This source type is not connected yet.";
         assetLibrary.setError(importError);
@@ -555,6 +563,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
     asset->bakeSettings = settings;
     asset->rasterSettings = rasterSettings;
+    asset->midiImportBpm = processor.document.project().bpm;
     const auto time = request.time;
     const auto generation = request.generation;
     auto task = std::make_shared<ImportState>();
@@ -608,6 +617,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 return;
             }
             asset->id = document.newId();
+            if (asset->midi != nullptr) {
+                document.edit("Import MIDI file", [&](motion::Project& project) { project.assets.push_back(asset); });
+                owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
+                return;
+            }
             auto clip = motion::Document::makeClip(document.newId(), *asset, time);
             motion::Track track;
             track.id = document.newId();
@@ -650,6 +664,7 @@ void MotionEditor::timerCallback() {
     timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
     if (!tempoValue.isBeingEdited()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
     timeline.repaint();
+    if (notesEditor.isVisible()) { notesEditor.repaint(); }
     curveEditor.repaint();
     composition.repaint();
     refreshInspector();
@@ -666,6 +681,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     effectsPanel.refresh();
     modulationPanel.refresh();
     curveEditor.refresh();
+    notesEditor.refresh();
     composition.refresh();
     refreshInspector();
     resized();
@@ -674,6 +690,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
 
 void MotionEditor::select(motion::Id id) {
     selection = id;
+    notesEditor.setSelection(id);
     effectsPanel.setSelectedClip(id);
     inspectorTabs.setSelectedIndex(0);
     timeline.selected = id;

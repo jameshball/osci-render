@@ -6,6 +6,7 @@
 #include "ui/CompositionView.h"
 #include "ui/AssetLibrary.h"
 #include "ui/CurveEditor.h"
+#include "ui/NotesEditor.h"
 #include "ui/CameraPanel.h"
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
@@ -54,6 +55,7 @@ private:
     MotionCompositionView composition;
     MotionAssetLibrary assetLibrary;
     MotionCurveEditor curveEditor;
+    MotionNotesEditor notesEditor;
     MotionCameraPanel cameraPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectsPanel effectsPanel;

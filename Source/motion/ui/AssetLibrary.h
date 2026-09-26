@@ -25,6 +25,9 @@ public:
             if (validRow(row) && onBake) { onBake(assetId(row)); }
         };
         addChildComponent(bakeSettings);
+        assignMidi.setButtonText("Assign to selected clip");
+        assignMidi.onClick = [this] { insert(list.getSelectedRow()); };
+        addChildComponent(assignMidi);
         setError({});
         refresh();
     }
@@ -66,7 +69,16 @@ public:
     void updateStatus() {
         cancelImport.setVisible(importStatus.isNotEmpty());
         status.setColour(juce::Label::textColourId, hasError && importStatus.isEmpty() ? juce::Colours::orange : osci::Colours::text().withAlpha(0.6f));
-        status.setText(importStatus.isNotEmpty() ? importStatus : (hasError ? errorMessage : "Double-click or press Enter to insert. Drag onto the timeline to place a copy."), juce::dontSendNotification);
+        const auto row = list.getSelectedRow();
+        const auto midi = validRow(row) ? assets[static_cast<std::size_t>(row)]->midi : nullptr;
+        juce::String help = midi != nullptr ? "Select a visual clip, then assign these notes. Or drag this MIDI file onto a clip." : "Double-click or press Enter to insert. Drag onto the timeline to place a copy.";
+        if (midi != nullptr) {
+            const auto& asset = *assets[static_cast<std::size_t>(row)];
+            help += "\n" + juce::String(static_cast<int>(midi->notes().size())) + (midi->notes().size() == 1 ? " note" : " notes");
+            if (asset.midiSuggestedBpm > 0) { help += " | " + juce::String(asset.midiSuggestedBpm, 1) + " BPM suggested"; }
+            if (asset.midiIgnoredEvents > 0) { help += "\n" + juce::String(asset.midiIgnoredEvents) + " unsupported events were not imported."; }
+        }
+        status.setText(importStatus.isNotEmpty() ? importStatus : (hasError ? errorMessage : help), juce::dontSendNotification);
         resized();
     }
 
@@ -75,7 +87,8 @@ public:
         if (cancelImport.isVisible()) {
             cancelImport.setBounds(area.removeFromBottom(30).reduced(6, 2));
         }
-        status.setBounds(area.removeFromBottom(hasError ? 110 : 68).reduced(6, 4));
+        status.setBounds(area.removeFromBottom(hasError || assignMidi.isVisible() ? 126 : 68).reduced(6, 4));
+        if (assignMidi.isVisible()) { assignMidi.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         list.setBounds(area);
     }
@@ -90,6 +103,8 @@ public:
 
 private:
     void selectedRowsChanged(int row) override {
+        assignMidi.setVisible(validRow(row) && assets[static_cast<std::size_t>(row)]->midi != nullptr);
+        updateStatus();
         const bool raster = validRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
         bakeSettings.setButtonText(raster ? "Image settings..." : "Bake settings...");
         bakeSettings.setVisible(raster || (validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
@@ -154,7 +169,7 @@ private:
     std::vector<std::shared_ptr<const motion::Asset>> assets;
     juce::ListBox list;
     juce::Label status;
-    juce::TextButton cancelImport, bakeSettings;
+    juce::TextButton cancelImport, bakeSettings, assignMidi;
     juce::String importStatus, errorMessage;
     bool hasError = false;
 };

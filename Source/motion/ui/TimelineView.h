@@ -24,7 +24,8 @@ public:
         setWantsKeyboardFocus(true);
         setTooltip("V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit.");
     }
-    std::function<void(motion::Id)> onSelection;
+    std::function<void(motion::Id)> onSelection, onMidiAssigned;
+    std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
     motion::Id selected = 0;
     double pixelsPerSecond = 70;
@@ -133,6 +134,15 @@ public:
         const auto& project = processor.document.project();
         const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [assetId](const auto& item) { return item->id == assetId; });
         if (asset == project.assets.end()) {
+            return;
+        }
+        if ((*asset)->midi != nullptr) {
+            int row = -1;
+            const auto* under = x >= namesWidth ? clipAt({x, y}, row) : nullptr;
+            const auto target = x < 0 ? selected : (under != nullptr ? under->id : 0);
+            const auto result = processor.document.assignMidi(target, assetId);
+            if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } }
+            else if (onMidiAssigned) { onMidiAssigned(target); }
             return;
         }
         const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
@@ -318,6 +328,15 @@ public:
             const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == dropAssetId; });
             if (asset != assets.end()) {
                 candidate = motion::Document::makeClip(candidate.id, **asset, candidate.start);
+            }
+            if (asset != assets.end() && (*asset)->midi != nullptr) {
+                int targetRow = -1;
+                const auto* target = clipAt(*dropPosition, targetRow);
+                if (target != nullptr && tracks[targetRow].kind == motion::TrackKind::visual && !tracks[targetRow].locked) {
+                    g.setColour(osci::Colours::accentColor());
+                    g.drawRoundedRectangle(clipBounds(*target, targetRow).toFloat().reduced(2), 3, 2);
+                }
+                return;
             }
             const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
             const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;

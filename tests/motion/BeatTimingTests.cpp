@@ -66,5 +66,32 @@ int main() {
     nonRound.start = 84.93030526342605; nonRound.duration = 174.1822300471203 - nonRound.start;
     const auto resolved = nonRound.timing(60 / .17976322142219237);
     check(resolved.end() == nonRound.end() * .17976322142219237, "resolved endpoint is not reconstructed from a rounded duration");
+    for (const double bpm : {150.0, 170.0}) {
+        motion::Clip seconds;
+        seconds.id = 20; seconds.start = bpm == 150 ? .3 : .1; seconds.duration = seconds.start;
+        const auto original = seconds.timing(bpm);
+        auto following = seconds; following.id = 21; following.start = original.end();
+        check(seconds.anchorToBeats(bpm), "fractional seconds clip anchors inward");
+        const auto anchored = seconds.timing(bpm);
+        check(anchored.start >= original.start && anchored.end() <= original.end(), "anchoring never expands the original interval");
+        check(near(anchored.start, original.start) && near(anchored.end(), original.end()), "inward anchoring retains placement to floating precision");
+        motion::Track touching;
+        check(touching.insert(seconds, bpm) && touching.insert(following, bpm), "anchored clip accepts exact-touching seconds neighbour");
+        following.start = anchored.end() - 1e-8;
+        check(!touching.canPlace(following, following.id, bpm), "real overlap remains rejected without tolerance");
+    }
+    for (const double bpm : {1.0, 63.7, 123.0, 150.0, 170.0, 999.0}) {
+        for (const double first : {.1, .3, 1.0, 1e6}) {
+            for (const double length : {.1, .3, 1.0, 1e-8}) {
+                motion::Clip seconds; seconds.id = 22; seconds.start = first; seconds.duration = length;
+                const auto original = seconds.timing(bpm);
+                check(seconds.anchorToBeats(bpm), "representable fractional interval anchors");
+                const auto anchored = seconds.timing(bpm);
+                check(anchored.start >= original.start && anchored.end() <= original.end(), "all converted boundaries stay inward");
+            }
+        }
+    }
+    motion::Clip tiny; tiny.id = 23; tiny.start = 0; tiny.duration = std::numeric_limits<double>::denorm_min();
+    check(!tiny.anchorToBeats(1) && tiny.timeBase == motion::ClipTimeBase::seconds, "unrepresentable beat interval rejects atomically");
     std::cout << "Beat timing contracts passed\n";
 }

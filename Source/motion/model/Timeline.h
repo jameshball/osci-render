@@ -5,6 +5,7 @@
 #include "MidiNotes.h"
 #include <cstdint>
 #include <map>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -83,12 +84,26 @@ struct Clip {
         if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000 || !valid()) { return false; }
         if (timeBase == ClipTimeBase::beats) { return true; }
         const auto before = timing(projectBpm);
+        if (!before.valid()) { return false; }
         auto next = *this;
         next.timeBase = ClipTimeBase::beats; next.contentBpm = projectBpm;
         next.start = before.start * (projectBpm / 60);
         next.duration = before.duration() * (projectBpm / 60);
         next.offset = before.offset * (projectBpm / 60);
+        // Reciprocal conversion can expand a touching interval by one ULP.
+        // Move only inward, and check the actual start + duration endpoint:
+        // accepting an overlap tolerance would also permit real overlaps.
+        const auto secondsPerBeat = 60 / projectBpm;
+        for (int step = 0; step < 4 && next.start * secondsPerBeat < before.start; ++step) {
+            next.start = std::nextafter(next.start, std::numeric_limits<double>::infinity());
+        }
+        for (int step = 0; step < 4 && next.end() * secondsPerBeat > before.end(); ++step) {
+            const auto inwardEnd = std::nextafter(next.end(), 0.0);
+            next.duration = inwardEnd - next.start;
+        }
         if (!next.valid() || !next.timing(projectBpm).valid()) { return false; }
+        const auto resolved = next.timing(projectBpm);
+        if (resolved.start < before.start || resolved.end() > before.end()) { return false; }
         *this = std::move(next);
         return true;
     }

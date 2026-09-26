@@ -16,6 +16,7 @@ struct MidiNote {
     std::uint64_t id = 0;
     double start = 0, duration = 1;
     int pitch = 60, velocity = 100, channel = 1;
+    bool operator==(const MidiNote&) const = default;
     double end() const { return start + duration; }
     bool valid() const {
         return id != 0 && std::isfinite(start) && start >= 0 && std::isfinite(duration) && duration > 0

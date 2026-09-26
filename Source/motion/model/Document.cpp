@@ -529,6 +529,76 @@ juce::Result Document::changeTempo(double bpm) {
     return juce::Result::ok();
 }
 
+juce::Result Document::editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation) {
+    for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
+        const auto& track = state.tracks[trackIndex];
+        for (std::size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex) {
+            const auto& original = track.clips[clipIndex];
+            if (original.id != clipId) { continue; }
+            if (track.kind != TrackKind::visual) { return juce::Result::fail("MIDI performance requires a visual track."); }
+            if (track.locked) { return juce::Result::fail("Unlock the track before editing its MIDI performance."); }
+            auto changed = original;
+            const auto result = operation(changed);
+            if (result.failed()) { return result; }
+            if (!track.canPlace(changed, clipId, state.bpm)) {
+                return juce::Result::fail("MIDI assignment would produce invalid or overlapping clip timing.");
+            }
+            if (changed.midi == original.midi && changed.midiAsset == original.midiAsset
+                && changed.timeBase == original.timeBase && changed.contentBpm == original.contentBpm
+                && changed.start == original.start && changed.duration == original.duration
+                && changed.offset == original.offset && changed.rate == original.rate) {
+                return juce::Result::ok();
+            }
+            edit(label, [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
+                project.tracks[trackIndex].clips[clipIndex] = changed;
+            });
+            return juce::Result::ok();
+        }
+    }
+    return juce::Result::fail("The selected clip no longer exists.");
+}
+
+juce::Result Document::assignMidi(Id clipId, Id assetId) {
+    std::shared_ptr<const MidiNotes> notes;
+    if (assetId == 0) {
+        const auto empty = MidiNotes::create({});
+        if (!empty) { return juce::Result::fail(empty.error); }
+        notes = empty.source;
+    } else {
+        for (const auto& asset : state.assets) {
+            if (asset != nullptr && asset->id == assetId && isMidiSource(asset->extension)) {
+                notes = asset->midi;
+                break;
+            }
+        }
+        if (notes == nullptr) { return juce::Result::fail("Choose an imported MIDI source that has been decoded successfully."); }
+    }
+    return editMidi(clipId, "Assign MIDI performance", [&](Clip& clip) {
+        if (!clip.anchorToBeats(state.bpm)) { return juce::Result::fail("Cannot anchor this clip to the project tempo."); }
+        clip.midi = notes;
+        clip.midiAsset = assetId;
+        return juce::Result::ok();
+    });
+}
+
+juce::Result Document::setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel) {
+    if (notes == nullptr) { return juce::Result::fail("MIDI note content must not be null. Use Clear MIDI to remove a performance."); }
+    return editMidi(clipId, undoLabel.isEmpty() ? "Edit MIDI notes" : undoLabel, [&](Clip& clip) {
+        if (clip.midi == nullptr) { return juce::Result::fail("Assign a MIDI performance before editing notes."); }
+        if (clip.midi->notes() == notes->notes()) { return juce::Result::ok(); }
+        clip.midi = notes;
+        return juce::Result::ok();
+    });
+}
+
+juce::Result Document::clearMidi(Id clipId) {
+    return editMidi(clipId, "Clear MIDI performance", [](Clip& clip) {
+        clip.midi.reset();
+        clip.midiAsset = 0;
+        return juce::Result::ok();
+    });
+}
+
 Clip Document::makeClip(Id id, const Asset& asset, double time) {
     Clip clip;
     clip.id = id;

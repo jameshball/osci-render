@@ -70,6 +70,9 @@ public:
     void edit(juce::String label, std::function<void(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
+    juce::Result assignMidi(Id clipId, Id assetId);
+    juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
+    juce::Result clearMidi(Id clipId);
     void preview(Project project) { apply(std::move(project)); }
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;
@@ -90,6 +93,7 @@ public:
     static Clip makeClip(Id id, const Asset& asset, double time);
 
 private:
+    juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);
     void apply(Project value);
     struct Change;
     Project state;
