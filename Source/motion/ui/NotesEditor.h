@@ -21,7 +21,7 @@ public:
         velocity.onTextChange = [this] {
             if (updating) { return; }
             const auto* clip = currentClip();
-            if (clip == nullptr || clip->midi == nullptr || selected.empty()) { return; }
+            if (clip == nullptr || clip->midi == nullptr || isLocked() || selected.empty()) { return; }
             const auto text = velocity.getText().trim();
             const auto value = text.getIntValue();
             if (text.isEmpty() || !text.containsOnly("0123456789") || value < 1 || value > 127) { error = "Velocity must be between 1 and 127."; refresh(); return; }
@@ -41,13 +41,19 @@ public:
         if (dragging && processor.document.revision() != dragRevision) { cancelDrag(); }
         const auto pattern = clip != nullptr ? clip->midi : nullptr;
         std::erase_if(selected, [&](auto id) { return pattern == nullptr || std::none_of(pattern->notes().begin(), pattern->notes().end(), [id](const auto& note) { return note.id == id; }); });
-        create.setVisible(clip != nullptr && pattern == nullptr);
+        create.setVisible(clip != nullptr && pattern == nullptr && !isLocked());
         fitButton.setVisible(pattern != nullptr); remove.setVisible(pattern != nullptr);
-        velocity.setVisible(pattern != nullptr); velocity.setEnabled(!selected.empty());
+        remove.setEnabled(!isLocked());
+        velocity.setVisible(pattern != nullptr); velocity.setEnabled(!isLocked() && !selected.empty());
         updating = true;
         juce::String value = "-";
         if (pattern != nullptr) {
-            for (const auto& note : pattern->notes()) { if (selected.contains(note.id)) { value = juce::String(note.velocity); break; } }
+            int commonVelocity = -1;
+            for (const auto& note : pattern->notes()) {
+                if (!selected.contains(note.id)) { continue; }
+                if (commonVelocity < 0) { commonVelocity = note.velocity; value = juce::String(commonVelocity); }
+                else if (commonVelocity != note.velocity) { value = "Mixed"; break; }
+            }
         }
         if (!velocity.isBeingEdited()) { velocity.setText(value, juce::dontSendNotification); }
         updating = false;
@@ -71,7 +77,7 @@ public:
         g.drawText(clip == nullptr ? "Notes" : juce::String(clip->name), 12, 0, std::max(0, velocity.getX() - 85), 30, juce::Justification::centredLeft);
         if (pattern == nullptr) {
             g.setColour(osci::Colours::text().withAlpha(.65f));
-            g.drawText(clip == nullptr ? "Select a visual clip to edit its notes." : "Create notes, or assign a MIDI file from Assets.", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
+            g.drawText(clip == nullptr ? "Select a visual clip to edit its notes." : isLocked() ? "This track is locked. Notes cannot be created." : "Create notes, or assign a MIDI file from Assets.", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
             return;
         }
         g.setColour(osci::Colours::text().withAlpha(.7f));
@@ -149,12 +155,12 @@ public:
             if (x >= keyboardWidth && x < getWidth()) { g.setColour(osci::Colours::accentColor().withAlpha(.65f)); g.drawVerticalLine(x, 30, static_cast<float>(lane.getBottom())); }
         }
         g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(11.0f);
-        g.drawText(error.isEmpty() ? "Double-click: add | Drag: move/resize | Delete: remove | Alt: bypass snap | Cmd/Ctrl-wheel: zoom" : error,
+        g.drawText(error.isEmpty() ? (isLocked() ? "Track locked | Notes are read-only. Selection, Fit and navigation remain available." : "Double-click: add | Drag: move/resize | Delete: remove | Alt: bypass snap | Cmd/Ctrl-wheel: zoom") : error,
             8, getHeight() - 20, getWidth() - 16, 20, juce::Justification::centredLeft);
     }
     void mouseDoubleClick(const juce::MouseEvent& event) override {
         const auto* clip = currentClip();
-        if (clip == nullptr || clip->midi == nullptr || !gridBounds().contains(event.getPosition()) || hit(event.getPosition()) != 0) { return; }
+        if (clip == nullptr || clip->midi == nullptr || isLocked() || !gridBounds().contains(event.getPosition()) || hit(event.getPosition()) != 0) { return; }
         auto notes = clip->midi->notes();
         motion::Id id = 1;
         std::set<motion::Id> ids; for (const auto& note : notes) { ids.insert(note.id); }
@@ -173,11 +179,14 @@ public:
         }
         const auto id = hit(event.getPosition());
         if (id == 0) {
+            marqueeSelection = selected;
             if (!event.mods.isShiftDown()) { selected.clear(); }
+            additiveMarquee = event.mods.isShiftDown();
             marquee = gridBounds().contains(event.getPosition()); anchor = event.getPosition(); selectionBox = {}; refresh(); return;
         }
         if (event.mods.isShiftDown()) { if (selected.contains(id)) { selected.erase(id); refresh(); return; } selected.insert(id); }
         else if (!selected.contains(id)) { selected = {id}; }
+        if (isLocked()) { refresh(); return; }
         dragging = true; dragRevision = processor.document.revision(); original = clip->midi; preview = original; anchor = event.getPosition();
         dragMode = velocityBounds().contains(event.getPosition()) ? 2 : 0;
         for (const auto& note : original->notes()) { if (note.id == id && dragMode == 0 && event.x >= noteBounds(note).getRight() - 6) { dragMode = 1; } }
@@ -188,7 +197,8 @@ public:
             selectionBox = juce::Rectangle<int>(anchor, event.getPosition()).getIntersection(gridBounds());
             const auto* clip = currentClip();
             if (clip != nullptr && clip->midi != nullptr) {
-                selected.clear(); for (const auto& note : clip->midi->notes()) { if (selectionBox.intersects(noteBounds(note))) { selected.insert(note.id); } }
+                selected = additiveMarquee ? marqueeSelection : std::set<motion::Id>();
+                for (const auto& note : clip->midi->notes()) { if (selectionBox.intersects(noteBounds(note))) { selected.insert(note.id); } }
             }
             repaint(); return;
         }
@@ -222,10 +232,11 @@ public:
         refresh();
     }
     bool keyPressed(const juce::KeyPress& key) override {
-        if (key == juce::KeyPress::escapeKey) { cancelDrag(); repaint(); return true; }
+        if (key == juce::KeyPress::escapeKey) { if (marquee) { selected = marqueeSelection; } cancelDrag(); refresh(); return true; }
         const auto* clip = currentClip();
         if (clip == nullptr || clip->midi == nullptr) { return false; }
         if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'A') { for (const auto& note : clip->midi->notes()) { selected.insert(note.id); } refresh(); return true; }
+        if (isLocked()) { return false; }
         const std::vector<motion::Id> ids(selected.begin(), selected.end());
         if (ids.empty()) { return false; }
         if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey) {
@@ -254,10 +265,16 @@ public:
 private:
     const motion::Clip* currentClip() const {
         for (const auto& track : processor.document.project().tracks) {
-            if (track.kind != motion::TrackKind::visual || track.locked) { continue; }
+            if (track.kind != motion::TrackKind::visual) { continue; }
             for (const auto& clip : track.clips) { if (clip.id == target) { return &clip; } }
         }
         return nullptr;
+    }
+    bool isLocked() const {
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.id == target) { return track.locked; } }
+        }
+        return false;
     }
     void report(const juce::Result& result) { error = result.failed() ? result.getErrorMessage() : juce::String(); repaint(); }
     void commit(std::vector<motion::MidiNote> notes, const juce::String& label) {
@@ -300,10 +317,10 @@ private:
     }
     MotionProcessor& processor;
     motion::Id target = 0;
-    std::set<motion::Id> selected;
+    std::set<motion::Id> selected, marqueeSelection;
     std::shared_ptr<const motion::MidiNotes> original, preview;
     std::uint64_t dragRevision = 0;
-    bool dragging = false, marquee = false, updating = false;
+    bool dragging = false, marquee = false, updating = false, additiveMarquee = false;
     int dragMode = 0, topPitch = 72, rowHeight = 16;
     static constexpr int keyboardWidth = 62, rulerHeight = 22;
     double scrollBeat = 0, pixelsPerBeat = 80;

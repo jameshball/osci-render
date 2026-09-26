@@ -111,15 +111,22 @@ try:
     step("commit note velocity", "press", "Return")
     saved, changed = saved_notes()
     assert next(n for n in changed if n.get("id") == "1").get("velocity") == "55"
+    step("select mixed velocities", "press", "command + a", "--class", "MotionNotesEditor")
+    command("wait-for-locator", "--name", "Mixed", "--class", "juce::Label", "--exact")
+    step("mixed velocities layout", "screenshot", "--file", session.artifact_dir / "mixed-velocities.png")
     step("undo velocity", "click", "--name", "Undo", "--exact")
+    step("clear mixed selection", "click", "--class", "MotionNotesEditor", "--position", "180,100")
+    step("select single gesture target", "click", "--class", "MotionNotesEditor", "--position", "234,170")
     drag("resize first note", (259, 170), (339, 170))
     saved, resized = saved_notes()
     assert abs(float(next(n for n in resized if n.get("id") == "1").get("duration")) - .75) < 1e-9
+    assert next(n for n in resized if n.get("id") == "2").attrib == next(n for n in notes if n.get("id") == "2").attrib
     step("undo note resize", "click", "--name", "Undo", "--exact")
     drag("move first note", (234, 170), (314, 154))
     saved, moved = saved_notes()
     first = next(note for note in moved if note.get("id") == "1")
     assert abs(float(first.get("start")) - 1.5) < 1e-9 and first.get("pitch") == "66", first.attrib
+    assert next(n for n in moved if n.get("id") == "2").attrib == next(n for n in notes if n.get("id") == "2").attrib
     step("undo note move", "click", "--name", "Undo", "--exact")
     saved, restored = saved_notes()
     assert [(n.get("start"), n.get("pitch")) for n in restored] == [(n.get("start"), n.get("pitch")) for n in notes]
@@ -155,6 +162,28 @@ try:
     subprocess.run(["open", "-a", str(session.app_path), str(fixture)], check=True)
     step("show reopened timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
-    print("Notes authoring/import/assignment/save workflow passed.", flush=True)
+    # A locked track retains readable notes without accepting edits.
+    saved.find("./composition/track").set("locked", "1")
+    saved.find("./composition/track").set("name", "Locked musical beam")
+    locked_xml = ET.tostring(saved, encoding="utf-8")
+    locked_fixture = session.artifact_dir / "locked-notes.osci-motion"
+    locked_fixture.write_bytes(struct.pack("<II", 0x21324356, len(locked_xml)) + locked_xml + b"\0")
+    subprocess.run(["open", "-a", str(session.app_path), str(locked_fixture)], check=True)
+    command("wait-for-locator", "--name", "Locked musical beam", "--class", "juce::Label", "--exact")
+    step("select locked visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
+    step("inspect locked notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    command("wait-for-locator", "--name", "Remove MIDI", "--exact")
+    step("select locked notes", "press", "command + a", "--class", "MotionNotesEditor")
+    locked_tree = json.loads(command("snapshot", "--json", "--full"))
+    assert find(locked_tree, "Note velocity")["enabled"] is False
+    assert find(locked_tree, "Remove MIDI")["enabled"] is False
+    step("attempt locked delete", "press", "Delete", "--class", "MotionNotesEditor")
+    step("attempt locked transpose", "press", "Up", "--class", "MotionNotesEditor")
+    step("save locked project", "press", "command + s", "--class", "MotionEditor")
+    locked_data = locked_fixture.read_bytes()
+    locked_saved = ET.fromstring(locked_data[8:8 + struct.unpack("<I", locked_data[4:8])[0]])
+    assert [n.attrib for n in locked_saved.findall("./composition/track/clip/midi/note")] == [n.attrib for n in restored]
+    step("locked notes layout", "screenshot", "--file", session.artifact_dir / "locked.png")
+    print("Notes authoring/import/assignment/save/read-only workflow passed.", flush=True)
 finally:
     session.stop_app()
