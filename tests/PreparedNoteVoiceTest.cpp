@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/audio/synth/PreparedNoteVoice.h"
+#include "../Source/motion/render/PreparedMidiSchedule.h"
 
 class PreparedNoteVoiceTest : public juce::UnitTest {
 public:
@@ -113,6 +114,41 @@ public:
             }
             expect(stagesMatch);
             expect(error < .000002f, "Long envelope maximum gain error: " + juce::String(error, 9));
+        }
+
+        beginTest("Scheduled trimmed notes match continuously stepped shared voices");
+        DahdsrParams scheduledParams;
+        scheduledParams.attackSeconds = .03; scheduledParams.decaySeconds = .04;
+        scheduledParams.sustainLevel = .7; scheduledParams.releaseSeconds = .025;
+        const auto scheduledEnvelope = osci_audio::PreparedVoiceEnvelope::prepare(scheduledParams, 48000);
+        const auto pattern = motion::MidiNotes::create({{1, 0, .25, 60, 127, 1}, {2, .125, .375, 60, 64, 1}});
+        motion::Clip scheduledClip;
+        scheduledClip.id = 1; scheduledClip.offset = .05; scheduledClip.duration = .3;
+        const auto scheduled = motion::PreparedMidiSchedule::prepare(*pattern.source, scheduledClip, 120, 48000, scheduledEnvelope->releaseSamples());
+        expect(bool(scheduled));
+        if (scheduled) {
+            for (std::uint32_t index = 0; index < scheduled.schedule->voiceCount(); ++index) {
+                const auto& note = scheduled.schedule->voice(index);
+                const auto noteVoice = osci_audio::PreparedNoteVoice::prepare(*scheduledEnvelope, 440, note.velocity / 127.0f, 1);
+                DahdsrState stepped; stepped.reset(scheduledParams);
+                std::vector<float> gains;
+                for (auto sample = note.on; sample < note.end; ++sample) {
+                    if (sample == note.off) { stepped.beginRelease(); }
+                    const auto gain = stepped.advance(1.0 / 48000);
+                    if (sample >= note.first) { gains.push_back(gain); }
+                }
+                // Reverse seeks exercise pre-roll, including attack/release
+                // before the clip boundary, without replaying past events.
+                for (auto sample = note.end; sample-- > note.first;) {
+                    const auto active = scheduled.schedule->activeAt(sample);
+                    expect(std::find(active.begin(), active.end(), index) != active.end());
+                    const auto actual = noteVoice->at(note.age(sample), note.heldSamples());
+                    expect(actual.active());
+                    expectWithinAbsoluteError(actual.envelope, gains[static_cast<std::size_t>(sample - note.first)], .000002f);
+                }
+                const auto after = scheduled.schedule->activeAt(note.end);
+                expect(std::find(after.begin(), after.end(), index) == after.end());
+            }
         }
 
         beginTest("Preparation rejects invalid and cancelled settings");
