@@ -855,9 +855,24 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         SvgParser svg(content);
         shapes = svg.draw();
     } else if (extension == ".txt") {
+        if (content.length() > 16384) {
+            return juce::Result::fail("Text sources support up to 16,384 characters. Split longer text into separate sources.");
+        }
         auto font = juce::Font(juce::FontOptions(30));
-        TextParser text(content, font);
-        shapes = text.draw();
+        // Motion titles retain their natural proportions and explicit line breaks.
+        // The synth's fitted two-line text box is unsuitable for composition work.
+        juce::GlyphArrangement glyphs;
+        juce::StringArray lines;
+        lines.addLines(content);
+        float baseline = 0.0f;
+        for (const auto& line : lines) {
+            if (importCancelled(cancel)) { return juce::Result::fail("Source preparation cancelled."); }
+            glyphs.addLineOfText(font, line, 0.0f, baseline);
+            baseline += font.getHeight() * 1.2f;
+        }
+        juce::Path path;
+        glyphs.createPath(path);
+        SvgParser::pathToShapes(path, shapes, true);
     } else {
         return juce::Result::fail("This source type is not connected to the Motion importer yet.");
     }

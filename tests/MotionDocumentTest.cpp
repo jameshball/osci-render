@@ -8,6 +8,35 @@ class MotionDocumentTest : public juce::UnitTest {
 public:
     MotionDocumentTest() : juce::UnitTest("Motion document and signal", "Motion") {}
     void runTest() override {
+        beginTest("Plain titles preserve natural proportions and explicit newlines");
+        const auto textAspect = [this](const juce::String& text) {
+            motion::Asset title;
+            title.extension = ".txt";
+            title.data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
+            const auto result = motion::Document::decodeAsset(title);
+            expect(result.wasOk(), result.getErrorMessage());
+            if (result.failed() || title.source == nullptr) { return 0.0f; }
+            float minX = 100, maxX = -100, minY = 100, maxY = -100;
+            for (int i = 0; i < 10000; ++i) {
+                const auto point = title.source->sample(0, i / 10000.0);
+                minX = std::min(minX, point.x);
+                maxX = std::max(maxX, point.x);
+                minY = std::min(minY, point.y);
+                maxY = std::max(maxY, point.y);
+            }
+            return (maxX - minX) / std::max(0.0001f, maxY - minY);
+        };
+        const auto singleLine = textAspect("PHASE / SPACE");
+        const auto explicitLines = textAspect("PHASE /\nSPACE");
+        expect(singleLine > 8.0f, "A title should not wrap to fit a square");
+        expect(explicitLines > 1.0f && explicitLines < singleLine * 0.5f, "Explicit line breaks must remain effective");
+        motion::Asset oversizedTitle;
+        oversizedTitle.extension = ".txt";
+        const auto oversizedText = juce::String::repeatedString("A", 16385);
+        oversizedTitle.data.append(oversizedText.toRawUTF8(), oversizedText.getNumBytesAsUTF8());
+        expect(motion::Document::decodeAsset(oversizedTitle).failed());
+        expect(oversizedTitle.source == nullptr);
+
         juce::UndoManager undo;
         motion::Document document(undo);
         auto asset = std::make_shared<motion::Asset>();
