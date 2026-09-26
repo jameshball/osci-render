@@ -71,9 +71,9 @@ public:
     void resetView() { cancelGesture(); camera = {}; repaint(); }
 
     std::function<void(motion::Id)> onSelection;
-    void refresh() { prepared = std::make_unique<motion::PreparedComposition>(processor.document.project()); repaint(); }
+    void refresh() { prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); repaint(); }
     void preview(const motion::Project& project) {
-        prepared = std::make_unique<motion::PreparedComposition>(project);
+        prepared = std::make_unique<motion::PreparedComposition>(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
         repaint();
     }
 

@@ -12,6 +12,8 @@
             resource="0" file="tests/MotionBeamContinuityTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
+      <FILE id="MotionMidiRenderT" name="MotionMidiRenderTest.cpp" compile="1"
+            resource="0" file="tests/MotionMidiRenderTest.cpp"/>
       <FILE id="PreparedNoteVoiceT" name="PreparedNoteVoiceTest.cpp" compile="1"
             resource="0" file="tests/PreparedNoteVoiceTest.cpp"/>
       <FILE id="MotionMidiDocumentT" name="MotionMidiDocumentTest.cpp" compile="1"

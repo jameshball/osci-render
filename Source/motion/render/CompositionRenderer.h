@@ -3,6 +3,7 @@
 #include "../model/Document.h"
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
+#include "PreparedMidiPerformance.h"
 #include <array>
 #include <numbers>
 
@@ -53,6 +54,7 @@ struct PreparedClip {
     std::vector<PreparedEffect> effects, trackEffects;
     std::vector<PreparedGroup> groups;
     double bpm = 120, contentBpm = 120;
+    std::shared_ptr<const PreparedMidiPerformance> midi;
 
     double localTime(double time) const { return offset + (time - start) * rate; }
     bool active(double time) const { return time >= start && time < end; }
@@ -119,8 +121,10 @@ struct PreparedCamera {
     }
 };
 
+enum class CompositionPurpose { signal, editorGeometry };
+
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project) : duration(project.duration), bpm(project.bpm), soundtrack(project), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), soundtrack(project), effects(prepareEffects(project.effects)) {
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;
@@ -143,6 +147,7 @@ struct PreparedComposition {
                 continue;
             }
             for (const auto& clip : track.clips) {
+                if (cancel != nullptr && cancel->load()) { preparationError = "Composition preparation cancelled."; clips.clear(); return; }
                 const auto asset = std::find_if(project.assets.begin(), project.assets.end(),
                     [&](const auto& item) { return item->id == clip.asset; });
                 if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr)) {
@@ -171,6 +176,16 @@ struct PreparedComposition {
                     item.groups.emplace_back(*group);
                     groupId = group->parent;
                 }
+                if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
+                    const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, project.bpm, sampleRate, cancel);
+                    if (!performance) {
+                        preparationError = "MIDI clip \"" + juce::String(clip.name) + "\": " + juce::String(performance.error);
+                        clips.clear();
+                        return;
+                    }
+                    item.midi = performance.performance;
+                    hasMidi = true;
+                }
                 clips.push_back(std::move(item));
             }
         }
@@ -179,17 +194,20 @@ struct PreparedComposition {
     // A signal sample is evaluated with both adjacent sample positions. This
     // stays stateless for seeking/export, while accounting for animated beam
     // allocation instead of assuming each clip's phase speed remains constant.
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1) const {
+        if (oscillatorTime < 0) { oscillatorTime = time; }
         if (!std::isfinite(time) || !std::isfinite(phase)) { return {0, 0, 0, 0, 0, 0}; }
-        const auto current = selectBeam(time, phase);
+        const auto current = selectBeam(time, phase, oscillatorTime);
         if (current.clip == nullptr) { return {0, 0, 0, 0, 0, 0}; }
         bool blank = !std::isfinite(phaseSpan) || phaseSpan < 0 || !std::isfinite(timeSpan) || timeSpan < 0;
-        auto localSpan = phaseSpan == 0 ? 0.0 : phaseSpan * current.phaseScale;
+        auto localSpan = phaseSpan == 0 ? 0.0 : (current.note != 0 ? current.notePhaseSpan : phaseSpan * current.phaseScale);
         if (!blank && (phaseSpan > 0 || timeSpan > 0)) {
             const auto wrap = [](double value) { return value - std::floor(value); };
-            const auto previous = selectBeam(time - timeSpan, wrap(phase - phaseSpan));
-            const auto next = selectBeam(time + timeSpan, wrap(phase + phaseSpan));
+            const auto oscillatorStep = 1 / sampleRate;
+            const auto previous = selectBeam(time - timeSpan, wrap(phase - phaseSpan), oscillatorTime - oscillatorStep);
+            const auto next = selectBeam(time + timeSpan, wrap(phase + phaseSpan), oscillatorTime + oscillatorStep);
             blank = previous.clip != current.clip || next.clip != current.clip
+                || previous.note != current.note || next.note != current.note
                 || activeCamera(time - timeSpan) != activeCamera(time)
                 || activeCamera(time + timeSpan) != activeCamera(time);
             if (!blank) {
@@ -204,9 +222,12 @@ struct PreparedComposition {
     struct BeamSelection {
         const PreparedClip* clip = nullptr;
         double phase = 0, phaseScale = 0;
+        Id note = 0;
+        double notePhaseSpan = 0;
     };
 
-    BeamSelection selectBeam(double time, double phase) const {
+    BeamSelection selectBeam(double time, double phase, double oscillatorTime = -1) const {
+        if (oscillatorTime < 0) { oscillatorTime = time; }
         double allocation = 0.0;
         for (const auto& clip : clips) {
             if (clip.active(time)) { allocation += std::max(1.0, clip.weight(time)); }
@@ -216,7 +237,13 @@ struct PreparedComposition {
         for (const auto& clip : clips) {
             if (!clip.active(time)) { continue; }
             const auto weight = clip.weight(time);
-            if (cursor < weight) { return {&clip, cursor / weight, allocation / weight}; }
+            if (cursor < weight) {
+                if (clip.midi != nullptr) {
+                    const auto note = clip.midi->select(time, cursor / weight, oscillatorTime);
+                    return note.note == 0 ? BeamSelection{} : BeamSelection{&clip, note.phase, 0, note.note, note.phaseSpan};
+                }
+                return {&clip, cursor / weight, allocation / weight};
+            }
             cursor -= weight;
         }
         // Unused allocation stays dark rather than normalizing away a fade.
@@ -267,6 +294,10 @@ struct PreparedComposition {
 
     double duration;
     double bpm = 120;
+    double sampleRate = 48000;
+    bool hasMidi = false;
+    std::uint64_t publicationRevision = 0;
+    juce::String preparationError;
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;

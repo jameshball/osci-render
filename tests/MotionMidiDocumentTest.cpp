@@ -86,7 +86,8 @@ public:
         red.modulation.amount = .1; red.modulation.beatsPerCycle = 4;
         auto fastProject = slowProject; fastProject.bpm = 340;
         const motion::PreparedComposition slow(slowProject), fast(fastProject);
-        const auto slowPoint = slow.sample(1.1, .2), fastPoint = fast.sample(.55, .2);
+        // Compare content geometry/curves, independently of the musical oscillator.
+        const auto slowPoint = slow.clips[0].sample(1.1, .2), fastPoint = fast.clips[0].sample(.55, .2);
         expectWithinAbsoluteError(slowPoint.x, fastPoint.x, 1e-6f);
         expectWithinAbsoluteError(slowPoint.r, fastPoint.r, 1e-6f);
         const auto target = motion::findPropertyTarget(fastProject, authored.id);

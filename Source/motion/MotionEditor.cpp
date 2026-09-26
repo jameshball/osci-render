@@ -629,6 +629,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
 void MotionEditor::timerCallback() {
     refreshOutputChoices();
     processor.collectPreparedState();
+    const auto preparationError = processor.getPreparationError();
+    if (preparationError != lastPreparationError) {
+        lastPreparationError = preparationError;
+        if (preparationError.isNotEmpty()) { osci::showOverlayMessage(*this, "Cannot play composition", preparationError); }
+    }
     if (pendingImports.empty()) {
         assetLibrary.setImportStatus({});
     } else {
@@ -842,7 +847,7 @@ void MotionEditor::exportVideo() {
                             temporary = std::make_shared<MotionVideoTemporaryFiles>();
                             result = temporary->directory.createDirectory();
                             if (result.wasOk() && !state->cancelled.load()) {
-                                const motion::PreparedComposition prepared(project);
+                                const motion::PreparedComposition prepared(project, 48000, &state->cancelled);
                                 result = motion::SignalExporter::write(prepared, temporary->signal(), 48000.0, state->cancelled, &state->progress);
                                 if (result.wasOk() && config.includeAudio) {
                                     result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), 48000.0, state->cancelled, &state->soundtrackProgress);

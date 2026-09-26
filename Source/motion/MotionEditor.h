@@ -104,7 +104,7 @@ private:
     double exportProgress = 0;
     juce::ProgressBar exportBar { exportProgress };
     juce::TextButton cancelExport { "Cancel" };
-    juce::String importError;
+    juce::String importError, lastPreparationError;
 
     MainMenuBarModel menus;
     osci::PanelHeader libraryHeader { "Assets" };

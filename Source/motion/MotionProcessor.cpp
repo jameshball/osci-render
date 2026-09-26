@@ -6,15 +6,36 @@ MotionProcessor::MotionProcessor()
     : CommonAudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     addAllParameters();
     rgbEnabled = true;
-    document.onChanged = [this] {
-        composition.publish(std::make_unique<motion::PreparedComposition>(document.project()));
-    };
+    preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
+    document.onChanged = [this] { requestComposition(document.project()); };
     document.onChanged();
 }
 
 MotionProcessor::~MotionProcessor() {
+    preparationWorker.reset();
+    cancelPendingUpdate();
     document.onChanged = nullptr;
     getUndoManager().clearUndoHistory();
+}
+
+void MotionProcessor::requestComposition(const motion::Project& project) {
+    preparationSampleRate = requestedSampleRate.load();
+    preparationRevision = preparationWorker->request(project, preparationSampleRate);
+}
+
+void MotionProcessor::handleAsyncUpdate() {
+    if (preparationSampleRate != requestedSampleRate.load()) {
+        requestComposition(document.project());
+        return;
+    }
+    auto result = preparationWorker->take();
+    if (result == nullptr || result->revision != preparationRevision) { return; }
+    preparationError = result->error;
+    preparationFailed.store(preparationError.isNotEmpty());
+    if (result->composition != nullptr) {
+        result->composition->publicationRevision = result->revision;
+        composition.publish(std::move(result->composition));
+    }
 }
 
 bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
@@ -25,28 +46,51 @@ bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
     signal.setSize(6, samplesPerBlock);
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
+    oscillatorSample = audioSample;
+    requestedSampleRate.store(sampleRate);
+    triggerAsyncUpdate();
+    transitionGuard.begin();
 }
 
 void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     buffer.clear();
     midi.clear();
     const auto* prepared = composition.acquire();
-    const auto requested = requestedPosition.exchange(-1.0);
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
-    if (prepared == nullptr || !std::isfinite(sampleRate) || sampleRate <= 0 || count > signal.getNumSamples()) {
+    if (count > signal.getNumSamples()) { return; }
+    if (prepared == nullptr || preparationFailed.load() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
+        transitionGuard.begin();
+        for (int i = 0; i < count; ++i) {
+            const auto point = transitionGuard.apply({0, 0, 0, 0, 0, 0});
+            signal.setSample(0, i, point.x); signal.setSample(1, i, point.y); signal.setSample(2, i, point.z);
+            signal.setSample(3, i, 0); signal.setSample(4, i, 0); signal.setSample(5, i, 0);
+        }
+        juce::AudioBuffer<float> silent(signal.getArrayOfWritePointers(), 6, count);
+        threadManager.write(silent, "VisualiserRenderer");
+        routeSignalOutput(buffer);
         return;
+    }
+    if (prepared->publicationRevision != previousRevision) {
+        previousRevision = prepared->publicationRevision;
+        transitionGuard.begin();
     }
     const auto durationIndex = motion::sampleIndex(prepared->duration, sampleRate);
     if (!durationIndex.has_value() || *durationIndex < 1) {
         return;
     }
     const auto durationSamples = *durationIndex;
+    const auto requested = requestedPosition.exchange(-1.0);
     if (requested >= 0.0 && std::isfinite(requested)) {
         audioSample = motion::sampleIndex(std::min(requested, prepared->duration), sampleRate).value_or(0);
+        oscillatorSample = audioSample;
+        transitionGuard.begin();
     }
     const auto running = playing.load();
     const auto drawing = running || freezeWhenStopped.load();
+    if (running != wasPlaying || drawing != wasDrawing) { transitionGuard.begin(); }
+    wasPlaying = running;
+    wasDrawing = drawing;
     if (running && audioSample >= durationSamples) {
         audioSample = 0;
     }
@@ -56,10 +100,11 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     const auto fallbackVolume = volumeEffect->getValue();
     for (int i = 0; i < count; ++i) {
         audioTime = static_cast<double>(audioSample) / sampleRate;
-        if (running) {
-            phase = std::fmod(static_cast<double>(audioSample) * 60.0 / sampleRate, 1.0);
-        }
-        const auto point = drawing ? prepared->sample(audioTime, phase, 60.0 / sampleRate, running ? 1.0 / sampleRate : 0.0) : osci::Point(0, 0, 0, 0, 0, 0);
+        if (running) { oscillatorSample = audioSample; }
+        const auto oscillatorTime = static_cast<double>(oscillatorSample) / sampleRate;
+        const auto phase = std::fmod(static_cast<double>(oscillatorSample) * 60.0 / sampleRate, 1.0);
+        auto point = drawing ? prepared->sample(audioTime, phase, 60.0 / sampleRate, running ? 1.0 / sampleRate : 0.0, oscillatorTime) : osci::Point(0, 0, 0, 0, 0, 0);
+        point = transitionGuard.apply(point);
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);
             const auto volume = volumes != nullptr ? volumes[i] : fallbackVolume;
@@ -74,11 +119,11 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         signal.setSample(3, i, point.r);
         signal.setSample(4, i, point.g);
         signal.setSample(5, i, point.b);
-        phase += 60.0 / sampleRate;
-        phase -= std::floor(phase);
+        ++oscillatorSample;
         if (running) {
             if (++audioSample >= durationSamples) {
                 audioSample = 0;
+                transitionGuard.begin();
             }
         }
     }
@@ -86,6 +131,13 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     position.store(audioTime);
     juce::AudioBuffer<float> block(signal.getArrayOfWritePointers(), 6, count);
     threadManager.write(block, "VisualiserRenderer");
+    routeSignalOutput(buffer);
+}
+
+void MotionProcessor::routeSignalOutput(juce::AudioBuffer<float>& buffer) {
+    const auto mode = outputMode.load();
+    const auto audible = !muteParameter->getBoolValue();
+    const auto count = buffer.getNumSamples();
     const auto requiredChannels = mode == OutputMode::xyrgb ? 5 : 2;
     if (audible && (mode == OutputMode::xy || mode == OutputMode::xyrgb) && buffer.getNumChannels() >= requiredChannels) {
         for (int channel = 0; channel < requiredChannels; ++channel) {
