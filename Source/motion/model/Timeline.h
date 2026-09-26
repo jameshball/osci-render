@@ -2,6 +2,7 @@
 
 #include "Animation.h"
 #include "Effects.h"
+#include "MidiNotes.h"
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -22,6 +23,10 @@ struct Clip {
     double rate = 1.0;
     std::map<std::string, Curve> properties;
     std::vector<EffectInstance> effects;
+    // Optional performance for this visual source. Immutable patterns are shared
+    // by duplication/undo; an edit replaces only the selected clip's pattern.
+    Id midiAsset = 0;
+    std::shared_ptr<const MidiNotes> midi;
 
     double end() const { return start + duration; }
     bool contains(double projectTime) const { return projectTime >= start && projectTime < end(); }

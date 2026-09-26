@@ -25,6 +25,10 @@ struct Asset {
     std::shared_ptr<const osci::PreparedDrawing> drawing;
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedAudio> audio;
+    std::shared_ptr<const MidiNotes> midi;
+    double midiImportBpm = 120;
+    double midiSuggestedBpm = 120;
+    int midiIgnoredEvents = 0;
 };
 
 struct Project {
@@ -78,6 +82,9 @@ public:
     static juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr);
     static bool isRasterSource(const juce::String& extension) {
         return extension.equalsIgnoreCase(".png") || extension.equalsIgnoreCase(".jpg") || extension.equalsIgnoreCase(".jpeg") || extension.equalsIgnoreCase(".gif");
+    }
+    static bool isMidiSource(const juce::String& extension) {
+        return extension.equalsIgnoreCase(".mid") || extension.equalsIgnoreCase(".midi");
     }
     static Clip makeClip(Id id, const Asset& asset, double time);
 

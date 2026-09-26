@@ -2,6 +2,7 @@
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
 #include "../import/RasterSourcePreparer.h"
+#include "../import/MidiSourcePreparer.h"
 #include <osci_file_import/osci_file_import.h>
 #include <set>
 #include <cstring>
@@ -10,6 +11,7 @@
 #include <sstream>
 #include <iomanip>
 #include <locale>
+#include <charconv>
 #if OSCI_PREMIUM
 #include "../../parser/lottie/LottieParser.h"
 #include "../../parser/lottie/DotLottieArchive.h"
@@ -545,6 +547,18 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     const auto extension = asset.extension.toLowerCase();
+    if (isMidiSource(extension)) {
+        const auto prepared = MidiSourcePreparer::prepare(asset.data.getData(), asset.data.getSize(), asset.midiImportBpm, cancel);
+        if (!prepared) { return juce::Result::fail(prepared.error); }
+        asset.midi = prepared.source;
+        asset.midiSuggestedBpm = prepared.suggestedBpm;
+        asset.midiIgnoredEvents = prepared.ignoredEvents;
+        asset.source.reset();
+        asset.drawing.reset();
+        asset.audio.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
+    }
     if (isRasterSource(extension)) {
         const auto prepared = RasterSourcePreparer::prepare(asset.data.getData(), asset.data.getSize(), asset.rasterSettings, cancel, progress);
         if (!prepared) { return juce::Result::fail(prepared.error); }
@@ -716,6 +730,7 @@ juce::XmlElement Document::save() const {
         item->setAttribute("id", juce::String(asset->id));
         item->setAttribute("name", asset->name);
         item->setAttribute("extension", asset->extension);
+        if (isMidiSource(asset->extension)) { item->setAttribute("midiImportBpm", exactBakeNumber(asset->midiImportBpm)); }
         if (asset->extension.equalsIgnoreCase(".lua")) {
             item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
             auto* bake = item->createNewChildElement("bake");
@@ -757,6 +772,19 @@ juce::XmlElement Document::save() const {
             item->setAttribute("duration", clip.duration);
             item->setAttribute("offset", clip.offset);
             item->setAttribute("rate", clip.rate);
+            if (clip.midi != nullptr) {
+                auto* pattern = item->createNewChildElement("midi");
+                pattern->setAttribute("asset", juce::String(clip.midiAsset));
+                for (const auto& note : clip.midi->notes()) {
+                    auto* event = pattern->createNewChildElement("note");
+                    event->setAttribute("id", juce::String(note.id));
+                    event->setAttribute("start", exactBakeNumber(note.start));
+                    event->setAttribute("duration", exactBakeNumber(note.duration));
+                    event->setAttribute("pitch", note.pitch);
+                    event->setAttribute("velocity", note.velocity);
+                    event->setAttribute("channel", note.channel);
+                }
+            }
             saveEffects(*item, clip.effects);
             for (const auto& [name, curve] : clip.properties) {
                 saveProperty(*item, name, curve);
@@ -845,6 +873,7 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
         asset->name = item->getStringAttribute("name");
         asset->extension = item->getStringAttribute("extension");
+        if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
         const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
         auto* source = luaSource ? item->getChildByName("source") : item;
         if (source == nullptr) { return juce::Result::fail("Baked Lua asset is missing its source."); }
@@ -936,6 +965,46 @@ juce::Result Document::load(const juce::XmlElement& xml) {
             }
             if ((track.kind == TrackKind::audio) != ((*found)->audio != nullptr)) {
                 return juce::Result::fail("The clip source type does not match its audio or visual track.");
+            }
+            if ((*found)->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
+            const auto* pattern = item->getChildByName("midi");
+            if (pattern != nullptr) {
+                if (track.kind != TrackKind::visual || pattern->getNextElementWithTagName("midi") != nullptr) {
+                    return juce::Result::fail("MIDI performances require a single pattern on a visual clip.");
+                }
+                const auto assetText = pattern->getStringAttribute("asset").toStdString();
+                const auto parsedAsset = std::from_chars(assetText.data(), assetText.data() + assetText.size(), clip.midiAsset);
+                if (parsedAsset.ec != std::errc() || parsedAsset.ptr != assetText.data() + assetText.size()) {
+                    return juce::Result::fail("Invalid MIDI source identity.");
+                }
+                if (clip.midiAsset != 0) {
+                    const auto source = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.midiAsset; });
+                    if (source == project.assets.end() || (*source)->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
+                }
+                std::vector<MidiNote> notes;
+                for (auto* event : pattern->getChildWithTagNameIterator("note")) {
+                    if (notes.size() >= MidiNotes::maximumNotes) { return juce::Result::fail("MIDI content exceeds 100000 notes."); }
+                    const auto idText = event->getStringAttribute("id").toStdString();
+                    Id id = 0;
+                    const auto parsedId = std::from_chars(idText.data(), idText.data() + idText.size(), id);
+                    if (id == 0 || parsedId.ec != std::errc() || parsedId.ptr != idText.data() + idText.size()) { return juce::Result::fail("Invalid MIDI note identity."); }
+                    const auto readNumber = [&](const char* name, auto& value) {
+                        std::istringstream stream(event->getStringAttribute(name).toStdString());
+                        stream.imbue(std::locale::classic());
+                        stream >> std::noskipws >> value;
+                        return !stream.fail() && stream.peek() == std::char_traits<char>::eof();
+                    };
+                    MidiNote note;
+                    note.id = id;
+                    if (!readNumber("start", note.start) || !readNumber("duration", note.duration)
+                        || !readNumber("pitch", note.pitch) || !readNumber("velocity", note.velocity) || !readNumber("channel", note.channel)) {
+                        return juce::Result::fail("MIDI note fields must contain valid numbers.");
+                    }
+                    notes.push_back(note);
+                }
+                const auto prepared = MidiNotes::create(std::move(notes));
+                if (!prepared) { return juce::Result::fail(prepared.error); }
+                clip.midi = prepared.source;
             }
             for (auto* property : item->getChildWithTagNameIterator("property")) {
                 Curve curve;
