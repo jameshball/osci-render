@@ -5,6 +5,7 @@
 #include "render/CompositionRenderer.h"
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
+#include "render/LiveMidiAudition.h"
 #include "../audio/PreparedState.h"
 
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater {
@@ -12,6 +13,10 @@ public:
     enum class OutputMode { soundtrack, xy, xyrgb };
     OutputMode getOutputMode() const { return outputMode.load(); }
     void setOutputMode(OutputMode value) { outputMode.store(value); }
+    // Transient input monitoring: neither note events nor this choice are part
+    // of the document/export. The audio thread resolves the ID in its snapshot.
+    void setMidiAudition(motion::Id clip) { midiAuditionTarget.store(clip); }
+    motion::Id getMidiAudition() const { return midiAuditionTarget.load(); }
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     MotionProcessor();
     ~MotionProcessor() override;
@@ -41,6 +46,10 @@ private:
     std::uint64_t previousRevision = 0;
     bool wasPlaying = false, wasDrawing = false;
     motion::BeamTransitionGuard transitionGuard;
+    motion::LiveMidiPerformance liveMidi;
+    std::atomic<motion::Id> midiAuditionTarget {0};
+    motion::Id previousAuditionTarget = 0;
+    std::uint64_t liveMidiSample = 0;
     juce::int64 oscillatorSample = 0;
     std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
     osci::PreparedState<motion::PreparedComposition> composition;

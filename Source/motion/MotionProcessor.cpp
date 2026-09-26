@@ -48,6 +48,8 @@ void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlo
     signal.setSize(6, samplesPerBlock);
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
     oscillatorSample = audioSample;
+    liveMidi.prepare(sampleRate);
+    liveMidiSample = 0;
     requestedSampleRate.store(sampleRate);
     triggerAsyncUpdate();
     transitionGuard.begin();
@@ -55,12 +57,13 @@ void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlo
 
 void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     buffer.clear();
-    midi.clear();
     const auto* prepared = composition.acquire();
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
-    if (count > signal.getNumSamples()) { return; }
+    if (count > signal.getNumSamples()) { midi.clear(); liveMidi.reset(); return; }
     if (prepared == nullptr || preparationFailed.load() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
+        liveMidi.reset();
+        midi.clear();
         transitionGuard.begin();
         for (int i = 0; i < count; ++i) {
             const auto point = transitionGuard.apply({0, 0, 0, 0, 0, 0});
@@ -78,13 +81,28 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto durationIndex = motion::sampleIndex(prepared->duration, sampleRate);
     if (!durationIndex.has_value() || *durationIndex < 1) {
+        midi.clear();
+        liveMidi.reset();
         return;
     }
     const auto durationSamples = *durationIndex;
+    const auto auditionId = midiAuditionTarget.load();
+    const motion::PreparedClip* audition = nullptr;
+    if (auditionId != 0) {
+        const auto found = std::find_if(prepared->clips.begin(), prepared->clips.end(), [auditionId](const auto& clip) { return clip.id == auditionId; });
+        if (found != prepared->clips.end()) { audition = &*found; }
+    }
+    const auto resolvedAudition = audition != nullptr ? auditionId : 0;
+    if (resolvedAudition != previousAuditionTarget) {
+        liveMidi.reset();
+        previousAuditionTarget = resolvedAudition;
+        transitionGuard.begin();
+    }
     const auto requested = requestedPosition.exchange(-1.0);
     if (requested >= 0.0 && std::isfinite(requested)) {
         audioSample = motion::sampleIndex(std::min(requested, prepared->duration), sampleRate).value_or(0);
         oscillatorSample = audioSample;
+        liveMidi.reset();
         transitionGuard.begin();
     }
     const auto running = playing.load();
@@ -99,10 +117,13 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     const auto audible = !muteParameter->getBoolValue();
     const auto* volumes = volumeEffect->getAnimatedValuesReadPointer(0, count);
     const auto fallbackVolume = volumeEffect->getValue();
+    motion::LiveMidiInputCursor events(midi);
     for (int i = 0; i < count; ++i) {
+        if (events.dispatch(audition != nullptr ? &liveMidi : nullptr, i, liveMidiSample)) { transitionGuard.begin(); }
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
-        auto point = drawing ? prepared->sampleAtClock(audioTime, oscillatorSample, sampleRate, running) : osci::Point(0, 0, 0, 0, 0, 0);
+        auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running)
+            : drawing ? prepared->sampleAtClock(audioTime, oscillatorSample, sampleRate, running) : osci::Point(0, 0, 0, 0, 0, 0);
         point = transitionGuard.apply(point);
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);
@@ -119,6 +140,11 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         signal.setSample(4, i, point.g);
         signal.setSample(5, i, point.b);
         ++oscillatorSample;
+        if (liveMidiSample == std::numeric_limits<std::uint64_t>::max()) {
+            liveMidi.reset();
+            liveMidiSample = 0;
+            transitionGuard.begin();
+        } else { ++liveMidiSample; }
         if (running) {
             if (++audioSample >= durationSamples) {
                 audioSample = 0;
@@ -126,6 +152,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
             }
         }
     }
+    midi.clear();
     audioTime = static_cast<double>(audioSample) / sampleRate;
     position.store(audioTime);
     juce::AudioBuffer<float> block(signal.getArrayOfWritePointers(), 6, count);
@@ -170,6 +197,7 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
     if (compositionXml == nullptr) { return; }
     const auto result = document.load(*compositionXml);
     if (result.failed()) { return; }
+    setMidiAudition(0);
     VisualiserState::load(*project, visualiserParameters, recordingParameters);
     restoreStandaloneProjectFilePathFromXml(*project);
     loadProperties(*project);
