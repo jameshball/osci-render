@@ -35,6 +35,36 @@ public:
     static constexpr int rulerHeight = 26;
     static constexpr int rowHeight = 40;
 
+    // Selection may originate in the preview, library or an import, not only
+    // from a row already on screen. Keep its layer reachable in a dense project.
+    void revealSelection() {
+        // Do not move rows under the pointer during a clip gesture.
+        if (before.has_value() || scrubbing) { return; }
+        ensureTrackRows();
+        const auto& project = processor.document.project();
+        motion::Id trackId = 0, parent = 0;
+        for (const auto& track : project.tracks) {
+            if (std::any_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return clip.id == selected; })) {
+                trackId = track.id; parent = track.group; break;
+            }
+        }
+        const auto* selectedGroup = motion::findGroup(project, selected);
+        if (selectedGroup != nullptr) { trackId = selectedGroup->id; parent = selectedGroup->parent; }
+        bool expanded = false;
+        for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
+            expanded = collapsedGroups.erase(parent) != 0 || expanded;
+            const auto* group = motion::findGroup(project, parent);
+            parent = group != nullptr ? group->parent : 0;
+        }
+        if (expanded) { layoutRevision.reset(); ensureTrackRows(); }
+        const auto found = std::find_if(rows.begin(), rows.end(), [trackId](const auto& row) { return row.id == trackId; });
+        if (found == rows.end()) { return; }
+        const auto row = static_cast<int>(found - rows.begin());
+        if (row < scrollRows) { scrollRows = row; }
+        else if (row >= scrollRows + visibleRowCount()) { scrollRows = row - visibleRowCount() + 1; }
+        if (expanded) { refreshTracks(); } else { resized(); repaint(); }
+    }
+
     void refreshTracks() {
         const auto& project = processor.document.project();
         if (layoutGeneration != processor.document.generation()) { collapsedGroups.clear(); layoutGeneration = processor.document.generation(); }
@@ -83,7 +113,7 @@ public:
     void resized() override {
         ensureTrackRows();
         addTrack.setBounds(namesWidth - 27, 2, 24, rulerHeight - 4);
-        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+        scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
         for (auto& header : headers) {
             const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id; });
             const auto row = static_cast<int>(found - rows.begin());
@@ -220,7 +250,7 @@ public:
         toolArrow.addTriangle(namesWidth - 47.0f, 11.0f, namesWidth - 39.0f, 11.0f, namesWidth - 43.0f, 15.0f);
         g.fillPath(toolArrow);
         const auto& tracks = processor.document.project().tracks;
-        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+        scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
         for (int visible = scrollRows; visible < static_cast<int>(rows.size()); ++visible) {
             const auto y = rowY(visible);
             if (y >= getHeight()) {
@@ -508,7 +538,7 @@ public:
         } else if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY)) {
             scrollTime = std::max(0.0, scrollTime - (wheel.deltaX + wheel.deltaY) * 8);
         } else {
-            const auto last = std::max(0, static_cast<int>(rows.size()) - 1);
+            const auto last = maximumScrollRow();
             scrollRows = std::clamp(scrollRows + (wheel.deltaY < 0 ? 1 : -1), 0, last);
         }
         resized();
@@ -765,6 +795,7 @@ private:
         pixelsPerSecond = std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0);
         scrollTime = 0.0;
         scrollRows = 0;
+        resized();
         repaint();
     }
 
@@ -841,8 +872,10 @@ private:
             rows = motion::trackRows(processor.document.project(), collapsedGroups);
             layoutRevision = revision;
         }
-        scrollRows = std::clamp(scrollRows, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+        scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
     }
+    int visibleRowCount() const { return std::max(1, (getHeight() - rulerHeight) / rowHeight); }
+    int maximumScrollRow() const { return std::max(0, static_cast<int>(rows.size()) - visibleRowCount()); }
     int visualRowAt(int y) const {
         ensureTrackRows();
         return y < rulerHeight ? -1 : (y - rulerHeight) / rowHeight + scrollRows;

@@ -694,6 +694,7 @@ void MotionEditor::select(motion::Id id) {
     effectsPanel.setSelectedClip(id);
     inspectorTabs.setSelectedIndex(0);
     timeline.selected = id;
+    timeline.revealSelection();
     composition.selected = id;
     selectCurveTarget(id, curvePropertyName, false);
     refreshInspector();
