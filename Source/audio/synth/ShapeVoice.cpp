@@ -509,7 +509,7 @@ void ShapeVoice::renderNextBlock(juce::AudioSampleBuffer& outputBuffer, int star
         const float velTrack = velocityTrackingValues != nullptr
             ? velocityTrackingValues[startSample + i]
             : parameters.velocityTracking->getValueUnnormalised();
-        const float velGain = 1.0f + velTrack * ((float)velocity - 1.0f);
+        const float velGain = osci_audio::voiceVelocityGain(static_cast<float>(velocity), velTrack);
         float gain = velGain * envelopeBuffer.getSample(0, i) * killMul;
 
         int sample = startSample + i;

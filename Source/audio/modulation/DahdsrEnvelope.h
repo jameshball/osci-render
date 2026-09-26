@@ -10,6 +10,10 @@ namespace osci_audio
 // Keep this centralized so we don't cargo-cult magic numbers.
 inline constexpr double kMacFrequencyEpsilonHz = 1.0e-6;
 
+inline float voiceVelocityGain(float velocity, float tracking) {
+    return 1.0f + tracking * (velocity - 1.0f);
+}
+
 // DAHDSR time parameter bounds and step.
 inline constexpr float kDahdsrTimeMinSeconds = 0.0f;
 inline constexpr float kDahdsrTimeMaxSeconds = 30.0f;
@@ -93,20 +97,29 @@ struct DahdsrParams
     float decayCurve = 0.0f;
     float releaseCurve = 0.0f;
 };
+enum class DahdsrStage {
+    Delay, Attack, Hold, Decay, Sustain, Release, Done,
+};
+
+// Shared segment evaluation for live voices and immutable, seekable voices.
+// Advancing a stage and quantizing its duration remain clock responsibilities.
+inline float evaluateDahdsrStage(DahdsrStage stage, const DahdsrParams& params, double elapsed, float releaseStart = 0) {
+    switch (stage) {
+        case DahdsrStage::Delay: return 0;
+        case DahdsrStage::Attack: return osci_audio::evalSegment(0, static_cast<float>(params.attackLevel), elapsed, params.attackSeconds, params.attackCurve);
+        case DahdsrStage::Hold: return static_cast<float>(params.attackLevel);
+        case DahdsrStage::Decay: return osci_audio::evalSegment(static_cast<float>(params.attackLevel), static_cast<float>(params.sustainLevel), elapsed, params.decaySeconds, params.decayCurve);
+        case DahdsrStage::Sustain: return static_cast<float>(params.sustainLevel);
+        case DahdsrStage::Release: return osci_audio::evalSegment(releaseStart, 0, elapsed, params.releaseSeconds, params.releaseCurve);
+        case DahdsrStage::Done: return 0;
+    }
+    return 0;
+}
+
 // Lightweight per-voice envelope evaluator (hot path).
-class DahdsrState
-{
+class DahdsrState {
 public:
-    enum class Stage
-    {
-        Delay,
-        Attack,
-        Hold,
-        Decay,
-        Sustain,
-        Release,
-        Done,
-    };
+    using Stage = DahdsrStage;
 
     void reset(const DahdsrParams& p)
     {
@@ -132,12 +145,11 @@ public:
         if (!midiEnabled)
             return 1.0f;
 
-        float envValue = currentValue;
+        float envValue = evaluateDahdsrStage(stage, params, stageElapsed, releaseStartValue);
 
         switch (stage)
         {
             case Stage::Delay:
-                envValue = 0.0f;
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.delaySeconds)
                 {
@@ -147,7 +159,6 @@ public:
                 break;
 
             case Stage::Attack:
-                envValue = osci_audio::evalSegment(0.0f, (float)params.attackLevel, stageElapsed, params.attackSeconds, params.attackCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.attackSeconds)
                 {
@@ -157,7 +168,6 @@ public:
                 break;
 
             case Stage::Hold:
-                envValue = (float)params.attackLevel;
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.holdSeconds)
                 {
@@ -167,7 +177,6 @@ public:
                 break;
 
             case Stage::Decay:
-                envValue = osci_audio::evalSegment((float)params.attackLevel, (float)params.sustainLevel, stageElapsed, params.decaySeconds, params.decayCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.decaySeconds)
                 {
@@ -177,11 +186,9 @@ public:
                 break;
 
             case Stage::Sustain:
-                envValue = (float) params.sustainLevel;
                 break;
 
             case Stage::Release:
-                envValue = osci_audio::evalSegment(releaseStartValue, 0.0f, stageElapsed, params.releaseSeconds, params.releaseCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.releaseSeconds)
                 {
@@ -191,7 +198,6 @@ public:
                 break;
 
             case Stage::Done:
-                envValue = 0.0f;
                 break;
         }
 
