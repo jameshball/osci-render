@@ -10,6 +10,12 @@
     <GROUP id="MotionTests" name="Motion">
       <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
             resource="0" file="tests/MotionSignalExportTest.cpp"/>
+      <FILE id="MotionBakeArchiveT" name="MotionBakeArchiveTest.cpp" compile="1"
+            resource="0" file="tests/MotionBakeArchiveTest.cpp"/>
+      <FILE id="MotionLuaBakeT" name="MotionLuaBakerTest.cpp" compile="1"
+            resource="0" file="tests/MotionLuaBakerTest.cpp"/>
+      <FILE id="LuaOfflineT" name="LuaOfflinePolicyTest.cpp" compile="1"
+            resource="0" file="tests/LuaOfflinePolicyTest.cpp"/>
       <FILE id="MotionDocT" name="MotionDocumentTest.cpp" compile="1" resource="0"
             file="tests/MotionDocumentTest.cpp"/>
       <FILE id="OfflineBeamT" name="OfflineVisualiserParametersTest.cpp"

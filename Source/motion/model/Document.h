@@ -6,6 +6,7 @@
 #include "Camera.h"
 #include "Group.h"
 #include "PreparedSource.h"
+#include "BakeSettings.h"
 #include "../render/PreparedAudio.h"
 #include <atomic>
 #include "../../audio/synth/PreparedDrawing.h"
@@ -16,6 +17,9 @@ struct Asset {
     juce::String name;
     juce::String extension;
     juce::MemoryBlock data;
+    BakeSettings bakeSettings;
+    juce::MemoryBlock bakedData;
+    juce::String bakeKey;
     std::shared_ptr<const osci::PreparedDrawing> drawing;
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedAudio> audio;

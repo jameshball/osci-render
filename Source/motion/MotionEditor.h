@@ -10,6 +10,7 @@
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
 #include "ui/ModulationPanel.h"
+#include <deque>
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
 public:
@@ -25,6 +26,16 @@ public:
 
 private:
     bool openSourceFile(const juce::File& file) override;
+    struct SourceRequest {
+        juce::File file;
+        double time = 0;
+        std::uint64_t generation = 0;
+        std::shared_ptr<const motion::Asset> replacement;
+    };
+    void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {});
+    void showNextBakeSettings();
+    std::deque<SourceRequest> bakeRequests;
+    bool bakeSettingsOpen = false;
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void select(motion::Id id);

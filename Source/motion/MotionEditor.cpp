@@ -2,6 +2,7 @@
 #include "export/SignalExporter.h"
 #include "export/SoundtrackExporter.h"
 #include "ui/VideoExportSettings.h"
+#include "ui/BakeSettingsPanel.h"
 #include <cstdlib>
 
 namespace {
@@ -249,7 +250,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -288,6 +289,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         });
     };
     assetLibrary.onInsert = [this](motion::Id id) { timeline.insertAsset(id, -1, -1); };
+    assetLibrary.onBake = [this](motion::Id id) {
+        const auto& assets = processor.document.project().assets;
+        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+        if (found == assets.end() || !(*found)->extension.equalsIgnoreCase(".lua")) { return; }
+        bakeRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
+        showNextBakeSettings();
+    };
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
     };
@@ -462,7 +470,7 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
 
 bool MotionEditor::openSourceFile(const juce::File& file) {
     const auto extension = file.getFileExtension().toLowerCase();
-    if (extension != ".obj" && extension != ".svg" && extension != ".txt"
+    if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua"
         && extension != ".gpla" && extension != ".json" && extension != ".lottie"
         && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
         importError = "This source type is not connected yet.";
@@ -470,32 +478,86 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
         repaint();
         return false;
     }
+    SourceRequest request {file, processor.position.load(), processor.document.generation(), {}};
+    if (extension == ".lua") {
+        bakeRequests.push_back(std::move(request));
+        showNextBakeSettings();
+    } else {
+        beginSourceImport(std::move(request));
+    }
+    return true;
+}
+
+void MotionEditor::showNextBakeSettings() {
+    if (bakeSettingsOpen) { return; }
+    while (!bakeRequests.empty() && bakeRequests.front().generation != processor.document.generation()) { bakeRequests.pop_front(); }
+    if (bakeRequests.empty()) { return; }
+    auto request = std::move(bakeRequests.front());
+    bakeRequests.pop_front();
+    motion::BakeSettings initial;
+    initial.bpm = processor.document.project().bpm;
+    initial.frameRate = processor.document.project().frameRate;
+    if (request.replacement != nullptr) { initial = request.replacement->bakeSettings; }
+    auto content = std::make_unique<MotionBakeSettingsPanel>(initial);
+    auto* panel = content.get();
+    const auto name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Bake " + name, juce::Point<int>(440, 400), true);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
+    bakeSettingsOpen = true;
+    overlay->onDismissRequested = [owner] {
+        if (owner != nullptr) {
+            owner->bakeSettingsOpen = false;
+            owner->showNextBakeSettings();
+        }
+    };
+    panel->onBake = [owner, overlayPointer, request](motion::BakeSettings settings) {
+        juce::MessageManager::callAsync([owner, overlayPointer, request, settings] {
+            if (owner == nullptr || overlayPointer == nullptr) { return; }
+            owner->dismissOverlay(overlayPointer.getComponent(), [owner, request, settings] {
+                if (owner == nullptr) { return; }
+                owner->bakeSettingsOpen = false;
+                if (owner->processor.document.generation() == request.generation) {
+                    owner->beginSourceImport(request, settings);
+                }
+                owner->showNextBakeSettings();
+            });
+        });
+    };
+    showOverlay(std::move(overlay));
+}
+
+void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings settings) {
     importError.clear();
     assetLibrary.setError({});
     auto asset = std::make_shared<motion::Asset>();
-    asset->name = file.getFileName();
-    asset->extension = extension;
-    const auto time = processor.position.load();
-    const auto generation = processor.document.generation();
+    asset->name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
+    asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
+    asset->bakeSettings = settings;
+    const auto time = request.time;
+    const auto generation = request.generation;
     auto task = std::make_shared<ImportState>();
     task->name = asset->name;
     task->generation = generation;
     pendingImports.push_back(task);
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    imports.addJob([owner, file, asset, time, generation, task] {
+    imports.addJob([owner, request, asset, time, generation, task] {
         auto result = juce::Result::fail("Import cancelled.");
         if (!task->cancelled.load()) {
             try {
-                if (file.getSize() > static_cast<juce::int64>(motion::Document::maximumSourceBytes)) {
+                if (request.replacement != nullptr) {
+                    asset->data = request.replacement->data;
+                    result = motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
+                } else if (request.file.getSize() > static_cast<juce::int64>(motion::Document::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {
-                    result = file.loadFileAsData(asset->data) ? motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress) : juce::Result::fail("Cannot read the source file.");
+                    result = request.file.loadFileAsData(asset->data) ? motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress) : juce::Result::fail("Cannot read the source file.");
                 }
             } catch (const std::exception& error) {
                 result = juce::Result::fail("Cannot import this source: " + juce::String(error.what()));
             }
         }
-        juce::MessageManager::callAsync([owner, asset, time, result, generation, task] {
+        juce::MessageManager::callAsync([owner, request, asset, time, result, generation, task] {
             if (owner == nullptr) {
                 return;
             }
@@ -508,6 +570,22 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
                 return;
             }
             auto& document = owner->processor.document;
+            if (request.replacement != nullptr) {
+                const auto& assets = document.project().assets;
+                if (std::find(assets.begin(), assets.end(), request.replacement) == assets.end()) {
+                    owner->assetLibrary.setError("The source changed while baking. Its previous result has been kept.");
+                    return;
+                }
+                asset->id = request.replacement->id;
+                document.edit("Rebuild source cache", [&](motion::Project& project) {
+                    for (auto& item : project.assets) {
+                        if (item == request.replacement) { item = asset; }
+                    }
+                });
+                owner->assetLibrary.refresh();
+                owner->assetLibrary.selectAsset(asset->id);
+                return;
+            }
             asset->id = document.newId();
             auto clip = motion::Document::makeClip(document.newId(), *asset, time);
             motion::Track track;
@@ -525,7 +603,6 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
             owner->select(clip.id);
         });
     });
-    return true;
 }
 
 void MotionEditor::timerCallback() {

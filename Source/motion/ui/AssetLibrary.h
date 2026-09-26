@@ -19,12 +19,19 @@ public:
         cancelImport.setButtonText("Cancel import");
         cancelImport.onClick = [this] { if (onCancelImport) { onCancelImport(); } };
         addChildComponent(cancelImport);
+        bakeSettings.setButtonText("Bake settings...");
+        bakeSettings.onClick = [this] {
+            const auto row = list.getSelectedRow();
+            if (validRow(row) && onBake) { onBake(assetId(row)); }
+        };
+        addChildComponent(bakeSettings);
         setError({});
         refresh();
     }
 
     std::function<void(motion::Id)> onInsert;
     std::function<void()> onCancelImport;
+    std::function<void(motion::Id)> onBake;
 
     void setImportStatus(const juce::String& message) {
         if (importStatus == message) { return; }
@@ -69,6 +76,7 @@ public:
             cancelImport.setBounds(area.removeFromBottom(30).reduced(6, 2));
         }
         status.setBounds(area.removeFromBottom(hasError ? 110 : 68).reduced(6, 4));
+        if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         list.setBounds(area);
     }
 
@@ -81,6 +89,10 @@ public:
     }
 
 private:
+    void selectedRowsChanged(int row) override {
+        bakeSettings.setVisible(validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua"));
+        resized();
+    }
     int getNumRows() override { return static_cast<int>(assets.size()); }
 
     juce::String getNameForRow(int row) override {
@@ -140,7 +152,7 @@ private:
     std::vector<std::shared_ptr<const motion::Asset>> assets;
     juce::ListBox list;
     juce::Label status;
-    juce::TextButton cancelImport;
+    juce::TextButton cancelImport, bakeSettings;
     juce::String importStatus, errorMessage;
     bool hasError = false;
 };

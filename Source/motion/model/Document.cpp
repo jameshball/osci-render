@@ -1,9 +1,14 @@
 #include "Document.h"
+#include "../import/LuaBaker.h"
+#include "../import/BakedSourceArchive.h"
 #include <osci_file_import/osci_file_import.h>
 #include <set>
 #include <cstring>
 #include <exception>
 #include <new>
+#include <sstream>
+#include <iomanip>
+#include <locale>
 #if OSCI_PREMIUM
 #include "../../parser/lottie/LottieParser.h"
 #include "../../parser/lottie/DotLottieArchive.h"
@@ -12,6 +17,25 @@
 namespace motion {
 namespace {
 using ImportShapes = std::vector<std::unique_ptr<osci::Shape>>;
+
+juce::String exactBakeNumber(double value) {
+    std::ostringstream stream;
+    stream.imbue(std::locale::classic());
+    stream << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+    return juce::String(stream.str());
+}
+
+juce::String sourceBakeKey(const Asset& asset) {
+    juce::MemoryOutputStream metadata;
+    metadata.writeInt(1); // Bake algorithm/context version, separate from cache wire version.
+    metadata.writeDouble(asset.bakeSettings.duration);
+    metadata.writeDouble(asset.bakeSettings.frameRate);
+    metadata.writeDouble(asset.bakeSettings.bpm);
+    metadata.writeInt64(static_cast<juce::int64>(asset.bakeSettings.pointsPerFrame));
+    metadata.writeInt64(asset.bakeSettings.seed);
+    metadata.write(asset.data.getData(), asset.data.getSize());
+    return juce::SHA256(metadata.getData(), metadata.getDataSize()).toHexString();
+}
 
 bool importCancelled(const std::atomic<bool>* cancel) {
     return cancel != nullptr && cancel->load(std::memory_order_relaxed);
@@ -493,7 +517,7 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.properties["pan"] = Curve(0);
         return clip;
     }
-    if (asset.source != nullptr && asset.source->frameCount() > 1) {
+    if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".lua"))) {
         clip.duration = asset.source->duration();
     }
     for (const auto* axis : { "x", "y", "z" }) {
@@ -501,9 +525,10 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.properties[std::string("rotation.") + axis] = Curve(0);
         clip.properties[std::string("scale.") + axis] = Curve(1);
     }
-    clip.properties["red"] = Curve(0.2);
+    const bool sourceColour = asset.source != nullptr && asset.source->hasExplicitColour();
+    clip.properties["red"] = Curve(sourceColour ? 1 : 0.2);
     clip.properties["green"] = Curve(1);
-    clip.properties["blue"] = Curve(0.35);
+    clip.properties["blue"] = Curve(sourceColour ? 1 : 0.35);
     clip.properties["weight"] = Curve(1);
     return clip;
 }
@@ -519,6 +544,39 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     const auto extension = asset.extension.toLowerCase();
+    if (extension == ".lua") {
+        const auto settingsError = asset.bakeSettings.validate();
+        if (!settingsError.empty()) { return juce::Result::fail(settingsError); }
+        const auto key = sourceBakeKey(asset);
+        PreparedPointFrames::Result prepared;
+        juce::MemoryBlock archive;
+        if (asset.bakedData.getSize() > 0) {
+            if (asset.bakeKey != key) { return juce::Result::fail("Baked source does not match its script and settings. Rebuild the source cache."); }
+            prepared = BakedSourceArchive::decode(asset.bakedData);
+        } else {
+            prepared = LuaBaker::bake(asset.name, juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())), asset.bakeSettings, cancel, progress);
+            if (prepared) {
+                auto encoded = BakedSourceArchive::encode(*prepared.source);
+                if (!encoded) { return juce::Result::fail(encoded.error); }
+                archive = std::move(encoded.data);
+            }
+        }
+        if (!prepared) { return juce::Result::fail(prepared.error); }
+        if (prepared.source->frameCount() != asset.bakeSettings.frameCount()
+            || prepared.source->frameRate() != asset.bakeSettings.frameRate
+            || prepared.source->pointsPerFrame() != asset.bakeSettings.pointsPerFrame) {
+            return juce::Result::fail("Baked source metadata does not match its settings.");
+        }
+        if (importCancelled(cancel)) { return juce::Result::fail("Source import cancelled."); }
+        auto source = std::make_shared<const PreparedSource>(prepared.source);
+        asset.source = std::move(source);
+        asset.drawing.reset();
+        asset.audio.reset();
+        if (archive.getSize() > 0) { asset.bakedData = std::move(archive); }
+        asset.bakeKey = key;
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
+    }
     if (extension == ".wav" || extension == ".wave" || extension == ".aif" || extension == ".aiff" || extension == ".flac" || extension == ".ogg") {
         juce::AudioFormatManager formats;
         formats.registerBasicFormats();
@@ -647,7 +705,19 @@ juce::XmlElement Document::save() const {
         item->setAttribute("id", juce::String(asset->id));
         item->setAttribute("name", asset->name);
         item->setAttribute("extension", asset->extension);
-        item->addTextElement(asset->data.toBase64Encoding());
+        if (asset->extension.equalsIgnoreCase(".lua")) {
+            item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
+            auto* bake = item->createNewChildElement("bake");
+            bake->setAttribute("duration", exactBakeNumber(asset->bakeSettings.duration));
+            bake->setAttribute("frameRate", exactBakeNumber(asset->bakeSettings.frameRate));
+            bake->setAttribute("bpm", exactBakeNumber(asset->bakeSettings.bpm));
+            bake->setAttribute("pointsPerFrame", static_cast<int>(asset->bakeSettings.pointsPerFrame));
+            bake->setAttribute("seed", juce::String(asset->bakeSettings.seed));
+            bake->setAttribute("key", asset->bakeKey);
+            bake->addTextElement(asset->bakedData.toBase64Encoding());
+        } else {
+            item->addTextElement(asset->data.toBase64Encoding());
+        }
     }
     for (const auto& track : state.tracks) {
         auto* row = xml.createNewChildElement("track");
@@ -756,12 +826,35 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
         asset->name = item->getStringAttribute("name");
         asset->extension = item->getStringAttribute("extension");
-        const auto encoded = item->getAllSubText();
+        const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
+        auto* source = luaSource ? item->getChildByName("source") : item;
+        if (source == nullptr) { return juce::Result::fail("Baked Lua asset is missing its source."); }
+        const auto encoded = source->getAllSubText();
         if (static_cast<std::size_t>(encoded.length()) > (maximumSourceBytes / 3 + 1) * 4) {
             return juce::Result::fail("Embedded source exceeds the 64 MiB import limit.");
         }
         if (asset->id == 0 || !identities.insert(asset->id).second || !asset->data.fromBase64Encoding(encoded)) {
             return juce::Result::fail("Invalid asset data or identity.");
+        }
+        if (luaSource) {
+            auto* bake = item->getChildByName("bake");
+            if (bake == nullptr) { return juce::Result::fail("Lua asset is missing its prepared cache. Project loading never executes scripts."); }
+            asset->bakeSettings.duration = bake->getDoubleAttribute("duration", 0);
+            asset->bakeSettings.frameRate = bake->getDoubleAttribute("frameRate", 0);
+            asset->bakeSettings.bpm = bake->getDoubleAttribute("bpm", 0);
+            const auto points = bake->getIntAttribute("pointsPerFrame", 0);
+            const auto seed = bake->getStringAttribute("seed", "-1").getLargeIntValue();
+            if (points < 0 || seed < 0 || seed > std::numeric_limits<std::uint32_t>::max()) {
+                return juce::Result::fail("Invalid Lua bake settings.");
+            }
+            asset->bakeSettings.pointsPerFrame = static_cast<std::size_t>(points);
+            asset->bakeSettings.seed = static_cast<std::uint32_t>(seed);
+            asset->bakeKey = bake->getStringAttribute("key");
+            const auto cache = bake->getAllSubText();
+            if (static_cast<std::size_t>(cache.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
+                || !asset->bakedData.fromBase64Encoding(cache) || asset->bakedData.getSize() == 0) {
+                return juce::Result::fail("Invalid or oversized Lua source cache.");
+            }
         }
         const auto result = decodeAsset(*asset);
         if (result.failed()) {
