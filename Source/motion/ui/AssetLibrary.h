@@ -106,8 +106,9 @@ private:
         assignMidi.setVisible(validRow(row) && assets[static_cast<std::size_t>(row)]->midi != nullptr);
         updateStatus();
         const bool raster = validRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
-        bakeSettings.setButtonText(raster ? "Image settings..." : "Bake settings...");
-        bakeSettings.setVisible(raster || (validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
+        const bool text = validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
+        bakeSettings.setButtonText(text ? "Edit text..." : (raster ? "Image settings..." : "Bake settings..."));
+        bakeSettings.setVisible(text || raster || (validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
         resized();
     }
     int getNumRows() override { return static_cast<int>(assets.size()); }

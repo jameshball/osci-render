@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Verify shared text editing, cancellation, undo and reopen through the UI.
+
+This is a usability stress pass, not the finished music-video benchmark.
+"""
+import json
+import struct
+import subprocess
+import xml.etree.ElementTree as ET
+from jucewright_osci_browser.cli import parse_args
+from jucewright_osci_browser.session import BrowserSession
+
+session = BrowserSession(parse_args())
+if session.build_app_requested:
+    session.build_app()
+if not session.find_jucewright():
+    session.build_jucewright()
+keep = session.keep_app
+session.keep_app = False
+session.launch_app("motion-text-edit")
+session.keep_app = keep
+
+
+def command(*args):
+    return subprocess.run(session.cli(*args), capture_output=True, text=True, check=True).stdout
+
+
+def step(label, *args):
+    if not session.run_step(label, session.cli(*args)):
+        raise RuntimeError(label)
+
+
+root = ET.Element("motion-project", schema="1")
+ET.SubElement(root, "composition", name="Text editing study", duration="180", bpm="120", fps="30")
+xml = ET.tostring(root, encoding="utf-8")
+project = session.artifact_dir / "text-edit.osci-motion"
+project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
+
+def saved_clips():
+    step("save selection test", "press", "command + s", "--class", "MotionEditor")
+    data = project.read_bytes()
+    return ET.fromstring(data[8:8 + struct.unpack("<I", data[4:8])[0]]).findall("./composition/track/clip")
+
+
+def saved_asset():
+    saved_clips()
+    data = project.read_bytes()
+    root = ET.fromstring(data[8:8 + struct.unpack("<I", data[4:8])[0]])
+    return ET.tostring(root.find("./composition/asset"))
+
+try:
+    command("wait-for-locator", "--class", "MotionEditor", "--exact")
+    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    step("size workspace", "resize-window", "--w", "1440", "--h", "900")
+    source = session.artifact_dir / "Title.txt"
+    source.write_text("ORIGINAL")
+    step("import text", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
+    command("wait-for-locator", "--name", "Title.txt", "--class", "juce::Label", "--exact")
+    step("duplicate text clip", "press", "command + d", "--class", "MotionTimelineView")
+    before = saved_asset()
+    clips = saved_clips()
+    assert len(clips) == 2 and clips[0].get("asset") == clips[1].get("asset")
+    step("open shared text", "click", "--name", "Edit text...", "--exact")
+    command("wait-for-locator", "--name", "Source text", "--class", "juce::TextEditor", "--exact")
+    step("edit multiline text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RETURN\nTOGETHER")
+    step("text editor", "screenshot", "--file", session.artifact_dir / "text-editor.png")
+    step("apply text", "click", "--name", "Apply text", "--exact")
+    command("wait-for-locator", "--name", "Undo Edit text source", "--class", "juce::Label", "--exact")
+    after = saved_asset()
+    assert after != before and len(saved_clips()) == 2
+    step("undo shared edit", "click", "--name", "Undo", "--exact")
+    assert saved_asset() == before
+    step("redo shared edit", "click", "--name", "Redo", "--exact")
+    assert saved_asset() == after
+    step("open text to cancel", "click", "--name", "Edit text...", "--exact")
+    step("unapplied edit", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "DO NOT APPLY")
+    step("dismiss edit", "click", "--name", "Close icon", "--exact")
+    assert saved_asset() == after
+    # Launch a fresh process so this verifies persisted source content.
+    session.keep_app = False
+    session.launch_app("text-reopen")
+    session.keep_app = keep
+    command("wait-for-locator", "--class", "MotionEditor", "--exact")
+    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    command("wait", "--ms", 500)
+    step("select text asset", "click", "--name", "Title.txt", "--role", "listItem", "--exact", "--position", "6,12")
+    step("reopen saved text", "click", "--name", "Edit text...", "--exact")
+    snapshot = command("snapshot", "--json", "--full")
+    assert "RETURN" in snapshot and "TOGETHER" in snapshot and "DO NOT APPLY" not in snapshot
+    step("close verified text", "click", "--name", "Close icon", "--exact")
+    command("wait", "--ms", 600)
+    assert len(saved_clips()) == 2
+    step("edited text output", "screenshot", "--file", session.artifact_dir / "text-output.png")
+    print("Shared text edit, undo/redo, cancel and reopen passed", flush=True)
+finally:
+    session.stop_app()

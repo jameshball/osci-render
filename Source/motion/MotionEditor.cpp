@@ -4,6 +4,7 @@
 #include "ui/VideoExportSettings.h"
 #include "ui/BakeSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
+#include "ui/TextSourcePanel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
@@ -340,7 +341,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     assetLibrary.onBake = [this](motion::Id id) {
         const auto& assets = processor.document.project().assets;
         const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-        if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !motion::Document::isRasterSource((*found)->extension))) { return; }
+        if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !(*found)->extension.equalsIgnoreCase(".txt") && !motion::Document::isRasterSource((*found)->extension))) { return; }
         preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
         showNextPreparationSettings();
     };
@@ -554,10 +555,20 @@ void MotionEditor::showNextPreparationSettings() {
     const auto name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
     const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
     const bool raster = motion::Document::isRasterSource(extension);
+    const bool text = extension.equalsIgnoreCase(".txt");
     std::unique_ptr<juce::Component> content;
     MotionBakeSettingsPanel* luaPanel = nullptr;
     MotionRasterSettingsPanel* imagePanel = nullptr;
-    if (raster) {
+    MotionTextSourcePanel* textPanel = nullptr;
+    if (text) {
+        int instances = 0;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.asset == request.replacement->id) { ++instances; } }
+        }
+        auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances);
+        textPanel = panel.get();
+        content = std::move(panel);
+    } else if (raster) {
         auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings());
         imagePanel = panel.get();
         content = std::move(panel);
@@ -570,7 +581,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (raster ? "Prepare " : "Bake ") + name, juce::Point<int>(440, 400), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text ? "Edit " : (raster ? "Prepare " : "Bake ")) + name, juce::Point<int>(text ? 560 : 440, 400), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -580,7 +591,8 @@ void MotionEditor::showNextPreparationSettings() {
             owner->showNextPreparationSettings();
         }
     };
-    const auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings) {
+    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}) mutable {
+        request.editedText = std::move(editedText);
         juce::MessageManager::callAsync([owner, overlayPointer, request, settings, rasterSettings] {
             if (owner == nullptr || overlayPointer == nullptr) { return; }
             owner->dismissOverlay(overlayPointer.getComponent(), [owner, request, settings, rasterSettings] {
@@ -593,8 +605,9 @@ void MotionEditor::showNextPreparationSettings() {
             });
         });
     };
-    if (luaPanel != nullptr) { luaPanel->onBake = [submit](motion::BakeSettings settings) { submit(settings, {}); }; }
-    if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) { submit({}, settings); }; }
+    if (luaPanel != nullptr) { luaPanel->onBake = [submit](motion::BakeSettings settings) mutable { submit(settings, {}); }; }
+    if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) mutable { submit({}, settings); }; }
+    if (textPanel != nullptr) { textPanel->onApply = [submit](juce::String text) mutable { submit({}, {}, std::move(text)); }; }
     showOverlay(std::move(overlay));
 }
 
@@ -619,7 +632,12 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
         if (!task->cancelled.load()) {
             try {
                 if (request.replacement != nullptr) {
-                    asset->data = request.replacement->data;
+                    if (request.editedText.has_value()) {
+                        const auto& text = *request.editedText;
+                        asset->data.replaceAll(text.toRawUTF8(), text.getNumBytesAsUTF8());
+                    } else {
+                        asset->data = request.replacement->data;
+                    }
                     result = motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
                 } else if (request.file.getSize() > static_cast<juce::int64>(motion::Document::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
@@ -650,7 +668,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     return;
                 }
                 asset->id = request.replacement->id;
-                document.edit("Rebuild source cache", [&](motion::Project& project) {
+                document.edit(request.editedText.has_value() ? "Edit text source" : "Rebuild source cache", [&](motion::Project& project) {
                     for (auto& item : project.assets) {
                         if (item == request.replacement) { item = asset; }
                     }
