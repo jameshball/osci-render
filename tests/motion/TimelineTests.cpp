@@ -111,6 +111,104 @@ int main() {
             && pair[0].clips[0].end() == pair[0].clips[1].start, "batch insertion remains ordered and exactly adjacent");
 
     }
+    {
+        const auto sameTrack = [](const motion::Track& left, const motion::Track& right) {
+            if (left.locked != right.locked || left.clips.size() != right.clips.size()) { return false; }
+            for (std::size_t index = 0; index < left.clips.size(); ++index) {
+                const auto& a = left.clips[index];
+                const auto& b = right.clips[index];
+                if (a.id != b.id || a.start != b.start || a.duration != b.duration || a.offset != b.offset
+                    || a.rate != b.rate || a.timeBase != b.timeBase || a.contentBpm != b.contentBpm) { return false; }
+            }
+            return true;
+        };
+        motion::Track track;
+        track.id = 4;
+        motion::Clip earlier; earlier.id = 201; earlier.start = 0; earlier.duration = 2;
+        motion::Clip selected; selected.id = 202; selected.start = 5; selected.duration = 2; selected.offset = .25; selected.rate = 1.5;
+        selected.properties["position.x"].setKey({.25, 1, motion::Interpolation::cubic, 2, -3});
+        motion::Clip downstream; downstream.id = 203; downstream.start = 10; downstream.duration = 2; downstream.offset = 3; downstream.rate = .5;
+        downstream.properties["position.x"].setKey({3, 4, motion::Interpolation::linear});
+        auto final = downstream; final.id = 204; final.start = 15;
+        check(track.insert(earlier) && track.insert(selected) && track.insert(downstream) && track.insert(final), "ripple trim fixture placement");
+        const auto original = track;
+        check(motion::rippleTrim(track, 202, true, 1, 120), "leading ripple trim succeeds");
+        check(near(track.clips[0].start, 0) && near(track.clips[1].start, 5) && near(track.clips[1].duration, 1)
+            && near(track.clips[1].offset, 1.75), "leading trim keeps placement and advances source offset");
+        check(near(track.clips[2].start, 9) && near(track.clips[3].start, 14), "leading trim shifts downstream clips left");
+        check(near(track.clips[2].timing(120).start - track.clips[1].timing(120).end(), 3), "leading trim preserves the downstream gap");
+        check(track.clips[0].start == original.clips[0].start && track.clips[2].offset == original.clips[2].offset
+            && track.clips[2].rate == original.clips[2].rate && track.clips[2].properties.at("position.x").keyframes()[0].time == 3,
+            "ripple movement leaves earlier and downstream source clocks and keys intact");
+        check(track.clips[1].properties.at("position.x").keyframes()[0].time == .25,
+            "ripple trim does not alter selected animation keys");
+
+        track = original;
+        check(motion::rippleTrim(track, 202, false, 2, 120), "trailing ripple trim succeeds");
+        check(near(track.clips[1].start, 5) && near(track.clips[1].duration, 4) && near(track.clips[1].offset, .25),
+            "trailing trim changes only selected duration");
+        check(near(track.clips[2].start, 12) && near(track.clips[3].start, 17), "trailing trim shifts downstream clips right");
+        check(near(track.clips[2].timing(120).start - track.clips[1].timing(120).end(), 3), "trailing trim preserves the downstream gap");
+
+        track = original;
+        check(motion::rippleTrim(track, 202, true, -.5, 120), "leading ripple extension accepts a negative source offset");
+        check(near(track.clips[1].start, 5) && near(track.clips[1].duration, 2.5) && near(track.clips[1].offset, -.5),
+            "leading ripple extension keeps placement and permits a negative source offset");
+        check(near(track.clips[2].start, 10.5) && near(track.clips[3].start, 15.5), "leading extension shifts downstream clips right");
+
+        motion::Track mixed;
+        mixed.id = 5;
+        auto absolute = selected; absolute.id = 211; absolute.start = 3; absolute.duration = 2; absolute.offset = .5; absolute.rate = 1.25;
+        auto musical = downstream; musical.id = 212; musical.start = 7; musical.duration = 2; musical.offset = .75; musical.rate = .8;
+        check(musical.anchorToBeats(137), "ripple trim fixture includes a beat-anchored downstream clip");
+        check(mixed.insert(earlier, 137) && mixed.insert(absolute, 137) && mixed.insert(musical, 137), "mixed-timebase ripple fixture placement");
+        const auto musicalStart = mixed.clips[2].timing(137).start;
+        const auto musicalOffset = mixed.clips[2].offset;
+        const auto musicalRate = mixed.clips[2].rate;
+        check(motion::rippleTrim(mixed, 211, true, .4, 137), "mixed-timebase leading ripple trim succeeds");
+        check(near(mixed.clips[1].start, 3) && near(mixed.clips[1].duration, 1.6) && near(mixed.clips[1].offset, 1),
+            "mixed leading trim uses resolved seconds for content advance");
+        check(mixed.clips[2].timeBase == motion::ClipTimeBase::beats && near(mixed.clips[2].timing(137).start, musicalStart - .4)
+            && mixed.clips[2].offset == musicalOffset && mixed.clips[2].rate == musicalRate,
+            "mixed ripple preserves beat authoring and downstream source clock");
+
+        motion::Track touchingMusical;
+        auto beatHead = selected; beatHead.id = 220; beatHead.timeBase = motion::ClipTimeBase::beats;
+        beatHead.start = 2; beatHead.duration = 3; beatHead.offset = .5; beatHead.contentBpm = 90;
+        auto touchingTail = downstream; touchingTail.id = 221; touchingTail.start = beatHead.timing(137).end();
+        check(touchingMusical.insert(beatHead, 137) && touchingMusical.insert(touchingTail, 137), "touching musical head fixture");
+        const auto headTiming = beatHead.timing(137);
+        check(motion::rippleTrim(touchingMusical, 220, true, .2, 137), "leading trim of a musical clip with a different content tempo");
+        check(near(touchingMusical.clips[0].timing(137).start, headTiming.start)
+            && near(touchingMusical.clips[0].timing(137).duration(), headTiming.duration() - .2)
+            && near(touchingMusical.clips[0].timing(137).offset, headTiming.offset + .2 * headTiming.rate),
+            "musical head converts placement and source offset independently");
+        check(touchingMusical.clips[1].timing(137).start >= touchingMusical.clips[0].timing(137).end()
+            && near(touchingMusical.clips[1].timing(137).start, touchingMusical.clips[0].timing(137).end()),
+            "rounding keeps the musical head and absolute tail adjacent without overlap");
+        check(motion::rippleTrim(touchingMusical, 220, false, -.3, 137)
+            && near(touchingMusical.clips[0].timing(137).duration(), headTiming.duration() - .5),
+            "trailing ripple shortening retains valid touching boundaries");
+
+        const auto unchanged = original;
+        track = unchanged;
+        check(!motion::rippleTrim(track, 999, false, 1, 120) && sameTrack(track, unchanged), "missing ripple trim target is atomic");
+        check(!motion::rippleTrim(track, 202, true, 2, 120) && sameTrack(track, unchanged), "nonpositive ripple trim duration is atomic");
+        check(!motion::rippleTrim(track, 202, false, std::numeric_limits<double>::infinity(), 120) && sameTrack(track, unchanged), "nonfinite ripple trim is atomic");
+        track.locked = true;
+        const auto locked = track;
+        check(!motion::rippleTrim(track, 202, false, 1, 120) && sameTrack(track, locked), "locked track rejects ripple trim atomically");
+        track = unchanged;
+        track.clips[2].start = 6;
+        const auto overlapping = track;
+        check(!motion::rippleTrim(track, 202, false, 1, 120) && sameTrack(track, overlapping), "overlapping track rejects ripple trim atomically");
+        track = unchanged;
+        track.clips[2].rate = 0;
+        const auto invalid = track;
+        check(!motion::rippleTrim(track, 202, false, 1, 120) && sameTrack(track, invalid), "invalid clip rejects ripple trim atomically");
+        track = unchanged;
+        check(!motion::rippleTrim(track, 202, false, 1, 0) && sameTrack(track, unchanged), "invalid tempo rejects ripple trim atomically");
+    }
     motion::Clip clip;
     clip.id = 1;
     clip.asset = 5;

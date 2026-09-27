@@ -24,7 +24,7 @@ public:
         };
         addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
-        setTooltip("Shift-click: select multiple clips. V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip. M: add marker. [ / ]: previous / next marker.");
+        setTooltip("Shift-click: select multiple clips. V: Move / trim. B: Ripple trim edges on this track. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip. M: add marker. [ / ]: previous / next marker.");
     }
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition;
     std::function<void(const juce::String&)> onError;
@@ -346,6 +346,12 @@ public:
                     g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38), juce::Justification::centred);
                     g.setColour(juce::Colours::white);
                 }
+                if (active && tool == Tool::ripple && bounds.getWidth() > 18) {
+                    g.setColour(juce::Colour(0xff70da91).withAlpha(opacity));
+                    g.fillRoundedRectangle(bounds.getX() + 3, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
+                    g.fillRoundedRectangle(bounds.getRight() - 6, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
+                    g.setColour(juce::Colours::white);
+                }
                 auto label = juce::String(clip.name);
                 if (active && tool == Tool::slip) {
                     label += "  offset " + juce::String(clip.timing(processor.document.project().bpm).offset, 2) + "s";
@@ -530,8 +536,13 @@ public:
         originalRow = row;
         downX = event.x;
         const auto bounds = clipBounds(original, row);
+        if (tool == Tool::ripple && event.x >= bounds.getX() + 8 && event.x <= bounds.getRight() - 8) {
+            selectClip(original.id);
+            return;
+        }
         mode = tool == Tool::slip ? Mode::slip : (tool == Tool::stretch ? Mode::stretch
             : (event.x < bounds.getX() + 8 ? Mode::left : (event.x > bounds.getRight() - 8 ? Mode::right : Mode::move)));
+        if (tool == Tool::ripple) { mode = mode == Mode::left ? Mode::rippleLeft : Mode::rippleRight; }
         before = processor.document.project();
         expectedRevision = processor.document.revision();
         changed = false;
@@ -549,7 +560,7 @@ public:
         } else if (clip != nullptr) {
             const auto bounds = clipBounds(*clip, row);
             const bool edge = event.x < bounds.getX() + 8 || event.x > bounds.getRight() - 8;
-            setMouseCursor(tool != Tool::move || edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor);
+            setMouseCursor((tool == Tool::slip || tool == Tool::stretch || edge) ? juce::MouseCursor::LeftRightResizeCursor : (tool == Tool::ripple ? juce::MouseCursor::NormalCursor : juce::MouseCursor::DraggingHandCursor));
         } else {
             setMouseCursor(juce::MouseCursor::NormalCursor);
         }
@@ -581,9 +592,19 @@ public:
         auto edited = timing;
         auto delta = (event.x - downX) / pixelsPerSecond;
         if (delta != 0.0 && !event.mods.isAltDown()) {
-            const auto anchor = mode == Mode::right || mode == Mode::stretch ? timing.end()
+            const auto anchor = mode == Mode::right || mode == Mode::stretch || mode == Mode::rippleRight ? timing.end()
                 : (mode == Mode::slip ? timing.offset / timing.rate : timing.start);
             delta = before->timeGrid().snap(anchor + delta) - anchor;
+        }
+        if (mode == Mode::rippleLeft || mode == Mode::rippleRight) {
+            auto updated = *before;
+            if (!motion::rippleTrim(updated.tracks[originalRow], original.id, mode == Mode::rippleLeft, delta, updated.bpm)) { return; }
+            for (const auto& item : updated.tracks[originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.bpm).end()); }
+            changed = delta != 0;
+            processor.document.preview(std::move(updated));
+            expectedRevision = processor.document.revision();
+            repaint();
+            return;
         }
         if (mode == Mode::move && selectedClips.size() > 1) {
             auto updated = *before;
@@ -666,7 +687,7 @@ public:
         auto originalProject = std::move(*before);
         before.reset();
         if (changed) {
-            const auto label = markerDragging != 0 ? "Move marker" : mode == Mode::move ? (selectedClips.size() > 1 ? "Move clips" : "Move clip") : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
+            const auto label = markerDragging != 0 ? "Move marker" : (mode == Mode::rippleLeft || mode == Mode::rippleRight) ? "Ripple trim clip" : mode == Mode::move ? (selectedClips.size() > 1 ? "Move clips" : "Move clip") : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
             processor.document.commit(label, std::move(originalProject));
         }
         changed = false;
@@ -723,9 +744,9 @@ public:
                 jumpMarker(character == ']');
                 return true;
             }
-            if (character == 'v' || character == 's' || character == 'r') {
+            if (character == 'v' || character == 's' || character == 'r' || character == 'b') {
                 cancelGesture();
-                tool = character == 'v' ? Tool::move : (character == 's' ? Tool::slip : Tool::stretch);
+                tool = character == 'b' ? Tool::ripple : character == 'v' ? Tool::move : (character == 's' ? Tool::slip : Tool::stretch);
                 repaint();
                 return true;
             }
@@ -1040,11 +1061,11 @@ private:
         });
         if (onEffectAdded) { onEffectAdded(owner, effect.id); }
     }
-    enum class Tool { move, slip, stretch };
-    enum class Mode { move, left, right, slip, stretch };
+    enum class Tool { move, slip, stretch, ripple };
+    enum class Mode { move, left, right, slip, stretch, rippleLeft, rippleRight };
 
     juce::String toolName() const {
-        return tool == Tool::move ? "Move / Trim (V)" : (tool == Tool::slip ? "Slip (S)" : "Stretch (R)");
+        return tool == Tool::ripple ? "Ripple Trim (B)" : tool == Tool::move ? "Move / Trim (V)" : (tool == Tool::slip ? "Slip (S)" : "Stretch (R)");
     }
 
     void showToolMenu(bool atHeader = false) {
@@ -1053,6 +1074,7 @@ private:
         menu.addItem(1, "Move / trim edges (V)", true, tool == Tool::move);
         menu.addItem(2, "Slip content inside clip (S)", true, tool == Tool::slip);
         menu.addItem(3, "Stretch duration and speed (R)", true, tool == Tool::stretch);
+        menu.addItem(5, "Ripple trim edges on this track (B)", true, tool == Tool::ripple);
         menu.addSeparator();
         menu.addItem(4, "Fit project (F)");
         menu.addSectionHeader("Alt: disable snapping   Escape: cancel");
@@ -1067,7 +1089,7 @@ private:
             if (result == 4) {
                 owner->fitProject();
             } else {
-                owner->tool = result == 1 ? Tool::move : (result == 2 ? Tool::slip : Tool::stretch);
+                owner->tool = result == 5 ? Tool::ripple : result == 1 ? Tool::move : (result == 2 ? Tool::slip : Tool::stretch);
                 owner->repaint();
             }
         });

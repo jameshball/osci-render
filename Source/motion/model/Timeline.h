@@ -4,12 +4,15 @@
 #include "Effects.h"
 #include "MidiNotes.h"
 #include "MidiInstrument.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <limits>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace motion {
 
@@ -243,6 +246,96 @@ struct Track {
         return nullptr;
     }
 };
+
+// Editor-thread operation: trim one clip and ripple only clips after its
+// original end. All displacement is resolved project seconds, so musical and
+// time-anchored clips retain their own authoring domains and source clocks.
+inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSeconds, double bpm) {
+    if (track.locked || clipId == 0 || !std::isfinite(deltaSeconds) || !std::isfinite(bpm) || bpm < 1 || bpm > 1000) {
+        return false;
+    }
+    auto candidate = track;
+    std::vector<Id> identities;
+    identities.reserve(candidate.clips.size());
+    for (const auto& clip : candidate.clips) {
+        if (!clip.valid() || !clip.timing(bpm).valid()) {
+            return false;
+        }
+        identities.push_back(clip.id);
+    }
+    std::sort(identities.begin(), identities.end());
+    if (std::adjacent_find(identities.begin(), identities.end()) != identities.end()) {
+        return false;
+    }
+    std::sort(candidate.clips.begin(), candidate.clips.end(), [bpm](const auto& left, const auto& right) {
+        return left.timing(bpm).start < right.timing(bpm).start;
+    });
+    double previousEnd = 0;
+    ClipTiming original;
+    std::size_t selected = candidate.clips.size();
+    for (std::size_t index = 0; index < candidate.clips.size(); ++index) {
+        const auto& clip = candidate.clips[index];
+        const auto timing = clip.timing(bpm);
+        if (timing.start < previousEnd) {
+            return false;
+        }
+        if (clip.id == clipId) {
+            if (selected != candidate.clips.size()) {
+                return false;
+            }
+            selected = index;
+            original = timing;
+        }
+        previousEnd = timing.end();
+    }
+    if (selected == candidate.clips.size()) {
+        return false;
+    }
+    auto edited = original;
+    if (leadingEdge) {
+        edited.setDuration(original.duration() - deltaSeconds);
+        edited.offset = original.offset + deltaSeconds * original.rate;
+    } else {
+        edited.setDuration(original.duration() + deltaSeconds);
+    }
+    if (!edited.valid() || !candidate.clips[selected].setTiming(edited, bpm)) {
+        return false;
+    }
+    const auto displacement = leadingEdge ? -deltaSeconds : deltaSeconds;
+    for (std::size_t index = selected + 1; index < candidate.clips.size(); ++index) {
+        auto timing = candidate.clips[index].timing(bpm);
+        timing.moveTo(timing.start + displacement);
+        if (!timing.valid() || !candidate.clips[index].setTiming(timing, bpm)) {
+            return false;
+        }
+    }
+    for (std::size_t index = 1; index < candidate.clips.size(); ++index) {
+        auto& clip = candidate.clips[index];
+        const auto previous = candidate.clips[index - 1].timing(bpm);
+        auto timing = clip.timing(bpm);
+        if (timing.start >= previous.end()) {
+            continue;
+        }
+        const auto overlap = previous.end() - timing.start;
+        const auto tolerance = 32 * std::numeric_limits<double>::epsilon()
+            * std::max({1.0, std::abs(timing.start), std::abs(previous.end()), std::abs(displacement)});
+        if (overlap > tolerance) {
+            return false;
+        }
+        timing.moveTo(previous.end());
+        if (!clip.setTiming(timing, bpm)) {
+            return false;
+        }
+        for (int step = 0; step < 4 && clip.timing(bpm).start < previous.end(); ++step) {
+            clip.start = std::nextafter(clip.start, std::numeric_limits<double>::infinity());
+        }
+        if (!clip.valid() || clip.timing(bpm).start < previous.end()) {
+            return false;
+        }
+    }
+    track = std::move(candidate);
+    return true;
+}
 
 // Editor-thread operation: apply a shared project-time displacement atomically.
 // Track displacement is in model rows; callers with collapsed groups translate
