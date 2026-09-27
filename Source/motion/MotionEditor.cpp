@@ -10,6 +10,25 @@
 #include <cstdlib>
 
 namespace {
+class MotionProjectLoading final : public juce::Component {
+public:
+    explicit MotionProjectLoading(std::function<void()> cancel) {
+        status.setText("Preparing sources. Your current project stays open until loading succeeds.", juce::dontSendNotification);
+        status.setJustificationType(juce::Justification::centred);
+        cancelButton.onClick = std::move(cancel);
+        addAndMakeVisible(status);
+        addAndMakeVisible(cancelButton);
+    }
+    void resized() override {
+        auto bounds = getLocalBounds().reduced(12);
+        cancelButton.setBounds(bounds.removeFromBottom(30).withSizeKeepingCentre(100, 30));
+        status.setBounds(bounds);
+    }
+private:
+    juce::Label status;
+    juce::TextButton cancelButton {"Cancel loading"};
+};
+
 class MotionVideoPreparation final : public juce::Component, private juce::Timer {
 public:
     MotionVideoPreparation(std::function<double()> readProgress, std::function<void()> cancel, bool includeAudio)
@@ -445,6 +464,7 @@ MotionEditor::~MotionEditor() {
     processor.previewComposition(processor.document.project());
     processor.document.removeChangeListener(this);
     for (const auto& task : pendingImports) { task->cancelled.store(true); }
+    if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
     imports.removeAllJobs(true, -1);
     if (exportState != nullptr) { exportState->cancelled.store(true); }
     exports.removeAllJobs(true, -1);
@@ -605,6 +625,80 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
         beginSourceImport(std::move(request));
     }
     return true;
+}
+
+void MotionEditor::openProject(const juce::File& file) {
+    if (file == juce::File()) { return; }
+    if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
+    if (projectLoadOverlay != nullptr) { dismissOverlay(projectLoadOverlay.getComponent()); }
+    auto task = std::make_shared<ProjectLoad>();
+    projectLoad = task;
+    const auto generation = processor.document.generation();
+    const auto revision = processor.document.revision();
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    auto cancel = [owner, task] {
+        task->cancelled.store(true);
+        if (owner != nullptr && owner->projectLoad == task) {
+            const auto editor = owner;
+            auto* overlay = editor->projectLoadOverlay.getComponent();
+            editor->projectLoadOverlay = nullptr;
+            editor->projectLoad.reset();
+            // Dismissal destroys this button and its callback: no captures may
+            // be accessed after it returns.
+            if (overlay != nullptr) { editor->dismissOverlay(overlay); }
+        }
+    };
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::make_unique<MotionProjectLoading>(cancel), "Opening " + file.getFileName(), juce::Point<int>(420, 130), true);
+    overlay->onDismissRequested = [owner, task] {
+        task->cancelled.store(true);
+        if (owner != nullptr && owner->projectLoad == task) {
+            owner->projectLoadOverlay = nullptr;
+            owner->projectLoad.reset();
+        }
+    };
+    projectLoadOverlay = overlay.get();
+    showOverlay(std::move(overlay));
+    imports.addJob([owner, task, file, generation, revision] {
+        auto result = juce::Result::fail("Project loading cancelled.");
+        if (!task->cancelled.load()) {
+            try {
+                juce::MemoryBlock bytes;
+                if (!file.loadFileAsData(bytes) || bytes.getSize() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+                    result = juce::Result::fail("Cannot read the project file.");
+                } else {
+                    task->xml = juce::AudioProcessor::getXmlFromBinary(bytes.getData(), static_cast<int>(bytes.getSize()));
+                    const auto* composition = task->xml != nullptr ? task->xml->getChildByName("composition") : nullptr;
+                    if (task->xml == nullptr || !task->xml->hasTagName("motion-project") || task->xml->getIntAttribute("schema") != 1 || composition == nullptr) {
+                        result = juce::Result::fail("This is not a valid osci-motion project.");
+                    } else {
+                        result = motion::Document::prepareLoad(*composition, task->prepared, &task->cancelled);
+                    }
+                }
+            } catch (const std::exception& error) {
+                result = juce::Result::fail("Cannot open project: " + juce::String(error.what()));
+            }
+        }
+        juce::MessageManager::callAsync([owner, task, file, generation, revision, result] {
+            if (owner == nullptr || owner->projectLoad != task || task->cancelled.load()) { return; }
+            auto* overlay = owner->projectLoadOverlay.getComponent();
+            owner->projectLoadOverlay = nullptr;
+            owner->projectLoad.reset();
+            if (overlay != nullptr) { owner->dismissOverlay(overlay); }
+            if (result.failed()) {
+                osci::showOverlayMessage(*owner, "Open Project Failed", result.getErrorMessage());
+                return;
+            }
+            if (owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) {
+                osci::showOverlayMessage(*owner, "Project Changed", "The current project changed while loading. Open the file again to replace it.");
+                return;
+            }
+            owner->processor.applyPreparedProject(std::move(task->prepared), *task->xml);
+            owner->processor.currentProjectFile = file.getFullPathName();
+            owner->processor.setLastOpenedDirectory(file.getParentDirectory());
+            owner->processor.addRecentProjectFile(file);
+            owner->updateTitle();
+        });
+    });
 }
 
 void MotionEditor::showNextPreparationSettings() {

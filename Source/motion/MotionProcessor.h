@@ -62,4 +62,6 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     void getStateInformation(juce::MemoryBlock& destination) override;
     void setStateInformation(const void* data, int size) override;
+    // Message-thread publication after standalone background preparation.
+    void applyPreparedProject(motion::Project prepared, juce::XmlElement& state);
 };

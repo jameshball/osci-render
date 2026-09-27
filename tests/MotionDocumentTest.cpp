@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include <thread>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
@@ -72,6 +73,29 @@ public:
         expectEquals(static_cast<int>(restored.project().tracks.size()), 1);
         expectWithinAbsoluteError(restored.project().tracks[0].clips[0].properties.at("position.x").evaluate(90), 0.5, 1.0e-9);
         expect(restored.newId() > track.id);
+
+        beginTest("Background load preparation does not publish and failures retain the destination");
+        motion::Project preparedLoad;
+        preparedLoad.name = "Untouched destination";
+        const auto beforePreparation = document.save().toString();
+        const auto preparedGeneration = document.generation();
+        std::atomic<bool> cancelled {true};
+        expect(motion::Document::prepareLoad(xml, preparedLoad, &cancelled).failed());
+        expectEquals(preparedLoad.name, juce::String("Untouched destination"));
+        cancelled.store(false);
+        auto invalidPreparation = xml;
+        invalidPreparation.getChildByName("asset")->setAttribute("id", "0");
+        expect(motion::Document::prepareLoad(invalidPreparation, preparedLoad, &cancelled).failed());
+        expectEquals(preparedLoad.name, juce::String("Untouched destination"));
+        auto preparationResult = juce::Result::fail("Not run");
+        std::thread preparationThread([&] { preparationResult = motion::Document::prepareLoad(xml, preparedLoad, &cancelled); });
+        preparationThread.join();
+        expect(preparationResult.wasOk(), preparationResult.getErrorMessage());
+        expect(document.generation() == preparedGeneration);
+        expectEquals(document.save().toString(), beforePreparation);
+        expectEquals(static_cast<int>(preparedLoad.assets.size()), 1);
+        expectEquals(static_cast<int>(preparedLoad.tracks.size()), 1);
+        expect(preparedLoad.assets.front()->source != nullptr);
 
         beginTest("Undo and redo retain shared asset payloads");
         const auto revisionBeforeUndo = document.revision();

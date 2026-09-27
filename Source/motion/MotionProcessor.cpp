@@ -195,12 +195,18 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
     }
     const auto* compositionXml = project->getChildByName("composition");
     if (compositionXml == nullptr) { return; }
-    const auto result = document.load(*compositionXml);
+    motion::Project prepared;
+    const auto result = motion::Document::prepareLoad(*compositionXml, prepared);
     if (result.failed()) { return; }
+    applyPreparedProject(std::move(prepared), *project);
+}
+
+void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlElement& state) {
+    document.reset(std::move(prepared));
     setMidiAudition(0);
-    VisualiserState::load(*project, visualiserParameters, recordingParameters);
-    restoreStandaloneProjectFilePathFromXml(*project);
-    loadProperties(*project);
+    VisualiserState::load(state, visualiserParameters, recordingParameters);
+    restoreStandaloneProjectFilePathFromXml(state);
+    loadProperties(state);
     getUndoManager().clearUndoHistory();
 }
 

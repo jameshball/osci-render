@@ -100,6 +100,8 @@ public:
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;
     juce::Result load(const juce::XmlElement& xml);
+    // Worker-safe preparation; output is replaced only after full validation.
+    static juce::Result prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel = nullptr);
     std::function<void()> onChanged;
 
     static constexpr std::size_t maximumSourceBytes = 64 * 1024 * 1024;

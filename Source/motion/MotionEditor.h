@@ -24,6 +24,7 @@ public:
     bool isInterestedInFileDrag(const juce::StringArray&) override { return true; }
     void filesDropped(const juce::StringArray& files, int, int) override;
     bool keyPressed(const juce::KeyPress& key) override;
+    void openProject(const juce::File& file) override;
 
 
 private:
@@ -42,6 +43,13 @@ private:
     void showNextPreparationSettings();
     std::deque<SourceRequest> preparationRequests;
     bool preparationSettingsOpen = false;
+    struct ProjectLoad {
+        std::atomic<bool> cancelled {false};
+        motion::Project prepared;
+        std::unique_ptr<juce::XmlElement> xml;
+    };
+    std::shared_ptr<ProjectLoad> projectLoad;
+    juce::Component::SafePointer<osci::OverlayComponent> projectLoadOverlay;
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void select(motion::Id id);

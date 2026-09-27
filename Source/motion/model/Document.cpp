@@ -1567,6 +1567,14 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
     return juce::Result::ok();
 }
 juce::Result Document::load(const juce::XmlElement& xml) {
+    Project prepared;
+    const auto result = prepareLoad(xml, prepared);
+    if (result.wasOk()) { reset(std::move(prepared)); }
+    return result;
+}
+
+juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel) try {
+    if (importCancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
     if (!xml.hasTagName("composition")) { return juce::Result::fail("Missing composition."); }
     Project project;
     std::set<Id> identities, compositionIds;
@@ -1576,6 +1584,7 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         compositionIds.insert(static_cast<Id>(identity));
     }
     for (auto* item : xml.getChildWithTagNameIterator("asset")) {
+        if (importCancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
         auto asset = std::make_shared<Asset>();
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
         asset->name = item->getStringAttribute("name");
@@ -1624,7 +1633,7 @@ juce::Result Document::load(const juce::XmlElement& xml) {
                 return juce::Result::fail("Invalid or oversized Lua source cache.");
             }
         }
-        const auto result = decodeAsset(*asset);
+        const auto result = decodeAsset(*asset, cancel);
         if (result.failed()) {
             return result;
         }
@@ -1648,7 +1657,10 @@ juce::Result Document::load(const juce::XmlElement& xml) {
     }
     const auto graph = validateCompositionGraph(project);
     if (!graph) { return juce::Result::fail(graph.error); }
-    reset(std::move(project));
+    if (importCancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
+    output = std::move(project);
     return juce::Result::ok();
+} catch (const std::exception& error) {
+    return juce::Result::fail("Cannot prepare project: " + juce::String(error.what()));
 }
 }
