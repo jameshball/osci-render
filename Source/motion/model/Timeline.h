@@ -55,6 +55,7 @@ private:
 struct Clip {
     Id id = 0;
     Id asset = 0;
+    Id composition = 0;
     std::string name;
     double start = 0.0;
     double duration = 5.0;
@@ -133,6 +134,7 @@ struct Clip {
         }
         return (timeBase == ClipTimeBase::seconds || timeBase == ClipTimeBase::beats)
             && std::isfinite(contentBpm) && contentBpm >= 1 && contentBpm <= 1000
+            && !(asset != 0 && composition != 0)
             && id != 0 && std::isfinite(start) && start >= 0.0 && std::isfinite(duration)
             && duration > 0.0 && std::isfinite(end()) && end() > start && std::isfinite(offset)
             && std::isfinite(rate) && rate > 0.0;

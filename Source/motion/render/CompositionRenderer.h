@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/Document.h"
+#include "../model/CompositionGraph.h"
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
 #include "PreparedMidiPerformance.h"
@@ -138,6 +139,9 @@ enum class CompositionPurpose { signal, editorGeometry };
 
 struct PreparedComposition {
     explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), soundtrack(project), effects(prepareEffects(project.effects)) {
+        const auto graph = validateCompositionGraph(project);
+        if (!graph) { preparationError = graph.error; return; }
+        if (graph.depth != 0) { preparationError = "Reusable composition rendering is not connected yet."; return; }
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;

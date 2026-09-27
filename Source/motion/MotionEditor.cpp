@@ -576,10 +576,7 @@ void MotionEditor::showNextPreparationSettings() {
     MotionRasterSettingsPanel* imagePanel = nullptr;
     MotionTextSourcePanel* textPanel = nullptr;
     if (text) {
-        int instances = 0;
-        for (const auto& track : processor.document.project().tracks) {
-            for (const auto& clip : track.clips) { if (clip.asset == request.replacement->id) { ++instances; } }
-        }
+        const auto instances = motion::sourceReferenceCount(processor.document.project(), request.replacement->id);
         auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances);
         textPanel = panel.get();
         content = std::move(panel);

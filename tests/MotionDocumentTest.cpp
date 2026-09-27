@@ -128,6 +128,7 @@ public:
         testCameras(document);
         testAnimatedSources();
         testEffects(document.project());
+        testCompositions(document.project());
         testTrackStates(document.project());
         testGroups(document.project());
         testModulation(document.project());
@@ -767,6 +768,48 @@ private:
             expectEquals(reloaded.sample(1, 0.1).r, savedSignal.sample(1, 0.1).r);
             expectEquals(reloaded.sample(1, 0.5).g, savedSignal.sample(1, 0.5).g);
         }
+    }
+
+    void testCompositions(const motion::Project& sourceProject) {
+        beginTest("Reusable definitions round trip shared media and globally unique nested identities");
+        auto project = sourceProject;
+        auto definition = std::make_shared<motion::CompositionDefinition>();
+        definition->id = 60001; definition->name = "Reusable motif";
+        auto childTrack = project.tracks[0];
+        childTrack.id = 60002; childTrack.clips.resize(1); childTrack.effects.clear(); childTrack.group = 0;
+        childTrack.clips[0].id = 60003; childTrack.clips[0].effects.clear();
+        definition->tracks = {childTrack};
+        project.definitions = {definition};
+        const auto sharedCount = motion::sourceReferenceCount(project, childTrack.clips[0].asset);
+        expect(sharedCount > motion::sourceReferenceCount(sourceProject, childTrack.clips[0].asset));
+        auto& instance = project.tracks[0].clips[0];
+        instance.asset = 0; instance.composition = definition->id;
+        juce::UndoManager undo, loadedUndo;
+        motion::Document document(undo), loaded(loadedUndo);
+        document.reset(project);
+        const auto xml = document.save();
+        const auto result = loaded.load(xml);
+        expect(result.wasOk(), result.getErrorMessage());
+        if (result.failed()) { return; }
+        expect(loaded.project().definitions.size() == 1);
+        expect(loaded.project().assets.size() == project.assets.size());
+        expect(loaded.project().tracks[0].clips[0].composition == definition->id);
+        expect(loaded.project().definitions[0]->tracks[0].clips[0].asset == childTrack.clips[0].asset);
+        expect(loaded.newId() > 60003);
+        // Until instance rendering lands, fail explicitly instead of producing
+        // a successful-looking export with the nested content omitted.
+        expect(motion::PreparedComposition(loaded.project()).preparationError.isNotEmpty());
+        beginTest("Invalid reusable graph loads leave the existing document untouched");
+        auto cyclic = xml;
+        auto* nestedClip = cyclic.getChildByName("definition")->getChildByName("composition")->getChildByName("track")->getChildByName("clip");
+        nestedClip->removeAttribute("asset"); nestedClip->setAttribute("composition", "60001");
+        const auto revision = loaded.revision();
+        expect(loaded.load(cyclic).failed());
+        expect(loaded.revision() == revision && loaded.project().definitions.size() == 1);
+        auto duplicate = xml;
+        duplicate.getChildByName("definition")->setAttribute("id", juce::String(project.assets[0]->id));
+        expect(loaded.load(duplicate).failed());
+        expect(loaded.revision() == revision);
     }
 
     void testEffects(const motion::Project& sourceProject) {

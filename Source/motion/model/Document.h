@@ -59,8 +59,13 @@ struct Composition {
     std::vector<Group> groups;
 };
 
+struct CompositionDefinition : Composition {
+    Id id = 0;
+};
+
 struct Project : Composition {
     std::vector<std::shared_ptr<const Asset>> assets;
+    std::vector<std::shared_ptr<const CompositionDefinition>> definitions;
 };
 
 // Editable state belongs to the message thread. Undo copies clip/curve values

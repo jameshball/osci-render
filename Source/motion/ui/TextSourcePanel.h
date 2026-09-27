@@ -5,7 +5,7 @@
 
 class MotionTextSourcePanel final : public juce::Component {
 public:
-    MotionTextSourcePanel(const juce::String& initial, int instances) : original(initial) {
+    MotionTextSourcePanel(const juce::String& initial, std::size_t instances) : original(initial) {
         setName("Text source editor");
         text.setName("Source text");
         text.setMultiLine(true);
@@ -17,7 +17,7 @@ public:
         text.onTextChange = [this] { refresh(); };
         help.setFont(juce::FontOptions(13));
         help.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        help.setText("Shared source: " + juce::String(instances) + (instances == 1 ? " clip" : " clips") + " will update. Clip animation stays unchanged.", juce::dontSendNotification);
+        help.setText("Shared source: " + juce::String(static_cast<juce::uint64>(instances)) + (instances == 1 ? " clip" : " clips") + " will update. Clip animation stays unchanged.", juce::dontSendNotification);
         help.setJustificationType(juce::Justification::centredLeft);
         status.setFont(juce::FontOptions(12));
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());

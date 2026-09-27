@@ -6,6 +6,7 @@
 #include <optional>
 #include <limits>
 #include <set>
+#include "../model/CompositionGraph.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
 public:
@@ -685,10 +686,7 @@ private:
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; locked = track.locked; } }
         }
-        int references = 0;
-        for (const auto& track : processor.document.project().tracks) {
-            for (const auto& clip : track.clips) { if (clip.asset == asset) { ++references; } }
-        }
+        const auto references = motion::sourceReferenceCount(processor.document.project(), asset);
         menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1);
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();

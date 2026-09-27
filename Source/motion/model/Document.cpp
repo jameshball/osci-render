@@ -1,4 +1,5 @@
 #include "Document.h"
+#include "CompositionGraph.h"
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
 #include "../import/RasterSourcePreparer.h"
@@ -478,33 +479,7 @@ void Document::commit(juce::String label, Project before) {
 void Document::reset(Project project) {
     ++projectGeneration;
     undo.clearUndoHistory();
-    const auto updateEffects = [&](const auto& effects) {
-        for (const auto& effect : effects) {
-            lastId = std::max(lastId, effect.id);
-        }
-    };
-    updateEffects(project.effects);
-    for (const auto& group : project.groups) {
-        lastId = std::max(lastId, group.id);
-        updateEffects(group.effects);
-    }
-    for (const auto& asset : project.assets) {
-        lastId = std::max(lastId, asset->id);
-    }
-    for (const auto& track : project.tracks) {
-        lastId = std::max(lastId, track.id);
-        updateEffects(track.effects);
-        for (const auto& clip : track.clips) {
-            lastId = std::max(lastId, clip.id);
-            updateEffects(clip.effects);
-        }
-    }
-    for (const auto& camera : project.cameras) {
-        lastId = std::max(lastId, camera.id);
-    }
-    for (const auto& cut : project.cameraCuts) {
-        lastId = std::max(lastId, cut.id);
-    }
+    lastId = highestProjectIdentity(project, lastId);
     apply(std::move(project));
 }
 
@@ -530,18 +505,7 @@ juce::Result Document::changeTempo(double bpm) {
 }
 
 Id Document::highestId() const {
-    auto highest = lastId;
-    const auto effects = [&](const auto& values) { for (const auto& value : values) { highest = std::max(highest, value.id); } };
-    effects(state.effects);
-    for (const auto& asset : state.assets) { if (asset != nullptr) { highest = std::max(highest, asset->id); } }
-    for (const auto& group : state.groups) { highest = std::max(highest, group.id); effects(group.effects); }
-    for (const auto& item : state.tracks) {
-        highest = std::max(highest, item.id); effects(item.effects);
-        for (const auto& clip : item.clips) { highest = std::max(highest, clip.id); effects(clip.effects); }
-    }
-    for (const auto& camera : state.cameras) { highest = std::max(highest, camera.id); }
-    for (const auto& cut : state.cameraCuts) { highest = std::max(highest, cut.id); }
-    return highest;
+    return highestProjectIdentity(state, lastId);
 }
 
 juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy) {
@@ -549,10 +513,7 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
         || std::find(state.assets.begin(), state.assets.end(), expected) == state.assets.end()) {
         return juce::Result::fail("The source changed while preparing its copy.");
     }
-    int references = 0;
-    for (const auto& track : state.tracks) {
-        for (const auto& clip : track.clips) { if (clip.asset == expected->id) { ++references; } }
-    }
+    const auto references = sourceReferenceCount(state, expected->id);
     if (references < 2) { return juce::Result::fail("This clip already has its own source."); }
     for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
         const auto& track = state.tracks[trackIndex];
@@ -942,7 +903,7 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
     return juce::Result::fail("Source preparation failed. Check that the file is valid and try a simpler source.");
 }
 
-juce::XmlElement Document::save() const {
+static juce::XmlElement saveCompositionContent(const Composition& state) {
     juce::XmlElement xml("composition");
     xml.setAttribute("name", state.name);
     xml.setAttribute("duration", state.duration);
@@ -965,37 +926,6 @@ juce::XmlElement Document::save() const {
             saveProperty(*item, name, curve);
         }
     }
-    for (const auto& asset : state.assets) {
-        auto* item = xml.createNewChildElement("asset");
-        item->setAttribute("id", juce::String(asset->id));
-        item->setAttribute("name", asset->name);
-        item->setAttribute("extension", asset->extension);
-        if (isMidiSource(asset->extension)) { item->setAttribute("midiImportBpm", exactBakeNumber(asset->midiImportBpm)); }
-        if (asset->extension.equalsIgnoreCase(".lua")) {
-            item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
-            auto* bake = item->createNewChildElement("bake");
-            bake->setAttribute("duration", exactBakeNumber(asset->bakeSettings.duration));
-            bake->setAttribute("frameRate", exactBakeNumber(asset->bakeSettings.frameRate));
-            bake->setAttribute("bpm", exactBakeNumber(asset->bakeSettings.bpm));
-            bake->setAttribute("pointsPerFrame", static_cast<int>(asset->bakeSettings.pointsPerFrame));
-            bake->setAttribute("seed", juce::String(asset->bakeSettings.seed));
-            bake->setAttribute("key", asset->bakeKey);
-            bake->addTextElement(asset->bakedData.toBase64Encoding());
-        } else {
-            if (isRasterSource(asset->extension)) {
-                auto* raster = item->createNewChildElement("raster");
-                raster->setAttribute("mode", asset->rasterSettings.mode == RasterSettings::Mode::contours ? "contours" : "scanlines");
-                raster->setAttribute("threshold", exactBakeNumber(asset->rasterSettings.threshold));
-                raster->setAttribute("invert", asset->rasterSettings.invert);
-                raster->setAttribute("resolution", asset->rasterSettings.resolution);
-                raster->setAttribute("pointsPerFrame", static_cast<int>(asset->rasterSettings.pointsPerFrame));
-            }
-            // Keep mixed-content payloads last. JUCE's single-line binary XML
-            // writer can attempt a null newline when wrapping attributes on an
-            // element following a text node.
-            item->addTextElement(asset->data.toBase64Encoding());
-        }
-    }
     for (const auto& track : state.tracks) {
         auto* row = xml.createNewChildElement("track");
         row->setAttribute("id", juce::String(track.id));
@@ -1009,7 +939,11 @@ juce::XmlElement Document::save() const {
         for (const auto& clip : track.clips) {
             auto* item = row->createNewChildElement("clip");
             item->setAttribute("id", juce::String(clip.id));
-            item->setAttribute("asset", juce::String(clip.asset));
+            if (clip.composition != 0) {
+                item->setAttribute("composition", juce::String(clip.composition));
+            } else {
+                item->setAttribute("asset", juce::String(clip.asset));
+            }
             item->setAttribute("name", juce::String(clip.name));
             item->setAttribute("timeBase", clip.timeBase == ClipTimeBase::beats ? "beats" : "seconds");
             item->setAttribute("contentBpm", exactBakeNumber(clip.contentBpm));
@@ -1054,11 +988,51 @@ juce::XmlElement Document::save() const {
     return xml;
 }
 
-juce::Result Document::load(const juce::XmlElement& xml) {
+juce::XmlElement Document::save() const {
+    auto xml = saveCompositionContent(state);
+    for (const auto& asset : state.assets) {
+        auto* item = xml.createNewChildElement("asset");
+        item->setAttribute("id", juce::String(asset->id));
+        item->setAttribute("name", asset->name);
+        item->setAttribute("extension", asset->extension);
+        if (isMidiSource(asset->extension)) { item->setAttribute("midiImportBpm", exactBakeNumber(asset->midiImportBpm)); }
+        if (asset->extension.equalsIgnoreCase(".lua")) {
+            item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
+            auto* bake = item->createNewChildElement("bake");
+            bake->setAttribute("duration", exactBakeNumber(asset->bakeSettings.duration));
+            bake->setAttribute("frameRate", exactBakeNumber(asset->bakeSettings.frameRate));
+            bake->setAttribute("bpm", exactBakeNumber(asset->bakeSettings.bpm));
+            bake->setAttribute("pointsPerFrame", static_cast<int>(asset->bakeSettings.pointsPerFrame));
+            bake->setAttribute("seed", juce::String(asset->bakeSettings.seed));
+            bake->setAttribute("key", asset->bakeKey);
+            bake->addTextElement(asset->bakedData.toBase64Encoding());
+        } else {
+            if (isRasterSource(asset->extension)) {
+                auto* raster = item->createNewChildElement("raster");
+                raster->setAttribute("mode", asset->rasterSettings.mode == RasterSettings::Mode::contours ? "contours" : "scanlines");
+                raster->setAttribute("threshold", exactBakeNumber(asset->rasterSettings.threshold));
+                raster->setAttribute("invert", asset->rasterSettings.invert);
+                raster->setAttribute("resolution", asset->rasterSettings.resolution);
+                raster->setAttribute("pointsPerFrame", static_cast<int>(asset->rasterSettings.pointsPerFrame));
+            }
+            // Keep mixed-content payloads last. JUCE's single-line binary XML
+            // writer can attempt a null newline when wrapping attributes on an
+            // element following a text node.
+            item->addTextElement(asset->data.toBase64Encoding());
+        }
+    }
+    for (const auto& definition : state.definitions) {
+        auto* item = xml.createNewChildElement("definition");
+        item->setAttribute("id", juce::String(definition->id));
+        item->addChildElement(new juce::XmlElement(saveCompositionContent(*definition)));
+    }
+    return xml;
+}
+
+static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composition& project, const std::vector<std::shared_ptr<const Asset>>& assets, std::set<Id>& identities, const std::set<Id>& compositionIds) {
     if (!xml.hasTagName("composition")) {
         return juce::Result::fail("Missing composition.");
     }
-    Project project;
     project.name = xml.getStringAttribute("name", "Untitled");
     project.duration = xml.getDoubleAttribute("duration", 180);
     project.frameRate = xml.getDoubleAttribute("fps", 30);
@@ -1075,7 +1049,6 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         || !std::isfinite(project.snapBeats) || project.snapBeats < 1.0 / 64 || project.snapBeats > 64) {
         return juce::Result::fail("Invalid composition timing.");
     }
-    std::set<Id> identities;
     const auto projectEffects = loadEffects(xml, project.effects, identities);
     if (projectEffects.failed()) {
         return projectEffects;
@@ -1113,61 +1086,6 @@ juce::Result Document::load(const juce::XmlElement& xml) {
         }
         project.groups.push_back(std::move(group));
     }
-    for (auto* item : xml.getChildWithTagNameIterator("asset")) {
-        auto asset = std::make_shared<Asset>();
-        asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
-        asset->name = item->getStringAttribute("name");
-        asset->extension = item->getStringAttribute("extension");
-        if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
-        const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
-        auto* source = luaSource ? item->getChildByName("source") : item;
-        if (source == nullptr) { return juce::Result::fail("Baked Lua asset is missing its source."); }
-        const auto encoded = source->getAllSubText();
-        if (static_cast<std::size_t>(encoded.length()) > (maximumSourceBytes / 3 + 1) * 4) {
-            return juce::Result::fail("Embedded source exceeds the 64 MiB import limit.");
-        }
-        if (asset->id == 0 || !identities.insert(asset->id).second || !asset->data.fromBase64Encoding(encoded)) {
-            return juce::Result::fail("Invalid asset data or identity.");
-        }
-        if (isRasterSource(asset->extension)) {
-            const auto* raster = item->getChildByName("raster");
-            if (raster == nullptr) { return juce::Result::fail("Image asset is missing its preparation settings."); }
-            const auto mode = raster->getStringAttribute("mode");
-            if (mode != "contours" && mode != "scanlines") { return juce::Result::fail("Unknown image preparation mode."); }
-            asset->rasterSettings.mode = mode == "contours" ? RasterSettings::Mode::contours : RasterSettings::Mode::scanlines;
-            asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", -1);
-            asset->rasterSettings.invert = raster->getBoolAttribute("invert");
-            asset->rasterSettings.resolution = raster->getIntAttribute("resolution", 0);
-            const auto points = raster->getIntAttribute("pointsPerFrame", 0);
-            if (points <= 0) { return juce::Result::fail("Invalid image sample count."); }
-            asset->rasterSettings.pointsPerFrame = static_cast<std::size_t>(points);
-        }
-        if (luaSource) {
-            auto* bake = item->getChildByName("bake");
-            if (bake == nullptr) { return juce::Result::fail("Lua asset is missing its prepared cache. Project loading never executes scripts."); }
-            asset->bakeSettings.duration = bake->getDoubleAttribute("duration", 0);
-            asset->bakeSettings.frameRate = bake->getDoubleAttribute("frameRate", 0);
-            asset->bakeSettings.bpm = bake->getDoubleAttribute("bpm", 0);
-            const auto points = bake->getIntAttribute("pointsPerFrame", 0);
-            const auto seed = bake->getStringAttribute("seed", "-1").getLargeIntValue();
-            if (points < 0 || seed < 0 || seed > std::numeric_limits<std::uint32_t>::max()) {
-                return juce::Result::fail("Invalid Lua bake settings.");
-            }
-            asset->bakeSettings.pointsPerFrame = static_cast<std::size_t>(points);
-            asset->bakeSettings.seed = static_cast<std::uint32_t>(seed);
-            asset->bakeKey = bake->getStringAttribute("key");
-            const auto cache = bake->getAllSubText();
-            if (static_cast<std::size_t>(cache.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
-                || !asset->bakedData.fromBase64Encoding(cache) || asset->bakedData.getSize() == 0) {
-                return juce::Result::fail("Invalid or oversized Lua source cache.");
-            }
-        }
-        const auto result = decodeAsset(*asset);
-        if (result.failed()) {
-            return result;
-        }
-        project.assets.push_back(std::move(asset));
-    }
     for (auto* row : xml.getChildWithTagNameIterator("track")) {
         Track track;
         track.id = static_cast<Id>(row->getStringAttribute("id").getLargeIntValue());
@@ -1199,6 +1117,7 @@ juce::Result Document::load(const juce::XmlElement& xml) {
             Clip clip;
             clip.id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
             clip.asset = static_cast<Id>(item->getStringAttribute("asset").getLargeIntValue());
+            clip.composition = static_cast<Id>(item->getStringAttribute("composition").getLargeIntValue());
             clip.name = item->getStringAttribute("name").toStdString();
             const auto timeBase = item->getStringAttribute("timeBase");
             if (timeBase != "seconds" && timeBase != "beats") { return juce::Result::fail("Clip timing must be seconds or beats."); }
@@ -1208,14 +1127,19 @@ juce::Result Document::load(const juce::XmlElement& xml) {
             clip.duration = item->getDoubleAttribute("duration");
             clip.offset = item->getDoubleAttribute("offset");
             clip.rate = item->getDoubleAttribute("rate", 1);
-            const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
-            if (found == project.assets.end() || !identities.insert(clip.id).second) {
-                return juce::Result::fail("Invalid clip asset or identity.");
+            const auto found = std::find_if(assets.begin(), assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
+            if (clip.id == 0 || !identities.insert(clip.id).second) { return juce::Result::fail("Invalid clip identity."); }
+            if (clip.composition != 0) {
+                if (clip.asset != 0 || !compositionIds.contains(clip.composition) || track.kind != TrackKind::visual) {
+                    return juce::Result::fail("Invalid reusable composition reference or track kind.");
+                }
+            } else {
+                if (found == assets.end()) { return juce::Result::fail("Invalid clip asset."); }
+                if ((track.kind == TrackKind::audio) != ((*found)->audio != nullptr)) {
+                    return juce::Result::fail("The clip source type does not match its audio or visual track.");
+                }
+                if ((*found)->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
             }
-            if ((track.kind == TrackKind::audio) != ((*found)->audio != nullptr)) {
-                return juce::Result::fail("The clip source type does not match its audio or visual track.");
-            }
-            if ((*found)->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
             const auto* pattern = item->getChildByName("midi");
             if (pattern != nullptr) {
                 if (track.kind != TrackKind::visual || pattern->getNextElementWithTagName("midi") != nullptr) {
@@ -1227,8 +1151,8 @@ juce::Result Document::load(const juce::XmlElement& xml) {
                     return juce::Result::fail("Invalid MIDI source identity.");
                 }
                 if (clip.midiAsset != 0) {
-                    const auto source = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.midiAsset; });
-                    if (source == project.assets.end() || (*source)->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
+                    const auto source = std::find_if(assets.begin(), assets.end(), [&](const auto& asset) { return asset->id == clip.midiAsset; });
+                    if (source == assets.end() || (*source)->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
                 }
                 std::vector<MidiNote> notes;
                 for (auto* event : pattern->getChildWithTagNameIterator("note")) {
@@ -1334,6 +1258,90 @@ juce::Result Document::load(const juce::XmlElement& xml) {
     if (!validGroupHierarchy(project)) {
         return juce::Result::fail("Groups require existing parents and track references, no cycles, and at most 32 nesting levels.");
     }
+    return juce::Result::ok();
+}
+juce::Result Document::load(const juce::XmlElement& xml) {
+    if (!xml.hasTagName("composition")) { return juce::Result::fail("Missing composition."); }
+    Project project;
+    std::set<Id> identities, compositionIds;
+    for (auto* item : xml.getChildWithTagNameIterator("definition")) {
+        const auto identity = item->getStringAttribute("id").getLargeIntValue();
+        if (identity <= 0 || !identities.insert(static_cast<Id>(identity)).second) { return juce::Result::fail("Invalid reusable composition identity."); }
+        compositionIds.insert(static_cast<Id>(identity));
+    }
+    for (auto* item : xml.getChildWithTagNameIterator("asset")) {
+        auto asset = std::make_shared<Asset>();
+        asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
+        asset->name = item->getStringAttribute("name");
+        asset->extension = item->getStringAttribute("extension");
+        if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
+        const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
+        auto* source = luaSource ? item->getChildByName("source") : item;
+        if (source == nullptr) { return juce::Result::fail("Baked Lua asset is missing its source."); }
+        const auto encoded = source->getAllSubText();
+        if (static_cast<std::size_t>(encoded.length()) > (maximumSourceBytes / 3 + 1) * 4) {
+            return juce::Result::fail("Embedded source exceeds the 64 MiB import limit.");
+        }
+        if (asset->id == 0 || !identities.insert(asset->id).second || !asset->data.fromBase64Encoding(encoded)) {
+            return juce::Result::fail("Invalid asset data or identity.");
+        }
+        if (isRasterSource(asset->extension)) {
+            const auto* raster = item->getChildByName("raster");
+            if (raster == nullptr) { return juce::Result::fail("Image asset is missing its preparation settings."); }
+            const auto mode = raster->getStringAttribute("mode");
+            if (mode != "contours" && mode != "scanlines") { return juce::Result::fail("Unknown image preparation mode."); }
+            asset->rasterSettings.mode = mode == "contours" ? RasterSettings::Mode::contours : RasterSettings::Mode::scanlines;
+            asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", -1);
+            asset->rasterSettings.invert = raster->getBoolAttribute("invert");
+            asset->rasterSettings.resolution = raster->getIntAttribute("resolution", 0);
+            const auto points = raster->getIntAttribute("pointsPerFrame", 0);
+            if (points <= 0) { return juce::Result::fail("Invalid image sample count."); }
+            asset->rasterSettings.pointsPerFrame = static_cast<std::size_t>(points);
+        }
+        if (luaSource) {
+            auto* bake = item->getChildByName("bake");
+            if (bake == nullptr) { return juce::Result::fail("Lua asset is missing its prepared cache. Project loading never executes scripts."); }
+            asset->bakeSettings.duration = bake->getDoubleAttribute("duration", 0);
+            asset->bakeSettings.frameRate = bake->getDoubleAttribute("frameRate", 0);
+            asset->bakeSettings.bpm = bake->getDoubleAttribute("bpm", 0);
+            const auto points = bake->getIntAttribute("pointsPerFrame", 0);
+            const auto seed = bake->getStringAttribute("seed", "-1").getLargeIntValue();
+            if (points < 0 || seed < 0 || seed > std::numeric_limits<std::uint32_t>::max()) {
+                return juce::Result::fail("Invalid Lua bake settings.");
+            }
+            asset->bakeSettings.pointsPerFrame = static_cast<std::size_t>(points);
+            asset->bakeSettings.seed = static_cast<std::uint32_t>(seed);
+            asset->bakeKey = bake->getStringAttribute("key");
+            const auto cache = bake->getAllSubText();
+            if (static_cast<std::size_t>(cache.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
+                || !asset->bakedData.fromBase64Encoding(cache) || asset->bakedData.getSize() == 0) {
+                return juce::Result::fail("Invalid or oversized Lua source cache.");
+            }
+        }
+        const auto result = decodeAsset(*asset);
+        if (result.failed()) {
+            return result;
+        }
+        project.assets.push_back(std::move(asset));
+    }
+    const auto main = loadCompositionContent(xml, project, project.assets, identities, compositionIds);
+    if (main.failed()) { return main; }
+    for (auto* item : xml.getChildWithTagNameIterator("definition")) {
+        const auto* content = item->getChildByName("composition");
+        if (content == nullptr || content->getNextElementWithTagName("composition") != nullptr) {
+            return juce::Result::fail("A reusable definition requires exactly one composition.");
+        }
+        if (content->getChildByName("asset") != nullptr || content->getChildByName("definition") != nullptr) {
+            return juce::Result::fail("Reusable definitions share the project media and definition registries.");
+        }
+        auto definition = std::make_shared<CompositionDefinition>();
+        definition->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
+        const auto result = loadCompositionContent(*content, *definition, project.assets, identities, compositionIds);
+        if (result.failed()) { return result; }
+        project.definitions.push_back(std::move(definition));
+    }
+    const auto graph = validateCompositionGraph(project);
+    if (!graph) { return juce::Result::fail(graph.error); }
     reset(std::move(project));
     return juce::Result::ok();
 }
