@@ -20,6 +20,9 @@ public:
     }
 
     static juce::Result write(const PreparedComposition& composition, const juce::File& destination, double sampleRate, const std::atomic<bool>& cancel, std::atomic<double>* progress = nullptr) {
+        for (const auto& clip : composition.clips) {
+            if (clip.liveIdentity != nullptr) { return juce::Result::fail("Capture live sources before exporting the signal."); }
+        }
         if (composition.preparationError.isNotEmpty()) { return juce::Result::fail(composition.preparationError); }
         if (composition.hasMidi && composition.sampleRate != sampleRate) { return juce::Result::fail("MIDI snapshot sample rate does not match the requested signal export rate."); }
         return WavExporter::write<5>(composition.duration, destination, sampleRate, cancel, progress,

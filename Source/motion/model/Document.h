@@ -6,6 +6,7 @@
 #include "Camera.h"
 #include "Group.h"
 #include "PreparedSource.h"
+#include "../live/LiveSourceFrames.h"
 #include "BakeSettings.h"
 #include "RasterSettings.h"
 #include "TextSettings.h"
@@ -16,6 +17,7 @@
 namespace motion {
 struct Asset {
     Id id = 0;
+    std::shared_ptr<const LiveSourceIdentity> liveIdentity;
     juce::String name;
     juce::String extension;
     juce::MemoryBlock data;

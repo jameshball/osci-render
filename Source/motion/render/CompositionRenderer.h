@@ -94,6 +94,7 @@ struct PreparedClipStage {
 };
 
 struct PreparedClip : PreparedClipStage {
+    std::shared_ptr<const LiveSourceIdentity> liveIdentity;
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedMidiPerformance> midi;
     std::shared_ptr<const PreparedMidiInstrument> liveInstrument;
@@ -117,8 +118,14 @@ struct PreparedClip : PreparedClipStage {
         // A direct leaf has at most 32 ancestors bounded to 1e6 each.
         return std::clamp(value, 0.0, 1000000.0);
     }
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
-        return processPoint(source->sample(localTime(time), phase, phaseSpan, std::abs(rate) * timeSpan), time);
+    const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
+        if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
+        return source.get();
+    }
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, const LiveSourceFrames* liveFrames = nullptr) const {
+        const auto* resolved = resolveSource(liveFrames);
+        if (resolved == nullptr) { return {0, 0, 0, 0, 0, 0}; }
+        return processPoint(resolved->sample(localTime(time), phase, phaseSpan, std::abs(rate) * timeSpan), time);
     }
     osci::Point processPoint(osci::Point point, double time) const {
         point = processStage(point, time);
@@ -220,9 +227,10 @@ struct PreparedComposition {
             const auto& clip = *leaf.clip;
             if (leaf.track->kind != TrackKind::visual) { return; }
             const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-            if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr)) { return; }
+            if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr && (*asset)->liveIdentity == nullptr)) { return; }
             PreparedClip item;
             static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1);
+            item.liveIdentity = (*asset)->liveIdentity;
             item.source = (*asset)->source;
             if (item.source == nullptr) {
                 item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> {(*asset)->drawing}, 30.0);
@@ -269,7 +277,7 @@ struct PreparedComposition {
         std::int64_t index = 0, count = 0;
     };
 
-    osci::Point sampleAtClock(double time, std::int64_t index, double clockRate, bool advancing = true) const {
+    osci::Point sampleAtClock(double time, std::int64_t index, double clockRate, bool advancing = true, const LiveSourceFrames* liveFrames = nullptr) const {
         if (index < 0 || !std::isfinite(clockRate) || clockRate <= 0) { return {0, 0, 0, 0, 0, 0}; }
         const auto phaseAt = [clockRate](double frame) { return std::fmod(frame * 60.0 / clockRate, 1.0); };
         const auto frame = static_cast<double>(index);
@@ -279,7 +287,7 @@ struct PreparedComposition {
             (frame - 1) / clockRate, (frame + 1) / clockRate };
         const auto traversal = traversalAtClock(time, index, clockRate, advancing);
         auto point = sample(time, phaseAt(frame), 60.0 / clockRate, advancing ? 1.0 / clockRate : 0.0,
-            frame / clockRate, &neighbours, &traversal);
+            frame / clockRate, &neighbours, &traversal, liveFrames);
         // Ownership guards do not detect a change of sampling strategy on the
         // same clip. Keep both sides dark when crossing an eligibility boundary.
         const auto previous = traversalAtClock(neighbours.previousTime, index - 1, clockRate, advancing);
@@ -292,7 +300,7 @@ struct PreparedComposition {
         return point;
     }
 
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const SamplingNeighbours* clockNeighbours = nullptr, const TraversalPosition* traversal = nullptr) const {
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const SamplingNeighbours* clockNeighbours = nullptr, const TraversalPosition* traversal = nullptr, const LiveSourceFrames* liveFrames = nullptr) const {
         if (oscillatorTime < 0) { oscillatorTime = time; }
         if (!std::isfinite(time) || !std::isfinite(phase)) { return {0, 0, 0, 0, 0, 0}; }
         const auto current = selectBeam(time, phase, oscillatorTime);
@@ -317,8 +325,9 @@ struct PreparedComposition {
                 || previous.note != current.note || next.note != current.note
                 || activeCamera(previousTime) != activeCamera(time)
                 || activeCamera(nextTime) != activeCamera(time);
-            if (!blank && clockNeighbours != nullptr && current.clip->source->frameCount() > 1) {
-                const auto& source = *current.clip->source;
+            const auto* resolved = current.clip->resolveSource(liveFrames);
+            if (!blank && clockNeighbours != nullptr && resolved != nullptr && resolved->frameCount() > 1) {
+                const auto& source = *resolved;
                 const auto frame = source.frameIndex(current.clip->localTime(time));
                 blank = source.frameIndex(current.clip->localTime(previousTime)) != frame
                     || source.frameIndex(current.clip->localTime(nextTime)) != frame;
@@ -329,7 +338,7 @@ struct PreparedComposition {
         }
         const auto complete = traversal != nullptr && traversal->clip == current.clip && traversal->drawing != nullptr;
         const auto sourcePoint = complete ? current.clip->processPoint(traversal->drawing->sampleTraversal(traversal->index, traversal->count), time)
-            : current.clip->sample(time, current.phase, localSpan, timeSpan);
+            : current.clip->sample(time, current.phase, localSpan, timeSpan, liveFrames);
         auto point = projectPoint(sourcePoint, time);
         if (blank) { point.r = point.g = point.b = 0; }
         return point;
@@ -498,7 +507,7 @@ private:
                 if (!clip.active(middle)) { continue; }
                 const auto weight = clip.weight(middle);
                 interval.weights.push_back({index, weight});
-                if (weight > 0 && clip.midi == nullptr && clip.source->frameCount() == 1) {
+                if (weight > 0 && clip.liveIdentity == nullptr && clip.midi == nullptr && clip.source->frameCount() == 1) {
                     const auto drawing = clip.source->firstFrame();
                     if (drawing != nullptr && drawing->minimumTraversalSamples() > 0) {
                         interval.slots.push_back({index, consumed / allocation, (consumed + weight) / allocation, drawing.get()});

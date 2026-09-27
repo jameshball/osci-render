@@ -1,5 +1,6 @@
 #include "Source/motion/MotionProcessor.h"
 #include "Source/motion/render/SampleClock.h"
+#include "Source/motion/live/PreparedBlenderFrame.h"
 
 #include <algorithm>
 #include <array>
@@ -67,13 +68,14 @@ struct Options {
     juce::String project, output, mode = "xyrgb";
     double rate = 48000;
     int blockSize = 256, warmup = 2000, blocks = 5000;
-    bool verifyOutputControls = false;
+    bool verifyOutputControls = false, liveSourceChurn = false;
 };
 
 Options parse(const juce::StringArray& args) {
     Options options;
     for (int i = 0; i < args.size(); ++i) {
         const auto key = args[i];
+        if (key == "--live-source-churn") { options.liveSourceChurn = true; continue; }
         if (key == "--verify-output-controls") {
             options.verifyOutputControls = true;
             continue;
@@ -314,6 +316,42 @@ int runBenchmark() {
             processor.processBlock(audio, midi);
             playHead.samples += options.blockSize;
         };
+        std::shared_ptr<const motion::LiveSourceIdentity> liveIdentity;
+        const auto publishLiveFrame = [&](double x) {
+            motion::BlenderFrame frame;
+            frame.frameRate = 30;
+            frame.segments.push_back({x, .1, x, .5});
+            auto frames = std::make_shared<const motion::LiveSourceFrames>(std::vector<motion::LiveSourceFrames::Entry>{{liveIdentity, motion::prepareBlenderFrame(frame)}});
+            processor.publishLiveSources(std::move(frames));
+            processor.collectPreparedState();
+        };
+        if (options.liveSourceChurn) {
+            if (options.mode != "xyrgb" || options.verifyOutputControls) {
+                throw std::runtime_error("Live source churn requires XYRGB and no output-controls fixture");
+            }
+            liveIdentity = std::make_shared<const motion::LiveSourceIdentity>();
+            motion::Project liveProject;
+            liveProject.duration = 180;
+            auto asset = std::make_shared<motion::Asset>();
+            asset->id = 1;
+            asset->liveIdentity = liveIdentity;
+            liveProject.assets.push_back(asset);
+            for (int index = 0; index < 2; ++index) {
+                motion::Track track;
+                track.id = 2 + index * 2;
+                motion::Clip clip;
+                clip.id = track.id + 1;
+                clip.asset = 1;
+                clip.duration = 180;
+                clip.properties["position.x"] = motion::Curve(index * .25);
+                track.clips.push_back(clip);
+                liveProject.tracks.push_back(track);
+            }
+            processor.document.reset(std::move(liveProject));
+            waitForPreparation(processor);
+            setStaticOutputControls(processor, 1, 1, false);
+            publishLiveFrame(.2);
+        }
         processor.playing.store(true);
         for (int index = 0; index < options.warmup; ++index) {
             process();
@@ -337,10 +375,13 @@ int runBenchmark() {
         std::vector<double> channelEnergy(static_cast<std::size_t>(channels), 0.0);
         double energy = 0, rgbEnergy = 0, peak = 0, maxPositionError = 0;
         std::int64_t nonfinite = 0, lateBlocks = 0;
+        std::array<bool, 2> sawLiveBase{}, sawLiveTranslated{};
         const auto deadline = options.blockSize / options.rate;
         const auto durationSamples = motion::sampleIndex(processor.document.project().duration, options.rate).value_or(0);
         if (durationSamples < 1) { throw std::runtime_error("Invalid project sample duration"); }
         for (int index = 0; index < options.blocks; ++index) {
+            const auto liveX = index % 2 == 0 ? .2f : .4f;
+            if (options.liveSourceChurn) { publishLiveFrame(liveX); }
             audio.clear();
             midi.clear();
 #if defined(OSCI_ALLOCATION_PROBE) && OSCI_ALLOCATION_PROBE
@@ -352,6 +393,23 @@ int runBenchmark() {
 #if defined(OSCI_ALLOCATION_PROBE) && OSCI_ALLOCATION_PROBE
             allocationProbe.enable(0);
 #endif
+            if (options.liveSourceChurn) {
+                bool lit = false;
+                for (int sample = 0; sample < audio.getNumSamples(); ++sample) {
+                    const bool visible = audio.getSample(2, sample) != 0 || audio.getSample(3, sample) != 0 || audio.getSample(4, sample) != 0;
+                    if (sample < 2 && visible) { throw std::runtime_error("Live replacement did not blank both transition samples"); }
+                    if (visible) {
+                        lit = true;
+                        const auto x = audio.getSample(0, sample);
+                        if (std::abs(x - liveX) <= 1e-5f) { sawLiveBase[index % 2] = true; }
+                        if (std::abs(x - liveX - .25f) <= 1e-5f) { sawLiveTranslated[index % 2] = true; }
+                        if (std::min(std::abs(x - liveX), std::abs(x - liveX - .25f)) > 1e-5f) {
+                            throw std::runtime_error("Callback used stale live geometry or lost an instance transform");
+                        }
+                    }
+                }
+                if (!lit) { throw std::runtime_error("Live callback produced no visible geometry"); }
+            }
             const auto seconds = juce::Time::highResolutionTicksToSeconds(end - start);
             timings[static_cast<std::size_t>(index)] = seconds;
             lateBlocks += seconds > deadline ? 1 : 0;
@@ -373,6 +431,9 @@ int runBenchmark() {
                 }
             }
         }
+        if (options.liveSourceChurn && !(sawLiveBase[0] && sawLiveBase[1] && sawLiveTranslated[0] && sawLiveTranslated[1])) {
+            throw std::runtime_error("Live callback did not render both instances for both frame versions");
+        }
         processor.playing.store(false);
         processor.releaseResources();
         processor.setPlayHead(nullptr);
@@ -393,6 +454,7 @@ int runBenchmark() {
         result->setProperty("measured_seconds", static_cast<double>(options.blocks) * options.blockSize / options.rate);
         result->setProperty("output_mode", options.mode);
         result->setProperty("output_controls_verified", outputControls.has_value());
+        result->setProperty("live_source_churn_verified", options.liveSourceChurn);
         if (outputControls.has_value()) {
             auto controls = std::make_unique<juce::DynamicObject>();
             controls->setProperty("representative_time_seconds", 10.0);

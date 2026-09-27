@@ -7,6 +7,7 @@
 #include "render/BeamTransitionGuard.h"
 #include "render/LiveMidiAudition.h"
 #include "../audio/PreparedState.h"
+#include "live/LiveSourceExchange.h"
 
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater {
 public:
@@ -27,7 +28,10 @@ public:
     std::atomic<double> position { 0.0 };
     void seek(double seconds) { seekSerial.fetch_add(1); requestedPosition.store(std::max(0.0, seconds)); }
     std::uint64_t seekRevision() const { return seekSerial.load(); }
-    void collectPreparedState() { composition.collect(); }
+    void collectPreparedState() { composition.collect(); liveSources.collect(); }
+    // Message-thread publication/preview; source geometry was prepared off audio.
+    void publishLiveSources(std::shared_ptr<const motion::LiveSourceFrames> frames) { liveSources.publish(std::move(frames)); }
+    std::shared_ptr<const motion::LiveSourceFrames> liveSourcePreview() const { return liveSources.previewSnapshot(); }
     bool isPreparingComposition() const { return acceptedPreparationRevision != preparationRevision; }
     juce::String getPreparationError() const { return preparationError; }
     // Message-thread-only transient editing preview; never alters saved state.
@@ -55,6 +59,8 @@ private:
     juce::int64 oscillatorSample = 0;
     std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
     osci::PreparedState<motion::PreparedComposition> composition;
+    motion::LiveSourceExchange liveSources;
+    std::uint64_t previousLiveRevision = 0;
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };
     std::atomic<std::uint64_t> seekSerial {0};

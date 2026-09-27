@@ -59,6 +59,12 @@ void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlo
 void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     buffer.clear();
     const auto* prepared = composition.acquire();
+    const auto* liveBlock = liveSources.acquire();
+    const auto* liveFrames = liveBlock != nullptr ? liveBlock->frames.get() : nullptr;
+    if (liveBlock != nullptr && liveBlock->revision != previousLiveRevision) {
+        previousLiveRevision = liveBlock->revision;
+        transitionGuard.begin();
+    }
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
     if (count > signal.getNumSamples()) { midi.clear(); liveMidi.reset(); return; }
@@ -131,8 +137,8 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         if (events.dispatch(audition != nullptr ? &liveMidi : nullptr, i, liveMidiSample)) { transitionGuard.begin(); }
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
-        auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running)
-            : drawing ? prepared->sampleAtClock(audioTime, oscillatorSample, sampleRate, running) : osci::Point(0, 0, 0, 0, 0, 0);
+        auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running, liveFrames)
+            : drawing ? prepared->sampleAtClock(audioTime, oscillatorSample, sampleRate, running, liveFrames) : osci::Point(0, 0, 0, 0, 0, 0);
         point = transitionGuard.apply(point);
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);

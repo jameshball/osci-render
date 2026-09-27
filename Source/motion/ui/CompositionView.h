@@ -73,6 +73,7 @@ public:
         repaint();
     }
     void frameSelection() {
+        const auto liveFrames = processor.liveSourcePreview();
         cancelGesture();
         if (prepared == nullptr) { return; }
         const auto time = editingTime();
@@ -82,7 +83,9 @@ public:
         for (const auto& clip : prepared->clips) {
             if (!clip.active(time) || (hasSelection && clip.editorId() != selected)) { continue; }
             for (int index = 0; index < 512; ++index) {
-                const auto point = worldPoint(clip.sample(time, index / 512.0), time);
+                const auto sample = clip.sample(time, index / 512.0, 0, 0, liveFrames.get());
+                if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
+                const auto point = worldPoint(sample, time);
                 if (!point.finite()) { continue; }
                 minimum = { std::min(minimum.x, point.x), std::min(minimum.y, point.y), std::min(minimum.z, point.z) };
                 maximum = { std::max(maximum.x, point.x), std::max(maximum.y, point.y), std::max(maximum.z, point.z) };
@@ -103,6 +106,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
+        const auto liveFrames = processor.liveSourcePreview();
         g.fillAll(osci::Colours::veryDark());
         for (int line = -5; line <= 5; ++line) {
             g.setColour(osci::Colours::text().withAlpha(line == 0 ? 0.12f : 0.045f));
@@ -134,13 +138,15 @@ public:
             }
             // Walk stored point frames at their native density so short lit
             // runs remain visible in the editing view. Output uses its audio rate.
-            const auto sampleCount = clip.source->previewSampleCount();
-            const auto previewSpan = clip.source->previewPhaseSpan();
-            const auto firstPoint = clip.sample(sampleTime, 0, previewSpan);
+            const auto* source = clip.resolveSource(liveFrames.get());
+            if (source == nullptr) { continue; }
+            const auto sampleCount = source->previewSampleCount();
+            const auto previewSpan = source->previewPhaseSpan();
+            const auto firstPoint = clip.sample(sampleTime, 0, previewSpan, 0, liveFrames.get());
             auto previous = projected(firstPoint, time);
             bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
             for (std::size_t i = 1; i <= sampleCount; ++i) {
-                const auto point = clip.sample(sampleTime, static_cast<double>(i) / sampleCount, previewSpan);
+                const auto point = clip.sample(sampleTime, static_cast<double>(i) / sampleCount, previewSpan, 0, liveFrames.get());
                 const auto next = projected(point, time);
                 const bool lit = point.r != 0 || point.g != 0 || point.b != 0;
                 if (!previous.has_value() || !next.has_value() || !previousLit || !lit) {
@@ -162,6 +168,7 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& event) override {
+        const auto liveFrames = processor.liveSourcePreview();
         if (navigating) { setNavigating(false); return; }
         grabKeyboardFocus();
         cancelGesture();
@@ -203,13 +210,15 @@ public:
                 continue;
             }
             for (int i = 0; i < 256; ++i) {
-                const auto point = projected(clip.sample(time, i / 256.0), time);
+                const auto sample = clip.sample(time, i / 256.0, 0, 0, liveFrames.get());
+                if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
+                const auto point = projected(sample, time);
                 if (!point.has_value()) { continue; }
                 const auto distance = point->getDistanceFrom(event.position);
                 if (distance < nearest) {
                     nearest = distance;
                     hit = clip.editorId();
-                    dragAnchor = worldPoint(clip.sample(time, i / 256.0), time);
+                    dragAnchor = worldPoint(sample, time);
                 }
             }
         }
