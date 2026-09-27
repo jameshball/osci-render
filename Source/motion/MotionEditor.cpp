@@ -106,6 +106,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     menus.addEditMenuItems(1, processor);
     menus.addTopLevelMenu("Audio");
     menus.addStandaloneAudioSettingsMenuItem(2, processor, *this);
+    menus.addMenuItem(2, "Playback health...", [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); });
+    addAndMakeVisible(playbackHealth);
+    playbackHealth.isPreparing = [this] { return processor.isPreparingComposition(); };
+    playbackHealth.onClick = [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); };
     menus.addTopLevelMenu("Interface");
     menus.addCommonInterfaceMenuItems(3, processor, *this);
     initialiseMenuBar(menus);
@@ -563,6 +567,7 @@ void MotionEditor::resized() {
     auto area = getLocalBounds().reduced(3);
     auto top = area.removeFromTop(30);
     undoRedoControls.setBounds(top.removeFromRight(undoRedoControls.getPreferredWidth()));
+    playbackHealth.setBounds(top.removeFromRight(96).reduced(3));
     menuBar.setBounds(top);
     area.removeFromTop(3);
     workspaceHeight = area.getHeight();

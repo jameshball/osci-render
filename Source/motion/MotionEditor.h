@@ -12,6 +12,7 @@
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
 #include "ui/ModulationPanel.h"
+#include "ui/PlaybackHealth.h"
 #include <deque>
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
@@ -105,6 +106,7 @@ private:
     int previewWidth = 1, workspaceHeight = 1;
     juce::Label compositionTitle;
     juce::ComboBox transformTool;
+    MotionPlaybackHealth playbackHealth;
     juce::TextButton navigateView { "Navigate" }, frameView { "Fit" }, pathView { "Path" };
     juce::TextButton importButton { "Import" };
     juce::TextButton playButton { "Play" };

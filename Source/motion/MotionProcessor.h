@@ -28,6 +28,7 @@ public:
     void seek(double seconds) { seekSerial.fetch_add(1); requestedPosition.store(std::max(0.0, seconds)); }
     std::uint64_t seekRevision() const { return seekSerial.load(); }
     void collectPreparedState() { composition.collect(); }
+    bool isPreparingComposition() const { return acceptedPreparationRevision != preparationRevision; }
     juce::String getPreparationError() const { return preparationError; }
     // Message-thread-only transient editing preview; never alters saved state.
     void previewComposition(const motion::Project& project) {
@@ -39,7 +40,7 @@ private:
     void handleAsyncUpdate() override;
     void routeSignalOutput(juce::AudioBuffer<float>& buffer);
     std::unique_ptr<motion::CompositionPreparationWorker> preparationWorker;
-    std::uint64_t preparationRevision = 0;
+    std::uint64_t preparationRevision = 0, acceptedPreparationRevision = 0;
     std::atomic<double> requestedSampleRate {48000};
     double preparationSampleRate = 48000;
     juce::String preparationError;

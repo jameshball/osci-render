@@ -31,6 +31,7 @@ void MotionProcessor::handleAsyncUpdate() {
     }
     auto result = preparationWorker->take();
     if (result == nullptr || result->revision != preparationRevision) { return; }
+    acceptedPreparationRevision = result->revision;
     preparationError = result->error;
     preparationFailed.store(preparationError.isNotEmpty());
     if (result->composition != nullptr) {
@@ -61,6 +62,10 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
     if (count > signal.getNumSamples()) { midi.clear(); liveMidi.reset(); return; }
+    // Shared output gain/clip buffers are allocated during prepareToPlay, but
+    // must be populated each block before music monitoring or physical XY output.
+    volumeEffect->animateValues(count, nullptr);
+    thresholdEffect->animateValues(count, nullptr);
     if (prepared == nullptr || preparationFailed.load() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
         liveMidi.reset();
         midi.clear();

@@ -26,28 +26,50 @@ def main():
     root = pathlib.Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-log', type=pathlib.Path, default=root / 'build/performance-review/profiling-build.log')
-    parser.add_argument('--output', type=pathlib.Path, default=root / 'build/performance-review/processor_benchmark')
+    parser.add_argument('--product', choices=('render', 'motion'), default='render',
+                        help='Product library and processor source to link (default: render).')
+    parser.add_argument('--output', type=pathlib.Path)
     parser.add_argument('--allocation-probe', action='store_true', help='Build macOS allocator interposer and opt-in callback counters')
     args = parser.parse_args()
     lines = args.build_log.read_text().splitlines()
     if not any('** BUILD SUCCEEDED **' in line for line in lines):
         raise SystemExit('Wait for the Profiling product build to finish successfully.')
+    product = {
+        'render': {
+            'processor_source': '/Source/PluginProcessor.cpp',
+            'library': '-losci-render',
+            'benchmark_source': root / 'scripts/performance_review/processor_benchmark.cpp',
+            'default_output': root / 'build/performance-review/processor_benchmark',
+            'build_dir': root / 'Builds/osci-render/MacOSX',
+        },
+        'motion': {
+            'processor_source': '/Source/motion/MotionProcessor.cpp',
+            'library': '-losci-motion',
+            'benchmark_source': root / 'scripts/performance_review/motion_processor_benchmark.cpp',
+            'default_output': root / 'build/performance-review/motion_processor_benchmark',
+            'build_dir': root / 'Builds/osci-motion/MacOSX',
+        },
+    }[args.product]
     compile_command = next((shlex.split(line.strip()) for line in reversed(lines)
-                            if ' -c ' in line and '/Source/PluginProcessor.cpp' in line), None)
+                            if ' -c ' in line and product['processor_source'] in line), None)
     link_command = next((shlex.split(line.strip()) for line in reversed(lines)
-                         if 'clang++' in line and ' -losci-render ' in line and ' -o ' in line), None)
+                         if 'clang++' in line and product['library'] in line and ' -o ' in line), None)
     if compile_command is None or link_command is None:
-        raise SystemExit('Build log must contain the PluginProcessor compile and standalone link commands.')
+        raise SystemExit('Build log must contain the selected processor compile and standalone link commands.')
     response = next((arg[1:] for arg in compile_command if arg.startswith('@')), None)
     if response is None or not pathlib.Path(response).is_file():
         raise SystemExit('The Xcode compiler response file is missing; retain the build intermediates.')
-    output = args.output.resolve()
+    output = (args.output or product['default_output']).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     object_file = output.with_suffix('.o')
-    cwd = root / 'Builds/osci-render/MacOSX'
+    cwd = product['build_dir']
     compiler = link_command[0]
     command = [compiler, '@' + response, '-g', '-I' + str(root), '-I' + str(root / 'JuceLibraryCode'),
-               '-c', str(root / 'scripts/performance_review/processor_benchmark.cpp'), '-o', str(object_file)]
+               '-c', str(product['benchmark_source']), '-o', str(object_file)]
+    for option in ('-target', '-isysroot', '-stdlib'):
+        if option in compile_command:
+            command.extend([option, compile_command[compile_command.index(option) + 1]])
+    command.extend(arg for arg in compile_command if arg.startswith('-D'))
     if args.allocation_probe:
         command.insert(2, '-DOSCI_ALLOCATION_PROBE=1')
         probe = output.with_suffix('.allocation_probe.dylib')
