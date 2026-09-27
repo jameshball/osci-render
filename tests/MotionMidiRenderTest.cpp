@@ -2,13 +2,16 @@
 #include "../Source/motion/render/LiveMidiPerformance.h"
 #include "../Source/motion/render/LiveMidiAudition.h"
 #include "../Source/motion/export/SignalExporter.h"
+#include "../Source/motion/export/SoundtrackExporter.h"
 #include "../Source/motion/render/CompositionPreparationWorker.h"
 #include "../Source/motion/render/BeamTransitionGuard.h"
+#include "../Source/motion/render/PreparedSoundtrack.h"
 
 class MotionMidiRenderTest : public juce::UnitTest {
 public:
     MotionMidiRenderTest() : juce::UnitTest("Motion MIDI signal rendering", "MotionMidi") {}
     void runTest() override {
+        testNestedAuthoring();
         testLiveMidi();
         testLiveMidiInputAndSampling();
         testLiveMidiBufferDispatch();
@@ -123,6 +126,127 @@ public:
         }
     }
 private:
+    void testNestedAuthoring() {
+        beginTest("Precomposing animated MIDI and soundtrack together preserves both signal clocks");
+        auto project = makeProject();
+        project.duration = 8; project.bpm = 96;
+        auto& visual = project.tracks.front().clips.front();
+        visual.start = 1; visual.duration = 2; visual.offset = .125; visual.rate = 1.25;
+        visual.midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}, {2, 1, 2, 72, 96, 1}, {3, 2, 2, 76, 127, 2}}).source;
+        visual.properties["position.y"].setKey({0, -.2, motion::Interpolation::linear});
+        visual.properties["position.y"].setKey({4, .4, motion::Interpolation::linear});
+        std::vector<motion::PointSample> points(32, {-.5f, 0, 0, 1, 1, 1});
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            points[i].x = (i < 16 ? -.5f : .5f) + static_cast<float>(i % 16) / 80.0f;
+            points[i].y = i < 16 ? 0 : .25f;
+        }
+        const auto frames = motion::PreparedPointFrames::create(4, 2, 16, std::move(points));
+        const auto frameTiming = motion::FrameTiming::create({125, 375});
+        auto animated = std::make_shared<motion::Asset>(*project.assets.front());
+        animated->source = std::make_shared<motion::PreparedSource>(frames.source, frameTiming.timing);
+        animated->drawing.reset(); project.assets.front() = animated;
+        std::vector<float> pcm(32000);
+        for (std::size_t i = 0; i < pcm.size(); ++i) { pcm[i] = static_cast<float>(std::sin(i * .017) * .3); }
+        const std::array<std::span<const float>, 1> channels {pcm};
+        const auto audio = motion::PreparedAudio::fromPlanar(8000, channels);
+        auto soundtrack = std::make_shared<motion::Asset>(); soundtrack->id = 10; soundtrack->name = "Reference"; soundtrack->audio = audio.audio;
+        project.assets.push_back(soundtrack);
+        motion::Clip sound; sound.id = 11; sound.asset = 10; sound.start = .75; sound.duration = 3; sound.offset = .2; sound.rate = .8;
+        sound.properties["gain"].setKey({0, .2, motion::Interpolation::linear});
+        sound.properties["gain"].setKey({4, .8, motion::Interpolation::linear});
+        sound.properties["pan"] = motion::Curve(.3);
+        motion::Track audioTrack; audioTrack.id = 12; audioTrack.kind = motion::TrackKind::audio; audioTrack.clips = {sound};
+        project.tracks.push_back(audioTrack);
+        const motion::PreparedComposition before(project, 48000);
+        const motion::PreparedSoundtrack beforeAudio(project);
+        expect(before.preparationError.isEmpty(), before.preparationError);
+        juce::UndoManager undo; motion::Document document(undo); document.reset(project);
+        motion::Id instance = 0;
+        auto result = document.createComposition({2, 11}, "Audiovisual motif", instance);
+        expect(result.wasOk(), result.getErrorMessage());
+        if (result.failed()) { return; }
+        motion::Id outer = 0;
+        result = document.createComposition({instance}, "Nested motif", outer);
+        expect(result.wasOk(), result.getErrorMessage());
+        if (result.failed()) { return; }
+        const motion::PreparedComposition nested(document.mainProject(), 48000);
+        const motion::PreparedSoundtrack nestedAudio(document.mainProject());
+        expect(nested.preparationError.isEmpty(), nested.preparationError);
+        expect(nestedAudio.preparationError.empty());
+        int lit = 0, audible = 0;
+        // Non-monotonic probes include trims, note/frame changes and exclusive ends.
+        for (const auto time : {2.8, .749, .75, 1.0, 1.0001, 1.399, 1.4, 2.0, 3.0, 3.749, 3.75, 1.123}) {
+            for (const auto phase : {.01, .19, .51, .93}) {
+                const auto a = before.sample(time, phase), b = nested.sample(time, phase);
+                expectWithinAbsoluteError(b.x, a.x, .00001f); expectWithinAbsoluteError(b.y, a.y, .00001f);
+                expectWithinAbsoluteError(b.r, a.r, .00001f); expectWithinAbsoluteError(b.g, a.g, .00001f); expectWithinAbsoluteError(b.b, a.b, .00001f);
+                lit += b.r > 0;
+            }
+            const auto a = beforeAudio.sample(time), b = nestedAudio.sample(time);
+            expectWithinAbsoluteError(b.left, a.left, .00001f); expectWithinAbsoluteError(b.right, a.right, .00001f);
+            audible += std::abs(b.left) > .001f;
+        }
+        expect(lit > 0 && audible > 0, "The equivalence probes must exercise nonblank visual and audio output");
+        beginTest("Nested animated MIDI and soundtrack exports match ungrouped output at every sample");
+        // A second instance begins a quarter-second into the definition and
+        // runs at 1.5x. Build the expected flat timing independently, rather
+        // than invoking the same nesting helper used by preparation.
+        auto repeated = document.mainProject();
+        auto copy = repeated.tracks.front().clips.front();
+        copy.id = document.newId(); copy.start = 4; copy.duration = 1.5; copy.offset = 1; copy.rate = 1.5;
+        repeated.tracks.front().clips.push_back(copy);
+        auto flat = project;
+        auto flatVisual = flat.tracks[0].clips.front();
+        flatVisual.id = copy.id + 1; flatVisual.start = 4; flatVisual.duration = 2.0 / 1.5; flatVisual.rate = 1.875;
+        flat.tracks[0].clips.push_back(flatVisual);
+        auto flatAudio = flat.tracks[1].clips.front();
+        flatAudio.id = copy.id + 2; flatAudio.start = 4; flatAudio.duration = 1.5; flatAudio.offset = .4; flatAudio.rate = 1.2;
+        flat.tracks[1].clips.push_back(flatAudio);
+        constexpr double exportRate = 44100;
+        const motion::PreparedComposition directExport(flat, exportRate);
+        const motion::PreparedSoundtrack flatSoundtrack(flat);
+        expect(directExport.preparationError.isEmpty(), directExport.preparationError);
+        expect(flatSoundtrack.preparationError.empty());
+        std::atomic<bool> cancel {false};
+        for (const bool signal : {true, false}) {
+            juce::TemporaryFile file(".wav");
+            const auto exported = signal
+                ? motion::SignalExporter::write(repeated, file.getFile(), exportRate, cancel)
+                : motion::SoundtrackExporter::write(repeated, file.getFile(), exportRate, cancel);
+            expect(exported.wasOk(), exported.getErrorMessage());
+            if (exported.failed()) { continue; }
+            juce::WavAudioFormat format;
+            auto stream = file.getFile().createInputStream();
+            std::unique_ptr<juce::AudioFormatReader> reader(format.createReaderFor(stream.release(), true));
+            expect(reader != nullptr);
+            if (reader == nullptr) { continue; }
+            const int channelCount = signal ? 5 : 2;
+            expectEquals(static_cast<int>(reader->numChannels), channelCount);
+            expectEquals(reader->lengthInSamples, static_cast<juce::int64>(project.duration * exportRate));
+            juce::AudioBuffer<float> samples(channelCount, static_cast<int>(reader->lengthInSamples));
+            expect(reader->read(samples.getArrayOfWritePointers(), channelCount, 0, samples.getNumSamples()));
+            float maximumError = 0;
+            for (int index = 0; index < samples.getNumSamples(); ++index) {
+                const auto time = index / exportRate;
+                if (signal) {
+                    const auto point = directExport.sampleAtClock(time, index, exportRate);
+                    const std::array<float, 5> expected {point.x, point.y, point.r, point.g, point.b};
+                    for (int channel = 0; channel < channelCount; ++channel) {
+                        maximumError = std::max(maximumError, std::abs(samples.getSample(channel, index) - expected[channel]));
+                    }
+                } else {
+                    const auto value = flatSoundtrack.sample(time);
+                    maximumError = std::max(maximumError, std::abs(samples.getSample(0, index) - value.left));
+                    maximumError = std::max(maximumError, std::abs(samples.getSample(1, index) - value.right));
+                }
+            }
+            expect(maximumError < .00001f, juce::String(signal ? "XYRGB" : "Soundtrack") + " maximum sample error " + juce::String(maximumError, 9));
+        }
+        expect(undo.undo()); expect(undo.undo()); expect(document.mainProject().definitions.empty());
+        expect(undo.redo()); expect(undo.redo());
+        expect(document.mainProject().definitions.size() == 2);
+    }
+
     void testLiveMidiBufferDispatch() {
         beginTest("Actual MIDI buffer offsets dispatch once at their absolute device sample");
         motion::LiveMidiPerformance live;
