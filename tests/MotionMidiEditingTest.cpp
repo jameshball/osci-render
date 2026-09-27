@@ -339,6 +339,35 @@ private:
             expect(document.project().tracks[0].clips.size() == 1);
             expect(document.newId() == marker + 1);
         }
+        beginTest("Unique source preserves prepared media and isolates one clip with undo and serialization");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            document.reset(initial);
+            const auto original = initial.assets[0];
+            const auto copy = std::make_shared<motion::Asset>(*original);
+            const auto clipId = initial.tracks[0].clips[0].id;
+            expect(document.makeSourceUnique(clipId, original, copy).wasOk());
+            expect(copy->id != original->id && copy->drawing == original->drawing);
+            expect(copy->data == original->data && copy->name != original->name);
+            expect(document.project().tracks[0].clips[0].asset == copy->id);
+            expect(document.project().tracks[0].clips[1].asset == original->id);
+            expect(document.project().tracks[0].clips[0].id == clipId);
+            expectEquals(document.project().tracks[0].clips[0].properties.at("position.x").evaluate(.75), 2.0);
+            juce::UndoManager loadedUndo;
+            motion::Document loaded(loadedUndo);
+            expect(loaded.load(document.save()).wasOk());
+            expect(loaded.project().tracks[0].clips[0].asset == copy->id);
+            expect(loaded.project().tracks[0].clips[1].asset == original->id);
+            expect(undo.undo());
+            expect(document.project().assets.size() == initial.assets.size());
+            expect(document.project().tracks[0].clips[0].asset == original->id);
+            expect(undo.redo());
+            expect(document.project().tracks[0].clips[0].asset == copy->id);
+            const auto revision = document.revision();
+            expect(document.makeSourceUnique(clipId, original, std::make_shared<motion::Asset>(*original)).failed());
+            expect(document.revision() == revision);
+        }
         beginTest("Identity exhaustion rejects duplication without wrapping IDs");
         juce::UndoManager undo;
         motion::Document document(undo);

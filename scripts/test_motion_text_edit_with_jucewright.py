@@ -91,6 +91,22 @@ try:
     command("wait", "--ms", 600)
     assert len(saved_clips()) == 2
     step("edited text output", "screenshot", "--file", session.artifact_dir / "text-output.png")
-    print("Shared text edit, undo/redo, cancel and reopen passed", flush=True)
+    shared = saved_asset()
+    step("open second clip menu", "click", "--class", "MotionTimelineView", "--position", "600,46", "--button", "right")
+    step("make second source unique", "click", "--name", "Make this clip's source unique", "--role", "menuItem", "--exact")
+    command("wait-for-locator", "--name", "Undo Make source unique", "--class", "juce::Label", "--exact")
+    isolated_clips = saved_clips()
+    assert len(isolated_clips) == 2 and isolated_clips[0].get("asset") != isolated_clips[1].get("asset")
+    step("edit isolated text", "click", "--name", "Edit text...", "--exact")
+    step("replace isolated text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "ONLY THIS CLIP")
+    step("apply isolated text", "click", "--name", "Apply text", "--exact")
+    command("wait-for-locator", "--name", "Undo Edit text source", "--class", "juce::Label", "--exact")
+    assert saved_asset() == shared
+    step("undo isolated edit", "click", "--name", "Undo", "--exact")
+    step("undo source separation", "click", "--name", "Undo", "--exact")
+    reunited = saved_clips()
+    assert reunited[0].get("asset") == reunited[1].get("asset")
+    assert saved_asset() == shared
+    print("Shared and unique text editing, undo/redo, cancel and reopen passed", flush=True)
 finally:
     session.stop_app()

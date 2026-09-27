@@ -529,6 +529,52 @@ juce::Result Document::changeTempo(double bpm) {
     return juce::Result::ok();
 }
 
+Id Document::highestId() const {
+    auto highest = lastId;
+    const auto effects = [&](const auto& values) { for (const auto& value : values) { highest = std::max(highest, value.id); } };
+    effects(state.effects);
+    for (const auto& asset : state.assets) { if (asset != nullptr) { highest = std::max(highest, asset->id); } }
+    for (const auto& group : state.groups) { highest = std::max(highest, group.id); effects(group.effects); }
+    for (const auto& item : state.tracks) {
+        highest = std::max(highest, item.id); effects(item.effects);
+        for (const auto& clip : item.clips) { highest = std::max(highest, clip.id); effects(clip.effects); }
+    }
+    for (const auto& camera : state.cameras) { highest = std::max(highest, camera.id); }
+    for (const auto& cut : state.cameraCuts) { highest = std::max(highest, cut.id); }
+    return highest;
+}
+
+juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy) {
+    if (expected == nullptr || copy == nullptr || expected == copy || std::find(state.assets.begin(), state.assets.end(), copy) != state.assets.end()
+        || std::find(state.assets.begin(), state.assets.end(), expected) == state.assets.end()) {
+        return juce::Result::fail("The source changed while preparing its copy.");
+    }
+    int references = 0;
+    for (const auto& track : state.tracks) {
+        for (const auto& clip : track.clips) { if (clip.asset == expected->id) { ++references; } }
+    }
+    if (references < 2) { return juce::Result::fail("This clip already has its own source."); }
+    for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
+        const auto& track = state.tracks[trackIndex];
+        for (std::size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex) {
+            const auto& clip = track.clips[clipIndex];
+            if (clip.id != clipId) { continue; }
+            if (track.locked || clip.asset != expected->id) { return juce::Result::fail("The selected clip is locked or its source has changed."); }
+            const auto highest = highestId();
+            if (highest == std::numeric_limits<Id>::max()) { return juce::Result::fail("There are no remaining source identities."); }
+            copy->id = highest + 1;
+            copy->name = expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy->id)) + expected->extension;
+            lastId = copy->id;
+            edit("Make source unique", [trackIndex, clipIndex, copy](Project& project) {
+                project.assets.push_back(copy);
+                project.tracks[trackIndex].clips[clipIndex].asset = copy->id;
+            });
+            return juce::Result::ok();
+        }
+    }
+    return juce::Result::fail("The selected clip no longer exists.");
+}
+
 juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
     duplicateId = 0;
     std::vector<Id> copies;
@@ -560,17 +606,7 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     }
     if (copies.size() != requested.size()) { return juce::Result::fail("A selected clip no longer exists."); }
     // Provisional identities are published only after every placement succeeds.
-    auto highest = lastId;
-    const auto effects = [&](const auto& values) { for (const auto& value : values) { highest = std::max(highest, value.id); } };
-    effects(state.effects);
-    for (const auto& asset : state.assets) { if (asset != nullptr) { highest = std::max(highest, asset->id); } }
-    for (const auto& group : state.groups) { highest = std::max(highest, group.id); effects(group.effects); }
-    for (const auto& item : state.tracks) {
-        highest = std::max(highest, item.id); effects(item.effects);
-        for (const auto& clip : item.clips) { highest = std::max(highest, clip.id); effects(clip.effects); }
-    }
-    for (const auto& camera : state.cameras) { highest = std::max(highest, camera.id); }
-    for (const auto& cut : state.cameraCuts) { highest = std::max(highest, cut.id); }
+    auto highest = highestId();
     auto candidate = state;
     std::vector<Id> ids;
     for (auto& [index, copy] : copies) {

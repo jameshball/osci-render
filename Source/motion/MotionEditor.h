@@ -34,6 +34,7 @@ private:
         std::uint64_t generation = 0;
         std::shared_ptr<const motion::Asset> replacement;
         std::optional<juce::String> editedText;
+        motion::Id uniqueClip = 0;
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();

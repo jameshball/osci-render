@@ -72,6 +72,7 @@ public:
     juce::Result changeTempo(double bpm);
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
+    juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
@@ -96,6 +97,7 @@ public:
     static Clip makeClip(Id id, const Asset& asset, double time);
 
 private:
+    Id highestId() const;
     juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);
     void apply(Project value);
     struct Change;

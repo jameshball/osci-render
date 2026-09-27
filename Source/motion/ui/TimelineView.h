@@ -25,7 +25,7 @@ public:
         setWantsKeyboardFocus(true);
         setTooltip("Shift-click: select multiple clips. V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip.");
     }
-    std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested;
+    std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique;
     std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
     mutable motion::Id selected = 0;
@@ -680,13 +680,28 @@ private:
         juce::PopupMenu menu;
         menu.addItem(1, selectedClips.size() > 1 ? "Duplicate clips" : "Duplicate clip");
         menu.addItem(2, "Edit clip timing");
+        motion::Id asset = 0;
+        bool locked = false;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; locked = track.locked; } }
+        }
+        int references = 0;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.asset == asset) { ++references; } }
+        }
+        menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1);
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, revision](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
-            if (result == 1) { owner->duplicateClip(id); }
-            else if (result == 2 && owner->onTimingRequested) { owner->onTimingRequested(id); }
+            if (result == 1) {
+                owner->duplicateClip(id);
+            } else if (result == 2 && owner->onTimingRequested) {
+                owner->onTimingRequested(id);
+            } else if (result == 3 && owner->onMakeUnique) {
+                owner->onMakeUnique(id);
+            }
         });
     }
     void createGroup(motion::Id trackId, motion::Id parent) {

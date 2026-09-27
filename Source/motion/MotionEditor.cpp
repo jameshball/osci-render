@@ -350,6 +350,21 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     timeline.onSelection = [this](motion::Id id) { select(id); };
     timeline.onMidiAssigned = [this](motion::Id id) { select(id); timelineTabs.setSelectedIndex(2); notesEditor.fitContents(); };
+    timeline.onMakeUnique = [this](motion::Id id) {
+        libraryTabs.setSelectedIndex(0);
+        const auto& project = processor.document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != id) { continue; }
+                const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
+                if (found == project.assets.end()) { return; }
+                SourceRequest request {{}, processor.position.load(), processor.document.generation(), *found};
+                request.uniqueClip = id;
+                beginSourceImport(std::move(request));
+                return;
+            }
+        }
+    };
     timeline.onTimingRequested = [this](motion::Id id) { select(id); inspectorTabs.setSelectedIndex(3); };
     timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
     composition.onSelection = timeline.onSelection;
@@ -632,13 +647,15 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
         if (!task->cancelled.load()) {
             try {
                 if (request.replacement != nullptr) {
-                    if (request.editedText.has_value()) {
+                    if (request.uniqueClip != 0) {
+                        *asset = *request.replacement;
+                    } else if (request.editedText.has_value()) {
                         const auto& text = *request.editedText;
                         asset->data.replaceAll(text.toRawUTF8(), text.getNumBytesAsUTF8());
                     } else {
                         asset->data = request.replacement->data;
                     }
-                    result = motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
+                    result = request.uniqueClip != 0 ? juce::Result::ok() : motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
                 } else if (request.file.getSize() > static_cast<juce::int64>(motion::Document::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {
@@ -661,6 +678,15 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 return;
             }
             auto& document = owner->processor.document;
+            if (request.uniqueClip != 0) {
+                const auto separated = document.makeSourceUnique(request.uniqueClip, request.replacement, asset);
+                if (separated.failed()) { owner->assetLibrary.setError(separated.getErrorMessage()); return; }
+                owner->assetLibrary.refresh();
+                owner->assetLibrary.selectAsset(asset->id);
+                owner->libraryTabs.setSelectedIndex(0);
+                owner->select(request.uniqueClip);
+                return;
+            }
             if (request.replacement != nullptr) {
                 const auto& assets = document.project().assets;
                 if (std::find(assets.begin(), assets.end(), request.replacement) == assets.end()) {
