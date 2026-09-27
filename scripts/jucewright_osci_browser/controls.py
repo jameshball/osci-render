@@ -139,6 +139,21 @@ class ControlDiscoveryMixin:
             if isinstance(child, dict):
                 yield from self.walk_tree_with_path(child, current_path)
 
+    def control_identity(self, node: dict, path: tuple[dict, ...]) -> tuple[str, str, str, tuple[tuple[str, str], ...]]:
+        ancestry = tuple((str(item.get("class", "")), str(item.get("name", ""))) for item in path[:-1])
+        return str(node.get("role", "")), self.node_label(node), str(node.get("class", "")), ancestry
+
+    def resolve_control_ref(self, snapshot_file: Path, identity: tuple[str, str, str, tuple[tuple[str, str], ...]]) -> str | None:
+        data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+        matches = []
+        for node, path in self.walk_tree_with_path(data.get("tree", {})):
+            if self.control_identity(node, path) != identity:
+                continue
+            if self.should_skip_control_path(path) or not self.is_visible_control(node):
+                continue
+            matches.append(node["ref"])
+        return matches[0] if len(matches) == 1 else None
+
     def discover_visible_controls(self, snapshot_file: Path, max_controls: int) -> list[tuple[str, str, str, str, str]]:
         data = json.loads(snapshot_file.read_text(encoding="utf-8"))
         root = data.get("tree", {})
@@ -204,15 +219,35 @@ class ControlDiscoveryMixin:
             self.log(f"INFO no visible controls discovered for {label} -> {controls_file}")
             return
 
-        for ref, _role, action, value, name in rows:
+        identities = {}
+        snapshot_data = json.loads(snapshot_file.read_text(encoding="utf-8"))
+        for node, path in self.walk_tree_with_path(snapshot_data.get("tree", {})):
+            ref = node.get("ref")
+            if ref:
+                identities[ref] = self.control_identity(node, path)
+
+        for index, (ref, _role, action, value, name) in enumerate(rows):
+            identity = identities.get(ref)
+            if identity is None:
+                self.optional_failure(f"dynamic {label} {name}", "No stable control identity was available; mutation skipped.")
+                continue
+            refreshed_snapshot = self.artifact_dir / f"{self.step:03d}_dynamic_{slug(label)}_refresh_{index:03d}.json"
+            if not self.call_to_file(self.cli("snapshot", "--json", "--full", "--depth", "18", *locator_args), refreshed_snapshot,
+                    refreshed_snapshot.with_suffix(refreshed_snapshot.suffix + ".stderr")):
+                self.optional_failure(f"dynamic {label} {name}", "Could not refresh the control snapshot; mutation skipped.")
+                continue
+            fresh_ref = self.resolve_control_ref(refreshed_snapshot, identity)
+            if fresh_ref is None:
+                self.optional_failure(f"dynamic {label} {name}", "Control was absent or ambiguous after refresh; mutation skipped.")
+                continue
             if action == "set-value":
-                self.try_step(f"dynamic {label} set slider {name}", self.cli("set-value", ref, "--timeout-ms", "3000", value))
+                self.try_step(f"dynamic {label} set slider {name}", self.cli("set-value", fresh_ref, "--timeout-ms", "3000", value))
             elif action == "select-index":
-                self.try_step(f"dynamic {label} select option {name}", self.cli("select-option", ref, "--index", value, "--timeout-ms", "3000"))
+                self.try_step(f"dynamic {label} select option {name}", self.cli("select-option", fresh_ref, "--index", value, "--timeout-ms", "3000"))
             elif action == "set-checked":
-                self.try_step(f"dynamic {label} set checked {name}", self.cli("set-checked", ref, "--timeout-ms", "3000", value))
+                self.try_step(f"dynamic {label} set checked {name}", self.cli("set-checked", fresh_ref, "--timeout-ms", "3000", value))
             elif action == "fill":
-                self.try_step(f"dynamic {label} fill {name}", self.cli("fill", ref, "--timeout-ms", "3000", value))
+                self.try_step(f"dynamic {label} fill {name}", self.cli("fill", fresh_ref, "--timeout-ms", "3000", value))
 
     def verify_new_recording_file(self, marker_file: Path) -> None:
         marker_time = marker_file.stat().st_mtime
