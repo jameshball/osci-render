@@ -3,6 +3,7 @@
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
 #include "../import/RasterSourcePreparer.h"
+#include "../import/VideoSourcePreparer.h"
 #include "../import/MidiSourcePreparer.h"
 #include <osci_file_import/osci_file_import.h>
 #include <set>
@@ -37,6 +38,19 @@ juce::String sourceBakeKey(const Asset& asset) {
     metadata.writeDouble(asset.bakeSettings.bpm);
     metadata.writeInt64(static_cast<juce::int64>(asset.bakeSettings.pointsPerFrame));
     metadata.writeInt64(asset.bakeSettings.seed);
+    metadata.write(asset.data.getData(), asset.data.getSize());
+    return juce::SHA256(metadata.getData(), metadata.getDataSize()).toHexString();
+}
+
+juce::String videoBakeKey(const Asset& asset) {
+    juce::MemoryOutputStream metadata;
+    metadata.writeInt(1);
+    metadata.writeInt(static_cast<int>(asset.rasterSettings.mode));
+    metadata.writeDouble(asset.rasterSettings.threshold);
+    metadata.writeBool(asset.rasterSettings.invert);
+    metadata.writeInt(asset.rasterSettings.resolution);
+    metadata.writeDouble(asset.rasterSettings.videoFrameRate);
+    metadata.writeInt64(static_cast<juce::int64>(asset.rasterSettings.pointsPerFrame));
     metadata.write(asset.data.getData(), asset.data.getSize());
     return juce::SHA256(metadata.getData(), metadata.getDataSize()).toHexString();
 }
@@ -1125,7 +1139,7 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.properties["pan"] = Curve(0);
         return clip;
     }
-    if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".lua"))) {
+    if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".lua") || isVideoSource(asset.extension))) {
         clip.duration = asset.source->duration();
     }
     for (const auto* axis : { "x", "y", "z" }) {
@@ -1141,7 +1155,7 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
     return clip;
 }
 
-juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::atomic<double>* progress) try {
+juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::atomic<double>* progress, const juce::File& videoDecoder) try {
     if (progress != nullptr) {
         progress->store(0.0, std::memory_order_relaxed);
     }
@@ -1161,6 +1175,35 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         asset.source.reset();
         asset.drawing.reset();
         asset.audio.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
+    }
+    if (isVideoSource(extension)) {
+        const auto invalid = asset.rasterSettings.validate();
+        if (!invalid.empty()) { return juce::Result::fail(invalid); }
+        const auto key = videoBakeKey(asset);
+        PreparedPointFrames::Result prepared;
+        juce::MemoryBlock archive;
+        if (asset.bakedData.getSize() > 0) {
+            if (asset.bakeKey != key) { return juce::Result::fail("Video cache does not match its source and tracing settings. Prepare the source again."); }
+            prepared = BakedSourceArchive::decode(asset.bakedData);
+        } else {
+            prepared = VideoSourcePreparer::prepare(asset.data, videoDecoder, asset.rasterSettings, cancel, progress);
+            if (prepared) {
+                auto encoded = BakedSourceArchive::encode(*prepared.source);
+                if (!encoded) { return juce::Result::fail(encoded.error); }
+                archive = std::move(encoded.data);
+            }
+        }
+        if (!prepared) { return juce::Result::fail(prepared.error); }
+        if (prepared.source->frameRate() != asset.rasterSettings.videoFrameRate || prepared.source->pointsPerFrame() != asset.rasterSettings.pointsPerFrame) {
+            return juce::Result::fail("Video cache metadata does not match its tracing settings.");
+        }
+        if (importCancelled(cancel)) { return juce::Result::fail("Video preparation cancelled."); }
+        asset.source = std::make_shared<const PreparedSource>(prepared.source);
+        asset.drawing.reset(); asset.audio.reset();
+        if (archive.getSize() > 0) { asset.bakedData = std::move(archive); }
+        asset.bakeKey = key;
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
@@ -1452,6 +1495,7 @@ juce::XmlElement Document::save() const {
                 raster->setAttribute("threshold", exactBakeNumber(asset->rasterSettings.threshold));
                 raster->setAttribute("invert", asset->rasterSettings.invert);
                 raster->setAttribute("resolution", asset->rasterSettings.resolution);
+                if (isVideoSource(asset->extension)) { raster->setAttribute("frameRate", exactBakeNumber(asset->rasterSettings.videoFrameRate)); }
                 raster->setAttribute("pointsPerFrame", static_cast<int>(asset->rasterSettings.pointsPerFrame));
             }
             if (asset->extension.equalsIgnoreCase(".txt")) {
@@ -1465,7 +1509,14 @@ juce::XmlElement Document::save() const {
             // Keep mixed-content payloads last. JUCE's single-line binary XML
             // writer can attempt a null newline when wrapping attributes on an
             // element following a text node.
-            item->addTextElement(asset->data.toBase64Encoding());
+            if (isVideoSource(asset->extension)) {
+                item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
+                auto* cache = item->createNewChildElement("video-cache");
+                cache->setAttribute("key", asset->bakeKey);
+                cache->addTextElement(asset->bakedData.toBase64Encoding());
+            } else {
+                item->addTextElement(asset->data.toBase64Encoding());
+            }
         }
     }
     for (const auto& definition : state.definitions) {
@@ -1763,8 +1814,9 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             }
         }
         const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
-        auto* source = luaSource ? item->getChildByName("source") : item;
-        if (source == nullptr) { return juce::Result::fail("Baked Lua asset is missing its source."); }
+        const bool videoSource = isVideoSource(asset->extension);
+        auto* source = luaSource || videoSource ? item->getChildByName("source") : item;
+        if (source == nullptr) { return juce::Result::fail("Baked asset is missing its source."); }
         const auto encoded = source->getAllSubText();
         if (static_cast<std::size_t>(encoded.length()) > (maximumSourceBytes / 3 + 1) * 4) {
             return juce::Result::fail("Embedded source exceeds the 64 MiB import limit.");
@@ -1781,9 +1833,20 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             asset->rasterSettings.threshold = raster->getDoubleAttribute("threshold", -1);
             asset->rasterSettings.invert = raster->getBoolAttribute("invert");
             asset->rasterSettings.resolution = raster->getIntAttribute("resolution", 0);
+            if (videoSource) { asset->rasterSettings.videoFrameRate = raster->getDoubleAttribute("frameRate", 0); }
             const auto points = raster->getIntAttribute("pointsPerFrame", 0);
             if (points <= 0) { return juce::Result::fail("Invalid image sample count."); }
             asset->rasterSettings.pointsPerFrame = static_cast<std::size_t>(points);
+        }
+        if (videoSource) {
+            const auto* cache = item->getChildByName("video-cache");
+            if (cache == nullptr) { return juce::Result::fail("Video asset is missing its prepared cache. Project loading never launches a decoder."); }
+            asset->bakeKey = cache->getStringAttribute("key");
+            const auto encodedCache = cache->getAllSubText();
+            if (static_cast<std::size_t>(encodedCache.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
+                || !asset->bakedData.fromBase64Encoding(encodedCache) || asset->bakedData.getSize() == 0) {
+                return juce::Result::fail("Invalid or oversized video source cache.");
+            }
         }
         if (luaSource) {
             auto* bake = item->getChildByName("bake");

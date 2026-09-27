@@ -7,7 +7,21 @@
 
 class MotionRasterSettingsPanel final : public juce::Component {
 public:
-    explicit MotionRasterSettingsPanel(motion::RasterSettings initial) : settings(initial) {
+    explicit MotionRasterSettingsPanel(motion::RasterSettings initial, bool video = false) : settings(initial), isVideo(video) {
+        if (isVideo) {
+            frameRate.setName("Video bake frame rate");
+            frameRate.setSliderStyle(juce::Slider::LinearHorizontal);
+            frameRate.setTextBoxStyle(juce::Slider::TextBoxRight, false, 66, 26);
+            frameRate.setRange(1, 120, .001);
+            frameRate.setValue(initial.videoFrameRate, juce::dontSendNotification);
+            frameRate.setTextValueSuffix(" fps");
+            frameRate.onValueChange = [this] { settings.videoFrameRate = frameRate.getValue(); refresh(); };
+            frameRate.setTooltip("Resample video timing at this rate for deterministic seeking and export.");
+            frameRateLabel.setFont(juce::FontOptions(13));
+            frameRateLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+            frameRateLabel.setBorderSize({});
+            addAndMakeVisible(frameRate); addAndMakeVisible(frameRateLabel);
+        }
         detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
         setName("Image preparation settings");
         mode.setName("Image trace mode");
@@ -77,8 +91,11 @@ public:
         note.setText("Use outlines for logos and scanlines for filled imagery. More scanline rows share the available beam samples and can dim the image; start with 64 px detail. GIF timing is preserved.", juce::dontSendNotification);
         error.setName("Image preparation validation error");
         error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
-        prepare.setName("Prepare image");
-        prepare.setButtonText("Prepare image");
+        if (isVideo) {
+            note.setText("Video frames are sampled at the chosen rate and saved in the project. Outlines suit clear shapes; scanlines suit filled imagery. Video audio is not imported; add your soundtrack separately.", juce::dontSendNotification);
+        }
+        prepare.setName(isVideo ? "Prepare video" : "Prepare image");
+        prepare.setButtonText(isVideo ? "Prepare video" : "Prepare image");
         prepare.onClick = [this] {
             if (submitted) { return; }
             refresh();
@@ -110,6 +127,7 @@ public:
         row(thresholdLabel, threshold);
         row(detailLabel, detail);
         row(samplesLabel, samples);
+        if (isVideo) { row(frameRateLabel, frameRate); }
         invert.setBounds(area.removeFromTop(28).withTrimmedLeft(142));
         area.removeFromTop(12);
         note.setBounds(area.removeFromTop(64));
@@ -144,6 +162,9 @@ private:
     }
 
     motion::RasterSettings settings;
+    bool isVideo = false;
+    juce::Slider frameRate;
+    juce::Label frameRateLabel {"Video frame rate caption", "Bake frame rate"};
     bool valid = false, submitted = false, thresholdEdited = false, detailEdited = false;
     std::vector<int> resolutions;
     std::vector<std::size_t> strides;

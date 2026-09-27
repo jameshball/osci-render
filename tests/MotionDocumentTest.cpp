@@ -4,6 +4,8 @@
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
 #include "../Source/motion/export/SoundtrackExporter.h"
+#include "../Source/motion/import/VideoSourcePreparer.h"
+#include "../Source/motion/export/SignalExporter.h"
 
 class MotionDocumentTest : public juce::UnitTest {
 public:
@@ -1823,3 +1825,129 @@ private:
 
 };
 static MotionDocumentTest motionDocumentTest;
+
+
+class MotionVideoImportTest : public juce::UnitTest {
+public:
+    MotionVideoImportTest() : juce::UnitTest("Motion video import", "MotionVideo") {}
+    void runTest() override {
+        const juce::File fixtures(juce::SystemStats::getEnvironmentVariable("MOTION_VIDEO_FIXTURES", ""));
+        const juce::File decoder(juce::SystemStats::getEnvironmentVariable("MOTION_VIDEO_DECODER", ""));
+        if (juce::SystemStats::getEnvironmentVariable("MOTION_VIDEO_DECODER", "").isEmpty()) {
+            logMessage("Video decoder integration not run: set MOTION_VIDEO_DECODER and MOTION_VIDEO_FIXTURES.");
+            return;
+        }
+        beginTest("Video fixture environment is present");
+        expect(fixtures.isDirectory() && decoder.existsAsFile(), "Set MOTION_VIDEO_FIXTURES and MOTION_VIDEO_DECODER; generate fixtures with scripts/generate_motion_video_fixtures.py.");
+        if (!fixtures.isDirectory() || !decoder.existsAsFile()) { return; }
+        std::shared_ptr<motion::Asset> reference;
+        for (const auto* name : {"motion.mp4", "motion.mov", "motion-anamorphic-sar2-1.mp4"}) {
+            beginTest(juce::String("Decode, archive and reopen ") + name);
+            auto asset = std::make_shared<motion::Asset>();
+            asset->id = 1; asset->name = name; asset->extension = fixtures.getChildFile(name).getFileExtension();
+            expect(fixtures.getChildFile(name).loadFileAsData(asset->data));
+            asset->rasterSettings.resolution = 64; asset->rasterSettings.pointsPerFrame = 1024; asset->rasterSettings.videoFrameRate = 24;
+            const auto prepared = motion::Document::decodeAsset(*asset, nullptr, nullptr, decoder);
+            expect(prepared.wasOk(), prepared.getErrorMessage());
+            if (prepared.failed()) { continue; }
+            expectEquals(static_cast<int>(asset->source->frameCount()), 48);
+            expectWithinAbsoluteError(asset->source->duration(), 2.0, 1e-12);
+            expect(asset->bakedData.getSize() > 0 && asset->bakeKey.isNotEmpty());
+            double earlyRed = 0, earlyBlue = 0, lateRed = 0, lateBlue = 0, maxY = 0;
+            for (int index = 0; index < 1024; ++index) {
+                const auto early = asset->source->sample(.25, (index + .5) / 1024);
+                const auto late = asset->source->sample(1.75, (index + .5) / 1024);
+                earlyRed += early.r; earlyBlue += early.b; lateRed += late.r; lateBlue += late.b;
+                if (early.r + early.g + early.b > .1) { maxY = std::max(maxY, static_cast<double>(std::abs(early.y))); }
+            }
+            expect(earlyRed > earlyBlue, "First half retains red marks");
+            expect(lateBlue > lateRed, "Second half retains blue marks");
+            if (juce::String(name).contains("anamorphic")) { expect(maxY < .22, "Anamorphic display aspect halves the vertical beam extent"); }
+            else { expect(maxY > .25 && maxY < .4, "Square-pixel source preserves its expected vertical extent"); }
+            motion::Project project; project.duration = 2; project.assets.push_back(asset);
+            motion::Track track; track.id = 2; track.clips.push_back(motion::Document::makeClip(3, *asset, 0)); project.tracks.push_back(track);
+            juce::UndoManager undo; motion::Document document(undo); document.reset(project);
+            juce::UndoManager loadedUndo; motion::Document loaded(loadedUndo);
+            const auto restored = loaded.load(document.save());
+            expect(restored.wasOk(), restored.getErrorMessage());
+            if (restored.wasOk()) {
+                const auto reopened = loaded.project().assets.front()->source;
+                for (const auto time : {1.8, .02, .999, 1.001, .35}) {
+                    for (int index = 0; index < 50; ++index) {
+                        const auto phase = index / 50.0;
+                        const auto a = asset->source->sample(time, phase), b = reopened->sample(time, phase);
+                        expectEquals(a.x, b.x); expectEquals(a.y, b.y); expectEquals(a.r, b.r); expectEquals(a.b, b.b);
+                    }
+                }
+            }
+            auto invalid = document.save();
+            invalid.getChildByName("asset")->getChildByName("raster")->setAttribute("threshold", .9);
+            const auto before = loaded.save().toString();
+            expect(loaded.load(invalid).failed()); expectEquals(loaded.save().toString(), before);
+            invalid = document.save();
+            invalid.getChildByName("asset")->removeChildElement(invalid.getChildByName("asset")->getChildByName("video-cache"), true);
+            expect(loaded.load(invalid).failed()); expectEquals(loaded.save().toString(), before);
+            if (juce::String(name) == "motion.mp4") {
+                reference = asset;
+                juce::TemporaryFile exported(".wav"); std::atomic<bool> cancel {false};
+                const auto result = motion::SignalExporter::write(project, exported.getFile(), 48000, cancel);
+                expect(result.wasOk(), result.getErrorMessage());
+                if (result.wasOk()) {
+                    juce::WavAudioFormat format;
+                    auto stream = exported.getFile().createInputStream();
+                    std::unique_ptr<juce::AudioFormatReader> reader(format.createReaderFor(stream.release(), true));
+                    expect(reader != nullptr);
+                    if (reader) {
+                        expectEquals(reader->lengthInSamples, static_cast<juce::int64>(96000));
+                        juce::AudioBuffer<float> signal(5, static_cast<int>(reader->lengthInSamples));
+                        expect(reader->read(signal.getArrayOfWritePointers(), 5, 0, signal.getNumSamples()));
+                        motion::PreparedComposition exact(project, 48000);
+                        for (int index = 0; index < signal.getNumSamples(); index += 421) {
+                            const auto point = exact.sample(index / 48000.0, std::fmod(index * 60.0 / 48000, 1.0), 60.0 / 48000, 1.0 / 48000);
+                            expectEquals(signal.getSample(0, index), point.x); expectEquals(signal.getSample(1, index), point.y);
+                            expectEquals(signal.getSample(2, index), point.r); expectEquals(signal.getSample(4, index), point.b);
+                        }
+                    }
+                }
+            }
+        }
+        if (reference == nullptr) { return; }
+        beginTest("A one-frame video retains its authored clip duration");
+        motion::Asset single; single.id = 4; single.name = "single-frame.mp4"; single.extension = ".mp4";
+        single.rasterSettings = reference->rasterSettings;
+        expect(fixtures.getChildFile("single-frame.mp4").loadFileAsData(single.data));
+        const auto singleResult = motion::Document::decodeAsset(single, nullptr, nullptr, decoder);
+        expect(singleResult.wasOk(), singleResult.getErrorMessage());
+        if (singleResult.wasOk()) { expectWithinAbsoluteError(motion::Document::makeClip(5, single, 0).duration, 1.0 / 24, 1e-12); }
+        beginTest("Corrupt media, absent decoder, bounded output and cancellation reject cleanly");
+        juce::MemoryBlock corrupt; expect(fixtures.getChildFile("corrupt.mp4").loadFileAsData(corrupt));
+        const auto corruptResult = motion::VideoSourcePreparer::prepare(corrupt, decoder, reference->rasterSettings);
+        expect(!corruptResult && juce::String(corruptResult.error).contains("Cannot decode"), juce::String(corruptResult.error));
+        expect(!motion::VideoSourcePreparer::prepare(reference->data, {}, reference->rasterSettings));
+#if JUCE_MAC || JUCE_LINUX
+        juce::TemporaryFile failingDecoder(".sh");
+        expect(failingDecoder.getFile().replaceWithText("#!/bin/sh\nfor last; do :; done\nhead -c 16384 /dev/zero > \"$last\"\nexit 1\n", false, false, "\n"));
+        expect(failingDecoder.getFile().setExecutePermission(true));
+        const auto partialFailure = motion::VideoSourcePreparer::prepare(reference->data, failingDecoder.getFile(), reference->rasterSettings);
+        expect(!partialFailure && juce::String(partialFailure.error).contains("Cannot decode"), "A failing decoder must not publish its complete but partial output: " + juce::String(partialFailure.error));
+        expect(failingDecoder.getFile().replaceWithText("#!/bin/sh\nfor last; do :; done\nhead -c 16384 /dev/zero > \"$last\"\nkill -KILL $$\n", false, false, "\n"));
+        expect(failingDecoder.getFile().setExecutePermission(true));
+        const auto crashed = motion::VideoSourcePreparer::prepare(reference->data, failingDecoder.getFile(), reference->rasterSettings);
+        expect(!crashed && juce::String(crashed.error).contains("Cannot decode"), "A crashed decoder must not publish partial output: " + juce::String(crashed.error));
+#endif
+
+        motion::VideoSourcePreparer::Limits limits; limits.rawBytes = 64 * 64 * 4 * 4;
+        const auto bounded = motion::VideoSourcePreparer::prepare(reference->data, decoder, reference->rasterSettings, nullptr, nullptr, limits);
+        expect(!bounded && juce::String(bounded.error).contains("budget"));
+        std::atomic<bool> cancel {true};
+        expect(!motion::VideoSourcePreparer::prepare(reference->data, decoder, reference->rasterSettings, &cancel));
+        cancel.store(false);
+        const auto start = juce::Time::getMillisecondCounterHiRes();
+        std::thread canceller([&] { juce::Thread::sleep(20); cancel.store(true); });
+        const auto cancelled = motion::VideoSourcePreparer::prepare(reference->data, decoder, reference->rasterSettings, &cancel);
+        canceller.join();
+        expect(!cancelled && juce::String(cancelled.error).contains("cancelled"));
+        expect(juce::Time::getMillisecondCounterHiRes() - start < 2000, "Decoder cancellation returns promptly");
+    }
+};
+static MotionVideoImportTest motionVideoImportTest;

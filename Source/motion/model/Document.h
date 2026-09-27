@@ -121,9 +121,10 @@ public:
     static constexpr std::size_t maximumSourceFrames = 3600;
     static constexpr std::size_t maximumShapesPerFrame = 100000;
     static constexpr std::size_t maximumSourceShapes = 1000000;
-    static juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr);
+    static juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr, const juce::File& videoDecoder = {});
+    static bool isVideoSource(const juce::String& extension) { return extension.equalsIgnoreCase(".mp4") || extension.equalsIgnoreCase(".mov"); }
     static bool isRasterSource(const juce::String& extension) {
-        return extension.equalsIgnoreCase(".png") || extension.equalsIgnoreCase(".jpg") || extension.equalsIgnoreCase(".jpeg") || extension.equalsIgnoreCase(".gif");
+        return isVideoSource(extension) || extension.equalsIgnoreCase(".png") || extension.equalsIgnoreCase(".jpg") || extension.equalsIgnoreCase(".jpeg") || extension.equalsIgnoreCase(".gif");
     }
     static bool isMidiSource(const juce::String& extension) {
         return extension.equalsIgnoreCase(".mid") || extension.equalsIgnoreCase(".midi");

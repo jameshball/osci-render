@@ -339,7 +339,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.png;*.jpg;*.jpeg;*.gif;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -769,6 +769,7 @@ void MotionEditor::showNextPreparationSettings() {
     const auto name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
     const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
     const bool raster = motion::Document::isRasterSource(extension);
+    const bool video = motion::Document::isVideoSource(extension);
     const bool text = extension.equalsIgnoreCase(".txt");
     const bool editLua = extension.equalsIgnoreCase(".lua") && request.replacement != nullptr;
     std::unique_ptr<juce::Component> content;
@@ -789,7 +790,7 @@ void MotionEditor::showNextPreparationSettings() {
         sourcePanel = panel.get();
         content = std::move(panel);
     } else if (raster) {
-        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings());
+        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video);
         imagePanel = panel.get();
         content = std::move(panel);
     } else {
@@ -801,7 +802,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 560 : 440, editLua ? 550 : 400), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 560 : 440, editLua ? 550 : video ? 444 : 400), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -839,6 +840,18 @@ void MotionEditor::showNextPreparationSettings() {
 }
 
 void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings settings, motion::RasterSettings rasterSettings) {
+    if (request.generation != processor.document.generation()) { return; }
+    const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
+    if (motion::Document::isVideoSource(extension) && request.uniqueClip == 0) {
+        if (!processor.getFFmpegFile().existsAsFile()) {
+            const juce::Component::SafePointer<MotionEditor> owner(this);
+            processor.ensureFFmpegExists({}, [owner, request, settings, rasterSettings] {
+                if (owner != nullptr) { owner->beginSourceImport(request, settings, rasterSettings); }
+            });
+            return;
+        }
+        if (!processor.ensureFFmpegExists()) { return; }
+    }
     importError.clear();
     assetLibrary.setError({});
     auto asset = std::make_shared<motion::Asset>();
@@ -855,7 +868,8 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     task->generation = generation;
     pendingImports.push_back(task);
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    imports.addJob([owner, request, asset, time, generation, task] {
+    const auto videoDecoder = processor.getFFmpegFile();
+    imports.addJob([owner, request, asset, time, generation, task, videoDecoder] {
         auto result = juce::Result::fail("Import cancelled.");
         if (!task->cancelled.load()) {
             try {
@@ -868,11 +882,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     } else {
                         asset->data = request.replacement->data;
                     }
-                    result = request.uniqueClip != 0 ? juce::Result::ok() : motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
+                    result = request.uniqueClip != 0 ? juce::Result::ok() : motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
                 } else if (request.file.getSize() > static_cast<juce::int64>(motion::Document::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {
-                    result = request.file.loadFileAsData(asset->data) ? motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress) : juce::Result::fail("Cannot read the source file.");
+                    result = request.file.loadFileAsData(asset->data) ? motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder) : juce::Result::fail("Cannot read the source file.");
                 }
             } catch (const std::exception& error) {
                 result = juce::Result::fail("Cannot import this source: " + juce::String(error.what()));
