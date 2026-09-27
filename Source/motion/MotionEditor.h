@@ -114,6 +114,7 @@ private:
     juce::Label tempoValue, tempoLabel;
     juce::TextButton timingButton;
     juce::ComboBox monitorOutput;
+    juce::TextButton canvasButton { "Canvas" };
     juce::Label selectionLabel;
     std::array<juce::Label, 13> values;
     std::array<osci::KeyframeButton, 13> keyButtons;

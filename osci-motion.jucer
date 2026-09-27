@@ -425,6 +425,8 @@
             file="Source/motion/export/WavExporter.h"/>
       <FILE id="MotMusicExport" name="SoundtrackExporter.h" compile="0" resource="0"
             file="Source/motion/export/SoundtrackExporter.h"/>
+      <FILE id="MotCanvasSize" name="CanvasSizeEditor.h" compile="0" resource="0"
+            file="Source/motion/ui/CanvasSizeEditor.h"/>
       <FILE id="MotVideoSettings" name="VideoExportSettings.h" compile="0"
             resource="0" file="Source/motion/ui/VideoExportSettings.h"/>
       <FILE id="OfflineBeamSnap" name="OfflineVisualiserParameters.h" compile="0"

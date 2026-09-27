@@ -167,6 +167,24 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
     addAndMakeVisible(timingButton);
+    addAndMakeVisible(canvasButton);
+    canvasButton.setName("Output canvas");
+    canvasButton.setTooltip("Set the output framing and default video dimensions.");
+    canvasButton.onClick = [this] {
+        auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize(), processor.document.mainProject().frameRate);
+        auto* controls = panel.get();
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "Output canvas", juce::Point<int>(420, 216), true);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
+        controls->onApply = [owner, dialog](VisualiserRenderSize size) {
+            juce::MessageManager::callAsync([owner, dialog, size] {
+                if (owner == nullptr || dialog == nullptr) { return; }
+                owner->processor.recordingParameters.setCanvasSize(size);
+                owner->dismissOverlay(dialog.getComponent());
+            });
+        };
+        showOverlay(std::move(overlay));
+    };
     addAndMakeVisible(monitorOutput);
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
@@ -602,6 +620,8 @@ void MotionEditor::resized() {
     auto output = area;
     outputHeader.setBounds(output.removeFromTop(30));
     auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(68).reduced(4, 3);
+    canvasButton.setBounds(monitorBounds.removeFromRight(64));
+    monitorBounds.removeFromRight(6);
     monitorOutput.setBounds(monitorBounds.withWidth(std::min(190, monitorBounds.getWidth())));
     output.removeFromTop(3);
     visualiser.setBounds(output);
@@ -966,6 +986,13 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
 
 void MotionEditor::timerCallback() {
     refreshOutputChoices();
+    auto& previewRate = processor.recordingParameters.frameRate;
+    // Keep playback and export cadence aligned within the live renderer's supported range.
+    const auto projectFrameRate = static_cast<float>(std::clamp<double>(processor.document.mainProject().frameRate, previewRate.min, previewRate.max));
+    if (!visualiser.isRecording() && std::abs(previewRate.getValueUnnormalised() - projectFrameRate) > 0.005f) {
+        previewRate.setUnnormalisedValueNotifyingHost(projectFrameRate);
+    }
+    canvasButton.setEnabled(!visualiser.isRecording() && exportState == nullptr);
     processor.collectPreparedState();
     const auto preparationError = processor.getPreparationError();
     if (preparationError != lastPreparationError) {
@@ -1219,7 +1246,7 @@ void MotionEditor::exportVideo() {
     const juce::Component::SafePointer<MotionEditor> owner(this);
     auto settings = std::make_unique<MotionVideoExportSettings>(config);
     auto* settingsPointer = settings.get();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), "Export video", juce::Point<int>(440, 352), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), "Export video", juce::Point<int>(440, 388), true);
     const juce::Component::SafePointer<osci::ComponentOverlay> settingsOverlay(overlay.get());
     auto accepted = std::make_shared<bool>(false);
     overlay->onDismissRequested = [owner, state, accepted] {

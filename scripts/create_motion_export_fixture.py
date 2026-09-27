@@ -49,6 +49,9 @@ def create_fixture(destination):
     ET.SubElement(clip, "property", name="gain", base="1")
     ET.SubElement(clip, "property", name="pan", base="0")
     ET.SubElement(composition, "camera", id="5", name="Output camera")
+    for clip in composition.findall("track/clip"):
+        clip.set("timeBase", "seconds")
+        clip.set("contentBpm", "120")
     xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
