@@ -1179,7 +1179,9 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         if (content.length() > 16384) {
             return juce::Result::fail("Text sources support up to 16,384 characters. Split longer text into separate sources.");
         }
-        auto font = juce::Font(juce::FontOptions(30));
+        const auto error = asset.textSettings.validate();
+        if (error.isNotEmpty()) { return juce::Result::fail(error); }
+        const auto font = asset.textSettings.font(30);
         // Motion titles retain their natural proportions and explicit line breaks.
         // The synth's fitted two-line text box is unsuitable for composition work.
         juce::GlyphArrangement glyphs;
@@ -1188,8 +1190,13 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         float baseline = 0.0f;
         for (const auto& line : lines) {
             if (importCancelled(cancel)) { return juce::Result::fail("Source preparation cancelled."); }
-            glyphs.addLineOfText(font, line, 0.0f, baseline);
-            baseline += font.getHeight() * 1.2f;
+            juce::GlyphArrangement row;
+            row.addLineOfText(font, line, 0.0f, baseline);
+            const auto width = row.getBoundingBox(0, row.getNumGlyphs(), true).getWidth();
+            const auto offset = asset.textSettings.alignment == 1 ? -0.5f * width : asset.textSettings.alignment == 2 ? -width : 0.0f;
+            row.moveRangeOfGlyphs(0, row.getNumGlyphs(), offset, 0.0f);
+            glyphs.addGlyphArrangement(row);
+            baseline += font.getHeight() * static_cast<float>(asset.textSettings.lineSpacing);
         }
         juce::Path path;
         glyphs.createPath(path);
@@ -1320,6 +1327,14 @@ juce::XmlElement Document::save() const {
                 raster->setAttribute("invert", asset->rasterSettings.invert);
                 raster->setAttribute("resolution", asset->rasterSettings.resolution);
                 raster->setAttribute("pointsPerFrame", static_cast<int>(asset->rasterSettings.pointsPerFrame));
+            }
+            if (asset->extension.equalsIgnoreCase(".txt")) {
+                auto* text = item->createNewChildElement("typography");
+                text->setAttribute("family", asset->textSettings.family);
+                text->setAttribute("style", asset->textSettings.style);
+                text->setAttribute("alignment", asset->textSettings.alignment);
+                text->setAttribute("lineSpacing", exactBakeNumber(asset->textSettings.lineSpacing));
+                text->setAttribute("tracking", exactBakeNumber(asset->textSettings.tracking));
             }
             // Keep mixed-content payloads last. JUCE's single-line binary XML
             // writer can attempt a null newline when wrapping attributes on an
@@ -1590,6 +1605,16 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         asset->name = item->getStringAttribute("name");
         asset->extension = item->getStringAttribute("extension");
         if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
+        if (asset->extension.equalsIgnoreCase(".txt")) {
+            const auto* text = item->getChildByName("typography");
+            if (text != nullptr) {
+                asset->textSettings.family = text->getStringAttribute("family");
+                asset->textSettings.style = text->getIntAttribute("style", -1);
+                asset->textSettings.alignment = text->getIntAttribute("alignment", -1);
+                asset->textSettings.lineSpacing = text->getDoubleAttribute("lineSpacing", -1);
+                asset->textSettings.tracking = text->getDoubleAttribute("tracking", -1);
+            }
+        }
         const bool luaSource = asset->extension.equalsIgnoreCase(".lua");
         auto* source = luaSource ? item->getChildByName("source") : item;
         if (source == nullptr) { return juce::Result::fail("Baked Lua asset is missing its source."); }

@@ -38,6 +38,7 @@ private:
         motion::Id uniqueClip = 0;
         std::optional<motion::BakeSettings> retrySettings;
         juce::String preparationError;
+        std::optional<motion::TextSettings> textSettings;
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();

@@ -719,7 +719,7 @@ void MotionEditor::showNextPreparationSettings() {
     MotionLuaSourcePanel* sourcePanel = nullptr;
     if (text) {
         const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
-        auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances);
+        auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances, request.replacement->textSettings);
         textPanel = panel.get();
         content = std::move(panel);
     } else if (editLua) {
@@ -751,7 +751,8 @@ void MotionEditor::showNextPreparationSettings() {
             owner->showNextPreparationSettings();
         }
     };
-    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}) mutable {
+    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}, std::optional<motion::TextSettings> textSettings = {}) mutable {
+        request.textSettings = std::move(textSettings);
         request.editedText = std::move(editedText);
         juce::MessageManager::callAsync([owner, overlayPointer, request, settings, rasterSettings] {
             if (owner == nullptr || overlayPointer == nullptr) { return; }
@@ -773,7 +774,7 @@ void MotionEditor::showNextPreparationSettings() {
         };
     }
     if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) mutable { submit({}, settings); }; }
-    if (textPanel != nullptr) { textPanel->onApply = [submit](juce::String text) mutable { submit({}, {}, std::move(text)); }; }
+    if (textPanel != nullptr) { textPanel->onApply = [submit](juce::String text, motion::TextSettings settings) mutable { submit({}, {}, std::move(text), std::move(settings)); }; }
     showOverlay(std::move(overlay));
 }
 
@@ -785,6 +786,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
     asset->bakeSettings = settings;
     asset->rasterSettings = rasterSettings;
+    asset->textSettings = request.textSettings.value_or(request.replacement != nullptr ? request.replacement->textSettings : motion::TextSettings());
     asset->midiImportBpm = processor.document.project().bpm;
     const auto time = request.time;
     const auto generation = request.generation;

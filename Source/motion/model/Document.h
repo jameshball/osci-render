@@ -8,6 +8,7 @@
 #include "PreparedSource.h"
 #include "BakeSettings.h"
 #include "RasterSettings.h"
+#include "TextSettings.h"
 #include "../render/PreparedAudio.h"
 #include <atomic>
 #include "../../audio/synth/PreparedDrawing.h"
@@ -20,6 +21,7 @@ struct Asset {
     juce::MemoryBlock data;
     BakeSettings bakeSettings;
     RasterSettings rasterSettings;
+    TextSettings textSettings;
     juce::MemoryBlock bakedData;
     juce::String bakeKey;
     std::shared_ptr<const osci::PreparedDrawing> drawing;

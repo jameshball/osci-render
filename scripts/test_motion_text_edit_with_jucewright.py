@@ -63,11 +63,19 @@ try:
     step("open shared text", "click", "--name", "Edit text...", "--exact")
     command("wait-for-locator", "--name", "Source text", "--class", "juce::TextEditor", "--exact")
     step("edit multiline text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RETURN\nTOGETHER")
+    step("choose font", "select-option", "--name", "Text font family", "--class", "juce::ComboBox", "--exact", "--text", "Menlo")
+    step("choose bold", "select-option", "--name", "Text font style", "--class", "juce::ComboBox", "--exact", "--text", "Bold")
+    step("centre title", "select-option", "--name", "Text alignment", "--class", "juce::ComboBox", "--exact", "--text", "Centre")
+    step("set line spacing", "set-value", "--name", "Text line spacing", "--role", "slider", "1.8")
+    step("set tracking", "set-value", "--name", "Text tracking", "--role", "slider", "0.15")
     step("text editor", "screenshot", "--file", session.artifact_dir / "text-editor.png")
     step("apply text", "click", "--name", "Apply text", "--exact")
     command("wait-for-locator", "--name", "Undo Edit text source", "--class", "juce::Label", "--exact")
     after = saved_asset()
     assert after != before and len(saved_clips()) == 2
+    typography = ET.fromstring(after).find("typography")
+    assert typography.get("family") == "Menlo" and typography.get("style") == "1" and typography.get("alignment") == "1"
+    assert float(typography.get("lineSpacing")) == 1.8 and float(typography.get("tracking")) == 0.15
     step("undo shared edit", "click", "--name", "Undo", "--exact")
     assert saved_asset() == before
     step("redo shared edit", "click", "--name", "Redo", "--exact")

@@ -10,9 +10,10 @@ public:
     MotionDocumentTest() : juce::UnitTest("Motion document and signal", "Motion") {}
     void runTest() override {
         beginTest("Plain titles preserve natural proportions and explicit newlines");
-        const auto textAspect = [this](const juce::String& text) {
+        const auto textAspect = [this](const juce::String& text, motion::TextSettings settings = {}) {
             motion::Asset title;
             title.extension = ".txt";
+            title.textSettings = settings;
             title.data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
             const auto result = motion::Document::decodeAsset(title);
             expect(result.wasOk(), result.getErrorMessage());
@@ -31,6 +32,52 @@ public:
         const auto explicitLines = textAspect("PHASE /\nSPACE");
         expect(singleLine > 8.0f, "A title should not wrap to fit a square");
         expect(explicitLines > 1.0f && explicitLines < singleLine * 0.5f, "Explicit line breaks must remain effective");
+        beginTest("Typography changes prepared geometry and validates numeric limits");
+        motion::TextSettings typography;
+        typography.tracking = 0.3;
+        expect(textAspect("PHASE / SPACE", typography) > singleLine * 1.2f);
+        typography.tracking = 0;
+        typography.lineSpacing = 2.4;
+        expect(textAspect("PHASE /\nSPACE", typography) < explicitLines * 0.8f);
+        typography.lineSpacing = std::numeric_limits<double>::quiet_NaN();
+        expect(typography.validate().isNotEmpty());
+        typography = {};
+        typography.style = 4;
+        expect(typography.validate().isNotEmpty());
+
+        beginTest("Typography is persisted and invalid styles reject atomically");
+        juce::UndoManager typographyUndo;
+        motion::Document typographyDocument(typographyUndo);
+        auto title = std::make_shared<motion::Asset>();
+        title->id = 1; title->name = "Title.txt"; title->extension = ".txt";
+        const juce::String titleText("WIDE TITLE\nI");
+        title->data.append(titleText.toRawUTF8(), titleText.getNumBytesAsUTF8());
+        title->textSettings.family = juce::Font::getDefaultMonospacedFontName();
+        title->textSettings.style = juce::Font::bold;
+        title->textSettings.alignment = 1;
+        title->textSettings.lineSpacing = 1.8;
+        title->textSettings.tracking = 0.15;
+        expect(motion::Document::decodeAsset(*title).wasOk());
+        typographyDocument.edit("Title", [&](motion::Project& project) { project.assets.push_back(title); });
+        const auto typographyXml = typographyDocument.save();
+        juce::UndoManager typographyRestoreUndo;
+        motion::Document typographyRestored(typographyRestoreUndo);
+        expect(typographyRestored.load(typographyXml).wasOk());
+        expect(typographyRestored.project().assets.front()->textSettings == title->textSettings);
+        for (int sample = 0; sample < 1000; ++sample) {
+            const auto phase = sample / 1000.0;
+            const auto original = title->source->sample(0, phase);
+            const auto reopened = typographyRestored.project().assets.front()->source->sample(0, phase);
+            expectWithinAbsoluteError(original.x, reopened.x, 1.0e-6f);
+            expectWithinAbsoluteError(original.y, reopened.y, 1.0e-6f);
+        }
+
+        const auto savedTypography = typographyRestored.save().toString();
+        auto badTypography = typographyXml;
+        badTypography.getChildByName("asset")->getChildByName("typography")->setAttribute("tracking", "nan");
+        expect(typographyRestored.load(badTypography).failed());
+        expectEquals(typographyRestored.save().toString(), savedTypography);
+
         motion::Asset oversizedTitle;
         oversizedTitle.extension = ".txt";
         const auto oversizedText = juce::String::repeatedString("A", 16385);
