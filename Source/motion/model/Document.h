@@ -104,6 +104,7 @@ public:
     juce::Result makeCompositionUnique(Id clipId, Id& definitionId);
     juce::Result createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
+    juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
     juce::Result clearMidi(Id clipId);

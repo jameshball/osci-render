@@ -96,6 +96,7 @@ struct PreparedClipStage {
 struct PreparedClip : PreparedClipStage {
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedMidiPerformance> midi;
+    std::shared_ptr<const PreparedMidiInstrument> liveInstrument;
     std::vector<PreparedClipStage> ancestors; // inner-to-outer
 
     Id editorId() const { return ancestors.empty() ? id : ancestors.back().id; }
@@ -212,6 +213,7 @@ struct PreparedComposition {
             }
             return item;
         };
+        std::map<std::array<double, 4>, std::shared_ptr<const PreparedMidiInstrument>> instruments;
         const auto expanded = expandComposition(project, [&](const auto&, const auto& stages) {
             if (preparationError.isNotEmpty()) { return; }
             const auto& leaf = stages.back();
@@ -227,6 +229,16 @@ struct PreparedComposition {
             }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1));
+            }
+            if (purpose == CompositionPurpose::signal) {
+                const auto key = clip.instrument.key();
+                auto found = instruments.find(key);
+                if (found == instruments.end()) {
+                    const auto instrument = PreparedMidiInstrument::prepare(clip.instrument, sampleRate, cancel);
+                    if (!instrument) { preparationError = "Could not prepare the MIDI instrument."; return; }
+                    found = instruments.emplace(key, std::make_shared<const PreparedMidiInstrument>(*instrument)).first;
+                }
+                item.liveInstrument = found->second;
             }
             if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
                 const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, leaf.bpm, sampleRate, cancel, &leaf.clipClock);

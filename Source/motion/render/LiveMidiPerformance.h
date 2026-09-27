@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../audio/synth/PreparedNoteVoice.h"
+#include "PreparedMidiInstrument.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -18,18 +18,18 @@ public:
         std::uint64_t note = 0;
         double phase = 0, phaseSpan = 0;
     };
-    bool prepare(double rate) {
-        reset();
-        pitches.fill(std::nullopt);
-        DahdsrParams params;
-        params.sustainLevel = 1;
-        envelope = osci_audio::PreparedVoiceEnvelope::prepare(params, rate);
-        if (!envelope) { return false; }
-        for (std::size_t pitch = 0; pitch < pitches.size(); ++pitch) {
-            pitches[pitch] = osci_audio::PreparedNoteVoice::prepare(*envelope,
-                440 * std::exp2((static_cast<double>(pitch) - 69) / 12), 1, 1);
-        }
+    bool prepare(double rate, MidiInstrument settings = {}) {
+        const auto prepared = PreparedMidiInstrument::prepare(settings, rate);
+        if (!prepared) { reset(); instrument = {}; return false; }
+        useInstrument(*prepared);
         return true;
+    }
+    bool usesInstrument(const PreparedMidiInstrument& value) const {
+        return instrument.sampleRate == value.sampleRate && instrument.settings == value.settings && instrument.envelope.has_value();
+    }
+    void useInstrument(const PreparedMidiInstrument& value) {
+        reset();
+        instrument = value;
     }
     void reset() {
         voices.fill(Voice{});
@@ -40,7 +40,7 @@ public:
     bool noteOn(int channel, int pitch, int velocity, std::uint64_t sample) {
         if (!validChannel(channel) || pitch < 0 || pitch > 127 || velocity < 0 || velocity > 127) { return false; }
         if (velocity == 0) { return noteOff(channel, pitch, sample); }
-        if (!pitches[static_cast<std::size_t>(pitch)] || !acceptTime(sample)
+        if (!instrument.pitches[static_cast<std::size_t>(pitch)] || !acceptTime(sample)
             || nextIdentity == std::numeric_limits<std::uint64_t>::max()) { return false; }
         Voice* chosen = nullptr;
         for (auto& voice : voices) {
@@ -57,7 +57,7 @@ public:
         return true;
     }
     bool noteOff(int channel, int pitch, std::uint64_t sample) {
-        if (!validChannel(channel) || pitch < 0 || pitch > 127 || !envelope || !acceptTime(sample)) { return false; }
+        if (!validChannel(channel) || pitch < 0 || pitch > 127 || !instrument.envelope || !acceptTime(sample)) { return false; }
         Voice* oldest = nullptr;
         for (auto& voice : voices) {
             if (voice.id != 0 && voice.channel == channel && voice.pitch == pitch && voice.held
@@ -69,7 +69,7 @@ public:
         return true;
     }
     bool sustain(int channel, bool down, std::uint64_t sample) {
-        if (!validChannel(channel) || !envelope || !acceptTime(sample)) { return false; }
+        if (!validChannel(channel) || !instrument.envelope || !acceptTime(sample)) { return false; }
         auto& pedal = pedals[static_cast<std::size_t>(channel - 1)];
         if (pedal == down) { return false; }
         pedal = down;
@@ -81,7 +81,7 @@ public:
         return true;
     }
     bool allNotesOff(int channel, std::uint64_t sample) {
-        if (!validChannel(channel) || !envelope || !acceptTime(sample)) { return false; }
+        if (!validChannel(channel) || !instrument.envelope || !acceptTime(sample)) { return false; }
         bool changed = false;
         for (auto& voice : voices) {
             if (voice.id != 0 && voice.channel == channel && voice.held) {
@@ -101,7 +101,7 @@ public:
         return changed;
     }
     Selection select(std::uint64_t sample, double allocationPhase) const {
-        if (!envelope || !std::isfinite(allocationPhase) || allocationPhase < 0 || allocationPhase >= 1) { return {}; }
+        if (!instrument.envelope || !std::isfinite(allocationPhase) || allocationPhase < 0 || allocationPhase >= 1) { return {}; }
         std::size_t count = 0;
         for (const auto& voice : voices) { if (active(voice, sample)) { ++count; } }
         auto cursor = allocationPhase * static_cast<double>(count);
@@ -109,7 +109,7 @@ public:
             if (!active(voice, sample)) { continue; }
             const auto gain = envelopeValue(voice, sample).gain * (voice.velocity / 127.0);
             if (cursor < gain) {
-                const auto value = pitches[static_cast<std::size_t>(voice.pitch)]->at(sample - voice.start,
+                const auto value = instrument.pitches[static_cast<std::size_t>(voice.pitch)]->at(sample - voice.start,
                     voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max());
                 return {voice.id, value.phase, value.phaseSpan};
             }
@@ -138,16 +138,15 @@ private:
         // UINT64_MAX is the kernel's unreleased sentinel. At the final clock
         // tick evaluate held gain one tick earlier; oscillator phase stays exact.
         if (!voice.released && age == std::numeric_limits<std::uint64_t>::max()) { --age; }
-        return envelope->at(age, voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max());
+        return instrument.envelope->at(age, voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max());
     }
     bool active(const Voice& voice, std::uint64_t sample) const {
-        return voice.id != 0 && sample >= voice.start && envelope
+        return voice.id != 0 && sample >= voice.start && instrument.envelope
             && envelopeValue(voice, sample).stage != DahdsrStage::Done;
     }
     std::array<Voice, 32> voices {};
     std::array<bool, 16> pedals {};
-    std::array<std::optional<osci_audio::PreparedNoteVoice>, 128> pitches {};
-    std::optional<osci_audio::PreparedVoiceEnvelope> envelope;
+    PreparedMidiInstrument instrument;
     std::uint64_t nextIdentity = 0, lastEvent = 0;
 };
 }

@@ -11,6 +11,7 @@ class MotionMidiRenderTest : public juce::UnitTest {
 public:
     MotionMidiRenderTest() : juce::UnitTest("Motion MIDI signal rendering", "MotionMidi") {}
     void runTest() override {
+        testAuthoredEnvelope();
         testNestedAuthoring();
         testLiveMidi();
         testLiveMidiInputAndSampling();
@@ -126,6 +127,64 @@ public:
         }
     }
 private:
+    void testAuthoredEnvelope() {
+        beginTest("Authored ADSR matches live and seekable MIDI allocation through attack, sustain and release");
+        for (const double rate : {44100.0, 48000.0}) {
+            auto project = makeProject();
+            auto& clip = project.tracks[0].clips[0];
+            clip.start = 0; clip.duration = 2; clip.offset = 0; clip.rate = 1;
+            clip.instrument = {.05, .1, .35, .2};
+            clip.midi = motion::MidiNotes::create({{1, 0, .8, 69, 127, 1}}).source;
+            const auto prepared = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, 120, rate);
+            expect(static_cast<bool>(prepared), juce::String(prepared.error));
+            motion::LiveMidiPerformance live;
+            expect(live.prepare(rate, clip.instrument));
+            expect(live.noteOn(1, 69, 127, 0));
+            expect(live.noteOff(1, 69, static_cast<std::uint64_t>(.4 * rate)));
+            if (!prepared) { continue; }
+            for (const double seconds : {.001, .025, .075, .2, .399, .4, .45, .55, .61}) {
+                const auto sample = static_cast<std::uint64_t>(std::round(seconds * rate));
+                const auto time = sample / rate;
+                for (const double phase : {.01, .2, .34, .36, .5, .9}) {
+                    const auto direct = live.select(sample, phase);
+                    const auto timeline = prepared.performance->select(time, phase, time);
+                    expect((direct.note != 0) == (timeline.note != 0), "Live/timeline envelope disagreement at " + juce::String(time));
+                    if (direct.note != 0 && timeline.note != 0) { expectWithinAbsoluteError(direct.phase, timeline.phase, 1e-10); }
+                }
+            }
+            expect(live.select(static_cast<std::uint64_t>(.45 * rate), .01).note != 0, "Release tail remains audible");
+            expect(live.select(static_cast<std::uint64_t>(.61 * rate), .01).note == 0);
+            const auto changed = motion::PreparedMidiInstrument::prepare({.1, .2, .5, .3}, rate);
+            expect(changed.has_value());
+            if (changed) { live.useInstrument(*changed); expect(live.select(static_cast<std::uint64_t>(.45 * rate), .01).note == 0); expect(live.usesInstrument(*changed)); }
+            motion::PreparedComposition composition(project, rate);
+            expect(composition.preparationError.isEmpty(), composition.preparationError);
+            expect(composition.clips[0].liveInstrument != nullptr);
+            if (composition.clips[0].liveInstrument != nullptr) { expect(composition.clips[0].liveInstrument->settings == clip.instrument); }
+            juce::TemporaryFile exported(".wav");
+            std::atomic<bool> cancel {false};
+            const auto result = motion::SignalExporter::write(project, exported.getFile(), rate, cancel);
+            expect(result.wasOk(), result.getErrorMessage());
+            if (result.wasOk()) {
+                juce::WavAudioFormat format;
+                auto stream = exported.getFile().createInputStream();
+                std::unique_ptr<juce::AudioFormatReader> reader(format.createReaderFor(stream.release(), true));
+                expect(reader != nullptr);
+                if (reader) {
+                    juce::AudioBuffer<float> signal(5, static_cast<int>(reader->lengthInSamples));
+                    expect(reader->read(signal.getArrayOfWritePointers(), 5, 0, signal.getNumSamples()));
+                    for (const double seconds : {.001, .025, .075, .2, .399, .4, .45, .55, .61}) {
+                        const int index = static_cast<int>(std::round(seconds * rate));
+                        const auto time = index / rate, phase = std::fmod(index * 60.0 / rate, 1.0);
+                        const auto point = composition.sample(time, phase, 60.0 / rate, 1.0 / rate);
+                        expectEquals(signal.getSample(0, index), point.x);
+                        expectEquals(signal.getSample(2, index), point.r);
+                    }
+                }
+            }
+        }
+    }
+
     void testNestedAuthoring() {
         beginTest("Precomposing animated MIDI and soundtrack together preserves both signal clocks");
         auto project = makeProject();

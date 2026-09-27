@@ -8,6 +8,38 @@
 class MotionDocumentTest : public juce::UnitTest {
 public:
     MotionDocumentTest() : juce::UnitTest("Motion document and signal", "Motion") {}
+    void testMidiEnvelope() {
+        beginTest("MIDI envelopes are clip-local, validated, undoable and persisted without requiring a note pattern");
+        auto asset = std::make_shared<motion::Asset>();
+        asset->id = 1; asset->name = "Title"; asset->extension = ".txt";
+        const juce::String text("A"); asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
+        expect(motion::Document::decodeAsset(*asset).wasOk());
+        motion::Project project; project.assets.push_back(asset);
+        motion::Track track; track.id = 3; track.clips.push_back(motion::Document::makeClip(2, *asset, 0)); project.tracks.push_back(track);
+        juce::UndoManager undo; motion::Document document(undo); document.reset(project);
+        const motion::MidiInstrument settings {.125, .25, .4, .75};
+        expect(document.setMidiInstrument(2, settings).wasOk());
+        expect(document.project().tracks[0].clips[0].instrument == settings);
+        expect(document.project().tracks[0].clips[0].midi == nullptr);
+        const auto revision = document.revision();
+        expect(document.setMidiInstrument(2, settings).wasOk()); expect(document.revision() == revision);
+        expect(undo.undo()); expect(document.project().tracks[0].clips[0].instrument == motion::MidiInstrument{});
+        expect(undo.redo());
+        const auto saved = document.save().toString();
+        expect(document.setMidiInstrument(2, {-1, 0, 1, 0}).failed());
+        expect(document.setMidiInstrument(2, {0, 0, 1.1, 0}).failed());
+        expect(document.setMidiInstrument(2, {0, 0, 1, 31}).failed());
+        expectEquals(document.save().toString(), saved);
+        juce::UndoManager loadedUndo; motion::Document loaded(loadedUndo);
+        expect(loaded.load(document.save()).wasOk());
+        expect(loaded.project().tracks[0].clips[0].instrument == settings);
+        auto invalid = document.save();
+        invalid.getChildByName("track")->getChildByName("clip")->getChildByName("instrument")->setAttribute("attack", "nan");
+        expect(loaded.load(invalid).failed()); expectEquals(loaded.save().toString(), saved);
+        document.edit("Lock", [](motion::Project& value) { value.tracks[0].locked = true; });
+        expect(document.setMidiInstrument(2, {}).failed());
+    }
+
     void testMarkers() {
         beginTest("Markers support scoped editing, undo, persistence and independent composition copies");
         juce::UndoManager undo;
@@ -69,6 +101,7 @@ public:
     }
 
     void runTest() override {
+        testMidiEnvelope();
         testMarkers();
         beginTest("Plain titles preserve natural proportions and explicit newlines");
         const auto textAspect = [this](const juce::String& text, motion::TextSettings settings = {}) {

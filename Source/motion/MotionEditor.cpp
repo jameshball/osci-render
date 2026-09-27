@@ -7,6 +7,7 @@
 #include "ui/TextSourcePanel.h"
 #include "ui/LuaSourcePanel.h"
 #include "ui/MarkerPanel.h"
+#include "ui/MidiEnvelopePanel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
@@ -404,6 +405,31 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
+    };
+    notesEditor.onEditInstrument = [this](motion::Id id) {
+        const motion::Clip* clip = nullptr;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& item : track.clips) { if (item.id == id) { clip = &item; } }
+        }
+        if (clip == nullptr) { return; }
+        const auto generation = processor.document.generation();
+        const auto revision = processor.document.revision();
+        auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
+        auto* controls = panel.get();
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "MIDI envelope", juce::Point<int>(420, 330), true);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
+        controls->onApply = [owner, dialog, id, generation, revision](motion::MidiInstrument settings) {
+            juce::MessageManager::callAsync([owner, dialog, id, generation, revision, settings] {
+                if (owner == nullptr || dialog == nullptr) { return; }
+                if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
+                    const auto result = owner->processor.document.setMidiInstrument(id, settings);
+                    if (result.failed()) { owner->assetLibrary.setError(result.getErrorMessage()); }
+                }
+                owner->dismissOverlay(dialog.getComponent());
+            });
+        };
+        showOverlay(std::move(overlay));
     };
     timeline.onEditMarker = [this](motion::Id id, double time) {
         const auto& project = processor.document.project();

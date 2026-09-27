@@ -98,6 +98,10 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         previousAuditionTarget = resolvedAudition;
         transitionGuard.begin();
     }
+    if (audition != nullptr && audition->liveInstrument != nullptr && !liveMidi.usesInstrument(*audition->liveInstrument)) {
+        liveMidi.useInstrument(*audition->liveInstrument);
+        transitionGuard.begin();
+    }
     const auto requested = requestedPosition.exchange(-1.0);
     if (requested >= 0.0 && std::isfinite(requested)) {
         audioSample = motion::sampleIndex(std::min(requested, prepared->duration), sampleRate).value_or(0);

@@ -3,6 +3,7 @@
 #include "Animation.h"
 #include "Effects.h"
 #include "MidiNotes.h"
+#include "MidiInstrument.h"
 #include <cstdint>
 #include <map>
 #include <limits>
@@ -65,6 +66,7 @@ struct Clip {
     std::vector<EffectInstance> effects;
     // Optional performance for this visual source. Immutable patterns are shared
     // by duplication/undo; an edit replaces only the selected clip's pattern.
+    MidiInstrument instrument;
     Id midiAsset = 0;
     std::shared_ptr<const MidiNotes> midi;
 
@@ -127,6 +129,7 @@ struct Clip {
     bool contains(double projectTime, double projectBpm = 120) const { const auto t = timing(projectBpm); return projectTime >= t.start && projectTime < t.end(); }
     double localTime(double projectTime, double projectBpm = 120) const { return timing(projectBpm).localTime(projectTime); }
     bool valid() const {
+        if (!instrument.valid()) { return false; }
         for (const auto& [name, curve] : properties) {
             if (!curve.valid()) {
                 return false;

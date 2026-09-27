@@ -10,12 +10,13 @@ public:
     explicit MotionNotesEditor(MotionProcessor& owner) : processor(owner) {
         setName("MIDI notes editor");
         setWantsKeyboardFocus(true);
-        for (auto* button : {&create, &fitButton, &remove, &audition}) { addAndMakeVisible(button); }
+        for (auto* button : {&create, &fitButton, &remove, &audition, &envelopeButton}) { addAndMakeVisible(button); }
         audition.setClickingTogglesState(true);
         audition.setColour(juce::TextButton::buttonOnColourId, osci::Colours::accentColor().withAlpha(.22f));
         audition.setColour(juce::TextButton::textColourOnId, osci::Colours::text());
         audition.setTooltip("Play this clip alone using a connected MIDI keyboard. Does not change notes or exports. MIDI input devices are selected in Audio settings.");
         audition.onClick = [this] { processor.setMidiAudition(audition.getToggleState() ? target : 0); refresh(); };
+        envelopeButton.onClick = [this] { if (onEditInstrument) { onEditInstrument(target); } };
         create.onClick = [this] { report(processor.document.assignMidi(target, 0)); refresh(); fit(); };
         fitButton.onClick = [this] { fit(); repaint(); };
         remove.onClick = [this] { report(processor.document.clearMidi(target)); refresh(); };
@@ -37,6 +38,7 @@ public:
         addAndMakeVisible(velocity);
         refresh();
     }
+    std::function<void(motion::Id)> onEditInstrument;
     struct ViewState {
         motion::Id target = 0;
         std::set<motion::Id> selected;
@@ -62,6 +64,7 @@ public:
         const auto available = clip != nullptr && canAudition();
         if (!available && processor.getMidiAudition() != 0) { processor.setMidiAudition(0); }
         audition.setEnabled(available);
+        envelopeButton.setEnabled(clip != nullptr && clip->composition == 0 && !isLocked());
         audition.setTooltip(clip != nullptr && !available ? "This track is muted or excluded by solo. Make it audible to use MIDI audition."
             : "Play this clip alone using a connected MIDI keyboard. Does not change notes or exports. MIDI input devices are selected in Audio settings.");
         audition.setToggleState(clip != nullptr && processor.getMidiAudition() == target, juce::dontSendNotification);
@@ -94,6 +97,7 @@ public:
     void resized() override {
         auto header = getLocalBounds().removeFromTop(30).reduced(6, 3);
         audition.setBounds(header.removeFromRight(112)); header.removeFromRight(6);
+        envelopeButton.setBounds(header.removeFromRight(92)); header.removeFromRight(6);
         remove.setBounds(header.removeFromRight(106)); header.removeFromRight(6);
         fitButton.setBounds(header.removeFromRight(46)); header.removeFromRight(6);
         velocity.setBounds(header.removeFromRight(48));
@@ -105,7 +109,7 @@ public:
         const auto* clip = currentClip();
         const auto pattern = preview != nullptr ? preview : (clip != nullptr ? clip->midi : nullptr);
         g.setFont(13.0f); g.setColour(osci::Colours::text());
-        const auto titleEnd = pattern != nullptr ? velocity.getX() - 73 : audition.getX();
+        const auto titleEnd = pattern != nullptr ? velocity.getX() - 73 : envelopeButton.getX();
         g.drawText(clip == nullptr ? "Notes" : juce::String(clip->name), 12, 0, std::max(0, titleEnd - 12), 30, juce::Justification::centredLeft);
         if (pattern == nullptr) {
             g.setColour(osci::Colours::text().withAlpha(.65f));
@@ -368,6 +372,7 @@ private:
     juce::Point<int> anchor;
     juce::Rectangle<int> selectionBox;
     juce::String error;
+    juce::TextButton envelopeButton {"Envelope..."};
     juce::TextButton create {"Create notes"}, fitButton {"Fit"}, remove {"Remove MIDI"}, audition {"MIDI audition"};
     juce::Label velocity;
 };

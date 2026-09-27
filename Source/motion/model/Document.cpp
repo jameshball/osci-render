@@ -977,7 +977,7 @@ juce::Result Document::editMidi(Id clipId, juce::String label, const std::functi
             if (!track.canPlace(changed, clipId, state.bpm)) {
                 return juce::Result::fail("MIDI assignment would produce invalid or overlapping clip timing.");
             }
-            if (changed.midi == original.midi && changed.midiAsset == original.midiAsset
+            if (changed.instrument == original.instrument && changed.midi == original.midi && changed.midiAsset == original.midiAsset
                 && changed.timeBase == original.timeBase && changed.contentBpm == original.contentBpm
                 && changed.start == original.start && changed.duration == original.duration
                 && changed.offset == original.offset && changed.rate == original.rate) {
@@ -990,6 +990,14 @@ juce::Result Document::editMidi(Id clipId, juce::String label, const std::functi
         }
     }
     return juce::Result::fail("The selected clip no longer exists.");
+}
+
+juce::Result Document::setMidiInstrument(Id clipId, MidiInstrument settings) {
+    if (!settings.valid()) { return juce::Result::fail("Envelope times must be between 0 and 30 seconds; sustain must be between 0 and 1."); }
+    return editMidi(clipId, "Change MIDI envelope", [settings](Clip& clip) {
+        clip.instrument = settings;
+        return juce::Result::ok();
+    });
 }
 
 juce::Result Document::assignMidi(Id clipId, Id assetId) {
@@ -1298,6 +1306,13 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
             item->setAttribute("duration", exactBakeNumber(clip.duration));
             item->setAttribute("offset", exactBakeNumber(clip.offset));
             item->setAttribute("rate", exactBakeNumber(clip.rate));
+            if (track.kind == TrackKind::visual && clip.composition == 0) {
+                auto* instrument = item->createNewChildElement("instrument");
+                instrument->setAttribute("attack", exactBakeNumber(clip.instrument.attack));
+                instrument->setAttribute("decay", exactBakeNumber(clip.instrument.decay));
+                instrument->setAttribute("sustain", exactBakeNumber(clip.instrument.sustain));
+                instrument->setAttribute("release", exactBakeNumber(clip.instrument.release));
+            }
             if (clip.midi != nullptr) {
                 auto* pattern = item->createNewChildElement("midi");
                 pattern->setAttribute("asset", juce::String(clip.midiAsset));
@@ -1500,6 +1515,14 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
                     return juce::Result::fail("The clip source type does not match its audio or visual track.");
                 }
                 if ((*found)->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
+            }
+            const auto* instrument = item->getChildByName("instrument");
+            if (instrument != nullptr) {
+                clip.instrument = {instrument->getDoubleAttribute("attack", -1), instrument->getDoubleAttribute("decay", -1),
+                    instrument->getDoubleAttribute("sustain", -1), instrument->getDoubleAttribute("release", -1)};
+                if (track.kind != TrackKind::visual || clip.composition != 0 || instrument->getNextElementWithTagName("instrument") != nullptr || !clip.instrument.valid()) {
+                    return juce::Result::fail("Invalid MIDI envelope settings.");
+                }
             }
             const auto* pattern = item->getChildByName("midi");
             if (pattern != nullptr) {
