@@ -7,6 +7,7 @@
 #include "Group.h"
 #include "PreparedSource.h"
 #include "../live/LiveSourceFrames.h"
+#include "../live/BlenderSourceSettings.h"
 #include "BakeSettings.h"
 #include "RasterSettings.h"
 #include "TextSettings.h"
@@ -18,6 +19,7 @@ namespace motion {
 struct Asset {
     Id id = 0;
     std::shared_ptr<const LiveSourceIdentity> liveIdentity;
+    BlenderSourceSettings blenderSettings;
     juce::String name;
     juce::String extension;
     juce::MemoryBlock data;
@@ -97,6 +99,8 @@ public:
     void edit(juce::String label, std::function<void(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
+    juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
+    juce::Result setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings);
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);

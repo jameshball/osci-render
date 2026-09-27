@@ -8,11 +8,16 @@ MotionProcessor::MotionProcessor()
     addAllParameters();
     rgbEnabled = true;
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
+    blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
     document.onChanged = [this] { requestComposition(document.project()); };
     document.onChanged();
 }
 
 MotionProcessor::~MotionProcessor() {
+    // Host teardown can occur off the message thread; exclude the controller's
+    // timer before destroying its document access and publication callback.
+    const juce::MessageManagerLock messageLock;
+    blender.reset();
     preparationWorker.reset();
     cancelPendingUpdate();
     document.onChanged = nullptr;
@@ -217,6 +222,9 @@ void MotionProcessor::setStateInformation(const void* data, int size) {
 }
 
 void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlElement& state) {
+    // Host state restore is not a realtime operation. Serialize its commit
+    // with the editor and the live-source owner, after worker preparation.
+    const juce::MessageManagerLock messageLock;
     document.reset(std::move(prepared));
     setMidiAudition(0);
     VisualiserState::load(state, visualiserParameters, recordingParameters);

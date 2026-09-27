@@ -611,8 +611,9 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
             if (track.locked || clip.asset != expected->id) { return juce::Result::fail("The selected clip is locked or its source has changed."); }
             const auto highest = highestId();
             if (highest == std::numeric_limits<Id>::max()) { return juce::Result::fail("There are no remaining source identities."); }
+            if (copy->liveIdentity != nullptr) { copy->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
             copy->id = highest + 1;
-            copy->name = expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy->id)) + expected->extension;
+            copy->name = copy->liveIdentity != nullptr ? expected->name + " copy" : expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy->id)) + expected->extension;
             lastId = copy->id;
             edit("Make source unique", [trackIndex, clipIndex, copy](Project& project) {
                 project.assets.push_back(copy);
@@ -1128,6 +1129,32 @@ juce::Result Document::clearMidi(Id clipId) {
     });
 }
 
+juce::Result Document::addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id) {
+    if (!settings.valid() || name.trim().isEmpty()) { return juce::Result::fail("Enter a source name and a port from 51600 to 51699."); }
+    auto asset = std::make_shared<Asset>();
+    asset->id = newId(); asset->name = name.trim(); asset->extension = ".blender";
+    asset->blenderSettings = settings;
+    const auto result = decodeAsset(*asset);
+    if (result.failed()) { return result; }
+    edit("Add Blender source", [asset](Project& project) { project.assets.push_back(asset); });
+    id = asset->id;
+    return juce::Result::ok();
+}
+
+juce::Result Document::setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings) {
+    const auto found = std::find_if(state.assets.begin(), state.assets.end(), [id](const auto& asset) { return asset->id == id; });
+    if (found == state.assets.end() || !(*found)->extension.equalsIgnoreCase(".blender")) { return juce::Result::fail("The Blender source no longer exists."); }
+    if (!settings.valid() || name.trim().isEmpty()) { return juce::Result::fail("Enter a source name and a port from 51600 to 51699."); }
+    if ((*found)->name == name.trim() && (*found)->blenderSettings == settings) { return juce::Result::ok(); }
+    auto replacement = std::make_shared<Asset>(**found);
+    replacement->name = name.trim(); replacement->blenderSettings = settings;
+    if ((*found)->blenderSettings.port != settings.port) { replacement->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
+    edit("Change Blender source", [id, replacement](Project& project) {
+        for (auto& asset : project.assets) { if (asset->id == id) { asset = replacement; break; } }
+    });
+    return juce::Result::ok();
+}
+
 Clip Document::makeClip(Id id, const Asset& asset, double time) {
     Clip clip;
     clip.id = id;
@@ -1162,6 +1189,13 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
     }
     if (importCancelled(cancel)) {
         return juce::Result::fail("Source import cancelled.");
+    }
+    if (asset.extension.equalsIgnoreCase(".blender")) {
+        if (!asset.blenderSettings.valid() || asset.data.getSize() != 0) { return juce::Result::fail("Invalid Blender source settings."); }
+        asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
+        asset.source.reset(); asset.drawing.reset(); asset.audio.reset(); asset.midi.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
     }
     if (asset.data.getSize() == 0 || asset.data.getSize() > maximumSourceBytes) {
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
@@ -1485,6 +1519,12 @@ juce::XmlElement Document::save() const {
         item->setAttribute("id", juce::String(asset->id));
         item->setAttribute("name", asset->name);
         item->setAttribute("extension", asset->extension);
+        if (asset->extension.equalsIgnoreCase(".blender")) {
+            auto* live = item->createNewChildElement("blender");
+            live->setAttribute("port", asset->blenderSettings.port);
+            live->setAttribute("disconnect", asset->blenderSettings.freezeOnDisconnect ? "freeze" : "blank");
+            continue;
+        }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { item->setAttribute("fractalDepth", asset->fractalDepth); }
         if (isMidiSource(asset->extension)) { item->setAttribute("midiImportBpm", exactBakeNumber(asset->midiImportBpm)); }
         if (asset->extension.equalsIgnoreCase(".lua")) {
@@ -1811,6 +1851,18 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
         asset->name = item->getStringAttribute("name");
         asset->extension = item->getStringAttribute("extension");
+        if (asset->extension.equalsIgnoreCase(".blender")) {
+            const auto* live = item->getChildByName("blender");
+            if (live == nullptr || live->getNextElement() != nullptr || item->getNumChildElements() != 1 || asset->name.trim().isEmpty() || asset->id == 0 || !identities.insert(asset->id).second) { return juce::Result::fail("Invalid Blender source identity or settings."); }
+            asset->blenderSettings.port = live->getIntAttribute("port", 0);
+            const auto policy = live->getStringAttribute("disconnect");
+            if (policy != "freeze" && policy != "blank") { return juce::Result::fail("Invalid Blender disconnect policy."); }
+            asset->blenderSettings.freezeOnDisconnect = policy == "freeze";
+            const auto result = decodeAsset(*asset, cancel);
+            if (result.failed()) { return result; }
+            project.assets.push_back(std::move(asset));
+            continue;
+        }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { asset->fractalDepth = item->getIntAttribute("fractalDepth", -1); }
         if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
         if (asset->extension.equalsIgnoreCase(".txt")) {

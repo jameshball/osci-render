@@ -1,3 +1,4 @@
+#include "ui/BlenderSourcePanel.h"
 #include "MotionEditor.h"
 #include "export/SignalExporter.h"
 #include "export/SoundtrackExporter.h"
@@ -370,14 +371,15 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.lsystem;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        juce::PopupMenu menu;
+        menu.addItem(1, "Import file...");
+        menu.addItem(2, "Blender live source...");
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [owner](const juce::FileChooser& chosen) {
-                if (owner != nullptr && chosen.getResult().existsAsFile()) {
-                    owner->openSourceFile(chosen.getResult());
-                }
-            });
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner](int choice) {
+            if (owner == nullptr) { return; }
+            if (choice == 1) { owner->chooseSourceFile(); }
+            if (choice == 2) { owner->showBlenderSettings(); }
+        });
     };
     playButton.onClick = [this] { processor.playing.store(!processor.playing.load()); };
     splitButton.onClick = [this] {
@@ -427,7 +429,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
     assetLibrary.onInsert = [this](motion::Id id) { timeline.insertAsset(id, -1, -1); };
+    assetLibrary.liveStatus = [this](motion::Id id) { return processor.blenderInputs().statusText(id); };
     assetLibrary.onBake = [this](motion::Id id) {
+        for (const auto& asset : processor.document.mainProject().assets) {
+            if (asset->id == id && asset->liveIdentity != nullptr) { showBlenderSettings(id); return; }
+        }
         const auto& assets = processor.document.project().assets;
         const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
         if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !(*found)->extension.equalsIgnoreCase(".txt")
@@ -797,6 +803,63 @@ void MotionEditor::openProject(const juce::File& file) {
     });
 }
 
+void MotionEditor::chooseSourceFile() {
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.lsystem;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [owner](const juce::FileChooser& chosen) {
+                if (owner != nullptr && chosen.getResult().existsAsFile()) {
+                    owner->openSourceFile(chosen.getResult());
+                }
+            });
+}
+
+void MotionEditor::showBlenderSettings(motion::Id id) {
+    auto& document = processor.document;
+    const auto& assets = document.mainProject().assets;
+    const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+    if (id != 0 && (found == assets.end() || (*found)->liveIdentity == nullptr)) { return; }
+    const auto original = found != assets.end() ? *found : std::shared_ptr<const motion::Asset>();
+    auto panel = std::make_unique<MotionBlenderSourcePanel>(original != nullptr ? original->name : "Blender", original != nullptr ? original->blenderSettings : motion::BlenderSourceSettings{}, id != 0);
+    auto* controls = panel.get();
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, 310), true);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
+    const auto generation = document.generation();
+    controls->onApply = [owner, dialog, id, generation, expected = original](juce::String name, motion::BlenderSourceSettings settings, bool start) mutable {
+        if (owner == nullptr || dialog == nullptr || owner->processor.document.generation() != generation) { return juce::Result::fail("The project changed. Reopen source settings."); }
+        auto sourceId = id;
+        auto& document = owner->processor.document;
+        const bool creating = id == 0;
+        if (!creating && std::find(document.mainProject().assets.begin(), document.mainProject().assets.end(), expected) == document.mainProject().assets.end()) {
+            return juce::Result::fail("The source changed. Reopen its settings.");
+        }
+        const auto result = id == 0 ? document.addBlenderSource(name, settings, sourceId) : document.setBlenderSource(id, name, settings);
+        if (result.failed()) { return result; }
+        owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(sourceId);
+        id = sourceId;
+        for (const auto& asset : document.mainProject().assets) { if (asset->id == sourceId) { expected = asset; break; } }
+        const auto listening = start ? owner->processor.blenderInputs().listen(sourceId, true) : juce::Result::ok();
+        if (listening.failed()) { owner->assetLibrary.setError(listening.getErrorMessage()); }
+        if (creating) {
+            juce::MessageManager::callAsync([owner, dialog, sourceId, generation, identity = expected->liveIdentity] {
+                if (owner == nullptr || dialog == nullptr || owner->processor.document.generation() != generation) { return; }
+                owner->dismissOverlay(dialog.getComponent(), [owner, sourceId, generation, identity] {
+                    if (owner == nullptr || owner->processor.document.generation() != generation) { return; }
+                    for (const auto& asset : owner->processor.document.mainProject().assets) {
+                        if (asset->id == sourceId && asset->liveIdentity == identity) { owner->showBlenderSettings(sourceId); break; }
+                    }
+                });
+            });
+        }
+        return listening;
+    };
+    controls->onStop = [owner, id, generation] { if (owner != nullptr && owner->processor.document.generation() == generation) { owner->processor.blenderInputs().listen(id, false); } };
+    controls->isListening = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().listening(id); };
+    controls->connectionStatus = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation ? owner->processor.blenderInputs().statusText(id) : juce::String("Project changed"); };
+    showOverlay(std::move(overlay));
+}
+
 void MotionEditor::showNextPreparationSettings() {
     if (preparationSettingsOpen) { return; }
     while (!preparationRequests.empty() && preparationRequests.front().generation != processor.document.generation()) { preparationRequests.pop_front(); }
@@ -1021,6 +1084,7 @@ void MotionEditor::timerCallback() {
     }
     canvasButton.setEnabled(!visualiser.isRecording() && exportState == nullptr);
     processor.collectPreparedState();
+    assetLibrary.updateLiveStatus();
     const auto preparationError = processor.getPreparationError();
     if (preparationError != lastPreparationError) {
         lastPreparationError = preparationError;

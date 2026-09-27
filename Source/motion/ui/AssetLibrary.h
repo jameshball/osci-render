@@ -36,6 +36,11 @@ public:
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
+    std::function<juce::String(motion::Id)> liveStatus;
+    void updateLiveStatus() {
+        const auto row = list.getSelectedRow();
+        if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr) { updateStatus(); list.repaint(); }
+    }
 
     void setImportStatus(const juce::String& message) {
         if (importStatus == message) { return; }
@@ -74,6 +79,9 @@ public:
         const auto row = list.getSelectedRow();
         const auto midi = validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->midi : nullptr;
         juce::String help = midi != nullptr ? "Select a visual clip, then assign these notes. Or drag this MIDI file onto a clip." : "Double-click or press Enter to insert. Drag onto the timeline to place a copy.";
+        if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr && liveStatus) {
+            help = liveStatus(assetId(row)) + "\nEnter to insert. Drag to place.";
+        }
         if (definitionRow(row)) {
             help = document.canReferenceComposition(assetId(row))
                 ? "Shared composition. Enter or double-click to insert; drag to place. Open to edit."
@@ -94,7 +102,9 @@ public:
         if (cancelImport.isVisible()) {
             cancelImport.setBounds(area.removeFromBottom(30).reduced(6, 2));
         }
-        status.setBounds(area.removeFromBottom(hasError || assignMidi.isVisible() ? 126 : 68).reduced(6, 4));
+        const auto row = list.getSelectedRow();
+        const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
+        status.setBounds(area.removeFromBottom(hasError || assignMidi.isVisible() ? 126 : live ? 92 : 68).reduced(6, 4));
         if (assignMidi.isVisible()) { assignMidi.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         list.setBounds(area);
@@ -114,9 +124,10 @@ private:
         updateStatus();
         const bool raster = validAssetRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
         const bool text = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
+        const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
         const bool fractal = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lsystem");
-        bakeSettings.setButtonText(definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (motion::Document::isVideoSource(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
-        bakeSettings.setVisible(definitionRow(row) || text || fractal || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
+        bakeSettings.setButtonText(live ? "Blender settings..." : definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (motion::Document::isVideoSource(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
+        bakeSettings.setVisible(live || definitionRow(row) || text || fractal || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
         resized();
     }
     int getNumRows() override { return static_cast<int>(assets.size() + definitions.size()); }
@@ -150,7 +161,7 @@ private:
             detail = "COMPOSITION | " + juce::String(clip.duration, 2) + "s";
         } else {
             const auto& asset = *assets[static_cast<std::size_t>(row)];
-            detail = asset.extension.trimCharactersAtStart(".").toUpperCase();
+            detail = asset.liveIdentity != nullptr ? "LIVE BLENDER" : asset.extension.trimCharactersAtStart(".").toUpperCase();
             if (asset.source != nullptr && asset.source->frameCount() > 1) {
                 detail += " | " + juce::String(asset.source->duration(), 2) + "s | " + juce::String(static_cast<int>(asset.source->frameCount())) + " frames";
             }

@@ -8,6 +8,7 @@
 #include "render/LiveMidiAudition.h"
 #include "../audio/PreparedState.h"
 #include "live/LiveSourceExchange.h"
+#include "live/LiveBlenderController.h"
 
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater {
 public:
@@ -32,6 +33,7 @@ public:
     // Message-thread publication/preview; source geometry was prepared off audio.
     void publishLiveSources(std::shared_ptr<const motion::LiveSourceFrames> frames) { liveSources.publish(std::move(frames)); }
     std::shared_ptr<const motion::LiveSourceFrames> liveSourcePreview() const { return liveSources.previewSnapshot(); }
+    motion::LiveBlenderController& blenderInputs() { return *blender; }
     bool isPreparingComposition() const { return acceptedPreparationRevision != preparationRevision; }
     juce::String getPreparationError() const { return preparationError; }
     // Message-thread-only transient editing preview; never alters saved state.
@@ -60,6 +62,7 @@ private:
     std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
     osci::PreparedState<motion::PreparedComposition> composition;
     motion::LiveSourceExchange liveSources;
+    std::unique_ptr<motion::LiveBlenderController> blender;
     std::uint64_t previousLiveRevision = 0;
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };

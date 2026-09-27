@@ -1,0 +1,112 @@
+#pragma once
+
+#include "PreparedBlenderInput.h"
+#include "../model/Document.h"
+#include <functional>
+
+namespace motion {
+// All methods and timer callbacks belong to the message thread. Sessions are
+// explicitly started; loading a document never opens a network listener.
+class LiveBlenderController final : private juce::Timer {
+public:
+    LiveBlenderController(Document& document, std::function<void(std::shared_ptr<const LiveSourceFrames>)> publish)
+        : document(document), publish(std::move(publish)) { startTimerHz(30); }
+    ~LiveBlenderController() override { stopTimer(); }
+
+    juce::Result listen(Id id, bool enabled) {
+        prune();
+        const auto asset = findAsset(id);
+        if (asset == nullptr) { return juce::Result::fail("The Blender source no longer exists."); }
+        auto* session = findSession(asset->liveIdentity);
+        if (enabled) {
+            for (const auto& item : sessions) {
+                const auto state = item.input->status().state;
+                if (item.identity != asset->liveIdentity && item.port == asset->blenderSettings.port
+                    && (state == BlenderReceiver::State::listening || state == BlenderReceiver::State::connected)) {
+                    return juce::Result::fail("Another Blender source is using this port. Choose a different port.");
+                }
+            }
+            if (session == nullptr) {
+                if (sessions.size() >= maximumInputs) { return juce::Result::fail("Motion supports up to 16 live Blender inputs in one session."); }
+                sessions.push_back({asset->liveIdentity, asset->blenderSettings.port, std::make_unique<PreparedBlenderInput>()});
+                session = &sessions.back();
+            }
+            session->input->listen(asset->blenderSettings.port);
+        } else if (session != nullptr) { session->input->stop(); }
+        poll();
+        return juce::Result::ok();
+    }
+    juce::String statusText(Id id) const {
+        const auto asset = findAsset(id);
+        if (asset == nullptr) { return "Source unavailable"; }
+        const auto* session = findSession(asset->liveIdentity);
+        if (session == nullptr) { return "Offline - start listening to connect Blender"; }
+        const auto status = session->input->status();
+        if (session->input->preparationFailed()) { return "Could not prepare the incoming frame"; }
+        if (status.message.isNotEmpty()) { return status.message; }
+        switch (status.state) {
+            case BlenderReceiver::State::connected: return "Connected | " + juce::String(status.acceptedFrames) + (status.acceptedFrames == 1 ? " frame received" : " frames received");
+            case BlenderReceiver::State::listening: return "Listening on port " + juce::String(status.port) + " | Waiting for Blender";
+            case BlenderReceiver::State::failed: return "Could not start the listener";
+            case BlenderReceiver::State::stopped: return asset->blenderSettings.freezeOnDisconnect && session->input->frame().source != nullptr ? "Stopped | last frame frozen" : "Stopped";
+        }
+        return {};
+    }
+    bool listening(Id id) const {
+        const auto asset = findAsset(id);
+        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        if (session == nullptr) { return false; }
+        const auto state = session->input->status().state;
+        return state == BlenderReceiver::State::connected || state == BlenderReceiver::State::listening;
+    }
+    void poll() {
+        prune();
+        std::vector<LiveSourceFrames::Entry> entries;
+        for (const auto& asset : document.mainProject().assets) {
+            const auto* session = findSession(asset->liveIdentity);
+            if (session == nullptr) { continue; }
+            const auto status = session->input->status();
+            const auto frame = session->input->frame();
+            const bool visible = asset->blenderSettings.freezeOnDisconnect
+                || (status.state == BlenderReceiver::State::connected && frame.connection == status.connection);
+            entries.push_back({asset->liveIdentity, visible ? frame.source : nullptr});
+        }
+        bool changed = entries.size() != previous.size();
+        for (std::size_t index = 0; !changed && index < entries.size(); ++index) {
+            changed = entries[index].identity != previous[index].identity || entries[index].source != previous[index].source;
+        }
+        if (changed) {
+            auto frames = std::make_shared<const LiveSourceFrames>(entries);
+            previous = std::move(entries);
+            publish(std::move(frames));
+        }
+    }
+private:
+    struct Session {
+        std::shared_ptr<const LiveSourceIdentity> identity;
+        int port;
+        std::unique_ptr<PreparedBlenderInput> input;
+    };
+    static constexpr std::size_t maximumInputs = 16;
+    const Asset* findAsset(Id id) const {
+        for (const auto& asset : document.mainProject().assets) {
+            if (asset->id == id && asset->liveIdentity != nullptr) { return asset.get(); }
+        }
+        return nullptr;
+    }
+    Session* findSession(const std::shared_ptr<const LiveSourceIdentity>& identity) const {
+        for (const auto& session : sessions) { if (identity != nullptr && session.identity == identity) { return const_cast<Session*>(&session); } }
+        return nullptr;
+    }
+    void prune() {
+        std::erase_if(sessions, [this](const auto& session) {
+            return std::none_of(document.mainProject().assets.begin(), document.mainProject().assets.end(), [&](const auto& asset) { return asset->liveIdentity == session.identity; });
+        });
+    }
+    void timerCallback() override { poll(); }
+    Document& document;
+    std::function<void(std::shared_ptr<const LiveSourceFrames>)> publish;
+    std::vector<Session> sessions;
+    std::vector<LiveSourceFrames::Entry> previous;
+};
+}

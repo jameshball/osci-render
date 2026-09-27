@@ -44,6 +44,8 @@ private:
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();
+    void showBlenderSettings(motion::Id id = 0);
+    void chooseSourceFile();
     std::deque<SourceRequest> preparationRequests;
     bool preparationSettingsOpen = false;
     struct ProjectLoad {
@@ -108,7 +110,7 @@ private:
     juce::ComboBox transformTool;
     MotionPlaybackHealth playbackHealth;
     juce::TextButton navigateView { "Navigate" }, frameView { "Fit" }, pathView { "Path" };
-    juce::TextButton importButton { "Import" };
+    juce::TextButton importButton { "Add source" };
     juce::TextButton playButton { "Play" };
     juce::TextButton splitButton { "Split" };
     juce::Label timeLabel;
