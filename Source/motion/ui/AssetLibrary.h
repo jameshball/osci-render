@@ -114,7 +114,7 @@ private:
         updateStatus();
         const bool raster = validAssetRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
         const bool text = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
-        bakeSettings.setButtonText(definitionRow(row) ? "Open composition" : text ? "Edit text..." : (raster ? "Image settings..." : "Bake settings..."));
+        bakeSettings.setButtonText(definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (raster ? "Image settings..." : "Bake settings..."));
         bakeSettings.setVisible(definitionRow(row) || text || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
         resized();
     }

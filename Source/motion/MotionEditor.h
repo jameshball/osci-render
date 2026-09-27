@@ -35,6 +35,8 @@ private:
         std::shared_ptr<const motion::Asset> replacement;
         std::optional<juce::String> editedText;
         motion::Id uniqueClip = 0;
+        std::optional<motion::BakeSettings> retrySettings;
+        juce::String preparationError;
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();

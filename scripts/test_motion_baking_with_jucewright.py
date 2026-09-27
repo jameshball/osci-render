@@ -65,16 +65,16 @@ try:
     wait_undo("Import object")
     command("wait", "--ms", 600)
     step("baked workspace screenshot", "screenshot", "--file", session.artifact_dir / "workspace.png")
-    step("open source bake settings", "click", "--name", "Bake settings...", "--exact")
+    step("open source bake settings", "click", "--name", "Edit Lua...", "--exact")
     assert float(field("Bake duration").get("value", "nan")) == 1
     duration("2")
     step("rebuild source", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     wait_undo("Rebuild source cache")
-    step("inspect rebuilt settings", "click", "--name", "Bake settings...", "--exact")
+    step("inspect rebuilt settings", "click", "--name", "Edit Lua...", "--exact")
     assert float(field("Bake duration").get("value", "nan")) == 2
     step("close rebuild settings", "press", "Escape", "--class", "MotionBakeSettingsPanel", "--exact")
     step("undo source rebuild", "click", "--name", "Undo", "--exact")
-    step("inspect restored source", "click", "--name", "Bake settings...", "--exact")
+    step("inspect restored source", "click", "--name", "Edit Lua...", "--exact")
     assert float(field("Bake duration").get("value", "nan")) == 1
     step("close restored settings", "press", "Escape", "--class", "MotionBakeSettingsPanel", "--exact")
     command("wait", "--ms", 600)

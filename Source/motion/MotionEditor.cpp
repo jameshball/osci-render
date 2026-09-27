@@ -5,6 +5,7 @@
 #include "ui/BakeSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
 #include "ui/TextSourcePanel.h"
+#include "ui/LuaSourcePanel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
@@ -616,14 +617,22 @@ void MotionEditor::showNextPreparationSettings() {
     const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
     const bool raster = motion::Document::isRasterSource(extension);
     const bool text = extension.equalsIgnoreCase(".txt");
+    const bool editLua = extension.equalsIgnoreCase(".lua") && request.replacement != nullptr;
     std::unique_ptr<juce::Component> content;
     MotionBakeSettingsPanel* luaPanel = nullptr;
     MotionRasterSettingsPanel* imagePanel = nullptr;
     MotionTextSourcePanel* textPanel = nullptr;
+    MotionLuaSourcePanel* sourcePanel = nullptr;
     if (text) {
         const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
         auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances);
         textPanel = panel.get();
+        content = std::move(panel);
+    } else if (editLua) {
+        const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
+        const auto code = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())));
+        auto panel = std::make_unique<MotionLuaSourcePanel>(code, request.retrySettings.value_or(request.replacement->bakeSettings), instances, request.preparationError);
+        sourcePanel = panel.get();
         content = std::move(panel);
     } else if (raster) {
         auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings());
@@ -638,7 +647,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text ? "Edit " : (raster ? "Prepare " : "Bake ")) + name, juce::Point<int>(text ? 560 : 440, 400), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 560 : 440, editLua ? 550 : 400), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -663,6 +672,12 @@ void MotionEditor::showNextPreparationSettings() {
         });
     };
     if (luaPanel != nullptr) { luaPanel->onBake = [submit](motion::BakeSettings settings) mutable { submit(settings, {}); }; }
+    if (sourcePanel != nullptr) {
+        sourcePanel->onBake = [submit, original = request.replacement](motion::BakeSettings settings, juce::String code) mutable {
+            const auto unchanged = code == juce::String::fromUTF8(static_cast<const char*>(original->data.getData()), static_cast<int>(original->data.getSize()));
+            submit(settings, {}, unchanged ? std::optional<juce::String>() : std::optional<juce::String>(std::move(code)));
+        };
+    }
     if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) mutable { submit({}, settings); }; }
     if (textPanel != nullptr) { textPanel->onApply = [submit](juce::String text) mutable { submit({}, {}, std::move(text)); }; }
     showOverlay(std::move(overlay));
@@ -717,6 +732,16 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 owner->importError = result.getErrorMessage();
                 owner->assetLibrary.setError(owner->importError);
                 owner->repaint();
+                if (request.replacement != nullptr && request.replacement->extension.equalsIgnoreCase(".lua")) {
+                    const auto& assets = owner->processor.document.project().assets;
+                    if (std::find(assets.begin(), assets.end(), request.replacement) != assets.end()) {
+                        auto retry = request;
+                        retry.retrySettings = asset->bakeSettings;
+                        retry.preparationError = result.getErrorMessage();
+                        owner->preparationRequests.push_front(std::move(retry));
+                        owner->showNextPreparationSettings();
+                    }
+                }
                 return;
             }
             auto& document = owner->processor.document;
@@ -736,7 +761,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     return;
                 }
                 asset->id = request.replacement->id;
-                document.edit(request.editedText.has_value() ? "Edit text source" : "Rebuild source cache", [&](motion::Project& project) {
+                document.edit(request.editedText.has_value() ? (asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source") : "Rebuild source cache", [&](motion::Project& project) {
                     for (auto& item : project.assets) {
                         if (item == request.replacement) { item = asset; }
                     }
