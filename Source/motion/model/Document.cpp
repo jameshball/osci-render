@@ -1,4 +1,5 @@
 #include "Document.h"
+#include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
@@ -1325,7 +1326,14 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
     }
     ImportShapes shapes;
     const auto content = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
-    if (extension == ".obj") {
+    if (extension == ".lsystem") {
+        const auto prepared = osci::fractal::prepare(content, asset.fractalDepth, cancel);
+        if (!prepared) { return juce::Result::fail(prepared.error); }
+        shapes.reserve(prepared.segments.size());
+        for (const auto& segment : prepared.segments) {
+            shapes.push_back(std::make_unique<osci::Line>(osci::Point(segment[0], segment[1], 0), osci::Point(segment[2], segment[3], 0)));
+        }
+    } else if (extension == ".obj") {
         WorldObject object(content.toStdString());
         shapes = object.draw();
     } else if (extension == ".svg") {
@@ -1477,6 +1485,7 @@ juce::XmlElement Document::save() const {
         item->setAttribute("id", juce::String(asset->id));
         item->setAttribute("name", asset->name);
         item->setAttribute("extension", asset->extension);
+        if (asset->extension.equalsIgnoreCase(".lsystem")) { item->setAttribute("fractalDepth", asset->fractalDepth); }
         if (isMidiSource(asset->extension)) { item->setAttribute("midiImportBpm", exactBakeNumber(asset->midiImportBpm)); }
         if (asset->extension.equalsIgnoreCase(".lua")) {
             item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
@@ -1802,6 +1811,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
         asset->name = item->getStringAttribute("name");
         asset->extension = item->getStringAttribute("extension");
+        if (asset->extension.equalsIgnoreCase(".lsystem")) { asset->fractalDepth = item->getIntAttribute("fractalDepth", -1); }
         if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
         if (asset->extension.equalsIgnoreCase(".txt")) {
             const auto* text = item->getChildByName("typography");

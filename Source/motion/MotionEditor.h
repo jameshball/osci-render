@@ -39,6 +39,7 @@ private:
         std::optional<motion::BakeSettings> retrySettings;
         juce::String preparationError;
         std::optional<motion::TextSettings> textSettings;
+        std::optional<int> fractalDepth;
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();

@@ -3,6 +3,7 @@
 #include "export/SoundtrackExporter.h"
 #include "ui/VideoExportSettings.h"
 #include "ui/BakeSettingsPanel.h"
+#include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
 #include "ui/TextSourcePanel.h"
 #include "ui/LuaSourcePanel.h"
@@ -357,7 +358,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.lsystem;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -417,7 +418,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     assetLibrary.onBake = [this](motion::Id id) {
         const auto& assets = processor.document.project().assets;
         const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-        if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !(*found)->extension.equalsIgnoreCase(".txt") && !motion::Document::isRasterSource((*found)->extension))) { return; }
+        if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !(*found)->extension.equalsIgnoreCase(".txt")
+                && !(*found)->extension.equalsIgnoreCase(".lsystem") && !motion::Document::isRasterSource((*found)->extension))) { return; }
         preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
         showNextPreparationSettings();
     };
@@ -688,7 +690,7 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
 
 bool MotionEditor::openSourceFile(const juce::File& file) {
     const auto extension = file.getFileExtension().toLowerCase();
-    if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua" && !motion::Document::isRasterSource(extension)
+    if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua" && extension != ".lsystem" && !motion::Document::isRasterSource(extension)
         && !motion::Document::isMidiSource(extension) && extension != ".gpla" && extension != ".json" && extension != ".lottie"
         && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
         importError = "This source type is not connected yet.";
@@ -697,7 +699,7 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
         return false;
     }
     SourceRequest request {file, processor.position.load(), processor.document.generation(), {}};
-    if (extension == ".lua" || motion::Document::isRasterSource(extension)) {
+    if (extension == ".lua" || extension == ".lsystem" || motion::Document::isRasterSource(extension)) {
         preparationRequests.push_back(std::move(request));
         showNextPreparationSettings();
     } else {
@@ -791,10 +793,12 @@ void MotionEditor::showNextPreparationSettings() {
     const bool raster = motion::Document::isRasterSource(extension);
     const bool video = motion::Document::isVideoSource(extension);
     const bool text = extension.equalsIgnoreCase(".txt");
+    const bool fractal = extension.equalsIgnoreCase(".lsystem");
     const bool editLua = extension.equalsIgnoreCase(".lua") && request.replacement != nullptr;
     std::unique_ptr<juce::Component> content;
     MotionBakeSettingsPanel* luaPanel = nullptr;
     MotionRasterSettingsPanel* imagePanel = nullptr;
+    MotionFractalSettingsPanel* fractalPanel = nullptr;
     MotionTextSourcePanel* textPanel = nullptr;
     MotionLuaSourcePanel* sourcePanel = nullptr;
     if (text) {
@@ -813,6 +817,11 @@ void MotionEditor::showNextPreparationSettings() {
         auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video);
         imagePanel = panel.get();
         content = std::move(panel);
+    } else if (fractal) {
+        const auto initialDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
+        auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth);
+        fractalPanel = panel.get();
+        content = std::move(panel);
     } else {
         motion::BakeSettings initial;
         initial.bpm = processor.document.project().bpm;
@@ -822,7 +831,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 560 : 440, editLua ? 550 : video ? 444 : 400), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 560 : 440, editLua ? 550 : fractal ? 170 : video ? 444 : 400), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -832,9 +841,10 @@ void MotionEditor::showNextPreparationSettings() {
             owner->showNextPreparationSettings();
         }
     };
-    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}, std::optional<motion::TextSettings> textSettings = {}) mutable {
+    auto submit = [owner, overlayPointer, request](motion::BakeSettings settings, motion::RasterSettings rasterSettings, std::optional<juce::String> editedText = {}, std::optional<motion::TextSettings> textSettings = {}, std::optional<int> fractalDepth = {}) mutable {
         request.textSettings = std::move(textSettings);
         request.editedText = std::move(editedText);
+        request.fractalDepth = fractalDepth;
         juce::MessageManager::callAsync([owner, overlayPointer, request, settings, rasterSettings] {
             if (owner == nullptr || overlayPointer == nullptr) { return; }
             owner->dismissOverlay(overlayPointer.getComponent(), [owner, request, settings, rasterSettings] {
@@ -855,6 +865,7 @@ void MotionEditor::showNextPreparationSettings() {
         };
     }
     if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) mutable { submit({}, settings); }; }
+    if (fractalPanel != nullptr) { fractalPanel->onPrepare = [submit](int depth) mutable { submit({}, {}, {}, {}, depth); }; }
     if (textPanel != nullptr) { textPanel->onApply = [submit](juce::String text, motion::TextSettings settings) mutable { submit({}, {}, std::move(text), std::move(settings)); }; }
     showOverlay(std::move(overlay));
 }
@@ -879,6 +890,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
     asset->bakeSettings = settings;
     asset->rasterSettings = rasterSettings;
+    asset->fractalDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
     asset->textSettings = request.textSettings.value_or(request.replacement != nullptr ? request.replacement->textSettings : motion::TextSettings());
     asset->midiImportBpm = processor.document.project().bpm;
     const auto time = request.time;

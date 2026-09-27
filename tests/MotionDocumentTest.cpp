@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include <thread>
+#include "../Source/parser/fractal/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
@@ -175,7 +176,60 @@ public:
         expectEquals(loaded.save().toString(), valid);
     }
 
+    void testFractal() {
+        beginTest("Fractal expansion is bounded, normalized and validates branch syntax");
+        const juce::String source(R"({"axiom":"F","angle":90,"rules":[{"variable":"F","replacement":"F+F-F-F+F"}]})");
+        const auto prepared = osci::fractal::prepare(source, 3);
+        expect(static_cast<bool>(prepared));
+        expectEquals(static_cast<int>(prepared.segments.size()), 125);
+        for (const auto& segment : prepared.segments) {
+            for (const auto coordinate : segment) { expect(std::isfinite(coordinate) && std::abs(coordinate) <= 1.000001); }
+        }
+        expect(!osci::fractal::prepare(juce::String::repeatedString("[", 50000) + "0" + juce::String::repeatedString("]", 50000), 0));
+        expect(!osci::fractal::prepare(juce::String(R"({"axiom":"F","extra":'"',"deep":)") + juce::String::repeatedString("[", 50000) + "0" + juce::String::repeatedString("]", 50000) + "}", 0));
+        expect(!osci::fractal::prepare(source, 15));
+        expect(!osci::fractal::prepare(source, -1));
+        expect(!osci::fractal::prepare(R"({"axiom":"F]"})", 0));
+        expect(!osci::fractal::prepare(R"({"axiom":"[F"})", 0));
+        expect(!osci::fractal::prepare(R"({"axiom":"X"})", 0));
+        expect(!osci::fractal::prepare(R"({"axiom":"F","angle":"90"})", 0));
+        expect(!osci::fractal::prepare(R"({"axiom":"F","rules":[{"variable":"F","replacement":"F"},{"variable":"F","replacement":"FF"}]})", 1));
+        std::atomic<bool> cancelled {true};
+        expect(!osci::fractal::prepare(source, 3, &cancelled));
+
+        beginTest("Fractal depth and prepared geometry survive project reopening; invalid depth is atomic");
+        auto asset = std::make_shared<motion::Asset>();
+        asset->id = 1; asset->name = "Curve.lsystem"; asset->extension = ".lsystem"; asset->fractalDepth = 4;
+        asset->data.append(source.toRawUTF8(), source.getNumBytesAsUTF8());
+        expect(motion::Document::decodeAsset(*asset).wasOk());
+        juce::UndoManager undo, restoreUndo;
+        motion::Document document(undo), restored(restoreUndo);
+        document.edit("Fractal", [&](motion::Project& project) { project.assets.push_back(asset); });
+        const auto xml = document.save();
+        expect(restored.load(xml).wasOk());
+        if (!restored.project().assets.empty()) {
+            const auto reopened = restored.project().assets.front();
+            expectEquals(reopened->fractalDepth, 4);
+            for (int index = 0; index < 1000; ++index) {
+                const auto before = asset->source->sample(0, index / 1000.0);
+                const auto after = reopened->source->sample(0, index / 1000.0);
+                expectWithinAbsoluteError(before.x, after.x, 1.0e-6f);
+                expectWithinAbsoluteError(before.y, after.y, 1.0e-6f);
+            }
+        }
+        const auto valid = restored.save().toString();
+        auto invalid = xml;
+        invalid.getChildByName("asset")->setAttribute("fractalDepth", 16);
+        expect(restored.load(invalid).failed());
+        expectEquals(restored.save().toString(), valid);
+        const auto original = asset->source;
+        asset->fractalDepth = 16;
+        expect(motion::Document::decodeAsset(*asset).failed());
+        expect(asset->source == original);
+    }
+
     void runTest() override {
+        testFractal();
         testMidiEnvelope();
         testMarkers();
         beginTest("Plain titles preserve natural proportions and explicit newlines");

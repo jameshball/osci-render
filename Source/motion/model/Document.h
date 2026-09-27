@@ -22,6 +22,7 @@ struct Asset {
     BakeSettings bakeSettings;
     RasterSettings rasterSettings;
     TextSettings textSettings;
+    int fractalDepth = 3;
     juce::MemoryBlock bakedData;
     juce::String bakeKey;
     std::shared_ptr<const osci::PreparedDrawing> drawing;

@@ -114,8 +114,9 @@ private:
         updateStatus();
         const bool raster = validAssetRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
         const bool text = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
-        bakeSettings.setButtonText(definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (raster ? (motion::Document::isVideoSource(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings..."));
-        bakeSettings.setVisible(definitionRow(row) || text || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
+        const bool fractal = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lsystem");
+        bakeSettings.setButtonText(definitionRow(row) ? "Open composition" : text ? "Edit text..." : (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")) ? "Edit Lua..." : (fractal ? "Fractal settings..." : (raster ? (motion::Document::isVideoSource(assets[static_cast<std::size_t>(row)]->extension) ? "Video settings..." : "Image settings...") : "Bake settings...")));
+        bakeSettings.setVisible(definitionRow(row) || text || fractal || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
         resized();
     }
     int getNumRows() override { return static_cast<int>(assets.size() + definitions.size()); }
