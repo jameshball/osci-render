@@ -1,3 +1,4 @@
+#include "live/BlenderCaptureArchive.h"
 #include "ui/BlenderSourcePanel.h"
 #include "MotionEditor.h"
 #include "export/SignalExporter.h"
@@ -552,6 +553,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
 }
 
 MotionEditor::~MotionEditor() {
+    processor.blenderInputs().cancelAllCaptures();
     stopTimer();
     visualiser.openSettings = {};
     visualiser.closeSettings = {};
@@ -822,11 +824,12 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     const auto original = found != assets.end() ? *found : std::shared_ptr<const motion::Asset>();
     auto panel = std::make_unique<MotionBlenderSourcePanel>(original != nullptr ? original->name : "Blender", original != nullptr ? original->blenderSettings : motion::BlenderSourceSettings{}, id != 0);
     auto* controls = panel.get();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, 310), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, id != 0 ? 358 : 310), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
     const auto generation = document.generation();
-    controls->onApply = [owner, dialog, id, generation, expected = original](juce::String name, motion::BlenderSourceSettings settings, bool start) mutable {
+    auto panelIdentity = std::make_shared<std::shared_ptr<const motion::LiveSourceIdentity>>(original != nullptr ? original->liveIdentity : nullptr);
+    controls->onApply = [owner, dialog, id, generation, panelIdentity, expected = original](juce::String name, motion::BlenderSourceSettings settings, bool start) mutable {
         if (owner == nullptr || dialog == nullptr || owner->processor.document.generation() != generation) { return juce::Result::fail("The project changed. Reopen source settings."); }
         auto sourceId = id;
         auto& document = owner->processor.document;
@@ -839,6 +842,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
         owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(sourceId);
         id = sourceId;
         for (const auto& asset : document.mainProject().assets) { if (asset->id == sourceId) { expected = asset; break; } }
+        *panelIdentity = expected->liveIdentity;
         const auto listening = start ? owner->processor.blenderInputs().listen(sourceId, true) : juce::Result::ok();
         if (listening.failed()) { owner->assetLibrary.setError(listening.getErrorMessage()); }
         if (creating) {
@@ -857,6 +861,61 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     controls->onStop = [owner, id, generation] { if (owner != nullptr && owner->processor.document.generation() == generation) { owner->processor.blenderInputs().listen(id, false); } };
     controls->isListening = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().listening(id); };
     controls->connectionStatus = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation ? owner->processor.blenderInputs().statusText(id) : juce::String("Project changed"); };
+    controls->isCapturing = [owner, id, generation] { return owner != nullptr && owner->processor.document.generation() == generation && owner->processor.blenderInputs().capturing(id); };
+    controls->onCancelCapture = [owner, id, generation] {
+        if (owner != nullptr && owner->processor.document.generation() == generation) { owner->processor.blenderInputs().cancelCapture(id); }
+    };
+    controls->onRecord = [owner, dialog, id, generation, panelIdentity] {
+        const auto identity = *panelIdentity;
+        if (owner == nullptr || owner->processor.document.generation() != generation) { return juce::Result::fail("The project changed. Reopen source settings."); }
+        auto& inputs = owner->processor.blenderInputs();
+        const auto& assets = owner->processor.document.mainProject().assets;
+        const auto source = std::find_if(assets.begin(), assets.end(), [id, identity](const auto& asset) { return asset->id == id && asset->liveIdentity == identity; });
+        if (source == assets.end()) { return juce::Result::fail("The source changed. Reopen its settings."); }
+        if (!inputs.capturing(id)) {
+            if (std::any_of(owner->pendingImports.begin(), owner->pendingImports.end(), [](const auto& task) { return task->capture; })) {
+                return juce::Result::fail("Wait for the previous capture to finish preparing.");
+            }
+            return inputs.beginCapture(id);
+        }
+        auto recording = inputs.finishCapture(id);
+        if (recording == nullptr) { return juce::Result::fail("There is no capture to save."); }
+        if (recording->failure != motion::BlenderCapture::Failure::none) { return juce::Result::fail(recording->error()); }
+        auto capture = std::shared_ptr<const motion::BlenderCapture>(std::move(recording));
+        auto task = std::make_shared<ImportState>();
+        task->capture = true;
+        task->name = (*source)->name + " capture";
+        task->generation = generation;
+        owner->pendingImports.push_back(task);
+        owner->imports.addJob([owner, generation, identity, task, capture] {
+            auto asset = std::make_shared<motion::Asset>();
+            asset->name = task->name;
+            asset->extension = ".blender-capture";
+            auto result = juce::Result::fail("Capture cancelled.");
+            try {
+                auto archive = motion::BlenderCaptureArchive::encode(*capture, &task->cancelled);
+                if (archive) {
+                    asset->data.replaceAll(archive.bytes.data(), archive.bytes.size());
+                    result = motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
+                } else { result = juce::Result::fail(archive.error); }
+            } catch (const std::exception& error) { result = juce::Result::fail("Cannot prepare capture: " + juce::String(error.what())); }
+            juce::MessageManager::callAsync([owner, generation, identity, task, asset, result] {
+                if (owner == nullptr) { return; }
+                std::erase(owner->pendingImports, task);
+                if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
+                auto& document = owner->processor.document;
+                const auto& sources = document.mainProject().assets;
+                if (std::none_of(sources.begin(), sources.end(), [&](const auto& source) { return source->liveIdentity == identity; })) { return; }
+                if (result.failed()) { owner->assetLibrary.setError(result.getErrorMessage()); return; }
+                asset->id = document.newId();
+                document.edit("Capture Blender source", [&](motion::Project& project) { project.assets.push_back(asset); });
+                owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
+                owner->libraryTabs.setSelectedIndex(0);
+            });
+        });
+        juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent(), [] {}); } });
+        return juce::Result::ok();
+    };
     showOverlay(std::move(overlay));
 }
 

@@ -21,6 +21,11 @@ public:
     }
     void listen(int port) { receiver.start(port); }
     void stop() { receiver.stop(); }
+    bool beginCapture(bool freeze) { return receiver.beginCapture(freeze); }
+    std::unique_ptr<BlenderCapture> finishCapture() { return receiver.finishCapture(); }
+    void cancelCapture() { receiver.cancelCapture(); }
+    bool capturing() const { return receiver.capturing(); }
+    juce::String captureError() { return receiver.captureError(); }
     BlenderReceiver::Status status() const { return receiver.getStatus(); }
     Frame frame() const {
         const juce::SpinLock::ScopedLockType guard(lock);

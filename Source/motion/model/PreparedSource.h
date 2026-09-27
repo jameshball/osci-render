@@ -5,6 +5,7 @@
 #include "FrameTiming.h"
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace motion {
 // Fully prepared immutable geometry. Construction and destruction happen off
@@ -21,6 +22,13 @@ public:
         : framesPerSecond(timing != nullptr ? timing->averageFrameRate() : 0), points(std::move(points)), timing(std::move(timing)) {
         if (this->points == nullptr || this->timing == nullptr || this->points->frameCount() != this->timing->frameCount()) {
             throw std::invalid_argument("Prepared source frame data and timing must have matching frame counts.");
+        }
+    }
+
+    PreparedSource(std::vector<std::shared_ptr<const osci::PreparedDrawing>> frameDrawings, std::shared_ptr<const FrameTiming> frameTiming)
+        : frames(std::move(frameDrawings)), framesPerSecond(frameTiming != nullptr ? frameTiming->averageFrameRate() : 0), timing(std::move(frameTiming)) {
+        if (frames.empty() || timing == nullptr || frames.size() != timing->frameCount()) {
+            throw std::invalid_argument("Prepared drawing frames and timing must have matching frame counts.");
         }
     }
 

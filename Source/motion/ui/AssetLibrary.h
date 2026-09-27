@@ -161,9 +161,9 @@ private:
             detail = "COMPOSITION | " + juce::String(clip.duration, 2) + "s";
         } else {
             const auto& asset = *assets[static_cast<std::size_t>(row)];
-            detail = asset.liveIdentity != nullptr ? "LIVE BLENDER" : asset.extension.trimCharactersAtStart(".").toUpperCase();
-            if (asset.source != nullptr && asset.source->frameCount() > 1) {
-                detail += " | " + juce::String(asset.source->duration(), 2) + "s | " + juce::String(static_cast<int>(asset.source->frameCount())) + " frames";
+            detail = asset.liveIdentity != nullptr ? "LIVE BLENDER" : asset.extension.equalsIgnoreCase(".blender-capture") ? "CAPTURE" : asset.extension.trimCharactersAtStart(".").toUpperCase();
+            if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
+                detail += " | " + juce::String(asset.source->duration(), 2) + "s | " + juce::String(static_cast<int>(asset.source->frameCount())) + (asset.source->frameCount() == 1 ? " frame" : " frames");
             }
         }
         graphics.drawText(detail, bounds, juce::Justification::centredLeft);

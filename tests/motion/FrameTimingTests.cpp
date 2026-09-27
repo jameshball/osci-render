@@ -6,6 +6,7 @@
 static void check(bool condition, const char* message) {
     if (!condition) { std::cerr << message << '\n'; std::exit(1); }
 }
+static bool near(double left, double right) { return std::abs(left - right) < 1.0e-15; }
 
 int main() {
     const auto timing = motion::FrameTiming::create({100, 300, 100});
@@ -28,5 +29,18 @@ int main() {
     check(fractional.timing->frameIndex(2.01) == 1, "Millisecond boundary must not round into preceding frame");
     check(fractional.timing->frameIndex(std::nextafter(2.01, 0.0)) == 0, "Immediately before a millisecond boundary remains previous frame");
     check(fractional.timing->frameIndex(std::nextafter(2.01, 3.0)) == 1, "Immediately after a millisecond boundary remains next frame");
+    const auto highResolution = motion::FrameTiming::createFromEndSeconds({0.000125, 0.001, 0.001125});
+    check(static_cast<bool>(highResolution), "Submillisecond cumulative frame boundaries prepare without quantisation");
+    check(near(highResolution.timing->frameStart(1), 0.000125) && near(highResolution.timing->frameEnd(1), 0.001)
+        && near(highResolution.timing->duration(), 0.001125), "Precise cumulative boundaries remain exact for frame lookup");
+    check(highResolution.timing->frameIndex(std::nextafter(0.000125, 0.0)) == 0
+        && highResolution.timing->frameIndex(0.000125) == 1
+        && highResolution.timing->frameIndex(std::nextafter(0.001, 0.0)) == 1
+        && highResolution.timing->frameIndex(0.001) == 2,
+        "High-resolution boundaries retain half-open frame ownership");
+    check(!motion::FrameTiming::createFromEndSeconds({0.001, 0.001}).timing
+        && !motion::FrameTiming::createFromEndSeconds({0.001, std::numeric_limits<double>::infinity()}).timing
+        && !motion::FrameTiming::createFromEndSeconds({86400.001}).timing,
+        "Invalid cumulative boundaries reject without clamping");
     std::cout << "Variable frame timing contracts passed\n";
 }

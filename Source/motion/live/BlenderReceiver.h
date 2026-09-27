@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include "BlenderFrame.h"
+#include "BlenderCapture.h"
 #include <memory>
 #include <string>
 
@@ -31,6 +32,7 @@ public:
     // endpoint should choose a port supported by the installed add-on.
     void start(int port) {
         stop();
+        cancelCapture();
         Snapshot old;
         {
             const juce::SpinLock::ScopedLockType guard(lock);
@@ -63,11 +65,45 @@ public:
         return latest;
     }
 
+    bool beginCapture(bool freeze) {
+        auto next = std::make_unique<BlenderCapture>(freeze);
+        const juce::SpinLock::ScopedLockType guard(lock);
+        if (capture != nullptr) { return false; }
+        const bool visible = freeze || (status.state == State::connected && latest.connection == status.connection);
+        next->begin(nowSeconds(), visible ? latest.frame : nullptr);
+        capture = std::move(next);
+        return true;
+    }
+    std::unique_ptr<BlenderCapture> finishCapture() {
+        const juce::SpinLock::ScopedLockType guard(lock);
+        if (capture != nullptr) { capture->finish(nowSeconds()); }
+        return std::move(capture);
+    }
+    void cancelCapture() {
+        std::unique_ptr<BlenderCapture> old;
+        {
+            const juce::SpinLock::ScopedLockType guard(lock);
+            old = std::move(capture);
+        }
+    }
+    juce::String captureError() {
+        const juce::SpinLock::ScopedLockType guard(lock);
+        if (capture == nullptr) { return {}; }
+        capture->checkTime(nowSeconds());
+        return capture->error();
+    }
+    bool capturing() const {
+        const juce::SpinLock::ScopedLockType guard(lock);
+        return capture != nullptr;
+    }
+
     static constexpr std::size_t maximumMessageBytes = 10 * 1024 * 1024;
 
 private:
+    static double nowSeconds() { return juce::Time::getMillisecondCounterHiRes() / 1000.0; }
     void setState(State state, juce::String message) {
         const juce::SpinLock::ScopedLockType guard(lock);
+        if (capture != nullptr && !capture->freezeOnDisconnect && state != State::connected) { capture->append(nowSeconds(), nullptr); }
         status.state = state;
         status.message = std::move(message);
     }
@@ -111,7 +147,8 @@ private:
         {
             const juce::SpinLock::ScopedLockType guard(lock);
             old = std::move(latest);
-            latest = {std::move(frame), status.connection, ++status.acceptedFrames, juce::Time::getMillisecondCounterHiRes() / 1000.0};
+            latest = {std::move(frame), status.connection, ++status.acceptedFrames, nowSeconds()};
+            if (capture != nullptr) { capture->append(latest.receivedSeconds, latest.frame); }
             status.message.clear();
         }
         return true;
@@ -169,14 +206,14 @@ private:
             }
             connection->close();
             if (!threadShouldExit()) {
-                const juce::SpinLock::ScopedLockType guard(lock);
-                status.state = State::listening;
+                setState(State::listening, {});
             }
         }
     }
     mutable juce::SpinLock lock;
     Status status;
     Snapshot latest;
+    std::unique_ptr<BlenderCapture> capture;
     int requestedPort = 0;
     std::uint64_t connectionSerial = 0; // Never reused across stop/start; worker owns it while running.
 };

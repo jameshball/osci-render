@@ -131,6 +131,7 @@ private:
     bool updatingInspector = false;
     juce::ThreadPool imports { 1 };
     struct ImportState {
+        bool capture = false;
         std::atomic<bool> cancelled { false };
         std::atomic<double> progress { 0.0 };
         juce::String name;

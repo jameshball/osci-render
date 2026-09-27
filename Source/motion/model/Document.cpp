@@ -1,3 +1,4 @@
+#include "../live/BlenderCaptureArchive.h"
 #include "Document.h"
 #include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
@@ -1167,7 +1168,7 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.properties["pan"] = Curve(0);
         return clip;
     }
-    if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".lua") || isVideoSource(asset.extension))) {
+    if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".lua") || asset.extension.equalsIgnoreCase(".blender-capture") || isVideoSource(asset.extension))) {
         clip.duration = asset.source->duration();
     }
     for (const auto* axis : { "x", "y", "z" }) {
@@ -1201,6 +1202,26 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     const auto extension = asset.extension.toLowerCase();
+    if (extension == ".blender-capture") {
+        auto capture = BlenderCaptureArchive::decode({static_cast<const std::uint8_t*>(asset.data.getData()), asset.data.getSize()}, cancel);
+        if (!capture) { return juce::Result::fail(capture.error); }
+        std::vector<std::shared_ptr<const osci::PreparedDrawing>> drawings;
+        drawings.reserve(capture.frames.size());
+        for (const auto& frame : capture.frames) {
+            if (importCancelled(cancel)) { return juce::Result::fail("Capture preparation cancelled."); }
+            std::vector<std::unique_ptr<osci::Shape>> lines;
+            lines.reserve(frame->segments.size());
+            for (const auto& segment : frame->segments) {
+                lines.push_back(std::make_unique<osci::Line>(osci::Point(segment.x1, segment.y1, 0), osci::Point(segment.x2, segment.y2, 0)));
+            }
+            drawings.push_back(std::make_shared<const osci::PreparedDrawing>(std::move(lines)));
+            if (progress != nullptr) { progress->store(static_cast<double>(drawings.size()) / capture.frames.size()); }
+        }
+        asset.source = std::make_shared<const PreparedSource>(std::move(drawings), std::move(capture.timing));
+        asset.drawing = asset.source->firstFrame();
+        asset.liveIdentity.reset(); asset.audio.reset(); asset.midi.reset();
+        return juce::Result::ok();
+    }
     if (isMidiSource(extension)) {
         const auto prepared = MidiSourcePreparer::prepare(asset.data.getData(), asset.data.getSize(), asset.midiImportBpm, cancel);
         if (!prepared) { return juce::Result::fail(prepared.error); }

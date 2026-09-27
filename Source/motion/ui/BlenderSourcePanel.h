@@ -25,7 +25,7 @@ public:
         }
         status.setName("Blender connection status"); status.setJustificationType(juce::Justification::centredLeft);
         note.setFont(juce::FontOptions(12)); note.setJustificationType(juce::Justification::topLeft);
-        note.setText("Use the same port in Blender's osci-render add-on.\nReceives camera-framed Grease Pencil line art.\nProjects reopen offline. Live sources cannot be exported yet.", juce::dontSendNotification);
+        note.setText("Use the same port in Blender's osci-render add-on.\nReceives camera-framed Grease Pencil line art.\nCapture creates a portable source for editing and export.", juce::dontSendNotification);
         save.setButtonText(existing ? "Apply settings" : "Add source");
         save.onClick = [this] { submit(false); };
         listen.setButtonText(existing ? "Start listening" : "Add & listen");
@@ -35,11 +35,20 @@ public:
             timerCallback();
         };
         for (auto* component : std::initializer_list<juce::Component*>{&name, &port, &policy, &nameLabel, &portLabel, &policyLabel, &status, &note, &save, &listen}) { addAndMakeVisible(component); }
-        setSize(460, 292);
+        record.setButtonText("Record capture"); record.setName("Record Blender capture");
+        cancel.setButtonText("Cancel capture");
+        record.onClick = [this] { if (onRecord) { error = onRecord().getErrorMessage(); } timerCallback(); };
+        cancel.onClick = [this] { if (onCancelCapture) { onCancelCapture(); } error.clear(); timerCallback(); };
+        addAndMakeVisible(record); addAndMakeVisible(cancel);
+        record.setVisible(existing); cancel.setVisible(false);
+        setSize(460, existing ? 340 : 292);
         startTimerHz(5);
     }
     std::function<juce::Result(juce::String, motion::BlenderSourceSettings, bool)> onApply;
-    std::function<void()> onStop;
+    ~MotionBlenderSourcePanel() override { if (onCancelCapture) { onCancelCapture(); } }
+    std::function<void()> onStop, onCancelCapture;
+    std::function<juce::Result()> onRecord;
+    std::function<bool()> isCapturing;
     std::function<bool()> isListening;
     std::function<juce::String()> connectionStatus;
     void resized() override {
@@ -49,8 +58,13 @@ public:
         }
         status.setBounds(area.removeFromTop(32)); area.removeFromTop(6);
         note.setBounds(area.removeFromTop(58)); area.removeFromTop(10);
+        if (existing) {
+            auto captureRow = area.removeFromBottom(30);
+            cancel.setBounds(captureRow.removeFromRight(150)); captureRow.removeFromRight(8);
+            record.setBounds(captureRow.removeFromRight(150)); area.removeFromBottom(8);
+        }
         auto buttons = area.removeFromBottom(30);
-        listen.setBounds(buttons.removeFromRight(150)); buttons.removeFromRight(8); save.setBounds(buttons.removeFromRight(140));
+        listen.setBounds(buttons.removeFromRight(150)); buttons.removeFromRight(8); save.setBounds(buttons.removeFromRight(150));
     }
 private:
     void submit(bool start) {
@@ -62,12 +76,22 @@ private:
     void timerCallback() override {
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : connectionStatus ? connectionStatus() : "Not connected", juce::dontSendNotification);
-        if (existing) { listen.setButtonText(isListening && isListening() ? "Stop listening" : "Start listening"); }
+        if (existing) {
+            const bool recording = isCapturing && isCapturing();
+            listen.setButtonText(isListening && isListening() ? "Stop listening" : "Start listening");
+            record.setButtonText(recording ? "Stop & save capture" : "Record capture");
+            record.setEnabled(recording || (isListening && isListening()));
+            cancel.setVisible(recording);
+            for (auto* control : std::initializer_list<juce::Component*>{&name, &port, &policy, &save, &listen}) { control->setEnabled(!recording); }
+            note.setColour(juce::Label::textColourId, recording ? osci::Colours::text() : osci::Colours::textMuted());
+            note.setText(recording ? "Closing this panel cancels the capture.\nRecording source geometry before effects.\nUp to 10 minutes, 20,000 updates and 1 million segments."
+                : "Use the same port in Blender's osci-render add-on.\nReceives camera-framed Grease Pencil line art.\nCapture creates a portable source for editing and export.", juce::dontSendNotification);
+        }
     }
     bool existing;
     juce::TextEditor name, port;
     juce::ComboBox policy;
     juce::Label nameLabel{"", "Name"}, portLabel{"", "Local port"}, policyLabel{"", "On disconnect"}, status, note;
-    juce::TextButton save, listen;
+    juce::TextButton save, listen, record, cancel;
     juce::String error;
 };

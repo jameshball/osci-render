@@ -36,12 +36,42 @@ public:
         poll();
         return juce::Result::ok();
     }
+    juce::Result beginCapture(Id id) {
+        prune();
+        for (const auto& item : sessions) {
+            if (item.input->capturing()) { return juce::Result::fail("Finish or cancel the current Blender capture first."); }
+        }
+        const auto* asset = findAsset(id);
+        auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        if (session == nullptr || !listening(id)) { return juce::Result::fail("Start listening before recording a capture."); }
+        return session->input->beginCapture(asset->blenderSettings.freezeOnDisconnect) ? juce::Result::ok() : juce::Result::fail("A capture is already running.");
+    }
+    std::unique_ptr<BlenderCapture> finishCapture(Id id) {
+        const auto* asset = findAsset(id);
+        auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        return session != nullptr ? session->input->finishCapture() : nullptr;
+    }
+    void cancelCapture(Id id) {
+        const auto* asset = findAsset(id);
+        auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        if (session != nullptr) { session->input->cancelCapture(); }
+    }
+    void cancelAllCaptures() { for (const auto& session : sessions) { session.input->cancelCapture(); } }
+    bool capturing(Id id) const {
+        const auto* asset = findAsset(id);
+        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        return session != nullptr && session->input->capturing();
+    }
     juce::String statusText(Id id) const {
         const auto asset = findAsset(id);
         if (asset == nullptr) { return "Source unavailable"; }
         const auto* session = findSession(asset->liveIdentity);
         if (session == nullptr) { return "Offline - start listening to connect Blender"; }
         const auto status = session->input->status();
+        if (session->input->capturing()) {
+            const auto error = session->input->captureError();
+            return error.isNotEmpty() ? error : "Recording capture | Stop to save to Assets";
+        }
         if (session->input->preparationFailed()) { return "Could not prepare the incoming frame"; }
         if (status.message.isNotEmpty()) { return status.message; }
         switch (status.state) {
@@ -61,6 +91,7 @@ public:
     }
     void poll() {
         prune();
+        for (const auto& session : sessions) { session.input->captureError(); }
         std::vector<LiveSourceFrames::Entry> entries;
         for (const auto& asset : document.mainProject().assets) {
             const auto* session = findSession(asset->liveIdentity);
