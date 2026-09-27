@@ -84,6 +84,7 @@ public:
 
     std::function<void(motion::Id, std::string)> onPropertySelected;
     motion::Id selectedCameraId() const { return selected; }
+    void restoreSelection(motion::Id id) { selected = id; refresh(); }
 
     void refresh() {
         const auto& project = processor.document.project();
@@ -134,7 +135,10 @@ public:
             }
         }
         const auto* output = findCamera(project, active);
-        status.setText(output == nullptr ? "Output: default view" : "Output: " + juce::String(output->name) + (active == selected ? " | editing" : ""), juce::dontSendNotification);
+        const auto prefix = processor.document.editingComposition() == 0 ? "Output: " : "Preview only: ";
+        status.setText(juce::String(prefix) + (output == nullptr ? "default view" : juce::String(output->name) + (active == selected ? " | editing" : "")), juce::dontSendNotification);
+        cutButton.setTooltip(processor.document.editingComposition() == 0 ? "Use this camera from the current frame until the next camera cut"
+            : "Camera cuts here affect this composition's preview. Main's camera controls final output.");
         status.setTooltip(output == nullptr ? "The composition uses its default view" : "Active output camera: " + juce::String(output->name));
         frameLabel.setText("Frame " + juce::String(static_cast<juce::int64>(std::llround(time * project.frameRate))), juce::dontSendNotification);
         cutButton.setEnabled(camera != nullptr && time < project.duration);

@@ -15,6 +15,24 @@ public:
         setWantsKeyboardFocus(true);
     }
 
+    struct ViewState {
+        motion::Id target = 0;
+        std::string property;
+        std::optional<double> selected;
+        double start = 0, end = 1, low = -1, high = 1;
+        bool user = false;
+    };
+    ViewState viewState() const { return {targetId, propertyName, selectedTime, viewStart, viewEnd, low, high, userView}; }
+    void restoreView(const ViewState& state) {
+        setSelection(state.target, state.property);
+        if (std::isfinite(state.start) && std::isfinite(state.end) && state.end > state.start
+            && std::isfinite(state.low) && std::isfinite(state.high) && state.high > state.low) {
+            viewStart = state.start; viewEnd = state.end; low = state.low; high = state.high; userView = state.user;
+        }
+        selectedTime = state.selected;
+        refresh();
+    }
+
     // Called synchronously; the curve pointer is only valid during this call.
     std::function<void(const motion::Curve*)> onPreview;
 

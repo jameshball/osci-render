@@ -29,6 +29,14 @@ public:
         if (onToolChanged) { onToolChanged(tool); }
         repaint();
     }
+    struct ViewState { motion::editor::Camera camera; MotionTransformTool tool = MotionTransformTool::move; };
+    ViewState viewState() const { return {camera, tool}; }
+    void restoreView(const ViewState& state) {
+        setNavigating(false);
+        cancelGesture();
+        camera = state.camera;
+        setTool(state.tool);
+    }
     bool isNavigating() const { return navigating; }
     void setNavigating(bool enabled) {
         if (navigating == enabled) { return; }
@@ -288,6 +296,9 @@ public:
         if (navigating || before.has_value()) { return; }
         camera.dolly(-wheel.deltaY * 2.0);
         repaint();
+    }
+    void mouseExit(const juce::MouseEvent&) override {
+        if (!navigating && hoverHandle != -1) { hoverHandle = -1; repaint(); }
     }
     void mouseMove(const juce::MouseEvent& event) override {
         if (!navigating) {

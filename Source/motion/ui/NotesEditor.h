@@ -37,6 +37,20 @@ public:
         addAndMakeVisible(velocity);
         refresh();
     }
+    struct ViewState {
+        motion::Id target = 0;
+        std::set<motion::Id> selected;
+        int pitch = 72, rowHeight = 16;
+        double scroll = 0, zoom = 80;
+    };
+    ViewState viewState() const { return {target, selected, topPitch, rowHeight, scrollBeat, pixelsPerBeat}; }
+    void restoreView(const ViewState& state) {
+        cancelDrag();
+        setSelection(state.target);
+        selected = state.selected;
+        topPitch = state.pitch; rowHeight = state.rowHeight; scrollBeat = state.scroll; pixelsPerBeat = state.zoom;
+        refresh();
+    }
     ~MotionNotesEditor() override { processor.setMidiAudition(0); }
     void setSelection(motion::Id id) {
         if (target == id) { refresh(); return; }

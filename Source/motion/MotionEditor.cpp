@@ -355,6 +355,23 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             }
         });
     };
+    assetLibrary.onRemoveComposition = [this](motion::Id id) {
+        const auto& definitions = processor.document.mainProject().definitions;
+        const auto found = std::find_if(definitions.begin(), definitions.end(), [id](const auto& value) { return value->id == id; });
+        if (found == definitions.end()) { return; }
+        const auto expected = *found;
+        const auto generation = processor.document.generation();
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        osci::showOverlayConfirmationOrAlert(this, "Remove unused composition?",
+            "Remove \"" + expected->name + "\" from the library? Shared media and child compositions remain available. You can undo this.",
+            "Remove composition", "Cancel", [owner, id, generation, expected] {
+                if (owner == nullptr || owner->processor.document.generation() != generation) { return; }
+                const auto& current = owner->processor.document.mainProject().definitions;
+                if (std::find(current.begin(), current.end(), expected) == current.end()) { return; }
+                const auto result = owner->processor.document.removeComposition(id);
+                if (result.failed()) { owner->assetLibrary.setError(result.getErrorMessage()); }
+            });
+    };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
     assetLibrary.onInsert = [this](motion::Id id) { timeline.insertAsset(id, -1, -1); };
     assetLibrary.onBake = [this](motion::Id id) {
@@ -831,27 +848,45 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
         }
     }
     if (definition == 0 || definition == processor.document.editingComposition()) { return; }
-    ScopeView previous {processor.document.editingComposition(), fromLibrary ? selection : id, processor.position.load(), timeline.pixelsPerSecond, timeline.scrollTime, timeline.scrollRows};
+    ScopeView previous;
+    previous.scope = processor.document.editingComposition(); previous.selection = fromLibrary ? selection : id;
+    previous.position = processor.position.load(); previous.timelineFraction = timelineFraction;
+    previous.timelineTab = timelineTabs.getCurrentTabIndex(); previous.inspectorTab = inspectorTabs.getCurrentTabIndex();
+    previous.curveTarget = curveTarget; previous.property = curvePropertyName; previous.cameraCurve = cameraCurve;
+    previous.timeline = timeline.viewState(); previous.preview = composition.viewState();
+    previous.graph = curveEditor.viewState(); previous.notes = notesEditor.viewState();
+    previous.effects = effectsPanel.viewState(); previous.cameraSelection = cameraPanel.selectedCameraId();
+    composition.setNavigating(false);
     const auto entered = processor.document.enterComposition(definition);
     if (entered.failed()) { assetLibrary.setError(entered.getErrorMessage()); return; }
     scopeHistory.push_back(previous);
     assetLibrary.setError({});
     processor.playing.store(false);
     processor.seek(std::clamp(time, 0.0, processor.document.project().duration));
+    composition.restoreView({});
     select(0); timeline.scrollRows = 0; timeline.scrollTime = 0; timeline.revealTime(time);
     timelineTabs.setSelectedIndex(0);
     changeListenerCallback(nullptr);
 }
 
 void MotionEditor::leaveComposition() {
-    ScopeView previous {0, 0, 0, 70, 0, 0};
+    ScopeView previous;
     if (!scopeHistory.empty()) { previous = scopeHistory.back(); scopeHistory.pop_back(); }
     auto entered = processor.document.enterComposition(previous.scope);
-    if (entered.failed()) { previous.scope = 0; processor.document.enterComposition(0); scopeHistory.clear(); }
+    if (entered.failed()) { previous = {}; processor.document.enterComposition(0); scopeHistory.clear(); }
     assetLibrary.setError({});
     processor.playing.store(false); processor.seek(previous.position);
     select(previous.selection);
-    timeline.pixelsPerSecond = previous.zoom; timeline.scrollTime = previous.scroll; timeline.scrollRows = previous.row;
+    cameraPanel.restoreSelection(previous.cameraSelection);
+    timelineTabs.setSelectedIndex(previous.timelineTab);
+    inspectorTabs.setSelectedIndex(previous.inspectorTab);
+    effectsPanel.restoreView(previous.effects);
+    selectCurveTarget(previous.curveTarget, previous.property, previous.cameraCurve);
+    timelineFraction = previous.timelineFraction;
+    timeline.restoreView(previous.timeline);
+    composition.restoreView(previous.preview);
+    curveEditor.restoreView(previous.graph);
+    notesEditor.restoreView(previous.notes);
     changeListenerCallback(nullptr);
 }
 

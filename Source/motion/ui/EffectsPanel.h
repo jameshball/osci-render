@@ -100,6 +100,19 @@ public:
         refresh();
         notifySelection();
     }
+    struct ViewState {
+        motion::Id clip = 0, track = 0, effect = 0;
+        int scope = 1, scroll = 0;
+        bool explicitTrack = false;
+    };
+    ViewState viewState() const { return {clipId, trackId, selected, scope.getSelectedId(), viewport.getViewPositionY(), explicitTrack}; }
+    void restoreView(const ViewState& state) {
+        cancelGesture();
+        clipId = state.clip; trackId = state.track; selected = state.effect; explicitTrack = state.explicitTrack;
+        scope.setSelectedId(state.scope, juce::dontSendNotification);
+        refresh();
+        viewport.setViewPosition(0, state.scroll);
+    }
     void activate() { refresh(); notifySelection(); }
     void addEffect(const std::string& type) {
         if (!validOwner()) { return; }

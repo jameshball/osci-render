@@ -39,6 +39,25 @@ public:
         }
         repaint();
     }
+    struct ViewState {
+        double zoom = 70, scroll = 0;
+        int row = 0;
+        motion::Id primary = 0;
+        std::set<motion::Id> selected, collapsed;
+    };
+    ViewState viewState() const {
+        ensureTrackRows();
+        return {pixelsPerSecond, scrollTime, scrollRows, selected, selectedClips, collapsedGroups};
+    }
+    void restoreView(const ViewState& state) {
+        ensureTrackRows();
+        pixelsPerSecond = state.zoom; scrollTime = state.scroll; scrollRows = state.row;
+        selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed;
+        std::erase_if(collapsedGroups, [this](auto id) { return motion::findGroup(processor.document.project(), id) == nullptr; });
+        if (!isClip(selected) && motion::findGroup(processor.document.project(), selected) == nullptr) { selected = 0; }
+        layoutRevision.reset();
+        refreshTracks();
+    }
     double pixelsPerSecond = 70;
     double scrollTime = 0;
     mutable int scrollRows = 0;

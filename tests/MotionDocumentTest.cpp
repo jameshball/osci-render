@@ -873,6 +873,27 @@ private:
             expect(unique.insertComposition(originalDefinition->id, 0, 0, 0, inserted).failed());
             expect(inserted == 0 && unique.revision() == scopeRevision);
         }
+        beginTest("Unused definition removal is reference-safe, scoped and undoable");
+        juce::UndoManager cleanupUndo; motion::Document cleanup(cleanupUndo); cleanup.reset(unique.mainProject());
+        const auto referenced = cleanup.mainProject().definitions.front()->id;
+        expect(cleanup.compositionReferenceCount(referenced) > 0);
+        const auto beforeRejected = cleanup.revision();
+        expect(cleanup.removeComposition(referenced).failed());
+        expect(cleanup.revision() == beforeRejected && !cleanupUndo.canUndo());
+        cleanup.edit("Remove independent instances", [copyId](motion::Project& value) {
+            for (auto& track : value.tracks) { std::erase_if(track.clips, [copyId](const auto& clip) { return clip.composition == copyId; }); }
+        });
+        expectEquals(static_cast<int>(cleanup.compositionReferenceCount(copyId)), 0);
+        expect(cleanup.enterComposition(copyId).wasOk());
+        expect(cleanup.removeComposition(copyId).failed());
+        expect(cleanup.enterComposition(referenced).wasOk());
+        const auto sourceCount = cleanup.mainProject().assets.size();
+        expect(cleanup.removeComposition(copyId).wasOk());
+        expect(cleanup.editingComposition() == referenced && cleanup.mainProject().definitions.size() == 1);
+        expect(cleanup.mainProject().assets.size() == sourceCount);
+        expect(cleanupUndo.undo()); expect(cleanup.mainProject().definitions.size() == 2);
+        expect(cleanupUndo.redo()); expect(cleanup.mainProject().definitions.size() == 1);
+        const auto cleanedSaved = loaded.load(cleanup.save()); expect(cleanedSaved.wasOk(), cleanedSaved.getErrorMessage());
         beginTest("Nested editing uses one undo history while save retains the complete main project");
         const auto definitionId = document.project().definitions.front()->id;
         const auto mainName = document.mainProject().name;

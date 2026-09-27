@@ -635,6 +635,31 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     return juce::Result::ok();
 }
 
+std::size_t Document::compositionReferenceCount(Id definition) const {
+    if (definition == 0) { return 0; }
+    std::size_t count = 0;
+    const auto scope = [&](const auto& value) {
+        for (const auto& track : value.tracks) {
+            for (const auto& clip : track.clips) { if (clip.composition == definition) { ++count; } }
+        }
+    };
+    scope(state);
+    for (const auto& value : state.definitions) { scope(*value); }
+    return count;
+}
+
+juce::Result Document::removeComposition(Id definition) {
+    if (definition == 0 || definition == scopeId || compositionReferenceCount(definition) != 0) {
+        return juce::Result::fail("Only unused, closed compositions can be removed from the library.");
+    }
+    auto candidate = project();
+    if (std::erase_if(candidate.definitions, [definition](const auto& value) { return value->id == definition; }) == 0) {
+        return juce::Result::fail("The composition no longer exists.");
+    }
+    edit("Remove unused composition", [candidate = std::move(candidate)](Project& value) { value = candidate; });
+    return juce::Result::ok();
+}
+
 bool Document::canReferenceComposition(Id definition) const {
     std::set<Id> visited;
     const auto visit = [&](auto&& self, Id id) -> bool {

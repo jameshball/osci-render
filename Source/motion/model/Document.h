@@ -86,6 +86,8 @@ public:
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);
+    std::size_t compositionReferenceCount(Id definition) const;
+    juce::Result removeComposition(Id definition);
     juce::Result insertComposition(Id definition, double time, Id track, Id group, Id& clipId);
     bool canReferenceComposition(Id definition) const;
     juce::Result makeCompositionUnique(Id clipId, Id& definitionId);

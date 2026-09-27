@@ -46,9 +46,16 @@ private:
     void enterComposition(motion::Id clip, bool fromLibrary = false);
     void leaveComposition();
     struct ScopeView {
-        motion::Id scope, selection;
-        double position, zoom, scroll;
-        int row;
+        motion::Id scope = 0, selection = 0, curveTarget = 0, cameraSelection = 0;
+        double position = 0, timelineFraction = 0.34;
+        int timelineTab = 0, inspectorTab = 0;
+        bool cameraCurve = false;
+        std::string property = "position.x";
+        MotionTimelineView::ViewState timeline;
+        MotionCompositionView::ViewState preview;
+        MotionCurveEditor::ViewState graph;
+        MotionNotesEditor::ViewState notes;
+        MotionEffectsPanel::ViewState effects;
     };
     std::vector<ScopeView> scopeHistory;
     juce::TextButton scopeBack { "Back to Main" };

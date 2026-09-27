@@ -33,7 +33,7 @@ public:
         refresh();
     }
 
-    std::function<void(motion::Id)> onInsert, onOpenComposition;
+    std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
 
@@ -155,6 +155,26 @@ private:
             }
         }
         graphics.drawText(detail, bounds, juce::Justification::centredLeft);
+    }
+
+    void listBoxItemClicked(int row, const juce::MouseEvent& event) override {
+        if (!event.mods.isPopupMenu() || !definitionRow(row)) { return; }
+        const auto id = assetId(row);
+        const auto generation = document.generation();
+        const auto references = document.compositionReferenceCount(id);
+        const bool open = id == document.editingComposition();
+        juce::PopupMenu menu;
+        menu.addItem(1, "Open composition");
+        menu.addItem(2, "Insert instance", document.canReferenceComposition(id));
+        menu.addSeparator();
+        menu.addItem(3, references != 0 ? "Remove composition (in use)" : open ? "Remove composition (open)" : "Remove unused composition", references == 0 && !open);
+        const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
+            if (owner == nullptr || owner->document.generation() != generation) { return; }
+            if (result == 1 && owner->onOpenComposition) { owner->onOpenComposition(id); }
+            if (result == 2 && owner->onInsert) { owner->onInsert(id); }
+            if (result == 3 && owner->onRemoveComposition) { owner->onRemoveComposition(id); }
+        });
     }
 
     void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override { insert(row); }
