@@ -50,6 +50,8 @@ public:
 
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
     virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
+    // Called on audio callback gates; products may acknowledge transient work.
+    virtual void processBlockSkipped(bool) {}
     virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
     virtual bool supportsInternalSampleRateOverride() const { return false; }
 

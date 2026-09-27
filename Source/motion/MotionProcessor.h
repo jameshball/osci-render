@@ -6,6 +6,7 @@
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
 #include "render/LiveMidiAudition.h"
+#include "render/MidiRecording.h"
 #include "../audio/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
@@ -19,6 +20,9 @@ public:
     // of the document/export. The audio thread resolves the ID in its snapshot.
     void setMidiAudition(motion::Id clip) { midiAuditionTarget.store(clip); }
     motion::Id getMidiAudition() const { return midiAuditionTarget.load(); }
+    motion::MidiRecording& midiRecorder() { return midiRecording; }
+    void releaseResources() override;
+    void processBlockSkipped(bool unavailable) override { midiRecording.skippedBlock(unavailable); }
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     MotionProcessor();
     ~MotionProcessor() override;
@@ -55,6 +59,7 @@ private:
     bool wasPlaying = false, wasDrawing = false;
     motion::BeamTransitionGuard transitionGuard;
     motion::LiveMidiPerformance liveMidi;
+    motion::MidiRecording midiRecording;
     std::atomic<motion::Id> midiAuditionTarget {0};
     motion::Id previousAuditionTarget = 0;
     std::uint64_t liveMidiSample = 0;

@@ -450,10 +450,12 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     const int deviceNumSamples = buffer.getNumSamples();
     if (deviceNumSamples <= 0) {
+        processBlockSkipped(false);
         return;
     }
 
     if (isSuspended() || legalNoticePending.load(std::memory_order_relaxed)) {
+        processBlockSkipped(true);
         buffer.clear();
         midi.clear();
         return;

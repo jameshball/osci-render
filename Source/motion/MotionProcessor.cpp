@@ -50,7 +50,13 @@ bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 5);
 }
 
+void MotionProcessor::releaseResources() {
+    midiRecording.deviceStopped();
+    CommonAudioProcessor::releaseResources();
+}
+
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
+    midiRecording.deviceStopped();
     signal.setSize(6, samplesPerBlock);
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
     oscillatorSample = audioSample;
@@ -72,12 +78,16 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
-    if (count > signal.getNumSamples()) { midi.clear(); liveMidi.reset(); return; }
+    const auto unavailableRecording = [&] {
+        midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(std::max<juce::int64>(0, audioSample)), static_cast<std::uint32_t>(std::max(0, count)), playing.load(), false);
+    };
+    if (count > signal.getNumSamples()) { unavailableRecording(); midi.clear(); liveMidi.reset(); return; }
     // Shared output gain/clip buffers are allocated during prepareToPlay, but
     // must be populated each block before music monitoring or physical XY output.
     volumeEffect->animateValues(count, nullptr);
     thresholdEffect->animateValues(count, nullptr);
     if (prepared == nullptr || preparationFailed.load() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
+        unavailableRecording();
         liveMidi.reset();
         midi.clear();
         transitionGuard.begin();
@@ -97,6 +107,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto durationIndex = motion::sampleIndex(prepared->duration, sampleRate);
     if (!durationIndex.has_value() || *durationIndex < 1) {
+        unavailableRecording();
         midi.clear();
         liveMidi.reset();
         return;
@@ -132,6 +143,13 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     wasDrawing = drawing;
     if (running && audioSample >= durationSamples) {
         audioSample = 0;
+    }
+    // Capture unowned byte views before the input buffer is consumed. Only the
+    // continuous span before a project wrap belongs to this pass.
+    const auto recordSamples = static_cast<std::uint32_t>(std::min<juce::int64>(count, std::max<juce::int64>(0, durationSamples - audioSample)));
+    if (midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(audioSample), recordSamples, running, true, requested >= 0)) {
+        for (const auto metadata : midi) { midiRecording.event(metadata.samplePosition, metadata.data, metadata.numBytes); }
+        midiRecording.endBlock();
     }
     const auto mode = outputMode.load();
     const auto audible = !muteParameter->getBoolValue();
