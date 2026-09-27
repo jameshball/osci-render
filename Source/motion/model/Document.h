@@ -73,7 +73,10 @@ struct Project : Composition {
 class Document : public juce::ChangeBroadcaster {
 public:
     explicit Document(juce::UndoManager& undo) : undo(undo) {}
-    const Project& project() const { return state; }
+    const Project& project() const { return scopeId == 0 ? state : scopeView; }
+    const Project& mainProject() const { return state; }
+    Id editingComposition() const { return scopeId; }
+    juce::Result enterComposition(Id id);
     std::uint64_t generation() const { return projectGeneration; }
     std::uint64_t revision() const { return stateRevision; }
     Id newId() { return ++lastId; }
@@ -83,11 +86,12 @@ public:
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);
+    juce::Result createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
     juce::Result clearMidi(Id clipId);
-    void preview(Project project) { apply(std::move(project)); }
+    void preview(Project project) { apply(mergeScope(std::move(project))); }
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;
     juce::Result load(const juce::XmlElement& xml);
@@ -110,8 +114,11 @@ private:
     Id highestId() const;
     juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);
     void apply(Project value);
+    Project mergeScope(Project view) const;
+    void refreshScope();
     struct Change;
-    Project state;
+    Project state, scopeView;
+    Id scopeId = 0;
     Id lastId = 0;
     std::uint64_t projectGeneration = 0;
     std::uint64_t stateRevision = 0;

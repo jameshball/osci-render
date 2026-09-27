@@ -92,6 +92,23 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &splitButton, &timeLabel, &selectionLabel, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
         addAndMakeVisible(component);
     }
+    addChildComponent(scopeBack);
+    addChildComponent(scopeLabel);
+    addChildComponent(scopeShared);
+    scopeShared.setText("Shared composition", juce::dontSendNotification);
+    scopeShared.setFont(juce::FontOptions(12.0f));
+    scopeShared.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(0.55f));
+    scopeShared.setJustificationType(juce::Justification::centredRight);
+    scopeBack.setName("Back to parent composition");
+    scopeBack.onClick = [this] { leaveComposition(); };
+    scopeLabel.setName("Composition name");
+    scopeLabel.setEditable(false, true);
+    scopeLabel.setTooltip("Shared composition: changes affect every instance. Double-click to rename.");
+    scopeLabel.onTextChange = [this] {
+        const auto name = scopeLabel.getText().trim();
+        if (processor.document.editingComposition() == 0 || name.isEmpty() || name.length() > 200) { return; }
+        processor.document.edit("Rename composition", [name](motion::Project& project) { project.name = name; });
+    };
     addAndMakeVisible(compositionTitle);
     compositionTitle.setText("Composition", juce::dontSendNotification);
     compositionTitle.setFont(juce::FontOptions(15.0f));
@@ -348,6 +365,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
     };
+    timeline.onEnterComposition = [this](motion::Id id) { enterComposition(id); };
     timeline.onSelection = [this](motion::Id id) { select(id); };
     timeline.onMidiAssigned = [this](motion::Id id) { select(id); timelineTabs.setSelectedIndex(2); notesEditor.fitContents(); };
     timeline.onMakeUnique = [this](motion::Id id) {
@@ -435,6 +453,14 @@ void MotionEditor::resized() {
     curveProperty.setBounds(transport.removeFromLeft(165).reduced(2));
     cancelExport.setBounds(transport.removeFromRight(62).reduced(2));
     exportBar.setBounds(transport.removeFromRight(180).reduced(2));
+    const bool nested = processor.document.editingComposition() != 0;
+    scopeBack.setVisible(nested); scopeLabel.setVisible(nested); scopeShared.setVisible(nested);
+    if (nested) {
+        auto breadcrumb = timeline.removeFromTop(28);
+        scopeBack.setBounds(breadcrumb.removeFromLeft(160).reduced(2));
+        scopeShared.setBounds(breadcrumb.removeFromRight(170).reduced(6, 1));
+        scopeLabel.setBounds(breadcrumb.reduced(5, 1));
+    }
     this->timeline.setBounds(timeline.withTrimmedTop(3));
     notesEditor.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
@@ -576,7 +602,7 @@ void MotionEditor::showNextPreparationSettings() {
     MotionRasterSettingsPanel* imagePanel = nullptr;
     MotionTextSourcePanel* textPanel = nullptr;
     if (text) {
-        const auto instances = motion::sourceReferenceCount(processor.document.project(), request.replacement->id);
+        const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
         auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances);
         textPanel = panel.get();
         content = std::move(panel);
@@ -757,6 +783,15 @@ void MotionEditor::timerCallback() {
 }
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
+    if (processor.document.editingComposition() == 0) { scopeHistory.clear(); }
+    if (!scopeLabel.isBeingEdited()) { scopeLabel.setText(processor.document.project().name, juce::dontSendNotification); }
+    juce::String parentName = "Main";
+    if (!scopeHistory.empty() && scopeHistory.back().scope != 0) {
+        for (const auto& definition : processor.document.mainProject().definitions) {
+            if (definition->id == scopeHistory.back().scope) { parentName = definition->name; }
+        }
+    }
+    scopeBack.setButtonText("Back to " + parentName);
     for (const auto& task : pendingImports) {
         if (task->generation != processor.document.generation()) { task->cancelled.store(true); }
     }
@@ -771,6 +806,42 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     refreshInspector();
     resized();
     repaint();
+}
+
+void MotionEditor::enterComposition(motion::Id id) {
+    const auto& project = processor.document.project();
+    motion::Id definition = 0;
+    double time = 0;
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id != id || clip.composition == 0) { continue; }
+            definition = clip.composition;
+            const auto clock = clip.timing(project.bpm);
+            const auto position = processor.position.load();
+            time = clock.localTime(position >= clock.start && position < clock.end() ? position : clock.start);
+        }
+    }
+    if (definition == 0) { return; }
+    ScopeView previous {processor.document.editingComposition(), id, processor.position.load(), timeline.pixelsPerSecond, timeline.scrollTime, timeline.scrollRows};
+    const auto entered = processor.document.enterComposition(definition);
+    if (entered.failed()) { assetLibrary.setError(entered.getErrorMessage()); return; }
+    scopeHistory.push_back(previous);
+    processor.playing.store(false);
+    processor.seek(std::clamp(time, 0.0, processor.document.project().duration));
+    select(0); timeline.scrollRows = 0; timeline.scrollTime = 0; timeline.revealTime(time);
+    timelineTabs.setSelectedIndex(0);
+    changeListenerCallback(nullptr);
+}
+
+void MotionEditor::leaveComposition() {
+    ScopeView previous {0, 0, 0, 70, 0, 0};
+    if (!scopeHistory.empty()) { previous = scopeHistory.back(); scopeHistory.pop_back(); }
+    auto entered = processor.document.enterComposition(previous.scope);
+    if (entered.failed()) { previous.scope = 0; processor.document.enterComposition(0); scopeHistory.clear(); }
+    processor.playing.store(false); processor.seek(previous.position);
+    select(previous.selection);
+    timeline.pixelsPerSecond = previous.zoom; timeline.scrollTime = previous.scroll; timeline.scrollRows = previous.row;
+    changeListenerCallback(nullptr);
 }
 
 void MotionEditor::select(motion::Id id) {
@@ -899,7 +970,7 @@ void MotionEditor::exportVideo() {
         return;
     }
     auto config = recordingSettings.createVideoEncodingConfiguration();
-    const auto project = processor.document.project();
+    const auto project = processor.document.mainProject();
     config.frameRate = project.frameRate;
     const auto renderMode = visualiser.getRenderMode();
     auto state = std::make_shared<ExportState>();
@@ -1024,7 +1095,7 @@ void MotionEditor::exportSignal() {
             owner->assetLibrary.setError("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
             return;
         }
-        const auto project = owner->processor.document.project();
+        const auto project = owner->processor.document.mainProject();
         owner->exportBar.setName("Signal export progress");
         owner->exportProgress = 0;
         owner->exportBar.setVisible(true);

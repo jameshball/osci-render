@@ -129,6 +129,7 @@ public:
         testAnimatedSources();
         testEffects(document.project());
         testCompositions(document.project());
+        testCompositionCreation(document.project());
         testTrackStates(document.project());
         testGroups(document.project());
         testModulation(document.project());
@@ -768,6 +769,113 @@ private:
             expectEquals(reloaded.sample(1, 0.1).r, savedSignal.sample(1, 0.1).r);
             expectEquals(reloaded.sample(1, 0.5).g, savedSignal.sample(1, 0.5).g);
         }
+    }
+
+    void testCompositionCreation(const motion::Project& sourceProject) {
+        beginTest("Creating a composition preserves partial groups, authored clocks and shared media");
+        motion::Project project; project.assets = sourceProject.assets; project.duration = 20;
+        auto clip = motion::Document::makeClip(70001, *project.assets.front(), 2); clip.duration = 4;
+        auto sibling = clip; sibling.id = 70002; sibling.start = 10; sibling.duration = 2;
+        motion::Track track; track.id = 70003; track.clips = {clip, sibling}; track.group = 70004;
+        motion::Group group; group.id = 70004;
+        group.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
+        group.properties["position.x"].setKey({20, 2, motion::Interpolation::linear});
+        auto effect = motion::makeEffect(70005, *motion::effectDefinition("translate"));
+        effect.properties["translateY"].setKey({0, 0, motion::Interpolation::linear});
+        effect.properties["translateY"].setKey({20, 1, motion::Interpolation::linear});
+        track.effects = {effect}; project.tracks = {track}; project.groups = {group};
+        auto global = motion::makeEffect(70006, *motion::effectDefinition("scale")); project.effects = {global};
+        juce::UndoManager undo; motion::Document document(undo); document.reset(project);
+        const motion::PreparedComposition before(project);
+        motion::Id instance = 0;
+        const auto created = document.createComposition({clip.id}, "Motif", instance);
+        expect(created.wasOk(), created.getErrorMessage());
+        if (created.failed()) { return; }
+        expect(instance != 0 && document.project().definitions.size() == 1);
+        const auto& definition = *document.project().definitions.front();
+        expectEquals(static_cast<int>(definition.tracks.size()), 1);
+        expectEquals(static_cast<int>(definition.groups.size()), 1);
+        expect(definition.tracks.front().clips.front().id == clip.id);
+        expect(definition.groups.front().id != group.id && definition.tracks.front().group == definition.groups.front().id);
+        expect(definition.tracks.front().effects.front().id != effect.id);
+        expect(definition.tracks.front().clips.front().asset == clip.asset);
+        expect(document.project().assets.front() == project.assets.front());
+        const auto& placement = document.project().tracks.front().clips.front();
+        expectEquals(placement.start, 2.0); expectEquals(placement.offset, 2.0); expectEquals(placement.duration, 4.0);
+        expect(document.project().tracks[1].clips.front().id == sibling.id);
+        const motion::PreparedComposition after(document.project());
+        expect(after.preparationError.isEmpty(), after.preparationError);
+        for (const auto time : {2.25, 3.5, 5.5, 10.5}) {
+            for (const auto phase : {0.12, 0.37, 0.68}) {
+                const auto a = before.sample(time, phase), b = after.sample(time, phase);
+                expectWithinAbsoluteError(b.x, a.x, 0.00001f); expectWithinAbsoluteError(b.y, a.y, 0.00001f);
+                expectWithinAbsoluteError(b.r, a.r, 0.00001f); expectWithinAbsoluteError(b.g, a.g, 0.00001f);
+            }
+        }
+        juce::UndoManager loadedUndo; motion::Document loaded(loadedUndo);
+        const auto reopened = loaded.load(document.save());
+        expect(reopened.wasOk(), reopened.getErrorMessage());
+        expect(undo.undo()); expect(document.project().definitions.empty());
+        expect(document.project().tracks.front().clips.size() == 2);
+        expect(undo.redo()); expect(document.project().definitions.size() == 1);
+        expect(document.project().tracks.front().clips.front().id == instance);
+        beginTest("Nested editing uses one undo history while save retains the complete main project");
+        const auto definitionId = document.project().definitions.front()->id;
+        const auto mainName = document.mainProject().name;
+        const auto generation = document.generation();
+        expect(document.enterComposition(definitionId).wasOk());
+        expect(document.generation() != generation && document.editingComposition() == definitionId);
+        expect(document.project().tracks.front().clips.front().id == clip.id);
+        document.edit("Rename motif", [](motion::Project& value) { value.name = "Shared edited motif"; });
+        expect(document.project().name == "Shared edited motif");
+        expect(document.mainProject().name == mainName);
+        expect(document.mainProject().definitions.front()->name == "Shared edited motif");
+        const auto savedInside = loaded.load(document.save());
+        expect(savedInside.wasOk(), savedInside.getErrorMessage());
+        expect(loaded.project().tracks.front().clips.front().composition == definitionId);
+        expect(loaded.project().definitions.front()->name == "Shared edited motif");
+        expect(undo.undo()); expect(document.project().name == "Motif");
+        expect(undo.redo()); expect(document.project().name == "Shared edited motif");
+        auto beforeDrag = document.project();
+        auto preview = beforeDrag; preview.tracks.front().clips.front().properties["position.z"] = motion::Curve(0.3);
+        document.preview(std::move(preview)); document.commit("Move child", beforeDrag);
+        expectWithinAbsoluteError(document.mainProject().definitions.front()->tracks.front().clips.front().properties.at("position.z").base, 0.3, 0.00001);
+        expect(undo.undo());
+        expectWithinAbsoluteError(document.project().tracks.front().clips.front().properties.at("position.z").base, 0.0, 0.00001);
+        motion::Id nestedInstance = 0;
+        expect(document.createComposition({clip.id}, "Inner motif", nestedInstance).wasOk());
+        expect(document.mainProject().definitions.size() == 2);
+        expect(document.mainProject().tracks.front().clips.front().id == instance);
+        expect(document.project().tracks.front().clips.front().id == nestedInstance);
+        const auto nestedSaved = loaded.load(document.save());
+        expect(nestedSaved.wasOk(), nestedSaved.getErrorMessage());
+        expect(undo.undo()); expect(document.mainProject().definitions.size() == 1);
+        expect(undo.undo()); // shared rename
+        expect(undo.undo()); // initial creation; active definition disappears
+        expect(document.editingComposition() == 0 && document.project().definitions.empty());
+        expect(document.project().tracks.front().clips.size() == 2);
+        expect(document.enterComposition(999999).failed());
+        beginTest("Invalid precomposition leaves identity allocation and undo untouched");
+        for (int reason = 0; reason < 4; ++reason) {
+            auto invalid = project; if (reason == 0) { invalid.tracks[0].locked = true; }
+            juce::UndoManager rejectedUndo; motion::Document rejected(rejectedUndo); rejected.reset(invalid);
+            const auto revision = rejected.revision(); motion::Id output = 999;
+            const auto ids = reason == 1 ? std::vector<motion::Id>{999999} : reason == 2 ? std::vector<motion::Id>{clip.id, clip.id} : std::vector<motion::Id>{clip.id};
+            expect(rejected.createComposition(ids, reason == 3 ? "  " : "Motif", output).failed());
+            expect(output == 0 && rejected.revision() == revision && !rejectedUndo.canUndo());
+            expect(rejected.newId() == 70007);
+        }
+        beginTest("Precomposition preserves solo-filtered visibility across scopes");
+        project.tracks[0].solo = true;
+        auto hidden = project.tracks[0]; hidden.id = 70010; hidden.solo = false; hidden.group = 0; hidden.effects.clear();
+        hidden.clips = {clip}; hidden.clips[0].id = 70011;
+        project.tracks.push_back(hidden);
+        document.reset(project);
+        expect(document.createComposition({clip.id, 70011}, "Solo study", instance).wasOk());
+        const motion::PreparedComposition solo(document.project());
+        expect(solo.preparationError.isEmpty(), solo.preparationError);
+        expect(std::none_of(solo.clips.begin(), solo.clips.end(), [](const auto& value) { return value.id == 70011; }));
+        expect(document.project().tracks.front().solo);
     }
 
     void testCompositions(const motion::Project& sourceProject) {

@@ -52,11 +52,11 @@ public:
         cancelGesture();
         if (prepared == nullptr) { return; }
         const auto time = processor.position.load();
-        const auto hasSelection = std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.id == selected && clip.active(time); });
+        const auto hasSelection = std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.editorId() == selected && clip.active(time); });
         motion::editor::Vec3 minimum { 1e12, 1e12, 1e12 }, maximum { -1e12, -1e12, -1e12 };
         bool found = false;
         for (const auto& clip : prepared->clips) {
-            if (!clip.active(time) || (hasSelection && clip.id != selected)) { continue; }
+            if (!clip.active(time) || (hasSelection && clip.editorId() != selected)) { continue; }
             for (int index = 0; index < 512; ++index) {
                 const auto point = worldPoint(clip.sample(time, index / 512.0), time);
                 if (!point.finite()) { continue; }
@@ -124,9 +124,9 @@ public:
                 }
                 const auto distance = previous->getDistanceFrom(*next);
                 const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
-                const auto colour = clip.id == selected ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
+                const auto colour = clip.editorId() == selected ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
                 g.setColour(colour.withAlpha(alpha * 0.8f));
-                g.drawLine({ *previous, *next }, clip.id == selected ? 1.4f : 1.0f);
+                g.drawLine({ *previous, *next }, clip.editorId() == selected ? 1.4f : 1.0f);
                 previous = next;
                 previousLit = lit;
             }
@@ -180,7 +180,7 @@ public:
                 const auto distance = point->getDistanceFrom(event.position);
                 if (distance < nearest) {
                     nearest = distance;
-                    hit = clip.id;
+                    hit = clip.editorId();
                     dragAnchor = worldPoint(clip.sample(time, i / 256.0), time);
                 }
             }

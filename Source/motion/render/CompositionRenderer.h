@@ -98,6 +98,7 @@ struct PreparedClip : PreparedClipStage {
     std::shared_ptr<const PreparedMidiPerformance> midi;
     std::vector<PreparedClipStage> ancestors; // inner-to-outer
 
+    Id editorId() const { return ancestors.empty() ? id : ancestors.back().id; }
     bool active(double time) const { return time >= start && time < end; }
     double weight(double time) const {
         if (!ancestors.empty()) {
