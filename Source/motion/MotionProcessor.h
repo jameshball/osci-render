@@ -25,7 +25,8 @@ public:
     std::atomic<bool> playing { false };
     std::atomic<bool> freezeWhenStopped { true };
     std::atomic<double> position { 0.0 };
-    void seek(double seconds) { requestedPosition.store(std::max(0.0, seconds)); }
+    void seek(double seconds) { seekSerial.fetch_add(1); requestedPosition.store(std::max(0.0, seconds)); }
+    std::uint64_t seekRevision() const { return seekSerial.load(); }
     void collectPreparedState() { composition.collect(); }
     juce::String getPreparationError() const { return preparationError; }
     // Message-thread-only transient editing preview; never alters saved state.
@@ -55,6 +56,7 @@ private:
     osci::PreparedState<motion::PreparedComposition> composition;
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };
+    std::atomic<std::uint64_t> seekSerial {0};
     double audioTime = 0.0;
     juce::int64 audioSample = 0;
 public:

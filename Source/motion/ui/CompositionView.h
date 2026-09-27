@@ -3,6 +3,7 @@
 #include "../MotionProcessor.h"
 #include "EditorCamera.h"
 #include "EditorTransformFrame.h"
+#include "MotionPath.h"
 #include "CompositionGizmo.h"
 #include "TransformGizmo.h"
 #include "../model/PropertyTarget.h"
@@ -29,13 +30,28 @@ public:
         if (onToolChanged) { onToolChanged(tool); }
         repaint();
     }
-    struct ViewState { motion::editor::Camera camera; MotionTransformTool tool = MotionTransformTool::move; };
-    ViewState viewState() const { return {camera, tool}; }
+    std::optional<double> selectedKeyContentTime(motion::Id id) const {
+        editingTime();
+        return pathKey.has_value() && pathKey->selection == id ? std::optional<double>(pathKey->contentTime) : std::nullopt;
+    }
+    void retainSelectedKeyAfterEdit() {
+        if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
+    }
+    bool isMotionPathVisible() const { return showMotionPath; }
+    std::function<void(bool)> onMotionPathChanged;
+    void setMotionPathVisible(bool visible) {
+        showMotionPath = visible;
+        if (onMotionPathChanged) { onMotionPathChanged(visible); }
+        repaint();
+    }
+    struct ViewState { motion::editor::Camera camera; MotionTransformTool tool = MotionTransformTool::move; bool motionPath = false; };
+    ViewState viewState() const { return {camera, tool, showMotionPath}; }
     void restoreView(const ViewState& state) {
         setNavigating(false);
         cancelGesture();
         camera = state.camera;
         setTool(state.tool);
+        setMotionPathVisible(state.motionPath);
     }
     bool isNavigating() const { return navigating; }
     void setNavigating(bool enabled) {
@@ -59,7 +75,7 @@ public:
     void frameSelection() {
         cancelGesture();
         if (prepared == nullptr) { return; }
-        const auto time = processor.position.load();
+        const auto time = editingTime();
         const auto hasSelection = std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.editorId() == selected && clip.active(time); });
         motion::editor::Vec3 minimum { 1e12, 1e12, 1e12 }, maximum { -1e12, -1e12, -1e12 };
         bool found = false;
@@ -79,8 +95,9 @@ public:
     void resetView() { cancelGesture(); camera = {}; repaint(); }
 
     std::function<void(motion::Id)> onSelection;
-    void refresh() { prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); repaint(); }
+    void refresh() { pathDirty = true; prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); repaint(); }
     void preview(const motion::Project& project) {
+        pathDirty = true;
         prepared = std::make_unique<motion::PreparedComposition>(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
         repaint();
     }
@@ -109,20 +126,21 @@ public:
         }
         juce::Graphics::ScopedSaveState sceneState(g);
         g.reduceClipRegion(getLocalBounds().withTrimmedBottom(30));
-        const auto time = processor.position.load();
+        const auto time = editingTime();
         for (const auto& clip : prepared->clips) {
-            if (!clip.active(time)) {
+            const auto sampleTime = clip.editorId() == selected && atSelectedPathEnd(time) ? std::nextafter(time, 0.0) : time;
+            if (!clip.active(sampleTime)) {
                 continue;
             }
             // Walk stored point frames at their native density so short lit
             // runs remain visible in the editing view. Output uses its audio rate.
             const auto sampleCount = clip.source->previewSampleCount();
             const auto previewSpan = clip.source->previewPhaseSpan();
-            const auto firstPoint = clip.sample(time, 0, previewSpan);
+            const auto firstPoint = clip.sample(sampleTime, 0, previewSpan);
             auto previous = projected(firstPoint, time);
             bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
             for (std::size_t i = 1; i <= sampleCount; ++i) {
-                const auto point = clip.sample(time, static_cast<double>(i) / sampleCount, previewSpan);
+                const auto point = clip.sample(sampleTime, static_cast<double>(i) / sampleCount, previewSpan);
                 const auto next = projected(point, time);
                 const bool lit = point.r != 0 || point.g != 0 || point.b != 0;
                 if (!previous.has_value() || !next.has_value() || !previousLit || !lit) {
@@ -139,6 +157,7 @@ public:
                 previousLit = lit;
             }
         }
+        paintMotionPath(g);
         currentGizmo().paint(g, before.has_value() ? dragAxis : hoverHandle);
     }
 
@@ -156,11 +175,12 @@ public:
         if (!event.mods.isLeftButtonDown() || prepared == nullptr) {
             return;
         }
+        if (showMotionPath && seekMotionKey(event.position)) { return; }
         const auto gizmo = currentGizmo();
         const auto handle = gizmo.hitTest(event.position);
         if (handle >= 0) {
             dragAnchor = gizmoFrame->parent.worldOrigin;
-            if (beginGesture(processor.position.load())) {
+            if (beginGesture(editingTime())) {
                 dragAxis = handle;
                 gesture = tool == MotionTransformTool::move ? (handle == 3 ? Gesture::plane : Gesture::moveAxis)
                     : tool == MotionTransformTool::rotate ? Gesture::rotateAxis
@@ -177,7 +197,7 @@ public:
         }
         float nearest = 18;
         motion::Id hit = 0;
-        const auto time = processor.position.load();
+        const auto time = editingTime();
         for (const auto& clip : prepared->clips) {
             if (!clip.active(time)) {
                 continue;
@@ -265,7 +285,7 @@ public:
             const auto property = std::string(prefix) + "xyz"[axis];
             auto* curve = target->curve(property);
             if (curve == nullptr) { continue; }
-            const auto localTime = target->localTime(editTime);
+            const auto localTime = pathKey.has_value() && pathKey->selection == editSelection ? pathKey->contentTime : target->localTime(editTime);
             const auto base = curve->evaluateBase(localTime);
             // A zero scale can be recovered by dragging; negative scales keep their sign.
             const auto value = scaling ? (base == 0 ? scaleFactor - 1 : base * scaleFactor) : base + offsets[axis];
@@ -278,6 +298,7 @@ public:
         changed = anyChange;
         processor.document.preview(std::move(project));
         editRevision = processor.document.revision();
+        if (pathKey.has_value()) { pathKey->revision = editRevision; }
     }
 
     void mouseUp(const juce::MouseEvent&) override {
@@ -289,6 +310,7 @@ public:
                 processor.document.preview(std::move(*before));
             }
             before.reset();
+            if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
         }
     }
 
@@ -327,6 +349,7 @@ public:
         }
         if (navigating) { return true; }
         if (key.getModifiers().isAltDown()) { return false; }
+        if (key.getKeyCode() == 'P') { setMotionPathVisible(!showMotionPath); return true; }
         if (key.getKeyCode() == 'G') { setTool(MotionTransformTool::move); return true; }
         if (key.getKeyCode() == 'R') { setTool(MotionTransformTool::rotate); return true; }
         if (key.getKeyCode() == 'S') { setTool(MotionTransformTool::scale); return true; }
@@ -337,13 +360,92 @@ public:
     }
 
 private:
+    double editingTime() const {
+        if (pathKey.has_value() && (pathKey->selection != selected || pathKey->generation != processor.document.generation()
+            || pathKey->scope != processor.document.editingComposition() || pathKey->seekSerial != processor.seekRevision() || pathKey->revision != processor.document.revision() || processor.playing.load())) {
+            pathKey.reset();
+        }
+        return pathKey.has_value() ? pathKey->time : processor.position.load();
+    }
+    bool atSelectedPathEnd(double time) const {
+        if (!pathKey.has_value() || pathKey->selection != selected || pathKey->time != time) { return false; }
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id == selected) { return clip.timing(processor.document.project().bpm).end() == time; }
+            }
+        }
+        return false;
+    }
+    void updateMotionPath() {
+        if (!pathDirty && pathSelection == selected && pathRevision == processor.document.revision()) { return; }
+        motionPath = motion::editor::buildMotionPath(processor.document.project(), selected);
+        pathDirty = false;
+        pathSelection = selected;
+        pathRevision = processor.document.revision();
+    }
+    void paintMotionPath(juce::Graphics& g) {
+        if (!showMotionPath || navigating || selected == 0) { return; }
+        updateMotionPath();
+        const auto colour = juce::Colour(0xffb8d4ea);
+        std::optional<juce::Point<float>> previous;
+        for (const auto& point : motionPath.points) {
+            const auto screen = screenPoint(point.position);
+            if (screen.has_value()) {
+                if (previous.has_value() && !point.breakBefore) {
+                    g.setColour(colour.withAlpha(0.35f));
+                    g.drawLine({*previous, *screen}, 1);
+                }
+                if (point.dot) {
+                    g.setColour(colour.withAlpha(0.65f));
+                    g.fillEllipse(screen->x - 1.5f, screen->y - 1.5f, 3, 3);
+                }
+            }
+            previous = screen;
+        }
+        for (const auto& point : motionPath.points) {
+            if (!point.key) { continue; }
+            const auto screen = screenPoint(point.position);
+            if (!screen.has_value()) { continue; }
+            const juce::Rectangle<float> bounds(screen->x - 4, screen->y - 4, 8, 8);
+            g.setColour(osci::Colours::veryDark());
+            g.fillRect(bounds);
+            g.setColour(colour);
+            g.drawRect(bounds, 1.5f);
+        }
+        g.setFont(juce::FontOptions(11));
+        g.setColour(osci::Colours::textMuted());
+        g.drawFittedText(motionPath.tooComplex ? "Path hidden: more than 2,048 transform keys"
+            : "Position path (before effects) | Click a key to seek", getLocalBounds().removeFromTop(26).reduced(10, 0), juce::Justification::centredLeft, 2);
+    }
+    bool seekMotionKey(juce::Point<float> position) {
+        updateMotionPath();
+        const motion::editor::MotionPathPoint* closest = nullptr;
+        float distance = 9;
+        for (const auto& point : motionPath.points) {
+            if (!point.key || point.time == editingTime()) { continue; }
+            const auto screen = screenPoint(point.position);
+            if (screen.has_value() && screen->getDistanceFrom(position) < distance) {
+                closest = &point;
+                distance = screen->getDistanceFrom(position);
+            }
+        }
+        if (closest == nullptr) { return false; }
+        const auto time = closest->time;
+        const auto rate = std::max(1.0, processor.getSampleRate());
+        const auto atEnd = !motionPath.points.empty() && time == motionPath.points.back().time;
+        processor.playing.store(false);
+        processor.seek(atEnd ? std::max(motionPath.points.front().time, time - 1.0 / rate) : time);
+        pathKey = PathKey {selected, processor.document.generation(), processor.document.editingComposition(), processor.seekRevision(), processor.document.revision(), time, closest->contentTime};
+        repaint();
+        return true;
+    }
     enum class Gesture { plane, moveAxis, rotateAxis, scaleAxis, uniformScale };
     bool editable(double time) const {
         const auto& project = processor.document.project();
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.id != selected) { continue; }
-                if (track.locked || !motion::trackIsAudible(project, track) || !clip.contains(time, project.bpm)) { return false; }
+                if (track.locked || !motion::trackIsAudible(project, track) || (!clip.contains(time, project.bpm) && !atSelectedPathEnd(time))) { return false; }
                 const auto prefix = tool == MotionTransformTool::move ? "position." : tool == MotionTransformTool::rotate ? "rotation." : "scale.";
                 for (const auto axis : std::string("xyz")) {
                     const auto found = clip.properties.find(std::string(prefix) + axis);
@@ -355,7 +457,7 @@ private:
         return false;
     }
     MotionCompositionGizmo currentGizmo() const {
-        const auto time = processor.position.load();
+        const auto time = editingTime();
         gizmoFrame = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
         if (navigating || !editable(time) || !gizmoFrame.has_value() || gizmoFrame->parent.hasPostTransformEffects) { return {}; }
         return MotionCompositionGizmo::layout(*gizmoFrame, camera, tool, std::clamp(getWidth() * 0.2, 35.0, 72.0), outputFrame().getHeight(),
@@ -374,7 +476,7 @@ private:
             return false;
         }
         processor.playing.store(false);
-        processor.seek(time);
+        if (!pathKey.has_value()) { processor.seek(time); }
         editTime = time;
         editSelection = selected;
         before = processor.document.project();
@@ -405,7 +507,11 @@ private:
         juce::Desktop::getInstance().getMainMouseSource().setScreenPosition(savedCursor);
     }
     void cancelGesture() {
-        if (validGesture()) { processor.document.preview(std::move(*before)); before.reset(); }
+        if (validGesture()) {
+            processor.document.preview(std::move(*before));
+            before.reset();
+            if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
+        }
         navigationDrag = false;
     }
     bool validGesture() {
@@ -438,6 +544,18 @@ private:
         const auto first = screenPoint(start), last = screenPoint(end);
         if (first.has_value() && last.has_value()) { g.drawLine({ *first, *last }, 1); }
     }
+    struct PathKey {
+        motion::Id selection;
+        std::uint64_t generation;
+        motion::Id scope;
+        std::uint64_t seekSerial, revision;
+        double time, contentTime;
+    };
+    mutable std::optional<PathKey> pathKey;
+    bool showMotionPath = false, pathDirty = true;
+    motion::Id pathSelection = 0;
+    std::uint64_t pathRevision = 0;
+    motion::editor::MotionPath motionPath;
     MotionProcessor& processor;
     std::unique_ptr<motion::PreparedComposition> prepared;
     std::optional<motion::Project> before;

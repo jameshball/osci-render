@@ -4,6 +4,7 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
+#include "../Source/motion/ui/MotionPath.h"
 #include "../Source/motion/export/SoundtrackExporter.h"
 #include "../Source/motion/import/VideoSourcePreparer.h"
 #include "../Source/motion/export/SignalExporter.h"
@@ -228,8 +229,80 @@ public:
         expect(asset->source == original);
     }
 
+    void testMotionPath() {
+        beginTest("Motion paths map clip-local keys through offsets, rates, beats and parent transforms");
+        motion::Project project;
+        project.duration = 10;
+        project.bpm = 120;
+        motion::Group parent;
+        parent.id = 10;
+        parent.properties["position.x"] = motion::Curve(10);
+        parent.properties["position.x"].setKey({3, 20, motion::Interpolation::linear});
+        parent.properties["rotation.z"] = motion::Curve(90);
+        parent.properties["scale.x"] = motion::Curve(2);
+        project.groups.push_back(parent);
+
+        motion::Clip clip;
+        clip.id = 20;
+        clip.start = 2;
+        clip.duration = 4;
+        clip.offset = 1;
+        clip.rate = 2;
+        clip.properties["position.x"] = motion::Curve(0);
+        clip.properties["position.x"].setKey({0, -4, motion::Interpolation::linear});
+        clip.properties["position.x"].setKey({1, 0, motion::Interpolation::hold});
+        clip.properties["position.x"].setKey({3, 1, motion::Interpolation::linear});
+        clip.properties["position.x"].setKey({10, 8, motion::Interpolation::linear});
+        expect(clip.anchorToBeats(project.bpm));
+        motion::Track track;
+        track.id = 30;
+        track.group = parent.id;
+        track.clips.push_back(clip);
+        project.tracks.push_back(track);
+
+        const auto path = motion::editor::buildMotionPath(project, clip.id);
+        expect(!path.tooComplex);
+        expect(!path.points.empty());
+        const auto keyAtThree = std::find_if(path.points.begin(), path.points.end(), [](const auto& point) {
+            return point.key && point.time == 3.0;
+        });
+        expect(keyAtThree != path.points.end());
+        if (keyAtThree != path.points.end()) {
+            expect(keyAtThree->key);
+            expect(keyAtThree->dot);
+            expect(keyAtThree->breakBefore);
+            expectWithinAbsoluteError(keyAtThree->position.x, 20.0, 1.0e-12);
+            expectWithinAbsoluteError(keyAtThree->position.y, 2.0, 1.0e-12);
+            expectWithinAbsoluteError(keyAtThree->position.z, 0.0, 1.0e-12);
+        }
+        for (const auto& point : path.points) {
+            expect(point.time >= 2.0 && point.time <= 6.0);
+            expect(point.position.finite());
+        }
+        expect(std::none_of(path.points.begin(), path.points.end(), [](const auto& point) { return point.key && point.time < 2.0; }));
+        expect(std::none_of(path.points.begin(), path.points.end(), [](const auto& point) { return point.key && point.time > 6.0; }));
+
+        beginTest("Motion paths reject non-finite transformed positions and bound excessive authored keys");
+        auto nonFinite = project;
+        nonFinite.tracks[0].clips[0].properties["position.x"] = motion::Curve(2);
+        nonFinite.groups[0].properties["scale.x"] = motion::Curve(std::numeric_limits<double>::max());
+        const auto finitePath = motion::editor::buildMotionPath(nonFinite, clip.id);
+        expect(finitePath.points.empty());
+        expect(!finitePath.tooComplex);
+
+        auto excessive = project;
+        auto& curve = excessive.tracks[0].clips[0].properties["position.x"];
+        for (int index = 0; index < 2049; ++index) {
+            curve.setKey({20.0 + index, static_cast<double>(index), motion::Interpolation::linear});
+        }
+        const auto complexPath = motion::editor::buildMotionPath(excessive, clip.id);
+        expect(complexPath.tooComplex);
+        expect(complexPath.points.empty());
+    }
+
     void runTest() override {
         testFractal();
+        testMotionPath();
         testMidiEnvelope();
         testMarkers();
         beginTest("Plain titles preserve natural proportions and explicit newlines");

@@ -149,6 +149,14 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     composition.onToolChanged = [this](MotionTransformTool tool) { transformTool.setSelectedId(static_cast<int>(tool) + 1, juce::dontSendNotification); };
     addAndMakeVisible(navigateView);
     addAndMakeVisible(frameView);
+    addAndMakeVisible(pathView);
+    pathView.setName("Show motion path");
+    pathView.setClickingTogglesState(true);
+    pathView.setColour(juce::TextButton::buttonOnColourId, osci::Colours::accentColor().withAlpha(.22f));
+    pathView.setColour(juce::TextButton::textColourOnId, osci::Colours::text());
+    pathView.setTooltip("Show the selected object's position path before effects. Click a path key to seek, then edit with the gizmo. Shortcut: P.");
+    pathView.onClick = [this] { composition.setMotionPathVisible(pathView.getToggleState()); };
+    composition.onMotionPathChanged = [this](bool visible) { pathView.setToggleState(visible, juce::dontSendNotification); };
     navigateView.setName("Navigate composition view");
     navigateView.setWantsKeyboardFocus(false);
     navigateView.setMouseClickGrabsKeyboardFocus(false);
@@ -157,7 +165,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     navigateView.onClick = [this] { composition.setNavigating(!composition.isNavigating()); };
     composition.onNavigationChanged = [this](bool active) {
         navigateView.setToggleState(active, juce::dontSendNotification);
-        navigateView.setButtonText(active ? "Done" : viewportHeader.getWidth() >= 260 ? "Navigate" : "3D");
+        navigateView.setButtonText(active ? "Done" : viewportHeader.getWidth() >= 320 ? "Navigate" : "3D");
     };
     frameView.setName("Frame composition selection");
     frameView.setTooltip("Frame the selected object, or all visible objects. Shortcut: F. Press 0 in the preview to reset the view.");
@@ -630,14 +638,16 @@ void MotionEditor::resized() {
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
     auto viewControls = viewportHeader.getBounds().reduced(5, 3);
-    const auto fullViewControls = viewportHeader.getWidth() >= 310;
+    const auto fullViewControls = viewportHeader.getWidth() >= 400;
     compositionTitle.setVisible(fullViewControls);
     if (fullViewControls) { compositionTitle.setBounds(viewControls.removeFromLeft(100)); }
     frameView.setVisible(fullViewControls);
     if (fullViewControls) { frameView.setBounds(viewControls.removeFromRight(36)); viewControls.removeFromRight(3); }
-    const auto namedNavigation = viewportHeader.getWidth() >= 260;
+    const auto namedNavigation = viewportHeader.getWidth() >= 320;
     navigateView.setBounds(viewControls.removeFromRight(namedNavigation ? 76 : 40));
     viewControls.removeFromRight(3);
+    pathView.setVisible(viewportHeader.getWidth() >= 200);
+    if (pathView.isVisible()) { pathView.setBounds(viewControls.removeFromRight(44)); viewControls.removeFromRight(3); }
     transformTool.setBounds(viewControls.removeFromLeft(std::min(86, viewControls.getWidth())));
     navigateView.setButtonText(composition.isNavigating() ? "Done" : namedNavigation ? "Navigate" : "3D");
     composition.setBounds(editing.withTrimmedTop(3));
@@ -1181,8 +1191,8 @@ void MotionEditor::refreshInspector() {
         if (editable && !values[index].isBeingEdited()) {
             const auto found = target->properties->find(property);
             if (found != target->properties->end()) {
-                values[index].setText(juce::String(found->second.evaluateBase(target->localTime(processor.position.load())), 2), juce::dontSendNotification);
-                const auto time = target->localTime(processor.position.load());
+                const auto time = composition.selectedKeyContentTime(selection).value_or(target->localTime(processor.position.load()));
+                values[index].setText(juce::String(found->second.evaluateBase(time), 2), juce::dontSendNotification);
                 const auto& keys = found->second.keyframes();
                 const auto keyed = std::any_of(keys.begin(), keys.end(), [time](const auto& key) { return std::abs(key.time - time) < 1.0e-6; });
                 keyButtons[index].setState(keyed ? osci::KeyframeButton::State::keyed
@@ -1203,7 +1213,8 @@ void MotionEditor::setProperty(int index, bool keyframe) {
     if (existing == nullptr) {
         return;
     }
-    auto value = existing->evaluateBase(target->localTime(time));
+    const auto localTime = composition.selectedKeyContentTime(selection).value_or(target->localTime(time));
+    auto value = existing->evaluateBase(localTime);
     if (!keyframe) {
         const auto text = values[index].getText().trim();
         char* end = nullptr;
@@ -1223,11 +1234,12 @@ void MotionEditor::setProperty(int index, bool keyframe) {
         auto* curve = updated.has_value() ? updated->curve(property) : nullptr;
         if (curve == nullptr) { return; }
         if (keyframe || curve->animated()) {
-            curve->setKeyValue(updated->localTime(time), value);
+            curve->setKeyValue(localTime, value);
         } else {
             curve->base = value;
         }
     });
+    composition.retainSelectedKeyAfterEdit();
 }
 
 bool MotionEditor::keyPressed(const juce::KeyPress& key) {

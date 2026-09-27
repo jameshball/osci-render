@@ -105,7 +105,7 @@ private:
     int previewWidth = 1, workspaceHeight = 1;
     juce::Label compositionTitle;
     juce::ComboBox transformTool;
-    juce::TextButton navigateView { "Navigate" }, frameView { "Fit" };
+    juce::TextButton navigateView { "Navigate" }, frameView { "Fit" }, pathView { "Path" };
     juce::TextButton importButton { "Import" };
     juce::TextButton playButton { "Play" };
     juce::TextButton splitButton { "Split" };
