@@ -43,7 +43,7 @@ private:
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void select(motion::Id id);
-    void enterComposition(motion::Id clip);
+    void enterComposition(motion::Id clip, bool fromLibrary = false);
     void leaveComposition();
     struct ScopeView {
         motion::Id scope, selection;
@@ -53,6 +53,7 @@ private:
     std::vector<ScopeView> scopeHistory;
     juce::TextButton scopeBack { "Back to Main" };
     juce::Label scopeLabel, scopeShared;
+    std::uint64_t scopeNameGeneration = 0;
     void refreshInspector();
     bool audioSelected() const;
     const char* inspectorProperty(std::size_t index) const;

@@ -104,9 +104,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     scopeLabel.setName("Composition name");
     scopeLabel.setEditable(false, true);
     scopeLabel.setTooltip("Shared composition: changes affect every instance. Double-click to rename.");
+    scopeLabel.onEditorShow = [this] { scopeNameGeneration = processor.document.generation(); };
     scopeLabel.onTextChange = [this] {
         const auto name = scopeLabel.getText().trim();
-        if (processor.document.editingComposition() == 0 || name.isEmpty() || name.length() > 200) { return; }
+        if (processor.document.editingComposition() == 0 || processor.document.generation() != scopeNameGeneration || name.isEmpty() || name.length() > 200) { return; }
         processor.document.edit("Rename composition", [name](motion::Project& project) { project.name = name; });
     };
     addAndMakeVisible(compositionTitle);
@@ -354,6 +355,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             }
         });
     };
+    assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
     assetLibrary.onInsert = [this](motion::Id id) { timeline.insertAsset(id, -1, -1); };
     assetLibrary.onBake = [this](motion::Id id) {
         const auto& assets = processor.document.project().assets;
@@ -784,6 +786,7 @@ void MotionEditor::timerCallback() {
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     if (processor.document.editingComposition() == 0) { scopeHistory.clear(); }
+    if (scopeLabel.isBeingEdited() && scopeNameGeneration != processor.document.generation()) { scopeLabel.hideEditor(true); }
     if (!scopeLabel.isBeingEdited()) { scopeLabel.setText(processor.document.project().name, juce::dontSendNotification); }
     juce::String parentName = "Main";
     if (!scopeHistory.empty() && scopeHistory.back().scope != 0) {
@@ -808,7 +811,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     repaint();
 }
 
-void MotionEditor::enterComposition(motion::Id id) {
+void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     const auto& project = processor.document.project();
     motion::Id definition = 0;
     double time = 0;
@@ -821,11 +824,18 @@ void MotionEditor::enterComposition(motion::Id id) {
             time = clock.localTime(position >= clock.start && position < clock.end() ? position : clock.start);
         }
     }
-    if (definition == 0) { return; }
-    ScopeView previous {processor.document.editingComposition(), id, processor.position.load(), timeline.pixelsPerSecond, timeline.scrollTime, timeline.scrollRows};
+    if (fromLibrary) {
+        for (const auto& source : project.definitions) {
+            if (source->id != id) { continue; }
+            definition = id; time = motion::Document::makeCompositionClip(0, *source, 0).offset;
+        }
+    }
+    if (definition == 0 || definition == processor.document.editingComposition()) { return; }
+    ScopeView previous {processor.document.editingComposition(), fromLibrary ? selection : id, processor.position.load(), timeline.pixelsPerSecond, timeline.scrollTime, timeline.scrollRows};
     const auto entered = processor.document.enterComposition(definition);
     if (entered.failed()) { assetLibrary.setError(entered.getErrorMessage()); return; }
     scopeHistory.push_back(previous);
+    assetLibrary.setError({});
     processor.playing.store(false);
     processor.seek(std::clamp(time, 0.0, processor.document.project().duration));
     select(0); timeline.scrollRows = 0; timeline.scrollTime = 0; timeline.revealTime(time);
@@ -838,6 +848,7 @@ void MotionEditor::leaveComposition() {
     if (!scopeHistory.empty()) { previous = scopeHistory.back(); scopeHistory.pop_back(); }
     auto entered = processor.document.enterComposition(previous.scope);
     if (entered.failed()) { previous.scope = 0; processor.document.enterComposition(0); scopeHistory.clear(); }
+    assetLibrary.setError({});
     processor.playing.store(false); processor.seek(previous.position);
     select(previous.selection);
     timeline.pixelsPerSecond = previous.zoom; timeline.scrollTime = previous.scroll; timeline.scrollRows = previous.row;

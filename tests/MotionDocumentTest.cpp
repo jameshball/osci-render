@@ -819,6 +819,60 @@ private:
         expect(document.project().tracks.front().clips.size() == 2);
         expect(undo.redo()); expect(document.project().definitions.size() == 1);
         expect(document.project().tracks.front().clips.front().id == instance);
+        beginTest("Making an instance unique forks authored identities while sharing media");
+        juce::UndoManager uniqueUndo; motion::Document unique(uniqueUndo); unique.reset(document.mainProject());
+        const auto cameraId = unique.newId(), cutId = unique.newId();
+        unique.edit("Add definition camera", [cameraId, cutId](motion::Project& value) {
+            auto definition = std::make_shared<motion::CompositionDefinition>(*value.definitions.front());
+            motion::Camera camera; camera.id = cameraId; definition->cameras = {camera};
+            motion::CameraCut cut; cut.id = cutId; cut.camera = cameraId; cut.start = 0; cut.duration = 20;
+            definition->cameraCuts = {cut}; value.definitions.front() = definition;
+        });
+        motion::Id secondInstance = 0; expect(unique.duplicateClip(instance, secondInstance).wasOk());
+        const auto originalDefinition = unique.mainProject().definitions.front();
+        motion::Id copyId = 0;
+        const auto forked = unique.makeCompositionUnique(secondInstance, copyId);
+        expect(forked.wasOk(), forked.getErrorMessage());
+        if (forked.wasOk()) {
+            expect(unique.mainProject().definitions.size() == 2 && copyId != originalDefinition->id);
+            const auto copy = unique.mainProject().definitions.back();
+            expect(copy->tracks.front().id != originalDefinition->tracks.front().id);
+            expect(copy->tracks.front().clips.front().id != originalDefinition->tracks.front().clips.front().id);
+            expect(copy->tracks.front().clips.front().asset == originalDefinition->tracks.front().clips.front().asset);
+            expect(copy->groups.front().id != originalDefinition->groups.front().id);
+            expect(copy->tracks.front().group == copy->groups.front().id);
+            expect(copy->cameras.front().id != cameraId && copy->cameraCuts.front().camera == copy->cameras.front().id);
+            expect(copy->cameraCuts.front().id != cutId);
+            expect(unique.project().tracks.front().clips.front().composition == originalDefinition->id);
+            expect(unique.project().tracks.front().clips.back().composition == copyId);
+            const auto copySaved = loaded.load(unique.save()); expect(copySaved.wasOk(), copySaved.getErrorMessage());
+            expect(uniqueUndo.undo()); expect(unique.mainProject().definitions.size() == 1);
+            expect(uniqueUndo.redo()); expect(unique.mainProject().definitions.size() == 2);
+            expect(unique.enterComposition(copyId).wasOk());
+            unique.edit("Edit isolated child", [](motion::Project& value) { value.tracks.front().clips.front().properties["position.z"] = motion::Curve(0.4); });
+            expectWithinAbsoluteError(unique.mainProject().definitions.front()->tracks.front().clips.front().properties.at("position.z").base, 0.0, 0.00001);
+            expect(unique.mainProject().assets.front() == project.assets.front());
+            const auto isolatedSaved = loaded.load(unique.save()); expect(isolatedSaved.wasOk(), isolatedSaved.getErrorMessage());
+            expect(unique.enterComposition(0).wasOk());
+            motion::Id inserted = 0;
+            const auto insertion = unique.insertComposition(originalDefinition->id, 20, 0, 0, inserted);
+            expect(insertion.wasOk(), insertion.getErrorMessage());
+            expect(unique.project().tracks.back().clips.front().id == inserted);
+            expectEquals(unique.project().tracks.back().clips.front().offset, 2.0);
+            expectEquals(unique.project().tracks.back().clips.front().duration, 4.0);
+            expect(uniqueUndo.undo()); expect(uniqueUndo.redo());
+            const auto insertedSaved = loaded.load(unique.save()); expect(insertedSaved.wasOk(), insertedSaved.getErrorMessage());
+            unique.edit("Lock insertion track", [](motion::Project& value) { value.tracks.back().locked = true; });
+            const auto revision = unique.revision();
+            const auto highest = motion::highestProjectIdentity(unique.mainProject());
+            expect(unique.insertComposition(originalDefinition->id, 30, unique.project().tracks.back().id, 0, inserted).failed());
+            expect(inserted == 0 && unique.revision() == revision && unique.newId() == highest + 1);
+            expect(unique.enterComposition(originalDefinition->id).wasOk());
+            expect(!unique.canReferenceComposition(originalDefinition->id));
+            const auto scopeRevision = unique.revision();
+            expect(unique.insertComposition(originalDefinition->id, 0, 0, 0, inserted).failed());
+            expect(inserted == 0 && unique.revision() == scopeRevision);
+        }
         beginTest("Nested editing uses one undo history while save retains the complete main project");
         const auto definitionId = document.project().definitions.front()->id;
         const auto mainName = document.mainProject().name;
@@ -849,6 +903,13 @@ private:
         expect(document.project().tracks.front().clips.front().id == nestedInstance);
         const auto nestedSaved = loaded.load(document.save());
         expect(nestedSaved.wasOk(), nestedSaved.getErrorMessage());
+        const auto innerId = document.project().tracks.front().clips.front().composition;
+        expect(document.enterComposition(innerId).wasOk());
+        expect(!document.canReferenceComposition(definitionId), "An ancestor cannot be inserted inside its child");
+        motion::Id rejectedInsertion = 123;
+        expect(document.insertComposition(definitionId, 0, 0, 0, rejectedInsertion).failed());
+        expect(rejectedInsertion == 0);
+        expect(document.enterComposition(definitionId).wasOk());
         expect(undo.undo()); expect(document.mainProject().definitions.size() == 1);
         expect(undo.undo()); // shared rename
         expect(undo.undo()); // initial creation; active definition disappears

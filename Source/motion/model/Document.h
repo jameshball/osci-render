@@ -86,6 +86,9 @@ public:
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);
+    juce::Result insertComposition(Id definition, double time, Id track, Id group, Id& clipId);
+    bool canReferenceComposition(Id definition) const;
+    juce::Result makeCompositionUnique(Id clipId, Id& definitionId);
     juce::Result createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
     juce::Result assignMidi(Id clipId, Id assetId);
@@ -108,6 +111,7 @@ public:
     static bool isMidiSource(const juce::String& extension) {
         return extension.equalsIgnoreCase(".mid") || extension.equalsIgnoreCase(".midi");
     }
+    static Clip makeCompositionClip(Id id, const CompositionDefinition& definition, double time);
     static Clip makeClip(Id id, const Asset& asset, double time);
 
 private:

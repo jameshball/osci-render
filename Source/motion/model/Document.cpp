@@ -635,6 +635,134 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     return juce::Result::ok();
 }
 
+bool Document::canReferenceComposition(Id definition) const {
+    std::set<Id> visited;
+    const auto visit = [&](auto&& self, Id id) -> bool {
+        if (id == scopeId) { return false; }
+        if (!visited.insert(id).second) { return true; }
+        const auto found = std::find_if(state.definitions.begin(), state.definitions.end(), [id](const auto& value) { return value->id == id; });
+        if (found == state.definitions.end()) { return false; }
+        for (const auto& track : (*found)->tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.composition != 0 && !self(self, clip.composition)) { return false; }
+            }
+        }
+        return true;
+    };
+    return definition != 0 && visit(visit, definition);
+}
+
+Clip Document::makeCompositionClip(Id id, const CompositionDefinition& definition, double time) {
+    Clip clip; clip.id = id; clip.composition = definition.id; clip.name = definition.name.toStdString();
+    double first = definition.duration, last = 0;
+    for (const auto& track : definition.tracks) {
+        for (const auto& source : track.clips) {
+            const auto timing = source.timing(definition.bpm);
+            if (!timing.valid() || timing.start >= definition.duration) { continue; }
+            first = std::min(first, timing.start); last = std::max(last, std::min(timing.end(), definition.duration));
+        }
+    }
+    if (last <= first) { first = 0; last = definition.duration; }
+    clip.start = time; clip.offset = first; clip.duration = last - first;
+    for (std::size_t index = 0; index < propertyNames.size(); ++index) { clip.properties.emplace(propertyNames[index], Curve(index >= 6 ? 1 : 0)); }
+    return clip;
+}
+
+juce::Result Document::insertComposition(Id definition, double time, Id trackId, Id groupId, Id& clipId) {
+    clipId = 0;
+    if (!std::isfinite(time) || time < 0 || !canReferenceComposition(definition)) {
+        return juce::Result::fail("Choose a valid composition that does not contain the current editing scope.");
+    }
+    auto candidate = project();
+    const auto source = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [definition](const auto& value) { return value->id == definition; });
+    if (source == candidate.definitions.end()) { return juce::Result::fail("The composition no longer exists."); }
+    auto highest = highestId();
+    const auto required = trackId == 0 ? 2u : 1u;
+    if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining clip identities."); }
+    auto clip = makeCompositionClip(++highest, **source, time);
+    if (!clip.valid() || !clip.timing(candidate.bpm).valid()) { return juce::Result::fail("The composition has invalid timing."); }
+    if (trackId != 0) {
+        const auto track = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [trackId](const auto& value) { return value.id == trackId; });
+        if (track == candidate.tracks.end() || track->locked || track->kind != TrackKind::visual || !track->insert(clip, candidate.bpm)) {
+            return juce::Result::fail("Use an unlocked visual track with room for the composition.");
+        }
+    } else {
+        if (groupId != 0 && findGroup(candidate, groupId) == nullptr) { return juce::Result::fail("The destination group no longer exists."); }
+        Track track; track.id = ++highest; track.name = clip.name; track.group = groupId; track.clips = {clip};
+        candidate.tracks.push_back(std::move(track));
+    }
+    candidate.duration = std::max(candidate.duration, clip.end());
+    const auto graph = validateCompositionGraph(mergeScope(candidate));
+    if (!graph) { return juce::Result::fail(graph.error); }
+    lastId = highest;
+    edit("Insert composition", [candidate = std::move(candidate)](Project& value) { value = candidate; });
+    clipId = clip.id;
+    return juce::Result::ok();
+}
+
+juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
+    definitionId = 0;
+    auto candidate = project();
+    Clip* target = nullptr;
+    for (auto& track : candidate.tracks) {
+        for (auto& clip : track.clips) {
+            if (clip.id != clipId) { continue; }
+            if (track.locked) { return juce::Result::fail("Unlock the track before making its composition unique."); }
+            target = &clip;
+        }
+    }
+    if (target == nullptr || target->composition == 0) { return juce::Result::fail("Select a composition instance."); }
+    const auto found = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [&](const auto& value) { return value->id == target->composition; });
+    if (found == candidate.definitions.end()) { return juce::Result::fail("The referenced composition no longer exists."); }
+    auto copy = std::make_shared<CompositionDefinition>(**found);
+    std::size_t required = 1 + copy->groups.size() + copy->tracks.size() + copy->cameras.size() + copy->cameraCuts.size() + copy->effects.size();
+    for (const auto& group : copy->groups) { required += group.effects.size(); }
+    for (const auto& track : copy->tracks) {
+        required += track.effects.size() + track.clips.size();
+        for (const auto& clip : track.clips) { required += clip.effects.size(); }
+    }
+    auto highest = highestId();
+    if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining composition identities."); }
+    const auto effects = [&](auto& values) { for (auto& value : values) { value.id = ++highest; } };
+    copy->id = ++highest;
+    copy->name += " copy";
+    std::map<Id, Id> groups, cameras;
+    for (auto& group : copy->groups) {
+        const auto old = group.id; group.id = ++highest; groups.emplace(old, group.id); effects(group.effects);
+    }
+    for (auto& group : copy->groups) {
+        if (group.parent != 0) {
+            if (!groups.contains(group.parent)) { return juce::Result::fail("Invalid composition group hierarchy."); }
+            group.parent = groups.at(group.parent);
+        }
+    }
+    for (auto& track : copy->tracks) {
+        track.id = ++highest; effects(track.effects);
+        if (track.group != 0) {
+            if (!groups.contains(track.group)) { return juce::Result::fail("Invalid composition group reference."); }
+            track.group = groups.at(track.group);
+        }
+        for (auto& clip : track.clips) { clip.id = ++highest; effects(clip.effects); }
+    }
+    for (auto& camera : copy->cameras) { const auto old = camera.id; camera.id = ++highest; cameras.emplace(old, camera.id); }
+    for (auto& cut : copy->cameraCuts) {
+        if (!cameras.contains(cut.camera)) { return juce::Result::fail("Invalid composition camera reference."); }
+        cut.id = ++highest; cut.camera = cameras.at(cut.camera);
+    }
+    effects(copy->effects);
+    // Only this definition is forked. Media and referenced child definitions
+    // remain shared, while all authored identities within this scope are fresh.
+    target->composition = copy->id;
+    target->name = copy->name.toStdString();
+    candidate.definitions.push_back(copy);
+    const auto graph = validateCompositionGraph(mergeScope(candidate));
+    if (!graph || !validGroupHierarchy(*copy)) { return juce::Result::fail(graph ? "Invalid copied group hierarchy." : graph.error); }
+    lastId = highest;
+    edit("Make composition unique", [candidate = std::move(candidate)](Project& value) { value = candidate; });
+    definitionId = copy->id;
+    return juce::Result::ok();
+}
+
 juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId) {
     const auto& state = project();
     instanceId = 0;

@@ -185,6 +185,13 @@ public:
         const auto& project = processor.document.project();
         const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [assetId](const auto& item) { return item->id == assetId; });
         if (asset == project.assets.end()) {
+            const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
+            const auto row = trackAtY(y);
+            const auto track = row >= 0 && row < static_cast<int>(project.tracks.size()) ? project.tracks[row].id : 0;
+            motion::Id inserted = 0;
+            const auto result = processor.document.insertComposition(assetId, snapTime(time, juce::ModifierKeys::getCurrentModifiers()), track, groupAtY(y), inserted);
+            if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
+            selectClip(inserted); refreshTracks();
             return;
         }
         if ((*asset)->midi != nullptr) {
@@ -373,9 +380,14 @@ public:
             candidate.start = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
             const auto& assets = processor.document.project().assets;
             const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == dropAssetId; });
+            const auto& definitions = processor.document.project().definitions;
+            const auto definition = std::find_if(definitions.begin(), definitions.end(), [&](const auto& item) { return item->id == dropAssetId; });
             if (asset != assets.end()) {
                 candidate = motion::Document::makeClip(candidate.id, **asset, candidate.start);
+            } else if (definition != definitions.end()) {
+                candidate = motion::Document::makeCompositionClip(candidate.id, **definition, candidate.start);
             }
+            const bool recursive = definition != definitions.end() && !processor.document.canReferenceComposition(dropAssetId);
             if (asset != assets.end() && (*asset)->midi != nullptr) {
                 int targetRow = -1;
                 const auto* target = clipAt(*dropPosition, targetRow);
@@ -388,7 +400,7 @@ public:
             const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
             const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
             const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
-            const auto allowed = asset != assets.end() && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].canPlace(candidate, 0, processor.document.project().bpm));
+            const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().bpm));
             const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), rowHeight)).toFloat().reduced(1, 4);
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
@@ -396,7 +408,7 @@ public:
             g.fillRoundedRectangle(bounds, 4);
             g.setColour(allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080));
             g.drawRoundedRectangle(bounds, 4, 1);
-            g.drawText(allowed ? (audio ? "Add audio" : "Add object") : (correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
+            g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
         }
         const auto playhead = timeX(processor.position.load());
         if (playhead >= namesWidth && playhead <= getWidth()) {
@@ -695,10 +707,10 @@ private:
             for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; definition = clip.composition; locked = track.locked; } }
         }
         const auto references = motion::sourceReferenceCount(processor.document.mainProject(), asset);
-        menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1);
+        if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
         menu.addSeparator();
         menu.addItem(4, "Create composition from selection", !locked && !selectedClips.empty());
-        if (definition != 0) { menu.addItem(5, "Open composition"); }
+        if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
@@ -720,6 +732,11 @@ private:
                 owner->refreshTracks();
             } else if (result == 5 && owner->onEnterComposition) {
                 owner->onEnterComposition(id);
+            } else if (result == 6) {
+                motion::Id definitionId = 0;
+                const auto copied = owner->processor.document.makeCompositionUnique(id, definitionId);
+                if (copied.failed() && owner->onError) { owner->onError(copied.getErrorMessage()); }
+                owner->refreshTracks();
             }
         });
     }

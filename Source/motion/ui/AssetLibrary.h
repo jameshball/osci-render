@@ -22,7 +22,8 @@ public:
         bakeSettings.setButtonText("Bake settings...");
         bakeSettings.onClick = [this] {
             const auto row = list.getSelectedRow();
-            if (validRow(row) && onBake) { onBake(assetId(row)); }
+            if (definitionRow(row)) { if (onOpenComposition) { onOpenComposition(assetId(row)); } }
+            else if (validAssetRow(row) && onBake) { onBake(assetId(row)); }
         };
         addChildComponent(bakeSettings);
         assignMidi.setButtonText("Assign to selected clip");
@@ -32,7 +33,7 @@ public:
         refresh();
     }
 
-    std::function<void(motion::Id)> onInsert;
+    std::function<void(motion::Id)> onInsert, onOpenComposition;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
 
@@ -45,6 +46,7 @@ public:
     void refresh() {
         const auto selectedId = assetId(list.getSelectedRow());
         assets = document.project().assets;
+        definitions = document.mainProject().definitions;
         list.updateContent();
         list.deselectAllRows();
         selectAsset(selectedId);
@@ -52,8 +54,8 @@ public:
     }
 
     void selectAsset(motion::Id id) {
-        for (std::size_t row = 0; row < assets.size(); ++row) {
-            if (assets[row]->id == id) {
+        for (std::size_t row = 0; row < assets.size() + definitions.size(); ++row) {
+            if (assetId(static_cast<int>(row)) == id) {
                 list.selectRow(static_cast<int>(row));
                 return;
             }
@@ -70,8 +72,13 @@ public:
         cancelImport.setVisible(importStatus.isNotEmpty());
         status.setColour(juce::Label::textColourId, hasError && importStatus.isEmpty() ? juce::Colours::orange : osci::Colours::text().withAlpha(0.6f));
         const auto row = list.getSelectedRow();
-        const auto midi = validRow(row) ? assets[static_cast<std::size_t>(row)]->midi : nullptr;
+        const auto midi = validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->midi : nullptr;
         juce::String help = midi != nullptr ? "Select a visual clip, then assign these notes. Or drag this MIDI file onto a clip." : "Double-click or press Enter to insert. Drag onto the timeline to place a copy.";
+        if (definitionRow(row)) {
+            help = document.canReferenceComposition(assetId(row))
+                ? "Shared composition. Enter or double-click to insert; drag to place. Open to edit."
+                : "Contains this scope: insertion would create a loop. Open to edit.";
+        }
         if (midi != nullptr) {
             const auto& asset = *assets[static_cast<std::size_t>(row)];
             help += "\n" + juce::String(static_cast<int>(midi->notes().size())) + (midi->notes().size() == 1 ? " note" : " notes");
@@ -94,7 +101,7 @@ public:
     }
 
     void paint(juce::Graphics& graphics) override {
-        if (assets.empty()) {
+        if (assets.empty() && definitions.empty()) {
             graphics.setColour(osci::Colours::text().withAlpha(0.6f));
             graphics.setFont(13.0f);
             graphics.drawFittedText("Import a source to add it to your asset library.", list.getBounds().reduced(12), juce::Justification::centred, 3);
@@ -103,25 +110,25 @@ public:
 
 private:
     void selectedRowsChanged(int row) override {
-        assignMidi.setVisible(validRow(row) && assets[static_cast<std::size_t>(row)]->midi != nullptr);
+        assignMidi.setVisible(validAssetRow(row) && assets[static_cast<std::size_t>(row)]->midi != nullptr);
         updateStatus();
-        const bool raster = validRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
-        const bool text = validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
-        bakeSettings.setButtonText(text ? "Edit text..." : (raster ? "Image settings..." : "Bake settings..."));
-        bakeSettings.setVisible(text || raster || (validRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
+        const bool raster = validAssetRow(row) && motion::Document::isRasterSource(assets[static_cast<std::size_t>(row)]->extension);
+        const bool text = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".txt");
+        bakeSettings.setButtonText(definitionRow(row) ? "Open composition" : text ? "Edit text..." : (raster ? "Image settings..." : "Bake settings..."));
+        bakeSettings.setVisible(definitionRow(row) || text || raster || (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->extension.equalsIgnoreCase(".lua")));
         resized();
     }
-    int getNumRows() override { return static_cast<int>(assets.size()); }
+    int getNumRows() override { return static_cast<int>(assets.size() + definitions.size()); }
 
     juce::String getNameForRow(int row) override {
-        return validRow(row) ? assets[static_cast<std::size_t>(row)]->name : juce::String();
+        return definitionRow(row) ? definitions[static_cast<std::size_t>(row) - assets.size()]->name
+            : validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->name : juce::String();
     }
 
     void paintListBoxItem(int row, juce::Graphics& graphics, int width, int height, bool selected) override {
         if (!validRow(row)) {
             return;
         }
-        const auto& asset = *assets[static_cast<std::size_t>(row)];
         auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(4, 2);
         if (selected) {
             graphics.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), 0.08f));
@@ -132,12 +139,20 @@ private:
         bounds.reduce(8, 3);
         graphics.setColour(osci::Colours::text());
         graphics.setFont(13.0f);
-        graphics.drawText(asset.name, bounds.removeFromTop(20), juce::Justification::centredLeft);
+        graphics.drawText(getNameForRow(row), bounds.removeFromTop(20), juce::Justification::centredLeft);
         graphics.setColour(osci::Colours::text().withAlpha(0.55f));
         graphics.setFont(11.0f);
-        auto detail = asset.extension.trimCharactersAtStart(".").toUpperCase();
-        if (asset.source != nullptr && asset.source->frameCount() > 1) {
-            detail += " | " + juce::String(asset.source->duration(), 2) + "s | " + juce::String(static_cast<int>(asset.source->frameCount())) + " frames";
+        juce::String detail;
+        if (definitionRow(row)) {
+            const auto& definition = *definitions[static_cast<std::size_t>(row) - assets.size()];
+            const auto clip = motion::Document::makeCompositionClip(0, definition, 0);
+            detail = "COMPOSITION | " + juce::String(clip.duration, 2) + "s";
+        } else {
+            const auto& asset = *assets[static_cast<std::size_t>(row)];
+            detail = asset.extension.trimCharactersAtStart(".").toUpperCase();
+            if (asset.source != nullptr && asset.source->frameCount() > 1) {
+                detail += " | " + juce::String(asset.source->duration(), 2) + "s | " + juce::String(static_cast<int>(asset.source->frameCount())) + " frames";
+            }
         }
         graphics.drawText(detail, bounds, juce::Justification::centredLeft);
     }
@@ -152,12 +167,13 @@ private:
         return "motion-asset:" + juce::String(static_cast<juce::uint64>(assetId(rows[0])));
     }
 
-    bool validRow(int row) const {
-        return row >= 0 && static_cast<std::size_t>(row) < assets.size();
-    }
+    bool validRow(int row) const { return row >= 0 && static_cast<std::size_t>(row) < assets.size() + definitions.size(); }
+    bool validAssetRow(int row) const { return row >= 0 && static_cast<std::size_t>(row) < assets.size(); }
+    bool definitionRow(int row) const { return validRow(row) && !validAssetRow(row); }
 
     motion::Id assetId(int row) const {
-        return validRow(row) ? assets[static_cast<std::size_t>(row)]->id : 0;
+        return definitionRow(row) ? definitions[static_cast<std::size_t>(row) - assets.size()]->id
+            : validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->id : 0;
     }
 
     void insert(int row) {
@@ -168,6 +184,7 @@ private:
 
     motion::Document& document;
     std::vector<std::shared_ptr<const motion::Asset>> assets;
+    std::vector<std::shared_ptr<const motion::CompositionDefinition>> definitions;
     juce::ListBox list;
     juce::Label status;
     juce::TextButton cancelImport, bakeSettings, assignMidi;
