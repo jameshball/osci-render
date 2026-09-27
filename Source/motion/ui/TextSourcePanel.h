@@ -6,7 +6,7 @@
 
 class MotionTextSourcePanel final : public juce::Component {
 public:
-    MotionTextSourcePanel(const juce::String& initial, std::size_t instances, motion::TextSettings initialSettings) : original(initial), originalSettings(initialSettings), settings(initialSettings) {
+    MotionTextSourcePanel(const juce::String& initial, std::size_t instances, motion::TextSettings initialSettings, const juce::String& preparationError = {}) : original(initial), originalSettings(initialSettings), settings(initialSettings) {
         setName("Text source editor");
         text.setName("Source text");
         text.setMultiLine(true);
@@ -21,6 +21,13 @@ public:
         help.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         help.setText("Shared source: " + juce::String(static_cast<juce::uint64>(instances)) + (instances == 1 ? " clip" : " clips") + " will update. Clip animation stays unchanged.", juce::dontSendNotification);
         help.setJustificationType(juce::Justification::centredLeft);
+        error.setName("Text preparation error");
+        error.setText(preparationError.contains("geometry budget") ? "This text is too detailed to prepare. Try a simpler font or shorten the text." : preparationError, juce::dontSendNotification);
+        error.setMinimumHorizontalScale(1.0f);
+        error.setTooltip(preparationError);
+        error.setFont(juce::FontOptions(13));
+        error.setColour(juce::Label::textColourId, osci::Colours::danger());
+        error.setJustificationType(juce::Justification::centredLeft);
         status.setFont(juce::FontOptions(12));
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         families = juce::Font::findAllTypefaceNames();
@@ -67,13 +74,14 @@ public:
         }
         apply.setButtonText("Apply text");
         apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(text.getText(), settings); } };
-        for (auto* component : std::initializer_list<juce::Component*>{&text, &help, &status, &apply, &family, &style, &alignment, &lineSpacing, &tracking}) { addAndMakeVisible(component); }
+        for (auto* component : std::initializer_list<juce::Component*>{&text, &help, &error, &status, &apply, &family, &style, &alignment, &lineSpacing, &tracking}) { addAndMakeVisible(component); }
         refresh();
     }
     std::function<void(juce::String, motion::TextSettings)> onApply;
     void resized() override {
         auto area = getLocalBounds().reduced(12);
         help.setBounds(area.removeFromTop(42));
+        error.setBounds(area.removeFromTop(error.getText().isEmpty() ? 0 : 48));
         auto footer = area.removeFromBottom(36);
         apply.setBounds(footer.removeFromRight(108).reduced(0, 4));
         status.setBounds(footer);
@@ -126,6 +134,6 @@ private:
     juce::Slider lineSpacing, tracking;
     std::array<juce::Label, 5> labels;
     juce::TextEditor text;
-    juce::Label help, status;
+    juce::Label help, error, status;
     juce::TextButton apply;
 };

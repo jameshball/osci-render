@@ -719,7 +719,8 @@ void MotionEditor::showNextPreparationSettings() {
     MotionLuaSourcePanel* sourcePanel = nullptr;
     if (text) {
         const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
-        auto panel = std::make_unique<MotionTextSourcePanel>(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())), instances, request.replacement->textSettings);
+        const auto draft = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())));
+        auto panel = std::make_unique<MotionTextSourcePanel>(draft, instances, request.textSettings.value_or(request.replacement->textSettings), request.preparationError);
         textPanel = panel.get();
         content = std::move(panel);
     } else if (editLua) {
@@ -828,7 +829,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 owner->importError = result.getErrorMessage();
                 owner->assetLibrary.setError(owner->importError);
                 owner->repaint();
-                if (request.replacement != nullptr && request.replacement->extension.equalsIgnoreCase(".lua")) {
+                if (request.uniqueClip == 0 && request.replacement != nullptr && (request.replacement->extension.equalsIgnoreCase(".lua") || request.replacement->extension.equalsIgnoreCase(".txt"))) {
                     const auto& assets = owner->processor.document.project().assets;
                     if (std::find(assets.begin(), assets.end(), request.replacement) != assets.end()) {
                         auto retry = request;
