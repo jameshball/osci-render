@@ -8,6 +8,79 @@
 class MotionDocumentTest : public juce::UnitTest {
 public:
     MotionDocumentTest() : juce::UnitTest("Motion document and signal", "Motion") {}
+    void testRippleDelete(const motion::Project& source) {
+        beginTest("Ripple deletion closes selected intervals per track and preserves source clocks, keys and cues");
+        auto project = source;
+        project.tracks.resize(2, project.tracks.front());
+        project.tracks[0].id = 100; project.tracks[1].id = 101;
+        const auto base = project.tracks[0].clips.front();
+        project.tracks[0].clips.clear(); project.tracks[1].clips.clear();
+        for (int index = 0; index < 5; ++index) {
+            auto clip = base;
+            clip.id = 200 + index; clip.start = index * 3; clip.duration = 2;
+            clip.offset = .75; clip.rate = 1.25;
+            clip.properties["position.x"].setKey({1, .5, motion::Interpolation::linear});
+            if (index == 4) { expect(clip.anchorToBeats(project.bpm)); }
+            project.tracks[0].clips.push_back(clip);
+        }
+        auto independent = base; independent.id = 300; independent.start = 9; independent.duration = 2;
+        project.tracks[1].clips.push_back(independent);
+        juce::UndoManager undo; motion::Document document(undo); document.reset(project);
+        expect(document.setMarker(0, 8, "Fixed cue").wasOk());
+        const auto original = document.save().toString();
+        const auto revision = document.revision();
+        expect(document.removeClips({201, 9999}, true).failed());
+        expect(document.removeClips({201, 201}, true).failed());
+        expect(document.removeClips({}, true).failed());
+        expectEquals(document.revision(), revision); expectEquals(document.save().toString(), original);
+        expect(document.removeClips({201, 203}, true).wasOk());
+        const auto& result = document.project();
+        expectEquals(static_cast<int>(result.tracks[0].clips.size()), 3);
+        expectEquals(result.tracks[0].clips[1].start, 4.0);
+        const auto& last = result.tracks[0].clips[2];
+        expectWithinAbsoluteError(last.timing(result.bpm).start, 8.0, 1e-12);
+        expectWithinAbsoluteError(last.timing(result.bpm).offset, .75, 1e-12);
+        expectWithinAbsoluteError(last.timing(result.bpm).rate, 1.25, 1e-12);
+        expect(last.timeBase == motion::ClipTimeBase::beats);
+        expectEquals(last.properties.at("position.x").evaluate(1), .5);
+        expectEquals(result.tracks[1].clips[0].start, 9.0);
+        expectEquals(result.markers[0].time, 8.0);
+        expectEquals(result.duration, project.duration);
+        const auto rippled = document.save().toString();
+        expect(undo.undo()); expectEquals(document.save().toString(), original);
+        expect(undo.redo()); expectEquals(document.save().toString(), rippled);
+        juce::UndoManager loadedUndo; motion::Document loaded(loadedUndo);
+        expect(loaded.load(document.save()).wasOk()); expectEquals(loaded.save().toString(), rippled);
+        expect(undo.undo());
+        expect(document.removeClips({201, 203}, false).wasOk());
+        expectEquals(document.project().tracks[0].clips[1].start, 6.0);
+        expect(undo.undo());
+        document.edit("Lock second track", [](motion::Project& value) { value.tracks[1].locked = true; });
+        const auto locked = document.save().toString();
+        expect(document.removeClips({201, 300}, true).failed()); expectEquals(document.save().toString(), locked);
+        expect(document.removeClips({201}, true).wasOk());
+
+        beginTest("Ripple retains touching mixed-timebase boundaries at non-round tempo");
+        project.bpm = 137;
+        project.tracks.resize(1); project.tracks[0].clips.clear();
+        for (int index = 0; index < 5; ++index) {
+            auto clip = base; clip.id = 400 + index; clip.start = index * .7; clip.duration = .7;
+            if (index % 2 == 1) { expect(clip.anchorToBeats(project.bpm)); }
+            project.tracks[0].clips.push_back(clip);
+        }
+        document.reset(project);
+        expect(document.removeClips({401, 403}, true).wasOk());
+        expectWithinAbsoluteError(document.project().tracks[0].clips.back().timing(137).start, 1.4, 1e-12);
+        project.tracks[0].clips.clear();
+        for (const auto [start, duration] : {std::pair{0.0, .3}, std::pair{.3, .4}, std::pair{.7, .1}}) {
+            auto clip = base; clip.id = 500 + project.tracks[0].clips.size(); clip.start = start; clip.duration = duration;
+            project.tracks[0].clips.push_back(clip);
+        }
+        document.reset(project);
+        expect(document.removeClips({500}, true).wasOk());
+        expectEquals(document.project().tracks[0].clips[1].start, document.project().tracks[0].clips[0].end());
+    }
+
     void testMidiEnvelope() {
         beginTest("MIDI envelopes are clip-local, validated, undoable and persisted without requiring a note pattern");
         auto asset = std::make_shared<motion::Asset>();
@@ -302,6 +375,7 @@ public:
         testAudioImports(document.project());
         testAudioExports(document.project());
         testTiming(document.project());
+        testRippleDelete(document.project());
     }
 
 private:

@@ -668,6 +668,77 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     return juce::Result::ok();
 }
 
+juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) {
+    const std::set<Id> requested(clipIds.begin(), clipIds.end());
+    if (requested.empty() || requested.contains(0) || requested.size() != clipIds.size()) {
+        return juce::Result::fail("Select distinct clips to delete.");
+    }
+    auto candidate = project();
+    std::size_t found = 0;
+    for (auto& track : candidate.tracks) {
+        std::vector<ClipTiming> removed;
+        for (const auto& clip : track.clips) {
+            if (!requested.contains(clip.id)) { continue; }
+            if (track.locked) { return juce::Result::fail("Unlock selected tracks before deleting clips."); }
+            const auto timing = clip.timing(candidate.bpm);
+            if (!timing.valid()) { return juce::Result::fail("A selected clip has invalid timing."); }
+            removed.push_back(timing);
+            ++found;
+        }
+        if (removed.empty()) { continue; }
+        if (ripple) {
+            std::sort(track.clips.begin(), track.clips.end(), [&](const auto& a, const auto& b) { return a.timing(candidate.bpm).start < b.timing(candidate.bpm).start; });
+            double previousEnd = 0;
+            for (const auto& clip : track.clips) {
+                const auto timing = clip.timing(candidate.bpm);
+                if (!timing.valid() || timing.start < previousEnd) { return juce::Result::fail("Ripple delete requires non-overlapping clip intervals."); }
+                previousEnd = timing.end();
+            }
+        }
+        std::erase_if(track.clips, [&](const auto& clip) { return requested.contains(clip.id); });
+        if (!ripple) { continue; }
+        // Close only the selected occupied intervals on each affected track.
+        // Gaps, other tracks, source clocks, keys and composition cues retain
+        // their own timing. Use resolved seconds for mixed musical/media clips.
+        auto originals = std::move(track.clips);
+        track.clips.clear();
+        for (auto clip : originals) {
+            auto timing = clip.timing(candidate.bpm);
+            double displacement = 0;
+            for (const auto& interval : removed) {
+                if (interval.end() <= timing.start) { displacement += interval.duration(); }
+                else if (interval.start < timing.end() && timing.start < interval.end()) {
+                    return juce::Result::fail("Ripple delete cannot close an overlapping clip interval.");
+                }
+            }
+            if (displacement > 0) {
+                timing.moveTo(std::max(0.0, timing.start - displacement));
+                if (!clip.setTiming(timing, candidate.bpm)) { return juce::Result::fail("Ripple delete produced invalid clip timing."); }
+                // Subtracting the same span from touching boundaries can round
+                // them in opposite directions. Original intervals were checked
+                // above; correct only arithmetic-sized overlaps, never content.
+                if (!track.clips.empty()) {
+                    const auto previousEnd = track.clips.back().timing(candidate.bpm).end();
+                    const auto first = clip.timing(candidate.bpm).start;
+                    const auto tolerance = 32 * std::numeric_limits<double>::epsilon() * std::max({1.0, std::abs(first), std::abs(previousEnd), displacement});
+                    if (first < previousEnd && previousEnd - first <= tolerance) {
+                        auto aligned = clip.timing(candidate.bpm); aligned.moveTo(previousEnd);
+                        if (!clip.setTiming(aligned, candidate.bpm)) { return juce::Result::fail("Ripple delete produced invalid clip timing."); }
+                        for (int step = 0; step < 4 && clip.timing(candidate.bpm).start < previousEnd; ++step) {
+                            clip.start = std::nextafter(clip.start, std::numeric_limits<double>::infinity());
+                        }
+                    }
+                }
+            }
+            if (!track.insert(std::move(clip), candidate.bpm)) { return juce::Result::fail("Ripple delete would overlap remaining clips."); }
+        }
+    }
+    if (found != requested.size()) { return juce::Result::fail("A selected clip no longer exists."); }
+    edit(ripple ? "Ripple delete clips" : (found == 1 ? "Delete clip" : "Delete clips"),
+        [candidate = std::move(candidate)](Project& value) { value = candidate; });
+    return juce::Result::ok();
+}
+
 std::size_t Document::compositionReferenceCount(Id definition) const {
     if (definition == 0) { return 0; }
     std::size_t count = 0;

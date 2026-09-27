@@ -738,7 +738,8 @@ public:
             processor.playing.store(!processor.playing.load());
             return true;
         }
-        if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey) {
+        if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey)
+            && !key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown()) {
             cancelGesture();
             if (selectedMarker != 0) {
                 const auto result = processor.document.removeMarker(selectedMarker);
@@ -746,31 +747,21 @@ public:
                 selectedMarker = 0;
                 return true;
             }
-            const auto& tracks = processor.document.project().tracks;
-            const auto exists = std::any_of(tracks.begin(), tracks.end(), [&](const auto& track) {
-                return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return selectedClips.contains(clip.id); });
-            });
-            if (!exists) {
-                return false;
-            }
-            for (const auto& track : tracks) {
-                if (track.locked && std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return selectedClips.contains(clip.id); })) {
-                    if (onError) { onError("Unlock selected tracks before deleting clips."); }
-                    return true;
-                }
-            }
-            processor.document.edit(selectedClips.size() > 1 ? "Delete clips" : "Delete clip", [&](motion::Project& project) {
-                for (auto& track : project.tracks) {
-                    std::erase_if(track.clips, [&](const auto& clip) { return selectedClips.contains(clip.id); });
-                }
-            });
-            selectClip(0);
+            if (selectedClips.empty()) { return false; }
+            deleteSelectedClips(key.getModifiers().isShiftDown());
             return true;
         }
         return false;
     }
 
 private:
+    void deleteSelectedClips(bool ripple) {
+        cancelGesture();
+        const auto result = processor.document.removeClips({selectedClips.begin(), selectedClips.end()}, ripple);
+        if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
+        selectClip(0);
+        refreshTracks();
+    }
     void duplicateClip(motion::Id id) {
         cancelGesture();
         std::vector<motion::Id> duplicates;
@@ -852,6 +843,9 @@ private:
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; definition = clip.composition; locked = track.locked; } }
         }
+        menu.addSeparator();
+        menu.addItem(7, "Delete clips (keep gaps)", !locked);
+        menu.addItem(8, "Ripple delete on selected tracks (Shift+Delete)", !locked);
         const auto references = motion::sourceReferenceCount(processor.document.mainProject(), asset);
         if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
         menu.addSeparator();
@@ -878,6 +872,8 @@ private:
                 owner->refreshTracks();
             } else if (result == 5 && owner->onEnterComposition) {
                 owner->onEnterComposition(id);
+            } else if (result == 7 || result == 8) {
+                owner->deleteSelectedClips(result == 8);
             } else if (result == 6) {
                 motion::Id definitionId = 0;
                 const auto copied = owner->processor.document.makeCompositionUnique(id, definitionId);
