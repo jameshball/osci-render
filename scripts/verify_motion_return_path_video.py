@@ -3,6 +3,8 @@
 import argparse
 import json
 import subprocess
+import struct
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import numpy as np
 
@@ -11,7 +13,7 @@ def run(*args):
     return subprocess.run(args, capture_output=True, check=True).stdout
 
 
-def verify(movie, soundtrack):
+def verify(movie, soundtrack, project=None):
     metadata = json.loads(run('ffprobe', '-v', 'error', '-count_frames', '-show_streams', '-of', 'json', str(movie)))
     video = next(s for s in metadata['streams'] if s['codec_type'] == 'video')
     audio = next(s for s in metadata['streams'] if s['codec_type'] == 'audio')
@@ -31,7 +33,17 @@ def verify(movie, soundtrack):
     # Exclude encoder boundaries; verify each channel separately, preserving stereo.
     correlations = [float(np.corrcoef(actual[48000:length-48000, c], original[48000:length-48000, c])[0, 1]) for c in range(2)]
     assert min(correlations) > .999, correlations
-    return {'movie': str(movie), 'frames': 5568, 'duration': 185.6, 'size': [1280, 720],
+    delivery = None
+    if project is not None:
+        data = project.read_bytes()
+        assert len(data) >= 8 and struct.unpack('<I', data[:4])[0] == 0x21324356, 'Invalid project header'
+        size = struct.unpack('<I', data[4:8])[0]
+        state = ET.fromstring(data[8:8 + size])
+        recording = state.find('recording/recordingSettings')
+        delivery = {name: float(recording.find(name + '/parameter').get('value'))
+                    for name in ('canvasWidth', 'canvasHeight', 'frameRate')}
+        assert delivery == {'canvasWidth': 1280., 'canvasHeight': 720., 'frameRate': 30.}, delivery
+    return {'saved_preview_settings': delivery, 'movie': str(movie), 'frames': 5568, 'duration': 185.6, 'size': [1280, 720],
             'fps': 30, 'stereo_correlations': correlations, 'full_decode': 'passed',
             'artistic_acceptance': 'not established by this check'}
 
@@ -40,5 +52,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('movie', type=Path)
     parser.add_argument('soundtrack', type=Path)
+    parser.add_argument('--project', type=Path, help='Also verify saved preview dimensions and frame rate match delivery')
     args = parser.parse_args()
-    print(json.dumps(verify(args.movie, args.soundtrack), indent=2))
+    print(json.dumps(verify(args.movie, args.soundtrack, args.project), indent=2))
