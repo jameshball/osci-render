@@ -15,6 +15,29 @@ bool near(double a, double b) { return std::abs(a - b) < 1.0e-9; }
 
 int main() {
     {
+        motion::Curve curve;
+        const auto authored = 166.4 - 128.0;
+        const auto restored = std::stod("38.40000000000001");
+        curve.setKey({restored, 0, motion::Interpolation::cubic, 2, -3});
+        curve.setKeyValue(authored, 90);
+        check(curve.keyframes().size() == 1, "decimal round-trip edit replaces the existing source-time key");
+        check(curve.keyframes().front().time == restored && curve.keyframes().front().value == 90,
+            "round-trip edit retains the authored time and updates its value");
+        check(curve.keyframes().front().interpolation == motion::Interpolation::cubic
+            && curve.keyframes().front().incomingSlope == 2 && curve.keyframes().front().outgoingSlope == -3,
+            "near-time value edit preserves interpolation and tangents");
+        curve.setKey({std::nextafter(restored, 100.0), 45});
+        check(curve.keyframes().size() == 1 && curve.keyframes().front().value == 45,
+            "key insertion also replaces a floating-point alias");
+        curve.setKey({restored + 1e-7, 30});
+        check(curve.keyframes().size() == 2, "distinct subframe keys are not quantised together");
+        check(curve.removeKey(authored) && curve.keyframes().size() == 1, "near-time deletion removes the intended key only");
+        check(!curve.removeKey(std::numeric_limits<double>::quiet_NaN()), "invalid key deletion is harmless");
+        motion::Curve origin;
+        origin.setKey({0, 1}); origin.setKeyValue(1e-16, 2);
+        check(origin.keyframes().size() == 1 && origin.keyframes().front().time == 0, "near-zero arithmetic residue does not add a duplicate key");
+    }
+    {
         // The parent plays composition seconds 4..24 at twice normal speed.
         // The child is active at 2..8 and starts its own content at 7.
         const motion::ClipTiming instance(10, 20, 4, 2);

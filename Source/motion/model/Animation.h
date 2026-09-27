@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <limits>
 #include <vector>
 
 namespace motion {
@@ -77,19 +78,20 @@ public:
             || !std::isfinite(key.incomingSlope) || !std::isfinite(key.outgoingSlope)) {
             throw std::invalid_argument("Keyframe values must be finite");
         }
-        const auto position = std::lower_bound(keys.begin(), keys.end(), key.time,
-            [](const Keyframe& existing, double time) { return existing.time < time; });
-        if (position != keys.end() && position->time == key.time) {
-            *position = key;
+        const auto existing = matchingKey(key.time);
+        if (existing != keys.end()) {
+            key.time = existing->time;
+            *existing = key;
         } else {
+            const auto position = std::lower_bound(keys.begin(), keys.end(), key.time,
+                [](const Keyframe& value, double time) { return value.time < time; });
             keys.insert(position, key);
         }
     }
 
     bool removeKey(double time) {
-        const auto position = std::lower_bound(keys.begin(), keys.end(), time,
-            [](const Keyframe& key, double value) { return key.time < value; });
-        if (position == keys.end() || position->time != time) {
+        const auto position = matchingKey(time);
+        if (position == keys.end()) {
             return false;
         }
         keys.erase(position);
@@ -98,9 +100,8 @@ public:
 
     // Editing a keyed value must not erase its interpolation or tangents.
     void setKeyValue(double time, double value) {
-        const auto found = std::lower_bound(keys.begin(), keys.end(), time,
-            [](const Keyframe& key, double at) { return key.time < at; });
-        auto key = found != keys.end() && found->time == time ? *found : Keyframe { time, value };
+        const auto found = matchingKey(time);
+        auto key = found != keys.end() ? *found : Keyframe { time, value };
         key.value = value;
         setKey(key);
     }
@@ -123,6 +124,21 @@ public:
     Modulation modulation;
 
 private:
+    std::vector<Keyframe>::iterator matchingKey(double time) {
+        if (!std::isfinite(time)) { return keys.end(); }
+        const auto sameTime = [time](const Keyframe& key) {
+            // Decimal persistence and project-to-source subtraction can differ
+            // by a few ULPs. Preserve the authored time, not a frame-sized snap.
+            const auto tolerance = 32 * std::numeric_limits<double>::epsilon()
+                * std::max({1.0, std::abs(time), std::abs(key.time)});
+            return std::abs(key.time - time) <= tolerance;
+        };
+        const auto next = std::lower_bound(keys.begin(), keys.end(), time,
+            [](const Keyframe& key, double value) { return key.time < value; });
+        if (next != keys.end() && sameTime(*next)) { return next; }
+        if (next != keys.begin() && sameTime(*(next - 1))) { return next - 1; }
+        return keys.end();
+    }
     std::vector<Keyframe> keys;
 };
 

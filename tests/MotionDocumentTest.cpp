@@ -130,6 +130,7 @@ public:
         testEffects(document.project());
         testCompositions(document.project());
         testCompositionCreation(document.project());
+        testRoundTripKeyEditing(document.project());
         testTrackStates(document.project());
         testGroups(document.project());
         testModulation(document.project());
@@ -768,6 +769,32 @@ private:
             const motion::PreparedComposition reloaded(restored.project());
             expectEquals(reloaded.sample(1, 0.1).r, savedSignal.sample(1, 0.1).r);
             expectEquals(reloaded.sample(1, 0.5).g, savedSignal.sample(1, 0.5).g);
+        }
+    }
+
+    void testRoundTripKeyEditing(const motion::Project& sourceProject) {
+        beginTest("Saved source-time keys remain editable without floating-point duplicates");
+        motion::Project project; project.assets = sourceProject.assets; project.duration = 185.6;
+        auto clip = motion::Document::makeClip(90001, *project.assets.front(), 128);
+        clip.duration = 51.2;
+        clip.properties["rotation.y"].setKey({166.4 - 128, 0, motion::Interpolation::cubic, 2, -3});
+        motion::Track track; track.id = 90002; track.clips = {clip}; project.tracks = {track};
+        juce::UndoManager undo; motion::Document document(undo); document.reset(project);
+        for (int pass = 0; pass < 4; ++pass) {
+            const auto saved = document.save();
+            const auto loaded = document.load(saved);
+            expect(loaded.wasOk(), loaded.getErrorMessage());
+            document.edit("Edit restored key", [pass](motion::Project& value) {
+                auto& clip = value.tracks.front().clips.front();
+                clip.properties.at("rotation.y").setKeyValue(clip.localTime(166.4), 90 + pass);
+            });
+            const auto& curve = document.project().tracks.front().clips.front().properties.at("rotation.y");
+            expectEquals(static_cast<int>(curve.keyframes().size()), 1);
+            expectEquals(curve.evaluateBase(166.4 - 128), 90.0 + pass);
+            expect(curve.keyframes().front().interpolation == motion::Interpolation::cubic);
+            expectEquals(curve.keyframes().front().incomingSlope, 2.0);
+            expectEquals(curve.keyframes().front().outgoingSlope, -3.0);
+            expect(undo.undo()); expect(undo.redo());
         }
     }
 
