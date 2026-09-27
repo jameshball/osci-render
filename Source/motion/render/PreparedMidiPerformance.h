@@ -16,13 +16,13 @@ public:
         std::string error;
         explicit operator bool() const { return performance != nullptr; }
     };
-    static Result prepare(const MidiNotes& notes, const Clip& clip, double bpm, double sampleRate, const std::atomic<bool>* cancel = nullptr) {
+    static Result prepare(const MidiNotes& notes, const Clip& clip, double bpm, double sampleRate, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) {
         // Initial instrument is a held gate. Envelope authoring will supply
         // explicit settings here; note velocity controls beam time, never XYZ.
         DahdsrParams params; params.sustainLevel = 1;
         const auto envelope = osci_audio::PreparedVoiceEnvelope::prepare(params, sampleRate, cancel);
         if (!envelope) { return {nullptr, "Could not prepare the MIDI voice envelope."}; }
-        const auto schedule = PreparedMidiSchedule::prepare(notes, clip, bpm, sampleRate, envelope->releaseSamples(), cancel);
+        const auto schedule = PreparedMidiSchedule::prepare(notes, clip, bpm, sampleRate, envelope->releaseSamples(), cancel, resolvedTiming);
         if (!schedule) { return {nullptr, schedule.error}; }
         auto result = std::shared_ptr<PreparedMidiPerformance>(new PreparedMidiPerformance(*envelope, schedule.schedule, sampleRate));
         for (std::uint32_t index = 0; index < schedule.schedule->voiceCount(); ++index) {

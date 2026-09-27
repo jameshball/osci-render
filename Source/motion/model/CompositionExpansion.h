@@ -15,6 +15,8 @@ struct CompositionStage {
     ClipTiming scopeClock;
     ClipTiming clipClock;
     double bpm = 120;
+    const std::vector<Group>* groups = nullptr;
+    const std::vector<EffectInstance>* effects = nullptr;
 };
 
 struct CompositionExpansionResult {
@@ -74,8 +76,12 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
                 }
                 const auto mapped = timing.nestedIn(*visible);
                 if (!mapped.has_value()) { continue; }
-                stages.push_back({&track, &clip, *visible, *mapped, scope.bpm});
+                stages.push_back({&track, &clip, *visible, *mapped, scope.bpm, &scope.groups, &scope.effects});
                 if (clip.composition != 0) {
+                    if (clip.midi != nullptr) {
+                        result.error = "MIDI patterns must be assigned to media clips inside a reusable composition.";
+                        return false;
+                    }
                     if (track.kind != TrackKind::visual) {
                         result.error = "Reusable compositions require a visual track.";
                         return false;

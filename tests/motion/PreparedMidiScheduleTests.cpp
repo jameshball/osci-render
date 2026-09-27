@@ -117,5 +117,15 @@ int main() {
     auto largeSchedule = PreparedMidiSchedule::prepare(*large.source, longClip, 120, 1000, 1);
     check(bool(largeSchedule) && largeSchedule.schedule->voiceCount() == MidiNotes::maximumNotes, "bounded 100000-note preparation");
     check(largeSchedule.schedule->voice(largeSchedule.schedule->activeAt(50000000)[0]).id == 100000, "seek to final note without traversing history");
+    const ClipTiming nestedClock(5, 6, 0.5, 2);
+    auto nested = PreparedMidiSchedule::prepare(*notes.source, clip, 120, 1000, 101, nullptr, &nestedClock);
+    check(bool(nested), "prepare resolved nested schedule");
+    check(nested.schedule->voice(0).on == 4750 && nested.schedule->voice(0).off == 5250,
+          "nested notes retain pre-trim age and retimed release onset");
+    check(nested.schedule->activeAt(4999).empty() && nested.schedule->activeAt(5000).size() == 2,
+          "nested visibility clips notes without restarting them");
+    check(nested.schedule->activeAt(6000).empty(), "nested instance end stops all notes");
+    const ClipTiming invalidClock(5, 4);
+    check(!PreparedMidiSchedule::prepare(*notes.source, clip, 120, 1000, 101, nullptr, &invalidClock), "invalid resolved clock rejected");
     std::cout << "Prepared MIDI schedule tests passed\n";
 }

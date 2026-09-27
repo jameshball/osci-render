@@ -18,6 +18,7 @@ struct Scope {
     double bpm = 120, duration = 20;
     std::vector<motion::Track> tracks;
     std::vector<motion::Group> groups;
+    std::vector<motion::EffectInstance> effects;
 };
 struct Definition : Scope { motion::Id id = 0; };
 struct Project : Scope {

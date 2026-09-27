@@ -47,7 +47,8 @@ public:
             expectWithinAbsoluteError(samples.getSample(1, index), -3.0f + static_cast<float>(phase), 0.000001f);
             // This open line jumps from (3,-2) back to (2,-3) each cycle.
             // Its adjacent output samples must be dark.
-            const bool travel = index == 0 || index == 1 || index == 799 || index == 800;
+            // The final sample also borders silence at the composition end.
+            const bool travel = index == 0 || index == 1 || index == 799 || index == 800 || index == frames - 1;
             expectWithinAbsoluteError(samples.getSample(2, index), travel ? 0.0f : 0.2f, 0.000001f);
             expectWithinAbsoluteError(samples.getSample(3, index), travel ? 0.0f : 0.4f, 0.000001f);
             expectWithinAbsoluteError(samples.getSample(4, index), travel ? 0.0f : 0.8f, 0.000001f);
@@ -63,6 +64,25 @@ public:
         expect(firstFile.loadFileAsData(firstBytes));
         expect(secondFile.loadFileAsData(secondBytes));
         expect(firstBytes == secondBytes);
+
+        beginTest("Wrapping a visual in a neutral reusable instance preserves every exported sample");
+        auto nestedProject = project;
+        auto definition = std::make_shared<motion::CompositionDefinition>();
+        definition->id = 900; definition->duration = project.duration;
+        definition->tracks = project.tracks;
+        nestedProject.definitions = {definition};
+        motion::Clip instance; instance.id = 901; instance.composition = 900; instance.duration = project.duration;
+        motion::Track instanceTrack; instanceTrack.id = 902; instanceTrack.clips = {instance};
+        nestedProject.tracks = {instanceTrack};
+        const auto nestedFile = directory.getFile().getChildFile("nested.wav");
+        const motion::PreparedComposition nested(nestedProject);
+        expect(nested.preparationError.isEmpty(), nested.preparationError);
+        const auto nestedExport = motion::SignalExporter::write(nested, nestedFile, sampleRate, cancel);
+        expect(nestedExport.wasOk(), nestedExport.getErrorMessage());
+        juce::MemoryBlock nestedBytes;
+        expect(nestedFile.loadFileAsData(nestedBytes));
+        expect(nestedBytes == firstBytes, "Nested stage preparation must preserve source signal and traversal blanking");
+        expect(nestedFile.deleteFile());
 
         beginTest("Subsampled point-source travel is blanked in live composition sampling and XYRGB export");
         std::vector<motion::PointSample> points(4096, {0.25f, -0.25f, 0, 1, 1, 1});

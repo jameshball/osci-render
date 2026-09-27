@@ -796,9 +796,69 @@ private:
         expect(loaded.project().tracks[0].clips[0].composition == definition->id);
         expect(loaded.project().definitions[0]->tracks[0].clips[0].asset == childTrack.clips[0].asset);
         expect(loaded.newId() > 60003);
-        // Until instance rendering lands, fail explicitly instead of producing
-        // a successful-looking export with the nested content omitted.
-        expect(motion::PreparedComposition(loaded.project()).preparationError.isNotEmpty());
+        const motion::PreparedComposition prepared(loaded.project());
+        expect(prepared.preparationError.isEmpty(), prepared.preparationError);
+        expect(!prepared.clips.empty());
+        beginTest("Nested visual stages retain local clocks, transform order and drawing fades");
+        motion::Project visual;
+        visual.assets = sourceProject.assets;
+        auto motif = std::make_shared<motion::CompositionDefinition>();
+        motif->id = 61000; motif->duration = 10;
+        auto child = motion::Document::makeClip(61001, *visual.assets.front(), 1);
+        child.duration = 6;
+        child.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
+        child.properties["position.x"].setKey({10, 10, motion::Interpolation::linear});
+        child.properties["weight"] = motion::Curve(0.5);
+        motion::Track nestedTrack; nestedTrack.id = 61002; nestedTrack.clips = {child};
+        auto translate = motion::makeEffect(61003, *motion::effectDefinition("translate"));
+        translate.properties["translateX"] = motion::Curve(0.25);
+        nestedTrack.effects = {translate};
+        motion::Group group; group.id = 61004; group.properties["scale.x"] = motion::Curve(2);
+        nestedTrack.group = group.id; motif->groups = {group}; motif->tracks = {nestedTrack};
+        translate.id = 61005; translate.properties["translateX"] = motion::Curve(0.5); motif->effects = {translate};
+        visual.definitions = {motif};
+        motion::Clip placement; placement.id = 61006; placement.composition = motif->id;
+        placement.start = 4; placement.duration = 3; placement.offset = 2; placement.rate = 2;
+        placement.properties["position.x"] = motion::Curve(1);
+        placement.properties["scale.x"] = motion::Curve(3);
+        placement.properties["weight"] = motion::Curve(0.25);
+        motion::Track mainTrack; mainTrack.id = 61007; mainTrack.clips = {placement}; visual.tracks = {mainTrack};
+        const motion::PreparedComposition nestedVisual(visual);
+        expect(nestedVisual.preparationError.isEmpty(), nestedVisual.preparationError);
+        expectEquals(static_cast<int>(nestedVisual.clips.size()), 1);
+        if (!nestedVisual.clips.empty()) {
+            const auto& leaf = nestedVisual.clips.front();
+            expectWithinAbsoluteError(leaf.processPoint({0, 0, 0, 1, 1, 1}, 5).x, 22.0f, 0.0001f);
+            expectWithinAbsoluteError(leaf.weight(5), 0.125, 0.000001);
+            expect(!leaf.active(3.99) && leaf.active(4) && !leaf.active(6.5));
+            expect(nestedVisual.selectBeam(5, 0.2).clip == nullptr, "Outer fades retain unused dark allocation");
+            expect(nestedVisual.selectBeam(5, 0.1).clip != nullptr);
+            const auto first = nestedVisual.sampleAtClock(5, 240000, 48000);
+            nestedVisual.sampleAtClock(4.5, 216000, 48000);
+            const auto again = nestedVisual.sampleAtClock(5, 240000, 48000);
+            expectEquals(first.x, again.x); expectEquals(first.r, again.r);
+        }
+        auto repeat = placement; repeat.id = 61008; repeat.start = 10; repeat.rate = 1;
+        visual.tracks[0].clips.push_back(repeat);
+        const motion::PreparedComposition repeatedVisual(visual);
+        expect(repeatedVisual.preparationError.isEmpty(), repeatedVisual.preparationError);
+        expectEquals(static_cast<int>(repeatedVisual.clips.size()), 2);
+        if (repeatedVisual.clips.size() == 2) {
+            expect(repeatedVisual.clips[0].source == repeatedVisual.clips[1].source);
+            expectWithinAbsoluteError(repeatedVisual.clips[1].processPoint({0, 0, 0, 1, 1, 1}, 11).x, 16.0f, 0.0001f);
+        }
+        beginTest("Repeated definitions keep distinct beam ownership at instance cuts");
+        visual.tracks[0].clips[0].duration = 2;
+        visual.tracks[0].clips[0].properties["weight"] = motion::Curve(1);
+        visual.tracks[0].clips[1].start = 6;
+        visual.tracks[0].clips[1].properties["weight"] = motion::Curve(1);
+        motif->tracks[0].clips[0].properties["weight"] = motion::Curve(1);
+        const motion::PreparedComposition cuts(visual);
+        expect(cuts.preparationError.isEmpty(), cuts.preparationError);
+        const auto before = cuts.sample(6 - 1.0 / 48000, 0.2, 0, 1.0 / 48000);
+        const auto after = cuts.sample(6, 0.2, 0, 1.0 / 48000);
+        expectEquals(before.r, 0.0f); expectEquals(after.r, 0.0f);
+        expect(cuts.sample(6.1, 0.2).r > 0, "Interior sample remains visible after the ownership guard");
         beginTest("Invalid reusable graph loads leave the existing document untouched");
         auto cyclic = xml;
         auto* nestedClip = cyclic.getChildByName("definition")->getChildByName("composition")->getChildByName("track")->getChildByName("clip");

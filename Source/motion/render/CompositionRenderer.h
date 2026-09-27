@@ -54,43 +54,73 @@ struct PreparedGroup {
     }
 };
 
-struct PreparedClip {
-    Id id;
-    double start, end, offset, rate;
-    std::shared_ptr<const PreparedSource> source;
+// One authored clip's transform/effect scope. Runtime stages carry no document
+// pointers; each clock maps main seconds directly to its authored coordinate.
+struct PreparedClipStage {
+    Id id = 0;
+    double start = 0, end = 0, offset = 0, rate = 1;
     std::array<Curve, 13> curves;
-    std::vector<PreparedEffect> effects, trackEffects;
+    std::vector<PreparedEffect> effects, trackEffects, compositionEffects;
     std::vector<PreparedGroup> groups;
     double bpm = 120, contentBpm = 120;
-    std::shared_ptr<const PreparedMidiPerformance> midi;
+    std::optional<ClipTiming> scopeClock;
 
+    double scopeTime(double time) const { return scopeClock.has_value() ? scopeClock->localTime(time) : time; }
     double localTime(double time) const { return offset + (time - start) * rate; }
-    bool active(double time) const { return time >= start && time < end; }
-    double weight(double time) const {
+    double localWeight(double time) const {
         const auto value = curves[12].evaluate(localTime(time), contentBpm);
-        double weight = std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0;
+    }
+    bool accumulateWeightLog(double time, double& logarithm) const {
+        const auto value = localWeight(time);
+        if (value <= 0) { return false; }
+        logarithm += std::log(value);
         for (const auto& group : groups) {
-            weight *= group.weight(time, bpm);
+            const auto factor = group.weight(scopeTime(time), bpm);
+            if (factor <= 0) { return false; }
+            logarithm += std::log(factor);
         }
-        // At most 32 ancestors, each bounded to 1e6, keeps this product
-        // below 1e198. Saturate only after outer attenuation is applied.
-        return std::clamp(weight, 0.0, 1000000.0);
+        return true;
     }
-
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
-        const auto local = localTime(time);
-        return processPoint(source->sample(local, phase, phaseSpan, std::abs(rate) * timeSpan), time);
-    }
-
-    osci::Point processPoint(osci::Point point, double time) const {
+    osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
         point = applySourceColour(point, curves, local, contentBpm);
         point = applyEffects(effects, point, local, contentBpm);
         point = applyTransform(point, curves, local, contentBpm, false);
-        point = applyEffects(trackEffects, point, time, bpm);
-        for (const auto& group : groups) {
-            point = group.apply(point, time, bpm);
+        point = applyEffects(trackEffects, point, scopeTime(time), bpm);
+        for (const auto& group : groups) { point = group.apply(point, scopeTime(time), bpm); }
+        return applyEffects(compositionEffects, point, scopeTime(time), bpm);
+    }
+};
+
+struct PreparedClip : PreparedClipStage {
+    std::shared_ptr<const PreparedSource> source;
+    std::shared_ptr<const PreparedMidiPerformance> midi;
+    std::vector<PreparedClipStage> ancestors; // inner-to-outer
+
+    bool active(double time) const { return time >= start && time < end; }
+    double weight(double time) const {
+        if (!ancestors.empty()) {
+            // Nested group products can overflow before a later fade attenuates
+            // them. Accumulate logs and saturate only after all attenuation.
+            double logarithm = 0;
+            if (!accumulateWeightLog(time, logarithm)) { return 0; }
+            for (const auto& ancestor : ancestors) {
+                if (!ancestor.accumulateWeightLog(time, logarithm)) { return 0; }
+            }
+            return std::min(1000000.0, std::exp(std::min(logarithm, std::log(1000000.0))));
         }
+        auto value = localWeight(time);
+        for (const auto& group : groups) { value *= group.weight(scopeTime(time), bpm); }
+        // A direct leaf has at most 32 ancestors bounded to 1e6 each.
+        return std::clamp(value, 0.0, 1000000.0);
+    }
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0) const {
+        return processPoint(source->sample(localTime(time), phase, phaseSpan, std::abs(rate) * timeSpan), time);
+    }
+    osci::Point processPoint(osci::Point point, double time) const {
+        point = processStage(point, time);
+        for (const auto& ancestor : ancestors) { point = ancestor.processStage(point, time); }
         return point;
     }
 };
@@ -140,9 +170,6 @@ enum class CompositionPurpose { signal, editorGeometry };
 struct PreparedComposition {
     explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
-        const auto graph = validateCompositionGraph(project);
-        if (!graph) { preparationError = graph.error; return; }
-        if (graph.depth != 0) { preparationError = "Reusable composition rendering is not connected yet."; return; }
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;
@@ -160,53 +187,59 @@ struct PreparedComposition {
             }
         }
         std::sort(cameraCuts.begin(), cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
-        for (const auto& track : project.tracks) {
-            if (track.kind != TrackKind::visual || !trackIsAudible(project, track)) {
-                continue;
+        const auto prepareStage = [&](const CompositionStage& stage, bool root) {
+            const auto& clip = *stage.clip;
+            const auto& timing = stage.clipClock;
+            PreparedClipStage item;
+            item.id = clip.id; item.start = timing.start; item.end = timing.end(); item.offset = timing.offset; item.rate = timing.rate;
+            item.scopeClock = stage.scopeClock;
+            item.bpm = stage.bpm;
+            item.contentBpm = clip.curveBpm(stage.bpm);
+            for (std::size_t i = 0; i < propertyNames.size(); ++i) {
+                const auto curve = clip.properties.find(propertyNames[i]);
+                item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
             }
-            for (const auto& clip : track.clips) {
-                if (cancel != nullptr && cancel->load()) { preparationError = "Composition preparation cancelled."; clips.clear(); return; }
-                const auto asset = std::find_if(project.assets.begin(), project.assets.end(),
-                    [&](const auto& item) { return item->id == clip.asset; });
-                if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr)) {
-                    continue;
-                }
-                auto source = (*asset)->source;
-                if (source == nullptr) {
-                    source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> { (*asset)->drawing }, 30.0);
-                }
-                const auto timing = clip.timing(project.bpm);
-                PreparedClip item { clip.id, timing.start, timing.end(), timing.offset, timing.rate, std::move(source), {} };
-                for (std::size_t i = 0; i < propertyNames.size(); ++i) {
-                    const auto curve = clip.properties.find(propertyNames[i]);
-                    item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
-                }
-                item.bpm = project.bpm;
-                item.contentBpm = clip.curveBpm(project.bpm);
-                item.effects = prepareEffects(clip.effects);
-                item.trackEffects = prepareEffects(track.effects);
-                auto groupId = track.group;
-                while (groupId != 0 && item.groups.size() < maximumGroupDepth) {
-                    const auto* group = findGroup(project, groupId);
-                    if (group == nullptr) {
-                        break;
-                    }
-                    item.groups.emplace_back(*group);
-                    groupId = group->parent;
-                }
-                if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
-                    const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, project.bpm, sampleRate, cancel);
-                    if (!performance) {
-                        preparationError = "MIDI clip \"" + juce::String(clip.name) + "\": " + juce::String(performance.error);
-                        clips.clear();
-                        return;
-                    }
-                    item.midi = performance.performance;
-                    hasMidi = true;
-                }
-                clips.push_back(std::move(item));
+            item.effects = prepareEffects(clip.effects);
+            item.trackEffects = prepareEffects(stage.track->effects);
+            if (!root) { item.compositionEffects = prepareEffects(*stage.effects); }
+            auto groupId = stage.track->group;
+            while (groupId != 0 && item.groups.size() < maximumGroupDepth) {
+                const auto group = std::find_if(stage.groups->begin(), stage.groups->end(), [groupId](const auto& value) { return value.id == groupId; });
+                if (group == stage.groups->end()) { break; }
+                item.groups.emplace_back(*group);
+                groupId = group->parent;
             }
-        }
+            return item;
+        };
+        const auto expanded = expandComposition(project, [&](const auto&, const auto& stages) {
+            if (preparationError.isNotEmpty()) { return; }
+            const auto& leaf = stages.back();
+            const auto& clip = *leaf.clip;
+            if (leaf.track->kind != TrackKind::visual) { return; }
+            const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
+            if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr)) { return; }
+            PreparedClip item;
+            static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1);
+            item.source = (*asset)->source;
+            if (item.source == nullptr) {
+                item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> {(*asset)->drawing}, 30.0);
+            }
+            for (std::size_t index = stages.size() - 1; index > 0; --index) {
+                item.ancestors.push_back(prepareStage(stages[index - 1], index == 1));
+            }
+            if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
+                const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, leaf.bpm, sampleRate, cancel, &leaf.clipClock);
+                if (!performance) {
+                    preparationError = "MIDI clip \"" + juce::String(clip.name) + "\": " + juce::String(performance.error);
+                    return;
+                }
+                item.midi = performance.performance;
+                hasMidi = true;
+            }
+            clips.push_back(std::move(item));
+        }, cancel);
+        if (!expanded) { preparationError = expanded.error; }
+        if (preparationError.isNotEmpty()) { clips.clear(); return; }
         prepareTraversals(cancel);
     }
 
@@ -409,10 +442,17 @@ private:
         for (const auto& clip : clips) {
             add(clip.start);
             add(clip.end);
-            for (const auto& key : clip.curves[12].keyframes()) { add(clip.start + (key.time - clip.offset) / clip.rate); }
-            for (const auto& group : clip.groups) {
-                for (const auto& key : group.curves[12].keyframes()) { add(key.time); }
-            }
+            const auto addStage = [&](const PreparedClipStage& stage) {
+                for (const auto& key : stage.curves[12].keyframes()) { add(stage.start + (key.time - stage.offset) / stage.rate); }
+                for (const auto& group : stage.groups) {
+                    for (const auto& key : group.curves[12].keyframes()) {
+                        const auto& clock = stage.scopeClock;
+                        add(clock.has_value() ? clock->start + (key.time - clock->offset) / clock->rate : key.time);
+                    }
+                }
+            };
+            addStage(clip);
+            for (const auto& ancestor : clip.ancestors) { addStage(ancestor); }
         }
         std::sort(boundaries.begin(), boundaries.end());
         boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
@@ -426,10 +466,15 @@ private:
             bool constant = true;
             for (const auto& clip : clips) {
                 if (!clip.active(middle)) { continue; }
-                constant = constant && curveConstantOnInterval(clip.curves[12], clip.localTime(first), clip.localTime(last));
-                for (const auto& group : clip.groups) {
-                    constant = constant && curveConstantOnInterval(group.curves[12], first, last);
-                }
+                const auto stageConstant = [&](const PreparedClipStage& stage) {
+                    if (!curveConstantOnInterval(stage.curves[12], stage.localTime(first), stage.localTime(last))) { return false; }
+                    for (const auto& group : stage.groups) {
+                        if (!curveConstantOnInterval(group.curves[12], stage.scopeTime(first), stage.scopeTime(last))) { return false; }
+                    }
+                    return true;
+                };
+                constant = constant && stageConstant(clip);
+                for (const auto& ancestor : clip.ancestors) { constant = constant && stageConstant(ancestor); }
                 allocation += std::max(1.0, clip.weight(middle));
             }
             if (!constant || allocation <= 0 || !std::isfinite(allocation)) { continue; }

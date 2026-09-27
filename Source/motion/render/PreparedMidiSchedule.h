@@ -26,7 +26,7 @@ public:
         explicit operator bool() const { return schedule != nullptr; }
     };
 
-    static Result prepare(const MidiNotes& notes, const Clip& clip, double projectBpm, double sampleRate, std::uint64_t releaseSamples, const std::atomic<bool>* cancel = nullptr) try {
+    static Result prepare(const MidiNotes& notes, const Clip& clip, double projectBpm, double sampleRate, std::uint64_t releaseSamples, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) try {
         if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000
             || !std::isfinite(sampleRate) || sampleRate < 1 || sampleRate > 768000
             || !clip.valid() || !clip.timing(projectBpm).valid()
@@ -35,7 +35,8 @@ public:
         }
         const auto cancelled = [&] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
         if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
-        const auto timing = clip.timing(projectBpm);
+        const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(projectBpm);
+        if (!timing.valid()) { return {nullptr, "Invalid resolved MIDI timing."}; }
         const auto first = quantize(timing.start, sampleRate), end = quantize(timing.end(), sampleRate);
         if (!first || !end || *end <= *first) { return {nullptr, "MIDI clip must occupy at least one output sample."}; }
         auto result = std::shared_ptr<PreparedMidiSchedule>(new PreparedMidiSchedule());
