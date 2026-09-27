@@ -138,7 +138,8 @@ struct PreparedCamera {
 enum class CompositionPurpose { signal, editorGeometry };
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), soundtrack(project), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
+        if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         const auto graph = validateCompositionGraph(project);
         if (!graph) { preparationError = graph.error; return; }
         if (graph.depth != 0) { preparationError = "Reusable composition rendering is not connected yet."; return; }

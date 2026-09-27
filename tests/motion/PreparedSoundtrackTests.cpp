@@ -14,11 +14,15 @@ struct Asset {
     motion::Id id = 1;
     std::shared_ptr<const motion::PreparedAudio> audio;
 };
-struct Project {
-    double bpm = 120;
-    std::vector<std::shared_ptr<const Asset>> assets;
+struct Scope {
+    double bpm = 120, duration = 20;
     std::vector<motion::Track> tracks;
     std::vector<motion::Group> groups;
+};
+struct Definition : Scope { motion::Id id = 0; };
+struct Project : Scope {
+    std::vector<std::shared_ptr<const Asset>> assets;
+    std::vector<std::shared_ptr<const Definition>> definitions;
 };
 Project fixture() {
     const std::vector<float> pcm { 0, 1, 0, -1 };
@@ -101,5 +105,26 @@ int main() {
     check(motion::PreparedSoundtrack(project).sample(2.25).left == 1, "solo ancestor includes soundtrack");
     project.tracks[0].group = 999;
     check(motion::PreparedSoundtrack(project).sample(2.25).left == 0, "missing ancestor cannot produce audio");
+    project = fixture();
+    auto definition = std::make_shared<Definition>();
+    definition->id = 10; definition->tracks = project.tracks;
+    project.definitions = {definition};
+    motion::Clip instance; instance.id = 11; instance.composition = 10;
+    instance.start = 5; instance.duration = 2; instance.offset = 2; instance.rate = 2;
+    instance.properties["gain"] = motion::Curve(0.5);
+    motion::Track container; container.clips = {instance}; project.tracks = {container};
+    motion::PreparedSoundtrack nested(project);
+    check(nested.preparationError.empty(), "nested soundtrack prepares");
+    check(near(nested.sample(5.125).left, 0.5), "nested rate and inherited gain reach source audio");
+    check(nested.sample(4.99).left == 0 && nested.sample(5.5).left == 0, "nested boundaries remain silent");
+    auto repeated = instance; repeated.id = 12; repeated.start = 10; repeated.rate = 1;
+    project.tracks[0].clips.push_back(repeated);
+    motion::PreparedSoundtrack shared(project);
+    check(near(shared.sample(10.25).left, 0.5) && near(shared.sample(5.125).left, 0.5), "shared source instances seek independently");
+    project.tracks[0].muted = true;
+    check(motion::PreparedSoundtrack(project).sample(5.125).left == 0, "muting visual instance track also mutes nested audio");
+    std::atomic<bool> cancelled {true};
+    motion::PreparedSoundtrack interrupted(project, &cancelled);
+    check(!interrupted.preparationError.empty() && interrupted.sample(5.125).left == 0, "cancelled soundtrack is explicitly invalid and silent");
     std::cout << "Prepared soundtrack tests passed\n";
 }
