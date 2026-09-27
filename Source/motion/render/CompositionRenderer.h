@@ -10,17 +10,22 @@
 #include <numbers>
 
 namespace motion {
-inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120) {
-    point.scale(curves[6].evaluate(time, bpm), curves[7].evaluate(time, bpm), curves[8].evaluate(time, bpm));
-    constexpr auto radians = std::numbers::pi / 180.0;
-    point.rotate(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
-    point.translate(curves[0].evaluate(time, bpm), curves[1].evaluate(time, bpm), curves[2].evaluate(time, bpm));
+inline osci::Point applySourceColour(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm) {
     const auto sourceRed = point.r < 0 ? 1.0f : point.r;
     const auto sourceGreen = point.r < 0 ? 1.0f : point.g;
     const auto sourceBlue = point.r < 0 ? 1.0f : point.b;
     point.r = std::clamp(static_cast<float>(sourceRed * curves[9].evaluate(time, bpm)), 0.0f, 1.0f);
     point.g = std::clamp(static_cast<float>(sourceGreen * curves[10].evaluate(time, bpm)), 0.0f, 1.0f);
     point.b = std::clamp(static_cast<float>(sourceBlue * curves[11].evaluate(time, bpm)), 0.0f, 1.0f);
+    return point;
+}
+
+inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true) {
+    point.scale(curves[6].evaluate(time, bpm), curves[7].evaluate(time, bpm), curves[8].evaluate(time, bpm));
+    constexpr auto radians = std::numbers::pi / 180.0;
+    point.rotate(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
+    point.translate(curves[0].evaluate(time, bpm), curves[1].evaluate(time, bpm), curves[2].evaluate(time, bpm));
+    if (applyColour) { point = applySourceColour(point, curves, time, bpm); }
     if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
         || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
         return { 0, 0, 0, 0, 0, 0 };
@@ -78,8 +83,9 @@ struct PreparedClip {
 
     osci::Point processPoint(osci::Point point, double time) const {
         const auto local = localTime(time);
+        point = applySourceColour(point, curves, local, contentBpm);
         point = applyEffects(effects, point, local, contentBpm);
-        point = applyTransform(point, curves, local, contentBpm);
+        point = applyTransform(point, curves, local, contentBpm, false);
         point = applyEffects(trackEffects, point, time, bpm);
         for (const auto& group : groups) {
             point = group.apply(point, time, bpm);
