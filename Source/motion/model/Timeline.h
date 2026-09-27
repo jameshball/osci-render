@@ -27,6 +27,21 @@ struct ClipTiming {
     void setEnd(double value) { finish = value; length = finish - start; }
     void setDuration(double value) { length = value; finish = start + value; }
     double localTime(double time) const { return offset + (time - start) * rate; }
+    // Resolve this child interval through a composition instance. Both inputs
+    // are seconds at their own scope; authored curves remain in source time.
+    // Clipping the visible interval also advances the source offset, so a trim
+    // cannot restart the child's animation.
+    std::optional<ClipTiming> nestedIn(const ClipTiming& instance) const {
+        if (!valid() || !instance.valid()) { return std::nullopt; }
+        const auto mappedStart = instance.start + (start - instance.offset) / instance.rate;
+        const auto mappedEnd = instance.start + (end() - instance.offset) / instance.rate;
+        if (!std::isfinite(mappedStart) || !std::isfinite(mappedEnd)) { return std::nullopt; }
+        const auto first = std::max(instance.start, mappedStart);
+        const auto last = std::min(instance.end(), mappedEnd);
+        if (first >= last) { return std::nullopt; }
+        ClipTiming resolved(first, last, localTime(instance.localTime(first)), rate * instance.rate);
+        return resolved.valid() ? std::optional<ClipTiming>(resolved) : std::nullopt;
+    }
     bool valid() const {
         return std::isfinite(start) && start >= 0 && std::isfinite(length) && length > 0
             && std::isfinite(finish) && finish > start && std::isfinite(offset) && std::isfinite(rate) && rate > 0;

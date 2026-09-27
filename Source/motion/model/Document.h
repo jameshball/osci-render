@@ -31,7 +31,9 @@ struct Asset {
     int midiIgnoredEvents = 0;
 };
 
-struct Project {
+// Composition content is independent of the project-wide media registry.
+// Reusable compositions can share assets without duplicating their payloads.
+struct Composition {
     juce::String name = "Untitled";
     double duration = 180.0;
     double frameRate = 30.0;
@@ -50,12 +52,15 @@ struct Project {
         grid.snapping = gridSnap;
         return grid;
     }
-    std::vector<std::shared_ptr<const Asset>> assets;
     std::vector<Track> tracks;
     std::vector<Camera> cameras;
     std::vector<CameraCut> cameraCuts;
     std::vector<EffectInstance> effects;
     std::vector<Group> groups;
+};
+
+struct Project : Composition {
+    std::vector<std::shared_ptr<const Asset>> assets;
 };
 
 // Editable state belongs to the message thread. Undo copies clip/curve values

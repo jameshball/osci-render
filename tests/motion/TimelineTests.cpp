@@ -15,6 +15,38 @@ bool near(double a, double b) { return std::abs(a - b) < 1.0e-9; }
 
 int main() {
     {
+        // The parent plays composition seconds 4..24 at twice normal speed.
+        // The child is active at 2..8 and starts its own content at 7.
+        const motion::ClipTiming instance(10, 20, 4, 2);
+        const motion::ClipTiming child(2, 8, 7, .5);
+        const auto nested = child.nestedIn(instance);
+        check(nested.has_value(), "partially trimmed child remains visible");
+        check(near(nested->start, 10) && near(nested->end(), 12), "instance trim clips child interval");
+        check(near(nested->offset, 8) && near(nested->rate, 1), "trim advances content and multiplies source speed");
+        motion::Curve animation;
+        animation.setKey({7, 0, motion::Interpolation::linear});
+        animation.setKey({10, 30, motion::Interpolation::linear});
+        for (int frame = 0; frame < 120; ++frame) {
+            const auto time = 10 + frame / 60.0;
+            check(near(nested->localTime(time), child.localTime(instance.localTime(time))), "nested clocks agree at every frame");
+            check(near(animation.evaluate(nested->localTime(time)), animation.evaluate(child.localTime(instance.localTime(time)))), "child keys retain source-time meaning");
+        }
+        const motion::ClipTiming outer(30, 50, 9, .5);
+        const auto twice = nested->nestedIn(outer);
+        check(twice.has_value() && near(twice->start, 32) && near(twice->end(), 36), "second instance preserves inner visible interval");
+        check(near(twice->localTime(34), child.localTime(instance.localTime(outer.localTime(34)))), "two nested speed mappings compose");
+        check(!motion::ClipTiming(0, 4).nestedIn(instance).has_value(), "touching inactive child has no visible duration");
+        check(!motion::ClipTiming(24, 26).nestedIn(instance).has_value(), "right boundary is exclusive");
+        check(!motion::ClipTiming(0, 5, 0, 0).nestedIn(instance).has_value(), "invalid child speed rejects before mapping");
+        check(!child.nestedIn(motion::ClipTiming(0, 5, 0, std::numeric_limits<double>::infinity())).has_value(), "invalid instance speed rejects");
+        check(!motion::ClipTiming(0, 5, 0, 1e308).nestedIn(motion::ClipTiming(0, 5, 0, 1e308)).has_value(), "composed speed overflow rejects");
+        motion::Clip musical; musical.id = 200; musical.start = 2; musical.duration = 6; musical.offset = 7; musical.rate = .5;
+        check(musical.anchorToBeats(120), "nested fixture has beat timing");
+        const auto musicalNested = musical.timing(120).nestedIn(instance);
+        check(musicalNested.has_value() && near(musicalNested->localTime(11), nested->localTime(11)), "beat and second children use the same resolved mapping");
+    }
+
+    {
         motion::Clip first; first.id = 101; first.start = 2; first.duration = 2;
         first.offset = 7; first.properties["position.x"].setKey({7, 42});
         motion::Clip second = first; second.id = 102; second.start = 5;
