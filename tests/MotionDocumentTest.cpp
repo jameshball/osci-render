@@ -8,7 +8,68 @@
 class MotionDocumentTest : public juce::UnitTest {
 public:
     MotionDocumentTest() : juce::UnitTest("Motion document and signal", "Motion") {}
+    void testMarkers() {
+        beginTest("Markers support scoped editing, undo, persistence and independent composition copies");
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        expect(document.setMarker(0, 4.125, " Verse ").wasOk());
+        const auto marker = document.project().markers.front();
+        expectEquals(marker.name, juce::String("Verse"));
+        expect(undo.undo()); expect(document.project().markers.empty());
+        expect(undo.redo());
+        expect(document.setMarker(marker.id, 6.25, "Chorus").wasOk());
+        expect(undo.undo()); expectEquals(document.project().markers.front().time, 4.125);
+        expect(document.removeMarker(marker.id).wasOk()); expect(document.project().markers.empty());
+        expect(undo.undo());
+        const auto saved = document.save().toString();
+        expect(document.setMarker(0, 4.125, "Duplicate position").failed());
+        expect(document.setMarker(0, -1, "Negative").failed());
+        expect(document.setMarker(0, 181, "Outside").failed());
+        expect(document.setMarker(0, 0, "\n").failed());
+        expectEquals(document.save().toString(), saved);
+        juce::UndoManager loadedUndo;
+        motion::Document loaded(loadedUndo);
+        expect(loaded.load(document.save()).wasOk());
+        expectEquals(loaded.project().markers.front().time, 4.125);
+        auto invalid = document.save();
+        invalid.getChildByName("marker")->setAttribute("time", "nan");
+        expect(loaded.load(invalid).failed());
+        expectEquals(loaded.save().toString(), saved);
+
+        motion::Project project;
+        auto definition = std::make_shared<motion::CompositionDefinition>();
+        definition->id = 100; definition->name = "Nested";
+        project.definitions.push_back(definition);
+        motion::Track track; track.id = 102;
+        auto instance = motion::Document::makeCompositionClip(101, *definition, 0);
+        expect(track.insert(instance)); project.tracks.push_back(track);
+        document.reset(project);
+        expect(document.setMarker(0, 8, "Main cue").wasOk());
+        expect(document.enterComposition(100).wasOk());
+        expect(document.project().markers.empty());
+        expect(document.setMarker(0, 2, "Nested cue").wasOk());
+        const auto nested = document.project().markers.front();
+        expect(document.enterComposition(0).wasOk());
+        expectEquals(document.project().markers.front().name, juce::String("Main cue"));
+        motion::Id copied = 0;
+        expect(document.makeCompositionUnique(101, copied).wasOk());
+        const auto copy = std::find_if(document.project().definitions.begin(), document.project().definitions.end(), [copied](const auto& value) { return value->id == copied; });
+        expect(copy != document.project().definitions.end());
+        if (copy != document.project().definitions.end()) {
+            expect((*copy)->markers.size() == 1);
+            expect((*copy)->markers.front().id != nested.id);
+            expectEquals((*copy)->markers.front().time, nested.time);
+        }
+        expect(loaded.load(document.save()).wasOk());
+        const auto valid = loaded.save().toString();
+        auto duplicateIdentity = document.save();
+        duplicateIdentity.getChildByName("marker")->setAttribute("id", "102");
+        expect(loaded.load(duplicateIdentity).failed());
+        expectEquals(loaded.save().toString(), valid);
+    }
+
     void runTest() override {
+        testMarkers();
         beginTest("Plain titles preserve natural proportions and explicit newlines");
         const auto textAspect = [this](const juce::String& text, motion::TextSettings settings = {}) {
             motion::Asset title;

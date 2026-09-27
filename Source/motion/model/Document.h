@@ -35,6 +35,12 @@ struct Asset {
 
 // Composition content is independent of the project-wide media registry.
 // Reusable compositions can share assets without duplicating their payloads.
+struct Marker {
+    Id id = 0;
+    double time = 0;
+    juce::String name;
+};
+
 struct Composition {
     juce::String name = "Untitled";
     double duration = 180.0;
@@ -57,6 +63,7 @@ struct Composition {
     std::vector<Track> tracks;
     std::vector<Camera> cameras;
     std::vector<CameraCut> cameraCuts;
+    std::vector<Marker> markers;
     std::vector<EffectInstance> effects;
     std::vector<Group> groups;
 };
@@ -79,6 +86,8 @@ public:
     const Project& mainProject() const { return state; }
     Id editingComposition() const { return scopeId; }
     juce::Result enterComposition(Id id);
+    juce::Result setMarker(Id id, double time, juce::String name);
+    juce::Result removeMarker(Id id);
     std::uint64_t generation() const { return projectGeneration; }
     std::uint64_t revision() const { return stateRevision; }
     Id newId() { return ++lastId; }

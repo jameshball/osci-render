@@ -478,6 +478,39 @@ void Document::refreshScope() {
     static_cast<Composition&>(scopeView) = **found;
 }
 
+juce::Result Document::setMarker(Id id, double time, juce::String name) {
+    name = name.trim();
+    if (!std::isfinite(time) || time < 0 || time > project().duration) { return juce::Result::fail("Place the marker within the composition duration."); }
+    if (name.isEmpty() || name.length() > 120 || name.containsChar('\n') || name.containsChar('\r')) { return juce::Result::fail("Use a marker name of 1-120 characters on one line."); }
+    const auto& markers = project().markers;
+    const auto found = std::find_if(markers.begin(), markers.end(), [id](const auto& marker) { return marker.id == id; });
+    const bool adding = id == 0;
+    if (std::any_of(markers.begin(), markers.end(), [id, time](const auto& marker) { return marker.id != id && std::abs(marker.time - time) < 1.0e-9; })) { return juce::Result::fail("A marker already exists at this position."); }
+    if (!adding && found == markers.end()) { return juce::Result::fail("The marker no longer exists."); }
+    if (!adding && found->time == time && found->name == name) { return juce::Result::ok(); }
+    if (adding) {
+        const auto highest = highestId();
+        if (highest >= static_cast<Id>(std::numeric_limits<juce::int64>::max())) { return juce::Result::fail("No marker identities remain."); }
+        id = highest + 1;
+        lastId = id;
+    }
+    edit(adding ? "Add marker" : "Edit marker", [id, time, name, adding](Project& project) {
+        if (adding) { project.markers.push_back({id, time, name}); }
+        else {
+            for (auto& marker : project.markers) { if (marker.id == id) { marker.time = time; marker.name = name; } }
+        }
+        std::sort(project.markers.begin(), project.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::removeMarker(Id id) {
+    const auto& markers = project().markers;
+    if (std::none_of(markers.begin(), markers.end(), [id](const auto& marker) { return marker.id == id; })) { return juce::Result::fail("The marker no longer exists."); }
+    edit("Delete marker", [id](Project& project) { std::erase_if(project.markers, [id](const auto& marker) { return marker.id == id; }); });
+    return juce::Result::ok();
+}
+
 juce::Result Document::enterComposition(Id id) {
     if (id == scopeId) { return juce::Result::ok(); }
     if (id != 0 && std::none_of(state.definitions.begin(), state.definitions.end(), [id](const auto& value) { return value->id == id; })) {
@@ -740,7 +773,7 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     const auto found = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [&](const auto& value) { return value->id == target->composition; });
     if (found == candidate.definitions.end()) { return juce::Result::fail("The referenced composition no longer exists."); }
     auto copy = std::make_shared<CompositionDefinition>(**found);
-    std::size_t required = 1 + copy->groups.size() + copy->tracks.size() + copy->cameras.size() + copy->cameraCuts.size() + copy->effects.size();
+    std::size_t required = 1 + copy->groups.size() + copy->tracks.size() + copy->cameras.size() + copy->cameraCuts.size() + copy->effects.size() + copy->markers.size();
     for (const auto& group : copy->groups) { required += group.effects.size(); }
     for (const auto& track : copy->tracks) {
         required += track.effects.size() + track.clips.size();
@@ -774,6 +807,7 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
         if (!cameras.contains(cut.camera)) { return juce::Result::fail("Invalid composition camera reference."); }
         cut.id = ++highest; cut.camera = cameras.at(cut.camera);
     }
+    for (auto& marker : copy->markers) { marker.id = ++highest; }
     effects(copy->effects);
     // Only this definition is forked. Media and referenced child definitions
     // remain shared, while all authored identities within this scope are fresh.
@@ -1291,6 +1325,12 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
             saveProperty(*item, name, curve);
         }
     }
+    for (const auto& marker : state.markers) {
+        auto* item = xml.createNewChildElement("marker");
+        item->setAttribute("id", juce::String(marker.id));
+        item->setAttribute("time", exactBakeNumber(marker.time));
+        item->setAttribute("name", marker.name);
+    }
     for (const auto& cut : state.cameraCuts) {
         auto* item = xml.createNewChildElement("cameraCut");
         item->setAttribute("id", juce::String(cut.id));
@@ -1555,6 +1595,19 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
             return juce::Result::fail("Invalid camera transform or field of view.");
         }
         project.cameras.push_back(std::move(camera));
+    }
+    for (auto* item : xml.getChildWithTagNameIterator("marker")) {
+        const auto id = item->getStringAttribute("id").getLargeIntValue();
+        Marker marker {static_cast<Id>(id), item->getDoubleAttribute("time", -1), item->getStringAttribute("name")};
+        if (id <= 0 || !identities.insert(marker.id).second || !std::isfinite(marker.time) || marker.time < 0 || marker.time > project.duration
+            || marker.name.trim().isEmpty() || marker.name.length() > 120 || marker.name.containsChar('\n') || marker.name.containsChar('\r')) {
+            return juce::Result::fail("Invalid marker identity, position or name.");
+        }
+        project.markers.push_back(std::move(marker));
+    }
+    std::sort(project.markers.begin(), project.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+    for (std::size_t index = 1; index < project.markers.size(); ++index) {
+        if (project.markers[index].time - project.markers[index - 1].time < 1.0e-9) { return juce::Result::fail("Markers must have distinct positions."); }
     }
     for (auto* item : xml.getChildWithTagNameIterator("cameraCut")) {
         CameraCut cut;

@@ -6,6 +6,7 @@
 #include "ui/RasterSettingsPanel.h"
 #include "ui/TextSourcePanel.h"
 #include "ui/LuaSourcePanel.h"
+#include "ui/MarkerPanel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
@@ -403,6 +404,38 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
+    };
+    timeline.onEditMarker = [this](motion::Id id, double time) {
+        const auto& project = processor.document.project();
+        juce::String name = "Marker";
+        if (id == 0) {
+            const auto found = std::find_if(project.markers.begin(), project.markers.end(), [time](const auto& marker) { return std::abs(marker.time - time) < 1.0e-9; });
+            if (found != project.markers.end()) { id = found->id; }
+        }
+        if (id != 0) {
+            const auto found = std::find_if(project.markers.begin(), project.markers.end(), [id](const auto& marker) { return marker.id == id; });
+            if (found == project.markers.end()) { return; }
+            name = found->name; time = found->time;
+        }
+        const auto generation = processor.document.generation();
+        const auto revision = processor.document.revision();
+        auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
+        auto* controls = panel.get();
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add marker" : "Edit marker", juce::Point<int>(420, 170), true);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
+        const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(controls);
+        controls->onApply = [owner, overlayPointer, markerPanel, id, generation, revision](juce::String name, double time) {
+            juce::MessageManager::callAsync([owner, overlayPointer, markerPanel, id, generation, revision, name, time] {
+                if (owner == nullptr || overlayPointer == nullptr) { return; }
+                if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
+                    const auto result = owner->processor.document.setMarker(id, time, name);
+                    if (result.failed()) { if (markerPanel != nullptr) { markerPanel->setError(result.getErrorMessage()); } return; }
+                }
+                owner->dismissOverlay(overlayPointer.getComponent());
+            });
+        };
+        showOverlay(std::move(overlay));
     };
     timeline.onEnterComposition = [this](motion::Id id) { enterComposition(id); };
     timeline.onSelection = [this](motion::Id id) { select(id); };

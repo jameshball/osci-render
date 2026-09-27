@@ -104,6 +104,7 @@ Id highestProjectIdentity(const ProjectType& project, Id highest = 0) {
             for (const auto& clip : track.clips) { highest = std::max(highest, clip.id); effects(clip.effects); }
         }
         for (const auto& camera : composition.cameras) { highest = std::max(highest, camera.id); }
+        for (const auto& marker : composition.markers) { highest = std::max(highest, marker.id); }
         for (const auto& cut : composition.cameraCuts) { highest = std::max(highest, cut.id); }
     };
     scope(project);

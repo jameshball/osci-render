@@ -24,14 +24,16 @@ public:
         };
         addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
-        setTooltip("Shift-click: select multiple clips. V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip.");
+        setTooltip("Shift-click: select multiple clips. V: Move / trim. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip. M: add marker. [ / ]: previous / next marker.");
     }
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition;
     std::function<void(const juce::String&)> onError;
+    std::function<void(motion::Id, double)> onEditMarker;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
     mutable motion::Id selected = 0;
     void setSelection(motion::Id id) {
         ensureTrackRows();
+        selectedMarker = 0;
         selected = id;
         if (!notifyingSelection) {
             selectedClips.clear();
@@ -52,6 +54,7 @@ public:
     void restoreView(const ViewState& state) {
         ensureTrackRows();
         pixelsPerSecond = state.zoom; scrollTime = state.scroll; scrollRows = state.row;
+        selectedMarker = 0;
         selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed;
         std::erase_if(collapsedGroups, [this](auto id) { return motion::findGroup(processor.document.project(), id) == nullptr; });
         if (!isClip(selected) && motion::findGroup(processor.document.project(), selected) == nullptr) { selected = 0; }
@@ -62,7 +65,7 @@ public:
     double scrollTime = 0;
     mutable int scrollRows = 0;
     static constexpr int namesWidth = 170;
-    static constexpr int rulerHeight = 26;
+    mutable int rulerHeight = 26;
     static constexpr int rowHeight = 40;
 
     // Selection may originate in the preview, library or an import, not only
@@ -152,7 +155,7 @@ public:
     }
     void resized() override {
         ensureTrackRows();
-        addTrack.setBounds(namesWidth - 27, 2, 24, rulerHeight - 4);
+        addTrack.setBounds(namesWidth - 27, 2, 24, 22);
         scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
         for (auto& header : headers) {
             const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id; });
@@ -283,12 +286,12 @@ public:
             g.setColour(juce::Colours::white.withAlpha(0.06f));
             g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
             g.setColour(osci::Colours::text().withAlpha(0.7f));
-            g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, rulerHeight, juce::Justification::centredLeft);
+            g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, 26, juce::Justification::centredLeft);
         }
         g.setColour(osci::Colours::surfaceRaised());
         g.fillRect(0, 0, namesWidth, rulerHeight);
         g.setColour(osci::Colours::text());
-        g.drawText(toolName(), 12, 0, namesWidth - 54, rulerHeight, juce::Justification::centredLeft);
+        g.drawText(toolName(), 12, 0, namesWidth - 54, 26, juce::Justification::centredLeft);
         juce::Path toolArrow;
         toolArrow.addTriangle(namesWidth - 47.0f, 11.0f, namesWidth - 39.0f, 11.0f, namesWidth - 43.0f, 15.0f);
         g.fillPath(toolArrow);
@@ -429,6 +432,24 @@ public:
             g.drawRoundedRectangle(bounds, 4, 1);
             g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
         }
+        if (rulerHeight > 26) {
+            g.setColour(osci::Colours::textMuted());
+            g.setFont(11.0f);
+            g.drawText("Markers", 12, 26, namesWidth - 24, 22, juce::Justification::centredLeft);
+            for (const auto& marker : processor.document.project().markers) {
+                const auto bounds = markerBounds(marker);
+                if (bounds.isEmpty()) { continue; }
+                const auto colour = juce::Colour(0xffcfb779);
+                g.setColour(colour.withAlpha(0.12f));
+                g.drawVerticalLine(bounds.getX(), rulerHeight, static_cast<float>(getHeight()));
+                g.setColour(colour.withAlpha(marker.id == selectedMarker ? 0.3f : 0.12f));
+                g.fillRoundedRectangle(bounds.toFloat(), 2.0f);
+                g.setColour(colour);
+                g.fillRect(bounds.getX(), bounds.getY(), 2, bounds.getHeight());
+                g.setColour(osci::Colours::text());
+                g.drawText(marker.name, bounds.reduced(6, 0), juce::Justification::centredLeft, true);
+            }
+        }
         const auto playhead = timeX(processor.position.load());
         if (playhead >= namesWidth && playhead <= getWidth()) {
             g.setColour(juce::Colour(0xff7de5a0));
@@ -447,6 +468,23 @@ public:
         grabKeyboardFocus();
         ensureTrackRows();
         cancelGesture();
+        const auto* marker = markerAt(event.getPosition());
+        if (event.mods.isPopupMenu() && event.x >= namesWidth && event.y < rulerHeight) {
+            showMarkerMenu(marker != nullptr ? marker->id : 0, snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods));
+            return;
+        }
+        if (marker != nullptr && event.mods.isLeftButtonDown()) {
+            const auto id = marker->id;
+            const auto time = marker->time;
+            selectMarker(id); markerDragging = id; markerOriginalTime = time;
+            processor.seek(time);
+            downX = event.x; before = processor.document.project();
+            expectedRevision = processor.document.revision(); changed = false;
+            repaint();
+            return;
+        }
+        selectedMarker = 0;
+        if (event.y >= 26 && event.y < rulerHeight && event.x < namesWidth && onEditMarker) { onEditMarker(0, processor.position.load()); return; }
         if (event.y < rulerHeight && event.x < namesWidth) {
             showToolMenu(true);
             return;
@@ -506,6 +544,8 @@ public:
         const auto* clip = clipAt(event.getPosition(), row);
         if (event.y < rulerHeight && event.x < namesWidth) {
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        } else if (markerAt(event.getPosition()) != nullptr) {
+            setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         } else if (clip != nullptr) {
             const auto bounds = clipBounds(*clip, row);
             const bool edge = event.x < bounds.getX() + 8 || event.x > bounds.getRight() - 8;
@@ -521,6 +561,19 @@ public:
             return;
         }
         if (!gestureIsCurrent()) {
+            return;
+        }
+        if (markerDragging != 0) {
+            auto updated = *before;
+            const auto delta = (event.x - downX) / pixelsPerSecond;
+            const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapTime(markerOriginalTime + delta, event.mods), 0.0, updated.duration);
+            if (std::any_of(updated.markers.begin(), updated.markers.end(), [this, time](const auto& marker) { return marker.id != markerDragging && std::abs(marker.time - time) < 1.0e-9; })) { return; }
+            for (auto& marker : updated.markers) { if (marker.id == markerDragging) { marker.time = time; } }
+            std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+            changed = time != markerOriginalTime;
+            processor.document.preview(std::move(updated));
+            expectedRevision = processor.document.revision();
+            repaint();
             return;
         }
         auto candidate = original;
@@ -613,14 +666,17 @@ public:
         auto originalProject = std::move(*before);
         before.reset();
         if (changed) {
-            const auto label = mode == Mode::move ? (selectedClips.size() > 1 ? "Move clips" : "Move clip") : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
+            const auto label = markerDragging != 0 ? "Move marker" : mode == Mode::move ? (selectedClips.size() > 1 ? "Move clips" : "Move clip") : (mode == Mode::slip ? "Slip clip" : (mode == Mode::stretch ? "Stretch clip" : "Trim clip"));
             processor.document.commit(label, std::move(originalProject));
         }
         changed = false;
+        markerDragging = 0;
     }
 
     void mouseDoubleClick(const juce::MouseEvent& event) override {
         cancelGesture();
+        const auto* marker = markerAt(event.getPosition());
+        if (marker != nullptr && onEditMarker) { onEditMarker(marker->id, marker->time); return; }
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
         if (clip != nullptr && clip->composition != 0 && onEnterComposition) { onEnterComposition(clip->id); }
@@ -658,6 +714,15 @@ public:
         }
         if (!key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown()) {
             const auto character = juce::CharacterFunctions::toLowerCase(key.getTextCharacter());
+            if (character == 'm' && onEditMarker) {
+                cancelGesture();
+                onEditMarker(0, std::clamp(processor.position.load(), 0.0, processor.document.project().duration));
+                return true;
+            }
+            if (character == '[' || character == ']') {
+                jumpMarker(character == ']');
+                return true;
+            }
             if (character == 'v' || character == 's' || character == 'r') {
                 cancelGesture();
                 tool = character == 'v' ? Tool::move : (character == 's' ? Tool::slip : Tool::stretch);
@@ -675,6 +740,12 @@ public:
         }
         if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey) {
             cancelGesture();
+            if (selectedMarker != 0) {
+                const auto result = processor.document.removeMarker(selectedMarker);
+                if (result.failed() && onError) { onError(result.getErrorMessage()); }
+                selectedMarker = 0;
+                return true;
+            }
             const auto& tracks = processor.document.project().tracks;
             const auto exists = std::any_of(tracks.begin(), tracks.end(), [&](const auto& track) {
                 return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return selectedClips.contains(clip.id); });
@@ -716,6 +787,62 @@ private:
             }
         }
     }
+    juce::Rectangle<int> markerBounds(const motion::Marker& marker) const {
+        const auto x = timeX(marker.time);
+        if (x < namesWidth || x >= getWidth()) { return {}; }
+        auto right = std::min(getWidth(), x + 140);
+        for (const auto& next : processor.document.project().markers) {
+            if (next.time > marker.time) { right = std::min(right, timeX(next.time) - 2); break; }
+        }
+        return {x, 27, std::max(3, right - x), 20};
+    }
+    const motion::Marker* markerAt(juce::Point<int> point) const {
+        if (point.y < 26 || point.y >= rulerHeight) { return nullptr; }
+        for (const auto& marker : processor.document.project().markers) {
+            if (markerBounds(marker).contains(point)) { return &marker; }
+        }
+        return nullptr;
+    }
+    void selectMarker(motion::Id id) {
+        selected = 0;
+        selectedClips.clear();
+        if (onSelection) { onSelection(0); }
+        selectedMarker = id;
+    }
+    void jumpMarker(bool forward) {
+        const auto now = processor.position.load();
+        const motion::Marker* target = nullptr;
+        for (const auto& marker : processor.document.project().markers) {
+            if (forward && marker.time > now + 0.000001) { target = &marker; break; }
+            if (!forward && marker.time < now - 0.000001) { target = &marker; }
+        }
+        if (target != nullptr) {
+            const auto id = target->id;
+            const auto time = target->time;
+            selectMarker(id); processor.seek(time); revealTime(time); repaint();
+        }
+    }
+    void showMarkerMenu(motion::Id id, double time) {
+        juce::PopupMenu menu;
+        if (id != 0) {
+            menu.addItem(1, "Edit marker...");
+            menu.addItem(2, "Delete marker");
+            menu.addSeparator();
+        }
+        menu.addItem(3, "Add marker here...");
+        menu.addItem(4, "Previous marker", !processor.document.project().markers.empty());
+        menu.addItem(5, "Next marker", !processor.document.project().markers.empty());
+        const auto generation = processor.document.generation();
+        const auto revision = processor.document.revision();
+        const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, time, generation, revision](int result) {
+            if (owner == nullptr || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
+            if ((result == 1 || result == 3) && owner->onEditMarker) { owner->onEditMarker(result == 1 ? id : 0, time); }
+            if (result == 2) { const auto removed = owner->processor.document.removeMarker(id); if (removed.failed() && owner->onError) { owner->onError(removed.getErrorMessage()); } }
+            if (result == 4 || result == 5) { owner->jumpMarker(result == 5); }
+        });
+    }
+
     void showClipMenu(motion::Id id) {
         juce::PopupMenu menu;
         menu.addItem(1, selectedClips.size() > 1 ? "Duplicate clips" : "Duplicate clip");
@@ -982,6 +1109,7 @@ private:
 
     void cancelGesture() {
         scrubbing = false;
+        markerDragging = 0;
         if (gestureIsCurrent()) {
             auto restore = std::move(*before);
             before.reset();
@@ -1047,10 +1175,13 @@ private:
             collapsedGroups.clear();
             selectedClips.clear();
             selected = 0;
+            selectedMarker = 0;
             layoutGeneration = generation;
             layoutRevision.reset();
         }
         if (!layoutRevision.has_value() || *layoutRevision != revision) {
+            rulerHeight = processor.document.project().markers.empty() ? 26 : 48;
+            if (std::none_of(processor.document.project().markers.begin(), processor.document.project().markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
             rows = motion::trackRows(processor.document.project(), collapsedGroups);
             std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });
             layoutRevision = revision;
@@ -1104,6 +1235,9 @@ private:
     Tool tool = Tool::move;
     Mode mode = Mode::move;
     std::uint64_t expectedRevision = 0;
+    mutable motion::Id selectedMarker = 0;
+    motion::Id markerDragging = 0;
+    double markerOriginalTime = 0;
     bool scrubbing = false;
     bool changed = false;
     std::optional<juce::Point<int>> dropPosition;
