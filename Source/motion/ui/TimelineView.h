@@ -7,8 +7,20 @@
 #include <limits>
 #include <set>
 #include "../model/CompositionGraph.h"
+#include "../model/PropertySchema.h"
+#include "MotionStyle.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
+    struct Row : motion::TrackRow {
+        std::string lane; // Property id for a keyframe lane under its track.
+        bool isLane() const { return !lane.empty(); }
+        bool group() const { return track < 0 && lane.empty(); }
+    };
+    struct KeyRef {
+        motion::Id clip = 0;
+        std::string property;
+        double time = 0; // Content-local key time.
+    };
 public:
     explicit MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
         setName("Composition timeline");
@@ -24,7 +36,7 @@ public:
         };
         addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
-        setTooltip("Shift-click: select multiple clips. V: Move / trim. B: Ripple trim edges on this track. S: Slip content. R: Stretch duration. Alt: disable snapping. Command/Ctrl + wheel: zoom. F: fit project. Escape: cancel edit. Command/Ctrl+D: duplicate clip. M: add marker. [ / ]: previous / next marker.");
+        // Shortcuts are listed in Help > Keyboard shortcuts rather than a hover wall.
     }
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition;
     std::function<void(const juce::String&)> onError;
@@ -45,17 +57,17 @@ public:
         double zoom = 70, scroll = 0;
         int row = 0;
         motion::Id primary = 0;
-        std::set<motion::Id> selected, collapsed;
+        std::set<motion::Id> selected, collapsed, expanded;
     };
     ViewState viewState() const {
         ensureTrackRows();
-        return {pixelsPerSecond, scrollTime, scrollRows, selected, selectedClips, collapsedGroups};
+        return {pixelsPerSecond, scrollTime, scrollRows, selected, selectedClips, collapsedGroups, expandedTracks};
     }
     void restoreView(const ViewState& state) {
         ensureTrackRows();
         pixelsPerSecond = state.zoom; scrollTime = state.scroll; scrollRows = state.row;
         selectedMarker = 0;
-        selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed;
+        selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed; expandedTracks = state.expanded;
         std::erase_if(collapsedGroups, [this](auto id) { return motion::findGroup(processor.document.project(), id) == nullptr; });
         if (!isClip(selected) && motion::findGroup(processor.document.project(), selected) == nullptr) { selected = 0; }
         layoutRevision.reset();
@@ -66,7 +78,8 @@ public:
     mutable int scrollRows = 0;
     static constexpr int namesWidth = 170;
     mutable int rulerHeight = 26;
-    static constexpr int rowHeight = 40;
+    static constexpr int rowHeight = 32;
+    static constexpr int laneHeight = 22;
 
     // Selection may originate in the preview, library or an import, not only
     // from a row already on screen. Keep its layer reachable in a dense project.
@@ -90,13 +103,85 @@ public:
             parent = group != nullptr ? group->parent : 0;
         }
         if (expanded) { layoutRevision.reset(); ensureTrackRows(); }
-        const auto found = std::find_if(rows.begin(), rows.end(), [trackId](const auto& row) { return row.id == trackId; });
+        const auto found = std::find_if(rows.begin(), rows.end(), [trackId](const auto& row) { return row.id == trackId && !row.isLane(); });
         if (found == rows.end()) { return; }
         const auto row = static_cast<int>(found - rows.begin());
         if (row < scrollRows) { scrollRows = row; }
         else if (row >= scrollRows + visibleRowCount()) { scrollRows = row - visibleRowCount() + 1; }
         if (expanded) { refreshTracks(); } else { resized(); repaint(); }
     }
+
+    bool hasSelectedKeys() const { return !selectedKeys.empty(); }
+    bool hasSelectedClips() const { return !selectedClips.empty(); }
+    std::vector<motion::Document::CopiedKey> copiedKeys() const {
+        std::vector<motion::Document::CopiedKey> result;
+        const auto& project = processor.document.project();
+        double earliest = std::numeric_limits<double>::infinity();
+        std::vector<std::pair<double, motion::Document::CopiedKey>> timed;
+        for (const auto& key : selectedKeys) {
+            const auto* clip = findClip(key.clip, project);
+            if (clip == nullptr) { continue; }
+            const auto found = clip->properties.find(key.property);
+            if (found == clip->properties.end()) { continue; }
+            const auto timing = clip->timing(project.bpm);
+            for (const auto& keyframe : found->second.keyframes()) {
+                if (!sameTime(keyframe.time, key.time) || timing.rate == 0) { continue; }
+                const auto time = timing.start + (keyframe.time - timing.offset) / timing.rate;
+                earliest = std::min(earliest, time);
+                timed.push_back({time, {key.property, 0, keyframe}});
+            }
+        }
+        for (auto& [time, copied] : timed) { copied.offset = time - earliest; result.push_back(std::move(copied)); }
+        return result;
+    }
+    std::vector<motion::Document::CopiedClip> copiedClips() const {
+        std::vector<motion::Document::CopiedClip> result;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) {
+                if (selectedClips.contains(clip.id)) { result.push_back({track.id, track.kind, track.name, clip}); }
+            }
+        }
+        return result;
+    }
+    void deleteSelection() {
+        if (!selectedKeys.empty()) { deleteSelectedKeys(); return; }
+        if (!selectedClips.empty()) { deleteSelectedClips(false); }
+    }
+    void selectClips(const std::vector<motion::Id>& ids) {
+        selectedKeys.clear();
+        selectedClips = {ids.begin(), ids.end()};
+        notifySelection(ids.empty() ? 0 : ids.front());
+        revealSelection();
+    }
+    // Select all keys in visible lanes when a key is selected, else all clips.
+    void selectAll() {
+        ensureTrackRows();
+        if (!selectedKeys.empty()) {
+            selectedKeys = keysInside({namesWidth, 0, 1 << 29, 1 << 29});
+            if (!selectedKeys.empty()) { repaint(); return; }
+        }
+        std::vector<motion::Id> ids;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { ids.push_back(clip.id); }
+        }
+        selectClips(ids);
+    }
+    void toggleLanesForSelection() {
+        for (const auto& track : processor.document.project().tracks) {
+            if (std::none_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return selectedClips.contains(clip.id); })) { continue; }
+            if (expandedTracks.contains(track.id)) { expandedTracks.erase(track.id); } else { expandedTracks.insert(track.id); }
+        }
+        layoutRevision.reset();
+        refreshTracks();
+    }
+    void zoomBy(double factor) {
+        const auto centreX = std::max(0, (getWidth() - namesWidth) / 2);
+        const auto anchor = scrollTime + centreX / pixelsPerSecond;
+        pixelsPerSecond = std::clamp(pixelsPerSecond * factor, 0.000001, 500.0);
+        scrollTime = std::max(0.0, anchor - centreX / pixelsPerSecond);
+        repaint();
+    }
+    void fitToProject() { fitProject(); }
 
     void revealTime(double seconds) {
         cancelGesture();
@@ -134,13 +219,20 @@ public:
                     selectClip(id);
                 };
                 header->onDragRevision = [this] { return processor.document.revision(); };
+                header->onLanes = [this](motion::Id id) {
+                    if (expandedTracks.contains(id)) { expandedTracks.erase(id); } else { expandedTracks.insert(id); }
+                    layoutRevision.reset();
+                    refreshTracks();
+                };
+                header->onLock = [this](motion::Id id) { toggleLock(id); };
                 header->onMute = [this](motion::Id id) { toggleTrack(id, false); };
                 header->onSolo = [this](motion::Id id) { toggleTrack(id, true); };
                 addAndMakeVisible(*header);
                 headers.push_back(std::move(header));
                 found = headers.end() - 1;
             }
-            (*found)->update(track, group, collapsedGroups.contains(track.id));
+            const auto lanes = group ? false : !animatedProperties(track).empty();
+            (*found)->update(track, group, collapsedGroups.contains(track.id), lanes, expandedTracks.contains(track.id));
         };
         for (const auto& track : project.tracks) { updateHeader(track, false); }
         for (const auto& group : project.groups) {
@@ -148,7 +240,7 @@ public:
             display.id = group.id; display.name = group.name; display.muted = group.muted; display.solo = group.solo;
             updateHeader(display, true);
         }
-        rows = motion::trackRows(project, collapsedGroups);
+        rebuildRows();
         layoutRevision = processor.document.revision();
         resized();
         repaint();
@@ -158,10 +250,10 @@ public:
         addTrack.setBounds(namesWidth - 27, 2, 24, 22);
         scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
         for (auto& header : headers) {
-            const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id; });
+            const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id && !row.isLane(); });
             const auto row = static_cast<int>(found - rows.begin());
             const auto y = rowY(row);
-            header->setVisible(found != rows.end() && y >= rulerHeight && y < getHeight());
+            header->setVisible(found != rows.end() && row >= scrollRows && y < getHeight());
             const auto indent = found != rows.end() ? std::min(48, found->depth * 8) : 0;
             header->setBounds(indent, y, namesWidth - 1 - indent, rowHeight - 1);
         }
@@ -296,96 +388,56 @@ public:
         toolArrow.addTriangle(namesWidth - 47.0f, 11.0f, namesWidth - 39.0f, 11.0f, namesWidth - 43.0f, 15.0f);
         g.fillPath(toolArrow);
         const auto& tracks = processor.document.project().tracks;
+        const auto& project = processor.document.project();
         scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
         for (int visible = scrollRows; visible < static_cast<int>(rows.size()); ++visible) {
             const auto y = rowY(visible);
             if (y >= getHeight()) {
                 break;
             }
-            g.setColour(osci::Colours::surfaceRaised());
-            g.fillRect(0, y, namesWidth - 1, rowHeight - 1);
-            g.setColour(osci::Colours::text());
-
-            const auto index = rows[visible].track;
+            const auto& row = rows[static_cast<std::size_t>(visible)];
+            const auto height = heightOf(static_cast<std::size_t>(visible));
+            if (row.isLane()) {
+                paintLane(g, row, y, height);
+                continue;
+            }
+            g.setColour(motion::style::raised());
+            g.fillRect(0, y, namesWidth - 1, height - 1);
+            g.setColour(motion::style::outline().withAlpha(.35f));
+            g.drawHorizontalLine(y + height - 1, static_cast<float>(namesWidth), static_cast<float>(getWidth()));
+            const auto index = row.track;
             if (index < 0) {
-                g.setColour(osci::Colours::surfaceRaised().withAlpha(0.25f));
-                g.fillRect(namesWidth, y, getWidth() - namesWidth, rowHeight - 1);
+                g.setColour(motion::style::raised().withAlpha(0.25f));
+                g.fillRect(namesWidth, y, getWidth() - namesWidth, height - 1);
                 juce::Graphics::ScopedSaveState summaryScope(g);
-                g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, rowHeight);
+                g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
                 for (const auto& track : tracks) {
                     auto parent = track.group;
                     for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
-                        if (parent == rows[visible].id) {
-                            g.setColour(osci::Colours::accentColor().withAlpha(motion::trackIsAudible(processor.document.project(), track) ? 0.35f : 0.1f));
+                        if (parent == row.id) {
+                            g.setColour(motion::style::accent().withAlpha(motion::trackIsAudible(project, track) ? 0.35f : 0.1f));
                             for (const auto& clip : track.clips) {
-                                const auto timing = clip.timing(processor.document.project().bpm);
-                                g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + rowHeight * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
+                                const auto timing = clip.timing(project.bpm);
+                                g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + height * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
                             }
                             break;
                         }
-                        const auto* group = motion::findGroup(processor.document.project(), parent);
+                        const auto* group = motion::findGroup(project, parent);
                         parent = group != nullptr ? group->parent : 0;
                     }
                 }
                 continue;
             }
             juce::Graphics::ScopedSaveState scope(g);
-            g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, rowHeight);
-            const auto opacity = !motion::trackIsAudible(processor.document.project(), tracks[index]) ? 0.38f : 1.0f;
-            for (const auto& clip : tracks[index].clips) {
-                const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 4);
-                const auto active = selectedClips.contains(clip.id);
-                const bool audio = tracks[index].kind == motion::TrackKind::audio;
-                g.setColour((audio ? (active ? juce::Colour(0xff365e80) : juce::Colour(0xff304451)) : (active ? juce::Colour(0xff305742) : juce::Colour(0xff354c45))).withAlpha(opacity));
-                g.fillRoundedRectangle(bounds, 4);
-                g.setColour((active ? juce::Colour(0xff70da91) : juce::Colour(0xff647d71)).withAlpha(opacity));
-                g.drawRoundedRectangle(bounds, 4, 1);
-                g.setColour(juce::Colours::white);
-                if (!clip.effects.empty() && bounds.getWidth() > 90) {
-                    g.setColour(juce::Colours::white.withAlpha(0.7f));
-                    g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38), juce::Justification::centred);
-                    g.setColour(juce::Colours::white);
-                }
-                if (active && tool == Tool::ripple && bounds.getWidth() > 18) {
-                    g.setColour(juce::Colour(0xff70da91).withAlpha(opacity));
-                    g.fillRoundedRectangle(bounds.getX() + 3, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
-                    g.fillRoundedRectangle(bounds.getRight() - 6, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
-                    g.setColour(juce::Colours::white);
-                }
-                auto label = juce::String(clip.name);
-                if (active && tool == Tool::slip) {
-                    label += "  offset " + juce::String(clip.timing(processor.document.project().bpm).offset, 2) + "s";
-                } else if (active && tool == Tool::stretch) {
-                    label += "  " + juce::String(clip.timing(processor.document.project().bpm).rate, 2) + "x";
-                }
-                auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f);
-                if (audio) {
-                    const auto& assets = processor.document.project().assets;
-                    const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == clip.asset; });
-                    if (asset != assets.end() && (*asset)->audio != nullptr) {
-                        const auto left = std::max(namesWidth, static_cast<int>(bounds.getX()) + 2);
-                        const auto right = std::min(getWidth(), static_cast<int>(bounds.getRight()) - 2);
-                        const auto centre = bounds.getBottom() - 8.5f;
-                        g.setColour(juce::Colour(0xff97c7df).withAlpha(opacity));
-                        for (int x = left; x < right; ++x) {
-                            const auto time = scrollTime + (x - namesWidth) / pixelsPerSecond;
-                            const auto end = time + 1.0 / pixelsPerSecond;
-                            const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time, processor.document.project().bpm), clip.localTime(end, processor.document.project().bpm));
-                            const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time, processor.document.project().bpm), clip.localTime(end, processor.document.project().bpm));
-                            const auto low = std::clamp(std::min(a.minimum, b.minimum), -1.0f, 1.0f);
-                            const auto high = std::clamp(std::max(a.maximum, b.maximum), -1.0f, 1.0f);
-                            g.drawVerticalLine(x, centre - high * 8, centre - low * 8 + 0.5f);
-                        }
-                    }
-                    labelBounds = labelBounds.withHeight(15);
-                }
-                g.setColour(juce::Colours::white.withAlpha(opacity));
-                g.drawText(label, labelBounds, juce::Justification::centredLeft);
+            g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
+            const auto opacity = !motion::trackIsAudible(project, tracks[static_cast<std::size_t>(index)]) ? 0.38f : 1.0f;
+            for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) {
+                paintClip(g, clip, tracks[static_cast<std::size_t>(index)], index, opacity);
             }
         }
         if (dropPosition.has_value() && dropTrack) {
             g.setColour(osci::Colours::accentColor());
-            const auto boundary = std::clamp((dropPosition->y - rulerHeight + rowHeight / 2) / rowHeight + scrollRows, 0, static_cast<int>(rows.size()));
+            const auto boundary = std::clamp(visualRowAt(dropPosition->y + rowHeight / 2), 0, static_cast<int>(rows.size()));
             if (groupAtY(dropPosition->y) != 0) { g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), rowHeight, 2); } else { g.fillRect(0, rowY(boundary) - 1, getWidth(), 2); }
         } else if (dropPosition.has_value() && !dropEffect.empty()) {
             int row = 0;
@@ -495,6 +547,34 @@ public:
             showToolMenu(true);
             return;
         }
+        if (event.y >= rulerHeight && laneAtY(event.y) != nullptr) {
+            if (event.x < namesWidth) { return; }
+            const auto key = keyAt(event.getPosition());
+            if (event.mods.isPopupMenu()) {
+                if (key.has_value() && !isKeySelected(key->clip, key->property, key->time)) { selectedKeys = {*key}; }
+                repaint();
+                showKeyMenu();
+                return;
+            }
+            if (!event.mods.isLeftButtonDown()) { return; }
+            if (key.has_value()) {
+                const bool chosen = isKeySelected(key->clip, key->property, key->time);
+                if (event.mods.isShiftDown()) {
+                    if (chosen) { std::erase_if(selectedKeys, [&](const auto& item) { return item.clip == key->clip && item.property == key->property && sameTime(item.time, key->time); }); }
+                    else { selectedKeys.push_back(*key); }
+                } else if (!chosen) {
+                    selectedKeys = {*key};
+                }
+                if (isKeySelected(key->clip, key->property, key->time)) { beginKeyDrag(*key, event.x); }
+            } else {
+                marqueeStart = event.getPosition();
+                marqueeBase = event.mods.isShiftDown() ? selectedKeys : std::vector<KeyRef>{};
+                selectedKeys = marqueeBase;
+                marquee = juce::Rectangle<int>(marqueeStart, marqueeStart);
+            }
+            repaint();
+            return;
+        }
         if (event.mods.isPopupMenu()) {
             int row = 0;
             const auto* clip = clipAt(event.getPosition(), row);
@@ -567,6 +647,16 @@ public:
     }
 
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (keyDrag.has_value()) { dragKeys(event.x, event.mods); return; }
+        if (marquee.has_value()) {
+            marquee = juce::Rectangle<int>(marqueeStart, event.getPosition());
+            selectedKeys = marqueeBase;
+            for (auto& key : keysInside(*marquee)) {
+                if (!isKeySelected(key.clip, key.property, key.time)) { selectedKeys.push_back(std::move(key)); }
+            }
+            repaint();
+            return;
+        }
         if (scrubbing) {
             seek(event.x, event.mods);
             return;
@@ -680,6 +770,8 @@ public:
     }
 
     void mouseUp(const juce::MouseEvent&) override {
+        if (keyDrag.has_value()) { endKeyDrag(); repaint(); return; }
+        if (marquee.has_value()) { marquee.reset(); repaint(); return; }
         scrubbing = false;
         if (!gestureIsCurrent()) {
             return;
@@ -696,6 +788,11 @@ public:
 
     void mouseDoubleClick(const juce::MouseEvent& event) override {
         cancelGesture();
+        const auto* lane = event.y >= rulerHeight ? laneAtY(event.y) : nullptr;
+        if (lane != nullptr) {
+            if (event.x >= namesWidth && !keyAt(event.getPosition()).has_value()) { addKeyAt(*lane, event.x, event.mods); }
+            return;
+        }
         const auto* marker = markerAt(event.getPosition());
         if (marker != nullptr && onEditMarker) { onEditMarker(marker->id, marker->time); return; }
         int row = 0;
@@ -727,6 +824,14 @@ public:
         ensureTrackRows();
         if (selected != 0 && key.getModifiers().isCommandDown() && key.getKeyCode() == 'D') {
             duplicateClip(selected);
+            return true;
+        }
+        if (key == juce::KeyPress::escapeKey && (keyDrag.has_value() || marquee.has_value())) {
+            cancelKeyDrag();
+            return true;
+        }
+        if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey) && !selectedKeys.empty()) {
+            deleteSelectedKeys();
             return true;
         }
         if (key == juce::KeyPress::escapeKey && (before.has_value() || scrubbing)) {
@@ -776,6 +881,367 @@ public:
     }
 
 private:
+    juce::Colour clipColour(const motion::Clip& clip, const motion::Track& track) const {
+        if (track.kind == motion::TrackKind::audio) { return motion::style::audioClip(); }
+        if (clip.composition != 0) { return motion::style::compositionClip(); }
+        if (clip.midi != nullptr) { return motion::style::midiClip(); }
+        return motion::style::visualClip();
+    }
+    // Project times of every key on a clip, restricted to its visible interval.
+    std::vector<double> clipKeyTimes(const motion::Clip& clip, const std::string& property = {}) const {
+        std::vector<double> times;
+        const auto timing = clip.timing(processor.document.project().bpm);
+        if (!(timing.rate != 0)) { return times; }
+        for (const auto& [name, curve] : clip.properties) {
+            if (!property.empty() && name != property) { continue; }
+            for (const auto& key : curve.keyframes()) {
+                const auto time = timing.start + (key.time - timing.offset) / timing.rate;
+                if (time >= timing.start - 1.0e-9 && time <= timing.end() + 1.0e-9) { times.push_back(time); }
+            }
+        }
+        std::sort(times.begin(), times.end());
+        times.erase(std::unique(times.begin(), times.end(), [](double a, double b) { return std::abs(a - b) < 1.0e-9; }), times.end());
+        return times;
+    }
+    void paintClip(juce::Graphics& g, const motion::Clip& clip, const motion::Track& track, int index, float opacity) const {
+        const auto& project = processor.document.project();
+        const auto bounds = clipBounds(clip, index).toFloat().reduced(1, 3);
+        const auto active = selectedClips.contains(clip.id);
+        const bool audio = track.kind == motion::TrackKind::audio;
+        const auto base = clipColour(clip, track);
+        g.setColour((active ? base.brighter(.35f) : base).withAlpha(opacity));
+        g.fillRoundedRectangle(bounds, motion::style::radius);
+        g.setColour((active ? motion::style::key() : base.brighter(.5f)).withAlpha(opacity * (active ? 1.0f : .55f)));
+        g.drawRoundedRectangle(bounds, motion::style::radius, active ? 1.4f : 1.0f);
+        g.setFont(motion::style::body());
+        if (!clip.effects.empty() && bounds.getWidth() > 90) {
+            g.setColour(juce::Colours::white.withAlpha(0.6f * opacity));
+            g.setFont(motion::style::small());
+            g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38).withTrimmedBottom(8), juce::Justification::centred);
+            g.setFont(motion::style::body());
+        }
+        if (active && tool == Tool::ripple && bounds.getWidth() > 18) {
+            g.setColour(motion::style::key().withAlpha(opacity));
+            g.fillRoundedRectangle(bounds.getX() + 3, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
+            g.fillRoundedRectangle(bounds.getRight() - 6, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
+        }
+        auto label = juce::String(clip.name);
+        if (active && tool == Tool::slip) {
+            label += "  offset " + juce::String(clip.timing(project.bpm).offset, 2) + "s";
+        } else if (active && tool == Tool::stretch) {
+            label += "  " + juce::String(clip.timing(project.bpm).rate, 2) + "x";
+        }
+        auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f).withTrimmedBottom(7);
+        if (audio) {
+            const auto& assets = project.assets;
+            const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == clip.asset; });
+            if (asset != assets.end() && (*asset)->audio != nullptr) {
+                const auto left = std::max(namesWidth, static_cast<int>(bounds.getX()) + 2);
+                const auto right = std::min(getWidth(), static_cast<int>(bounds.getRight()) - 2);
+                const auto centre = bounds.getBottom() - 7.5f;
+                g.setColour(juce::Colour(0xff97c7df).withAlpha(opacity * .8f));
+                for (int x = left; x < right; ++x) {
+                    const auto time = scrollTime + (x - namesWidth) / pixelsPerSecond;
+                    const auto end = time + 1.0 / pixelsPerSecond;
+                    const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time, project.bpm), clip.localTime(end, project.bpm));
+                    const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time, project.bpm), clip.localTime(end, project.bpm));
+                    const auto low = std::clamp(std::min(a.minimum, b.minimum), -1.0f, 1.0f);
+                    const auto high = std::clamp(std::max(a.maximum, b.maximum), -1.0f, 1.0f);
+                    g.drawVerticalLine(x, centre - high * 6, centre - low * 6 + 0.5f);
+                }
+            }
+            labelBounds = labelBounds.withHeight(15);
+        }
+        g.setColour(juce::Colours::white.withAlpha(.92f * opacity));
+        g.drawText(label, labelBounds, juce::Justification::centredLeft);
+        // Key summary ticks along the bottom edge.
+        g.setColour(motion::style::key().withAlpha(.8f * opacity));
+        double lastX = -10;
+        for (const auto time : clipKeyTimes(clip)) {
+            const auto x = static_cast<float>(timeX(time));
+            if (x - lastX < 3 || x < bounds.getX() - 2 || x > bounds.getRight() + 2) { continue; }
+            motion::style::drawDiamond(g, {x, bounds.getBottom() - 4.0f}, 2.5f, true);
+            lastX = x;
+        }
+    }
+    void paintLane(juce::Graphics& g, const Row& row, int y, int height) const {
+        const auto& project = processor.document.project();
+        const auto& track = project.tracks[static_cast<std::size_t>(row.track)];
+        g.setColour(motion::style::sunken());
+        g.fillRect(0, y, getWidth(), height);
+        const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
+        const auto* spec = motion::findPropertySpec(specs, row.lane);
+        g.setFont(motion::style::small());
+        g.setColour(motion::style::muted());
+        const auto indent = std::min(48, row.depth * 8) + 30;
+        g.drawText(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(row.lane), indent, y, namesWidth - indent - 6, height, juce::Justification::centredLeft);
+        juce::Graphics::ScopedSaveState scope(g);
+        g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
+        const auto centre = y + height * .5f;
+        for (const auto& clip : track.clips) {
+            const auto timing = clip.timing(project.bpm);
+            const auto left = timeX(timing.start), right = timeX(timing.end());
+            g.setColour(clipColour(clip, track).withAlpha(.18f));
+            g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
+            const auto found = clip.properties.find(row.lane);
+            if (found == clip.properties.end() || timing.rate == 0) { continue; }
+            const auto& keys = found->second.keyframes();
+            // A faint value curve normalised to the lane shows each move's shape.
+            if (keys.size() > 1) {
+                const auto first = std::max(left, namesWidth), last = std::min(right, getWidth());
+                double low = std::numeric_limits<double>::max(), high = std::numeric_limits<double>::lowest();
+                for (const auto& key : keys) { low = std::min(low, key.value); high = std::max(high, key.value); }
+                const auto localAt = [&](int x) { return timing.localTime(scrollTime + (x - namesWidth) / pixelsPerSecond); };
+                for (int x = first; x < last; x += 3) {
+                    const auto value = found->second.evaluateBase(localAt(x));
+                    low = std::min(low, value); high = std::max(high, value);
+                }
+                if (high > low && last > first) {
+                    juce::Path shape;
+                    const auto yOf = [&](double value) { return static_cast<float>(y + height - 4 - (value - low) / (high - low) * (height - 8)); };
+                    shape.startNewSubPath(static_cast<float>(first), yOf(found->second.evaluateBase(localAt(first))));
+                    for (int x = first + 2; x < last; x += 2) { shape.lineTo(static_cast<float>(x), yOf(found->second.evaluateBase(localAt(x)))); }
+                    g.setColour(motion::style::key().withAlpha(.35f));
+                    g.strokePath(shape, juce::PathStrokeType(1.0f));
+                }
+            }
+            // Key shape encodes its outgoing interpolation: square hold,
+            // diamond linear, circle auto/Bezier.
+            for (std::size_t k = 0; k < keys.size(); ++k) {
+                const auto time = timing.start + (keys[k].time - timing.offset) / timing.rate;
+                const auto x = static_cast<float>(timeX(time));
+                const bool chosen = isKeySelected(clip.id, row.lane, keys[k].time);
+                g.setColour(chosen ? juce::Colours::white : motion::style::key());
+                const auto shape = keys[k].interpolation;
+                if (shape == motion::Interpolation::hold) {
+                    g.fillRect(juce::Rectangle<float>(x - 3.5f, centre - 3.5f, 7, 7));
+                } else if (shape == motion::Interpolation::linear) {
+                    motion::style::drawDiamond(g, {x, centre}, 4.5f, true);
+                } else {
+                    g.fillEllipse(x - 4, centre - 4, 8, 8);
+                }
+                if (chosen) {
+                    g.setColour(motion::style::key());
+                    g.drawEllipse(x - 6, centre - 6, 12, 12, 1.0f);
+                }
+            }
+        }
+        if (marquee.has_value()) {
+            g.setColour(motion::style::accent().withAlpha(.12f));
+            g.fillRect(*marquee);
+            g.setColour(motion::style::accent().withAlpha(.6f));
+            g.drawRect(*marquee);
+        }
+    }
+    static bool sameTime(double a, double b) { return std::abs(a - b) < 1.0e-6; }
+    bool isKeySelected(motion::Id clip, const std::string& property, double time) const {
+        return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.clip == clip && key.property == property && sameTime(key.time, time); });
+    }
+    const motion::Clip* findClip(motion::Id id, const motion::Project& project) const {
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) { if (clip.id == id) { return &clip; } }
+        }
+        return nullptr;
+    }
+    // Keys whose diamond lies under a point in a lane row.
+    std::optional<KeyRef> keyAt(juce::Point<int> point) const {
+        const auto* lane = laneAtY(point.y);
+        if (lane == nullptr || point.x < namesWidth) { return std::nullopt; }
+        const auto& project = processor.document.project();
+        const auto& track = project.tracks[static_cast<std::size_t>(lane->track)];
+        std::optional<KeyRef> best;
+        auto bestDistance = 7.0;
+        for (const auto& clip : track.clips) {
+            const auto found = clip.properties.find(lane->lane);
+            const auto timing = clip.timing(project.bpm);
+            if (found == clip.properties.end() || timing.rate == 0) { continue; }
+            for (const auto& key : found->second.keyframes()) {
+                const auto distance = std::abs(timeX(timing.start + (key.time - timing.offset) / timing.rate) - point.x);
+                if (distance < bestDistance) { bestDistance = distance; best = KeyRef{clip.id, lane->lane, key.time}; }
+            }
+        }
+        return best;
+    }
+    std::vector<KeyRef> keysInside(juce::Rectangle<int> area) const {
+        std::vector<KeyRef> result;
+        const auto& project = processor.document.project();
+        for (int visible = scrollRows; visible < static_cast<int>(rows.size()); ++visible) {
+            const auto& row = rows[static_cast<std::size_t>(visible)];
+            const auto y = rowY(visible);
+            if (!row.isLane() || y + laneHeight / 2 < area.getY() || y + laneHeight / 2 > area.getBottom()) { continue; }
+            for (const auto& clip : project.tracks[static_cast<std::size_t>(row.track)].clips) {
+                const auto found = clip.properties.find(row.lane);
+                const auto timing = clip.timing(project.bpm);
+                if (found == clip.properties.end() || timing.rate == 0) { continue; }
+                for (const auto& key : found->second.keyframes()) {
+                    const auto x = timeX(timing.start + (key.time - timing.offset) / timing.rate);
+                    if (x >= area.getX() && x <= area.getRight()) { result.push_back({clip.id, row.lane, key.time}); }
+                }
+            }
+        }
+        return result;
+    }
+    // Moves keys by a project-time delta on a copy of the gesture's project.
+    // Fails when a moved key would land on a key that is not moving.
+    static bool moveKeys(motion::Project& project, const std::vector<KeyRef>& keys, double delta) {
+        for (auto& track : project.tracks) {
+            if (track.locked) {
+                const bool touched = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {
+                    return std::any_of(keys.begin(), keys.end(), [&](const auto& key) { return key.clip == clip.id; });
+                });
+                if (touched) { return false; }
+                continue;
+            }
+            for (auto& clip : track.clips) {
+                const auto timing = clip.timing(project.bpm);
+                for (auto& [name, curve] : clip.properties) {
+                    std::vector<motion::Keyframe> moving;
+                    for (const auto& key : curve.keyframes()) {
+                        const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == clip.id && item.property == name && sameTime(item.time, key.time); });
+                        if (chosen) { moving.push_back(key); }
+                    }
+                    if (moving.empty()) { continue; }
+                    for (const auto& key : moving) { curve.removeKey(key.time); }
+                    for (auto key : moving) {
+                        key.time += delta * timing.rate;
+                        const auto& remaining = curve.keyframes();
+                        if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return sameTime(other.time, key.time); })) { return false; }
+                        curve.setKey(key);
+                    }
+                }
+            }
+        }
+        return true;
+    }
+    void beginKeyDrag(const KeyRef& grabbed, int x) {
+        keyDrag = KeyDrag{processor.document.project(), selectedKeys, grabbed, x, processor.document.revision(), false};
+    }
+    void dragKeys(int x, juce::ModifierKeys modifiers) {
+        if (!keyDrag.has_value()) { return; }
+        if (processor.document.revision() != keyDrag->revision) { keyDrag.reset(); return; }
+        const auto* clip = findClip(keyDrag->grabbed.clip, keyDrag->before);
+        if (clip == nullptr) { return; }
+        const auto timing = clip->timing(keyDrag->before.bpm);
+        if (timing.rate == 0) { return; }
+        const auto grabbedTime = timing.start + (keyDrag->grabbed.time - timing.offset) / timing.rate;
+        auto delta = (x - keyDrag->downX) / pixelsPerSecond;
+        if (delta != 0 && !modifiers.isAltDown()) { delta = keyDrag->before.timeGrid().snap(grabbedTime + delta) - grabbedTime; }
+        auto updated = keyDrag->before;
+        if (delta != 0 && !moveKeys(updated, keyDrag->keys, delta)) { return; }
+        keyDrag->changed = delta != 0;
+        selectedKeys = keyDrag->keys;
+        for (auto& key : selectedKeys) {
+            const auto* owner = findClip(key.clip, keyDrag->before);
+            if (owner != nullptr) { key.time += delta * owner->timing(keyDrag->before.bpm).rate; }
+        }
+        processor.document.preview(std::move(updated));
+        keyDrag->revision = processor.document.revision();
+        repaint();
+    }
+    void endKeyDrag() {
+        if (keyDrag.has_value() && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
+            processor.document.commit(keyDrag->keys.size() > 1 ? "Move keyframes" : "Move keyframe", std::move(keyDrag->before));
+        }
+        keyDrag.reset();
+    }
+    void cancelKeyDrag() {
+        if (keyDrag.has_value() && keyDrag->changed && processor.document.revision() == keyDrag->revision) {
+            selectedKeys = keyDrag->keys;
+            processor.document.preview(std::move(keyDrag->before));
+        }
+        keyDrag.reset();
+        marquee.reset();
+        repaint();
+    }
+    void deleteSelectedKeys() {
+        const auto keys = selectedKeys;
+        const auto removed = processor.document.tryEdit(keys.size() > 1 ? "Delete keyframes" : "Delete keyframe", [&keys](motion::Project& project) {
+            bool any = false;
+            for (auto& track : project.tracks) {
+                for (auto& clip : track.clips) {
+                    for (const auto& key : keys) {
+                        if (key.clip != clip.id) { continue; }
+                        if (track.locked) { return false; }
+                        const auto found = clip.properties.find(key.property);
+                        if (found != clip.properties.end()) { any = found->second.removeKey(key.time) || any; }
+                    }
+                }
+            }
+            return any;
+        });
+        if (removed) { selectedKeys.clear(); }
+        repaint();
+    }
+    void addKeyAt(const Row& lane, int x, juce::ModifierKeys modifiers) {
+        const auto& project = processor.document.project();
+        const auto time = snapTime(scrollTime + (x - namesWidth) / pixelsPerSecond, modifiers);
+        const auto& track = project.tracks[static_cast<std::size_t>(lane.track)];
+        const motion::Clip* target = nullptr;
+        for (const auto& clip : track.clips) {
+            const auto timing = clip.timing(project.bpm);
+            if (time >= timing.start && time <= timing.end()) { target = &clip; }
+        }
+        if (target == nullptr || track.locked) { return; }
+        const auto clipId = target->id;
+        const auto local = target->timing(project.bpm).localTime(time);
+        const auto property = lane.lane;
+        const auto added = processor.document.tryEdit("Add keyframe", [&](motion::Project& updated) {
+            auto* curve = motion::findPropertyCurve(updated, clipId, property);
+            if (curve == nullptr) { return false; }
+            curve->setKeyValue(local, curve->evaluateBase(local));
+            return true;
+        });
+        if (added) { selectedKeys = {{clipId, property, local}}; }
+        repaint();
+    }
+    void showKeyMenu() {
+        if (selectedKeys.empty()) { return; }
+        juce::PopupMenu menu;
+        menu.addSectionHeader(selectedKeys.size() > 1 ? juce::String(static_cast<int>(selectedKeys.size())) + " keyframes" : juce::String("Keyframe"));
+        menu.addItem(1, "Hold");
+        menu.addItem(2, "Linear");
+        menu.addItem(3, "Auto");
+        menu.addItem(4, "Bezier");
+        menu.addSeparator();
+        menu.addItem(10, "Delete");
+        const auto revision = processor.document.revision();
+        const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, revision](int result) {
+            if (owner == nullptr || result == 0 || owner->processor.document.revision() != revision) { return; }
+            if (result == 10) { owner->deleteSelectedKeys(); return; }
+            const auto shape = static_cast<motion::Interpolation>(result - 1);
+            const auto keys = owner->selectedKeys;
+            owner->processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
+                bool any = false;
+                for (auto& track : project.tracks) {
+                    for (auto& clip : track.clips) {
+                        for (const auto& key : keys) {
+                            if (key.clip != clip.id || track.locked) { continue; }
+                            const auto found = clip.properties.find(key.property);
+                            if (found == clip.properties.end()) { continue; }
+                            auto& curve = found->second;
+                            const auto& all = curve.keyframes();
+                            for (std::size_t index = 0; index < all.size(); ++index) {
+                                if (!sameTime(all[index].time, key.time) || all[index].interpolation == shape) { continue; }
+                                auto updated = all[index];
+                                if (shape == motion::Interpolation::cubic && index + 1 < all.size()) {
+                                    auto following = all[index + 1];
+                                    updated.outgoingSlope = curve.automaticSlope(index);
+                                    following.incomingSlope = curve.automaticSlope(index + 1);
+                                    curve.setKey(following);
+                                }
+                                updated.interpolation = shape;
+                                curve.setKey(updated);
+                                any = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                return any;
+            });
+        });
+    }
     void deleteSelectedClips(bool ripple) {
         cancelGesture();
         const auto result = processor.document.removeClips({selectedClips.begin(), selectedClips.end()}, ripple);
@@ -1000,6 +1466,12 @@ private:
             }
         });
     }
+    void toggleLock(motion::Id id) {
+        cancelGesture();
+        processor.document.edit("Toggle track lock", [id](motion::Project& project) {
+            for (auto& track : project.tracks) { if (track.id == id) { track.locked = !track.locked; } }
+        });
+    }
     void toggleTrack(motion::Id id, bool solo) {
         cancelGesture();
         processor.document.edit(solo ? "Toggle track solo" : "Toggle track mute", [id, solo](motion::Project& project) {
@@ -1154,6 +1626,7 @@ private:
         repaint();
     }
     void selectClip(motion::Id id) {
+        selectedKeys.clear();
         selectedClips.clear();
         if (isClip(id)) { selectedClips.insert(id); }
         notifySelection(id);
@@ -1200,33 +1673,94 @@ private:
         if (!layoutRevision.has_value() || *layoutRevision != revision) {
             rulerHeight = processor.document.project().markers.empty() ? 26 : 48;
             if (std::none_of(processor.document.project().markers.begin(), processor.document.project().markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
-            rows = motion::trackRows(processor.document.project(), collapsedGroups);
+            rebuildRows();
             std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });
             layoutRevision = revision;
         }
         scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
     }
-    int visibleRowCount() const { return std::max(1, (getHeight() - rulerHeight) / rowHeight); }
-    int maximumScrollRow() const { return std::max(0, static_cast<int>(rows.size()) - visibleRowCount()); }
+    // Lanes list every animated property on a track's clips, in schema order.
+    static std::vector<std::string> animatedProperties(const motion::Track& track) {
+        std::vector<std::string> result;
+        const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
+        for (const auto& spec : specs) {
+            const std::string id(spec.id);
+            const bool animated = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {
+                const auto found = clip.properties.find(id);
+                return found != clip.properties.end() && found->second.animated();
+            });
+            if (animated) { result.push_back(id); }
+        }
+        return result;
+    }
+    void rebuildRows() const {
+        const auto& project = processor.document.project();
+        rows.clear();
+        std::erase_if(expandedTracks, [&](auto id) { return std::none_of(project.tracks.begin(), project.tracks.end(), [id](const auto& track) { return track.id == id; }); });
+        for (const auto& base : motion::trackRows(project, collapsedGroups)) {
+            Row row;
+            static_cast<motion::TrackRow&>(row) = base;
+            rows.push_back(row);
+            if (base.track < 0 || !expandedTracks.contains(base.id)) { continue; }
+            for (auto& property : animatedProperties(project.tracks[static_cast<std::size_t>(base.track)])) {
+                Row lane;
+                static_cast<motion::TrackRow&>(lane) = base;
+                lane.lane = std::move(property);
+                rows.push_back(std::move(lane));
+            }
+        }
+    }
+    int heightOf(std::size_t row) const { return rows[row].isLane() ? laneHeight : rowHeight; }
+    int visibleRowCount() const {
+        int count = 0, used = 0;
+        for (auto row = static_cast<std::size_t>(std::max(0, scrollRows)); row < rows.size() && used + heightOf(row) <= getHeight() - rulerHeight; ++row) { used += heightOf(row); ++count; }
+        return std::max(1, count);
+    }
+    int maximumScrollRow() const {
+        int used = 0;
+        for (int row = static_cast<int>(rows.size()) - 1; row >= 0; --row) {
+            used += heightOf(static_cast<std::size_t>(row));
+            if (used > getHeight() - rulerHeight) { return std::min(static_cast<int>(rows.size()) - 1, row + 1); }
+        }
+        return 0;
+    }
     int visualRowAt(int y) const {
         ensureTrackRows();
-        return y < rulerHeight ? -1 : (y - rulerHeight) / rowHeight + scrollRows;
+        if (y < rulerHeight) { return -1; }
+        auto top = rulerHeight;
+        for (auto row = static_cast<std::size_t>(std::max(0, scrollRows)); row < rows.size(); ++row) {
+            if (y < top + heightOf(row)) { return static_cast<int>(row); }
+            top += heightOf(row);
+        }
+        return static_cast<int>(rows.size()) + (y - top) / rowHeight;
     }
     int trackAtY(int y) const {
         const auto row = visualRowAt(y);
-        return row >= 0 && row < static_cast<int>(rows.size()) ? rows[row].track : -1;
+        return row >= 0 && row < static_cast<int>(rows.size()) && !rows[static_cast<std::size_t>(row)].isLane() ? rows[static_cast<std::size_t>(row)].track : -1;
     }
     motion::Id groupAtY(int y) const {
         const auto row = visualRowAt(y);
-        return row >= 0 && row < static_cast<int>(rows.size()) && rows[row].group() ? rows[row].id : 0;
+        return row >= 0 && row < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(row)].group() ? rows[static_cast<std::size_t>(row)].id : 0;
+    }
+    const Row* laneAtY(int y) const {
+        const auto row = visualRowAt(y);
+        return row >= 0 && row < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(row)].isLane() ? &rows[static_cast<std::size_t>(row)] : nullptr;
     }
     int trackY(int track) const {
         ensureTrackRows();
-        const auto found = std::find_if(rows.begin(), rows.end(), [track](const auto& row) { return row.track == track; });
+        const auto found = std::find_if(rows.begin(), rows.end(), [track](const auto& row) { return row.track == track && !row.isLane(); });
         return found == rows.end() ? -rowHeight : rowY(static_cast<int>(found - rows.begin()));
     }
     int timeX(double time) const { return namesWidth + boundedPixel((time - scrollTime) * pixelsPerSecond); }
-    int rowY(int row) const { return rulerHeight + (row - scrollRows) * rowHeight; }
+    int rowY(int row) const {
+        auto y = rulerHeight;
+        if (row >= scrollRows) {
+            for (auto index = static_cast<std::size_t>(std::max(0, scrollRows)); static_cast<int>(index) < row && index < rows.size(); ++index) { y += heightOf(index); }
+        } else {
+            for (auto index = static_cast<std::size_t>(std::max(0, row)); static_cast<int>(index) < scrollRows && index < rows.size(); ++index) { y -= heightOf(index); }
+        }
+        return y;
+    }
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const {
         const auto timing = clip.timing(processor.document.project().bpm);
         return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), rowHeight };
@@ -1241,7 +1775,8 @@ private:
     juce::TextButton addTrack;
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
     bool dropTrack = false;
-    mutable std::vector<motion::TrackRow> rows;
+    mutable std::vector<Row> rows;
+    mutable std::set<motion::Id> expandedTracks;
     mutable std::set<motion::Id> collapsedGroups;
     mutable std::uint64_t layoutGeneration = 0;
     mutable std::optional<std::uint64_t> layoutRevision;
@@ -1261,4 +1796,17 @@ private:
     std::optional<juce::Point<int>> dropPosition;
     motion::Id dropAssetId = 0;
     std::string dropEffect;
+    std::vector<KeyRef> selectedKeys;
+    struct KeyDrag {
+        motion::Project before;
+        std::vector<KeyRef> keys;
+        KeyRef grabbed;
+        int downX = 0;
+        std::uint64_t revision = 0;
+        bool changed = false;
+    };
+    std::optional<KeyDrag> keyDrag;
+    std::optional<juce::Rectangle<int>> marquee;
+    juce::Point<int> marqueeStart;
+    std::vector<KeyRef> marqueeBase;
 };

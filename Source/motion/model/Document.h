@@ -113,6 +113,14 @@ public:
     juce::Result makeCompositionUnique(Id clipId, Id& definitionId);
     juce::Result createComposition(const std::vector<Id>& clipIds, juce::String name, Id& instanceId);
     juce::Result duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds);
+    // Clipboard contents are value copies, so pasting survives source deletion.
+    struct CopiedClip { Id track = 0; TrackKind kind = TrackKind::visual; std::string trackName; Clip clip; };
+    struct CopiedKey { std::string property; double offset = 0; Keyframe key; };
+    // Places copies so the earliest starts at `time`, on their original track
+    // when it is free and unlocked, otherwise on a new track below it.
+    juce::Result pasteClips(const std::vector<CopiedClip>& clips, double time, std::vector<Id>& pastedIds);
+    // Pastes keys with their relative timing so the earliest lands at `time`.
+    juce::Result pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, double time);
     juce::Result removeClips(const std::vector<Id>& clipIds, bool ripple = false);
     juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
     juce::Result assignMidi(Id clipId, Id assetId);

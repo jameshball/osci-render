@@ -117,7 +117,7 @@ try:
     choose("1/8 triplet", "Beat grid")
     step("seek triplet", "click", "--class", "MotionTimelineView", "--position", "193,12")
     position("1.1.320")
-    step("key object", "click", "--name", "Key position.x", "--exact")
+    step("key object", "click", "--name", "Key position", "--exact")
     step("show musical graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("musical graph screenshot", "screenshot", "--file", session.artifact_dir / "beat-graph.png")
     choose("24 fps", "Frame rate")

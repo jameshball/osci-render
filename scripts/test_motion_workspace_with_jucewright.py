@@ -47,7 +47,7 @@ try:
         step("resize initial workspace", "resize-window", "--w", session.window_width, "--h", session.window_height)
     step("import cube", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "cube.obj", "--role", "label", "--exact")
-    step("key position", "click", "--name", "Key position.x", "--exact")
+    step("key position", "click", "--name", "Key position", "--exact")
     step("play timeline", "click", "--name", "Play", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", "Pause", "--class", "juce::TextButton", "--exact")
     step("pause timeline", "click", "--name", "Pause", "--class", "juce::TextButton", "--exact")

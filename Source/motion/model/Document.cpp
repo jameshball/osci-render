@@ -1,5 +1,6 @@
 #include "../live/BlenderCaptureArchive.h"
 #include "Document.h"
+#include "PropertyTarget.h"
 #include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
 #include "../import/LuaBaker.h"
@@ -644,6 +645,87 @@ juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
     const auto result = duplicateClips({sourceId}, copies);
     if (result.wasOk()) { duplicateId = copies.front(); }
     return result;
+}
+
+juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double time, std::vector<Id>& pastedIds) {
+    pastedIds.clear();
+    const auto& state = project();
+    if (clips.empty()) { return juce::Result::fail("The clipboard has no clips."); }
+    if (!std::isfinite(time) || time < 0) { return juce::Result::fail("Paste at a valid position."); }
+    double first = std::numeric_limits<double>::infinity();
+    for (const auto& copied : clips) {
+        if (!copied.clip.valid()) { return juce::Result::fail("A copied clip is no longer valid."); }
+        if (copied.clip.asset != 0 && std::none_of(state.assets.begin(), state.assets.end(), [&](const auto& asset) { return asset->id == copied.clip.asset; })) {
+            return juce::Result::fail("A copied clip's source is not in this composition.");
+        }
+        if (copied.clip.composition != 0 && !canReferenceComposition(copied.clip.composition)) {
+            return juce::Result::fail("A copied composition cannot be placed here.");
+        }
+        first = std::min(first, copied.clip.timing(state.bpm).start);
+    }
+    auto highest = highestId();
+    auto candidate = state;
+    std::map<Id, Id> overflowTracks;
+    for (const auto& copied : clips) {
+        auto clip = copied.clip;
+        if (static_cast<Id>(clip.effects.size()) + 2 > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for pasted clips."); }
+        auto timing = clip.timing(state.bpm);
+        timing.moveTo(timing.start - first + time);
+        if (!clip.setTiming(timing, state.bpm)) { return juce::Result::fail("The pasted selection has invalid timing."); }
+        clip.id = ++highest;
+        for (auto& effect : clip.effects) { effect.id = ++highest; }
+        const auto original = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [&](const auto& track) { return track.id == copied.track; });
+        const bool fits = original != candidate.tracks.end() && !original->locked && original->kind == copied.kind && original->canPlace(clip, 0, state.bpm);
+        if (fits) {
+            original->insert(clip, state.bpm);
+        } else {
+            auto existing = overflowTracks.find(copied.track);
+            auto overflow = existing != overflowTracks.end() ? std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [&](const auto& track) { return track.id == existing->second; }) : candidate.tracks.end();
+            if (overflow == candidate.tracks.end() || !overflow->canPlace(clip, 0, state.bpm)) {
+                Track track;
+                track.id = ++highest;
+                track.kind = copied.kind;
+                track.name = copied.trackName.empty() ? clip.name : copied.trackName;
+                track.group = original != candidate.tracks.end() ? original->group : 0;
+                const auto position = original != candidate.tracks.end() ? original + 1 : candidate.tracks.end();
+                overflow = candidate.tracks.insert(position, std::move(track));
+                overflowTracks[copied.track] = overflow->id;
+            }
+            overflow->insert(clip, state.bpm);
+        }
+        candidate.duration = std::max(candidate.duration, clip.timing(state.bpm).end());
+        pastedIds.push_back(clip.id);
+    }
+    lastId = highest;
+    edit(clips.size() > 1 ? "Paste clips" : "Paste clip", [&candidate](Project& project) { project = candidate; });
+    return juce::Result::ok();
+}
+
+juce::Result Document::pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, double time) {
+    if (keys.empty()) { return juce::Result::fail("The clipboard has no keyframes."); }
+    const auto target = findPropertyTarget(project(), clipId);
+    if (!target.has_value() || target->isEffect) { return juce::Result::fail("Select a clip, group or camera to paste keyframes onto."); }
+    for (const auto& track : project().tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id == clipId && track.locked) { return juce::Result::fail("Unlock the track before pasting keyframes."); }
+        }
+    }
+    const auto changed = tryEdit(keys.size() > 1 ? "Paste keyframes" : "Paste keyframe", [&](Project& updated) {
+        const auto found = findPropertyTarget(updated, clipId);
+        if (!found.has_value()) { return false; }
+        bool any = false;
+        for (const auto& copied : keys) {
+            auto* curve = found->curve(copied.property);
+            if (curve == nullptr) { continue; }
+            auto key = copied.key;
+            key.time = found->localTime(time + copied.offset);
+            if (!key.valid()) { continue; }
+            curve->setKey(key);
+            any = true;
+        }
+        return any;
+    });
+    return changed ? juce::Result::ok() : juce::Result::fail("None of the copied properties exist on the selection.");
 }
 
 juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vector<Id>& duplicateIds) {

@@ -147,7 +147,7 @@ try:
     step("reselect exact middle key for inspector", "click", "--class", "MotionCompositionView", "--position", f"{middle_x - bounds['x']},{middle_y - bounds['y']}")
     for axis, value in (("x", "0.2"), ("y", "0.4")):
         field = next(node for node in nodes(snapshot()) if node.get("componentId") == "motion.position." + axis)
-        step("edit selected key in inspector " + axis, "fill", field["ref"], value)
+        step("edit selected key in inspector " + axis, "set-value", field["ref"], value)
         keys = saved_keys(axis)
         assert len(keys) == 3 and [key[0] for key in keys] == [0.0, 2.123456, 6.0]
         assert abs(keys[1][1] - float(value)) < 1e-12

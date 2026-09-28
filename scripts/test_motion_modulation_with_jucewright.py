@@ -59,7 +59,7 @@ try:
     wait_undo("Change modulation")
     step("set amount", "set-value", "--name", "Modulation amount", "--role", "slider", "0.5")
     step("set phase", "set-value", "--name", "Modulation phase", "--role", "slider", "90")
-    step("key authored position", "click", "--name", "Key position.x", "--exact")
+    step("key authored position", "click", "--name", "Key position", "--exact")
     wait_undo("Set keyframe")
     position = find(snapshot(), lambda node: node.get("componentName") == "position.x")
     if abs(float(position["value"])) > 0.00001:

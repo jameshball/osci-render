@@ -78,7 +78,7 @@ try:
     step("frame selection", "click", "--name", "Fit", "--class", "juce::TextButton", "--exact")
     assert [property_value("position." + axis) for axis in "xyz"] == initial
     step("reset editing view", "press", "0", "--class", "MotionCompositionView")
-    step("key position", "click", "--name", "Key position.x", "--exact")
+    step("key position", "click", "--name", "Key position", "--exact")
     x, y, bounds = preview_point()
     step("begin reversible drag", "mouse-down", x, y)
     step("preview reversible drag", "mouse-move", x + 35, y)

@@ -77,10 +77,9 @@ try:
     if header_bounds(track) != source:
         raise RuntimeError("Ruler drop changed track order or parent")
     position = find(snapshot(), lambda node: node.get("componentName") == "position.x")
-    step("translate group", "fill", position["ref"], "0.35")
-    step("commit group position", "press", "Return")
+    step("translate group", "set-value", position["ref"], "0.35")
     wait_undo("Change property")
-    step("key group position", "click", "--name", "Key position.x", "--exact")
+    step("key group position", "click", "--name", "Key position", "--exact")
     wait_undo("Set keyframe")
     step("fold group", "click", "--name", "Fold group " + group, "--exact")
     hidden = find(snapshot(), lambda node: node.get("name") == "Reorder track " + track and node.get("visible"))

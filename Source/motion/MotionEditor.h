@@ -13,7 +13,9 @@
 #include "ui/EffectsPanel.h"
 #include "ui/ModulationPanel.h"
 #include "ui/PlaybackHealth.h"
+#include "ui/PropertyInspector.h"
 #include <deque>
+#include <variant>
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
 public:
@@ -78,14 +80,29 @@ private:
     std::uint64_t scopeNameGeneration = 0;
     void refreshInspector();
     bool audioSelected() const;
-    const char* inspectorProperty(std::size_t index) const;
-    void setProperty(int index, bool keyframe);
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera);
     void exportSignal();
     void exportVideo();
     void showTimingMenu();
     void refreshTiming();
     void refreshOutputChoices();
+    // Keyboard shortcuts are data: each command appears in a menu with its
+    // shortcut and is dispatched from keyPressed when no focused view used it.
+    struct Command {
+        juce::String name, shortcut;
+        juce::KeyPress key;
+        std::function<void()> action;
+    };
+    std::vector<Command> commands;
+    void addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action);
+    void registerCommands();
+    void copySelection(bool cut);
+    void pasteClipboard();
+    void stepFrames(int frames);
+    void jumpToKey(bool forward);
+    void splitAtPlayhead();
+    void showShortcuts();
+    std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
     SettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, 550, 500, 1500 };
     MotionTimelineView timeline;
@@ -111,7 +128,9 @@ private:
     MotionPlaybackHealth playbackHealth;
     juce::TextButton navigateView { "Navigate" }, frameView { "Fit" }, pathView { "Path" };
     juce::TextButton importButton { "Add source" };
-    juce::TextButton playButton { "Play" };
+    motion::style::IconButton playButton { "Play", motion::style::IconButton::Icon::play };
+    motion::style::IconButton startButton { "Go to start", motion::style::IconButton::Icon::start };
+    motion::style::IconButton endButton { "Go to end", motion::style::IconButton::Icon::end };
     juce::TextButton splitButton { "Split" };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
@@ -120,15 +139,12 @@ private:
     juce::TextButton timingButton;
     juce::ComboBox monitorOutput;
     juce::TextButton canvasButton { "Canvas" };
-    juce::Label selectionLabel;
-    std::array<juce::Label, 13> values;
-    std::array<osci::KeyframeButton, 13> keyButtons;
+    MotionPropertyInspector propertyInspector;
     motion::Id selection = 0;
     motion::Id curveTarget = 0;
     std::string curvePropertyName = "position.x";
     std::vector<std::string> curveProperties;
     bool cameraCurve = false;
-    bool updatingInspector = false;
     juce::ThreadPool imports { 1 };
     struct ImportState {
         bool capture = false;

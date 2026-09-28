@@ -83,7 +83,7 @@ bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor), propertyInspector(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
     beamSettingsWindow.setLookAndFeel(&lookAndFeel);
@@ -106,19 +106,22 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
 #endif
     menus.addTopLevelMenu("Edit");
     menus.addEditMenuItems(1, processor);
+    menus.addTopLevelMenu("Clip");
+    menus.addTopLevelMenu("Play");
     menus.addTopLevelMenu("Audio");
-    menus.addStandaloneAudioSettingsMenuItem(2, processor, *this);
-    menus.addMenuItem(2, "Playback health...", [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); });
+    menus.addStandaloneAudioSettingsMenuItem(4, processor, *this);
+    menus.addMenuItem(4, "Playback health...", [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); });
     addAndMakeVisible(playbackHealth);
     playbackHealth.isPreparing = [this] { return processor.isPreparingComposition(); };
     playbackHealth.onClick = [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); };
     menus.addTopLevelMenu("Interface");
-    menus.addCommonInterfaceMenuItems(3, processor, *this);
+    menus.addCommonInterfaceMenuItems(5, processor, *this);
+    registerCommands();
     initialiseMenuBar(menus);
     for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &splitButton, &timeLabel, &selectionLabel, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &splitButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
         addAndMakeVisible(component);
     }
     addChildComponent(scopeBack);
@@ -224,7 +227,19 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         processor.setOutputMode(mode);
     };
     timingButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
-    playButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
+    playButton.setTooltip("Play / pause (Space)");
+    startButton.setTooltip("Go to start (Home)");
+    endButton.setTooltip("Go to end (End)");
+    startButton.onClick = [this] { processor.seek(0); timeline.revealTime(0); };
+    endButton.onClick = [this] {
+        const auto end = processor.document.project().duration;
+        processor.seek(end); timeline.revealTime(end);
+    };
+    timeLabel.setFont(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 14.0f, juce::Font::plain));
+    timeLabel.setJustificationType(juce::Justification::centred);
+    tempoValue.setFont(motion::style::body());
+    tempoLabel.setFont(motion::style::small());
+    tempoLabel.setColour(juce::Label::textColourId, motion::style::muted());
     curveProperty.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     timingButton.setName("Time and grid");
     timingButton.setTitle("Time and grid");
@@ -310,9 +325,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         cameraPanel.setVisible(index == 2);
         clipTimingPanel.setVisible(index == 3);
         effectsPanel.setVisible(index == 1);
-        selectionLabel.setVisible(index == 0);
-        for (auto& value : values) { value.setVisible(index == 0); }
-        for (auto& button : keyButtons) { button.setVisible(index == 0); }
+        propertyInspector.setVisible(index == 0);
         refreshInspector();
         if (index == 1) { effectsPanel.activate(); } else { selectCurveTarget(index == 2 ? cameraPanel.selectedCameraId() : selection, curvePropertyName, index == 2); }
         repaint();
@@ -522,26 +535,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timeline.onTimingRequested = [this](motion::Id id) { select(id); inspectorTabs.setSelectedIndex(3); };
     timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
     composition.onSelection = timeline.onSelection;
-    selectionLabel.setColour(juce::Label::textColourId, osci::Colours::text());
-    selectionLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold));
-    for (std::size_t index = 0; index < values.size(); ++index) {
-        auto& value = values[index];
-        value.setEditable(false, true);
-        value.setName(motion::propertyNames[index]);
-        value.setTitle(motion::propertyNames[index]);
-        value.setComponentID("motion." + juce::String(motion::propertyNames[index]));
-        value.setJustificationType(juce::Justification::centredRight);
-        value.setFont(juce::FontOptions(13.0f));
-        value.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
-        value.onTextChange = [this, index] { if (!updatingInspector) { setProperty(static_cast<int>(index), false); } };
-        addAndMakeVisible(value);
-        auto& button = keyButtons[index];
-        button.setName("Key " + juce::String(motion::propertyNames[index]));
-        button.setButtonText(button.getName());
-        button.setTooltip("Add or update a keyframe at the playhead");
-        button.onClick = [this, index] { setProperty(static_cast<int>(index), true); };
-        addAndMakeVisible(button);
-    }
+    propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false); };
+    propertyInspector.selectedKeyTime = [this](motion::Id id) { return composition.selectedKeyContentTime(id); };
+    propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
     processor.document.addChangeListener(this);
     composition.refresh();
     timeline.refreshTracks();
@@ -575,23 +571,30 @@ void MotionEditor::resized() {
     auto top = area.removeFromTop(30);
     undoRedoControls.setBounds(top.removeFromRight(undoRedoControls.getPreferredWidth()));
     playbackHealth.setBounds(top.removeFromRight(96).reduced(3));
-    menuBar.setBounds(top);
+    // Transport sits centred in the menu row, leaving the full height below
+    // for the workspace.
+    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - 340, 470), 30).withX(std::max(top.getX() + 340, top.getCentreX() - 235));
+    menuBar.setBounds(top.withRight(transport.getX()));
+    startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
+    playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
+    endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
+    transport.removeFromLeft(8);
+    timeLabel.setBounds(transport.removeFromLeft(118).reduced(0, 3));
+    transport.removeFromLeft(8);
+    tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
+    tempoLabel.setBounds(transport.removeFromLeft(34));
+    timingButton.setBounds(transport.removeFromLeft(140).reduced(0, 3));
     area.removeFromTop(3);
     workspaceHeight = area.getHeight();
     timelineBounds = area.removeFromBottom(std::clamp(juce::roundToInt(workspaceHeight * timelineFraction), 240, workspaceHeight - 370));
     auto timeline = timelineBounds;
-    auto transport = timeline.removeFromTop(30);
-    timelineHeader.setBounds(transport);
-    timelineTabs.setBounds(transport.removeFromLeft(270));
-    playButton.setBounds(transport.removeFromLeft(65).reduced(2));
-    splitButton.setBounds(transport.removeFromLeft(65).reduced(2));
-    timeLabel.setBounds(transport.removeFromLeft(110).reduced(2, 3));
-    tempoValue.setBounds(transport.removeFromLeft(56).reduced(1, 3));
-    tempoLabel.setBounds(transport.removeFromLeft(34));
-    timingButton.setBounds(transport.removeFromLeft(150).reduced(2));
-    curveProperty.setBounds(transport.removeFromLeft(165).reduced(2));
-    cancelExport.setBounds(transport.removeFromRight(62).reduced(2));
-    exportBar.setBounds(transport.removeFromRight(180).reduced(2));
+    auto header = timeline.removeFromTop(30);
+    timelineHeader.setBounds(header);
+    timelineTabs.setBounds(header.removeFromLeft(270));
+    splitButton.setBounds(header.removeFromLeft(65).reduced(2, 3));
+    curveProperty.setBounds(header.removeFromLeft(165).reduced(2));
+    cancelExport.setBounds(header.removeFromRight(62).reduced(2));
+    exportBar.setBounds(header.removeFromRight(180).reduced(2));
     const bool nested = processor.document.editingComposition() != 0;
     scopeBack.setVisible(nested); scopeLabel.setVisible(nested); scopeShared.setVisible(nested);
     if (nested) {
@@ -615,26 +618,14 @@ void MotionEditor::resized() {
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
-    inspectorBounds = area.removeFromRight(260);
+    inspectorBounds = area.removeFromRight(300);
     auto inspector = inspectorBounds;
     inspectorHeader.setBounds(inspector.removeFromTop(30));
     inspectorTabs.setBounds(inspectorHeader.getBounds());
     cameraPanel.setBounds(inspector);
     clipTimingPanel.setBounds(inspector);
     effectsPanel.setBounds(inspector);
-    selectionLabel.setBounds(inspector.removeFromTop(36).reduced(10, 0));
-    inspector.reduce(10, 0);
-    for (int group = 0; group < (audioSelected() ? 2 : 5); ++group) {
-        inspector.removeFromTop(22);
-        auto row = inspector.removeFromTop(26);
-        for (int axis = 0; axis < (audioSelected() || group == 4 ? 1 : 3); ++axis) {
-            const auto index = audioSelected() ? group : group * 3 + axis;
-            auto field = row.removeFromLeft(audioSelected() || group == 4 ? row.getWidth() : inspector.getWidth() / 3);
-            keyButtons[index].setBounds(field.removeFromRight(18).reduced(1));
-            values[index].setBounds(field.reduced(2, 1));
-        }
-        inspector.removeFromTop(8);
-    }
+    propertyInspector.setBounds(inspector);
     area.removeFromRight(3);
     previewWidth = area.getWidth();
     auto editing = area.removeFromLeft(juce::roundToInt((previewWidth - 7) * previewFraction));
@@ -668,9 +659,7 @@ void MotionEditor::resized() {
 void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
     graphics.setColour(osci::Colours::outlineSubtle());
-    for (const auto x : { splitButton.getRight() + 1, timingButton.getRight() + 1 }) {
-        graphics.drawVerticalLine(x, static_cast<float>(timelineHeader.getY() + 8), static_cast<float>(timelineHeader.getBottom() - 8));
-    }
+    graphics.drawVerticalLine(timelineTabs.getRight() + 1, static_cast<float>(timelineHeader.getY() + 8), static_cast<float>(timelineHeader.getBottom() - 8));
 }
 
 void MotionEditor::paint(juce::Graphics& graphics) {
@@ -679,29 +668,6 @@ void MotionEditor::paint(juce::Graphics& graphics) {
     for (const auto& panel : { libraryBounds, viewportBounds, inspectorBounds, timelineBounds }) {
         graphics.fillRoundedRectangle(panel.toFloat(), 5.0f);
     }
-    graphics.setColour(osci::Colours::textMuted());
-    graphics.setFont(12.0f);
-    if (inspectorTabs.getCurrentTabIndex() != 0) {
-        return;
-    }
-    auto labelArea = inspectorBounds.withTrimmedTop(66).reduced(12, 0);
-    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
-    if (!target.has_value() || target->camera || target->isEffect) {
-        graphics.drawFittedText("Select an object in the composition or a clip on the timeline to edit its properties.", labelArea.removeFromTop(70), juce::Justification::topLeft, 4);
-        return;
-    }
-    if (audioSelected()) {
-        for (const auto* label : { "Gain", "Pan   Left / Right" }) {
-            graphics.drawText(label, labelArea.removeFromTop(22), juce::Justification::centredLeft);
-            labelArea.removeFromTop(34);
-        }
-        return;
-    }
-    for (const auto* label : { "Position   X / Y / Z", "Rotation   X / Y / Z", "Scale   X / Y / Z", "Color   R / G / B", "Drawing weight" }) {
-        graphics.drawText(label, labelArea.removeFromTop(22), juce::Justification::centredLeft);
-        labelArea.removeFromTop(34);
-    }
-
 }
 
 void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
@@ -1160,7 +1126,12 @@ void MotionEditor::timerCallback() {
             ? (exportState->progress.load() + exportState->soundtrackProgress.load()) * 0.5
             : exportState->progress.load();
     }
-    playButton.setButtonText(processor.playing.load() ? "Pause" : "Play");
+    const auto playing = processor.playing.load();
+    playButton.setIcon(playing ? motion::style::IconButton::Icon::pause : motion::style::IconButton::Icon::play);
+    if (playButton.getName() != (playing ? "Pause" : "Play")) {
+        playButton.setName(playing ? "Pause" : "Play");
+        playButton.setTitle(playButton.getName());
+    }
     if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.generation() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
     if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
     if (!tempoValue.isBeingEdited()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
@@ -1281,10 +1252,6 @@ bool MotionEditor::audioSelected() const {
     return target.has_value() && target->isAudio;
 }
 
-const char* MotionEditor::inspectorProperty(std::size_t index) const {
-    return audioSelected() && index < 2 ? (index == 0 ? "gain" : "pan") : motion::propertyNames[index];
-}
-
 void MotionEditor::refreshInspector() {
     cameraPanel.refresh();
     clipTimingPanel.refresh();
@@ -1299,82 +1266,143 @@ void MotionEditor::refreshInspector() {
     splitButton.setEnabled(canSplitClip(selected, processor.position.load(), processor.document.project().bpm));
     const auto target = motion::findPropertyTarget(processor.document.project(), selection);
     const bool editable = target.has_value() && !target->camera && !target->isEffect;
-    selectionLabel.setText(editable ? juce::String(target->name.data(), target->name.size()) : "No object selected", juce::dontSendNotification);
     const auto tabName = editable && target->isGroup ? "Group" : (audioSelected() ? "Audio" : "Object");
     if (inspectorTabs.getTabNames()[0] != tabName) { inspectorTabs.setTabName(0, tabName); }
-    updatingInspector = true;
-    for (std::size_t index = 0; index < values.size(); ++index) {
-        const bool visible = editable && inspectorTabs.getCurrentTabIndex() == 0 && (!audioSelected() || index < 2);
-        values[index].setVisible(visible);
-        keyButtons[index].setVisible(visible);
-        const auto property = inspectorProperty(index);
-        values[index].setName(property);
-        values[index].setTitle(property);
-        values[index].setComponentID("motion." + juce::String(property));
-        keyButtons[index].setName("Key " + juce::String(property));
-        keyButtons[index].setButtonText(keyButtons[index].getName());
-        values[index].setEnabled(editable);
-        keyButtons[index].setEnabled(editable);
-        if (editable && !values[index].isBeingEdited()) {
-            const auto found = target->properties->find(property);
-            if (found != target->properties->end()) {
-                const auto time = composition.selectedKeyContentTime(selection).value_or(target->localTime(processor.position.load()));
-                values[index].setText(juce::String(found->second.evaluateBase(time), 2), juce::dontSendNotification);
-                const auto& keys = found->second.keyframes();
-                const auto keyed = std::any_of(keys.begin(), keys.end(), [time](const auto& key) { return std::abs(key.time - time) < 1.0e-6; });
-                keyButtons[index].setState(keyed ? osci::KeyframeButton::State::keyed
-                    : (found->second.animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
-            }
-        }
-    }
-    updatingInspector = false;
-}
-
-void MotionEditor::setProperty(int index, bool keyframe) {
-    if (audioSelected() && index >= 2) { return; }
-    const std::string property = inspectorProperty(static_cast<std::size_t>(index));
-    selectCurveTarget(selection, property, false);
-    const auto time = processor.position.load();
-    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
-    const auto* existing = target.has_value() ? target->curve(property) : nullptr;
-    if (existing == nullptr) {
-        return;
-    }
-    const auto localTime = composition.selectedKeyContentTime(selection).value_or(target->localTime(time));
-    auto value = existing->evaluateBase(localTime);
-    if (!keyframe) {
-        const auto text = values[index].getText().trim();
-        char* end = nullptr;
-        value = std::strtod(text.toRawUTF8(), &end);
-        if (text.isEmpty() || end == nullptr || *end != '\0' || !std::isfinite(value)) {
-            refreshInspector();
-            return;
-        }
-    }
-    if (!std::isfinite(value)) {
-        return;
-    }
-    if (audioSelected()) { value = index == 0 ? std::clamp(value, 0.0, 4.0) : std::clamp(value, -1.0, 1.0); }
-    if (!audioSelected() && index >= 9) { value = std::clamp(value, 0.0, index == 12 ? 1000000.0 : 1.0); }
-    processor.document.edit(keyframe ? "Set keyframe" : "Change property", [&](motion::Project& project) {
-        const auto updated = motion::findPropertyTarget(project, selection);
-        auto* curve = updated.has_value() ? updated->curve(property) : nullptr;
-        if (curve == nullptr) { return; }
-        if (keyframe || curve->animated()) {
-            curve->setKeyValue(localTime, value);
-        } else {
-            curve->base = value;
-        }
-    });
-    composition.retainSelectedKeyAfterEdit();
+    propertyInspector.setTarget(editable ? selection : 0);
 }
 
 bool MotionEditor::keyPressed(const juce::KeyPress& key) {
-    if (key == juce::KeyPress::spaceKey) {
-        processor.playing.store(!processor.playing.load());
-        return true;
+    for (const auto& command : commands) {
+        if (command.key.isValid() && command.key == key) {
+            command.action();
+            return true;
+        }
     }
     return CommonPluginEditor::keyPressed(key);
+}
+
+void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action) {
+    menus.addMenuItem(menu, name, action, shortcut);
+    commands.push_back({std::move(name), std::move(shortcut), key, std::move(action)});
+}
+
+void MotionEditor::registerCommands() {
+    const auto command = juce::ModifierKeys::commandModifier;
+    const auto shift = juce::ModifierKeys::shiftModifier;
+    menus.addMenuSeparator(1);
+    addCommand(1, "Cut", juce::KeyPress('x', command, 0), "Cmd+X", [this] { copySelection(true); });
+    addCommand(1, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
+    addCommand(1, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
+    addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] { timeline.deleteSelection(); });
+    menus.addMenuSeparator(1);
+    addCommand(1, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] { timeline.selectAll(); });
+    addCommand(2, "Split at playhead", juce::KeyPress('k', command, 0), "Cmd+K", [this] { splitAtPlayhead(); });
+    addCommand(2, "Duplicate", juce::KeyPress('d', command, 0), "Cmd+D", [this] {
+        std::vector<motion::Id> duplicates;
+        const auto clips = timeline.copiedClips();
+        std::vector<motion::Id> ids;
+        for (const auto& copied : clips) { ids.push_back(copied.clip.id); }
+        if (ids.empty()) { return; }
+        const auto result = processor.document.duplicateClips(ids, duplicates);
+        if (result.failed()) { osci::showOverlayMessage(*this, "Cannot duplicate", result.getErrorMessage()); return; }
+        timeline.selectClips(duplicates);
+    });
+    menus.addMenuSeparator(2);
+    addCommand(2, "Show keyframe lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
+    addCommand(2, "Edit notes", juce::KeyPress(), {}, [this] { timelineTabs.setSelectedIndex(2); });
+    addCommand(2, "Edit curves", juce::KeyPress(), {}, [this] { timelineTabs.setSelectedIndex(1); });
+    addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { processor.playing.store(!processor.playing.load()); });
+    addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { processor.seek(0); timeline.revealTime(0); });
+    addCommand(3, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] {
+        const auto end = processor.document.project().duration;
+        processor.seek(end); timeline.revealTime(end);
+    });
+    addCommand(3, "Previous frame", juce::KeyPress(juce::KeyPress::leftKey), "Left", [this] { stepFrames(-1); });
+    addCommand(3, "Next frame", juce::KeyPress(juce::KeyPress::rightKey), "Right", [this] { stepFrames(1); });
+    addCommand(3, "Back ten frames", juce::KeyPress(juce::KeyPress::leftKey, shift, 0), "Shift+Left", [this] { stepFrames(-10); });
+    addCommand(3, "Forward ten frames", juce::KeyPress(juce::KeyPress::rightKey, shift, 0), "Shift+Right", [this] { stepFrames(10); });
+    addCommand(3, "Previous keyframe", juce::KeyPress('j', 0, 0), "J", [this] { jumpToKey(false); });
+    addCommand(3, "Next keyframe", juce::KeyPress('k', 0, 0), "K", [this] { jumpToKey(true); });
+    menus.addMenuSeparator(3);
+    addCommand(3, "Zoom timeline in", juce::KeyPress('=', command, 0), "Cmd+=", [this] { timeline.zoomBy(1.5); });
+    addCommand(3, "Zoom timeline out", juce::KeyPress('-', command, 0), "Cmd+-", [this] { timeline.zoomBy(1 / 1.5); });
+    addCommand(3, "Fit timeline to project", juce::KeyPress(), "F", [this] { timeline.fitToProject(); });
+    menus.addMenuSeparator(5);
+    addCommand(5, "Keyboard shortcuts...", juce::KeyPress('/', command, 0), "Cmd+/", [this] { showShortcuts(); });
+}
+
+void MotionEditor::copySelection(bool cut) {
+    if (timeline.hasSelectedKeys()) {
+        clipboard = timeline.copiedKeys();
+    } else if (timeline.hasSelectedClips()) {
+        clipboard = timeline.copiedClips();
+    } else {
+        return;
+    }
+    if (cut) { timeline.deleteSelection(); }
+}
+
+void MotionEditor::pasteClipboard() {
+    const auto time = processor.position.load();
+    if (const auto* keys = std::get_if<std::vector<motion::Document::CopiedKey>>(&clipboard)) {
+        const auto result = processor.document.pasteKeys(selection, *keys, time);
+        if (result.failed()) { osci::showOverlayMessage(*this, "Cannot paste keyframes", result.getErrorMessage()); }
+        return;
+    }
+    if (const auto* clips = std::get_if<std::vector<motion::Document::CopiedClip>>(&clipboard)) {
+        std::vector<motion::Id> pasted;
+        const auto result = processor.document.pasteClips(*clips, time, pasted);
+        if (result.failed()) { osci::showOverlayMessage(*this, "Cannot paste clips", result.getErrorMessage()); return; }
+        timeline.refreshTracks();
+        timeline.selectClips(pasted);
+    }
+}
+
+void MotionEditor::stepFrames(int frames) {
+    const auto& project = processor.document.project();
+    const auto rate = project.frameRate > 0 ? project.frameRate : 30.0;
+    const auto current = std::round(processor.position.load() * rate);
+    const auto next = std::clamp((current + frames) / rate, 0.0, project.duration);
+    processor.playing.store(false);
+    processor.seek(next);
+    timeline.revealTime(next);
+}
+
+void MotionEditor::jumpToKey(bool forward) {
+    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
+    if (!target.has_value() || target->properties == nullptr || target->rate == 0) { return; }
+    const auto now = processor.position.load();
+    std::optional<double> best;
+    for (const auto& [name, curve] : *target->properties) {
+        for (const auto& key : curve.keyframes()) {
+            const auto time = target->start + (key.time - target->offset) / target->rate;
+            const bool candidate = forward ? time > now + 1.0e-6 : time < now - 1.0e-6;
+            if (candidate && (!best.has_value() || (forward ? time < *best : time > *best))) { best = time; }
+        }
+    }
+    if (!best.has_value()) { return; }
+    const auto time = std::clamp(*best, 0.0, processor.document.project().duration);
+    processor.seek(time);
+    timeline.revealTime(time);
+}
+
+void MotionEditor::splitAtPlayhead() {
+    splitButton.triggerClick();
+}
+
+void MotionEditor::showShortcuts() {
+    juce::String text;
+    for (const auto& command : commands) {
+        if (command.shortcut.isNotEmpty()) { text << command.shortcut.paddedRight(' ', 14) << command.name << "\n"; }
+    }
+    text << "\nTimeline\n"
+         << "V / B / S / R   Move, ripple trim, slip, stretch tools\n"
+         << "M               Add marker     [ ]  Previous / next marker\n"
+         << "Alt             Bypass snapping while dragging\n"
+         << "Cmd+wheel       Zoom          Double-click lane: add key\n"
+         << "\nComposition view\n"
+         << "G / R / S       Move, rotate, scale    F  Frame selection    N  Navigate    P  Motion path\n";
+    osci::showOverlayMessage(*this, "Keyboard shortcuts", text, osci::ErrorOverlay::Icon::None, {620, 560}, juce::Justification::centredLeft);
 }
 
 void MotionEditor::exportVideo() {
