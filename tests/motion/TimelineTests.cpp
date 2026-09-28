@@ -304,5 +304,28 @@ int main() {
     modulation.mode = motion::ModulationMode::multiply;
     modulated.base = std::numeric_limits<double>::max();
     check(std::isfinite(modulated.evaluate(0)), "multiplication overflow falls back to finite authored output");
+    {
+        // Frame-aligned splits whose start + (split - start) rounds past the
+        // split point must still produce two adjacent, insertable halves.
+        int failures = 0;
+        for (int startFrame = 0; startFrame < 400; startFrame += 7) {
+            for (int splitFrame = startFrame + 1; splitFrame < startFrame + 2000; splitFrame += 13) {
+                motion::Clip clip;
+                clip.id = 1; clip.asset = 1; clip.start = startFrame / 30.0; clip.duration = 2000 / 30.0 + .5;
+                motion::Track track;
+                track.id = 2;
+                motion::Clip after = clip;
+                after.id = 3; after.start = clip.end();
+                if (!track.insert(clip) || !track.insert(after)) { ++failures; continue; }
+                const auto parts = clip.split(splitFrame / 30.0, 4);
+                if (!parts) { ++failures; continue; }
+                track.clips.erase(track.clips.begin());
+                if (!track.insert(parts->first) || !track.insert(parts->second)) { ++failures; }
+                if (parts->first.end() > parts->second.start || parts->second.end() > clip.end()) { ++failures; }
+            }
+        }
+        check(failures == 0, "splits never overlap their halves or the following clip");
+        check(motion::spanUntil(8.7, 59.6) > 0 && 8.7 + motion::spanUntil(8.7, 59.6) <= 59.6, "spanUntil never passes its end");
+    }
     std::cout << "Motion timeline contracts passed\n";
 }

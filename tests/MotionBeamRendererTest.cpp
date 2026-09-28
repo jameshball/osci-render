@@ -128,6 +128,23 @@ public:
             expectWithinAbsoluteError(static_cast<double>(big) / small, 2.0, 0.15);
         }
 
+        beginTest("Stroke-heavy drawings are budgeted by their true length, not their probe continuity");
+        {
+            // 60 strokes of height ~0.1 have the same drawn length (6.0) as a square of half 0.75.
+            const motion::PreparedComposition composition(project({{strokes(1, 60), 0, .5}, {square(2, .75f), 0, -.2}}), 192000);
+            motion::BeamRenderer beam;
+            cycle(composition, 192000, 3, beam);
+            std::vector<std::int64_t> counts;
+            for (const auto& segment : beam.plannedSegments()) {
+                if (segment.kind == motion::BeamRenderer::Kind::draw) { counts.push_back(segment.count); }
+            }
+            expectEquals(static_cast<int>(counts.size()), 2);
+            if (counts.size() == 2) {
+                const auto ratio = static_cast<double>(std::max(counts[0], counts[1])) / static_cast<double>(std::min(counts[0], counts[1]));
+                expect(ratio < 1.1, "equal drawn lengths get equal budgets: " + juce::String(counts[0]) + " vs " + juce::String(counts[1]));
+            }
+        }
+
         beginTest("A fading layer reserves its share: other layers keep their brightness");
         {
             const auto shape = square(1, .15f);

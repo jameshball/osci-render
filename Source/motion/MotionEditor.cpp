@@ -395,20 +395,19 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             return;
         }
         const auto id = processor.document.newId();
-        processor.document.edit("Split clip", [&](motion::Project& project) {
+        processor.document.tryEdit("Split clip", [&](motion::Project& project) {
             for (auto& track : project.tracks) {
                 for (std::size_t index = 0; index < track.clips.size(); ++index) {
-                    if (track.clips[index].id == selection) {
-                        auto parts = track.clips[index].split(time, id, project.bpm);
-                        if (parts.has_value()) {
-                            for (auto& effect : parts->second.effects) { effect.id = processor.document.newId(); }
-                            track.clips[index] = std::move(parts->first);
-                            track.insert(std::move(parts->second), project.bpm);
-                        }
-                        return;
-                    }
+                    if (track.clips[index].id != selection) { continue; }
+                    if (track.locked) { return false; }
+                    auto parts = track.clips[index].split(time, id, project.bpm);
+                    if (!parts.has_value()) { return false; }
+                    for (auto& effect : parts->second.effects) { effect.id = processor.document.newId(); }
+                    track.clips[index] = std::move(parts->first);
+                    return track.insert(std::move(parts->second), project.bpm);
                 }
             }
+            return false;
         });
     };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {

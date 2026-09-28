@@ -72,8 +72,8 @@ public:
         if (!start) { return juce::Result::fail("The playhead has invalid recording timing."); }
         config.transportStart = std::clamp<std::uint64_t>(static_cast<std::uint64_t>(*start), config.firstSample, config.endSample - 1);
         if (!config.valid()) { return juce::Result::fail("Recordings need a valid source clock and a clip of at most one hour."); }
-        generation = config.generation; revision = config.revision; scope = document.editingComposition();
-        target = id; base = selected->midi;
+        generation = config.generation; scope = document.editingComposition();
+        target = id; base = selected->midi; mapping = mappingOf(project, *selected);
         status = "Starting recording..."; error = false; cancelled = stopRequested = false;
         transport.monitor(id);
         if (!transport.arm(config)) {
@@ -98,8 +98,10 @@ public:
     }
     void poll() {
         if (!busy()) { return; }
-        if (!cancelled && (document.generation() != generation || document.revision() != revision || document.editingComposition() != scope)) {
-            cancel("Recording cancelled because the project changed.");
+        // Unrelated edits keep recording. Only changes that move the take's
+        // beat mapping, lock the clip or replace its notes invalidate it.
+        if (!cancelled && (document.generation() != generation || document.editingComposition() != scope || !targetUnchanged())) {
+            cancel("Recording cancelled because its clip changed.");
         }
         if (job != nullptr) {
             if (!job->finished.load(std::memory_order_acquire)) { return; }
@@ -107,7 +109,7 @@ public:
             if (cancelled || completed->cancelled.load()) { base.reset(); return; }
             if (!completed->result) { status = completed->result.error; error = true; base.reset(); return; }
             if (completed->result.addedCount == 0) { status = "No notes recorded."; base.reset(); return; }
-            const auto result = document.recordMidiNotes(target, base, completed->result.source, generation, revision);
+            const auto result = document.recordMidiNotes(target, base, completed->result.source, generation);
             base.reset();
             if (result.failed()) { status = result.getErrorMessage(); error = true; return; }
             const auto added = static_cast<int>(completed->result.addedCount);
@@ -145,6 +147,23 @@ private:
         std::atomic<bool> cancelled{false}, finished{false};
         MidiTakeNotes::Result result;
     };
+    struct Mapping {
+        double start = 0, duration = 0, offset = 0, rate = 0, contentBpm = 0, bpm = 0;
+        ClipTimeBase timeBase = ClipTimeBase::seconds;
+        bool operator==(const Mapping&) const = default;
+    };
+    static Mapping mappingOf(const Project& project, const Clip& clip) {
+        return {clip.start, clip.duration, clip.offset, clip.rate, clip.contentBpm, project.bpm, clip.timeBase};
+    }
+    bool targetUnchanged() const {
+        const auto& project = document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id == target) { return !track.locked && clip.midi == base && mappingOf(project, clip) == mapping; }
+            }
+        }
+        return false;
+    }
     void timerCallback() override { poll(); }
     Document& document;
     MidiRecording& recorder;
@@ -152,7 +171,8 @@ private:
     juce::ThreadPool worker{1};
     std::shared_ptr<Job> job;
     std::shared_ptr<const MidiNotes> base;
-    std::uint64_t token = 0, generation = 0, revision = 0;
+    std::uint64_t token = 0, generation = 0;
+    Mapping mapping;
     Id target = 0, scope = 0;
     bool stopRequested = false, cancelled = false, error = false;
     juce::String status;

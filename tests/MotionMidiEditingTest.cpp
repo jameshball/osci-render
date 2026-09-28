@@ -105,7 +105,8 @@ public:
             expect(static_cast<bool>(firstTake));
             const auto generation = recordedDocument.generation();
             const auto recordRevision = recordedDocument.revision();
-            expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, generation, recordRevision).wasOk());
+            expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, generation).wasOk());
+            juce::ignoreUnused(recordRevision);
             const auto& firstRecorded = findRecorded();
             expect(firstRecorded.midi == firstTake.source && firstRecorded.midiAsset == 0 && firstRecorded.timeBase == motion::ClipTimeBase::beats);
             expectWithinAbsoluteError(firstRecorded.timing(initial.bpm).start, originalTiming.start, 1e-12);
@@ -123,7 +124,8 @@ public:
             const auto expected = findRecorded().midi;
             const auto replaceGeneration = recordedDocument.generation();
             const auto replaceRevision = recordedDocument.revision();
-            expect(recordedDocument.recordMidiNotes(clip.id, expected, secondTake.source, replaceGeneration, replaceRevision).wasOk());
+            expect(recordedDocument.recordMidiNotes(clip.id, expected, secondTake.source, replaceGeneration).wasOk());
+            juce::ignoreUnused(replaceRevision);
             expect(findRecorded().midi == secondTake.source && findRecorded().midiAsset == 0);
             expect(recordedDocument.project().tracks[0].clips[1].midi == nullptr, "Recording one clip does not replace its sibling pattern");
             expect(recordedUndo.undo());
@@ -135,7 +137,7 @@ public:
             expect(static_cast<bool>(identical));
             const auto noOpRevision = recordedDocument.revision();
             const auto noOpDescription = recordedUndo.getUndoDescription();
-            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, identical.source, recordedDocument.generation(), noOpRevision).wasOk());
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, identical.source, recordedDocument.generation()).wasOk());
             expect(recordedDocument.revision() == noOpRevision && recordedUndo.getUndoDescription() == noOpDescription && findRecorded().midi == secondTake.source,
                 "Identical recorded content is a no-op after confirming the expected source");
 
@@ -148,26 +150,26 @@ public:
                 "Recorded notes round-trip as an authored pattern");
 
             const auto mismatchRevision = recordedDocument.revision();
-            expect(recordedDocument.recordMidiNotes(clip.id, firstTake.source, firstTake.source,
-                recordedDocument.generation(), mismatchRevision).failed());
-            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, nullptr,
-                recordedDocument.generation(), mismatchRevision).failed());
+            expect(recordedDocument.recordMidiNotes(clip.id, firstTake.source, firstTake.source, recordedDocument.generation()).failed());
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, nullptr, recordedDocument.generation()).failed());
             expect(recordedDocument.revision() == mismatchRevision && findRecorded().midi == secondTake.source,
                 "A changed source or null merged take cannot alter the current clip");
 
-            const auto staleGeneration = recordedDocument.generation();
-            const auto staleRevision = recordedDocument.revision();
             recordedDocument.edit("Unrelated edit", [](motion::Project& project) { project.name = "Edited while recording"; });
-            const auto afterUnrelated = recordedDocument.revision();
-            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, firstTake.source, staleGeneration, staleRevision).failed());
-            expect(recordedDocument.revision() == afterUnrelated && findRecorded().midi == secondTake.source,
-                "A stale recording revision cannot overwrite current notes");
+            const auto merged = motion::MidiNotes::create({{900, .25, .5, 67, 110, 2}, {901, 1.25, .25, 72, 90, 3}, {902, 2, .5, 60, 64, 1}});
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, merged.source, recordedDocument.generation()).wasOk(),
+                "An unrelated edit during a take does not discard it");
+            expect(findRecorded().midi == merged.source);
+            const auto afterMerge = recordedDocument.revision();
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, firstTake.source, recordedDocument.generation()).failed());
+            expect(recordedDocument.revision() == afterMerge && findRecorded().midi == merged.source,
+                "A take based on replaced notes cannot overwrite them");
 
             auto lockedProject = initial;
             lockedProject.tracks[0].locked = true;
             recordedDocument.reset(lockedProject);
             const auto lockedRevision = recordedDocument.revision();
-            expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, recordedDocument.generation(), lockedRevision).failed());
+            expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, recordedDocument.generation()).failed());
             expect(recordedDocument.revision() == lockedRevision && findRecorded().midi == nullptr && !recordedUndo.canUndo(),
                 "Locked tracks reject recorded note insertion without an undo action");
         }

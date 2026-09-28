@@ -272,9 +272,9 @@ private:
         }
         const auto cameraId = selected;
         const auto cutId = processor.document.newId();
-        processor.document.edit("Cut to camera", [time, cameraId, cutId](motion::Project& updated) {
+        processor.document.tryEdit("Cut to camera", [time, cameraId, cutId](motion::Project& updated) {
             if (findCamera(updated, cameraId) == nullptr) {
-                return;
+                return false;
             }
             auto end = updated.duration;
             for (const auto& cut : updated.cameraCuts) {
@@ -285,11 +285,12 @@ private:
             std::erase_if(updated.cameraCuts, [time](const auto& cut) { return cut.start == time; });
             for (auto& cut : updated.cameraCuts) {
                 if (cut.start < time && cut.end() > time) {
-                    cut.duration = time - cut.start;
+                    cut.duration = motion::spanUntil(cut.start, time);
                 }
             }
-            updated.cameraCuts.push_back({ cutId, cameraId, time, end - time });
+            updated.cameraCuts.push_back({ cutId, cameraId, time, motion::spanUntil(time, end) });
             std::sort(updated.cameraCuts.begin(), updated.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+            return true;
         });
         refresh();
     }

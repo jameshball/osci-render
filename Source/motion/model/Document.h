@@ -97,6 +97,8 @@ public:
     std::uint64_t revision() const { return stateRevision; }
     Id newId() { return ++lastId; }
     void edit(juce::String label, std::function<void(Project&)> operation);
+    // Records nothing, and changes no revision, when the operation declines.
+    bool tryEdit(juce::String label, std::function<bool(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
@@ -115,8 +117,9 @@ public:
     juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
-    juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged,
-        std::uint64_t expectedGeneration, std::uint64_t expectedRevision);
+    // Guarded by the clip's current notes, not the global revision, so edits
+    // elsewhere during a take do not discard it.
+    juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration);
     juce::Result clearMidi(Id clipId);
     void preview(Project project) { apply(mergeScope(std::move(project))); }
     void commit(juce::String label, Project before);

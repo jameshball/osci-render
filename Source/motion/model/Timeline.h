@@ -15,6 +15,13 @@
 #include <vector>
 
 namespace motion {
+// Intervals are stored as start + duration. Returns the largest duration whose
+// floating end does not pass `end`, so adjacent intervals never overlap.
+inline double spanUntil(double start, double end) {
+    auto duration = end - start;
+    while (duration > 0 && start + duration > end) { duration = std::nextafter(duration, 0.0); }
+    return duration;
+}
 
 using Id = std::uint64_t;
 
@@ -179,6 +186,8 @@ struct Clip {
         return true;
     }
 
+    // Both halves end exactly where the original boundaries were: neither can
+    // round past the split point or the original end into a neighbour.
     std::optional<std::pair<Clip, Clip>> split(double projectTime, Id rightId, double projectBpm = 120) const {
         if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return std::nullopt; }
         if (timeBase == ClipTimeBase::beats) { projectTime *= projectBpm / 60; }
@@ -188,11 +197,12 @@ struct Clip {
         }
         auto left = *this;
         auto right = *this;
-        left.duration = projectTime - start;
+        left.duration = spanUntil(start, projectTime);
         right.id = rightId;
         right.offset = offset + (projectTime - start) * rate;
         right.start = projectTime;
-        right.duration = end() - projectTime;
+        right.duration = spanUntil(projectTime, end());
+        if (!(left.duration > 0) || !(right.duration > 0)) { return std::nullopt; }
         return std::make_pair(std::move(left), std::move(right));
     }
 };

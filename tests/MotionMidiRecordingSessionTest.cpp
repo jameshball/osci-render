@@ -94,11 +94,21 @@ public:
             expect(f.clip().midi == nullptr && f.document.revision() == revision && !f.undo.canUndo());
             expect(f.recorder.state() == motion::MidiRecording::State::idle);
         }
-        beginTest("Revision changes, target removal and project replacement invalidate pending completion");
+        beginTest("Unrelated edits during a take keep it; the take commits after them");
+        {
+            Fixture f; expect(f.initialise().wasOk()); expect(f.session->start(f.clipId).wasOk());
+            expect(f.block());
+            f.document.edit("Other edit", [](motion::Project& p) { p.duration += 1; p.name = "Renamed"; });
+            f.session->poll();
+            expect(f.session->busy() && !f.session->hasError(), "An unrelated edit does not cancel recording");
+            f.session->stop(); f.acknowledge(); expect(f.drain());
+            expect(f.clip().midi != nullptr && f.undo.getUndoDescription() == "Record MIDI notes");
+        }
+        beginTest("Clip timing changes, target removal and project replacement invalidate pending completion");
         for (int change = 0; change < 3; ++change) {
             Fixture f; expect(f.initialise().wasOk()); expect(f.session->start(f.clipId).wasOk());
             expect(f.block()); f.session->stop(); f.acknowledge(); f.session->poll();
-            if (change == 0) { f.document.edit("Other edit", [](motion::Project& p) { p.duration += 1; }); }
+            if (change == 0) { f.document.edit("Move clip", [](motion::Project& p) { p.tracks[0].clips[0].start += .5; }); }
             else if (change == 1) { f.document.edit("Remove target", [](motion::Project& p) { p.tracks[0].clips.clear(); }); }
             else { auto project = f.document.mainProject(); f.document.reset(std::move(project)); }
             const auto revision = f.document.revision(); const auto description = f.undo.getUndoDescription();

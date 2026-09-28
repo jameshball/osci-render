@@ -341,24 +341,24 @@ juce::Result decodeGpla(Asset& asset, const std::atomic<bool>* cancel, std::atom
 void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& curve) {
     auto* property = item.createNewChildElement("property");
     property->setAttribute("name", juce::String(name));
-    property->setAttribute("base", curve.base);
+    property->setAttribute("base", exactBakeNumber(curve.base));
     auto* modulation = property->createNewChildElement("modulation");
     modulation->setAttribute("enabled", curve.modulation.enabled);
     modulation->setAttribute("waveform", static_cast<int>(curve.modulation.waveform));
-    modulation->setAttribute("amount", curve.modulation.amount);
-    modulation->setAttribute("rateHz", curve.modulation.rateHz);
-    modulation->setAttribute("phase", curve.modulation.phase);
+    modulation->setAttribute("amount", exactBakeNumber(curve.modulation.amount));
+    modulation->setAttribute("rateHz", exactBakeNumber(curve.modulation.rateHz));
+    modulation->setAttribute("phase", exactBakeNumber(curve.modulation.phase));
     modulation->setAttribute("tempoSync", curve.modulation.tempoSync);
-    modulation->setAttribute("beatsPerCycle", curve.modulation.beatsPerCycle);
+    modulation->setAttribute("beatsPerCycle", exactBakeNumber(curve.modulation.beatsPerCycle));
     modulation->setAttribute("seed", juce::String(static_cast<juce::int64>(curve.modulation.seed)));
     modulation->setAttribute("mode", static_cast<int>(curve.modulation.mode));
     for (const auto& key : curve.keyframes()) {
         auto* point = property->createNewChildElement("key");
-        point->setAttribute("time", key.time);
-        point->setAttribute("value", key.value);
+        point->setAttribute("time", exactBakeNumber(key.time));
+        point->setAttribute("value", exactBakeNumber(key.value));
         point->setAttribute("interpolation", static_cast<int>(key.interpolation));
-        point->setAttribute("in", key.incomingSlope);
-        point->setAttribute("out", key.outgoingSlope);
+        point->setAttribute("in", exactBakeNumber(key.incomingSlope));
+        point->setAttribute("out", exactBakeNumber(key.outgoingSlope));
     }
 }
 
@@ -413,8 +413,8 @@ void saveEffects(juce::XmlElement& owner, const std::vector<EffectInstance>& eff
         item->setAttribute("name", juce::String(effect.name));
         item->setAttribute("enabled", effect.enabled);
         if (effect.range.has_value()) {
-            item->setAttribute("start", effect.range->start);
-            item->setAttribute("duration", effect.range->duration);
+            item->setAttribute("start", exactBakeNumber(effect.range->start));
+            item->setAttribute("duration", exactBakeNumber(effect.range->duration));
         }
         for (const auto& [name, curve] : effect.properties) {
             saveProperty(*item, name, curve);
@@ -555,6 +555,15 @@ void Document::edit(juce::String label, std::function<void(Project&)> operation)
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
+}
+
+bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {
+    auto after = project();
+    if (!operation(after)) { return false; }
+    after = mergeScope(std::move(after));
+    undo.beginNewTransaction(label);
+    undo.perform(new Change(*this, state, std::move(after)));
+    return true;
 }
 
 void Document::commit(juce::String label, Project before) {
@@ -1122,10 +1131,9 @@ juce::Result Document::setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> 
     });
 }
 
-juce::Result Document::recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged,
-    std::uint64_t expectedGeneration, std::uint64_t expectedRevision) {
+juce::Result Document::recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration) {
     if (merged == nullptr) { return juce::Result::fail("Recorded MIDI note content must not be null."); }
-    if (generation() != expectedGeneration || revision() != expectedRevision) {
+    if (generation() != expectedGeneration) {
         return juce::Result::fail("The recording target changed before the take was saved.");
     }
     const auto bpm = project().bpm;
@@ -1457,12 +1465,12 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
 static juce::XmlElement saveCompositionContent(const Composition& state) {
     juce::XmlElement xml("composition");
     xml.setAttribute("name", state.name);
-    xml.setAttribute("duration", state.duration);
-    xml.setAttribute("fps", state.frameRate);
-    xml.setAttribute("bpm", state.bpm);
+    xml.setAttribute("duration", exactBakeNumber(state.duration));
+    xml.setAttribute("fps", exactBakeNumber(state.frameRate));
+    xml.setAttribute("bpm", exactBakeNumber(state.bpm));
     xml.setAttribute("timeDisplay", static_cast<int>(state.timeDisplay));
     xml.setAttribute("beatsPerBar", state.beatsPerBar);
-    xml.setAttribute("snapBeats", state.snapBeats);
+    xml.setAttribute("snapBeats", exactBakeNumber(state.snapBeats));
     xml.setAttribute("gridSnap", state.gridSnap);
     saveEffects(xml, state.effects);
     for (const auto& group : state.groups) {
@@ -1546,8 +1554,8 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
         auto* item = xml.createNewChildElement("cameraCut");
         item->setAttribute("id", juce::String(cut.id));
         item->setAttribute("camera", juce::String(cut.camera));
-        item->setAttribute("start", cut.start);
-        item->setAttribute("duration", cut.duration);
+        item->setAttribute("start", exactBakeNumber(cut.start));
+        item->setAttribute("duration", exactBakeNumber(cut.duration));
     }
     return xml;
 }

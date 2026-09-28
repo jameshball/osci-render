@@ -23,7 +23,7 @@ class BeamRenderer {
 public:
     static constexpr std::size_t maximumLayers = 256;
     static constexpr std::size_t maximumSegments = maximumLayers * 4 + 4;
-    static constexpr int lengthProbes = 32;
+    static constexpr int lengthProbes = 24, pointLengthProbes = 128;
     static constexpr double dwellSeconds = 12.0e-6;
     static constexpr double travelSecondsPerUnit = 30.0e-6;
     static constexpr double minimumLayerLength = 0.05;
@@ -132,17 +132,36 @@ private:
                 voices = static_cast<double>(clip.midi->activeCount(time));
                 if (voices == 0) { continue; }
             }
-            // Probe the projected path. Only lit-to-lit steps count as drawn length.
-            osci::Point previous;
-            bool havePrevious = false, haveStart = false;
-            for (int probe = 0; probe < lengthProbes; ++probe) {
-                const auto phase = static_cast<double>(probe) / (lengthProbes - 1);
-                const auto raw = source->sampleFrame(layer.frame, phase, 1.0 / (lengthProbes - 1));
+            // Vector drawings know their exact length; probes only measure how
+            // the clip's transforms, effects and camera scale it on screen. The
+            // ratio of projected to source distance is uniform under affine
+            // transforms, so pen-up jumps measure scale as well as strokes do.
+            // Point frames have no stored length: sum their lit steps directly.
+            const auto* vector = source->drawingAt(layer.frame);
+            const auto probes = vector != nullptr ? lengthProbes : pointLengthProbes;
+            osci::Point previousRaw, previousPoint;
+            double sourceDistance = 0, projectedDistance = 0, litDistance = 0;
+            for (int probe = 0; probe < probes; ++probe) {
+                const auto phase = static_cast<double>(probe) / (probes - 1);
+                const auto raw = source->sampleFrame(layer.frame, phase);
                 const auto point = output(composition, layer, raw);
-                if (!haveStart) { layer.start = point; haveStart = true; }
+                if (probe == 0) {
+                    layer.start = point;
+                } else {
+                    const auto dx = static_cast<double>(raw.x) - previousRaw.x, dy = static_cast<double>(raw.y) - previousRaw.y, dz = static_cast<double>(raw.z) - previousRaw.z;
+                    const auto step = std::sqrt(dx * dx + dy * dy + dz * dz);
+                    const auto projected = distance(previousPoint, point);
+                    if (std::isfinite(step) && std::isfinite(projected)) { sourceDistance += step; projectedDistance += projected; }
+                    if (lit(previousPoint) && lit(point)) { litDistance += projected; }
+                }
                 layer.end = point;
-                if (havePrevious && lit(previous) && lit(point)) { layer.length += distance(previous, point); }
-                previous = point; havePrevious = true;
+                previousRaw = raw; previousPoint = point;
+            }
+            if (vector != nullptr) {
+                const auto scale = sourceDistance > 1.0e-9 ? projectedDistance / sourceDistance : 1.0;
+                layer.length = vector->length() * (std::isfinite(scale) ? scale : 1.0);
+            } else {
+                layer.length = litDistance;
             }
             layer.length = std::max(minimumLayerLength, layer.length) * voices;
             items[layerCount++] = layer;
