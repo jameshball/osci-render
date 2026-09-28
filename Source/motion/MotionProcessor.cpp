@@ -9,6 +9,11 @@ MotionProcessor::MotionProcessor()
     rgbEnabled = true;
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
     blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
+    midiSession = std::make_unique<motion::MidiRecordingSession>(document, midiRecording, motion::MidiRecordingSession::Transport{
+        [this] { return getEffectiveSampleRate(); }, [this] { return position.load(); },
+        [this] { return midiDeviceReady.load() && !isSuspended() && !legalNoticePending.load() && !isPreparingComposition() && !preparationFailed.load(); },
+        [this](motion::Id id) { setMidiAudition(id); }, [this](const auto& config) { return armMidiRecording(config); }
+    });
     document.onChanged = [this] { requestComposition(document.project()); };
     document.onChanged();
 }
@@ -17,6 +22,7 @@ MotionProcessor::~MotionProcessor() {
     // Host teardown can occur off the message thread; exclude the controller's
     // timer before destroying its document access and publication callback.
     const juce::MessageManagerLock messageLock;
+    midiSession.reset();
     blender.reset();
     preparationWorker.reset();
     cancelPendingUpdate();
@@ -50,25 +56,52 @@ bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 5);
 }
 
-void MotionProcessor::releaseResources() {
+bool MotionProcessor::armMidiRecording(const motion::MidiRecording::Config& config) {
+    const juce::SpinLock::ScopedLockType lock(midiLifecycleLock);
+    return midiDeviceReady.load() && midiRecording.arm(config);
+}
+
+void MotionProcessor::stopMidiDevice() {
+    // Callbacks are excluded here. Holding the arm lock means a take is either
+    // armed before this stop (and finished by it) or refused afterwards.
+    const juce::SpinLock::ScopedLockType lock(midiLifecycleLock);
+    midiDeviceReady.store(false);
     midiRecording.deviceStopped();
+    recordingOwnsTransport = false;
+}
+
+void MotionProcessor::releaseResources() {
+    stopMidiDevice();
     CommonAudioProcessor::releaseResources();
 }
 
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
-    midiRecording.deviceStopped();
+    stopMidiDevice();
     signal.setSize(6, samplesPerBlock);
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
     oscillatorSample = audioSample;
     liveMidi.prepare(sampleRate);
     liveMidiSample = 0;
+    {
+        const juce::SpinLock::ScopedLockType lock(midiLifecycleLock);
+        midiDeviceReady.store(true);
+    }
     requestedSampleRate.store(sampleRate);
     triggerAsyncUpdate();
     transitionGuard.begin();
 }
 
+void MotionProcessor::releaseRecordingTransport() {
+    const auto state = midiRecording.state();
+    if (recordingOwnsTransport && state != motion::MidiRecording::State::armed && state != motion::MidiRecording::State::recording) {
+        recordingOwnsTransport = false;
+        playing.store(false);
+    }
+}
+
 void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     buffer.clear();
+    releaseRecordingTransport();
     const auto* prepared = composition.acquire();
     const auto* liveBlock = liveSources.acquire();
     const auto* liveFrames = liveBlock != nullptr ? liveBlock->frames.get() : nullptr;
@@ -136,21 +169,35 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         liveMidi.reset();
         transitionGuard.begin();
     }
-    const auto running = playing.load();
-    const auto drawing = running || freezeWhenStopped.load();
-    if (running != wasPlaying || drawing != wasDrawing) { transitionGuard.begin(); }
-    wasPlaying = running;
-    wasDrawing = drawing;
-    if (running && audioSample >= durationSamples) {
+    const auto recordingStart = midiRecording.transportStart();
+    if (recordingStart.has_value()) {
+        audioSample = static_cast<juce::int64>(std::min<std::uint64_t>(*recordingStart, static_cast<std::uint64_t>(durationSamples - 1)));
+        oscillatorSample = audioSample;
+        liveMidi.reset();
+        playing.store(true);
+        recordingOwnsTransport = true;
+        transitionGuard.begin();
+    }
+    const auto requestedPlay = playing.load();
+    if (requestedPlay && audioSample >= durationSamples) {
         audioSample = 0;
     }
     // Capture unowned byte views before the input buffer is consumed. Only the
     // continuous span before a project wrap belongs to this pass.
     const auto recordSamples = static_cast<std::uint32_t>(std::min<juce::int64>(count, std::max<juce::int64>(0, durationSamples - audioSample)));
-    if (midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(audioSample), recordSamples, running, true, requested >= 0)) {
+    if (midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(audioSample), recordSamples, requestedPlay, true, requested >= 0)) {
         for (const auto metadata : midi) { midiRecording.event(metadata.samplePosition, metadata.data, metadata.numBytes); }
         midiRecording.endBlock();
+    } else {
+        // A Stop or Cancel observed by beginBlock ends recording-started playback
+        // before this block produces a sample, even if it raced the start above.
+        releaseRecordingTransport();
     }
+    const auto running = playing.load() && requestedPlay;
+    const auto drawing = running || freezeWhenStopped.load();
+    if (running != wasPlaying || drawing != wasDrawing) { transitionGuard.begin(); }
+    wasPlaying = running;
+    wasDrawing = drawing;
     const auto mode = outputMode.load();
     const auto audible = !muteParameter->getBoolValue();
     const auto* volumes = volumeEffect->getAnimatedValuesReadPointer(0, count);

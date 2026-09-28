@@ -93,6 +93,85 @@ public:
         expect(undo.undo()); expect(current().midi->notes().empty());
         expect(undo.redo()); expect(current().midi == changed.source);
 
+        beginTest("Recorded MIDI notes create, replace and serialize in one guarded transaction");
+        {
+            juce::UndoManager recordedUndo;
+            motion::Document recordedDocument(recordedUndo);
+            recordedDocument.reset(initial);
+            const auto findRecorded = [&]() -> const motion::Clip& { return recordedDocument.project().tracks[0].clips[0]; };
+            const auto original = findRecorded();
+            const auto originalTiming = original.timing(initial.bpm);
+            const auto firstTake = motion::MidiNotes::create({{900, .25, .5, 67, 110, 2}});
+            expect(static_cast<bool>(firstTake));
+            const auto generation = recordedDocument.generation();
+            const auto recordRevision = recordedDocument.revision();
+            expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, generation, recordRevision).wasOk());
+            const auto& firstRecorded = findRecorded();
+            expect(firstRecorded.midi == firstTake.source && firstRecorded.midiAsset == 0 && firstRecorded.timeBase == motion::ClipTimeBase::beats);
+            expectWithinAbsoluteError(firstRecorded.timing(initial.bpm).start, originalTiming.start, 1e-12);
+            expectWithinAbsoluteError(firstRecorded.timing(initial.bpm).end(), originalTiming.end(), 1e-12);
+            expect(firstRecorded.asset == original.asset);
+            expectEquals(firstRecorded.properties.at("position.x").evaluate(.75), 2.0);
+            expect(recordedUndo.getUndoDescription() == "Record MIDI notes");
+            expect(recordedUndo.undo());
+            expect(findRecorded().midi == nullptr && findRecorded().timeBase == motion::ClipTimeBase::seconds && !recordedUndo.canUndo());
+            expect(recordedUndo.redo());
+            expect(findRecorded().midi == firstTake.source && findRecorded().midiAsset == 0);
+
+            const auto secondTake = motion::MidiNotes::create({{900, .25, .5, 67, 110, 2}, {901, 1.25, .25, 72, 90, 3}});
+            expect(static_cast<bool>(secondTake));
+            const auto expected = findRecorded().midi;
+            const auto replaceGeneration = recordedDocument.generation();
+            const auto replaceRevision = recordedDocument.revision();
+            expect(recordedDocument.recordMidiNotes(clip.id, expected, secondTake.source, replaceGeneration, replaceRevision).wasOk());
+            expect(findRecorded().midi == secondTake.source && findRecorded().midiAsset == 0);
+            expect(recordedDocument.project().tracks[0].clips[1].midi == nullptr, "Recording one clip does not replace its sibling pattern");
+            expect(recordedUndo.undo());
+            expect(findRecorded().midi == expected);
+            expect(recordedUndo.redo());
+            expect(findRecorded().midi == secondTake.source);
+
+            const auto identical = motion::MidiNotes::create(secondTake.source->notes());
+            expect(static_cast<bool>(identical));
+            const auto noOpRevision = recordedDocument.revision();
+            const auto noOpDescription = recordedUndo.getUndoDescription();
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, identical.source, recordedDocument.generation(), noOpRevision).wasOk());
+            expect(recordedDocument.revision() == noOpRevision && recordedUndo.getUndoDescription() == noOpDescription && findRecorded().midi == secondTake.source,
+                "Identical recorded content is a no-op after confirming the expected source");
+
+            juce::UndoManager reopenedUndo;
+            motion::Document reopened(reopenedUndo);
+            expect(reopened.load(recordedDocument.save()).wasOk());
+            expect(reopened.project().tracks[0].clips[0].midi != nullptr
+                && reopened.project().tracks[0].clips[0].midi->notes() == secondTake.source->notes()
+                && reopened.project().tracks[0].clips[0].midiAsset == 0,
+                "Recorded notes round-trip as an authored pattern");
+
+            const auto mismatchRevision = recordedDocument.revision();
+            expect(recordedDocument.recordMidiNotes(clip.id, firstTake.source, firstTake.source,
+                recordedDocument.generation(), mismatchRevision).failed());
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, nullptr,
+                recordedDocument.generation(), mismatchRevision).failed());
+            expect(recordedDocument.revision() == mismatchRevision && findRecorded().midi == secondTake.source,
+                "A changed source or null merged take cannot alter the current clip");
+
+            const auto staleGeneration = recordedDocument.generation();
+            const auto staleRevision = recordedDocument.revision();
+            recordedDocument.edit("Unrelated edit", [](motion::Project& project) { project.name = "Edited while recording"; });
+            const auto afterUnrelated = recordedDocument.revision();
+            expect(recordedDocument.recordMidiNotes(clip.id, secondTake.source, firstTake.source, staleGeneration, staleRevision).failed());
+            expect(recordedDocument.revision() == afterUnrelated && findRecorded().midi == secondTake.source,
+                "A stale recording revision cannot overwrite current notes");
+
+            auto lockedProject = initial;
+            lockedProject.tracks[0].locked = true;
+            recordedDocument.reset(lockedProject);
+            const auto lockedRevision = recordedDocument.revision();
+            expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, recordedDocument.generation(), lockedRevision).failed());
+            expect(recordedDocument.revision() == lockedRevision && findRecorded().midi == nullptr && !recordedUndo.canUndo(),
+                "Locked tracks reject recorded note insertion without an undo action");
+        }
+
         beginTest("Locked and audio tracks reject every authoring command atomically");
         for (const bool audio : {false, true}) {
             auto blocked = document.project();

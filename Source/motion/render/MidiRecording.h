@@ -23,8 +23,9 @@ public:
         std::uint64_t token = 0, target = 0, generation = 0, revision = 0;
         std::uint64_t firstSample = 0, endSample = 0;
         double sampleRate = 0, sourceOffset = 0, sourceRate = 1, sourceBpm = 120;
+        std::optional<std::uint64_t> transportStart;
         bool valid() const {
-            return token != 0 && target != 0 && std::isfinite(sampleRate) && sampleRate >= 1 && sampleRate <= 768000
+            return token != 0 && target != 0 && (!transportStart || (*transportStart >= firstSample && *transportStart < endSample)) && std::isfinite(sampleRate) && sampleRate >= 1 && sampleRate <= 768000
                 && endSample > firstSample && static_cast<double>(endSample - firstSample) / sampleRate <= 3600
                 && std::isfinite(sourceOffset) && sourceOffset >= 0 && std::isfinite(sourceRate) && sourceRate > 0
                 && std::isfinite(sourceBpm) && sourceBpm > 0
@@ -51,6 +52,15 @@ public:
     explicit MidiRecording(std::size_t capacity = maximumEvents)
         : capacity(std::clamp<std::size_t>(capacity, 1, maximumEvents)), events(std::make_unique<Event[]>(this->capacity)) {}
 
+    // Message-thread token source; arming still validates monotonicity.
+    std::uint64_t nextToken() const { return lastToken == std::numeric_limits<std::uint64_t>::max() ? 0 : lastToken + 1; }
+    // Audio-thread only. Start is applied together with the first armed block,
+    // never by separate UI play/seek writes that can straddle a callback.
+    std::optional<std::uint64_t> transportStart() const {
+        if (state() != State::armed || stopToken.load(std::memory_order_acquire) == config.token
+            || cancelToken.load(std::memory_order_acquire) == config.token) { return {}; }
+        return config.transportStart;
+    }
     State state() const { return published.load(std::memory_order_acquire); }
     // Message-thread only. The token must increase even after cancelled takes.
     bool arm(const Config& next) {

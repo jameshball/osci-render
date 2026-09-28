@@ -5,12 +5,25 @@
 
 // Clip-local beat editor. Gestures preview immutable note content locally and
 // commit once; an unrelated document revision cancels a stale gesture.
-class MotionNotesEditor : public juce::Component {
+class MotionNotesEditor : public juce::Component, private juce::Timer {
 public:
     explicit MotionNotesEditor(MotionProcessor& owner) : processor(owner) {
         setName("MIDI notes editor");
         setWantsKeyboardFocus(true);
-        for (auto* button : {&create, &fitButton, &remove, &audition, &envelopeButton}) { addAndMakeVisible(button); }
+        for (auto* button : {&create, &fitButton, &remove, &audition, &envelopeButton, &record, &cancelRecording}) { addAndMakeVisible(button); }
+        record.setName("Record MIDI notes"); cancelRecording.setName("Cancel MIDI recording");
+        record.setTooltip("Record unquantized notes, velocity and sustain into this clip. Existing notes are kept. Other controllers are not applied yet.");
+        record.onClick = [this] {
+            cancelDrag();
+            auto& session = processor.midiRecordingSession();
+            if (session.busy()) { session.stop(); }
+            else { report(session.start(target)); }
+            refresh();
+        };
+        cancelRecording.onClick = [this] { processor.midiRecordingSession().cancel(); refresh(); };
+        recordingStatus.setName("MIDI recording status"); recordingStatus.setFont(juce::FontOptions(11));
+        recordingStatus.setBorderSize({}); addAndMakeVisible(recordingStatus);
+        startTimerHz(15);
         audition.setClickingTogglesState(true);
         audition.setColour(juce::TextButton::buttonOnColourId, osci::Colours::accentColor().withAlpha(.22f));
         audition.setColour(juce::TextButton::textColourOnId, osci::Colours::text());
@@ -53,28 +66,30 @@ public:
         topPitch = state.pitch; rowHeight = state.rowHeight; scrollBeat = state.scroll; pixelsPerBeat = state.zoom;
         refresh();
     }
-    ~MotionNotesEditor() override { processor.setMidiAudition(0); }
+    ~MotionNotesEditor() override { stopTimer(); processor.midiRecordingSession().cancel(); processor.setMidiAudition(0); }
     void setSelection(motion::Id id) {
         if (target == id) { refresh(); return; }
+        processor.midiRecordingSession().cancel();
         processor.setMidiAudition(0);
         target = id; selected.clear(); cancelDrag(); error.clear(); fit(); refresh();
     }
     void refresh() {
         const auto* clip = currentClip();
+        const bool recording = processor.midiRecordingSession().busy();
         const auto available = clip != nullptr && canAudition();
         if (!available && processor.getMidiAudition() != 0) { processor.setMidiAudition(0); }
-        audition.setEnabled(available);
-        envelopeButton.setEnabled(clip != nullptr && clip->composition == 0 && !isLocked());
+        audition.setEnabled(available && !recording);
+        envelopeButton.setEnabled(clip != nullptr && clip->composition == 0 && !isLocked() && !recording);
         audition.setTooltip(clip != nullptr && !available ? "This track is muted or excluded by solo. Make it audible to use MIDI audition."
             : "Play this clip alone using a connected MIDI keyboard. Does not change notes or exports. MIDI input devices are selected in Audio settings.");
         audition.setToggleState(clip != nullptr && processor.getMidiAudition() == target, juce::dontSendNotification);
         if (dragging && processor.document.revision() != dragRevision) { cancelDrag(); }
         const auto pattern = clip != nullptr ? clip->midi : nullptr;
         std::erase_if(selected, [&](auto id) { return pattern == nullptr || std::none_of(pattern->notes().begin(), pattern->notes().end(), [id](const auto& note) { return note.id == id; }); });
-        create.setVisible(clip != nullptr && pattern == nullptr && !isLocked());
+        create.setVisible(clip != nullptr && pattern == nullptr && !isLocked() && !recording);
         fitButton.setVisible(pattern != nullptr); remove.setVisible(pattern != nullptr);
-        remove.setEnabled(!isLocked());
-        velocity.setVisible(pattern != nullptr); velocity.setEnabled(!isLocked() && !selected.empty());
+        remove.setEnabled(!isLocked() && !recording);
+        velocity.setVisible(pattern != nullptr); velocity.setEnabled(!isLocked() && !selected.empty() && !recording);
         updating = true;
         juce::String value = "-";
         if (pattern != nullptr) {
@@ -87,15 +102,26 @@ public:
         }
         if (!velocity.isBeingEdited()) { velocity.setText(value, juce::dontSendNotification); }
         updating = false;
+        record.setButtonText(recording ? (processor.midiRecordingSession().stopping() ? "Finishing..." : "Stop recording") : "Record notes");
+        record.setEnabled(recording ? !processor.midiRecordingSession().stopping() : available && !isLocked() && clip->composition == 0);
+        record.setColour(juce::TextButton::buttonColourId, recording ? juce::Colour(0xff8b3039) : osci::Colours::surfaceRaised());
+        cancelRecording.setVisible(recording);
+        const auto& status = processor.midiRecordingSession().message();
+        recordingStatus.setText(error.isNotEmpty() ? error : status, juce::dontSendNotification);
+        recordingStatus.setColour(juce::Label::textColourId, error.isNotEmpty() || processor.midiRecordingSession().hasError() ? juce::Colours::orange : osci::Colours::textMuted());
+        recordingStatus.setVisible(error.isNotEmpty() || status.isNotEmpty());
         resized(); repaint();
     }
     void fitContents() { fit(); repaint(); }
     void visibilityChanged() override {
         if (isVisible()) { fit(); refresh(); }
-        else { processor.setMidiAudition(0); }
+        else { processor.midiRecordingSession().cancel(); processor.setMidiAudition(0); }
     }
     void resized() override {
         auto header = getLocalBounds().removeFromTop(30).reduced(6, 3);
+        record.setBounds(header.removeFromRight(118)); header.removeFromRight(6);
+        if (cancelRecording.isVisible()) { cancelRecording.setBounds(header.removeFromRight(64)); header.removeFromRight(6); }
+        recordingStatus.setBounds(getLocalBounds().removeFromBottom(20).reduced(8, 0));
         audition.setBounds(header.removeFromRight(112)); header.removeFromRight(6);
         envelopeButton.setBounds(header.removeFromRight(92)); header.removeFromRight(6);
         remove.setBounds(header.removeFromRight(106)); header.removeFromRight(6);
@@ -113,7 +139,7 @@ public:
         g.drawText(clip == nullptr ? "Notes" : juce::String(clip->name), 12, 0, std::max(0, titleEnd - 12), 30, juce::Justification::centredLeft);
         if (pattern == nullptr) {
             g.setColour(osci::Colours::text().withAlpha(.65f));
-            g.drawText(clip == nullptr ? "Select a visual clip to edit its notes." : isLocked() ? "This track is locked. Notes cannot be created." : "Create notes, or assign a MIDI file from Assets.", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
+            g.drawText(clip == nullptr ? "Select a visual clip to edit its notes." : isLocked() ? "This track is locked. Notes cannot be created." : processor.midiRecordingSession().busy() ? "Play your MIDI keyboard. Stop to keep the notes, or Cancel to discard." : "Create notes, record a performance, or assign a MIDI file from Assets.", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
             return;
         }
         g.setColour(osci::Colours::text().withAlpha(.7f));
@@ -191,10 +217,13 @@ public:
             if (x >= keyboardWidth && x < getWidth()) { g.setColour(osci::Colours::accentColor().withAlpha(.65f)); g.drawVerticalLine(x, 30, static_cast<float>(lane.getBottom())); }
         }
         g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(11.0f);
-        g.drawText(error.isEmpty() ? (isLocked() ? "Track locked | Notes are read-only. Selection, Fit and navigation remain available." : "Double-click: add | Drag: move/resize | Delete: remove | Alt: bypass snap | Cmd/Ctrl-wheel: zoom") : error,
+        if (!recordingStatus.isVisible()) {
+            g.drawText(error.isEmpty() ? (isLocked() ? "Track locked | Notes are read-only. Selection, Fit and navigation remain available." : "Double-click: add | Drag: move/resize | Delete: remove | Alt: bypass snap | Cmd/Ctrl-wheel: zoom") : error,
             8, getHeight() - 20, getWidth() - 16, 20, juce::Justification::centredLeft);
+        }
     }
     void mouseDoubleClick(const juce::MouseEvent& event) override {
+        if (processor.midiRecordingSession().busy()) { return; }
         const auto* clip = currentClip();
         if (clip == nullptr || clip->midi == nullptr || isLocked() || !gridBounds().contains(event.getPosition()) || hit(event.getPosition()) != 0) { return; }
         auto notes = clip->midi->notes();
@@ -205,6 +234,7 @@ public:
         selected = {id}; commit(std::move(notes), "Add MIDI note");
     }
     void mouseDown(const juce::MouseEvent& event) override {
+        if (processor.midiRecordingSession().busy()) { return; }
         grabKeyboardFocus(); error.clear();
         const auto* clip = currentClip();
         if (clip == nullptr || clip->midi == nullptr) { return; }
@@ -229,6 +259,7 @@ public:
         refresh();
     }
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (processor.midiRecordingSession().busy()) { return; }
         if (marquee) {
             selectionBox = juce::Rectangle<int>(anchor, event.getPosition()).getIntersection(gridBounds());
             const auto* clip = currentClip();
@@ -268,6 +299,7 @@ public:
         refresh();
     }
     bool keyPressed(const juce::KeyPress& key) override {
+        if (processor.midiRecordingSession().busy()) { if (key == juce::KeyPress::escapeKey) { processor.midiRecordingSession().cancel(); } return true; }
         if (key == juce::KeyPress::escapeKey) { if (marquee) { selected = marqueeSelection; } cancelDrag(); refresh(); return true; }
         const auto* clip = currentClip();
         if (clip == nullptr || clip->midi == nullptr) { return false; }
@@ -299,6 +331,14 @@ public:
         repaint();
     }
 private:
+    void timerCallback() override {
+        const auto message = processor.midiRecordingSession().message();
+        const auto busy = processor.midiRecordingSession().busy();
+        if (message != lastRecordingStatus || busy != wasRecording) {
+            if (wasRecording && !busy) { fit(); }
+            lastRecordingStatus = message; wasRecording = busy; refresh();
+        }
+    }
     bool canAudition() const {
         const auto& project = processor.document.project();
         for (const auto& track : project.tracks) {
@@ -371,7 +411,10 @@ private:
     double scrollBeat = 0, pixelsPerBeat = 80;
     juce::Point<int> anchor;
     juce::Rectangle<int> selectionBox;
-    juce::String error;
+    juce::String error, lastRecordingStatus;
+    bool wasRecording = false;
+    juce::Label recordingStatus;
+    juce::TextButton record{"Record notes"}, cancelRecording{"Cancel"};
     juce::TextButton envelopeButton {"Envelope..."};
     juce::TextButton create {"Create notes"}, fitButton {"Fit"}, remove {"Remove MIDI"}, audition {"MIDI audition"};
     juce::Label velocity;

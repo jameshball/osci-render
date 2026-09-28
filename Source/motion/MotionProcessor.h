@@ -7,6 +7,7 @@
 #include "render/BeamTransitionGuard.h"
 #include "render/LiveMidiAudition.h"
 #include "render/MidiRecording.h"
+#include "render/MidiRecordingSession.h"
 #include "../audio/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
@@ -21,6 +22,7 @@ public:
     void setMidiAudition(motion::Id clip) { midiAuditionTarget.store(clip); }
     motion::Id getMidiAudition() const { return midiAuditionTarget.load(); }
     motion::MidiRecording& midiRecorder() { return midiRecording; }
+    motion::MidiRecordingSession& midiRecordingSession() { return *midiSession; }
     void releaseResources() override;
     void processBlockSkipped(bool unavailable) override { midiRecording.skippedBlock(unavailable); }
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
@@ -60,6 +62,13 @@ private:
     motion::BeamTransitionGuard transitionGuard;
     motion::LiveMidiPerformance liveMidi;
     motion::MidiRecording midiRecording;
+    std::unique_ptr<motion::MidiRecordingSession> midiSession;
+    bool armMidiRecording(const motion::MidiRecording::Config& config);
+    void stopMidiDevice();
+    void releaseRecordingTransport();
+    juce::SpinLock midiLifecycleLock;
+    std::atomic<bool> midiDeviceReady{false};
+    bool recordingOwnsTransport = false; // Audio thread, or lifecycle with callbacks excluded.
     std::atomic<motion::Id> midiAuditionTarget {0};
     motion::Id previousAuditionTarget = 0;
     std::uint64_t liveMidiSample = 0;

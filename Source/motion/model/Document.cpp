@@ -1122,6 +1122,25 @@ juce::Result Document::setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> 
     });
 }
 
+juce::Result Document::recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged,
+    std::uint64_t expectedGeneration, std::uint64_t expectedRevision) {
+    if (merged == nullptr) { return juce::Result::fail("Recorded MIDI note content must not be null."); }
+    if (generation() != expectedGeneration || revision() != expectedRevision) {
+        return juce::Result::fail("The recording target changed before the take was saved.");
+    }
+    const auto bpm = project().bpm;
+    return editMidi(clipId, "Record MIDI notes", [expected = std::move(expected), merged = std::move(merged), bpm](Clip& clip) {
+        if (clip.midi != expected) { return juce::Result::fail("The recording target changed before the take was saved."); }
+        if (expected != nullptr && expected->notes() == merged->notes()) { return juce::Result::ok(); }
+        if (clip.timeBase != ClipTimeBase::beats && !clip.anchorToBeats(bpm)) {
+            return juce::Result::fail("Cannot anchor this clip to the project tempo.");
+        }
+        clip.midi = merged;
+        clip.midiAsset = 0;
+        return juce::Result::ok();
+    });
+}
+
 juce::Result Document::clearMidi(Id clipId) {
     return editMidi(clipId, "Clear MIDI performance", [](Clip& clip) {
         clip.midi.reset();

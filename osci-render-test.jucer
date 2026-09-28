@@ -18,6 +18,8 @@
             resource="0" file="tests/MotionBeamContinuityTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
+      <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"
+            compile="1" resource="0" file="tests/MotionMidiRecordingSessionTest.cpp"/>
       <FILE id="MotionMidiEditingT" name="MotionMidiEditingTest.cpp" compile="1"
             resource="0" file="tests/MotionMidiEditingTest.cpp"/>
       <FILE id="MotionMidiRenderT" name="MotionMidiRenderTest.cpp" compile="1"

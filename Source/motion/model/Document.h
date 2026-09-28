@@ -115,6 +115,8 @@ public:
     juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
+    juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged,
+        std::uint64_t expectedGeneration, std::uint64_t expectedRevision);
     juce::Result clearMidi(Id clipId);
     void preview(Project project) { apply(mergeScope(std::move(project))); }
     void commit(juce::String label, Project before);
