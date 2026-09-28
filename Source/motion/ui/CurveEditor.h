@@ -2,6 +2,8 @@
 
 #include "../MotionProcessor.h"
 #include "../model/PropertyTarget.h"
+#include "../model/PropertySchema.h"
+#include "MotionStyle.h"
 #include <optional>
 #include <limits>
 
@@ -35,6 +37,8 @@ public:
 
     // Called synchronously; the curve pointer is only valid during this call.
     std::function<void(const motion::Curve*)> onPreview;
+    // A sibling axis curve was clicked: the owner switches the edited property.
+    std::function<void(const std::string&)> onPropertyChosen;
 
     void setSelection(motion::Id id, std::string property) {
         if (targetId == id && propertyName == property) {
@@ -80,7 +84,12 @@ public:
         }
         const auto& curve = drag.has_value() ? drag->preview : *storedCurve;
         const auto area = plot();
-        g.drawText(juce::String(propertyName) + " | " + juce::String(clip->name.data(), clip->name.size()), 12, 3, getWidth() - 180, 22, juce::Justification::centredLeft);
+        g.setFont(motion::style::strong());
+        g.drawText(propertyLabel(*clip), 12, 3, 160, 22, juce::Justification::centredLeft);
+        g.setFont(motion::style::body());
+        g.setColour(motion::style::muted());
+        g.drawText(juce::String(clip->name.data(), clip->name.size()), 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
+        g.setFont(13.0f);
         if (curve.modulation.enabled) {
             g.setColour(juce::Colour(0xff70da91));
             g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
@@ -113,6 +122,22 @@ public:
         }
         g.setColour(osci::Colours::text().withAlpha(0.5f));
         g.drawText("Double-click: key | Drag: move | Right-click: curve | Cmd+wheel: time zoom | F: fit", 12, getHeight() - 19, getWidth() - 24, 17, juce::Justification::centredLeft);
+        {
+            juce::Graphics::ScopedSaveState ghosts(g);
+            g.reduceClipRegion(area.toNearestInt().expanded(5));
+            const auto steps = std::max(2, juce::roundToInt(area.getWidth() / 2));
+            for (const auto& [name, colour] : siblings(*clip)) {
+                const auto* other = clip->curve(name);
+                juce::Path ghost;
+                for (int i = 0; i <= steps; ++i) {
+                    const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
+                    const auto y = valueY(other->evaluateBase(clip->localTime(time)));
+                    if (i == 0) { ghost.startNewSubPath(timeX(time), y); } else { ghost.lineTo(timeX(time), y); }
+                }
+                g.setColour(colour.withAlpha(.35f));
+                g.strokePath(ghost, juce::PathStrokeType(1.1f));
+            }
+        }
         {
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(area.toNearestInt().expanded(5));
@@ -195,6 +220,17 @@ public:
             }
         }
         selectedTime = hitKey(*clip, *curve, event.position);
+        if (!selectedTime.has_value() && event.mods.isLeftButtonDown() && onPropertyChosen) {
+            const auto time = viewStart + (event.position.x - plot().getX()) / plot().getWidth() * (viewEnd - viewStart);
+            const auto own = std::abs(valueY(curve->evaluateBase(clip->localTime(time))) - event.position.y);
+            for (const auto& [name, colour] : siblings(*clip)) {
+                const auto distance = std::abs(valueY(clip->curve(name)->evaluateBase(clip->localTime(time))) - event.position.y);
+                if (distance < 6.0f && distance < own) {
+                    onPropertyChosen(name);
+                    return;
+                }
+            }
+        }
         if (event.mods.isPopupMenu()) {
             if (selectedTime.has_value()) {
                 showKeyMenu();
@@ -399,6 +435,24 @@ private:
         }
     }
 
+    // Other axes of the same property group (Position Y/Z beside X), drawn
+    // as faint context curves in their axis colour.
+    std::vector<std::pair<std::string, juce::Colour>> siblings(const motion::PropertyTarget& target) const {
+        std::vector<std::pair<std::string, juce::Colour>> result;
+        const auto specs = motion::propertySpecs(target);
+        const auto* current = motion::findPropertySpec(specs, propertyName);
+        if (current == nullptr || target.isEffect) { return result; }
+        for (const auto& spec : specs) {
+            if (spec.group != current->group || spec.id == current->id || target.curve(std::string(spec.id)) == nullptr) { continue; }
+            const auto axis = spec.axis.empty() ? ' ' : spec.axis[0];
+            result.emplace_back(std::string(spec.id), axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : motion::style::axisZ());
+        }
+        return result;
+    }
+    juce::String propertyLabel(const motion::PropertyTarget& target) const {
+        const auto* spec = target.isEffect ? nullptr : motion::findPropertySpec(motion::propertySpecs(target), propertyName);
+        return spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(propertyName);
+    }
     static const motion::Curve* findCurve(const std::optional<motion::PropertyTarget>& target, const std::string& property) {
         return target.has_value() ? target->curve(property) : nullptr;
     }
@@ -559,6 +613,13 @@ private:
             if (key.time >= clip->offset && key.time <= clip->localTime(clip->end())) {
                 low = std::min(low, key.value);
                 high = std::max(high, key.value);
+            }
+        }
+        for (const auto& [name, colour] : siblings(*clip)) {
+            const auto* other = clip->curve(name);
+            for (int i = 0; i <= 128; ++i) {
+                const auto value = other->evaluateBase(clip->localTime(std::lerp(clip->start, clip->end(), i / 128.0)));
+                if (std::isfinite(value)) { low = std::min(low, value); high = std::max(high, value); }
             }
         }
         const auto minimumSpan = propertyName.starts_with("rotation.") ? 90.0 : 1.0;

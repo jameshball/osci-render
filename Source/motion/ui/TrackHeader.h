@@ -10,6 +10,7 @@ public:
         name.setEditable(false, true);
         name.setJustificationType(juce::Justification::centredLeft);
         name.setFont(motion::style::body());
+        name.setMinimumHorizontalScale(1.0f);
         name.addMouseListener(this, false);
         disclosure.onClick = [this] {
             if (isGroup) { if (onCollapse) { onCollapse(id); } }
@@ -71,7 +72,7 @@ public:
             button->setBounds(buttons.removeFromLeft(18));
             buttons.removeFromLeft(1);
         }
-        name.setBounds(bounds.reduced(2, 0));
+        name.setBounds(bounds.reduced(2, 0).withSizeKeepingCentre(bounds.getWidth() - 4, 18));
     }
     void mouseDown(const juce::MouseEvent& event) override {
         if (event.eventComponent == &name && onSelect) { onSelect(id); }

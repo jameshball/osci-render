@@ -350,7 +350,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     curveProperty.setName("Animated property");
     for (std::size_t index = 0; index < motion::propertyNames.size(); ++index) {
         curveProperties.emplace_back(motion::propertyNames[index]);
-        curveProperty.addItem(juce::String(motion::propertyNames[index]).replace(".", " "), static_cast<int>(index) + 1);
+        const auto* spec = motion::findPropertySpec(motion::objectPropertySpecs(), motion::propertyNames[index]);
+        curveProperty.addItem(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(motion::propertyNames[index]), static_cast<int>(index) + 1);
     }
     curveProperty.setSelectedId(1, juce::dontSendNotification);
     curveProperty.onChange = [this] {
@@ -363,6 +364,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     cameraPanel.onPropertySelected = [this](motion::Id id, std::string property) {
         selectCurveTarget(id, property, true);
     };
+    curveEditor.onPropertyChosen = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve); };
     curveEditor.onPreview = [this](const motion::Curve* curve) {
         auto preview = processor.document.project();
         if (curve != nullptr) {
@@ -573,7 +575,11 @@ void MotionEditor::resized() {
     playbackHealth.setBounds(top.removeFromRight(96).reduced(3));
     // Transport sits centred in the menu row, leaving the full height below
     // for the workspace.
-    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - 340, 470), 30).withX(std::max(top.getX() + 340, top.getCentreX() - 235));
+    // Menus keep their natural width; the transport follows them.
+    int menuWidth = 0;
+    const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
+    for (int index = 0; index < names.size(); ++index) { menuWidth += getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
+    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 470), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 235));
     menuBar.setBounds(top.withRight(transport.getX()));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
@@ -1600,7 +1606,9 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     for (std::size_t index = 0; index < count; ++index) {
         const std::string name = audio ? (index == 0 ? "gain" : "pan") : definition != nullptr ? definition->parameters[index].id : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
         curveProperties.push_back(name);
-        curveProperty.addItem(definition != nullptr ? juce::String(definition->parameters[index].name) : juce::String(name).replace(".", " "), static_cast<int>(index) + 1);
+        const auto* spec = target.has_value() && definition == nullptr ? motion::findPropertySpec(motion::propertySpecs(*target), name) : nullptr;
+        curveProperty.addItem(definition != nullptr ? juce::String(definition->parameters[index].name)
+            : spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(name).replace(".", " "), static_cast<int>(index) + 1);
         if (property == name) {
             selectedIndex = static_cast<int>(index);
         }
