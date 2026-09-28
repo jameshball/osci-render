@@ -283,6 +283,41 @@ public:
             expectEquals(litOrigin, 0);
         }
 
+        beginTest("Soundtrack loudness modulation follows project time through clip clocks");
+        {
+            auto layers = project({{square(1, .1f)}}, 3);
+            auto& clip = layers.tracks[0].clips[0];
+            clip.start = .2; clip.duration = 2.5; clip.offset = 1; clip.rate = 2;
+            auto& curve = clip.properties["position.x"];
+            curve.base = 0;
+            curve.modulation.enabled = true;
+            curve.modulation.waveform = motion::ModulationWaveform::soundtrack;
+            curve.modulation.amount = .5;
+            // One quiet second, then one loud second.
+            std::vector<float> pcm(24000, 0.0f);
+            for (std::size_t i = 8000; i < 16000; ++i) { pcm[i] = static_cast<float>(std::sin(i * .3) * .8); }
+            const std::array<std::span<const float>, 1> channels {pcm};
+            auto audio = std::make_shared<motion::Asset>();
+            audio->id = 99; audio->name = "Beat"; audio->audio = motion::PreparedAudio::fromPlanar(8000, channels).audio;
+            layers.assets.push_back(audio);
+            motion::Clip sound; sound.id = 98; sound.asset = 99; sound.duration = 3;
+            sound.properties["gain"] = motion::Curve(1); sound.properties["pan"] = motion::Curve(0);
+            motion::Track track; track.id = 97; track.kind = motion::TrackKind::audio; track.clips = {sound};
+            layers.tracks.push_back(track);
+            const motion::PreparedComposition composition(layers, 48000);
+            expect(composition.preparationError.isEmpty(), composition.preparationError);
+            if (!composition.clips.empty()) {
+                const auto& visual = composition.clips[0];
+                const auto quiet = visual.processPoint({0, 0, 0, 1, 1, 1}, .6).x;
+                const auto loud = visual.processPoint({0, 0, 0, 1, 1, 1}, 1.6).x;
+                expectWithinAbsoluteError(quiet, 0.0f, .01f, "Silence leaves the keyed value");
+                expect(loud > .4f, "Loudness pushes the value by up to the amount: " + juce::String(loud));
+            }
+            motion::Curve saved = curve;
+            saved.modulation.soundtrack.reset();
+            expect(curve.modulation == saved.modulation, "The runtime clock is not part of authored equality");
+        }
+
         beginTest("Twenty-layer renderer throughput diagnostic");
         {
             std::vector<Layer> layers;

@@ -15,7 +15,7 @@ public:
         enabled.setTitle("Enable modulation");
         enabled.setColour(juce::TextButton::buttonColourId, osci::Colours::surface());
         waveform.setName("Modulation waveform");
-        waveform.addItemList({ "Sine", "Triangle", "Saw", "Square", "Smooth random", "Random steps" }, 1);
+        waveform.addItemList({ "Sine", "Triangle", "Saw", "Square", "Smooth random", "Random steps", "Soundtrack loudness" }, 1);
         sync.setName("Modulation clock");
         sync.addItemList({ "Hz", "Beats" }, 1);
         mode.setName("Modulation mode");
@@ -89,9 +89,13 @@ public:
         const auto noise = settings.waveform == motion::ModulationWaveform::noiseHold || settings.waveform == motion::ModulationWaveform::noiseSmooth;
         seed.setVisible(noise);
         newSeed.setVisible(noise);
+        // Soundtrack loudness has no rate or phase of its own.
+        const auto audio = settings.waveform == motion::ModulationWaveform::soundtrack;
+        for (auto* component : std::initializer_list<juce::Component*> { &sync, &rate, &phase, &rateLabel, &phaseLabel }) { component->setVisible(!audio); }
         rate.setTooltip(settings.tempoSync ? "Beats per cycle; follows project tempo" : "Cycles per second in the property's time domain");
         phase.setTooltip("Phase offset in degrees");
-        amount.setTooltip(settings.mode == motion::ModulationMode::multiply ? "Multiply the keyed value by 1 + amount * waveform" : "Add amount * waveform to the keyed value");
+        amount.setTooltip(audio ? "Follow the soundtrack: add amount x loudness (0 in silence, 1 at the loudest moment)"
+            : settings.mode == motion::ModulationMode::multiply ? "Multiply the keyed value by 1 + amount * waveform" : "Add amount * waveform to the keyed value");
         updating = false;
         repaint();
     }

@@ -59,6 +59,7 @@ struct CameraCut {
 
     double end() const { return start + duration; }
     bool contains(double time) const { return time >= start && time < end(); }
+    bool operator==(const CameraCut&) const = default;
     bool valid() const {
         return id != 0 && camera != 0 && std::isfinite(start) && start >= 0.0
             && std::isfinite(duration) && duration > 0.0 && std::isfinite(end());

@@ -3,10 +3,35 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <numbers>
+#include <vector>
 
 namespace motion {
-enum class ModulationWaveform { sine, triangle, saw, square, noiseSmooth, noiseHold };
+enum class ModulationWaveform { sine, triangle, saw, square, noiseSmooth, noiseHold, soundtrack };
+
+// The composition's soundtrack loudness, 0..1, sampled on a fixed grid. Built
+// once per prepared composition; curves reach it through a clock that maps
+// their owner's local time back to project time.
+struct SoundtrackEnvelope {
+    std::vector<float> values;
+    double rate = 240;
+    double at(double projectTime) const {
+        if (values.empty() || !std::isfinite(projectTime) || projectTime < 0) { return 0; }
+        const auto position = projectTime * rate;
+        const auto index = static_cast<std::size_t>(position);
+        if (index + 1 >= values.size()) { return values.back(); }
+        const auto fraction = position - static_cast<double>(index);
+        return values[index] * (1 - fraction) + values[index + 1] * fraction;
+    }
+};
+struct SoundtrackClock {
+    std::shared_ptr<const SoundtrackEnvelope> envelope;
+    double start = 0, offset = 0, rate = 1; // project = start + (local - offset) / rate
+    double at(double localTime) const {
+        return envelope == nullptr || rate == 0 ? 0 : envelope->at(start + (localTime - offset) / rate);
+    }
+};
 enum class ModulationMode { add, multiply };
 
 struct Modulation {
@@ -19,10 +44,15 @@ struct Modulation {
     double beatsPerCycle = 1;
     std::uint32_t seed = 0;
     ModulationMode mode = ModulationMode::add;
+    // Runtime only: attached to prepared copies, never saved or compared.
+    std::shared_ptr<const SoundtrackClock> soundtrack;
 
-    bool operator==(const Modulation&) const = default;
+    bool operator==(const Modulation& other) const {
+        return enabled == other.enabled && waveform == other.waveform && amount == other.amount && rateHz == other.rateHz && phase == other.phase
+            && tempoSync == other.tempoSync && beatsPerCycle == other.beatsPerCycle && seed == other.seed && mode == other.mode;
+    }
     bool valid() const {
-        return static_cast<int>(waveform) >= 0 && static_cast<int>(waveform) <= 5
+        return static_cast<int>(waveform) >= 0 && static_cast<int>(waveform) <= 6
             && static_cast<int>(mode) >= 0 && static_cast<int>(mode) <= 1
             && std::isfinite(amount) && amount >= -1000000 && amount <= 1000000
             && std::isfinite(rateHz) && rateHz >= 0.001 && rateHz <= 1000
@@ -35,6 +65,10 @@ struct Modulation {
     double value(double time, double bpm = 120) const {
         if (!enabled || !valid() || !std::isfinite(time) || (tempoSync && (!std::isfinite(bpm) || bpm <= 0))) {
             return 0;
+        }
+        if (waveform == ModulationWaveform::soundtrack) {
+            // Unipolar loudness: silence leaves the keyed value untouched.
+            return soundtrack != nullptr ? soundtrack->at(time) : 0.0;
         }
         const auto frequency = tempoSync ? bpm / (60 * beatsPerCycle) : rateHz;
         const auto cycles = time * frequency + phase;

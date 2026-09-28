@@ -280,7 +280,8 @@ struct PreparedComposition {
             clips.push_back(std::move(item));
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
-        if (preparationError.isNotEmpty()) { clips.clear(); }
+        if (preparationError.isNotEmpty()) { clips.clear(); return; }
+        attachSoundtrack(cancel);
     }
 
     // Geometry probe: the beam allocation at one phase of a static multiplexed
@@ -390,6 +391,63 @@ struct PreparedComposition {
     std::vector<PreparedCamera> cameras;
 
 private:
+    // Loudness at 240 Hz: rectified peak per bin, then a fast-attack /
+    // slow-release follower, normalised to the loudest moment of the piece.
+    void attachSoundtrack(const std::atomic<bool>* cancel) {
+        const auto uses = [](const Curve& curve) { return curve.modulation.enabled && curve.modulation.waveform == ModulationWaveform::soundtrack; };
+        bool needed = false;
+        const auto scanEffects = [&](const std::vector<PreparedEffect>& list) { for (const auto& effect : list) { for (const auto& curve : effect.curves) { needed = needed || uses(curve); } } };
+        const auto scanStage = [&](const PreparedClipStage& stage) {
+            for (const auto& curve : stage.curves) { needed = needed || uses(curve); }
+            scanEffects(stage.effects); scanEffects(stage.trackEffects); scanEffects(stage.compositionEffects);
+            for (const auto& group : stage.groups) { for (const auto& curve : group.curves) { needed = needed || uses(curve); } scanEffects(group.effects); }
+        };
+        for (const auto& clip : clips) { scanStage(clip); for (const auto& ancestor : clip.ancestors) { scanStage(ancestor); } }
+        for (const auto& camera : cameras) { for (const auto& curve : camera.curves) { needed = needed || uses(curve); } }
+        scanEffects(effects);
+        if (!needed) { return; }
+        auto envelope = std::make_shared<SoundtrackEnvelope>();
+        const auto bins = static_cast<std::size_t>(std::ceil(std::max(0.0, duration) * envelope->rate)) + 2;
+        envelope->values.assign(bins, 0.0f);
+        constexpr int probes = 24;
+        float follower = 0, loudest = 0;
+        for (std::size_t bin = 0; bin < bins; ++bin) {
+            if (cancel != nullptr && (bin & 1023) == 0 && cancel->load()) { return; }
+            float peak = 0;
+            for (int probe = 0; probe < probes; ++probe) {
+                const auto sample = soundtrack.sample((static_cast<double>(bin) + probe / static_cast<double>(probes)) / envelope->rate);
+                peak = std::max({peak, std::abs(static_cast<float>(sample.left)), std::abs(static_cast<float>(sample.right))});
+            }
+            follower = peak > follower ? follower + (peak - follower) * .6f : follower * .93f;
+            envelope->values[bin] = follower;
+            loudest = std::max(loudest, follower);
+        }
+        if (loudest > 0) { for (auto& value : envelope->values) { value /= loudest; } }
+        const std::shared_ptr<const SoundtrackEnvelope> shared = envelope;
+        const auto attach = [&](Curve& curve, double start, double offset, double rate) {
+            if (uses(curve)) { curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock{shared, start, offset, rate}); }
+        };
+        const auto attachEffects = [&](std::vector<PreparedEffect>& list, double start, double offset, double rate) {
+            for (auto& effect : list) { for (auto& curve : effect.curves) { attach(curve, start, offset, rate); } }
+        };
+        const auto attachStage = [&](PreparedClipStage& stage) {
+            for (auto& curve : stage.curves) { attach(curve, stage.start, stage.offset, stage.rate); }
+            attachEffects(stage.effects, stage.start, stage.offset, stage.rate);
+            // Track, group and composition scopes run on the scope clock.
+            const auto scopeStart = stage.scopeClock.has_value() ? stage.scopeClock->start : 0.0;
+            const auto scopeOffset = stage.scopeClock.has_value() ? stage.scopeClock->offset : 0.0;
+            const auto scopeRate = stage.scopeClock.has_value() ? stage.scopeClock->rate : 1.0;
+            attachEffects(stage.trackEffects, scopeStart, scopeOffset, scopeRate);
+            attachEffects(stage.compositionEffects, scopeStart, scopeOffset, scopeRate);
+            for (auto& group : stage.groups) {
+                for (auto& curve : group.curves) { attach(curve, scopeStart, scopeOffset, scopeRate); }
+                attachEffects(group.effects, scopeStart, scopeOffset, scopeRate);
+            }
+        };
+        for (auto& clip : clips) { attachStage(clip); for (auto& ancestor : clip.ancestors) { attachStage(ancestor); } }
+        for (auto& camera : cameras) { for (auto& curve : camera.curves) { attach(curve, 0, 0, 1); } }
+        attachEffects(effects, 0, 0, 1);
+    }
     struct PreparedCameraCut {
         double start, end;
         std::size_t cameraIndex;

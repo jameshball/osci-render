@@ -107,7 +107,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     menus.addTopLevelMenu("Edit");
     menus.addEditMenuItems(1, processor);
     menus.addTopLevelMenu("Clip");
-    menus.addTopLevelMenu("Play");
+    menus.addTopLevelMenu("Transport");
     menus.addTopLevelMenu("Audio");
     menus.addStandaloneAudioSettingsMenuItem(4, processor, *this);
     menus.addMenuItem(4, "Playback health...", [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); });

@@ -31,6 +31,10 @@ public:
     std::function<std::optional<double>(motion::Id)> selectedKeyTime;
     std::function<void()> onKeyTimeEdited;
 
+    // Embedded inspectors (e.g. in the camera panel) supply their own title.
+    // Distinguishes controls of several inspectors for automation and access.
+    void setNamePrefix(juce::String prefix) { namePrefix = std::move(prefix); layoutSignature = "none"; refresh(); }
+    void setShowsHeader(bool shows) { showsHeader = shows; title.setVisible(shows); kind.setVisible(shows); resized(); }
     void setTarget(motion::Id id) {
         if (id != target) { target = id; cancelGesture(); }
         refresh();
@@ -80,9 +84,11 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds();
-        auto header = area.removeFromTop(34).reduced(motion::style::padding + 2, 0);
-        kind.setBounds(header.removeFromRight(60));
-        title.setBounds(header);
+        if (showsHeader) {
+            auto header = area.removeFromTop(34).reduced(motion::style::padding + 2, 0);
+            kind.setBounds(header.removeFromRight(60));
+            title.setBounds(header);
+        }
         viewport.setBounds(area);
         layoutContent();
     }
@@ -132,7 +138,7 @@ private:
             if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size())) {
                 auto row = std::make_unique<Row>();
                 row->group = juce::String(spec.group.data(), spec.group.size());
-                row->key.setName("Key " + row->group.toLowerCase());
+                row->key.setName("Key " + namePrefix + row->group.toLowerCase());
                 row->key.setTitle(row->key.getName());
                 row->key.setTooltip("Add or remove keys for " + row->group.toLowerCase() + " at the playhead");
                 row->previous.setName("Previous " + row->group.toLowerCase() + " key");
@@ -152,9 +158,9 @@ private:
             auto field = std::make_unique<Field>(spec);
             auto& editor = field->editor;
             editor.setSpec(spec);
-            editor.setName(juce::String(spec.id.data(), spec.id.size()));
+            editor.setName(namePrefix + juce::String(spec.id.data(), spec.id.size()));
             editor.setTitle(juce::String(spec.label.data(), spec.label.size()));
-            editor.setComponentID("motion." + juce::String(spec.id.data(), spec.id.size()));
+            editor.setComponentID("motion." + namePrefix.replace(" ", ".") + juce::String(spec.id.data(), spec.id.size()));
             editor.setTooltip(juce::String(spec.label.data(), spec.label.size()) + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
             if (spec.axis.size() == 1) {
                 editor.setPrefix(juce::String(spec.axis.data(), spec.axis.size()));
@@ -284,8 +290,8 @@ private:
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
     motion::Id target = 0;
-    juce::String layoutSignature = "none";
+    juce::String layoutSignature = "none", namePrefix;
     std::optional<Gesture> gesture;
     double gestureTime = 0;
-    bool changed = false, empty = true;
+    bool changed = false, empty = true, showsHeader = true;
 };
