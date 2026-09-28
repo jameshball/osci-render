@@ -112,8 +112,24 @@ public:
             const auto& keys = project.cameras[0].properties.at("position.x").keyframes();
             expectWithinAbsoluteError(keys[1].time, 4 * scale, 1e-12);
             expectWithinAbsoluteError(keys[0].outgoingSlope, 1 / scale, 1e-12, "Slopes steepen with the shorter span");
+            juce::UndoManager reopenedUndo;
+            motion::Document reopened(reopenedUndo);
+            expect(reopened.load(f.document.save()).wasOk(), "A tempo change always saves a loadable project");
             expect(f.undo.undo());
             expectWithinAbsoluteError(f.document.project().markers[0].time, 3.0, 1e-12);
+        }
+        beginTest("Slowing a musical project keeps late markers inside the longer composition");
+        {
+            Fixture f; f.initialise();
+            f.document.edit("Setup", [&](motion::Project& project) {
+                project.timeDisplay = motion::TimeDisplay::beats;
+                project.markers = {{f.document.newId(), 9.5, "Late"}};
+            });
+            expect(f.document.changeTempo(60).wasOk());
+            expect(f.document.project().markers[0].time <= f.document.project().duration);
+            juce::UndoManager reopenedUndo;
+            motion::Document reopened(reopenedUndo);
+            expect(reopened.load(f.document.save()).wasOk());
         }
 
         beginTest("Sources rename and only unused sources can be removed, in one undo step");

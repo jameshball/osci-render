@@ -13,6 +13,7 @@
 #include "ui/MidiEnvelopePanel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
+#include <iostream>
 
 namespace {
 class MotionProjectLoading final : public juce::Component {
@@ -772,6 +773,7 @@ void MotionEditor::openProject(const juce::File& file) {
             owner->projectLoad.reset();
             if (overlay != nullptr) { owner->dismissOverlay(overlay); }
             if (result.failed()) {
+                owner->projectLoadFailed = true;
                 osci::showOverlayMessage(*owner, "Open Project Failed", result.getErrorMessage());
                 return;
             }
@@ -1117,6 +1119,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
 }
 
 void MotionEditor::timerCallback() {
+    continueCommandLineRender();
     refreshOutputChoices();
     auto& previewRate = processor.recordingParameters.frameRate;
     // Keep playback and export cadence aligned within the live renderer's supported range.
@@ -1272,7 +1275,9 @@ void MotionEditor::select(motion::Id id) {
     notesEditor.setSelection(id);
     clipTimingPanel.setSelection(id);
     effectsPanel.setSelectedClip(id);
-    if (inspectorTabs.getCurrentTabIndex() != 3) { inspectorTabs.setSelectedIndex(0); }
+    // Keep the inspector tab the user chose; only leave the Camera tab, which
+    // does not follow clip selection.
+    if (inspectorTabs.getCurrentTabIndex() == 2 && id != 0) { inspectorTabs.setSelectedIndex(0); }
     timeline.setSelection(id);
     timeline.revealSelection();
     composition.selected = id;
@@ -1488,75 +1493,158 @@ void MotionEditor::exportVideo() {
                     return;
                 }
                 owner->processor.setLastOpenedDirectory(destination.getParentDirectory());
-                auto& recording = owner->processor.recordingParameters;
-                recording.setCanvasSize(config.renderSize);
-                recording.frameRate.setUnnormalisedValueNotifyingHost(static_cast<float>(config.frameRate));
-                recording.qualityParameter.setUnnormalisedValueNotifyingHost(RecordingParameters::qualityForCRF(config.crf));
-                recording.losslessVideo.setBoolValue(config.crf == 0);
-                recording.recordAudio.setBoolValue(config.includeAudio);
-                recording.videoCodec = config.codec;
-                recording.compressionPreset = config.compressionPreset;
-                juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, destination] {
-                    if (owner == nullptr) { return; }
-                    state->videoWithAudio = config.includeAudio;
-                    auto content = std::make_unique<MotionVideoPreparation>([state] {
-                        return state->videoWithAudio ? (state->progress.load() + state->soundtrackProgress.load()) * 0.5 : state->progress.load();
-                    }, [state] { state->cancelled.store(true); }, config.includeAudio);
-                    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Preparing video", juce::Point<int>(440, 130), true);
-                    overlay->setDismissible(false);
-                    const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(overlay.get());
-                    owner->showOverlay(std::move(overlay));
-                    // The worker owns one immutable prepared snapshot for both WAVs.
-                    owner->exports.addJob([owner, state, project, beamSnapshot, renderMode, config, destination, preparationOverlay] {
-                        std::shared_ptr<MotionVideoTemporaryFiles> temporary;
-                        auto result = juce::Result::ok();
-                        try {
-                            temporary = std::make_shared<MotionVideoTemporaryFiles>();
-                            result = temporary->directory.createDirectory();
-                            if (result.wasOk() && !state->cancelled.load()) {
-                                const auto rate = state->sampleRate;
-                                const motion::PreparedComposition prepared(project, rate, &state->cancelled);
-                                result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
-                                if (result.wasOk() && config.includeAudio) {
-                                    result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), rate, state->cancelled, &state->soundtrackProgress);
-                                }
-                            }
-                        } catch (...) {
-                            result = juce::Result::fail("Could not prepare the composition for video export.");
-                        }
-                        // Native save-dialog callbacks have returned before this starts
-                        // the shared GL renderer and its own cancellable progress overlay.
-                        juce::MessageManager::callAsync([owner, state, temporary, result, beamSnapshot, renderMode, config, destination, preparationOverlay] {
-                            if (owner == nullptr) { return; }
-                            if (state->cancelled.load() || result.failed()) {
-                                if (preparationOverlay != nullptr) { owner->dismissOverlay(preparationOverlay.getComponent()); }
-                                owner->exportState.reset();
-                                if (!state->cancelled.load()) { owner->statusBar.show(result.getErrorMessage()); }
-                                return;
-                            }
-                            auto startRender = [owner, state, temporary, config, destination, renderMode, beamSnapshot] {
-                                if (owner == nullptr) { return; }
-                                owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
-                                destination, config, renderMode, [owner, state, temporary] {
-                                    // Completion can run from base-editor destruction;
-                                    // touch derived UI only in a later safe callback.
-                                    juce::MessageManager::callAsync([owner, state] {
-                                        if (owner != nullptr && owner->exportState == state) { owner->exportState.reset(); }
-                                    });
-                                }, beamSnapshot);
-                            };
-                            if (preparationOverlay != nullptr) {
-                                owner->dismissOverlay(preparationOverlay.getComponent(), std::move(startRender));
-                            } else {
-                                startRender();
-                            }
-                        });
-                    });
-                });
+                owner->startVideoExport(state, project, beamSnapshot, renderMode, config, destination, {});
             });
         });
     };
     showOverlay(std::move(overlay));
+#endif
+}
+
+void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::Project project, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot,
+    VisualiserRenderer::RenderMode renderMode, VideoEncodingConfiguration config, juce::File destination, std::function<void(bool)> finished) {
+#if OSCI_PREMIUM
+    auto& recording = processor.recordingParameters;
+    recording.setCanvasSize(config.renderSize);
+    recording.frameRate.setUnnormalisedValueNotifyingHost(static_cast<float>(config.frameRate));
+    recording.qualityParameter.setUnnormalisedValueNotifyingHost(RecordingParameters::qualityForCRF(config.crf));
+    recording.losslessVideo.setBoolValue(config.crf == 0);
+    recording.recordAudio.setBoolValue(config.includeAudio);
+    recording.videoCodec = config.codec;
+    recording.compressionPreset = config.compressionPreset;
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, destination, finished] {
+        if (owner == nullptr) { return; }
+        state->videoWithAudio = config.includeAudio;
+        auto content = std::make_unique<MotionVideoPreparation>([state] {
+            return state->videoWithAudio ? (state->progress.load() + state->soundtrackProgress.load()) * 0.5 : state->progress.load();
+        }, [state] { state->cancelled.store(true); }, config.includeAudio);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Preparing video", juce::Point<int>(440, 130), true);
+        overlay->setDismissible(false);
+        const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(overlay.get());
+        owner->showOverlay(std::move(overlay));
+        // The worker owns one immutable prepared snapshot for both WAVs.
+        owner->exports.addJob([owner, state, project, beamSnapshot, renderMode, config, destination, preparationOverlay, finished] {
+            std::shared_ptr<MotionVideoTemporaryFiles> temporary;
+            auto result = juce::Result::ok();
+            try {
+                temporary = std::make_shared<MotionVideoTemporaryFiles>();
+                result = temporary->directory.createDirectory();
+                if (result.wasOk() && !state->cancelled.load()) {
+                    const auto rate = state->sampleRate;
+                    const motion::PreparedComposition prepared(project, rate, &state->cancelled);
+                    result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
+                    if (result.wasOk() && config.includeAudio) {
+                        result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), rate, state->cancelled, &state->soundtrackProgress);
+                    }
+                }
+            } catch (...) {
+                result = juce::Result::fail("Could not prepare the composition for video export.");
+            }
+            // Native save-dialog callbacks have returned before this starts
+            // the shared GL renderer and its own cancellable progress overlay.
+            juce::MessageManager::callAsync([owner, state, temporary, result, beamSnapshot, renderMode, config, destination, preparationOverlay, finished] {
+                if (owner == nullptr) { return; }
+                if (state->cancelled.load() || result.failed()) {
+                    if (preparationOverlay != nullptr) { owner->dismissOverlay(preparationOverlay.getComponent()); }
+                    owner->exportState.reset();
+                    if (!state->cancelled.load()) { owner->statusBar.show(result.getErrorMessage()); }
+                    if (finished) { finished(false); }
+                    return;
+                }
+                auto startRender = [owner, state, temporary, config, destination, renderMode, beamSnapshot, finished] {
+                    if (owner == nullptr) { return; }
+                    const auto started = owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
+                        destination, config, renderMode, [owner, state, temporary, finished] {
+                            // Completion can run from base-editor destruction;
+                            // touch derived UI only in a later safe callback.
+                            juce::MessageManager::callAsync([owner, state, finished] {
+                                if (owner == nullptr) { return; }
+                                if (owner->exportState == state) { owner->exportState.reset(); }
+                                if (finished) { finished(owner->lastOfflineRenderSucceeded()); }
+                            });
+                        }, beamSnapshot);
+                    if (!started && finished) { finished(false); }
+                };
+                if (preparationOverlay != nullptr) {
+                    owner->dismissOverlay(preparationOverlay.getComponent(), std::move(startRender));
+                } else {
+                    startRender();
+                }
+            });
+        });
+    });
+#else
+    juce::ignoreUnused(state, project, beamSnapshot, renderMode, config, destination);
+    if (finished) { finished(false); }
+#endif
+}
+
+// Standalone batch render: osci-motion --render-video <out.mp4> <project.osci-motion>
+// opens the project, renders it with the canvas and project frame rate, then quits.
+void MotionEditor::handleCommandLine(const juce::String& commandLine) {
+    auto tokens = juce::StringArray::fromTokens(commandLine, " ", "\"");
+    tokens.removeEmptyStrings();
+    juce::StringArray remaining;
+    for (int index = 0; index < tokens.size(); ++index) {
+        const auto token = tokens[index].trim().unquoted();
+        if (token == "--render-video" && index + 1 < tokens.size()) {
+            commandLineRender = juce::File::createFileWithoutCheckingPath(tokens[++index].trim().unquoted());
+            continue;
+        }
+        if (token.startsWith("-psn_")) { continue; }
+        remaining.add(tokens[index]);
+    }
+    if (commandLineRender != juce::File()) {
+        const auto project = remaining.isEmpty() ? juce::File() : juce::File::createFileWithoutCheckingPath(remaining[0].trim().unquoted());
+        if (!project.existsAsFile() || !project.hasFileExtension(".osci-motion")) {
+            failCommandLineRender("pass an existing .osci-motion project after --render-video <output>.");
+            return;
+        }
+        projectLoadFailed = false;
+        commandLineProjectRequested = true;
+    }
+    if (remaining.size() > 0) { CommonPluginEditor::handleCommandLine(remaining.joinIntoString(" ")); }
+}
+
+void MotionEditor::failCommandLineRender(const juce::String& message) {
+    std::cerr << "osci-motion render failed: " << message << std::endl;
+    commandLineRender = juce::File();
+    juce::JUCEApplicationBase::getInstance()->setApplicationReturnValue(1);
+    juce::JUCEApplicationBase::quit();
+}
+
+void MotionEditor::continueCommandLineRender() {
+#if OSCI_PREMIUM
+    if (commandLineRender == juce::File() || commandLineRenderStarted || projectLoad != nullptr || processor.isPreparingComposition() || exportState != nullptr) { return; }
+    if (projectLoadFailed) { failCommandLineRender("the project could not be opened."); return; }
+    if (!commandLineProjectRequested) { return; }
+    if (processor.getPreparationError().isNotEmpty()) { failCommandLineRender(processor.getPreparationError()); return; }
+    commandLineRenderStarted = true;
+    if (!processor.ensureFFmpegExists()) { failCommandLineRender("FFmpeg is unavailable."); return; }
+    std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
+    try {
+        beamSnapshot = captureOfflineVisualiserParameters();
+    } catch (const std::exception& error) {
+        failCommandLineRender(error.what());
+        return;
+    }
+    auto config = recordingSettings.createVideoEncodingConfiguration();
+    const auto project = processor.document.mainProject();
+    config.frameRate = project.frameRate;
+    config.includeAudio = true;
+    auto state = std::make_shared<ExportState>();
+    state->sampleRate = processor.exportSampleRate();
+    exportState = state;
+    const auto destination = commandLineRender;
+    std::cout << "osci-motion rendering " << project.name << " to " << destination.getFullPathName() << std::endl;
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    startVideoExport(state, project, beamSnapshot, visualiser.getRenderMode(), config, destination, [owner, destination](bool succeeded) {
+        if (owner == nullptr) { return; }
+        if (!succeeded) { owner->failCommandLineRender("the export did not complete."); return; }
+        std::cout << "osci-motion rendered " << destination.getFullPathName() << std::endl;
+        juce::JUCEApplicationBase::quit();
+    });
 #endif
 }
 

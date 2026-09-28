@@ -230,9 +230,23 @@ public:
                         }));
                     }
                 }
-                logMessage("Dense layers at " + juce::String(rate) + " Hz interleave over " + juce::String(beam.plannedInterleave()) + " cycles; worst lit fraction " + juce::String(worstLit, 3));
+                logMessage("Dense layers at " + juce::String(rate) + " Hz span " + juce::String(beam.plannedInterleave()) + " cycles; worst lit fraction " + juce::String(worstLit, 3));
                 expect(worstLit > 0.3, "every cycle stays mostly lit");
                 expect(std::all_of(drawn.begin(), drawn.end(), [](int count) { return count > 180; }), "every layer draws its complete strokes");
+            }
+        }
+
+        beginTest("Oversized content spans cycles and never leaves a cycle dark");
+        for (const int count : {1, 2, 3}) {
+            std::vector<Layer> layers;
+            for (int i = 0; i < count; ++i) { layers.push_back({strokes(static_cast<motion::Id>(i + 1), 400), i * .5 - .5}); }
+            const motion::PreparedComposition composition(project(layers), 48000);
+            motion::BeamRenderer beam;
+            for (std::int64_t c = 0; c < 12; ++c) {
+                const auto points = cycle(composition, 48000, c, beam);
+                const auto lit = std::count_if(points.begin(), points.end(), [](const auto& p) { return !dark(p); });
+                expect(lit > 0, juce::String(count) + " oversized layers, cycle " + juce::String(c) + " is lit");
+                expect(beam.plannedInterleave() >= 2 && beam.plannedInterleave() <= motion::BeamRenderer::maximumSpan, "the plan spans several cycles");
             }
         }
 

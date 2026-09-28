@@ -231,10 +231,10 @@ private:
         menu.addItem(4, uses == 0 ? "Remove source" : "Remove source (in use)", uses == 0);
         menu.addItem(5, "Remove all unused sources");
         const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, row, generation](int result) {
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
             if (owner == nullptr || result == 0 || owner->document.generation() != generation) { return; }
             if (result == 1 && owner->onInsert) { owner->onInsert(id); }
-            if (result == 2) { owner->beginRename(row); }
+            if (result == 2) { owner->beginRename(id); }
             if (result == 3 && owner->onSelectUses) { owner->onSelectUses(id); }
             if (result == 4 || result == 5) {
                 int removed = 0;
@@ -245,9 +245,14 @@ private:
             }
         });
     }
-    void beginRename(int row) {
+    // Rename by identity: the list may have changed while the menu was open.
+    void beginRename(motion::Id id) {
+        int row = -1;
+        for (int candidate = 0; candidate < static_cast<int>(assets.size()); ++candidate) {
+            if (assetId(candidate) == id) { row = candidate; }
+        }
         if (!validAssetRow(row)) { return; }
-        renaming = assetId(row);
+        renaming = id;
         rename.setText(assets[static_cast<std::size_t>(row)]->name, juce::dontSendNotification);
         rename.setBounds(list.getRowPosition(row, true).translated(list.getX(), list.getY()).reduced(8, 10).withHeight(24));
         rename.setVisible(true);

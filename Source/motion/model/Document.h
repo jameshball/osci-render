@@ -99,6 +99,9 @@ public:
     void edit(juce::String label, std::function<void(Project&)> operation);
     // Records nothing, and changes no revision, when the operation declines.
     bool tryEdit(juce::String label, std::function<bool(Project&)> operation);
+    // Repeated changes to one control (wheel, arrow keys) within a second
+    // join a single undo step instead of one step per increment.
+    void editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
@@ -135,6 +138,9 @@ public:
     juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration);
     juce::Result clearMidi(Id clipId);
     void preview(Project project) { apply(mergeScope(std::move(project))); }
+    juce::String coalescingControl;
+    std::uint64_t coalescingRevision = 0;
+    double coalescingTime = 0;
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;
     juce::Result load(const juce::XmlElement& xml);

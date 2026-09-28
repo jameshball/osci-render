@@ -84,6 +84,14 @@ private:
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera);
     void exportSignal();
     void exportVideo();
+    struct ExportState;
+    void startVideoExport(std::shared_ptr<ExportState> state, motion::Project project, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot,
+        VisualiserRenderer::RenderMode renderMode, VideoEncodingConfiguration config, juce::File destination, std::function<void(bool)> finished);
+    void handleCommandLine(const juce::String& commandLine) override;
+    void continueCommandLineRender();
+    void failCommandLineRender(const juce::String& message);
+    juce::File commandLineRender;
+    bool commandLineRenderStarted = false, commandLineProjectRequested = false, projectLoadFailed = false;
     void showTimingMenu();
     void refreshTiming();
     void refreshOutputChoices();

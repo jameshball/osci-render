@@ -186,7 +186,7 @@ private:
             const auto* original = motion::findPropertyCurve(gesture->before, id, property);
             gesture->changed = original != nullptr && !(original->modulation == settings);
         } else {
-            processor.document.edit("Change modulation", change);
+            processor.document.editCoalesced("Change modulation", "modulation:" + juce::String(id) + ":" + juce::String(property), change);
         }
         refresh();
     }

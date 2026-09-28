@@ -18,7 +18,7 @@ struct SoundtrackEnvelope {
     double rate = 240;
     double at(double projectTime) const {
         if (values.empty() || !std::isfinite(projectTime) || projectTime < 0) { return 0; }
-        const auto position = projectTime * rate;
+        const auto position = std::min(projectTime * rate, static_cast<double>(values.size() - 1));
         const auto index = static_cast<std::size_t>(position);
         if (index + 1 >= values.size()) { return values.back(); }
         const auto fraction = position - static_cast<double>(index);

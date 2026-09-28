@@ -18,16 +18,20 @@ namespace motion {
 // brightness per unit length. Faded layers reserve their full-weight share so a
 // fade never brightens the rest of the scene. Layers are ordered to minimise
 // dark travel, and every jump dwells dark at both ends so reconstruction
-// filters and slow scopes settle before the next stroke lights.
+// filters and slow scopes settle before the next stroke lights. When complete
+// strokes do not fit one cycle, a plan spans several aligned cycles instead of
+// undersampling, trading refresh rate for complete, unbroken drawings.
 class BeamRenderer {
 public:
     static constexpr std::size_t maximumLayers = 256;
     static constexpr std::size_t maximumSegments = maximumLayers * 4 + 4;
-    static constexpr int lengthProbes = 24, pointLengthProbes = 128;
+    // Vector lengths are exact; probes only measure the transform's scale.
+    // Point frames sum lit probe steps. Both run once per cycle per layer.
+    static constexpr int lengthProbes = 9, pointLengthProbes = 48;
     static constexpr double dwellSeconds = 12.0e-6;
     static constexpr double travelSecondsPerUnit = 30.0e-6;
     static constexpr double minimumLayerLength = 0.05;
-    static constexpr std::int64_t maximumInterleave = 8;
+    static constexpr std::int64_t maximumSpan = 8;
 
     enum class Kind : std::uint8_t { draw, midi, move, hold };
     struct Segment {
@@ -66,10 +70,23 @@ public:
         if (index < 0 || !std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { return {0, 0, 0, 0, 0, 0}; }
         const auto cycleRate = composition.beamRate;
         auto first = planFirst, end = planEnd;
-        if (!planned || index < planFirst || index >= planEnd || rate != planRate) {
+        if (!planned || index < planFirst || index >= planEnd || rate != planRate || cycleRate != planCycleRate || generation != planGeneration) {
+            // Dense scenes span several cycles: the window is aligned to its
+            // span k and k is the smallest span that fits the demand measured
+            // at the window's own start, so windows are a pure function of the
+            // cycle index for random access, playback and export alike.
             const auto cycle = cycleOf(index, rate, cycleRate);
-            first = cycleStart(cycle, rate, cycleRate);
-            end = cycleStart(cycle + 1, rate, cycleRate);
+            std::int64_t span = maximumSpan;
+            for (std::int64_t k = 1; k <= maximumSpan; ++k) {
+                const auto window = cycle - ((cycle % k) + k) % k;
+                const auto windowFirst = cycleStart(window, rate, cycleRate);
+                const auto windowTime = advancing ? time - static_cast<double>(index - windowFirst) / rate : time;
+                if (spanFor(composition, windowTime, rate, cycleStart(window + 1, rate, cycleRate) - windowFirst, liveFrames) <= k) { span = k; break; }
+            }
+            const auto window = cycle - ((cycle % span) + span) % span;
+            first = cycleStart(window, rate, cycleRate);
+            end = cycleStart(window + span, rate, cycleRate);
+            planSpan = span;
         }
         // Per-sample transport time carries rounding; half a sample of drift is
         // the same cycle, anything more is a seek.
@@ -78,6 +95,7 @@ public:
             || std::abs(latched - planTime) > 0.5 / rate) {
             plan(composition, latched, first, end, rate, liveFrames);
             planGeneration = generation;
+            planCycleRate = cycleRate;
             planAdvancing = advancing;
         }
         return evaluate(composition, index, time, rate, advancing);
@@ -86,7 +104,8 @@ public:
     // Diagnostic view of the current plan, for tests and the editor meter.
     std::span<const Segment> plannedSegments() const { return {segments->data(), segmentCount}; }
     std::size_t plannedLayers() const { return layerCount; }
-    std::int64_t plannedInterleave() const { return interleaved; }
+    // Cycles the current plan spans: each layer refreshes once per span.
+    std::int64_t plannedInterleave() const { return planSpan; }
 
 private:
     struct Layer {
@@ -113,7 +132,7 @@ private:
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
         planned = true; planFirst = first; planEnd = end; planRate = rate; planTime = time;
-        segmentCount = 0; layerCount = 0; lastSegment = 0; interleaved = 1;
+        segmentCount = 0; layerCount = 0; lastSegment = 0;
         auto& items = *layers;
         for (const auto& clip : composition.clips) {
             if (layerCount == maximumLayers) { break; }
@@ -175,7 +194,6 @@ private:
         const auto travel = [&](const osci::Point& a, const osci::Point& b) {
             return std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(distance(a, b) * travelSecondsPerUnit * rate)));
         };
-        interleave(cycleOf(first, rate, composition.beamRate), total, dwell, travel(osci::Point(-1, 0, 0), osci::Point(1, 0, 0)));
         order();
         const auto entry = [&](std::size_t index) { return items[index].midi ? items[index].start : (reversedFlags[index] ? items[index].end : items[index].start); };
         const auto exit = [&](std::size_t index) { return items[index].midi ? items[index].start : (reversedFlags[index] ? items[index].start : items[index].end); };
@@ -250,27 +268,25 @@ private:
         hold(entry(0), end - cursor);
     }
 
-    // When complete strokes for every layer cannot fit in one cycle, layers
-    // take turns across k consecutive cycles: each is drawn whole at a lower
-    // refresh rate instead of every layer blanking out from undersampling.
-    void interleave(std::int64_t cycle, std::int64_t total, std::int64_t dwell, std::int64_t travel) {
-        auto& items = *layers;
-        double demand = 0;
-        for (std::size_t i = 0; i < layerCount; ++i) { demand += static_cast<double>(items[i].minimum + 2 * dwell + travel); }
-        const auto groups = std::min<std::int64_t>(maximumInterleave, static_cast<std::int64_t>(std::ceil(demand / static_cast<double>(std::max<std::int64_t>(1, total)))));
-        interleaved = std::max<std::int64_t>(1, groups);
-        if (interleaved <= 1) { return; }
-        const auto share = demand / static_cast<double>(interleaved);
-        const auto turn = ((cycle % interleaved) + interleaved) % interleaved;
-        std::size_t kept = 0;
-        double before = 0;
-        for (std::size_t i = 0; i < layerCount; ++i) {
-            const auto cost = static_cast<double>(items[i].minimum + 2 * dwell + travel);
-            const auto group = std::min<std::int64_t>(interleaved - 1, static_cast<std::int64_t>((before + cost * 0.5) / share));
-            before += cost;
-            if (group == turn) { items[kept++] = items[i]; }
+    // Cycles needed to draw every visible layer's complete strokes once,
+    // from minimum traversal budgets plus dwell and travel, capped at the
+    // maximum span. Cheap: no geometry is transformed.
+    static std::int64_t spanFor(const PreparedComposition& composition, double time, double rate, std::int64_t cycleSamples, const LiveSourceFrames* liveFrames) {
+        if (cycleSamples <= 0) { return 1; }
+        const auto dwell = std::max<std::int64_t>(1, static_cast<std::int64_t>(std::llround(dwellSeconds * rate)));
+        const auto jump = 2 * dwell + std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(travelSecondsPerUnit * rate)));
+        double demand = static_cast<double>(dwell);
+        std::size_t counted = 0;
+        for (const auto& clip : composition.clips) {
+            if (counted == maximumLayers) { break; }
+            if (!clip.active(time) || !(clip.weight(time) > 0)) { continue; }
+            const auto* source = clip.resolveSource(liveFrames);
+            if (source == nullptr || source->frameCount() == 0) { continue; }
+            const auto* drawing = clip.midi == nullptr ? source->drawingAt(source->frameIndex(clip.localTime(time))) : nullptr;
+            demand += static_cast<double>(std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2) + jump);
+            ++counted;
         }
-        layerCount = kept;
+        return std::clamp<std::int64_t>(static_cast<std::int64_t>(std::ceil(demand / static_cast<double>(cycleSamples))), 1, maximumSpan);
     }
 
     // Greedy nearest-neighbour order from the first layer, allowing either
@@ -370,10 +386,10 @@ private:
     std::unique_ptr<std::array<Layer, maximumLayers>> layers;
     std::array<bool, maximumLayers> reversedFlags{};
     std::size_t segmentCount = 0, layerCount = 0, lastSegment = 0;
-    std::int64_t interleaved = 1;
+    std::int64_t planSpan = 1;
     bool planned = false, planAdvancing = true;
     std::int64_t planFirst = 0, planEnd = 0;
-    double planRate = 0, planTime = 0;
+    double planRate = 0, planTime = 0, planCycleRate = 0;
     std::uint64_t planGeneration = 0;
 };
 }

@@ -171,7 +171,7 @@ private:
             editor.onBegin = [this, property] { beginGesture(property); };
             editor.onChange = [this, property](double value) { previewValue(property, value); };
             editor.onEnd = [this] { endGesture(); };
-            editor.onCancel = [this] { refresh(); };
+            editor.onCancel = [this] { cancelGesture(); refresh(); };
             editor.onCommit = [this, property](double value) { commitValue(property, value); };
             rows.back()->addAndMakeVisible(editor);
             rows.back()->fields.push_back(std::move(field));

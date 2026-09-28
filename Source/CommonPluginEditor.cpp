@@ -639,6 +639,7 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
             }
         }
     });
+    lastOfflineRenderSuccess = false;
     auto* existing = findActiveOverlay<OfflineRenderOverlay>();
     if (existing != nullptr) {
         existing->toFront(true);
@@ -688,6 +689,7 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
         }
 
         *resultHolder = r;
+        safeThis->lastOfflineRenderSuccess = r.success;
 
         if (r.success) {
             offlineRenderLog.completed();

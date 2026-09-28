@@ -562,6 +562,19 @@ void Document::edit(juce::String label, std::function<void(Project&)> operation)
     undo.perform(new Change(*this, state, std::move(after)));
 }
 
+void Document::editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation) {
+    const auto now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
+    const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0;
+    auto after = project();
+    operation(after);
+    after = mergeScope(std::move(after));
+    if (!joins) { undo.beginNewTransaction(label); }
+    undo.perform(new Change(*this, state, std::move(after)));
+    coalescingControl = control;
+    coalescingRevision = revision();
+    coalescingTime = now;
+}
+
 bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {
     auto after = project();
     if (!operation(after)) { return false; }
@@ -610,7 +623,9 @@ juce::Result Document::changeTempo(double bpm) {
                 if (effect.range.has_value()) { effect.range->start *= ratio; effect.range->duration *= ratio; }
             }
         };
-        for (auto& marker : next.markers) { marker.time *= ratio; }
+        // The composition keeps its length in bars as well.
+        next.duration *= ratio;
+        for (auto& marker : next.markers) { marker.time = std::min(marker.time * ratio, next.duration); }
         for (auto& cut : next.cameraCuts) {
             const auto end = cut.end() * ratio;
             cut.start *= ratio;
@@ -741,7 +756,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
     double first = std::numeric_limits<double>::infinity();
     for (const auto& copied : clips) {
         if (!copied.clip.valid()) { return juce::Result::fail("A copied clip is no longer valid."); }
-        if (copied.clip.asset != 0 && std::none_of(state.assets.begin(), state.assets.end(), [&](const auto& asset) { return asset->id == copied.clip.asset; })) {
+        if (copied.clip.asset != 0 && std::none_of(state.assets.begin(), state.assets.end(), [&](const auto& asset) { return asset != nullptr && asset->id == copied.clip.asset; })) {
             return juce::Result::fail("A copied clip's source is not in this composition.");
         }
         if (copied.clip.composition != 0 && !canReferenceComposition(copied.clip.composition)) {

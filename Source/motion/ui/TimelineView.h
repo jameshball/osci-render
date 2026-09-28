@@ -324,7 +324,7 @@ public:
         const auto kind = (*asset)->audio != nullptr ? motion::TrackKind::audio : motion::TrackKind::visual;
         auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
         const auto id = clip.id;
-        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip, 0, project.bpm))) {
+        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].locked || project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip, 0, project.bpm))) {
             return;
         }
         const auto trackId = processor.document.newId();

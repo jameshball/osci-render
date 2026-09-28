@@ -281,7 +281,9 @@ struct PreparedComposition {
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
         if (preparationError.isNotEmpty()) { clips.clear(); return; }
-        attachSoundtrack(cancel);
+        // Editor geometry is rebuilt during drags; loudness modulation only
+        // matters to the signal, so the envelope is built there alone.
+        if (purpose == CompositionPurpose::signal) { attachSoundtrack(cancel); }
     }
 
     // Geometry probe: the beam allocation at one phase of a static multiplexed

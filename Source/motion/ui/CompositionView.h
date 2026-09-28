@@ -245,6 +245,12 @@ public:
             return;
         }
         if (!validGesture() || !gizmoAtDown.has_value()) { return; }
+        if (!dragStarted) {
+            if (event.getDistanceFromDragStart() < 3) { return; }
+            dragStarted = true;
+            processor.playing.store(false);
+            if (!pathKey.has_value()) { processor.seek(editTime); }
+        }
         std::array<double, 3> offsets { 0, 0, 0 };
         double scaleFactor = 1;
         if (gesture == Gesture::plane || gesture == Gesture::moveAxis) {
@@ -315,7 +321,7 @@ public:
         if (validGesture()) {
             if (changed) {
                 processor.document.commit(tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object", std::move(*before));
-            } else {
+            } else if (dragStarted) {
                 processor.document.preview(std::move(*before));
             }
             before.reset();
@@ -449,6 +455,7 @@ private:
         return true;
     }
     enum class Gesture { plane, moveAxis, rotateAxis, scaleAxis, uniformScale };
+    bool dragStarted = false;
     bool editable(double time) const {
         const auto& project = processor.document.project();
         for (const auto& track : project.tracks) {
@@ -484,13 +491,14 @@ private:
             dragHint = "Use the inspector for modulated or effected results";
             return false;
         }
-        processor.playing.store(false);
-        if (!pathKey.has_value()) { processor.seek(time); }
+        // A plain click only selects: playback stops and the document is
+        // touched only once the pointer actually drags.
         editTime = time;
         editSelection = selected;
         before = processor.document.project();
         editRevision = processor.document.revision();
         changed = false;
+        dragStarted = false;
         return true;
     }
     void timerCallback() override {

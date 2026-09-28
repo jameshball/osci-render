@@ -352,7 +352,8 @@ private:
             processor.document.preview(std::move(project));
             gesture->revision = processor.document.revision();
         } else {
-            processor.document.edit(key ? "Key effect parameter" : "Change effect parameter", operation);
+            if (key) { processor.document.edit("Key effect parameter", operation); }
+            else { processor.document.editCoalesced("Change effect parameter", "effect:" + juce::String(id) + ":" + juce::String(property), operation); }
         }
         if (onPropertySelected) { onPropertySelected(id, property); }
     }

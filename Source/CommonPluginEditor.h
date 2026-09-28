@@ -24,7 +24,7 @@ public:
     CommonPluginEditor(CommonAudioProcessor&, juce::String appName, juce::String projectFileType, int width, int height);
     ~CommonPluginEditor() override;
 
-    void handleCommandLine(const juce::String& commandLine);
+    virtual void handleCommandLine(const juce::String& commandLine);
     bool openFile(const juce::File& file);
     void initialiseMenuBar(juce::MenuBarModel& menuBarModel);
     virtual void openProject(const juce::File& file);
@@ -67,6 +67,8 @@ protected:
     // Completion retains caller resources until the worker and OpenGL renderer
     // have stopped. It also runs on failed launch/editor teardown: cleanup only.
     std::shared_ptr<OfflineVisualiserParameters> captureOfflineVisualiserParameters();
+    // True when the most recent offline render finished successfully.
+    bool lastOfflineRenderSucceeded() const { return lastOfflineRenderSuccess; }
     bool startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void()> completion = {}, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot = nullptr);
 #endif
     virtual bool openSourceFile(const juce::File& file) = 0;
@@ -117,6 +119,7 @@ public:
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
+    bool lastOfflineRenderSuccess = false;
     juce::SharedResourcePointer<CustomTooltipWindow> tooltipWindow;
 
     osci::UndoRedoComponent undoRedoControls{
