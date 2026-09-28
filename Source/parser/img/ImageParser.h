@@ -38,7 +38,7 @@ private:
     float getPixelValue(int x, int y, bool invert);
     void findWhite(double thresholdPow, bool invert);
     bool isOverThreshold(float pixel, float thresholdValue);
-    int jumpFrequency();
+    static int jumpFrequency(double sampleRate);
     void handleError(juce::String message);
     void processGifFile(juce::File& file);
     void processImageFile(juce::File& file);

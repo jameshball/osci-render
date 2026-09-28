@@ -44,6 +44,20 @@ public:
         return processor != nullptr && processor->invertImage->getValue();
     }
 
+    ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const override {
+        juce::SpinLock::ScopedLockType scope(ownerLock);
+        if (processor == nullptr) {
+            return {};
+        }
+        const auto index = static_cast<size_t>(blockSampleIndex);
+        ImageSampleSettings settings;
+        settings.sampleRate = processor->currentSampleRate.load();
+        settings.threshold = processor->imageThreshold->getAnimatedValue(0, index);
+        settings.stride = static_cast<int>(processor->imageStride->getAnimatedValue(0, index));
+        settings.inverted = processor->invertImage->getValue() != 0.0f;
+        return settings;
+    }
+
     int getFractalDepth() const override {
         juce::SpinLock::ScopedLockType scope(ownerLock);
 #if OSCI_PREMIUM

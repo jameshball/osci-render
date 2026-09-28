@@ -178,6 +178,11 @@
                 file="Source/parser/lottie/LottieParser.cpp"/>
           <FILE id="lTsP02" name="LottieParser.h" compile="0" resource="0" file="Source/parser/lottie/LottieParser.h"/>
         </GROUP>
+        <GROUP id="{B7E30008-2D78-4CD2-9195-222222222222}" name="img">
+          <FILE id="iTsP01" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
+          <FILE id="iTsP02" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
+          <FILE id="iTsG01" name="gifdec.c" compile="1" resource="0" file="modules/gifdec/gifdec.c"/>
+        </GROUP>
       </GROUP>
     </GROUP>
     <GROUP id="{C3D4E5F6-A7B8-9012-CDEF-123456789012}" name="Tests">
@@ -216,6 +221,8 @@
             file="tests/ObjLoadingTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"
             file="tests/LottieParserTests.cpp"/>
+      <FILE id="ImgSvT" name="ImageParserServicesTest.cpp" compile="1" resource="0"
+            file="tests/ImageParserServicesTest.cpp"/>
       <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"
             file="tests/UndoRedoTests.cpp"/>
       <FILE id="LuBnH" name="LuaBenchmarkHelpers.h" compile="0" resource="0"

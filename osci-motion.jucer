@@ -12,7 +12,6 @@
   <MAINGROUP id="j5Ge2T" name="osci-motion">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{42A9EAA7-6D00-065D-0F8B-755E9B552173}" name="audio">
-        <FILE id="bv80Wk" name="sosci.flac" compile="0" resource="1" file="Resources/audio/sosci.flac"/>
         <FILE id="MotPrepState" name="PreparedState.h" compile="0" resource="0"
               file="Source/audio/PreparedState.h"/>
       </GROUP>
@@ -26,13 +25,6 @@
         <FILE id="SBWt8K" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
               file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
-      <GROUP id="{525C568C-29E9-D0A2-9773-8A04981C5575}" name="images">
-        <FILE id="vNhqT4" name="sosci_logo.png" compile="0" resource="1" file="Resources/images/sosci_logo.png"/>
-        <FILE id="CeSRLV" name="sosci_mac_saturated.png" compile="0" resource="1"
-              file="Resources/images/sosci_mac_saturated.png"/>
-        <FILE id="KigaoN" name="sosci_win_saturated.png" compile="0" resource="1"
-              file="Resources/images/sosci_win_saturated.png"/>
-      </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
         <FILE id="ZgcesA" name="no_reflection.jpg" compile="0" resource="1"
@@ -45,15 +37,6 @@
               file="Resources/oscilloscope/vector_display.png"/>
         <FILE id="IiqBke" name="vector_display_reflection.png" compile="0"
               resource="1" file="Resources/oscilloscope/vector_display_reflection.png"/>
-      </GROUP>
-      <GROUP id="{08DE8F94-4A00-7C71-4AF3-4C34C821A5DF}" name="sosci">
-        <FILE id="jtOYDo" name="clean.sosci" compile="0" resource="1" file="Resources/sosci/clean.sosci"/>
-        <FILE id="AHn0sU" name="default.sosci" compile="0" resource="1" file="Resources/sosci/default.sosci"/>
-        <FILE id="nisXT4" name="rainbow.sosci" compile="0" resource="1" file="Resources/sosci/rainbow.sosci"/>
-        <FILE id="OxpU7u" name="real_oscilloscope.sosci" compile="0" resource="1"
-              file="Resources/sosci/real_oscilloscope.sosci"/>
-        <FILE id="LDoLqS" name="vector_display.sosci" compile="0" resource="1"
-              file="Resources/sosci/vector_display.sosci"/>
       </GROUP>
       <GROUP id="{82BCD6F1-A8BF-F30B-5587-81EE70168883}" name="svg">
         <FILE id="YzPzNV" name="bit-crush.svg" compile="0" resource="1" file="Resources/svg/bit-crush.svg"/>
@@ -117,10 +100,6 @@
       </GROUP>
     </GROUP>
     <GROUP id="{75439074-E50C-362F-1EDF-8B4BE9011259}" name="Source">
-      <GROUP id="{B1C2D3E4-5F67-8901-2345-678901234567}" name="gifdec">
-        <FILE id="xwx39V" name="gifdec.c" compile="1" resource="0" file="modules/gifdec/gifdec.c"/>
-        <FILE id="PkBzDR" name="gifdec.h" compile="0" resource="0" file="modules/gifdec/gifdec.h"/>
-      </GROUP>
       <GROUP id="{D3E4F5A6-7B89-0123-4567-890123456789}" name="thorvg">
         <FILE id="tvgHdrA" name="thorvg.h" compile="0" resource="0" file="modules/thorvg/inc/thorvg.h"/>
         <FILE id="tvgCfg1" name="config.h" compile="0" resource="0" file="Source/thorvg-config/config.h"/>
@@ -198,15 +177,9 @@
               resource="0" file="modules/Clipper2/CPP/Clipper2Lib/src/clipper.rectclip.cpp"/>
       </GROUP>
       <GROUP id="{2AE40B10-2C85-6401-644A-D5F36BCC5BC1}" name="parser">
-        <FILE id="q22Fiw" name="FileParser.cpp" compile="1" resource="0" file="Source/parser/FileParser.cpp"/>
-        <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
         <FILE id="FmtReg1" name="FileFormatRegistry.h" compile="0" resource="0"
               file="Source/parser/FileFormatRegistry.h"/>
         <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla"/>
-        <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
-          <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
-          <FILE id="ibvT5B" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
-        </GROUP>
         <GROUP id="{56A27063-1FE7-31C3-8263-98389240A8CB}" name="svg"/>
         <GROUP id="{9A3C1F4E-4B12-4E6B-8A7D-2F6E11C5D901}" name="lottie">
           <FILE id="DotLot1" name="DotLottieArchive.cpp" compile="1" resource="0"
@@ -449,8 +422,8 @@
                JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"
                JUCE_USE_XRENDER="1"/>
   <EXPORTFORMATS>
-    <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="KigaoN"
-                bigIcon="KigaoN" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender"
+    <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="MotionIcon"
+                bigIcon="MotionIcon" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender"
                 extraLinkerFlags="-Wl,--wrap=eglChooseConfig,--wrap=eglInitialize,--wrap=eglTerminate">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="../../../modules/osci_scripting/third_party/LuaJIT/src&#10;../../../Source/thorvg-config&#10;../../../modules/thorvg/inc&#10;../../../modules/thorvg/src&#10;../../../modules/thorvg/src/common&#10;../../../modules/thorvg/src/renderer&#10;../../../modules/thorvg/src/loaders&#10;../../../modules/thorvg/src/loaders/lottie&#10;../../../modules/thorvg/src/loaders/lottie/rapidjson&#10;../../../modules/thorvg/src/loaders/raw&#10;../../../modules/Clipper2/CPP/Clipper2Lib/include"
@@ -496,8 +469,8 @@
         <MODULEPATH id="osci_scripting" path="modules"/>
       </MODULEPATHS>
     </LINUX_MAKE>
-    <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="KigaoN"
-            bigIcon="KigaoN" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
+    <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="MotionIcon"
+            bigIcon="MotionIcon" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
             externalLibraries="luajit51.lib" extraLinkerFlags="/IGNORE:4006">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
@@ -547,8 +520,8 @@
       </MODULEPATHS>
     </VS2022>
     <XCODE_MAC targetFolder="Builds/osci-motion/MacOSX" extraLinkerFlags="-Wl,-weak_reference_mismatches,weak -framework IOSurface"
-               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="CeSRLV"
-               bigIcon="CeSRLV" applicationCategory="public.app-category.music"
+               extraDefs="JUCE_SILENCE_XCODE_15_LINKER_WARNING=1" smallIcon="MotionIcon"
+               bigIcon="MotionIcon" applicationCategory="public.app-category.music"
                microphonePermissionNeeded="1" hardenedRuntime="1" hardenedRuntimeOptions="com.apple.security.cs.allow-jit,com.apple.security.cs.allow-unsigned-executable-memory,com.apple.security.cs.disable-library-validation,com.apple.security.device.audio-input"
                iosDevelopmentTeamID="D86A3M3H2L" customPList="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&#10;&#10;&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;&#10;&lt;plist&gt;&#10;  &lt;dict&gt;&#10;    &lt;key&gt;NSAudioCaptureUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs permission to capture audio from other applications for visualization.&lt;/string&gt;&#10;    &lt;key&gt;NSBluetoothAlwaysUsageDescription&lt;/key&gt;&#10;    &lt;string&gt;osci-motion needs Bluetooth access to connect to Bluetooth MIDI devices.&lt;/string&gt;&#10;  &lt;/dict&gt;&#10;&lt;/plist&gt;&#10;"
                externalLibraries="luajit">

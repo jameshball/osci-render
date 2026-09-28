@@ -17,6 +17,19 @@ public:
     virtual bool getImageInverted() const = 0;
     virtual int getFractalDepth() const = 0;
 
+    struct ImageSampleSettings {
+        double sampleRate = 44100.0;
+        float threshold = 0.0f;
+        int stride = 1;
+        bool inverted = false;
+    };
+
+    // Everything an image source reads per sample, fetched in one call so
+    // implementations can take any owner lock once per sample.
+    virtual ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const {
+        return { getSampleRate(), getImageThreshold(blockSampleIndex), getImageStride(blockSampleIndex), getImageInverted() };
+    }
+
     virtual juce::File getFFmpegFile() const = 0;
     virtual void ensureFFmpegExists(std::function<void()> ready) = 0;
     virtual void showError(juce::String title, juce::String message) = 0;

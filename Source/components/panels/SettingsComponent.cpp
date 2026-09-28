@@ -646,12 +646,12 @@ void SettingsComponent::timerCallback() {
 
     // Send flow markers for the currently active envelope tab
     int activeEnv = envelope.getActiveEnvIndex();
-    constexpr int kMax = OscirenderAudioProcessor::kMaxUiVoices;
+    constexpr int kMax = VoiceTelemetry::kMaxUiVoices;
     double times[kMax];
     bool anyActive = false;
     for (int i = 0; i < kMax; ++i) {
-        if (audioProcessor.uiVoiceEnvActive[activeEnv][i].load(std::memory_order_relaxed)) {
-            times[i] = audioProcessor.uiVoiceEnvTimeSeconds[activeEnv][i].load(std::memory_order_relaxed);
+        if (audioProcessor.getVoiceTelemetry().uiVoiceEnvActive[activeEnv][i].load(std::memory_order_relaxed)) {
+            times[i] = audioProcessor.getVoiceTelemetry().uiVoiceEnvTimeSeconds[activeEnv][i].load(std::memory_order_relaxed);
             anyActive = true;
         } else {
             times[i] = -1.0;

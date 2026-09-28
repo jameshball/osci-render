@@ -87,7 +87,7 @@ private:
 
 /**
  */
-class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient, public VoiceContext, public VoiceTelemetry
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient, public VoiceContext
 #if JucePlugin_Enable_ARA
     ,
                                  public juce::AudioProcessorARAExtension
@@ -97,6 +97,8 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
     // Declared first so unhosted parameters outlive every modulation source and consumer.
     juce::OwnedArray<juce::AudioProcessorParameter> unhostedModulationParameters;
 #endif
+    // Declared before the synth so voice telemetry outlives every voice.
+    VoiceTelemetry voiceTelemetry;
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
@@ -164,7 +166,7 @@ public:
     DahdsrParams getCurrentDahdsrParams(int envIndex) const;
 
     VoiceParameters getVoiceParameters() override;
-    VoiceTelemetry& getVoiceTelemetry() override { return *this; }
+    VoiceTelemetry& getVoiceTelemetry() override { return voiceTelemetry; }
     VoiceEffectMap cloneVoiceEffectInstances() override;
     double getVoiceSampleRate() override { return getEffectiveSampleRate(); }
     const osci::DawPosition& getVoiceTransport() const override { return dawPosition; }

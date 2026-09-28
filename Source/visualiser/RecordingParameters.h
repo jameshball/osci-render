@@ -8,6 +8,8 @@ class RecordingParameters {
 public:
     RecordingParameters();
     int getCRF() const;
+    // Quality value whose getCRF() result is exactly crf (1-51).
+    static float qualityForCRF(int crf);
 
 private:
 
