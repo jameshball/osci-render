@@ -682,6 +682,57 @@ juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
     return result;
 }
 
+std::size_t Document::assetUses(Id assetId) const {
+    const auto& whole = mainProject();
+    auto count = sourceReferenceCount(whole, assetId);
+    const auto midi = [&](const auto& composition) {
+        for (const auto& track : composition.tracks) {
+            for (const auto& clip : track.clips) { if (clip.midiAsset == assetId && assetId != 0) { ++count; } }
+        }
+    };
+    midi(whole);
+    for (const auto& definition : whole.definitions) { if (definition != nullptr) { midi(*definition); } }
+    return count;
+}
+
+juce::Result Document::renameAsset(Id assetId, juce::String name) {
+    name = name.trim();
+    if (name.isEmpty() || name.length() > 200 || name.containsAnyOf("\r\n")) { return juce::Result::fail("Use a source name of 1-200 characters on one line."); }
+    const auto& assets = mainProject().assets;
+    const auto found = std::find_if(assets.begin(), assets.end(), [assetId](const auto& asset) { return asset != nullptr && asset->id == assetId; });
+    if (found == assets.end()) { return juce::Result::fail("The source no longer exists."); }
+    if ((*found)->name == name) { return juce::Result::ok(); }
+    edit("Rename source", [assetId, name](Project& project) {
+        for (auto& asset : project.assets) {
+            if (asset != nullptr && asset->id == assetId) {
+                auto renamed = std::make_shared<Asset>(*asset);
+                renamed->name = name;
+                asset = std::move(renamed);
+            }
+        }
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::removeUnusedAssets(std::vector<Id> assetIds, int& removed) {
+    removed = 0;
+    const auto& assets = mainProject().assets;
+    if (assetIds.empty()) {
+        for (const auto& asset : assets) { if (asset != nullptr) { assetIds.push_back(asset->id); } }
+    }
+    std::set<Id> unused;
+    for (const auto id : assetIds) {
+        if (std::none_of(assets.begin(), assets.end(), [id](const auto& asset) { return asset != nullptr && asset->id == id; })) { continue; }
+        if (assetUses(id) == 0) { unused.insert(id); }
+    }
+    if (unused.empty()) { return juce::Result::fail("Only sources that no clip uses can be removed."); }
+    removed = static_cast<int>(unused.size());
+    edit(unused.size() > 1 ? "Remove unused sources" : "Remove source", [&unused](Project& project) {
+        std::erase_if(project.assets, [&](const auto& asset) { return asset != nullptr && unused.contains(asset->id); });
+    });
+    return juce::Result::ok();
+}
+
 juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double time, std::vector<Id>& pastedIds) {
     pastedIds.clear();
     const auto& state = project();

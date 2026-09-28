@@ -29,9 +29,27 @@ public:
         assignMidi.setButtonText("Assign to selected clip");
         assignMidi.onClick = [this] { insert(list.getSelectedRow()); };
         addChildComponent(assignMidi);
+        search.setName("Search sources");
+        search.setTextToShowWhenEmpty("Search sources", osci::Colours::textMuted());
+        search.setFont(juce::Font(juce::FontOptions(12.0f)));
+        search.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+        search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        search.setIndents(8, 5);
+        search.onTextChange = [this] { refresh(); };
+        search.onEscapeKey = [this] { search.clear(); refresh(); };
+        addAndMakeVisible(search);
+        rename.setName("Rename source");
+        rename.setFont(juce::Font(juce::FontOptions(13.0f)));
+        rename.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+        rename.onReturnKey = [this] { finishRename(true); };
+        rename.onEscapeKey = [this] { finishRename(false); };
+        rename.onFocusLost = [this] { finishRename(true); };
+        addChildComponent(rename);
         setError({});
         refresh();
     }
+    std::function<void(motion::Id)> onSelectUses;
+    std::function<void(const juce::String&)> onMessage;
 
     std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition;
     std::function<void()> onCancelImport;
@@ -50,8 +68,15 @@ public:
 
     void refresh() {
         const auto selectedId = assetId(list.getSelectedRow());
-        assets = document.project().assets;
-        definitions = document.mainProject().definitions;
+        const auto filter = search.getText().trim();
+        assets.clear();
+        definitions.clear();
+        for (const auto& asset : document.project().assets) {
+            if (asset != nullptr && (filter.isEmpty() || asset->name.containsIgnoreCase(filter))) { assets.push_back(asset); }
+        }
+        for (const auto& definition : document.mainProject().definitions) {
+            if (definition != nullptr && (filter.isEmpty() || juce::String(definition->name).containsIgnoreCase(filter))) { definitions.push_back(definition); }
+        }
         list.updateContent();
         list.deselectAllRows();
         selectAsset(selectedId);
@@ -99,6 +124,8 @@ public:
 
     void resized() override {
         auto area = getLocalBounds();
+        search.setBounds(area.removeFromTop(26).reduced(4, 1));
+        area.removeFromTop(4);
         if (cancelImport.isVisible()) {
             cancelImport.setBounds(area.removeFromBottom(30).reduced(6, 2));
         }
@@ -170,6 +197,7 @@ private:
     }
 
     void listBoxItemClicked(int row, const juce::MouseEvent& event) override {
+        if (event.mods.isPopupMenu() && validAssetRow(row)) { showSourceMenu(row); return; }
         if (!event.mods.isPopupMenu() || !definitionRow(row)) { return; }
         const auto id = assetId(row);
         const auto generation = document.generation();
@@ -189,6 +217,51 @@ private:
         });
     }
 
+    void showSourceMenu(int row) {
+        list.selectRow(row);
+        const auto id = assetId(row);
+        const auto uses = document.assetUses(id);
+        const auto generation = document.generation();
+        juce::PopupMenu menu;
+        menu.addSectionHeader(assets[static_cast<std::size_t>(row)]->name);
+        menu.addItem(1, "Insert at playhead");
+        menu.addItem(2, "Rename...");
+        menu.addItem(3, uses == 0 ? "Not used by any clip" : "Select " + juce::String(static_cast<int>(uses)) + (uses == 1 ? " clip using it" : " clips using it"), uses != 0);
+        menu.addSeparator();
+        menu.addItem(4, uses == 0 ? "Remove source" : "Remove source (in use)", uses == 0);
+        menu.addItem(5, "Remove all unused sources");
+        const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, row, generation](int result) {
+            if (owner == nullptr || result == 0 || owner->document.generation() != generation) { return; }
+            if (result == 1 && owner->onInsert) { owner->onInsert(id); }
+            if (result == 2) { owner->beginRename(row); }
+            if (result == 3 && owner->onSelectUses) { owner->onSelectUses(id); }
+            if (result == 4 || result == 5) {
+                int removed = 0;
+                const auto outcome = owner->document.removeUnusedAssets(result == 4 ? std::vector<motion::Id>{id} : std::vector<motion::Id>{}, removed);
+                if (owner->onMessage) {
+                    owner->onMessage(outcome.failed() ? outcome.getErrorMessage() : "Removed " + juce::String(removed) + (removed == 1 ? " unused source." : " unused sources."));
+                }
+            }
+        });
+    }
+    void beginRename(int row) {
+        if (!validAssetRow(row)) { return; }
+        renaming = assetId(row);
+        rename.setText(assets[static_cast<std::size_t>(row)]->name, juce::dontSendNotification);
+        rename.setBounds(list.getRowPosition(row, true).translated(list.getX(), list.getY()).reduced(8, 10).withHeight(24));
+        rename.setVisible(true);
+        rename.grabKeyboardFocus();
+        rename.selectAll();
+    }
+    void finishRename(bool accept) {
+        if (!rename.isVisible()) { return; }
+        rename.setVisible(false);
+        const auto id = std::exchange(renaming, 0);
+        if (!accept) { return; }
+        const auto result = document.renameAsset(id, rename.getText());
+        if (result.failed() && onMessage) { onMessage(result.getErrorMessage()); }
+    }
     void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override { insert(row); }
     void returnKeyPressed(int row) override { insert(row); }
 
@@ -218,6 +291,8 @@ private:
     std::vector<std::shared_ptr<const motion::Asset>> assets;
     std::vector<std::shared_ptr<const motion::CompositionDefinition>> definitions;
     juce::ListBox list;
+    juce::TextEditor search, rename;
+    motion::Id renaming = 0;
     juce::Label status;
     juce::TextButton cancelImport, bakeSettings, assignMidi;
     juce::String importStatus, errorMessage;

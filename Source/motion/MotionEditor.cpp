@@ -443,6 +443,16 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             });
     };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
+    assetLibrary.onMessage = [this](const juce::String& message) { statusBar.show(message, message.startsWith("Removed") ? MotionStatusBar::Kind::notice : MotionStatusBar::Kind::warning); };
+    assetLibrary.onSelectUses = [this](motion::Id id) {
+        std::vector<motion::Id> clips;
+        for (const auto& track : processor.document.project().tracks) {
+            for (const auto& clip : track.clips) { if (clip.asset == id || clip.midiAsset == id) { clips.push_back(clip.id); } }
+        }
+        timelineTabs.setSelectedIndex(0);
+        timeline.selectClips(clips);
+        if (clips.empty()) { statusBar.show("This source is only used inside other compositions.", MotionStatusBar::Kind::notice); }
+    };
     assetLibrary.onInsert = [this](motion::Id id) { timeline.insertAsset(id, -1, -1); };
     assetLibrary.liveStatus = [this](motion::Id id) { return processor.blenderInputs().statusText(id); };
     assetLibrary.onBake = [this](motion::Id id) {

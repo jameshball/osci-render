@@ -124,6 +124,11 @@ public:
     juce::Result removeClips(const std::vector<Id>& clipIds, bool ripple = false);
     juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
     juce::Result assignMidi(Id clipId, Id assetId);
+    juce::Result renameAsset(Id assetId, juce::String name);
+    // Removes the listed sources (or every unused source when empty) that no
+    // clip, composition or MIDI assignment references; one undo step.
+    juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);
+    std::size_t assetUses(Id assetId) const;
     juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
     // Guarded by the clip's current notes, not the global revision, so edits
     // elsewhere during a take do not discard it.

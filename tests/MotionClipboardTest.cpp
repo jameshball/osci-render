@@ -116,6 +116,26 @@ public:
             expectWithinAbsoluteError(f.document.project().markers[0].time, 3.0, 1e-12);
         }
 
+        beginTest("Sources rename and only unused sources can be removed, in one undo step");
+        {
+            Fixture f; f.initialise();
+            auto spare = std::make_shared<motion::Asset>(*f.document.project().assets[0]);
+            spare->id = f.document.newId(); spare->name = "spare.obj";
+            const auto used = f.document.project().assets[0]->id;
+            f.document.edit("Add spare", [spare](motion::Project& project) { project.assets.push_back(spare); });
+            expect(f.document.assetUses(used) == 2 && f.document.assetUses(spare->id) == 0);
+            expect(f.document.renameAsset(spare->id, "  Spare shape  ").wasOk());
+            expect(f.document.project().assets[1]->name == "Spare shape");
+            expect(f.document.renameAsset(spare->id, "").failed());
+            int removed = 0;
+            expect(f.document.removeUnusedAssets({used}, removed).failed() && removed == 0, "A used source is kept");
+            expect(f.document.removeUnusedAssets({}, removed).wasOk() && removed == 1);
+            expectEquals(static_cast<int>(f.document.project().assets.size()), 1);
+            expect(f.undo.getUndoDescription() == "Remove source");
+            expect(f.undo.undo());
+            expectEquals(static_cast<int>(f.document.project().assets.size()), 2);
+        }
+
         beginTest("Locked tracks reject pasted keys without an undo step");
         {
             Fixture f; f.initialise();
