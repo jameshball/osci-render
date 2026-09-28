@@ -42,9 +42,7 @@ struct Camera {
                 return false;
             }
             for (const auto& key : found->second.keyframes()) {
-                if (!std::isfinite(key.time) || !validValue(key.value) || !std::isfinite(key.incomingSlope)
-                    || !std::isfinite(key.outgoingSlope) || static_cast<int>(key.interpolation) < 0
-                    || static_cast<int>(key.interpolation) > 3) {
+                if (!key.valid() || !validValue(key.value)) {
                     return false;
                 }
             }

@@ -359,6 +359,8 @@ void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& 
         point->setAttribute("interpolation", static_cast<int>(key.interpolation));
         point->setAttribute("in", exactBakeNumber(key.incomingSlope));
         point->setAttribute("out", exactBakeNumber(key.outgoingSlope));
+        if (key.incomingInfluence != Keyframe::defaultInfluence) { point->setAttribute("inInfluence", exactBakeNumber(key.incomingInfluence)); }
+        if (key.outgoingInfluence != Keyframe::defaultInfluence) { point->setAttribute("outInfluence", exactBakeNumber(key.outgoingInfluence)); }
     }
 }
 
@@ -398,7 +400,8 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
         }
         try {
             curve.setKey({ point->getDoubleAttribute("time"), point->getDoubleAttribute("value"),
-                static_cast<Interpolation>(interpolation), point->getDoubleAttribute("in"), point->getDoubleAttribute("out") });
+                static_cast<Interpolation>(interpolation), point->getDoubleAttribute("in"), point->getDoubleAttribute("out"),
+                point->getDoubleAttribute("inInfluence", Keyframe::defaultInfluence), point->getDoubleAttribute("outInfluence", Keyframe::defaultInfluence) });
         } catch (const std::invalid_argument&) {
             return juce::Result::fail("Invalid animation key.");
         }

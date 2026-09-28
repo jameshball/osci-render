@@ -259,10 +259,15 @@ public:
             if (!std::isfinite(slope)) {
                 return;
             }
+            // Horizontal handle distance is the Bezier time influence.
+            const auto span = segmentSpan(drag->originalCurve, key, drag->mode);
+            const auto influence = span != 0 ? std::clamp(std::abs(localDelta / span), 0.02, 1.0) : motion::Keyframe::defaultInfluence;
             if (drag->mode == DragMode::incoming) {
                 key.incomingSlope = slope;
+                key.incomingInfluence = event.mods.isAltDown() ? key.incomingInfluence : influence;
             } else {
                 key.outgoingSlope = slope;
+                key.outgoingInfluence = event.mods.isAltDown() ? key.outgoingInfluence : influence;
             }
         } else {
             const auto originalProjectTime = clip->start + (key.time - clip->offset) / clip->rate;
@@ -464,35 +469,33 @@ private:
     juce::Point<float> keyPoint(const motion::PropertyTarget& clip, const motion::Keyframe& key) const {
         return { timeX(clip.start + (key.time - clip.offset) / clip.rate), valueY(key.value) };
     }
+    // Signed content-time length of the segment a handle belongs to, or 0.
+    static double segmentSpan(const motion::Curve& curve, const motion::Keyframe& key, DragMode mode) {
+        const auto& keys = curve.keyframes();
+        const auto found = std::lower_bound(keys.begin(), keys.end(), key.time, [](const auto& item, double time) { return item.time < time; });
+        if (found == keys.end()) { return 0; }
+        if (mode == DragMode::incoming) { return found == keys.begin() ? 0 : (found - 1)->time - key.time; }
+        return found + 1 == keys.end() ? 0 : (found + 1)->time - key.time;
+    }
+    // Handles sit on the true Bezier control points of cubic segments.
     std::optional<juce::Point<float>> tangentPoint(const motion::PropertyTarget& clip, const motion::Curve& curve, const motion::Keyframe& key, DragMode mode) const {
         const auto& keys = curve.keyframes();
         const auto found = std::lower_bound(keys.begin(), keys.end(), key.time, [](const auto& item, double time) { return item.time < time; });
         if (found == keys.end()) {
             return std::nullopt;
         }
-        double span = 0.0;
-        if (mode == DragMode::incoming) {
-            if (found == keys.begin() || (found - 1)->interpolation != motion::Interpolation::cubic) {
-                return std::nullopt;
-            }
-            span = (found - 1)->time - key.time;
-        } else {
-            if (key.interpolation != motion::Interpolation::cubic || found + 1 == keys.end()) {
-                return std::nullopt;
-            }
-            span = (found + 1)->time - key.time;
+        if (mode == DragMode::incoming && (found == keys.begin() || (found - 1)->interpolation != motion::Interpolation::cubic)) {
+            return std::nullopt;
         }
-        // Limit handles to one third of their segment and 48 screen pixels.
-        // Slopes remain value per content-local second, including stretched clips.
+        if (mode == DragMode::outgoing && (key.interpolation != motion::Interpolation::cubic || found + 1 == keys.end())) {
+            return std::nullopt;
+        }
+        const auto span = segmentSpan(curve, key, mode);
         const auto slope = mode == DragMode::incoming ? key.incomingSlope : key.outgoingSlope;
-        auto delta = span / 3.0;
+        const auto delta = span * (mode == DragMode::incoming ? key.incomingInfluence : key.outgoingInfluence);
         const auto xScale = (plot().getWidth() / (viewEnd - viewStart)) / clip.rate;
         const auto yScale = plot().getHeight() / (high - low);
-        const auto length = std::hypot(delta * xScale, slope * delta * yScale);
-        if (!std::isfinite(length)) { return std::nullopt; }
-        if (length > 48.0) {
-            delta *= 48.0 / length;
-        }
+        if (!std::isfinite(delta * xScale) || !std::isfinite(slope * delta * yScale)) { return std::nullopt; }
         const auto centre = keyPoint(clip, key);
         return juce::Point<float>(centre.x + static_cast<float>(delta * xScale), centre.y - static_cast<float>(slope * delta * yScale));
     }
@@ -598,7 +601,7 @@ private:
         juce::PopupMenu menu;
         menu.setLookAndFeel(&getLookAndFeel());
         menu.addSectionHeader("Outgoing segment");
-        const char* labels[] = { "Hold", "Linear", "Smooth", "Cubic" };
+        const char* labels[] = { "Hold", "Linear", "Auto", "Bezier" };
         for (int i = 0; i < 4; ++i) {
             menu.addItem(i + 1, labels[i], true, static_cast<int>(key->interpolation) == i);
         }
@@ -620,7 +623,19 @@ private:
                 const auto* found = target != nullptr ? findKey(*target, time) : nullptr;
                 if (found != nullptr) {
                     auto updated = *found;
-                    updated.interpolation = static_cast<motion::Interpolation>(result - 1);
+                    const auto next = static_cast<motion::Interpolation>(result - 1);
+                    const auto& keys = target->keyframes();
+                    const auto index = static_cast<std::size_t>(found - keys.data());
+                    // Bezier handles start on the automatic tangents: the shape holds.
+                    if (next == motion::Interpolation::cubic && updated.interpolation != motion::Interpolation::cubic && index + 1 < keys.size()) {
+                        auto following = keys[index + 1];
+                        updated.outgoingSlope = target->automaticSlope(index);
+                        updated.outgoingInfluence = motion::Keyframe::defaultInfluence;
+                        following.incomingSlope = target->automaticSlope(index + 1);
+                        following.incomingInfluence = motion::Keyframe::defaultInfluence;
+                        if (updated.interpolation == motion::Interpolation::smooth) { target->setKey(following); }
+                    }
+                    updated.interpolation = next;
                     target->setKey(updated);
                 }
             });

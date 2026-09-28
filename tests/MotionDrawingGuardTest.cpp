@@ -1,73 +1,71 @@
 #include <JuceHeader.h>
 #include "../Source/audio/synth/PreparedDrawing.h"
-#include "../Source/motion/render/TraversalEligibility.h"
+#include "../Source/motion/model/Animation.h"
 
 class MotionDrawingGuardTest final : public juce::UnitTest {
 public:
     MotionDrawingGuardTest() : juce::UnitTest("Motion prepared vector discontinuity guards", "Motion") {}
 
     void runTest() override {
-        beginTest("Allocation eligibility proves closed-interval curve constancy structurally");
-        using motion::curveConstantOnInterval;
-        motion::Curve constant(2);
-        expect(curveConstantOnInterval(constant, -100, 100));
-        expect(!curveConstantOnInterval(constant, 2, 1));
-        expect(!curveConstantOnInterval(constant, 0, std::numeric_limits<double>::infinity()));
-        expect(!curveConstantOnInterval(constant, std::numeric_limits<double>::quiet_NaN(), 0));
-        constant.modulation.enabled = true;
-        constant.modulation.rateHz = 1;
-        expect(!curveConstantOnInterval(constant, 0, 1), "Matching sine endpoints do not prove constancy");
-        constant.modulation.amount = 0;
-        expect(curveConstantOnInterval(constant, 0, 1));
-        constant.modulation.enabled = false;
-        constant.modulation.amount = .5;
-        expect(curveConstantOnInterval(constant, 0, 1));
-
-        motion::Curve holds;
-        holds.setKey({0, 2, motion::Interpolation::hold});
-        holds.setKey({1, 3, motion::Interpolation::hold});
-        holds.setKey({2, 2, motion::Interpolation::hold});
-        expect(curveConstantOnInterval(holds, -1, std::nextafter(1.0, 0.0)));
-        expect(!curveConstantOnInterval(holds, 0, 1), "Closed ending boundary includes a jump");
-        expect(curveConstantOnInterval(holds, 1, std::nextafter(2.0, 1.0)));
-        expect(curveConstantOnInterval(holds, 2, 10));
-        expect(curveConstantOnInterval(holds, 1, 1));
-        expect(!curveConstantOnInterval(holds, 0, 2), "Equal outer values cannot hide an interior excursion");
-
-        for (const auto interpolation : {motion::Interpolation::linear, motion::Interpolation::smooth, motion::Interpolation::cubic}) {
-            motion::Curve flat;
-            flat.setKey({0, 2, interpolation});
-            flat.setKey({1, 2, interpolation});
-            flat.setKey({2, 2, interpolation});
-            expect(curveConstantOnInterval(flat, -.5, 2.5));
-            flat.setKey({1, 3, interpolation});
-            expect(!curveConstantOnInterval(flat, .1, .9));
-            expect(!curveConstantOnInterval(flat, 0, 2));
-            expect(curveConstantOnInterval(flat, -2, 0));
-            expect(curveConstantOnInterval(flat, 2, 3));
+        beginTest("Smooth keys use automatic clamped tangents");
+        {
+            motion::Curve two;
+            two.setKey({0, 0, motion::Interpolation::smooth});
+            two.setKey({1, 1, motion::Interpolation::smooth});
+            expectWithinAbsoluteError(two.evaluateBase(.25), .15625, 1e-12, "Two keys ease in and out");
+            motion::Curve rising;
+            rising.setKey({0, 0, motion::Interpolation::smooth});
+            rising.setKey({1, 1, motion::Interpolation::smooth});
+            rising.setKey({2, 2, motion::Interpolation::smooth});
+            const auto slope = (rising.evaluateBase(1 + 1e-6) - rising.evaluateBase(1 - 1e-6)) / 2e-6;
+            expectWithinAbsoluteError(slope, 1.0, 1e-4, "Motion flows through a middle key");
+            double previous = -1;
+            bool monotone = true;
+            for (int i = 0; i <= 200; ++i) {
+                const auto value = rising.evaluateBase(i / 100.0);
+                monotone = monotone && value >= previous;
+                previous = value;
+            }
+            expect(monotone, "Monotone keys give monotone motion");
+            motion::Curve peak;
+            peak.setKey({0, 0, motion::Interpolation::smooth});
+            peak.setKey({1, 1, motion::Interpolation::smooth});
+            peak.setKey({2, 0, motion::Interpolation::smooth});
+            double highest = 0;
+            for (int i = 0; i <= 200; ++i) { highest = std::max(highest, peak.evaluateBase(i / 100.0)); }
+            expectEquals(highest, 1.0, "An extreme key never overshoots");
+            motion::Curve uneven;
+            uneven.setKey({0, 0, motion::Interpolation::smooth});
+            uneven.setKey({.1, 1, motion::Interpolation::smooth});
+            uneven.setKey({3, 1.05, motion::Interpolation::smooth});
+            double maximum = 0;
+            for (int i = 0; i <= 300; ++i) { maximum = std::max(maximum, uneven.evaluateBase(i / 100.0)); }
+            expect(maximum <= 1.05 + 1e-12, "Fritsch-Carlson limiting prevents overshoot on uneven spacing");
         }
-        motion::Curve cubic;
-        cubic.setKey({0, 2, motion::Interpolation::cubic, 0, 1});
-        cubic.setKey({1, 2, motion::Interpolation::linear, 0, 0});
-        expect(!curveConstantOnInterval(cubic, 0, 1));
-        cubic.setKey({0, 2, motion::Interpolation::cubic, 99, 0});
-        cubic.setKey({1, 2, motion::Interpolation::linear, 1, 99});
-        expect(!curveConstantOnInterval(cubic, .2, .8));
-        cubic.setKey({1, 2, motion::Interpolation::linear, 0, 99});
-        expect(curveConstantOnInterval(cubic, 0, 1), "Unused outer tangents do not affect this segment");
-        motion::Curve extreme;
-        extreme.setKey({-std::numeric_limits<double>::max(), 2, motion::Interpolation::linear});
-        extreme.setKey({std::numeric_limits<double>::max(), 2, motion::Interpolation::linear});
-        expect(!curveConstantOnInterval(extreme, -1, 1));
-        constant.base = std::numeric_limits<double>::infinity();
-        expect(!curveConstantOnInterval(constant, 0, 1));
+
+        beginTest("Bezier influence reshapes timing and defaults to Hermite");
+        {
+            motion::Curve hermite, bezier;
+            hermite.setKey({0, 0, motion::Interpolation::cubic, 0, 0});
+            hermite.setKey({1, 1, motion::Interpolation::cubic, 0, 0});
+            bezier.setKey({0, 0, motion::Interpolation::cubic, 0, 0, motion::Keyframe::defaultInfluence, .9});
+            bezier.setKey({1, 1, motion::Interpolation::cubic, 0, 0, .9, motion::Keyframe::defaultInfluence});
+            expectWithinAbsoluteError(hermite.evaluateBase(.5), .5, 1e-12);
+            expectWithinAbsoluteError(bezier.evaluateBase(.5), .5, 1e-9, "Symmetric handles stay centred");
+            expect(bezier.evaluateBase(.2) < hermite.evaluateBase(.2), "Long influence eases out harder");
+            expect(bezier.evaluateBase(.8) > hermite.evaluateBase(.8), "and eases in harder");
+            expectWithinAbsoluteError(bezier.evaluateBase(0), 0.0, 1e-12);
+            expectWithinAbsoluteError(bezier.evaluateBase(std::nextafter(1.0, 0.0)), 1.0, 1e-6);
+            bool invalid = false;
+            try { bezier.setKey({2, 0, motion::Interpolation::cubic, 0, 0, 0, .5}); } catch (const std::invalid_argument&) { invalid = true; }
+            expect(invalid, "Zero influence is rejected");
+        }
 
         beginTest("Flat cubic allocation weights evaluate exactly at every sampled time");
         for (const auto value : {0.0, .1, .22, 1.0, 2.0, -3.7, 1000000.0, std::numeric_limits<double>::max()}) {
             motion::Curve flatCubic;
             flatCubic.setKey({-.37, value, motion::Interpolation::cubic, 19, 0});
             flatCubic.setKey({1.73, value, motion::Interpolation::smooth, 0, -23});
-            expect(curveConstantOnInterval(flatCubic, -.37, 1.73));
             for (int step = 0; step <= 257; ++step) {
                 const auto time = -.37 + 2.1 * (step / 257.0);
                 expectEquals(flatCubic.evaluateBase(time), value);
