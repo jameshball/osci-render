@@ -1394,6 +1394,7 @@ void MotionEditor::exportVideo() {
     config.frameRate = project.frameRate;
     const auto renderMode = visualiser.getRenderMode();
     auto state = std::make_shared<ExportState>();
+    state->sampleRate = processor.exportSampleRate();
     exportState = state;
     const juce::Component::SafePointer<MotionEditor> owner(this);
     auto settings = std::make_unique<MotionVideoExportSettings>(config);
@@ -1451,10 +1452,11 @@ void MotionEditor::exportVideo() {
                             temporary = std::make_shared<MotionVideoTemporaryFiles>();
                             result = temporary->directory.createDirectory();
                             if (result.wasOk() && !state->cancelled.load()) {
-                                const motion::PreparedComposition prepared(project, 48000, &state->cancelled);
-                                result = motion::SignalExporter::write(prepared, temporary->signal(), 48000.0, state->cancelled, &state->progress);
+                                const auto rate = state->sampleRate;
+                                const motion::PreparedComposition prepared(project, rate, &state->cancelled);
+                                result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
                                 if (result.wasOk() && config.includeAudio) {
-                                    result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), 48000.0, state->cancelled, &state->soundtrackProgress);
+                                    result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), rate, state->cancelled, &state->soundtrackProgress);
                                 }
                             }
                         } catch (...) {
@@ -1502,7 +1504,8 @@ void MotionEditor::exportSignal() {
     }
     auto state = std::make_shared<ExportState>();
     exportState = state;
-    chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal - 48 kHz float WAV",
+    state->sampleRate = processor.exportSampleRate();
+    chooser = std::make_unique<juce::FileChooser>("Export XYRGB signal - " + juce::String(state->sampleRate / 1000.0, 1) + " kHz float WAV",
         processor.getLastOpenedDirectory().getChildFile("composition.wav"), "*.wav");
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
@@ -1521,7 +1524,7 @@ void MotionEditor::exportSignal() {
         owner->exportBar.setVisible(true);
         owner->cancelExport.setVisible(true);
         owner->exports.addJob([owner, state, project, destination] {
-            const auto result = motion::SignalExporter::write(project, destination, 48000.0, state->cancelled, &state->progress);
+            const auto result = motion::SignalExporter::write(project, destination, state->sampleRate, state->cancelled, &state->progress);
             juce::MessageManager::callAsync([owner, state, result] {
                 if (owner == nullptr) {
                     return;

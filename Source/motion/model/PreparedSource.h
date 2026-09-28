@@ -65,6 +65,19 @@ public:
     }
 
     std::shared_ptr<const osci::PreparedDrawing> firstFrame() const { return frames.empty() ? nullptr : frames.front(); }
+    // Vector frame for exact traversal; null for point-frame sources.
+    const osci::PreparedDrawing* drawingAt(std::size_t frame) const { return frame < frames.size() ? frames[frame].get() : nullptr; }
+
+    // Samples one latched frame. phaseSpan blanks drawing discontinuities and
+    // point-source travel exactly as sample() does, without frame guards.
+    osci::Point sampleFrame(std::size_t frame, double phase, double phaseSpan = 0) const {
+        if (points != nullptr) {
+            const auto point = points->sampleFrame(frame, phase, phaseSpan);
+            return {point.x, point.y, point.z, point.r, point.g, point.b};
+        }
+        const auto* drawing = drawingAt(frame);
+        return drawing != nullptr ? drawing->sample(phase, phaseSpan) : osci::Point(0, 0, 0, 0, 0, 0);
+    }
 
     osci::Point sample(double localSeconds, double phase, double phaseSpan = 0, double timeSpan = 0) const {
         if (points != nullptr) {

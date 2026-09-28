@@ -14,8 +14,8 @@
             resource="0" file="tests/MotionLiveSourceTest.cpp"/>
       <FILE id="MotionBlenderReceiverT" name="MotionBlenderReceiverTest.cpp"
             compile="1" resource="0" file="tests/MotionBlenderReceiverTest.cpp"/>
-      <FILE id="MotionContinuityT" name="MotionBeamContinuityTest.cpp" compile="1"
-            resource="0" file="tests/MotionBeamContinuityTest.cpp"/>
+      <FILE id="MotionContinuityT" name="MotionBeamRendererTest.cpp" compile="1"
+            resource="0" file="tests/MotionBeamRendererTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
       <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"

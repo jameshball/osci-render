@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/live/LiveSourceExchange.h"
 #include "../Source/motion/live/PreparedBlenderFrame.h"
 #include "../Source/motion/render/LiveMidiAudition.h"
@@ -16,7 +17,11 @@ public:
         beginTest("Live leaves awaiting their first frame retain their timeline allocation and draw darkness");
         expect(composition.preparationError.isEmpty(), composition.preparationError);
         expectEquals(static_cast<int>(composition.clips.size()), 2);
-        expect(dark(composition.sampleAtClock(.25, 123, 48000)));
+        const auto beamAt = [&](std::int64_t index, const motion::LiveSourceFrames* live) {
+            motion::BeamRenderer beam;
+            return beam.sample(composition, .25, index, 48000, false, 1, live);
+        };
+        expect(dark(beamAt(123, nullptr)));
         auto one = frames(identity, 1);
         auto two = frames(identity, 2);
         beginTest("All instances resolve the same source while retaining their independent transforms");
@@ -24,20 +29,20 @@ public:
         expectWithinAbsoluteError(composition.clips[1].sample(.25, .3, 0, 0, one.get()).x, 4.0f, 1e-6f);
         expectWithinAbsoluteError(composition.clips[0].sample(.25, .3, 0, 0, two.get()).x, 2.0f, 1e-6f);
         expectWithinAbsoluteError(composition.clips[1].sample(.25, .3, 0, 0, two.get()).x, 5.0f, 1e-6f);
-        beginTest("Sample-clock traversal cannot retain fallback geometry for a live leaf");
+        beginTest("Beam plans cannot retain fallback geometry for a live leaf");
         for (int index = 1; index < 800; ++index) {
-            const auto point = composition.sampleAtClock(.25, index, 48000, false, two.get());
+            const auto point = beamAt(index, two.get());
             if (!dark(point)) { expect(point.x == 2 || point.x == 5); }
         }
         beginTest("Unrelated source identities and explicit empty frames cannot reuse earlier geometry");
         auto foreign = frames(std::make_shared<const motion::LiveSourceIdentity>(), 9);
-        expect(dark(composition.sampleAtClock(.25, 123, 48000, false, foreign.get())));
+        expect(dark(beamAt(123, foreign.get())));
         motion::BlenderFrame blank;
         blank.frameRate = 24;
         auto empty = std::make_shared<const motion::LiveSourceFrames>(std::vector<motion::LiveSourceFrames::Entry>{{identity, motion::prepareBlenderFrame(blank)}});
-        expect(dark(composition.sampleAtClock(.25, 123, 48000, false, empty.get())));
+        expect(dark(beamAt(123, empty.get())));
         auto disconnected = std::make_shared<const motion::LiveSourceFrames>(std::vector<motion::LiveSourceFrames::Entry>{{identity, nullptr}});
-        expect(dark(composition.sampleAtClock(.25, 123, 48000, false, disconnected.get())));
+        expect(dark(beamAt(123, disconnected.get())));
         beginTest("Live MIDI audition uses the same frame set");
         motion::LiveMidiPerformance midi;
         midi.prepare(48000);

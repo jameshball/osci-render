@@ -5,6 +5,7 @@
 #include "render/CompositionRenderer.h"
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
+#include "render/BeamRenderer.h"
 #include "render/LiveMidiAudition.h"
 #include "render/MidiRecording.h"
 #include "render/MidiRecordingSession.h"
@@ -23,6 +24,11 @@ public:
     motion::Id getMidiAudition() const { return midiAuditionTarget.load(); }
     motion::MidiRecording& midiRecorder() { return midiRecording; }
     motion::MidiRecordingSession& midiRecordingSession() { return *midiSession; }
+    // Exports use the live rate so the file matches what the scope showed.
+    double exportSampleRate() const {
+        const auto rate = std::round(requestedSampleRate.load());
+        return std::isfinite(rate) && rate >= 8000 && rate <= 768000 ? rate : 48000.0;
+    }
     void releaseResources() override;
     void processBlockSkipped(bool unavailable) override { midiRecording.skippedBlock(unavailable); }
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
@@ -60,6 +66,7 @@ private:
     std::uint64_t previousRevision = 0;
     bool wasPlaying = false, wasDrawing = false;
     motion::BeamTransitionGuard transitionGuard;
+    motion::BeamRenderer beam;
     motion::LiveMidiPerformance liveMidi;
     motion::MidiRecording midiRecording;
     std::unique_ptr<motion::MidiRecordingSession> midiSession;

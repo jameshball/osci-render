@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/render/LiveMidiPerformance.h"
 #include "../Source/motion/render/LiveMidiAudition.h"
 #include "../Source/motion/export/SignalExporter.h"
@@ -49,9 +50,18 @@ public:
         const auto a = voices.selectBeam(.123, .49), b = voices.selectBeam(.123, .51);
         expect(a.note == 1 && b.note == 2);
         expectWithinAbsoluteError(a.phase, .12, 1e-9); expectWithinAbsoluteError(b.phase, .24, 1e-9);
-        const auto unguarded = voices.sample(.123, .5);
-        const auto guarded = voices.sample(.123, .5, 60.0 / 48000, 1.0 / 48000);
-        expect(unguarded.r > 0); expectEquals(guarded.r, 0.0f); expectEquals(guarded.x, unguarded.x);
+        {
+            // Voice changes inside the beam's MIDI segment are dark on both sides.
+            motion::BeamRenderer beam;
+            int jumps = 0;
+            osci::Point previous;
+            for (std::int64_t index = 5000; index < 5800; ++index) {
+                const auto point = beam.sample(voices, index / 48000.0, index, 48000, true, 1);
+                if (index > 5000 && point.r > 0 && previous.r > 0 && std::abs(point.x - previous.x) > .2f) { ++jumps; }
+                previous = point;
+            }
+            expectEquals(jumps, 0, "No lit sample connects two voices");
+        }
 
         beginTest("Paused audition freezes membership but continues tracing the source");
         const auto frozen = composition.sample(.123, .2, 0, 0, .123);
@@ -78,9 +88,9 @@ public:
                 juce::AudioBuffer<float> signal(5, static_cast<int>(reader->lengthInSamples));
                 expect(reader->read(signal.getArrayOfWritePointers(), 5, 0, signal.getNumSamples()));
                 motion::PreparedComposition exact(project, 44100);
+                motion::BeamRenderer beam;
                 for (const int index : {0, 1, 123, 4095, 8000, 11025, 22050, 30000}) {
-                    const auto time = index / 44100.0, phase = std::fmod(index * 60.0 / 44100, 1.0);
-                    const auto value = exact.sample(time, phase, 60.0 / 44100, 1.0 / 44100);
+                    const auto value = beam.sample(exact, index / 44100.0, index, 44100, true, 1);
                     expectEquals(signal.getSample(0, index), value.x);
                     expectEquals(signal.getSample(2, index), value.r);
                 }
@@ -173,10 +183,11 @@ private:
                 if (reader) {
                     juce::AudioBuffer<float> signal(5, static_cast<int>(reader->lengthInSamples));
                     expect(reader->read(signal.getArrayOfWritePointers(), 5, 0, signal.getNumSamples()));
+                    motion::BeamRenderer beam;
                     for (const double seconds : {.001, .025, .075, .2, .399, .4, .45, .55, .61}) {
                         const int index = static_cast<int>(std::round(seconds * rate));
-                        const auto time = index / rate, phase = std::fmod(index * 60.0 / rate, 1.0);
-                        const auto point = composition.sample(time, phase, 60.0 / rate, 1.0 / rate);
+                        const auto time = index / rate;
+                        const auto point = beam.sample(composition, time, index, rate, true, 1);
                         expectEquals(signal.getSample(0, index), point.x);
                         expectEquals(signal.getSample(2, index), point.r);
                     }
@@ -285,10 +296,11 @@ private:
             juce::AudioBuffer<float> samples(channelCount, static_cast<int>(reader->lengthInSamples));
             expect(reader->read(samples.getArrayOfWritePointers(), channelCount, 0, samples.getNumSamples()));
             float maximumError = 0;
+            motion::BeamRenderer directBeam;
             for (int index = 0; index < samples.getNumSamples(); ++index) {
                 const auto time = index / exportRate;
                 if (signal) {
-                    const auto point = directExport.sampleAtClock(time, index, exportRate);
+                    const auto point = directBeam.sample(directExport, time, index, exportRate, true, 1);
                     const std::array<float, 5> expected {point.x, point.y, point.r, point.g, point.b};
                     for (int channel = 0; channel < channelCount; ++channel) {
                         maximumError = std::max(maximumError, std::abs(samples.getSample(channel, index) - expected[channel]));

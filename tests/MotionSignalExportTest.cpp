@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/export/SignalExporter.h"
+#include "../Source/motion/render/BeamRenderer.h"
 #include <thread>
 
 class MotionSignalExportTest : public juce::UnitTest {
@@ -38,21 +39,26 @@ public:
         expectEquals(reader->lengthInSamples, static_cast<juce::int64>(frames));
         juce::AudioBuffer<float> samples(5, frames);
         expect(reader->read(samples.getArrayOfWritePointers(), 5, 0, frames));
-        for (const auto index : { 0, 1, 799, 800, 4095, 4096, frames - 1 }) {
-            // Interior complete cycles reserve dark endpoints and sample both
-            // lit ends of the line. Boundary cycles retain continuous sampling.
-            const auto phase = index == 4095 || index == 4096 ? static_cast<double>(index % 800 - 1) / 797
-                : std::fmod(index * 60.0 / sampleRate, 1.0);
-            expectWithinAbsoluteError(samples.getSample(0, index), 2.0f + static_cast<float>(phase), 0.000001f);
-            expectWithinAbsoluteError(samples.getSample(1, index), -3.0f + static_cast<float>(phase), 0.000001f);
-            // This open line jumps from (3,-2) back to (2,-3) each cycle.
-            // Its adjacent output samples must be dark.
-            // The final sample also borders silence at the composition end.
-            const bool travel = index == 0 || index == 1 || index == 799 || index == 800 || index == frames - 1;
-            expectWithinAbsoluteError(samples.getSample(2, index), travel ? 0.0f : 0.2f, 0.000001f);
-            expectWithinAbsoluteError(samples.getSample(3, index), travel ? 0.0f : 0.4f, 0.000001f);
-            expectWithinAbsoluteError(samples.getSample(4, index), travel ? 0.0f : 0.8f, 0.000001f);
+        // The open line (2,-3)->(3,-2) is drawn out and back through dark travel.
+        // Every lit sample lies on the line in the authored colour; every sample
+        // matches the beam renderer, and each lit run begins and ends at the line.
+        const motion::PreparedComposition line(project, sampleRate);
+        motion::BeamRenderer beam;
+        int lit = 0, offLine = 0, mismatched = 0;
+        for (int index = 0; index < frames; ++index) {
+            const auto point = beam.sample(line, index / sampleRate, index, sampleRate, true, 1);
+            const auto x = samples.getSample(0, index), y = samples.getSample(1, index);
+            if (x != point.x || y != point.y || samples.getSample(2, index) != point.r) { ++mismatched; }
+            if (samples.getSample(2, index) == 0) { continue; }
+            ++lit;
+            if (std::abs((y - x) + 5.0f) > 1e-5f || x < 2 - 1e-5f || x > 3 + 1e-5f) { ++offLine; }
+            expectWithinAbsoluteError(samples.getSample(2, index), 0.2f, 1e-6f);
+            expectWithinAbsoluteError(samples.getSample(3, index), 0.4f, 1e-6f);
+            expectWithinAbsoluteError(samples.getSample(4, index), 0.8f, 1e-6f);
         }
+        expectEquals(mismatched, 0);
+        expectEquals(offLine, 0);
+        expect(lit > frames / 2, "Most of each cycle draws the line: " + juce::String(lit));
         reader.reset();
 
         beginTest("Repeated exports of the same snapshot are byte-for-byte deterministic");

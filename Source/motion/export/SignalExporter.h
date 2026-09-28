@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../render/CompositionRenderer.h"
+#include "../render/BeamRenderer.h"
 #include "WavExporter.h"
 
 namespace motion {
@@ -25,9 +25,10 @@ public:
         }
         if (composition.preparationError.isNotEmpty()) { return juce::Result::fail(composition.preparationError); }
         if (composition.hasMidi && composition.sampleRate != sampleRate) { return juce::Result::fail("MIDI snapshot sample rate does not match the requested signal export rate."); }
+        BeamRenderer beam;
         return WavExporter::write<5>(composition.duration, destination, sampleRate, cancel, progress,
             [&](double index, double time) {
-                const auto point = composition.sampleAtClock(time, static_cast<std::int64_t>(index), sampleRate);
+                const auto point = beam.sample(composition, time, static_cast<std::int64_t>(index), sampleRate, true, 1);
                 return std::array<float, 5> { point.x, point.y, point.r, point.g, point.b };
             }, "Signal", "The composition produced a non-finite signal sample. Check its transforms and camera animation.");
     }

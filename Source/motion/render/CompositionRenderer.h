@@ -6,7 +6,6 @@
 #include "PreparedSoundtrack.h"
 #include "PreparedMidiPerformance.h"
 #include "SampleClock.h"
-#include "TraversalEligibility.h"
 #include <array>
 #include <numbers>
 
@@ -176,8 +175,14 @@ struct PreparedCamera {
 
 enum class CompositionPurpose { signal, editorGeometry };
 
+// Whole beam cycles per video frame, at least 45 Hz so scopes do not flicker.
+inline double beamCycleRate(double frameRate) {
+    if (!std::isfinite(frameRate) || frameRate <= 0) { return 60; }
+    return frameRate * std::max(1.0, std::ceil(45.0 / frameRate - 1.0e-9));
+}
+
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
@@ -260,88 +265,19 @@ struct PreparedComposition {
             clips.push_back(std::move(item));
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
-        if (preparationError.isNotEmpty()) { clips.clear(); return; }
-        prepareTraversals(cancel);
+        if (preparationError.isNotEmpty()) { clips.clear(); }
     }
 
-    // A signal sample is evaluated with both adjacent sample positions. This
-    // stays stateless for seeking/export, while accounting for animated beam
-    // allocation instead of assuming each clip's phase speed remains constant.
-    struct SamplingNeighbours {
-        double previousPhase, nextPhase, previousTime, nextTime, previousOscillatorTime, nextOscillatorTime;
-    };
-
-    struct TraversalPosition {
-        const PreparedClip* clip = nullptr;
-        const osci::PreparedDrawing* drawing = nullptr;
-        std::int64_t index = 0, count = 0;
-    };
-
-    osci::Point sampleAtClock(double time, std::int64_t index, double clockRate, bool advancing = true, const LiveSourceFrames* liveFrames = nullptr) const {
-        if (index < 0 || !std::isfinite(clockRate) || clockRate <= 0) { return {0, 0, 0, 0, 0, 0}; }
-        const auto phaseAt = [clockRate](double frame) { return std::fmod(frame * 60.0 / clockRate, 1.0); };
-        const auto frame = static_cast<double>(index);
-        const auto timeFrame = std::round(time * clockRate);
-        const SamplingNeighbours neighbours { phaseAt(frame - 1), phaseAt(frame + 1),
-            advancing ? (timeFrame - 1) / clockRate : time, advancing ? (timeFrame + 1) / clockRate : time,
-            (frame - 1) / clockRate, (frame + 1) / clockRate };
-        const auto traversal = traversalAtClock(time, index, clockRate, advancing);
-        auto point = sample(time, phaseAt(frame), 60.0 / clockRate, advancing ? 1.0 / clockRate : 0.0,
-            frame / clockRate, &neighbours, &traversal, liveFrames);
-        // Ownership guards do not detect a change of sampling strategy on the
-        // same clip. Keep both sides dark when crossing an eligibility boundary.
-        const auto previous = traversalAtClock(neighbours.previousTime, index - 1, clockRate, advancing);
-        const auto next = index == std::numeric_limits<std::int64_t>::max() ? TraversalPosition{}
-            : traversalAtClock(neighbours.nextTime, index + 1, clockRate, advancing);
-        if ((traversal.drawing == nullptr) != (previous.drawing == nullptr)
-            || (traversal.drawing == nullptr) != (next.drawing == nullptr)) {
-            point.r = point.g = point.b = 0;
-        }
-        return point;
-    }
-
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const SamplingNeighbours* clockNeighbours = nullptr, const TraversalPosition* traversal = nullptr, const LiveSourceFrames* liveFrames = nullptr) const {
+    // Geometry probe: the beam allocation at one phase of a static multiplexed
+    // cycle. Output signals use BeamRenderer; this stays for editor and model
+    // checks that need a direct time/phase lookup.
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const LiveSourceFrames* liveFrames = nullptr) const {
         if (oscillatorTime < 0) { oscillatorTime = time; }
-        if (!std::isfinite(time) || !std::isfinite(phase)) { return {0, 0, 0, 0, 0, 0}; }
+        if (!std::isfinite(time) || !std::isfinite(phase) || !std::isfinite(phaseSpan) || phaseSpan < 0) { return {0, 0, 0, 0, 0, 0}; }
         const auto current = selectBeam(time, phase, oscillatorTime);
         if (current.clip == nullptr) { return {0, 0, 0, 0, 0, 0}; }
-        bool blank = !std::isfinite(phaseSpan) || phaseSpan < 0 || !std::isfinite(timeSpan) || timeSpan < 0;
-        auto localSpan = phaseSpan == 0 ? 0.0 : (current.note != 0 ? current.notePhaseSpan : phaseSpan * current.phaseScale);
-        if (!blank && (phaseSpan > 0 || timeSpan > 0)) {
-            const auto wrap = [](double value) { return value - std::floor(value); };
-            const auto oscillatorStep = 1 / sampleRate;
-            // At exact allocation boundaries, subtracting a phase increment can
-            // round to the other side of the sample actually emitted by the clock.
-            // Live and exported signals compare the actual adjacent clock phases.
-            const auto previousPhase = clockNeighbours != nullptr ? clockNeighbours->previousPhase : phase - phaseSpan;
-            const auto nextPhase = clockNeighbours != nullptr ? clockNeighbours->nextPhase : phase + phaseSpan;
-            const auto previousTime = clockNeighbours != nullptr ? clockNeighbours->previousTime : time - timeSpan;
-            const auto nextTime = clockNeighbours != nullptr ? clockNeighbours->nextTime : time + timeSpan;
-            const auto previousOscillator = clockNeighbours != nullptr ? clockNeighbours->previousOscillatorTime : oscillatorTime - oscillatorStep;
-            const auto nextOscillator = clockNeighbours != nullptr ? clockNeighbours->nextOscillatorTime : oscillatorTime + oscillatorStep;
-            const auto previous = selectBeam(previousTime, wrap(previousPhase), previousOscillator);
-            const auto next = selectBeam(nextTime, wrap(nextPhase), nextOscillator);
-            blank = previous.clip != current.clip || next.clip != current.clip
-                || previous.note != current.note || next.note != current.note
-                || activeCamera(previousTime) != activeCamera(time)
-                || activeCamera(nextTime) != activeCamera(time);
-            const auto* resolved = current.clip->resolveSource(liveFrames);
-            if (!blank && clockNeighbours != nullptr && resolved != nullptr && resolved->frameCount() > 1) {
-                const auto& source = *resolved;
-                const auto frame = source.frameIndex(current.clip->localTime(time));
-                blank = source.frameIndex(current.clip->localTime(previousTime)) != frame
-                    || source.frameIndex(current.clip->localTime(nextTime)) != frame;
-            }
-            if (!blank) {
-                localSpan = std::max({localSpan, std::abs(previous.phase - current.phase), std::abs(next.phase - current.phase)});
-            }
-        }
-        const auto complete = traversal != nullptr && traversal->clip == current.clip && traversal->drawing != nullptr;
-        const auto sourcePoint = complete ? current.clip->processPoint(traversal->drawing->sampleTraversal(traversal->index, traversal->count), time)
-            : current.clip->sample(time, current.phase, localSpan, timeSpan, liveFrames);
-        auto point = projectPoint(sourcePoint, time);
-        if (blank) { point.r = point.g = point.b = 0; }
-        return point;
+        const auto localSpan = current.note != 0 ? current.notePhaseSpan : phaseSpan * current.phaseScale;
+        return projectPoint(current.clip->sample(time, current.phase, localSpan, timeSpan, liveFrames), time);
     }
 
     struct BeamSelection {
@@ -420,6 +356,7 @@ struct PreparedComposition {
     double duration;
     double bpm = 120;
     double sampleRate = 48000;
+    double beamRate = 60;
     bool hasMidi = false;
     std::uint64_t publicationRevision = 0;
     juce::String preparationError;
@@ -428,142 +365,6 @@ struct PreparedComposition {
     std::vector<PreparedCamera> cameras;
 
 private:
-    struct TraversalSlot {
-        std::size_t clip;
-        double start, end;
-        const osci::PreparedDrawing* drawing;
-    };
-    struct ConstantAllocation {
-        std::size_t clip;
-        double weight;
-    };
-    struct TraversalInterval {
-        double start, end;
-        double allocation;
-        std::vector<TraversalSlot> slots;
-        std::vector<ConstantAllocation> weights;
-
-        std::size_t owner(double phase) const {
-            auto cursor = phase * allocation;
-            for (const auto& item : weights) {
-                if (cursor < item.weight) { return item.clip; }
-                cursor -= item.weight;
-            }
-            return std::numeric_limits<std::size_t>::max();
-        }
-    };
-
-    void prepareTraversals(const std::atomic<bool>* cancel) {
-        // Weight/key boundaries are prepared off-thread. Only structurally
-        // constant allocation intervals qualify; matching endpoint values do
-        // not prove constancy for modulation or cubic animation.
-        std::vector<double> boundaries {0, duration};
-        const auto add = [&](double time) {
-            if (std::isfinite(time) && time > 0 && time < duration) { boundaries.push_back(time); }
-        };
-        for (const auto& clip : clips) {
-            add(clip.start);
-            add(clip.end);
-            const auto addStage = [&](const PreparedClipStage& stage) {
-                for (const auto& key : stage.curves[12].keyframes()) { add(stage.start + (key.time - stage.offset) / stage.rate); }
-                for (const auto& group : stage.groups) {
-                    for (const auto& key : group.curves[12].keyframes()) {
-                        const auto& clock = stage.scopeClock;
-                        add(clock.has_value() ? clock->start + (key.time - clock->offset) / clock->rate : key.time);
-                    }
-                }
-            };
-            addStage(clip);
-            for (const auto& ancestor : clip.ancestors) { addStage(ancestor); }
-        }
-        std::sort(boundaries.begin(), boundaries.end());
-        boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
-        for (std::size_t range = 1; range < boundaries.size(); ++range) {
-            if (cancel != nullptr && cancel->load()) { return; }
-            const auto start = boundaries[range - 1], end = boundaries[range];
-            const auto first = std::nextafter(start, end), last = std::nextafter(end, start);
-            if (first > last) { continue; }
-            const auto middle = first + (last - first) * 0.5;
-            double allocation = 0;
-            bool constant = true;
-            for (const auto& clip : clips) {
-                if (!clip.active(middle)) { continue; }
-                const auto stageConstant = [&](const PreparedClipStage& stage) {
-                    if (!curveConstantOnInterval(stage.curves[12], stage.localTime(first), stage.localTime(last))) { return false; }
-                    for (const auto& group : stage.groups) {
-                        if (!curveConstantOnInterval(group.curves[12], stage.scopeTime(first), stage.scopeTime(last))) { return false; }
-                    }
-                    return true;
-                };
-                constant = constant && stageConstant(clip);
-                for (const auto& ancestor : clip.ancestors) { constant = constant && stageConstant(ancestor); }
-                allocation += std::max(1.0, clip.weight(middle));
-            }
-            if (!constant || allocation <= 0 || !std::isfinite(allocation)) { continue; }
-            TraversalInterval interval {start, end, allocation, {}, {}};
-            double consumed = 0;
-            for (std::size_t index = 0; index < clips.size(); ++index) {
-                const auto& clip = clips[index];
-                if (!clip.active(middle)) { continue; }
-                const auto weight = clip.weight(middle);
-                interval.weights.push_back({index, weight});
-                if (weight > 0 && clip.liveIdentity == nullptr && clip.midi == nullptr && clip.source->frameCount() == 1) {
-                    const auto drawing = clip.source->firstFrame();
-                    if (drawing != nullptr && drawing->minimumTraversalSamples() > 0) {
-                        interval.slots.push_back({index, consumed / allocation, (consumed + weight) / allocation, drawing.get()});
-                    }
-                }
-                consumed += weight;
-            }
-            if (!interval.slots.empty()) { traversalIntervals.push_back(std::move(interval)); }
-        }
-    }
-
-    TraversalPosition traversalAtClock(double time, std::int64_t index, double rate, bool advancing) const {
-        if (index < 0 || !std::isfinite(time) || traversalIntervals.empty()) { return {}; }
-        const auto found = std::upper_bound(traversalIntervals.begin(), traversalIntervals.end(), time,
-            [](double value, const auto& item) { return value < item.start; });
-        if (found == traversalIntervals.begin()) { return {}; }
-        const auto& interval = *(found - 1);
-        if (time < interval.start || time >= interval.end) { return {}; }
-        const auto cycle = std::floor(static_cast<double>(index) * 60.0 / rate);
-        const auto cycleStart = std::ceil(cycle * rate / 60.0);
-        const auto cycleEnd = std::ceil((cycle + 1) * rate / 60.0);
-        // Limit conversion to exactly represented integer clocks. Real project
-        // durations are many orders of magnitude below this bound.
-        constexpr double largestExactClock = 9007199254740991.0;
-        if (cycleStart < 0 || cycleEnd > largestExactClock || cycleEnd <= cycleStart) { return {}; }
-        if (advancing && (time + (cycleStart - static_cast<double>(index) - 1) / rate <= interval.start
-            || time + (cycleEnd - static_cast<double>(index)) / rate >= interval.end)) { return {}; }
-        const auto phaseAt = [rate](std::int64_t frame) { return std::fmod(static_cast<double>(frame) * 60.0 / rate, 1.0); };
-        const auto selected = interval.owner(phaseAt(index));
-        for (const auto& slot : interval.slots) {
-            const auto* clip = &clips[slot.clip];
-            if (selected != slot.clip) { continue; }
-            const auto* drawing = slot.drawing;
-            // A fractional cycle may receive one fewer sample. Use the lower
-            // bound so eligibility cannot alternate merely with clock rounding.
-            if (std::floor((slot.end - slot.start) * rate / 60.0) < drawing->minimumTraversalSamples()) { return {}; }
-            auto first = static_cast<std::int64_t>(std::ceil((cycle + slot.start) * rate / 60.0));
-            auto end = static_cast<std::int64_t>(std::ceil((cycle + slot.end) * rate / 60.0));
-            const auto owned = [&](std::int64_t frame) {
-                return frame >= cycleStart && frame < cycleEnd
-                    && interval.owner(phaseAt(frame)) == slot.clip;
-            };
-            // Floating ceil can disagree with the actual repeated-subtraction
-            // selection predicate at an exact boundary. Correct and verify it.
-            for (int correction = 0; correction < 2 && owned(first - 1); ++correction) { --first; }
-            for (int correction = 0; correction < 2 && !owned(first) && first < end; ++correction) { ++first; }
-            for (int correction = 0; correction < 2 && owned(end); ++correction) { ++end; }
-            for (int correction = 0; correction < 2 && !owned(end - 1) && end > first; ++correction) { --end; }
-            if (!owned(first) || owned(first - 1) || !owned(end - 1) || owned(end)
-                || index < first || index >= end || end - first < drawing->minimumTraversalSamples()) { return {}; }
-            return {clip, drawing, index - first, end - first};
-        }
-        return {};
-    }
-
-    std::vector<TraversalInterval> traversalIntervals;
     struct PreparedCameraCut {
         double start, end;
         std::size_t cameraIndex;

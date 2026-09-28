@@ -143,6 +143,7 @@ private:
         std::atomic<double> progress { 0.0 };
         std::atomic<double> soundtrackProgress { 0.0 };
         bool videoWithAudio = false;
+        double sampleRate = 48000;
     };
     std::shared_ptr<ExportState> exportState;
     juce::ThreadPool exports { 1 };

@@ -1,4 +1,5 @@
 #include <JuceHeader.h>
+#include "../Source/motion/render/BeamRenderer.h"
 #include <thread>
 #include "../Source/parser/fractal/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
@@ -1418,9 +1419,10 @@ private:
             expect(!leaf.active(3.99) && leaf.active(4) && !leaf.active(6.5));
             expect(nestedVisual.selectBeam(5, 0.2).clip == nullptr, "Outer fades retain unused dark allocation");
             expect(nestedVisual.selectBeam(5, 0.1).clip != nullptr);
-            const auto first = nestedVisual.sampleAtClock(5, 240000, 48000);
-            nestedVisual.sampleAtClock(4.5, 216000, 48000);
-            const auto again = nestedVisual.sampleAtClock(5, 240000, 48000);
+            motion::BeamRenderer beam;
+            const auto first = beam.sample(nestedVisual, 5, 240000, 48000, true, 1);
+            beam.sample(nestedVisual, 4.5, 216000, 48000, true, 1);
+            const auto again = beam.sample(nestedVisual, 5, 240000, 48000, true, 1);
             expectEquals(first.x, again.x); expectEquals(first.r, again.r);
         }
         auto repeat = placement; repeat.id = 61008; repeat.start = 10; repeat.rate = 1;
@@ -1432,7 +1434,7 @@ private:
             expect(repeatedVisual.clips[0].source == repeatedVisual.clips[1].source);
             expectWithinAbsoluteError(repeatedVisual.clips[1].processPoint({0, 0, 0, 1, 1, 1}, 11).x, 16.0f, 0.0001f);
         }
-        beginTest("Repeated definitions keep distinct beam ownership at instance cuts");
+        beginTest("Repeated definitions stay visible across instance cuts");
         visual.tracks[0].clips[0].duration = 2;
         visual.tracks[0].clips[0].properties["weight"] = motion::Curve(1);
         visual.tracks[0].clips[1].start = 6;
@@ -1440,10 +1442,7 @@ private:
         motif->tracks[0].clips[0].properties["weight"] = motion::Curve(1);
         const motion::PreparedComposition cuts(visual);
         expect(cuts.preparationError.isEmpty(), cuts.preparationError);
-        const auto before = cuts.sample(6 - 1.0 / 48000, 0.2, 0, 1.0 / 48000);
-        const auto after = cuts.sample(6, 0.2, 0, 1.0 / 48000);
-        expectEquals(before.r, 0.0f); expectEquals(after.r, 0.0f);
-        expect(cuts.sample(6.1, 0.2).r > 0, "Interior sample remains visible after the ownership guard");
+        expect(cuts.sample(6.1, 0.2).r > 0, "Interior sample remains visible after the instance cut");
         beginTest("Invalid reusable graph loads leave the existing document untouched");
         auto cyclic = xml;
         auto* nestedClip = cyclic.getChildByName("definition")->getChildByName("composition")->getChildByName("track")->getChildByName("clip");

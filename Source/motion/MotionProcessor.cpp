@@ -146,6 +146,9 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         return;
     }
     const auto durationSamples = *durationIndex;
+    // Plans hold pointers into the composition and live frames; either change replans.
+    const auto liveGeneration = liveBlock != nullptr ? liveBlock->revision : std::numeric_limits<std::uint64_t>::max();
+    const auto beamGeneration = prepared->publicationRevision * 0x9E3779B97F4A7C15ull + liveGeneration;
     const auto auditionId = midiAuditionTarget.load();
     const motion::PreparedClip* audition = nullptr;
     if (auditionId != 0) {
@@ -208,7 +211,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
         auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running, liveFrames)
-            : drawing ? prepared->sampleAtClock(audioTime, oscillatorSample, sampleRate, running, liveFrames) : osci::Point(0, 0, 0, 0, 0, 0);
+            : drawing ? beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames) : osci::Point(0, 0, 0, 0, 0, 0);
         point = transitionGuard.apply(point);
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);

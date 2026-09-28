@@ -33,6 +33,11 @@ public:
         return {std::move(result), {}};
     }
 
+    std::size_t activeCount(double time) const {
+        const auto sample = sampleIndex(time, sampleRate);
+        return sample ? schedule->activeAt(*sample).size() : 0;
+    }
+
     Selection select(double time, double allocationPhase, double oscillatorTime) const {
         const auto sample = sampleIndex(time, sampleRate), oscillatorSample = sampleIndex(oscillatorTime, sampleRate);
         if (!sample || !oscillatorSample || !std::isfinite(allocationPhase) || allocationPhase < 0 || allocationPhase >= 1) { return {}; }
