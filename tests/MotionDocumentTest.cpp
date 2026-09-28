@@ -1442,7 +1442,8 @@ private:
         motif->tracks[0].clips[0].properties["weight"] = motion::Curve(1);
         const motion::PreparedComposition cuts(visual);
         expect(cuts.preparationError.isEmpty(), cuts.preparationError);
-        expect(cuts.sample(6.1, 0.2).r > 0, "Interior sample remains visible after the instance cut");
+        const auto after = std::find_if(cuts.clips.begin(), cuts.clips.end(), [](const auto& clip) { return clip.active(6.1); });
+        expect(after != cuts.clips.end() && after->sample(6.1, 0.2).r > 0, "The later instance is active and lit after the instance cut");
         beginTest("Invalid reusable graph loads leave the existing document untouched");
         auto cyclic = xml;
         auto* nestedClip = cyclic.getChildByName("definition")->getChildByName("composition")->getChildByName("track")->getChildByName("clip");

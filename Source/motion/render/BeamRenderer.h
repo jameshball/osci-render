@@ -108,7 +108,7 @@ private:
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
     osci::Point output(const PreparedComposition& composition, const Layer& layer, osci::Point raw) const {
-        return composition.projectPoint(layer.clip->processPoint(raw, planTime), planTime);
+        return composition.projectVisible(layer.clip->processPoint(raw, planTime), planTime).value_or(osci::Point(0, 0, 0, 0, 0, 0));
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -345,7 +345,8 @@ private:
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
                     raw = segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
                 }
-                return composition.projectPoint(segment->clip->processPoint(raw, planTime), planTime);
+                // Behind the camera there is no position: hold dark at the entry.
+                return composition.projectVisible(segment->clip->processPoint(raw, planTime), planTime).value_or(dark(segment->from));
             }
             case Kind::midi: {
                 const auto n = segment->count;
@@ -357,8 +358,9 @@ private:
                 if (current.note == 0) { return dark(segment->from); }
                 auto raw = segment->source->sampleFrame(segment->frame, current.phase, current.phaseSpan);
                 const bool edge = j == 0 || j == n - 1 || at(j - 1).note != current.note || at(j + 1).note != current.note;
-                auto point = composition.projectPoint(segment->clip->processPoint(raw, planTime), planTime);
-                return edge ? dark(point) : point;
+                const auto projected = composition.projectVisible(segment->clip->processPoint(raw, planTime), planTime);
+                if (!projected.has_value()) { return dark(segment->from); }
+                return edge ? dark(*projected) : *projected;
             }
         }
         return {0, 0, 0, 0, 0, 0};

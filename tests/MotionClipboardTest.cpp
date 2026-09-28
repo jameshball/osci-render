@@ -91,6 +91,31 @@ public:
             expect(f.undo.undo());
             expect(!f.clip(f.second)->properties.at("position.x").animated());
         }
+        beginTest("Musical tempo changes keep markers, cuts and project-time keys on their beats");
+        for (const bool musical : {true, false}) {
+            Fixture f; f.initialise();
+            motion::Camera camera; camera.id = f.document.newId();
+            camera.properties["position.x"].setKey({2, 0, motion::Interpolation::cubic, 0, 1});
+            camera.properties["position.x"].setKey({4, 2, motion::Interpolation::linear});
+            f.document.edit("Setup", [&](motion::Project& project) {
+                project.timeDisplay = musical ? motion::TimeDisplay::beats : motion::TimeDisplay::seconds;
+                project.cameras = {camera};
+                project.cameraCuts = {{f.document.newId(), camera.id, 2, 2}};
+                project.markers = {{f.document.newId(), 3, "Drop"}};
+            });
+            expect(f.document.changeTempo(240).wasOk());
+            const auto& project = f.document.project();
+            const auto scale = musical ? .5 : 1.0;
+            expectWithinAbsoluteError(project.markers[0].time, 3 * scale, 1e-12);
+            expectWithinAbsoluteError(project.cameraCuts[0].start, 2 * scale, 1e-12);
+            expect(project.cameraCuts[0].end() <= 4 * scale + 1e-12);
+            const auto& keys = project.cameras[0].properties.at("position.x").keyframes();
+            expectWithinAbsoluteError(keys[1].time, 4 * scale, 1e-12);
+            expectWithinAbsoluteError(keys[0].outgoingSlope, 1 / scale, 1e-12, "Slopes steepen with the shorter span");
+            expect(f.undo.undo());
+            expectWithinAbsoluteError(f.document.project().markers[0].time, 3.0, 1e-12);
+        }
+
         beginTest("Locked tracks reject pasted keys without an undo step");
         {
             Fixture f; f.initialise();

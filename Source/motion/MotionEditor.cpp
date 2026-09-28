@@ -121,7 +121,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &splitButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &splitButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs, &statusBar }) {
         addAndMakeVisible(component);
     }
     addChildComponent(scopeBack);
@@ -219,7 +219,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             auto* holder = juce::StandalonePluginHolder::getInstance();
             const auto result = holder != nullptr ? holder->configureOutputChannels(5) : juce::Result::fail("Five-channel output requires the standalone audio device.");
             if (result.failed()) {
-                assetLibrary.setError(result.getErrorMessage());
+                statusBar.show(result.getErrorMessage());
                 monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
                 return;
             }
@@ -437,7 +437,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                 const auto& current = owner->processor.document.mainProject().definitions;
                 if (std::find(current.begin(), current.end(), expected) == current.end()) { return; }
                 const auto result = owner->processor.document.removeComposition(id);
-                if (result.failed()) { owner->assetLibrary.setError(result.getErrorMessage()); }
+                if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
             });
     };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
@@ -475,7 +475,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                 if (owner == nullptr || dialog == nullptr) { return; }
                 if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
                     const auto result = owner->processor.document.setMidiInstrument(id, settings);
-                    if (result.failed()) { owner->assetLibrary.setError(result.getErrorMessage()); }
+                    if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
                 }
                 owner->dismissOverlay(dialog.getComponent());
             });
@@ -585,6 +585,8 @@ void MotionEditor::resized() {
     tempoLabel.setBounds(transport.removeFromLeft(34));
     timingButton.setBounds(transport.removeFromLeft(140).reduced(0, 3));
     area.removeFromTop(3);
+    statusBar.setBounds(area.removeFromBottom(20));
+    area.removeFromBottom(2);
     workspaceHeight = area.getHeight();
     timelineBounds = area.removeFromBottom(std::clamp(juce::roundToInt(workspaceHeight * timelineFraction), 240, workspaceHeight - 370));
     auto timeline = timelineBounds;
@@ -682,7 +684,7 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
         && !motion::Document::isMidiSource(extension) && extension != ".gpla" && extension != ".json" && extension != ".lottie"
         && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
         importError = "This source type is not connected yet.";
-        assetLibrary.setError(importError);
+        statusBar.show(importError);
         repaint();
         return false;
     }
@@ -809,7 +811,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
         for (const auto& asset : document.mainProject().assets) { if (asset->id == sourceId) { expected = asset; break; } }
         *panelIdentity = expected->liveIdentity;
         const auto listening = start ? owner->processor.blenderInputs().listen(sourceId, true) : juce::Result::ok();
-        if (listening.failed()) { owner->assetLibrary.setError(listening.getErrorMessage()); }
+        if (listening.failed()) { owner->statusBar.show(listening.getErrorMessage()); }
         if (creating) {
             juce::MessageManager::callAsync([owner, dialog, sourceId, generation, identity = expected->liveIdentity] {
                 if (owner == nullptr || dialog == nullptr || owner->processor.document.generation() != generation) { return; }
@@ -871,7 +873,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
                 auto& document = owner->processor.document;
                 const auto& sources = document.mainProject().assets;
                 if (std::none_of(sources.begin(), sources.end(), [&](const auto& source) { return source->liveIdentity == identity; })) { return; }
-                if (result.failed()) { owner->assetLibrary.setError(result.getErrorMessage()); return; }
+                if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
                 asset->id = document.newId();
                 document.edit("Capture Blender source", [&](motion::Project& project) { project.assets.push_back(asset); });
                 owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
@@ -986,7 +988,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
         if (!processor.ensureFFmpegExists()) { return; }
     }
     importError.clear();
-    assetLibrary.setError({});
+    statusBar.clear();
     auto asset = std::make_shared<motion::Asset>();
     asset->name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
     asset->extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension().toLowerCase();
@@ -1034,7 +1036,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
             if (result.failed()) {
                 owner->importError = result.getErrorMessage();
-                owner->assetLibrary.setError(owner->importError);
+                owner->statusBar.show(owner->importError);
                 owner->repaint();
                 if (request.uniqueClip == 0 && request.replacement != nullptr && (request.replacement->extension.equalsIgnoreCase(".lua") || request.replacement->extension.equalsIgnoreCase(".txt"))) {
                     const auto& assets = owner->processor.document.project().assets;
@@ -1051,7 +1053,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             auto& document = owner->processor.document;
             if (request.uniqueClip != 0) {
                 const auto separated = document.makeSourceUnique(request.uniqueClip, request.replacement, asset);
-                if (separated.failed()) { owner->assetLibrary.setError(separated.getErrorMessage()); return; }
+                if (separated.failed()) { owner->statusBar.show(separated.getErrorMessage()); return; }
                 owner->assetLibrary.refresh();
                 owner->assetLibrary.selectAsset(asset->id);
                 owner->libraryTabs.setSelectedIndex(0);
@@ -1061,7 +1063,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (request.replacement != nullptr) {
                 const auto& assets = document.project().assets;
                 if (std::find(assets.begin(), assets.end(), request.replacement) == assets.end()) {
-                    owner->assetLibrary.setError("The source changed while baking. Its previous result has been kept.");
+                    owner->statusBar.show("The source changed while baking. Its previous result has been kept.");
                     return;
                 }
                 asset->id = request.replacement->id;
@@ -1107,12 +1109,29 @@ void MotionEditor::timerCallback() {
         previewRate.setUnnormalisedValueNotifyingHost(projectFrameRate);
     }
     canvasButton.setEnabled(!visualiser.isRecording() && exportState == nullptr);
+    {
+        const auto rate = processor.exportSampleRate();
+        const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate);
+        const auto layers = processor.beamLayers.load(std::memory_order_relaxed);
+        const auto interleave = processor.beamInterleave.load(std::memory_order_relaxed);
+        const juce::String dot(juce::CharPointer_UTF8("  \xc2\xb7  "));
+        auto statistics = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
+        if (processor.playing.load() || layers > 0) {
+            statistics += dot + juce::String(layers) + (layers == 1 ? " layer" : " layers");
+            if (interleave > 1) { statistics += dot + "dense: each layer every " + juce::String(interleave) + " cycles"; }
+        }
+        statusBar.setStatistics(statistics);
+    }
     processor.collectPreparedState();
     assetLibrary.updateLiveStatus();
     const auto preparationError = processor.getPreparationError();
     if (preparationError != lastPreparationError) {
         lastPreparationError = preparationError;
-        if (preparationError.isNotEmpty()) { osci::showOverlayMessage(*this, "Cannot play composition", preparationError); }
+        if (preparationError.isNotEmpty()) {
+            statusBar.show("The latest edit cannot play: " + preparationError + " Playing the last valid version.", MotionStatusBar::Kind::warning);
+        } else if (statusBar.text().startsWith("The latest edit cannot play")) {
+            statusBar.clear();
+        }
     }
     if (pendingImports.empty()) {
         assetLibrary.setImportStatus({});
@@ -1200,9 +1219,9 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     previous.effects = effectsPanel.viewState(); previous.cameraSelection = cameraPanel.selectedCameraId();
     composition.setNavigating(false);
     const auto entered = processor.document.enterComposition(definition);
-    if (entered.failed()) { assetLibrary.setError(entered.getErrorMessage()); return; }
+    if (entered.failed()) { statusBar.show(entered.getErrorMessage()); return; }
     scopeHistory.push_back(previous);
-    assetLibrary.setError({});
+    statusBar.clear();
     processor.playing.store(false);
     processor.seek(std::clamp(time, 0.0, processor.document.project().duration));
     composition.restoreView({});
@@ -1216,7 +1235,7 @@ void MotionEditor::leaveComposition() {
     if (!scopeHistory.empty()) { previous = scopeHistory.back(); scopeHistory.pop_back(); }
     auto entered = processor.document.enterComposition(previous.scope);
     if (entered.failed()) { previous = {}; processor.document.enterComposition(0); scopeHistory.clear(); }
-    assetLibrary.setError({});
+    statusBar.clear();
     processor.playing.store(false); processor.seek(previous.position);
     select(previous.selection);
     cameraPanel.restoreSelection(previous.cameraSelection);
@@ -1413,7 +1432,7 @@ void MotionEditor::exportVideo() {
     try {
         beamSnapshot = captureOfflineVisualiserParameters();
     } catch (const std::exception& error) {
-        assetLibrary.setError("Cannot capture the beam settings: " + juce::String(error.what()));
+        statusBar.show("Cannot capture the beam settings: " + juce::String(error.what()));
         return;
     }
     auto config = recordingSettings.createVideoEncodingConfiguration();
@@ -1449,7 +1468,7 @@ void MotionEditor::exportVideo() {
                 const auto destination = selected.getResult();
                 if (!destination.getFileExtension().equalsIgnoreCase("." + config.fileExtension)) {
                     owner->exportState.reset();
-                    owner->assetLibrary.setError("Video export requires a ." + config.fileExtension + " filename. Choose Export video again and use that extension.");
+                    owner->statusBar.show("Video export requires a ." + config.fileExtension + " filename. Choose Export video again and use that extension.");
                     return;
                 }
                 owner->processor.setLastOpenedDirectory(destination.getParentDirectory());
@@ -1496,7 +1515,7 @@ void MotionEditor::exportVideo() {
                             if (state->cancelled.load() || result.failed()) {
                                 if (preparationOverlay != nullptr) { owner->dismissOverlay(preparationOverlay.getComponent()); }
                                 owner->exportState.reset();
-                                if (!state->cancelled.load()) { owner->assetLibrary.setError(result.getErrorMessage()); }
+                                if (!state->cancelled.load()) { owner->statusBar.show(result.getErrorMessage()); }
                                 return;
                             }
                             auto startRender = [owner, state, temporary, config, destination, renderMode, beamSnapshot] {
@@ -1542,7 +1561,7 @@ void MotionEditor::exportSignal() {
         const auto destination = selected.getResult();
         if (!destination.getFileExtension().equalsIgnoreCase(".wav")) {
             owner->exportState.reset();
-            owner->assetLibrary.setError("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
+            owner->statusBar.show("Signal export requires a .wav filename. Choose Export XYRGB signal again and use that extension.");
             return;
         }
         const auto project = owner->processor.document.mainProject();
@@ -1560,7 +1579,7 @@ void MotionEditor::exportSignal() {
                 owner->exportBar.setVisible(false);
                 owner->cancelExport.setVisible(false);
                 if (result.failed() && !state->cancelled.load()) {
-                    owner->assetLibrary.setError(result.getErrorMessage());
+                    owner->statusBar.show(result.getErrorMessage());
                 }
             });
         });

@@ -1,6 +1,7 @@
 #include "../live/BlenderCaptureArchive.h"
 #include "Document.h"
 #include "PropertyTarget.h"
+#include "PropertySchema.h"
 #include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
 #include "../import/LuaBaker.h"
@@ -589,6 +590,40 @@ juce::Result Document::changeTempo(double bpm) {
     if (bpm == state.bpm) { return juce::Result::ok(); }
     auto next = state;
     next.bpm = bpm;
+    // In musical time, everything placed in project time keeps its bar
+    // position, like beat-anchored clips. Seconds projects keep seconds.
+    if (state.timeDisplay == TimeDisplay::beats) {
+        const auto ratio = state.bpm / bpm;
+        const auto scaleCurve = [ratio](Curve& curve) {
+            auto keys = curve.keyframes();
+            for (const auto& key : keys) { curve.removeKey(key.time); }
+            for (auto key : keys) {
+                key.time *= ratio;
+                key.incomingSlope /= ratio;
+                key.outgoingSlope /= ratio;
+                curve.setKey(key);
+            }
+        };
+        const auto scaleEffects = [&](std::vector<EffectInstance>& effects) {
+            for (auto& effect : effects) {
+                for (auto& [name, curve] : effect.properties) { scaleCurve(curve); }
+                if (effect.range.has_value()) { effect.range->start *= ratio; effect.range->duration *= ratio; }
+            }
+        };
+        for (auto& marker : next.markers) { marker.time *= ratio; }
+        for (auto& cut : next.cameraCuts) {
+            const auto end = cut.end() * ratio;
+            cut.start *= ratio;
+            cut.duration = spanUntil(cut.start, end);
+        }
+        for (auto& camera : next.cameras) { for (auto& [name, curve] : camera.properties) { scaleCurve(curve); } }
+        for (auto& group : next.groups) {
+            for (auto& [name, curve] : group.properties) { scaleCurve(curve); }
+            scaleEffects(group.effects);
+        }
+        for (auto& track : next.tracks) { scaleEffects(track.effects); }
+        scaleEffects(next.effects);
+    }
     for (auto& track : next.tracks) {
         std::sort(track.clips.begin(), track.clips.end(), [bpm](const auto& a, const auto& b) { return a.timing(bpm).start < b.timing(bpm).start; });
         double previousEnd = 0;
@@ -1867,13 +1902,25 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
                 if (!prepared) { return juce::Result::fail(prepared.error); }
                 clip.midi = prepared.source;
             }
+            // Every clip property must be a known, unique schema entry whose
+            // values lie inside its declared range.
+            const auto specs = track.kind == TrackKind::audio ? audioPropertySpecs() : objectPropertySpecs();
             for (auto* property : item->getChildWithTagNameIterator("property")) {
+                const auto name = property->getStringAttribute("name").toStdString();
+                const auto* spec = findPropertySpec(specs, name);
+                if (spec == nullptr || clip.properties.contains(name)) {
+                    return juce::Result::fail("Unknown or duplicate clip property \"" + juce::String(name) + "\".");
+                }
                 Curve curve;
                 const auto result = loadProperty(*property, curve);
                 if (result.failed()) {
                     return result;
                 }
-                clip.properties[property->getStringAttribute("name").toStdString()] = std::move(curve);
+                const auto inRange = [spec](double value) { return std::isfinite(value) && value >= spec->minimum && value <= spec->maximum; };
+                if (!inRange(curve.base) || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [&](const auto& key) { return !inRange(key.value); })) {
+                    return juce::Result::fail(juce::String(spec->label.data(), spec->label.size()) + " is outside its allowed range.");
+                }
+                clip.properties[name] = std::move(curve);
             }
             const auto clipEffects = loadEffects(*item, clip.effects, identities);
             if (clipEffects.failed()) {

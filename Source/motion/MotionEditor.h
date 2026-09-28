@@ -14,6 +14,7 @@
 #include "ui/ModulationPanel.h"
 #include "ui/PlaybackHealth.h"
 #include "ui/PropertyInspector.h"
+#include "ui/StatusBar.h"
 #include <deque>
 #include <variant>
 
@@ -140,6 +141,7 @@ private:
     juce::ComboBox monitorOutput;
     juce::TextButton canvasButton { "Canvas" };
     MotionPropertyInspector propertyInspector;
+    MotionStatusBar statusBar;
     motion::Id selection = 0;
     motion::Id curveTarget = 0;
     std::string curvePropertyName = "position.x";

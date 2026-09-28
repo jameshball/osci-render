@@ -85,7 +85,7 @@ def area():
 
 def drag(label, x, dx, row=0):
     bounds = area()
-    y = bounds['y'] + 68 + row * 40
+    y = bounds['y'] + 64 + row * 32
     step(label, 'drag-xy', bounds['x'] + x, y, bounds['x'] + x + dx, y, '--steps', 8)
 
 

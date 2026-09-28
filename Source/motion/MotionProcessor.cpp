@@ -45,7 +45,10 @@ void MotionProcessor::handleAsyncUpdate() {
     acceptedPreparationRevision = result->revision;
     preparationError = result->error;
     preparationFailed.store(preparationError.isNotEmpty());
-    if (result->composition != nullptr) {
+    // A failed edit keeps playing the last good snapshot instead of blanking;
+    // the editor reports the error. The audio thread only ever sees snapshots
+    // that prepared completely.
+    if (result->composition != nullptr && preparationError.isEmpty() && result->composition->preparationError.isEmpty()) {
         result->composition->publicationRevision = result->revision;
         composition.publish(std::move(result->composition));
     }
@@ -119,7 +122,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     // must be populated each block before music monitoring or physical XY output.
     volumeEffect->animateValues(count, nullptr);
     thresholdEffect->animateValues(count, nullptr);
-    if (prepared == nullptr || preparationFailed.load() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
+    if (prepared == nullptr || prepared->preparationError.isNotEmpty() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
         unavailableRecording();
         liveMidi.reset();
         midi.clear();
@@ -241,6 +244,8 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         }
     }
     midi.clear();
+    beamLayers.store(static_cast<int>(beam.plannedLayers()), std::memory_order_relaxed);
+    beamInterleave.store(static_cast<int>(beam.plannedInterleave()), std::memory_order_relaxed);
     audioTime = static_cast<double>(audioSample) / sampleRate;
     position.store(audioTime);
     juce::AudioBuffer<float> block(signal.getArrayOfWritePointers(), 6, count);

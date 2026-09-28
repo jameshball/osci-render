@@ -261,6 +261,28 @@ public:
             }
         }
 
+        beginTest("Geometry through the camera plane never streaks or parks lit at the origin");
+        {
+            auto layers = project({{square(1, .5f)}});
+            motion::Camera camera;
+            camera.id = 50;
+            // The camera flies through the square: some cycles place it behind the lens.
+            camera.properties["position.z"] = motion::Curve(1.0);
+            camera.properties["position.z"].setKey({0, 1.0, motion::Interpolation::linear});
+            camera.properties["position.z"].setKey({2, -1.0, motion::Interpolation::linear});
+            layers.cameras = {camera};
+            const motion::PreparedComposition composition(layers, 48000);
+            motion::BeamRenderer beam;
+            int huge = 0, litOrigin = 0;
+            for (std::int64_t index = 0; index < 96000; ++index) {
+                const auto p = beam.sample(composition, index / 48000.0, index, 48000, true, 1);
+                if (std::abs(p.x) > motion::PreparedComposition::outputLimit || std::abs(p.y) > motion::PreparedComposition::outputLimit) { ++huge; }
+                if (!dark(p) && p.x == 0 && p.y == 0) { ++litOrigin; }
+            }
+            expectEquals(huge, 0);
+            expectEquals(litOrigin, 0);
+        }
+
         beginTest("Twenty-layer renderer throughput diagnostic");
         {
             std::vector<Layer> layers;

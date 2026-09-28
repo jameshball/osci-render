@@ -70,6 +70,11 @@ private:
     motion::LiveMidiPerformance liveMidi;
     motion::MidiRecording midiRecording;
     std::unique_ptr<motion::MidiRecordingSession> midiSession;
+public:
+    // Last beam plan, for the status bar. Written by the audio thread.
+    std::atomic<int> beamLayers {0};
+    std::atomic<int> beamInterleave {1};
+private:
     bool armMidiRecording(const motion::MidiRecording::Config& config);
     void stopMidiDevice();
     void releaseRecordingTransport();

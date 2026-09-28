@@ -8,6 +8,7 @@
 #include "SampleClock.h"
 #include <array>
 #include <numbers>
+#include <optional>
 
 namespace motion {
 inline osci::Point applySourceColour(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm) {
@@ -138,6 +139,20 @@ struct PreparedCamera {
     std::array<Curve, 7> curves;
     double bpm = 120;
 
+    bool visible(osci::Point point, double time) const {
+        std::array<double, 6> values;
+        for (std::size_t index = 0; index < values.size(); ++index) {
+            values[index] = curves[index].evaluate(time, bpm);
+            if (!std::isfinite(values[index])) { return false; }
+        }
+        point.translate(-values[0], -values[1], -values[2]);
+        constexpr auto radians = std::numbers::pi / 180.0;
+        point.rotate(0.0f, 0.0f, -values[5] * radians);
+        point.rotate(0.0f, -values[4] * radians, 0.0f);
+        point.rotate(-values[3] * radians, 0.0f, 0.0f);
+        return std::isfinite(point.z) && -point.z > nearPlane;
+    }
+    static constexpr float nearPlane = 0.05f;
     osci::Point projectPoint(osci::Point point, double time) const {
         std::array<double, 7> values;
         for (std::size_t index = 0; index < values.size(); ++index) {
@@ -330,27 +345,37 @@ struct PreparedComposition {
         return applyEffects(effects, point, time, bpm);
     }
 
-    osci::Point projectPoint(osci::Point point, double time) const {
+    // Output space is the unit square. Geometry behind the camera has no
+    // position; geometry far outside the frame is clamped and blanked so no
+    // exported or live signal carries huge off-screen excursions.
+    static constexpr float outputLimit = 8.0f;
+    std::optional<osci::Point> projectVisible(osci::Point point, double time) const {
         if (!std::isfinite(time) || !std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
-            return { 0, 0, 0, 0, 0, 0 };
+            return std::nullopt;
         }
         point = applyCompositionEffects(point, time);
         const auto* camera = activeCamera(time);
         if (camera != nullptr) {
-            return camera->projectPoint(point, time);
+            if (!camera->visible(point, time)) { return std::nullopt; }
+            point = camera->projectPoint(point, time);
+        } else {
+            // Empty camera collections retain the original fixed output framing.
+            const auto depth = 4.0f - point.z;
+            if (depth <= 0.05f) { return std::nullopt; }
+            point.x *= 4.0f / depth;
+            point.y *= 4.0f / depth;
+            point.z = 1.0f;
         }
-        // Empty camera collections retain the original fixed output framing.
-        const auto depth = 4.0f - point.z;
-        if (depth <= 0.05f) {
-            return { 0, 0, 0, 0, 0, 0 };
-        }
-        point.x *= 4.0f / depth;
-        point.y *= 4.0f / depth;
-        point.z = 1.0f;
-        if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
-            return { 0, 0, 0, 0, 0, 0 };
+        if (!std::isfinite(point.x) || !std::isfinite(point.y)) { return std::nullopt; }
+        if (std::abs(point.x) > outputLimit || std::abs(point.y) > outputLimit) {
+            point.x = std::clamp(point.x, -outputLimit, outputLimit);
+            point.y = std::clamp(point.y, -outputLimit, outputLimit);
+            point.r = point.g = point.b = 0;
         }
         return point;
+    }
+    osci::Point projectPoint(osci::Point point, double time) const {
+        return projectVisible(point, time).value_or(osci::Point(0, 0, 0, 0, 0, 0));
     }
 
     double duration;
