@@ -461,8 +461,8 @@ void ImageParser::findWhite(double thresholdPow, bool invert) {
     }
 }
 
-int ImageParser::jumpFrequency() {
-    return services->getSampleRate() * 0.005;
+int ImageParser::jumpFrequency(double sampleRate) {
+    return sampleRate * 0.005;
 }
 
 void ImageParser::findNearestNeighbour(int searchRadius, float thresholdPow, int stride, bool invert) {
@@ -506,7 +506,8 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
         return osci::Point();
     }
 
-    const int jumpInterval = juce::jmax(1, jumpFrequency());
+    const auto settings = services->getImageSampleSettings(blockSampleIndex);
+    const int jumpInterval = juce::jmax(1, jumpFrequency(settings.sampleRate));
     const int resetInterval = 10 * jumpInterval;
     if (count % jumpInterval == 0) {
         resetPosition();
@@ -515,8 +516,8 @@ osci::Point ImageParser::getSample(int blockSampleIndex) {
         std::fill(visited.begin(), visited.end(), false);
     }
 
-    float thresholdPow = services->getImageThreshold(blockSampleIndex) * 10 + 1;
-    findNearestNeighbour(10, thresholdPow, services->getImageStride(blockSampleIndex), services->getImageInverted());
+    float thresholdPow = settings.threshold * 10 + 1;
+    findNearestNeighbour(10, thresholdPow, settings.stride, settings.inverted);
     float maxDim = juce::jmax(width, height);
     count = (count + 1) % resetInterval;
     float widthDiff = (maxDim - width) / 2;

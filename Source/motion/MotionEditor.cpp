@@ -1428,7 +1428,7 @@ void MotionEditor::exportVideo() {
                 auto& recording = owner->processor.recordingParameters;
                 recording.setCanvasSize(config.renderSize);
                 recording.frameRate.setUnnormalisedValueNotifyingHost(static_cast<float>(config.frameRate));
-                recording.qualityParameter.setUnnormalisedValueNotifyingHost(static_cast<float>((51.0 - config.crf) / 50.0));
+                recording.qualityParameter.setUnnormalisedValueNotifyingHost(RecordingParameters::qualityForCRF(config.crf));
                 recording.losslessVideo.setBoolValue(config.crf == 0);
                 recording.recordAudio.setBoolValue(config.includeAudio);
                 recording.videoCodec = config.codec;

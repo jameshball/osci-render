@@ -5,10 +5,15 @@ int RecordingParameters::getCRF() const {
     if (losslessVideo.getBoolValue()) {
         return 0;
     }
-    const double quality = juce::jlimit(0.0f, 1.0f, qualityEffect->getValue());
-    // Round canonical CRF values back to themselves despite float storage error.
-    // CRF 0 remains reserved for the explicit lossless setting.
-    return juce::roundToInt(50.0 * (1.0 - quality) + 1.0);
+    double quality = juce::jlimit(0.0f, 1.0f, qualityEffect->getValue());
+    // mapping to 1-51 for ffmpeg's crf value (ignoring 0 as this is lossless and
+    // not supported by all media players)
+    return 50 * (1.0 - quality) + 1;
+}
+
+float RecordingParameters::qualityForCRF(int crf) {
+    // Aim for the middle of the truncated CRF bucket so float storage error cannot shift it.
+    return juce::jlimit(0.0f, 1.0f, static_cast<float>((50.5 - crf) / 50.0));
 }
 
 RecordingParameters::RecordingParameters() {

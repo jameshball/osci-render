@@ -702,10 +702,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         modulationEngine.beginModulationBlock(numSamples);
 
         // Fill modulation block buffers (type-specific generation)
-        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, blockDawPosition, uiVoiceActive);
-        envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
+        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, blockDawPosition, voiceTelemetry.uiVoiceActive);
+        envelopeParameters.fillBlockBuffers(numSamples, voiceTelemetry.uiVoiceEnvActive, voiceTelemetry.uiVoiceEnvValue);
         randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                          blockDawPosition.bpm.load(std::memory_order_relaxed), uiVoiceActive);
+                                          blockDawPosition.bpm.load(std::memory_order_relaxed), voiceTelemetry.uiVoiceActive);
 #endif
 
         // Always run the sidechain envelope follower so the UI display
@@ -1203,10 +1203,10 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (numVoices != currentVoices) {
             // Reset UI telemetry for voices that are about to be added/removed.
             const int lo = std::min(numVoices, currentVoices);
-            const int hi = std::min(std::max(numVoices, currentVoices), kMaxUiVoices);
+            const int hi = std::min(std::max(numVoices, currentVoices), VoiceTelemetry::kMaxUiVoices);
             for (int i = lo; i < hi; i++) {
-                uiVoiceActive[i].store(false, std::memory_order_relaxed);
-                uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
+                voiceTelemetry.uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                voiceTelemetry.uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
             }
         }
         voiceBuilder->setTargetVoiceCount(numVoices + 1); // +1 overlap voice for kill-fade
