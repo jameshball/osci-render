@@ -48,10 +48,17 @@ public:
         const auto found = motion::findPropertyTarget(processor.document.project(), target);
         const bool editable = found.has_value() && !found->isEffect;
         if (gesture.has_value() && processor.document.revision() != gesture->revision) { cancelGesture(); }
-        const auto specs = editable ? motion::propertySpecs(*found) : std::span<const motion::PropertySpec>{};
+        specList.clear();
+        if (editable) {
+            const auto base = motion::propertySpecs(*found);
+            specList.assign(base.begin(), base.end());
+            for (const auto& slider : luaSliders()) { specList.push_back(slider); }
+        }
+        const auto specs = std::span<const motion::PropertySpec>(specList);
         const auto modes = currentModes();
         motionModes = modes.has_value();
-        const auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
+        auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
+        signature << ":" << static_cast<int>(specList.size());
         if (signature != layoutSignature) {
             layoutSignature = signature;
             build(specs);
@@ -244,6 +251,7 @@ private:
     }
     void apply(motion::Project& project, const std::string& property, double value, double time) const {
         auto* curve = motion::findPropertyCurve(project, target, property);
+        if (curve == nullptr) { curve = createSlider(project, property); }
         if (curve == nullptr) { return; }
         if (curve->animated()) { curve->setKeyValue(time, value); } else { curve->base = value; }
     }
@@ -298,6 +306,7 @@ private:
         processor.document.edit(allKeyed ? "Remove keyframe" : "Set keyframe", [&](motion::Project& project) {
             for (auto& field : row.fields) {
                 auto* curve = motion::findPropertyCurve(project, target, std::string(field->spec.id));
+                if (curve == nullptr) { curve = createSlider(project, std::string(field->spec.id)); }
                 if (curve == nullptr) { continue; }
                 if (allKeyed) { curve->removeKey(time); } else { curve->setKeyValue(time, curve->evaluateBase(time)); }
             }
@@ -323,6 +332,32 @@ private:
         processor.seek(std::clamp(projectTime, 0.0, processor.document.project().duration));
     }
 
+    // Sliders a Lua clip's script reads (slider_a ...), plus any it already
+    // animates. Their curves are created on first edit.
+    std::vector<motion::PropertySpec> luaSliders() const {
+        std::vector<motion::PropertySpec> result;
+        const auto& project = processor.document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != target || clip.composition != 0) { continue; }
+                const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
+                if (asset == project.assets.end() || !(*asset)->extension.equalsIgnoreCase(".lua")) { return result; }
+                const auto script = juce::String::fromUTF8(static_cast<const char*>((*asset)->data.getData()), static_cast<int>((*asset)->data.getSize()));
+                for (const auto& spec : motion::luaSliderSpecs()) {
+                    const auto name = juce::String("slider_") + juce::String::charToString(static_cast<juce::juce_wchar>(spec.id.back()));
+                    if (script.contains(name) || clip.properties.contains(std::string(spec.id))) { result.push_back(spec); }
+                }
+                return result;
+            }
+        }
+        return result;
+    }
+    motion::Curve* createSlider(motion::Project& project, const std::string& property) const {
+        if (!property.starts_with("slider.")) { return nullptr; }
+        auto found = motion::findPropertyTarget(project, target);
+        if (!found.has_value() || found->properties == nullptr) { return nullptr; }
+        return &(*found->properties)[property];
+    }
     // (spatial path, quaternion rotation) of the target clip or group.
     std::optional<std::pair<bool, bool>> currentModes() const {
         const auto& project = processor.document.project();
@@ -373,6 +408,7 @@ private:
     juce::Component content;
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
+    std::vector<motion::PropertySpec> specList;
     motion::Id target = 0;
     juce::String layoutSignature = "none", namePrefix;
     std::optional<Gesture> gesture;

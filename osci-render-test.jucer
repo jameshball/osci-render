@@ -28,6 +28,8 @@
             resource="0" file="tests/MotionTempoMapTest.cpp"/>
       <FILE id="MotionMidiExprT" name="MotionMidiExpressionTest.cpp" compile="1"
             resource="0" file="tests/MotionMidiExpressionTest.cpp"/>
+      <FILE id="MotionLuaSlidersT" name="MotionLuaSlidersTest.cpp" compile="1"
+            resource="0" file="tests/MotionLuaSlidersTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
       <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"

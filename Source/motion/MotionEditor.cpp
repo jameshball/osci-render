@@ -602,6 +602,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     propertyInspector.selectedKeyTime = [this](motion::Id id) { return composition.selectedKeyContentTime(id); };
     propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
     processor.document.addChangeListener(this);
+    sliderBakes.onStatus = [this](const juce::String& text, bool error) { statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice); };
+    sliderBakes.update();
     composition.refresh();
     timeline.refreshTracks();
     refreshInspector();
@@ -1268,6 +1270,7 @@ void MotionEditor::timerCallback() {
 }
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
+    sliderBakes.update();
     if (processor.document.editingComposition() == 0) { scopeHistory.clear(); }
     if (scopeLabel.isBeingEdited() && scopeNameGeneration != processor.document.generation()) { scopeLabel.hideEditor(true); }
     if (!scopeLabel.isBeingEdited()) { scopeLabel.setText(processor.document.project().name, juce::dontSendNotification); }
@@ -1824,6 +1827,16 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
             : spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(name).replace(".", " "), static_cast<int>(index) + 1);
         if (property == name) {
             selectedIndex = static_cast<int>(index);
+        }
+    }
+    // A Lua clip's slider curves are graphable once they exist.
+    if (!audio && !camera && definition == nullptr && target.has_value() && target->properties != nullptr) {
+        for (const auto& spec : motion::luaSliderSpecs()) {
+            const std::string name(spec.id);
+            if (!target->properties->contains(name)) { continue; }
+            curveProperties.push_back(name);
+            curveProperty.addItem(juce::String(spec.label.data(), spec.label.size()), static_cast<int>(curveProperties.size()));
+            if (property == name) { selectedIndex = static_cast<int>(curveProperties.size()) - 1; }
         }
     }
     curveProperty.setSelectedId(selectedIndex + 1, juce::dontSendNotification);

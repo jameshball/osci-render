@@ -45,6 +45,27 @@ inline std::span<const PropertySpec> audioPropertySpecs() {
     return specs;
 }
 
+// A Lua source's sliders (slider_a .. slider_z in the script), 0..1, animated
+// per clip. Changes re-bake that clip's frames in the background.
+inline std::span<const PropertySpec> luaSliderSpecs() {
+    static constexpr PropertySpec specs[] {
+        {"slider.a", "Slider A", "Slider A", "", 0, 1, 0, .01, 3, ""}, {"slider.b", "Slider B", "Slider B", "", 0, 1, 0, .01, 3, ""},
+        {"slider.c", "Slider C", "Slider C", "", 0, 1, 0, .01, 3, ""}, {"slider.d", "Slider D", "Slider D", "", 0, 1, 0, .01, 3, ""},
+        {"slider.e", "Slider E", "Slider E", "", 0, 1, 0, .01, 3, ""}, {"slider.f", "Slider F", "Slider F", "", 0, 1, 0, .01, 3, ""},
+        {"slider.g", "Slider G", "Slider G", "", 0, 1, 0, .01, 3, ""}, {"slider.h", "Slider H", "Slider H", "", 0, 1, 0, .01, 3, ""},
+        {"slider.i", "Slider I", "Slider I", "", 0, 1, 0, .01, 3, ""}, {"slider.j", "Slider J", "Slider J", "", 0, 1, 0, .01, 3, ""},
+        {"slider.k", "Slider K", "Slider K", "", 0, 1, 0, .01, 3, ""}, {"slider.l", "Slider L", "Slider L", "", 0, 1, 0, .01, 3, ""},
+        {"slider.m", "Slider M", "Slider M", "", 0, 1, 0, .01, 3, ""}, {"slider.n", "Slider N", "Slider N", "", 0, 1, 0, .01, 3, ""},
+        {"slider.o", "Slider O", "Slider O", "", 0, 1, 0, .01, 3, ""}, {"slider.p", "Slider P", "Slider P", "", 0, 1, 0, .01, 3, ""},
+        {"slider.q", "Slider Q", "Slider Q", "", 0, 1, 0, .01, 3, ""}, {"slider.r", "Slider R", "Slider R", "", 0, 1, 0, .01, 3, ""},
+        {"slider.s", "Slider S", "Slider S", "", 0, 1, 0, .01, 3, ""}, {"slider.t", "Slider T", "Slider T", "", 0, 1, 0, .01, 3, ""},
+        {"slider.u", "Slider U", "Slider U", "", 0, 1, 0, .01, 3, ""}, {"slider.v", "Slider V", "Slider V", "", 0, 1, 0, .01, 3, ""},
+        {"slider.w", "Slider W", "Slider W", "", 0, 1, 0, .01, 3, ""}, {"slider.x", "Slider X", "Slider X", "", 0, 1, 0, .01, 3, ""},
+        {"slider.y", "Slider Y", "Slider Y", "", 0, 1, 0, .01, 3, ""}, {"slider.z", "Slider Z", "Slider Z", "", 0, 1, 0, .01, 3, ""},
+    };
+    return specs;
+}
+
 inline std::span<const PropertySpec> cameraPropertySpecs() {
     static constexpr PropertySpec specs[] {
         {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},

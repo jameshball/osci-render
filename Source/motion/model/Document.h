@@ -144,6 +144,9 @@ public:
     // timing, keys and effects). The kind must match: visual for visual,
     // audio for audio.
     juce::Result replaceAsset(Id assetId, std::shared_ptr<const Asset> replacement);
+    // Installs a Lua clip's slider bake (a cache: no undo step). False when the
+    // clip no longer exists.
+    bool setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake);
     // Removes the listed sources (or every unused source when empty) that no
     // clip, composition or MIDI assignment references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);

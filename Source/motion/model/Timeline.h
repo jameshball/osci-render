@@ -64,6 +64,8 @@ private:
     double finish, length;
 };
 
+struct LuaClipBake;
+
 struct Clip {
     Id id = 0;
     Id asset = 0;
@@ -87,6 +89,9 @@ struct Clip {
     // rotation keys interpolate as orientations, free of gimbal lock.
     bool spatialPath = false;
     bool quaternionRotation = false;
+    // Lua clips with sliders keep their own baked frames (runtime cache, also
+    // saved with the project).
+    std::shared_ptr<const LuaClipBake> luaBake;
 
     // Canonical fields above use beats for musical clips, seconds otherwise.
     // Resolved content remains seconds so visual curves and their tangents are

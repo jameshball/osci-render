@@ -4,6 +4,7 @@
 #include <osci_scripting/osci_scripting.h>
 #include <atomic>
 #include <numbers>
+#include <functional>
 
 namespace motion {
 
@@ -12,8 +13,11 @@ namespace motion {
 // sought in any order without executing Lua on the audio or message thread.
 class LuaBaker {
 public:
+    // sliders(frameSeconds, values[26]) supplies slider_a..slider_z per frame
+    // (content seconds from the start of the bake); absent, sliders stay 0.
+    using Sliders = std::function<void(double, double*)>;
     static PreparedPointFrames::Result bake(const juce::String& name, const juce::String& script, const BakeSettings& settings,
-            const std::atomic<bool>* cancelled = nullptr, std::atomic<double>* progress = nullptr) {
+            const std::atomic<bool>* cancelled = nullptr, std::atomic<double>* progress = nullptr, const Sliders& sliders = {}) {
         if (progress != nullptr) { progress->store(0); }
         const auto error = settings.validate();
         if (!error.empty()) { return {nullptr, error}; }
@@ -47,6 +51,7 @@ public:
                 vars.step = static_cast<double>(index) + 1;
                 vars.phase = 2 * std::numbers::pi * static_cast<double>(index % settings.pointsPerFrame) / static_cast<double>(settings.pointsPerFrame);
                 vars.cycle = static_cast<double>(index / settings.pointsPerFrame) + 1;
+                if (sliders && index % settings.pointsPerFrame == 0) { sliders(static_cast<double>(index / settings.pointsPerFrame) / settings.frameRate, vars.sliders); }
                 vars.playTime = static_cast<double>(index) / vars.sampleRate;
                 vars.playTimeBeats = vars.playTime * settings.bpm / 60;
                 const auto result = parser.run(state, vars);

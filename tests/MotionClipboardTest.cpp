@@ -161,6 +161,27 @@ public:
             expect(f.document.pasteKeys(f.second, {{"position.x", 0, keys[0]}}, 4).failed());
             expect(f.undo.getUndoDescription() == description);
         }
+        beginTest("Replacing a source swaps its media under the same identity");
+        {
+            Fixture f; f.initialise();
+            const auto original = f.document.project().assets[0];
+            auto square = std::make_shared<motion::Asset>();
+            square->id = original->id; square->name = "square.svg"; square->extension = ".svg";
+            const juce::String svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><rect x='1' y='1' width='8' height='8' fill='none' stroke='black'/></svg>");
+            square->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+            expect(motion::Document::decodeAsset(*square).wasOk());
+            expect(f.document.replaceAsset(original->id, square).wasOk());
+            expect(f.document.project().assets[0]->name == "square.svg");
+            expect(f.clip(f.first) != nullptr && f.clip(f.first)->asset == original->id, "clips keep their source identity");
+            expect(f.undo.getUndoDescription() == "Replace source");
+            auto notes = std::make_shared<motion::Asset>(*square);
+            notes->midi = motion::MidiNotes::create({}).source;
+            notes->source.reset();
+            notes->drawing.reset();
+            expect(f.document.replaceAsset(original->id, notes).failed(), "a visual source cannot become a MIDI file");
+            expect(f.undo.undo());
+            expect(f.document.project().assets[0] == original);
+        }
     }
 };
 static MotionClipboardTest motionClipboardTest;

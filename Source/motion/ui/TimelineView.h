@@ -1978,7 +1978,10 @@ private:
     // Lanes list every animated property on a track's clips, in schema order.
     static std::vector<std::string> animatedProperties(const motion::Track& track) {
         std::vector<std::string> result;
-        const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
+        std::vector<motion::PropertySpec> specs;
+        const auto base = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
+        specs.assign(base.begin(), base.end());
+        if (track.kind == motion::TrackKind::visual) { specs.insert(specs.end(), motion::luaSliderSpecs().begin(), motion::luaSliderSpecs().end()); }
         for (const auto& spec : specs) {
             const std::string id(spec.id);
             const bool animated = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {

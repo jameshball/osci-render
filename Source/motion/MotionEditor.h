@@ -14,6 +14,7 @@
 #include "ui/EffectsPanel.h"
 #include "ui/ModulationPanel.h"
 #include "ui/ModulatorPanels.h"
+#include "render/LuaSliderBakes.h"
 #include "ui/PlaybackHealth.h"
 #include "ui/PropertyInspector.h"
 #include "ui/StatusBar.h"
@@ -119,6 +120,7 @@ private:
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
+    motion::LuaSliderBakes sliderBakes { processor.document };
     MotionScopeProfilePanel scopeProfilePanel { processor };
     MotionBeamSettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, scopeProfilePanel, 550, 500, 1500 };
     MotionTimelineView timeline;

@@ -5,6 +5,7 @@
 #include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
 #include "ModulationGraph.h"
+#include "LuaClipBake.h"
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
 #include "../import/RasterSourcePreparer.h"
@@ -846,6 +847,31 @@ std::size_t Document::assetUses(Id assetId) const {
     midi(whole);
     for (const auto& definition : whole.definitions) { if (definition != nullptr) { midi(*definition); } }
     return count;
+}
+
+bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
+    // A cache, not an edit: no undo step and no revision-guarded gesture is
+    // disturbed beyond a normal state refresh.
+    bool found = false;
+    const auto update = [&](auto& composition) {
+        for (auto& track : composition.tracks) {
+            for (auto& clip : track.clips) {
+                if (clip.id == clipId) { clip.luaBake = bake; found = true; }
+            }
+        }
+    };
+    auto next = state;
+    update(next);
+    for (auto& definition : next.definitions) {
+        if (definition == nullptr) { continue; }
+        auto copy = std::make_shared<CompositionDefinition>(*definition);
+        const auto before = found;
+        update(*copy);
+        if (found != before) { definition = std::move(copy); }
+    }
+    if (!found) { return false; }
+    apply(std::move(next));
+    return true;
 }
 
 juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> replacement) {
@@ -2216,6 +2242,11 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
             for (const auto& [name, curve] : clip.properties) {
                 saveProperty(*item, name, curve);
             }
+            if (clip.luaBake != nullptr && clip.luaBake->archive.getSize() > 0) {
+                auto* bake = item->createNewChildElement("luaBake");
+                bake->setAttribute("key", juce::String(clip.luaBake->key));
+                bake->addTextElement(clip.luaBake->archive.toBase64Encoding());
+            }
         }
     }
     for (const auto& camera : state.cameras) {
@@ -2531,9 +2562,11 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
             // Every clip property must be a known, unique schema entry whose
             // values lie inside its declared range.
             const auto specs = track.kind == TrackKind::audio ? audioPropertySpecs() : objectPropertySpecs();
+            const bool luaClip = clip.composition == 0 && found != assets.end() && (*found)->extension.equalsIgnoreCase(".lua");
             for (auto* property : item->getChildWithTagNameIterator("property")) {
                 const auto name = property->getStringAttribute("name").toStdString();
-                const auto* spec = findPropertySpec(specs, name);
+                auto* spec = findPropertySpec(specs, name);
+                if (spec == nullptr && luaClip) { spec = findPropertySpec(luaSliderSpecs(), name); }
                 if (spec == nullptr || clip.properties.contains(name)) {
                     return juce::Result::fail("Unknown or duplicate clip property \"" + juce::String(name) + "\".");
                 }
@@ -2547,6 +2580,21 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
                     return juce::Result::fail(juce::String(spec->label.data(), spec->label.size()) + " is outside its allowed range.");
                 }
                 clip.properties[name] = std::move(curve);
+            }
+            const auto* luaBake = item->getChildByName("luaBake");
+            if (luaBake != nullptr) {
+                // Saved slider bakes load without executing the script.
+                auto bake = std::make_shared<LuaClipBake>();
+                bake->key = luaBake->getStringAttribute("key").toStdString();
+                const auto encoded = luaBake->getAllSubText();
+                if (!luaClip || bake->key.empty() || static_cast<std::size_t>(encoded.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
+                    || !bake->archive.fromBase64Encoding(encoded) || bake->archive.getSize() == 0) {
+                    return juce::Result::fail("Invalid or oversized Lua slider bake.");
+                }
+                const auto frames = BakedSourceArchive::decode(bake->archive);
+                if (!frames) { return juce::Result::fail(juce::String(frames.error)); }
+                bake->source = std::make_shared<const PreparedSource>(frames.source);
+                clip.luaBake = std::move(bake);
             }
             const auto clipEffects = loadEffects(*item, clip.effects, identities);
             if (clipEffects.failed()) {

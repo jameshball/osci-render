@@ -7,6 +7,7 @@
 #include "PreparedMidiPerformance.h"
 #include "PreparedDrivers.h"
 #include "../model/SpatialMotion.h"
+#include "../model/LuaClipBake.h"
 #include "SampleClock.h"
 #include <array>
 #include <numbers>
@@ -427,7 +428,7 @@ struct PreparedComposition {
             static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1, scopeOf(stages, stages.size() - 1));
             item.rootTrack = stages.front().track->id;
             item.liveIdentity = (*asset)->liveIdentity;
-            item.source = (*asset)->source;
+            item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : (*asset)->source;
             if (item.source == nullptr) {
                 item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> {(*asset)->drawing}, 30.0);
             }
