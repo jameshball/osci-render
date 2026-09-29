@@ -47,6 +47,7 @@ public:
         }
         cancelDrag();
         selectedTime.reset();
+        companions.clear();
         targetId = id;
         propertyName = std::move(property);
         userView = false;
@@ -65,6 +66,7 @@ public:
             if (curve != nullptr && selectedTime.has_value() && findKey(*curve, *selectedTime) == nullptr) {
                 selectedTime.reset();
             }
+            std::erase_if(companions, [curve](double time) { return curve == nullptr || findKey(*curve, time) == nullptr; });
             if (!userView) {
                 fit();
             }
@@ -186,13 +188,19 @@ public:
                 diamond.lineTo(point.x, point.y + 5);
                 diamond.lineTo(point.x - 5, point.y);
                 diamond.closeSubPath();
-                const auto active = selectedTime.has_value() && key.time == *selectedTime;
+                const auto active = (selectedTime.has_value() && key.time == *selectedTime) || isCompanion(key.time);
                 g.setColour(active ? juce::Colours::white : juce::Colour(0xff70da91));
                 g.fillPath(diamond);
             }
             const auto x = timeX(processor.position.load());
             g.setColour(juce::Colour(0xffe7bc6c));
             g.drawLine(x, area.getY(), x, area.getBottom(), 1.0f);
+        }
+        if (marquee.has_value()) {
+            g.setColour(osci::Colours::accentColor().withAlpha(.12f));
+            g.fillRect(*marquee);
+            g.setColour(osci::Colours::accentColor().withAlpha(.6f));
+            g.drawRect(*marquee);
         }
     }
 
@@ -219,13 +227,49 @@ public:
                 }
             }
         }
-        selectedTime = hitKey(*clip, *curve, event.position);
+        const auto previousPrimary = selectedTime;
+        const auto hit = hitKey(*clip, *curve, event.position);
+        if (hit.has_value() && event.mods.isShiftDown() && event.mods.isLeftButtonDown()) {
+            // Shift toggles a key in the selection without dragging.
+            if (isCompanion(*hit)) {
+                std::erase(companions, *hit);
+            } else if (previousPrimary.has_value() && *previousPrimary == *hit) {
+                // Deselecting the primary promotes the most recent companion.
+                selectedTime.reset();
+                if (!companions.empty()) {
+                    selectedTime = companions.back();
+                    companions.pop_back();
+                }
+            } else {
+                if (previousPrimary.has_value()) {
+                    companions.push_back(*previousPrimary);
+                }
+                selectedTime = hit;
+            }
+            repaint();
+            return;
+        }
+        if (hit.has_value() && (isCompanion(*hit) || (previousPrimary.has_value() && *previousPrimary == *hit))) {
+            // Grabbing a selected key keeps the group and makes it primary.
+            if (previousPrimary.has_value() && *previousPrimary != *hit) {
+                std::erase(companions, *hit);
+                companions.push_back(*previousPrimary);
+            }
+        } else {
+            companions.clear();
+        }
+        selectedTime = hit;
+        if (!hit.has_value() && event.mods.isLeftButtonDown() && !event.mods.isPopupMenu() && plot().contains(event.position)) {
+            marqueeStart = event.position;
+            marquee = juce::Rectangle<float>(event.position, event.position);
+        }
         if (!selectedTime.has_value() && event.mods.isLeftButtonDown() && onPropertyChosen) {
             const auto time = viewStart + (event.position.x - plot().getX()) / plot().getWidth() * (viewEnd - viewStart);
             const auto own = std::abs(valueY(curve->evaluateBase(clip->localTime(time))) - event.position.y);
             for (const auto& [name, colour] : siblings(*clip)) {
                 const auto distance = std::abs(valueY(clip->curve(name)->evaluateBase(clip->localTime(time))) - event.position.y);
                 if (distance < 6.0f && distance < own) {
+                    marquee.reset();
                     onPropertyChosen(name);
                     return;
                 }
@@ -238,6 +282,7 @@ public:
         } else if (selectedTime.has_value() && event.mods.isLeftButtonDown()) {
             const auto* key = findKey(*curve, *selectedTime);
             drag = Drag { *curve, *curve, *key, event.position, clip->start, clip->duration, clip->offset, clip->rate };
+            drag->companions = companions;
         }
         repaint();
     }
@@ -275,6 +320,25 @@ public:
     }
 
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (marquee.has_value()) {
+            marquee = juce::Rectangle<float>(marqueeStart, event.position);
+            const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+            const auto* curve = findCurve(clip, propertyName);
+            selectedTime.reset();
+            companions.clear();
+            if (curve != nullptr) {
+                for (const auto& key : curve->keyframes()) {
+                    if (!marquee->contains(keyPoint(*clip, key))) { continue; }
+                    if (!selectedTime.has_value()) {
+                        selectedTime = key.time;
+                    } else {
+                        companions.push_back(key.time);
+                    }
+                }
+            }
+            repaint();
+            return;
+        }
         if (!drag.has_value()) {
             return;
         }
@@ -313,7 +377,8 @@ public:
             // A drag cannot silently replace a neighbouring key. Double-click adds
             // and explicit deletion remain the ways to change the number of keys.
             const auto* collision = findKey(drag->originalCurve, key.time);
-            if (collision != nullptr && collision->time != drag->original.time) {
+            const auto movesWithGroup = collision != nullptr && std::find(drag->companions.begin(), drag->companions.end(), collision->time) != drag->companions.end();
+            if (collision != nullptr && collision->time != drag->original.time && !movesWithGroup) {
                 return;
             }
         }
@@ -321,6 +386,27 @@ public:
         if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
         drag->preview = drag->originalCurve;
         drag->preview.removeKey(drag->original.time);
+        if (drag->mode == DragMode::key && !drag->companions.empty()) {
+            // The whole selection moves by the primary key's time and value delta.
+            const auto timeDelta = key.time - drag->original.time, valueDelta = key.value - drag->original.value;
+            std::vector<motion::Keyframe> moved;
+            for (const auto time : drag->companions) {
+                const auto* original = findKey(drag->originalCurve, time);
+                if (original == nullptr) { continue; }
+                auto companion = *original;
+                companion.time += timeDelta;
+                companion.value = constrainedValue(*clip, companion.value + valueDelta);
+                drag->preview.removeKey(time);
+                moved.push_back(companion);
+            }
+            for (const auto& companion : moved) {
+                if (findKey(drag->preview, companion.time) != nullptr || std::abs(companion.time - key.time) < 1.0e-9) { return; }
+            }
+            if (findKey(drag->preview, key.time) != nullptr) { return; }
+            for (const auto& companion : moved) { drag->preview.setKey(companion); }
+            companions.clear();
+            for (const auto& companion : moved) { companions.push_back(companion.time); }
+        }
         drag->preview.setKey(key);
         selectedTime = key.time;
         repaint();
@@ -330,6 +416,11 @@ public:
     }
 
     void mouseUp(const juce::MouseEvent&) override {
+        if (marquee.has_value()) {
+            marquee.reset();
+            repaint();
+            return;
+        }
         if (!drag.has_value()) {
             return;
         }
@@ -343,7 +434,7 @@ public:
         if (valid && changed) {
             const auto id = targetId;
             const auto property = propertyName;
-            processor.document.edit(mode == DragMode::key ? "Move animation key" : "Edit cubic tangent", [id, property, preview = std::move(preview)](motion::Project& project) {
+            processor.document.edit(mode == DragMode::key ? (companions.empty() ? "Move animation key" : "Move animation keys") : "Edit cubic tangent", [id, property, preview = std::move(preview)](motion::Project& project) {
                 auto* target = mutableCurve(project, id, property);
                 if (target != nullptr) {
                     *target = preview;
@@ -365,12 +456,14 @@ public:
         }
         if (key.getModifiers().isCommandDown() && (key.getKeyCode() == 'Z' || key.getKeyCode() == 'z') && drag.has_value()) {
             selectedTime = drag->original.time;
+            companions = drag->companions;
             cancelDrag();
             refresh();
             return true;
         }
         if (key == juce::KeyPress::escapeKey && drag.has_value()) {
             selectedTime = drag->original.time;
+            companions = drag->companions;
             cancelDrag();
             refresh();
             return true;
@@ -424,6 +517,7 @@ private:
         double start, duration, offset, rate;
         DragMode mode = DragMode::key;
         juce::Point<float> handle;
+        std::vector<double> companions; // Other selected keys moving with the primary.
     };
 
     void cancelDrag() {
@@ -641,14 +735,16 @@ private:
         }
         const auto id = targetId;
         const auto property = propertyName;
-        const auto time = *selectedTime;
-        processor.document.edit("Delete animation key", [id, property, time](motion::Project& project) {
+        auto times = companions;
+        times.push_back(*selectedTime);
+        processor.document.edit(times.size() > 1 ? "Delete animation keys" : "Delete animation key", [id, property, times](motion::Project& project) {
             auto* target = mutableCurve(project, id, property);
             if (target != nullptr) {
-                target->removeKey(time);
+                for (const auto time : times) { target->removeKey(time); }
             }
         });
         selectedTime.reset();
+        companions.clear();
         refresh();
         return true;
     }
@@ -676,13 +772,16 @@ private:
             }
             const auto* current = findCurve(motion::findPropertyTarget(safe->processor.document.project(), id), property);
             const auto* currentKey = current != nullptr ? findKey(*current, original.time) : nullptr;
-            if (currentKey == nullptr || currentKey->interpolation == static_cast<motion::Interpolation>(result - 1)) {
+            if (currentKey == nullptr || (safe->companions.empty() && currentKey->interpolation == static_cast<motion::Interpolation>(result - 1))) {
                 return;
             }
-            safe->processor.document.edit("Change key interpolation", [id, property, time = original.time, result](motion::Project& project) {
-                auto* target = mutableCurve(project, id, property);
-                const auto* found = target != nullptr ? findKey(*target, time) : nullptr;
-                if (found != nullptr) {
+            auto times = safe->companions;
+            times.push_back(original.time);
+            safe->processor.document.edit(times.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, property, times, result](motion::Project& project) {
+                for (const auto time : times) {
+                    auto* target = mutableCurve(project, id, property);
+                    const auto* found = target != nullptr ? findKey(*target, time) : nullptr;
+                    if (found == nullptr) { continue; }
                     auto updated = *found;
                     const auto next = static_cast<motion::Interpolation>(result - 1);
                     const auto& keys = target->keyframes();
@@ -708,6 +807,10 @@ private:
     motion::Id targetId = 0;
     std::string propertyName;
     std::optional<double> selectedTime;
+    std::vector<double> companions; // Additional selected keys (content time).
+    std::optional<juce::Rectangle<float>> marquee;
+    juce::Point<float> marqueeStart;
+    bool isCompanion(double time) const { return std::any_of(companions.begin(), companions.end(), [time](double other) { return other == time; }); }
     std::optional<Drag> drag;
     double viewStart = 0.0, viewEnd = 1.0;
     double low = -1.0, high = 1.0;

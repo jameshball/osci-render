@@ -595,12 +595,20 @@ void MotionEditor::resized() {
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
     endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
-    transport.removeFromLeft(8);
-    timeLabel.setBounds(transport.removeFromLeft(118).reduced(0, 3));
-    transport.removeFromLeft(8);
+    // Narrow windows drop the BPM caption and tighten the readouts so the
+    // timing menu never collapses to nothing.
+    const auto compact = transport.getWidth() < 390;
+    if (compact != compactTransport) {
+        compactTransport = compact;
+        refreshTiming();
+    }
+    transport.removeFromLeft(compact ? 4 : 8);
+    timeLabel.setBounds(transport.removeFromLeft(compact ? 92 : 118).reduced(0, 3));
+    transport.removeFromLeft(compact ? 4 : 8);
     tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
-    tempoLabel.setBounds(transport.removeFromLeft(34));
-    timingButton.setBounds(transport.removeFromLeft(140).reduced(0, 3));
+    tempoLabel.setVisible(!compact);
+    tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34));
+    timingButton.setBounds(transport.removeFromLeft(compact ? std::max(0, transport.getWidth()) : 140).reduced(0, 3));
     area.removeFromTop(3);
     statusBar.setBounds(area.removeFromBottom(20));
     area.removeFromBottom(2);
@@ -1730,7 +1738,8 @@ void MotionEditor::refreshTiming() {
         else if (std::abs(project.snapBeats - 1.0 / 6) < 1.0e-9) { grid = "1/16 T"; }
         else { grid = "1/" + juce::String(4.0 / project.snapBeats, 0); }
     }
-    timingButton.setButtonText(juce::String(display) + " / " + grid + " " + juce::String::charToString(0x25be));
+    // The compact transport shows only the grid; the readout already shows the display unit.
+    timingButton.setButtonText((compactTransport ? grid : juce::String(display) + " / " + grid) + " " + juce::String::charToString(0x25be));
     timeline.repaint();
     curveEditor.repaint();
 }

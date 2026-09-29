@@ -69,7 +69,7 @@ try:
     step("undo child duplication", "click", "--name", "Undo", "--exact")
     step("redo child duplication", "click", "--name", "Redo", "--exact")
     step("open composition name", "click", "--name", "Composition 1", "--class", "juce::Label", "--exact", "--click-count", 2)
-    step("rename composition", "fill", "--class", "juce::TextEditor", "--exact", "Shared motif")
+    step("rename composition", "fill", "--name", "Composition name", "--class", "juce::TextEditor", "--exact", "Shared motif")
     step("commit composition name", "press", "Return")
     step("save renamed composition", "press", "command + s", "--class", "MotionEditor")
     saved = read_project(seed)

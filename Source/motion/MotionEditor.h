@@ -146,6 +146,7 @@ private:
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
     juce::Label tempoValue, tempoLabel;
     juce::TextButton timingButton;
+    bool compactTransport = false;
     juce::ComboBox monitorOutput;
     juce::TextButton canvasButton { "Canvas" };
     MotionPropertyInspector propertyInspector;

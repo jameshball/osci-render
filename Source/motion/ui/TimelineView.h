@@ -508,6 +508,14 @@ public:
                 g.drawText(marker.name, bounds.reduced(6, 0), juce::Justification::centredLeft, true);
             }
         }
+        if (snapGuide.has_value()) {
+            const auto x = timeX(*snapGuide);
+            if (x >= namesWidth && x <= getWidth()) {
+                g.setColour(motion::style::accent().withAlpha(.75f));
+                const float dashes[] {4.0f, 3.0f};
+                g.drawDashedLine(juce::Line<float>(static_cast<float>(x), static_cast<float>(rulerHeight), static_cast<float>(x), static_cast<float>(getHeight())), dashes, 2, 1.0f);
+            }
+        }
         const auto playhead = timeX(processor.position.load());
         if (playhead >= namesWidth && playhead <= getWidth()) {
             g.setColour(juce::Colour(0xff7de5a0));
@@ -667,7 +675,7 @@ public:
         if (markerDragging != 0) {
             auto updated = *before;
             const auto delta = (event.x - downX) / pixelsPerSecond;
-            const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapTime(markerOriginalTime + delta, event.mods), 0.0, updated.duration);
+            const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapEdge(markerOriginalTime + delta, event.mods, *before, {}), 0.0, updated.duration);
             if (std::any_of(updated.markers.begin(), updated.markers.end(), [this, time](const auto& marker) { return marker.id != markerDragging && std::abs(marker.time - time) < 1.0e-9; })) { return; }
             for (auto& marker : updated.markers) { if (marker.id == markerDragging) { marker.time = time; } }
             std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
@@ -682,9 +690,33 @@ public:
         auto edited = timing;
         auto delta = (event.x - downX) / pixelsPerSecond;
         if (delta != 0.0 && !event.mods.isAltDown()) {
-            const auto anchor = mode == Mode::right || mode == Mode::stretch || mode == Mode::rippleRight ? timing.end()
-                : (mode == Mode::slip ? timing.offset / timing.rate : timing.start);
-            delta = before->timeGrid().snap(anchor + delta) - anchor;
+            std::set<motion::Id> excluded(selectedClips.begin(), selectedClips.end());
+            excluded.insert(original.id);
+            if (mode == Mode::slip) {
+                const auto anchor = timing.offset / timing.rate;
+                delta = before->timeGrid().snap(anchor + delta) - anchor;
+            } else if (mode == Mode::move) {
+                // Either edge of a moving clip can catch a magnet.
+                const auto startTarget = magnet(timing.start + delta, *before, excluded);
+                const auto endTarget = magnet(timing.end() + delta, *before, excluded);
+                const auto startDistance = startTarget.has_value() ? std::abs(*startTarget - (timing.start + delta)) : 1.0e300;
+                const auto endDistance = endTarget.has_value() ? std::abs(*endTarget - (timing.end() + delta)) : 1.0e300;
+                if (startTarget.has_value() && startDistance <= endDistance) {
+                    delta = *startTarget - timing.start;
+                    snapGuide = startTarget;
+                } else if (endTarget.has_value()) {
+                    delta = *endTarget - timing.end();
+                    snapGuide = endTarget;
+                } else {
+                    delta = before->timeGrid().snap(timing.start + delta) - timing.start;
+                    snapGuide.reset();
+                }
+            } else {
+                const auto anchor = mode == Mode::right || mode == Mode::stretch || mode == Mode::rippleRight ? timing.end() : timing.start;
+                delta = snapEdge(anchor + delta, event.mods, *before, excluded) - anchor;
+            }
+        } else {
+            snapGuide.reset();
         }
         if (mode == Mode::rippleLeft || mode == Mode::rippleRight) {
             auto updated = *before;
@@ -770,6 +802,7 @@ public:
     }
 
     void mouseUp(const juce::MouseEvent&) override {
+        snapGuide.reset();
         if (keyDrag.has_value()) { endKeyDrag(); repaint(); return; }
         if (marquee.has_value()) { marquee.reset(); repaint(); return; }
         scrubbing = false;
@@ -1125,7 +1158,7 @@ private:
         if (timing.rate == 0) { return; }
         const auto grabbedTime = timing.start + (keyDrag->grabbed.time - timing.offset) / timing.rate;
         auto delta = (x - keyDrag->downX) / pixelsPerSecond;
-        if (delta != 0 && !modifiers.isAltDown()) { delta = keyDrag->before.timeGrid().snap(grabbedTime + delta) - grabbedTime; }
+        if (delta != 0) { delta = snapEdge(grabbedTime + delta, modifiers, keyDrag->before, {}, &keyDrag->keys) - grabbedTime; }
         auto updated = keyDrag->before;
         if (delta != 0 && !moveKeys(updated, keyDrag->keys, delta)) { return; }
         keyDrag->changed = delta != 0;
@@ -1768,8 +1801,59 @@ private:
     double snapTime(double time, juce::ModifierKeys modifiers) const {
         return modifiers.isAltDown() ? time : processor.document.project().timeGrid().snap(time);
     }
+    // Magnetic targets within 8 px: the playhead, markers, other clips' edges
+    // and keys shown in lanes. Keys being dragged and excluded clips are skipped.
+    std::optional<double> magnet(double time, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr, bool includePlayhead = true) const {
+        const auto reach = 8.0 / pixelsPerSecond;
+        std::optional<double> best;
+        auto bestDistance = reach;
+        const auto consider = [&](double candidate) {
+            const auto distance = std::abs(candidate - time);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = candidate;
+            }
+        };
+        if (includePlayhead) {
+            consider(processor.position.load());
+        }
+        for (const auto& marker : project.markers) { consider(marker.time); }
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (excludedClips.contains(clip.id)) { continue; }
+                const auto timing = clip.timing(project.bpm);
+                consider(timing.start);
+                consider(timing.end());
+                if (!expandedTracks.contains(track.id) || timing.rate == 0) { continue; }
+                for (const auto& [name, curve] : clip.properties) {
+                    for (const auto& key : curve.keyframes()) {
+                        const bool moving = movingKeys != nullptr && std::any_of(movingKeys->begin(), movingKeys->end(), [&](const auto& item) {
+                            return item.clip == clip.id && item.property == name && sameTime(item.time, key.time);
+                        });
+                        if (!moving) { consider(timing.start + (key.time - timing.offset) / timing.rate); }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+    // Snaps a moving edge: magnets first, then the grid; Alt bypasses both.
+    double snapEdge(double time, juce::ModifierKeys modifiers, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr) {
+        if (modifiers.isAltDown()) {
+            snapGuide.reset();
+            return time;
+        }
+        const auto target = magnet(time, project, excludedClips, movingKeys);
+        snapGuide = target;
+        return target.value_or(project.timeGrid().snap(time));
+    }
+    std::optional<double> snapGuide;
     void seek(int x, juce::ModifierKeys modifiers) {
-        processor.seek(std::clamp(snapTime(scrollTime + (x - namesWidth) / pixelsPerSecond, modifiers), 0.0, processor.document.project().duration));
+        // The playhead itself is excluded as a magnet while scrubbing it.
+        const auto raw = scrollTime + (x - namesWidth) / pixelsPerSecond;
+        const auto& project = processor.document.project();
+        auto target = modifiers.isAltDown() ? std::optional<double>() : magnet(raw, project, {}, nullptr, false);
+        processor.seek(std::clamp(target.value_or(snapTime(raw, modifiers)), 0.0, project.duration));
         repaint();
     }
     juce::TextButton addTrack;

@@ -281,6 +281,9 @@ def setup():
     subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "dah", "--timeout-ms", 30000)
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
+    step("canvas", "click", "--component-name", "Output canvas", "--class", "juce::TextButton", "--exact")
+    step("landscape", "select-option", "--name", "Canvas preset", "--exact", "--index", 2)
+    step("apply canvas", "click", "--name", "Apply canvas", "--exact")
     # The track starts 0.15 s before its first downbeat: slip it so bars fall on 1.6 s.
     import_source("dah 48k.flac", 0, duration=185.45, offset=0.15)
     save()
@@ -304,57 +307,57 @@ def intro():
 
 def mouths():
     # The singer: lips open on every beat. A second, magenta mouth answers on
-    # the off-beats; both return for the finale inside one swaying group.
+    # the off-beats; both return as a duet to open the finale.
     import_source("Mouth.lua", bar(7), duration=bar(30) - bar(7), bake=1.6)
     rename_track("Mouth")
-    set_properties({"position.x": -0.05, "position.y": 0.04, "scale.x": 0.9, "scale.y": 0.9, "scale.z": 0.9})
-    keys("Mouth", "Drawing", [(bar(7), {"weight": 0}), (bar(7.5), {"weight": 1})])
-    duplicate_to(bar(80), duration=bar(112) - bar(80))
-    set_properties({"position.x": -0.36, "scale.x": 0.72, "scale.y": 0.72, "scale.z": 0.72})
+    set_properties({"position.y": 0.05, "position.z": 0.3, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1})
+    keys("Mouth", "Drawing", [(bar(7), {"weight": 0}), (bar(7.5), {"weight": 2.5})])
+    duplicate_to(bar(80), duration=bar(96) - bar(80))
+    set_properties({"position.x": -0.42, "position.y": 0, "scale.x": 0.62, "scale.y": 0.62, "scale.z": 0.62})
     import_source("Mouth.lua", bar(22), duration=bar(30) - bar(22), bake=1.6, offset=BEAT / 2)
     rename_track("Answer")
-    set_properties({"position.x": 0.62, "position.y": 0.2, "scale.x": 0.5, "scale.y": 0.5, "scale.z": 0.5})
+    set_properties({"position.x": 0.72, "position.y": 0.36, "position.z": 0.3, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "weight": 2.2})
     add_effect("Colour", {"hue": -80, "saturation": 1.3})
-    duplicate_to(bar(80), duration=bar(112) - bar(80))
-    set_properties({"position.x": 0.36, "position.y": 0.02, "scale.x": 0.72, "scale.y": 0.72, "scale.z": 0.72})
+    duplicate_to(bar(80), duration=bar(96) - bar(80))
+    set_properties({"position.x": 0.42, "position.y": 0, "scale.x": 0.62, "scale.y": 0.62, "scale.z": 0.62})
     save()
 
 
 def sphere():
     import_source("Sphere.obj", bar(8), duration=bar(30) - bar(8))
     rename_track("Globe")
-    set_properties({"position.z": -1.2, "scale.x": 0.95, "scale.y": 0.95, "scale.z": 0.95, "rotation.x": 18,
-                    "red": 0.25, "green": 0.7, "blue": 1, "weight": 0.55})
+    # A large, dim backdrop rather than a competing subject.
+    # Beam time is shared between layers, so it only appears in the groove.
+    set_properties({"position.z": -2.2, "scale.x": 1.5, "scale.y": 1.5, "scale.z": 1.5, "rotation.x": 18,
+                    "red": 0.15, "green": 0.4, "blue": 0.9, "weight": 0.12})
     modulate("Rotation Y", "Saw", 180, beats=32)
-    duplicate_to(bar(80), duration=bar(112) - bar(80))
-    set_properties({"scale.x": 1.25, "scale.y": 1.25, "scale.z": 1.25, "weight": 0.45})
     save()
 
 
 def type_hits():
     # "do" on the downbeat, "da" on beat two, "dahh!" on beat four.
-    groove = {"red": 0.35, "green": 1, "blue": 0.6, "scale.x": 0.12, "scale.y": 0.12, "scale.z": 0.12}
-    words("do.txt", bar(10), bar(2), bar(30), BEAT, dict(groove, **{"position.x": -0.62, "position.y": 0.6}), "do")
+    groove = {"red": 0.35, "green": 1, "blue": 0.6, "scale.x": 0.15, "scale.y": 0.15, "scale.z": 0.15, "weight": 1.4}
+    words("do.txt", bar(10), bar(2), bar(30), BEAT, dict(groove, **{"position.x": -0.7, "position.y": 0.62}), "do")
     duplicate_to(bar(80), duration=BEAT)
     words_after = bar(84)
-    while words_after < bar(110):
+    while words_after < bar(94):
         duplicate_to(words_after)
         words_after += bar(4)
-    words("da.txt", bar(10) + BEAT, bar(2), bar(30), BEAT, dict(groove, **{"position.x": 0.62, "position.y": 0.6}), "da")
+    words("da.txt", bar(10) + BEAT, bar(2), bar(30), BEAT, dict(groove, **{"position.x": 0.7, "position.y": 0.62}), "da")
     duplicate_to(bar(80) + BEAT, duration=BEAT)
     words_after = bar(84) + BEAT
-    while words_after < bar(110):
+    while words_after < bar(94):
         duplicate_to(words_after)
         words_after += bar(4)
     words("dahh!.txt", bar(10) + 3 * BEAT, bar(2), bar(30), 2 * BEAT,
-          {"position.y": -0.64, "scale.x": 0.2, "scale.y": 0.2, "scale.z": 0.2, "red": 1, "green": 0.62, "blue": 0.25}, "dahh!")
+          {"position.y": -0.66, "scale.x": 0.24, "scale.y": 0.24, "scale.z": 0.24, "red": 1, "green": 0.62, "blue": 0.25, "weight": 1.6}, "dahh!")
     # The drop lands on one huge "dahh!".
     duplicate_to(bar(30), duration=bar(1))
-    set_properties({"position.y": 0, "scale.x": 0.5, "scale.y": 0.5, "scale.z": 0.5})
+    set_properties({"position.y": 0, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55})
     duplicate_to(bar(80) + 3 * BEAT, duration=2 * BEAT)
-    set_properties({"position.y": -0.64, "scale.x": 0.2, "scale.y": 0.2, "scale.z": 0.2})
+    set_properties({"position.y": -0.66, "scale.x": 0.24, "scale.y": 0.24, "scale.z": 0.24})
     words_after = bar(84) + 3 * BEAT
-    while words_after < bar(110):
+    while words_after < bar(94):
         duplicate_to(words_after)
         words_after += bar(4)
     save()
@@ -372,7 +375,7 @@ def ornaments():
     import_source("Equaliser.gif", bar(16), duration=bar(30) - bar(16))
     rename_track("Meter")
     set_properties({"position.y": 0.82, "scale.x": 0.13, "scale.y": 0.13, "scale.z": 0.13, "red": 0.35, "green": 1, "blue": 0.6, "weight": 0.7})
-    duplicate_to(bar(80), duration=bar(112) - bar(80))
+    duplicate_to(bar(80), duration=bar(88) - bar(80))
     save()
 
 
@@ -382,24 +385,24 @@ def drop():
     # at the far end pulse with the track's loudness.
     import_source("Tunnel.obj", bar(30), duration=bar(48) - bar(30))
     rename_track("Tunnel")
-    set_properties({"red": 0.3, "green": 0.9, "blue": 1, "weight": 0.9})
+    # Sources are normalised on import: restore the corridor's 14-unit depth.
+    set_properties({"scale.x": 7, "scale.y": 7, "scale.z": 7, "red": 0.3, "green": 0.9, "blue": 1, "weight": 0.8})
     modulate("Position Z", "Saw", 1, beats=8)
     modulate("Rotation Z", "Saw", 180, beats=16)
     add_effect("Vortex", {"strength": 0.35})
     duplicate_to(bar(88), duration=bar(112) - bar(88))
     import_source("Stars.obj", bar(30), duration=bar(48) - bar(30))
     rename_track("Stars")
-    set_properties({"red": 0.85, "green": 0.95, "blue": 1, "weight": 0.5})
+    set_properties({"scale.x": 3, "scale.y": 3, "scale.z": 3, "red": 0.85, "green": 0.95, "blue": 1, "weight": 0.7})
     modulate("Position Z", "Saw", 3, beats=4)
-    duplicate_to(bar(76), duration=bar(112) - bar(76))
+    duplicate_to(bar(88), duration=bar(112) - bar(88))
     import_source("DAHH.obj", bar(34), duration=bar(48) - bar(34))
     rename_track("Letters")
-    set_properties({"position.z": -4, "scale.x": 0.35, "scale.y": 0.35, "scale.z": 0.35, "red": 1, "green": 0.8, "blue": 0.55})
+    set_properties({"position.z": -2.5, "scale.x": 1.2, "scale.y": 1.2, "scale.z": 1.2, "red": 1, "green": 0.8, "blue": 0.55, "weight": 1.8})
     for axis in ("X", "Y", "Z"):
         modulate("Scale " + axis, "Soundtrack loudness", 0.9, mode="Multiply")
     modulate("Rotation Y", "Sine", 25, beats=8)
     duplicate_to(bar(96), duration=bar(112) - bar(96))
-    set_properties({"position.y": 0.55, "position.z": 0, "scale.x": 0.28, "scale.y": 0.28, "scale.z": 0.28})
     save()
 
 
@@ -408,18 +411,18 @@ def breakdown():
     # halo that rings out the MIDI melody.
     import_source("Knot.obj", bar(48), duration=bar(80) - bar(48))
     rename_track("Knot")
-    set_properties({"scale.x": 0.9, "scale.y": 0.9, "scale.z": 0.9, "red": 0.75, "green": 0.45, "blue": 1})
+    set_properties({"scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "red": 0.75, "green": 0.45, "blue": 1})
     modulate("Rotation X", "Saw", 180, beats=48)
     modulate("Rotation Y", "Saw", 180, beats=32)
-    keys("Knot", "Drawing", [(bar(48), {"weight": 0}), (bar(50), {"weight": 1}), (bar(78), {"weight": 1}), (bar(80), {"weight": 0})])
+    keys("Knot", "Drawing", [(bar(48), {"weight": 0}), (bar(50), {"weight": 1.2}), (bar(78), {"weight": 1.2}), (bar(80), {"weight": 0})])
     add_effect("Ripple", {"rippleDepth": 0.12, "rippleAmount": 0.08})
     import_source("Spirograph.lua", bar(52), duration=bar(78) - bar(52), bake=12.8)
     rename_track("Spirograph")
-    set_properties({"position.z": -0.6, "scale.x": 1.35, "scale.y": 1.35, "scale.z": 1.35, "weight": 0.45})
-    keys("Spirograph", "Drawing", [(bar(52), {"weight": 0}), (bar(54), {"weight": 0.45})])
+    set_properties({"position.z": -0.6, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1, "weight": 0.35})
+    keys("Spirograph", "Drawing", [(bar(52), {"weight": 0}), (bar(54), {"weight": 0.35})])
     import_source("Ring.svg", bar(56), duration=bar(72) - bar(56))
     rename_track("Halo")
-    set_properties({"scale.x": 1.12, "scale.y": 1.12, "scale.z": 1.12, "red": 1, "green": 0.9, "blue": 0.75})
+    set_properties({"scale.x": 0.72, "scale.y": 0.72, "scale.z": 0.72, "red": 1, "green": 0.9, "blue": 0.75})
     step("import melody", "drop-files", "--file", ASSETS / "Melody.mid", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Undo Import MIDI file", "--role", "label", "--exact", "--timeout-ms", 60000)
     step("select melody", "click", "--name", "Melody.mid", "--role", "listItem", "--exact")
@@ -444,15 +447,17 @@ def cameras():
     # inside the rings; Orbit circles the knot; Close is a tighter lens.
     camera("Wide", {"position.z": 4}, {"Position": [(bar(8), {"position.z": 4}), (bar(30), {"position.z": 3.4}), (bar(80), {"position.z": 4})]})
     camera("Tunnel", {"position.z": 1.6, "fov": 62})
-    orbit = [(bar(48 + 8 * i), {"position.x": round(3.2 * __import__("math").sin(__import__("math").radians(45 * i)), 4),
-                                "position.y": 0.6, "position.z": round(3.2 * __import__("math").cos(__import__("math").radians(45 * i)), 4)}) for i in range(5)]
-    yaw = [(bar(48 + 8 * i), {"rotation.x": -10, "rotation.y": 45 * i}) for i in range(5)]
+    # A gentle sway around the knot keeps the flat spirograph readable.
+    import math
+    angles = [-35, 0, 35, 0, -35]
+    orbit = [(bar(48 + 8 * i), {"position.x": round(4.5 * math.sin(math.radians(a)), 4), "position.y": 0.4,
+                                "position.z": round(4.5 * math.cos(math.radians(a)), 4)}) for i, a in enumerate(angles)]
+    yaw = [(bar(48 + 8 * i), {"rotation.x": -5, "rotation.y": a}) for i, a in enumerate(angles)]
     camera("Orbit", {}, {"Position": orbit, "Rotation": yaw})
     camera("Close", {"position.z": 2.7})
     for moment, name in [(0, "Wide"), (bar(30), "Tunnel"), (bar(38), "Close"), (bar(40), "Tunnel"), (bar(46), "Wide"),
-                         (bar(48), "Orbit"), (bar(80), "Wide"), (bar(84), "Close"), (bar(88), "Tunnel"), (bar(92), "Wide"),
-                         (bar(96), "Close"), (bar(100), "Tunnel"), (bar(104), "Wide"), (bar(106), "Close"), (bar(108), "Tunnel"),
-                         (bar(110), "Close"), (bar(112), "Wide")]:
+                         (bar(48), "Orbit"), (bar(80), "Wide"), (bar(84), "Close"), (bar(88), "Tunnel"), (bar(92), "Close"),
+                         (bar(96), "Tunnel"), (bar(104), "Close"), (bar(106), "Tunnel"), (bar(110), "Close"), (bar(112), "Wide")]:
         cut(moment, name)
     save()
 
