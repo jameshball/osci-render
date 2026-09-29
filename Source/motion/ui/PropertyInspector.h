@@ -3,6 +3,7 @@
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
 #include "../model/PropertySchema.h"
+#include "../model/SpatialMotion.h"
 
 // Scrolling transform/appearance inspector for one property target (object,
 // group, audio clip or camera). Rows group related axes; each row keys all of
@@ -56,7 +57,25 @@ public:
             build(specs);
         }
         for (auto& row : rows) {
-            if (row->mode != nullptr && modes.has_value()) { row->mode->setToggleState(row->group == "Position" ? modes->first : modes->second, juce::dontSendNotification); }
+            if (row->mode == nullptr || !modes.has_value()) { continue; }
+            const bool path = row->group == "Position";
+            const bool on = path ? modes->first : modes->second;
+            const std::string prefix = path ? "position." : "rotation.";
+            const auto* x = found->curve(prefix + "x");
+            const auto* y = found->curve(prefix + "y");
+            const auto* z = found->curve(prefix + "z");
+            const bool keyed = x != nullptr && y != nullptr && z != nullptr && (x->animated() || y->animated() || z->animated());
+            const auto times = [](const motion::Curve& curve) {
+                std::vector<double> result;
+                for (const auto& key : curve.keyframes()) { result.push_back(key.time); }
+                return result;
+            };
+            row->misaligned = on && keyed && (times(*x) != times(*y) || times(*x) != times(*z));
+            row->mode->setToggleState(on, juce::dontSendNotification);
+            row->mode->setOnColour(row->misaligned ? motion::style::warning() : motion::style::accent());
+            const juce::String base = path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out)."
+                                           : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock.";
+            row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
         }
         title.setText(editable ? juce::String(found->name.data(), found->name.size()) : "Nothing selected", juce::dontSendNotification);
         kind.setText(!editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object", juce::dontSendNotification);
@@ -111,6 +130,7 @@ private:
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         // Position: one spatial path; Rotation: quaternion orientation.
         std::unique_ptr<motion::style::Chip> mode;
+        bool misaligned = false; // mode on, but axes no longer share key times
         void paint(juce::Graphics& g) override {
             g.setFont(motion::style::small());
             g.setColour(motion::style::muted());
@@ -164,7 +184,8 @@ private:
                     row->mode->setTitle(row->mode->getName());
                     row->mode->setTooltip(path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out). Keys all three axes together."
                                                : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock. Keys all three axes together.");
-                    row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState()); };
+                    // A misaligned mode stays on and realigns its keys.
+                    row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState() || raw->misaligned); };
                     row->addAndMakeVisible(*row->mode);
                 }
                 row->previous.onClick = [this, raw] { jumpToKey(*raw, false); };

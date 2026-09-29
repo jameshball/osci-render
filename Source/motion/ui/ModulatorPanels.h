@@ -21,15 +21,16 @@ inline const EffectInstance* findEffect(const Project& project, Id id) {
 }
 
 inline juce::String propertyLabel(const Project& project, Id id, const std::string& property) {
-    if (const auto* effect = findEffect(project, id)) {
-        if (const auto* definition = effectDefinition(effect->type)) {
-            for (const auto& parameter : definition->parameters) {
-                if (parameter.id == property) { return juce::String(parameter.name); }
-            }
+    const auto* effect = findEffect(project, id);
+    const auto* definition = effect != nullptr ? effectDefinition(effect->type) : nullptr;
+    if (definition != nullptr) {
+        for (const auto& parameter : definition->parameters) {
+            if (parameter.id == property) { return juce::String(parameter.name); }
         }
     }
     for (const auto specs : {objectPropertySpecs(), cameraPropertySpecs(), audioPropertySpecs()}) {
-        if (const auto* spec = findPropertySpec(specs, property)) { return juce::String(spec->label.data(), spec->label.size()); }
+        const auto* spec = findPropertySpec(specs, property);
+        if (spec != nullptr) { return juce::String(spec->label.data(), spec->label.size()); }
     }
     return juce::String(property);
 }
@@ -295,12 +296,12 @@ private:
             amount.onCommit = [this](double value) { apply(value, this->route.mode); };
             mode.setButtonText(route.mode == motion::ModulationMode::multiply ? "x" : "+");
             mode.setName("Route mode " + text);
-        mode.setTitle("Route mode " + text);
+            mode.setTitle("Route mode " + text);
             mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
             mode.onClick = [this] { apply(amount.getValue(), this->route.mode == motion::ModulationMode::add ? motion::ModulationMode::multiply : motion::ModulationMode::add); };
             remove.setButtonText("x");
             remove.setName("Remove route " + text);
-        remove.setTitle("Remove route " + text);
+            remove.setTitle("Remove route " + text);
             remove.onClick = [this] { this->owner.report(this->owner.processor.document.removeRoute(this->route.id)); };
             for (auto* component : std::initializer_list<juce::Component*> {&target, &amount, &mode, &remove}) { addAndMakeVisible(component); }
         }
@@ -449,8 +450,9 @@ public:
             addAndMakeVisible(*row);
             rows.push_back(std::move(row));
         }
-        route.setEnabled(curve != nullptr);
-        link.setEnabled(curve != nullptr);
+        const auto drivable = motion::drivableProperty(project, targetId, propertyName);
+        route.setEnabled(drivable);
+        link.setEnabled(drivable);
         const auto linked = curve != nullptr && curve->link.has_value();
         unlink.setVisible(linked);
         linkSource.setVisible(linked);
@@ -514,7 +516,7 @@ private:
             amount.onCommit = [this](double value) { edit(value); };
             remove.setButtonText("x");
             remove.setName("Unroute " + text);
-        remove.setTitle("Unroute " + text);
+            remove.setTitle("Unroute " + text);
             remove.onClick = [this] { this->owner.report(this->owner.processor.document.removeRoute(this->route.id)); };
             for (auto* component : std::initializer_list<juce::Component*> {&name, &amount, &remove}) { addAndMakeVisible(component); }
         }
@@ -550,23 +552,25 @@ private:
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&route), [safe, id, property](int result) {
             if (safe == nullptr || result == 0) { return; }
             auto& document = safe->processor.document;
-            motion::Id modulator = 0;
+            // Rotations get a visible default depth; everything else one unit.
+            const auto amount = property.starts_with("rotation.") ? 45.0 : (property.starts_with("red") || property.starts_with("green") || property.starts_with("blue") ? 0.5 : 1.0);
+            const motion::ModulationRoute route {0, 0, id, property, amount, motion::ModulationMode::add};
             if (result == 1 || result == 2) {
                 motion::Modulator created;
                 created.kind = result == 2 ? motion::ModulatorKind::envelope : motion::ModulatorKind::oscillator;
                 created.name = result == 2 ? "Envelope" : "LFO";
-                const auto added = document.addModulator(created, modulator);
-                if (added.failed()) { safe->report(added); return; }
-            } else {
-                const auto index = static_cast<std::size_t>(result - 100);
-                if (index >= document.project().modulators.size()) { return; }
-                modulator = document.project().modulators[index].id;
+                motion::Id modulator = 0;
+                const auto added = document.addRoutedModulator(created, route, modulator);
+                safe->report(added);
+                if (added.wasOk() && safe->onShowModulator) { safe->onShowModulator(modulator); }
+                return;
             }
-            // Rotations get a visible default depth; everything else one unit.
-            const auto amount = property.starts_with("rotation.") ? 45.0 : (property.starts_with("red") || property.starts_with("green") || property.starts_with("blue") ? 0.5 : 1.0);
+            const auto index = static_cast<std::size_t>(result - 100);
+            if (index >= document.project().modulators.size()) { return; }
+            auto existing = route;
+            existing.modulator = document.project().modulators[index].id;
             motion::Id routeId = 0;
-            safe->report(document.addRoute({0, modulator, id, property, amount, motion::ModulationMode::add}, routeId));
-            if ((result == 1 || result == 2) && safe->onShowModulator) { safe->onShowModulator(modulator); }
+            safe->report(document.addRoute(existing, routeId));
         });
     }
     void showLinkMenu() {

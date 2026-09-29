@@ -142,9 +142,9 @@ private:
                     if (!(end > start)) { continue; }
                     const auto level = (1 - modulator.velocity) + modulator.velocity * note.velocity / 127.0;
                     prepared.notes.push_back({start, end, level});
-                    prepared.longest = std::max(prepared.longest, end - start);
                 }
                 std::sort(prepared.notes.begin(), prepared.notes.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
+                prepared.buildIndex();
                 return;
             }
         }

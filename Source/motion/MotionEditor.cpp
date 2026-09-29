@@ -439,9 +439,17 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                     if (track.locked) { return false; }
                     auto parts = track.clips[index].split(time, id, project.bpm);
                     if (!parts.has_value()) { return false; }
-                    for (auto& effect : parts->second.effects) { effect.id = processor.document.newId(); }
+                    // The right half keeps the left's routes and internal links.
+                    std::map<motion::Id, motion::Id> owners {{parts->first.id, id}};
+                    for (auto& effect : parts->second.effects) {
+                        const auto clone = processor.document.newId();
+                        owners.emplace(effect.id, clone);
+                        effect.id = clone;
+                    }
                     track.clips[index] = std::move(parts->first);
-                    return track.insert(std::move(parts->second), project.bpm);
+                    if (!track.insert(std::move(parts->second), project.bpm)) { return false; }
+                    motion::cloneDrivers(project, owners, [this] { return processor.document.newId(); });
+                    return true;
                 }
             }
             return false;

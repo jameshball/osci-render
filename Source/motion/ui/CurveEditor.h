@@ -240,6 +240,18 @@ public:
             g.setColour(osci::Colours::accentColor().withAlpha(.6f));
             g.drawRect(*marquee);
         }
+        // A linked property ignores its keys; say so rather than let edits
+        // appear to do nothing.
+        if (storedCurve->link.has_value()) {
+            const auto source = motion::findPropertyTarget(processor.document.project(), storedCurve->link->source);
+            const auto name = source.has_value() ? juce::String(source->name.data(), source->name.size()) : juce::String("?");
+            auto banner = area.withHeight(22).reduced(40, 0).translated(0, 4);
+            g.setColour(osci::Colours::warning().withAlpha(.18f));
+            g.fillRoundedRectangle(banner.toFloat(), 3.0f);
+            g.setColour(osci::Colours::warning());
+            g.setFont(motion::style::small());
+            g.drawText("Linked to " + name + " (" + juce::String(storedCurve->link->property) + "): keys here are ignored. Unlink in Routing.", banner.reduced(8, 0), juce::Justification::centred, true);
+        }
     }
 
     void mouseDown(const juce::MouseEvent& event) override {

@@ -175,6 +175,39 @@ public:
             expect(fork.routes[0].target != f.first && fork.routes[0].modulator == fork.modulators[0].id);
             expect(motion::findPropertyCurve(fork, fork.routes[0].target, "position.y") != nullptr);
         }
+        beginTest("Envelopes stay exact and cheap under a long held note");
+        {
+            motion::PreparedModulator envelope;
+            envelope.kind = motion::ModulatorKind::envelope;
+            envelope.attack = 0; envelope.decay = 0; envelope.sustain = 0.25; envelope.release = 0.1;
+            envelope.notes.push_back({0, 60, 1});
+            for (int index = 0; index < 2000; ++index) { envelope.notes.push_back({0.5 + index * 0.02, 0.5 + index * 0.02 + 0.01, 0.8}); }
+            envelope.buildIndex();
+            expectWithinAbsoluteError(envelope.value(10.505, 0), 0.25, 1.0e-9); // drone sustain vs a short note's sustain
+            expectWithinAbsoluteError(envelope.value(60.05, 0), 0.125, 1.0e-9);  // drone halfway through its release
+            expectWithinAbsoluteError(envelope.value(61, 0), 0.0, 1.0e-9);
+        }
+        beginTest("Audio properties refuse routes and links; duplicates keep internal links");
+        {
+            Fixture f; f.initialise();
+            motion::Id id = 0, route = 0;
+            motion::Modulator lfo;
+            expect(f.document.addModulator(lfo, id).wasOk());
+            f.document.edit("Self link", [&](motion::Project& project) {
+                project.tracks[0].clips[0].properties["position.y"].link = motion::PropertyLink {f.first, "position.x", 1, 0, 0};
+            });
+            std::vector<motion::Id> duplicates;
+            expect(f.document.duplicateClips({f.first}, duplicates).wasOk());
+            const auto* copied = motion::findPropertyCurve(f.document.project(), duplicates[0], "position.y");
+            expect(copied != nullptr && copied->link.has_value() && copied->link->source == duplicates[0], "the copy follows its own X");
+            motion::Id created = 0;
+            expect(f.document.addRoutedModulator(lfo, {0, 0, f.second, "position.y", 1, motion::ModulationMode::add}, created).wasOk());
+            expectEquals(static_cast<int>(f.document.project().modulators.size()), 2);
+            expect(f.undo.getUndoDescription() == "Route new modulator");
+            expect(f.document.addRoutedModulator(lfo, {0, 0, 424242, "position.y", 1, motion::ModulationMode::add}, created).failed());
+            expectEquals(static_cast<int>(f.document.project().modulators.size()), 2);
+            juce::ignoreUnused(route);
+        }
         beginTest("Loading rejects cyclic links and dangling routes");
         {
             Fixture f; f.initialise();

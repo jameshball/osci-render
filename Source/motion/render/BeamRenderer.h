@@ -33,7 +33,7 @@ public:
     static constexpr std::int64_t maximumSpan = 8;
     // Tour improvement stops after this many candidate checks and moved
     // layers, bounding planning cost however many layers are visible.
-    static constexpr std::int64_t maximumOrderingWork = 65536;
+    static constexpr std::int64_t maximumOrderingWork = 8192;
 
     enum class Kind : std::uint8_t { draw, midi, move, hold };
     struct Segment {

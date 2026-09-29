@@ -158,6 +158,8 @@ public:
     juce::Result setModulator(Modulator modulator);
     juce::Result removeModulator(Id id);
     juce::Result addRoute(ModulationRoute route, Id& id);
+    // Creates a modulator already driving one property, as one undo step.
+    juce::Result addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId);
     juce::Result setRoute(const ModulationRoute& route);
     juce::Result removeRoute(Id id);
     // Links (or unlinks, with nullopt) a property; refuses cycles.

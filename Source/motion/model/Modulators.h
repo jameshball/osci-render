@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Modulation.h"
+#include <algorithm>
+#include <set>
 #include <string>
 
 namespace motion {
@@ -71,8 +73,35 @@ struct PreparedModulator {
     double bpm = 120;
     std::shared_ptr<const SoundtrackEnvelope> soundtrack; // project time
     std::vector<Note> notes; // composition seconds, sorted by start
-    double longest = 0;
     double attack = 0, decay = 0, sustain = 0, release = 0;
+
+    // Indexes, for each interval between note starts and release ends, the
+    // notes that can sound there, so evaluation visits only those (bounded
+    // by polyphony, however long another note is held). Build once after
+    // filling `notes`.
+    void buildIndex() {
+        boundaries.clear();
+        offsets.clear();
+        active.clear();
+        std::vector<std::uint32_t> byReach(notes.size());
+        for (std::uint32_t index = 0; index < notes.size(); ++index) {
+            byReach[index] = index;
+            boundaries.push_back(notes[index].start);
+            boundaries.push_back(reach(notes[index]));
+        }
+        std::sort(boundaries.begin(), boundaries.end());
+        boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
+        std::sort(byReach.begin(), byReach.end(), [this](auto a, auto b) { return reach(notes[a]) < reach(notes[b]); });
+        std::set<std::uint32_t> sounding;
+        std::size_t started = 0, ended = 0;
+        for (const auto boundary : boundaries) {
+            while (started < notes.size() && notes[started].start <= boundary) { sounding.insert(static_cast<std::uint32_t>(started++)); }
+            while (ended < byReach.size() && reach(notes[byReach[ended]]) <= boundary) { sounding.erase(byReach[ended++]); }
+            offsets.push_back(static_cast<std::uint32_t>(active.size()));
+            active.insert(active.end(), sounding.begin(), sounding.end());
+        }
+        offsets.push_back(static_cast<std::uint32_t>(active.size()));
+    }
 
     // `time` is the owning composition's time; `projectTime` reaches the
     // soundtrack, which always runs on the main timeline.
@@ -83,18 +112,20 @@ struct PreparedModulator {
             return shape.value(time, bpm);
         }
         // Loudest active note wins, so chords do not pile up past 1.
-        const auto after = std::upper_bound(notes.begin(), notes.end(), time, [](double value, const Note& note) { return value < note.start; });
-        const auto horizon = time - longest - release;
+        const auto next = std::upper_bound(boundaries.begin(), boundaries.end(), time);
+        if (next == boundaries.begin()) { return 0; }
+        const auto interval = static_cast<std::size_t>(next - boundaries.begin()) - 1;
         double level = 0;
-        for (auto note = after; note != notes.begin();) {
-            --note;
-            if (note->start < horizon) { break; }
-            level = std::max(level, envelopeAt(*note, time));
+        for (auto index = offsets[interval]; index < offsets[interval + 1]; ++index) {
+            level = std::max(level, envelopeAt(notes[active[index]], time));
         }
         return level;
     }
 
 private:
+    double reach(const Note& note) const { return note.end + std::max(0.0, release); }
+    std::vector<double> boundaries;
+    std::vector<std::uint32_t> offsets, active;
     double held(double age) const {
         if (age < attack) { return attack > 0 ? age / attack : 1.0; }
         age -= attack;

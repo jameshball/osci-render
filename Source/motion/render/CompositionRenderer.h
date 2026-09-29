@@ -34,14 +34,17 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
 inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
     point.scale(curves[6].evaluate(time, bpm), curves[7].evaluate(time, bpm), curves[8].evaluate(time, bpm));
     constexpr auto radians = std::numbers::pi / 180.0;
-    if (spatial != nullptr && spatial->orientation != nullptr) {
-        // Keys set the orientation; modulation and links add Euler offsets in
-        // object space before it.
+    // A linked rotation axis replaces its keys, so orientation interpolation
+    // only applies while every rotation axis is keyed.
+    const bool oriented = spatial != nullptr && spatial->orientation != nullptr && !curves[3].linked() && !curves[4].linked() && !curves[5].linked();
+    if (oriented) {
+        // Keys set the orientation; modulation adds Euler offsets in object
+        // space before it.
         std::array<double, 3> extra {};
         for (std::size_t axis = 0; axis < 3; ++axis) {
             const auto& curve = curves[3 + axis];
             const auto keyed = curve.evaluateBase(time);
-            extra[axis] = (curve.linked() ? curve.evaluate(time, bpm) : curve.evaluateWith(keyed, time, bpm)) - keyed;
+            extra[axis] = curve.evaluateWith(keyed, time, bpm) - keyed;
         }
         if (extra[0] != 0 || extra[1] != 0 || extra[2] != 0) { point.rotate(extra[0] * radians, extra[1] * radians, extra[2] * radians); }
         const auto rotated = spatial->orientation->at(time).rotate(point.x, point.y, point.z);

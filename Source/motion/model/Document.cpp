@@ -795,15 +795,19 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
     }
     auto highest = highestId();
     auto candidate = state;
-    std::map<Id, Id> overflowTracks;
+    std::map<Id, Id> overflowTracks, owners;
     for (const auto& copied : clips) {
         auto clip = copied.clip;
-        if (static_cast<Id>(clip.effects.size()) + 2 > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for pasted clips."); }
+        if (static_cast<Id>(clip.effects.size() + state.routes.size()) + 2 > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for pasted clips."); }
         auto timing = clip.timing(state.bpm);
         timing.moveTo(timing.start - first + time);
         if (!clip.setTiming(timing, state.bpm)) { return juce::Result::fail("The pasted selection has invalid timing."); }
+        owners.emplace(clip.id, highest + 1);
         clip.id = ++highest;
-        for (auto& effect : clip.effects) { effect.id = ++highest; }
+        for (auto& effect : clip.effects) {
+            owners.emplace(effect.id, highest + 1);
+            effect.id = ++highest;
+        }
         const auto original = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [&](const auto& track) { return track.id == copied.track; });
         const bool fits = original != candidate.tracks.end() && !original->locked && original->kind == copied.kind && original->canPlace(clip, 0, state.bpm);
         if (fits) {
@@ -826,6 +830,8 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
         candidate.duration = std::max(candidate.duration, clip.timing(state.bpm).end());
         pastedIds.push_back(clip.id);
     }
+    // Pasting while the originals exist copies their routes too.
+    cloneDrivers(candidate, owners, [&highest] { return ++highest; });
     lastId = highest;
     edit(clips.size() > 1 ? "Paste clips" : "Paste clip", [&candidate](Project& project) { project = candidate; });
     return juce::Result::ok();
@@ -885,11 +891,11 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     auto highest = highestId();
     auto candidate = state;
     std::vector<Id> ids;
+    std::map<Id, Id> owners;
     for (auto& [index, copy] : copies) {
         const auto required = static_cast<Id>(copy.effects.size() + state.routes.size()) + 1;
         if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for duplicated clips."); }
         const auto original = copy.id;
-        std::map<Id, Id> owners;
         auto timing = copy.timing(state.bpm);
         timing.moveTo(timing.start + (last - first));
         if (copies.size() == 1) {
@@ -904,21 +910,14 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
             effect.id = ++highest;
             owners.emplace(old, effect.id);
         }
-        // A duplicate keeps its routed modulators, like its own keys.
-        for (const auto& route : state.routes) {
-            const auto owner = owners.find(route.target);
-            if (owner == owners.end()) { continue; }
-            auto duplicate = route;
-            duplicate.id = ++highest;
-            duplicate.target = owner->second;
-            candidate.routes.push_back(std::move(duplicate));
-        }
         if (!candidate.tracks[index].insert(copy, state.bpm)) {
             return juce::Result::fail("There is not enough free space after the selection. Move the following clips first.");
         }
         candidate.duration = std::max(candidate.duration, copy.timing(state.bpm).end());
         ids.push_back(copy.id);
     }
+    // A duplicate keeps its routed modulators, like its own keys.
+    cloneDrivers(candidate, owners, [&highest] { return ++highest; });
     lastId = highest;
     edit(copies.size() == 1 ? "Duplicate clip" : "Duplicate clips", [candidate = std::move(candidate)](Project& project) { project = candidate; });
     duplicateIds = std::move(ids);
@@ -1241,19 +1240,28 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     required += 2 * state.routes.size() + state.modulators.size();
     if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining composition identities."); }
     definition->id = ++highest;
-    std::map<Id, Id> groupIds;
+    // copies: every root owner copied (not moved) into the definition.
+    std::map<Id, Id> groupIds, copies;
+    const auto renumber = [&](std::vector<EffectInstance>& effects) {
+        for (auto& effect : effects) {
+            const auto old = effect.id;
+            effect.id = ++highest;
+            copies.emplace(old, effect.id);
+        }
+    };
     for (const auto& group : state.groups) {
         if (!requiredGroups.contains(group.id)) { continue; }
         auto copy = group; copy.id = ++highest; copy.solo = false;
         groupIds.emplace(group.id, copy.id);
-        for (auto& effect : copy.effects) { effect.id = ++highest; }
+        copies.emplace(group.id, copy.id);
+        renumber(copy.effects);
         definition->groups.push_back(std::move(copy));
     }
     for (auto& group : definition->groups) { if (group.parent != 0) { group.parent = groupIds.at(group.parent); } }
     for (auto& track : definition->tracks) {
         track.id = ++highest;
         if (track.group != 0) { track.group = groupIds.at(track.group); }
-        for (auto& effect : track.effects) { effect.id = ++highest; }
+        renumber(track.effects);
     }
     // Routes follow their targets: clip (and clip effect) routes move into the
     // definition; routes on copied groups are copied. Each modulator they use
@@ -1265,9 +1273,9 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     std::map<Id, Id> modulatorIds;
     std::set<Id> movedRoutes;
     for (const auto& route : state.routes) {
-        const auto group = groupIds.find(route.target);
+        const auto group = copies.find(route.target);
         const bool moved = movedTargets.contains(route.target);
-        if (!moved && group == groupIds.end()) { continue; }
+        if (!moved && group == copies.end()) { continue; }
         if (!modulatorIds.contains(route.modulator)) {
             const auto source = std::find_if(state.modulators.begin(), state.modulators.end(), [&](const auto& item) { return item.id == route.modulator; });
             if (source == state.modulators.end()) { continue; }
@@ -1285,6 +1293,15 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         if (moved) { movedRoutes.insert(route.id); }
     }
     std::erase_if(candidate.routes, [&](const auto& route) { return movedRoutes.contains(route.id); });
+    // Links follow copied owners; links to material left in the root cannot
+    // cross the composition boundary and are pruned.
+    forEachPropertyMap(*definition, [&](Id, auto& properties) {
+        for (auto& [property, curve] : properties) {
+            if (!curve.link.has_value()) { continue; }
+            const auto copy = copies.find(curve.link->source);
+            if (copy != copies.end()) { curve.link->source = copy->second; }
+        }
+    });
     pruneReferences(*definition);
     Clip instance;
     instance.id = ++highest; instance.composition = definition->id; instance.name = name.toStdString();
@@ -1607,9 +1624,25 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
     route.id = newId();
     const auto& current = project();
     const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == route.modulator; });
-    if (!route.valid() || !hasModulator || !hasPropertyCurve(current, route.target, route.property)) { return juce::Result::fail("A route needs an existing modulator and property."); }
+    if (!route.valid() || !hasModulator || !drivableProperty(current, route.target, route.property)) { return juce::Result::fail("A route needs an existing modulator and a visual property."); }
     id = route.id;
     edit("Route modulator", [route](Project& project) { project.routes.push_back(route); });
+    return juce::Result::ok();
+}
+
+juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId) {
+    modulator.id = newId();
+    normaliseModulator(modulator);
+    route.id = newId();
+    route.modulator = modulator.id;
+    if (!modulator.valid() || !route.valid() || !drivableProperty(project(), route.target, route.property)) {
+        return juce::Result::fail("A route needs an existing visual property.");
+    }
+    modulatorId = modulator.id;
+    edit("Route new modulator", [modulator, route](Project& project) {
+        project.modulators.push_back(modulator);
+        project.routes.push_back(route);
+    });
     return juce::Result::ok();
 }
 
@@ -1642,6 +1675,7 @@ juce::Result Document::setLink(Id target, const std::string& property, std::opti
     const auto& current = project();
     const auto* curve = findPropertyCurve(current, target, property);
     if (curve == nullptr) { return juce::Result::fail("The property no longer exists."); }
+    if (link.has_value() && !drivableProperty(current, target, property)) { return juce::Result::fail("Audio clip gain and pan cannot be linked."); }
     if (link.has_value()) {
         if (!link->valid() || !hasPropertyCurve(current, link->source, link->property)) { return juce::Result::fail("Choose an existing property to link to."); }
         if (linkCreatesCycle(current, target, property, *link)) { return juce::Result::fail("That link would make the property depend on itself."); }
