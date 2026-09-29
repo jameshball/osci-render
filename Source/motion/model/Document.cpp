@@ -65,7 +65,9 @@ bool importCancelled(const std::atomic<bool>* cancel) {
     return cancel != nullptr && cancel->load(std::memory_order_relaxed);
 }
 
-juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress) {
+// repeatsPrevious(frame) lets identical frames share one drawing (and count
+// once against the geometry budget).
+juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress, const std::function<bool(int)>& repeatsPrevious = {}) {
     if (frameCount <= 0 || static_cast<std::size_t>(frameCount) > Document::maximumSourceFrames
         || !std::isfinite(frameRate) || frameRate <= 0.0 || frameRate > 1000.0
         || !std::isfinite(frameCount / frameRate)) {
@@ -78,6 +80,10 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
     for (int frame = 0; frame < frameCount; ++frame) {
         if (importCancelled(cancel)) {
             return juce::Result::fail("Source import cancelled.");
+        }
+        if (frame > 0 && repeatsPrevious && repeatsPrevious(frame)) {
+            frames.push_back(frames.back());
+            continue;
         }
         ImportShapes shapes;
         const auto result = draw(frame, shapes);
@@ -138,7 +144,15 @@ juce::Result prepareAnimatedText(Asset& asset, const juce::GlyphArrangement& gly
     const auto scale = 1.8f / std::max(maxX - minX, maxY - minY);
     constexpr double frameRate = 30;
     const auto& settings = asset.textSettings;
-    const auto frames = static_cast<int>(std::clamp(std::ceil(settings.animationLength(static_cast<int>(paths.size())) * frameRate), 1.0, static_cast<double>(Document::maximumSourceFrames)));
+    const auto characters = static_cast<int>(paths.size());
+    const auto length = std::ceil(settings.animationLength(characters) * frameRate);
+    if (length > static_cast<double>(Document::maximumSourceFrames)) {
+        return juce::Result::fail("This text animation lasts over 120 seconds. Shorten the stagger or hold, or split the text.");
+    }
+    const auto frames = static_cast<int>(std::max(1.0, length));
+    // Once every character has arrived, the remaining (hold) frames repeat.
+    const auto settled = settings.animation == TextSettings::Animation::wave ? frames
+        : static_cast<int>(std::ceil((settings.characterDelay * std::max(0, characters - 1) + settings.characterDuration) * frameRate));
     return prepareSourceFrames(asset, frames, frameRate, [&](int frame, ImportShapes& shapes) {
         juce::Path posed;
         const auto time = frame / frameRate;
@@ -159,7 +173,7 @@ juce::Result prepareAnimatedText(Asset& asset, const juce::GlyphArrangement& gly
             shape->scale(scale, scale, 1);
         }
         return importCancelled(cancel) ? juce::Result::fail("Source preparation cancelled.") : juce::Result::ok();
-    }, cancel, progress);
+    }, cancel, progress, [settled](int frame) { return frame > settled; });
 }
 
 bool finiteNumber(const juce::var& value) {
@@ -589,6 +603,16 @@ struct Document::Change : juce::UndoableAction {
         unique(after.assets, before.assets, [](const Asset& asset) { return assetBytes(asset); });
         unique(before.definitions, after.definitions, [](const Composition& definition) { return compositionBytes(definition); });
         unique(after.definitions, before.definitions, [](const Composition& definition) { return compositionBytes(definition); });
+        const auto bakes = [](const Project& project) {
+            std::vector<std::shared_ptr<const LuaClipBake>> result;
+            for (const auto& track : project.tracks) {
+                for (const auto& clip : track.clips) { if (clip.luaBake != nullptr) { result.push_back(clip.luaBake); } }
+            }
+            return result;
+        };
+        const auto bakeBytes = [](const LuaClipBake& bake) { return 3 * bake.archive.getSize(); };
+        unique(bakes(before), bakes(after), bakeBytes);
+        unique(bakes(after), bakes(before), bakeBytes);
         return static_cast<int>(std::clamp<std::size_t>(bytes / 1024, 1, static_cast<std::size_t>(std::numeric_limits<int>::max() / 4)));
     }
     Document& owner;
@@ -664,8 +688,39 @@ juce::Result Document::enterComposition(Id id) {
     return juce::Result::ok();
 }
 
+// Snapshots taken before a slider bake landed (undo history, gesture
+// previews) carry the installed bake forward; the baker re-checks its key.
+static void carryLuaBakes(Project& next, const Project& current) {
+    std::map<Id, std::shared_ptr<const LuaClipBake>> installed;
+    const auto collect = [&](const Composition& composition) {
+        for (const auto& track : composition.tracks) {
+            for (const auto& clip : track.clips) { if (clip.luaBake != nullptr) { installed.emplace(clip.id, clip.luaBake); } }
+        }
+    };
+    collect(current);
+    for (const auto& definition : current.definitions) { if (definition != nullptr) { collect(*definition); } }
+    if (installed.empty()) { return; }
+    const auto carry = [&](Composition& composition) {
+        bool changed = false;
+        for (auto& track : composition.tracks) {
+            for (auto& clip : track.clips) {
+                const auto found = installed.find(clip.id);
+                if (clip.luaBake == nullptr && found != installed.end()) { clip.luaBake = found->second; changed = true; }
+            }
+        }
+        return changed;
+    };
+    carry(next);
+    for (auto& definition : next.definitions) {
+        if (definition == nullptr) { continue; }
+        auto copy = std::make_shared<CompositionDefinition>(*definition);
+        if (carry(*copy)) { definition = std::move(copy); }
+    }
+}
+
 void Document::apply(Project value) {
     ++stateRevision;
+    carryLuaBakes(value, state);
     state = std::move(value);
     refreshScope();
     if (onChanged) {
@@ -917,7 +972,12 @@ bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
         if (found != before) { definition = std::move(copy); }
     }
     if (!found) { return false; }
-    apply(std::move(next));
+    // A cache: publish the new frames without an edit's revision, so open
+    // gestures, coalescing and change guards are undisturbed.
+    state = std::move(next);
+    refreshScope();
+    if (onChanged) { onChanged(); }
+    sendChangeMessage();
     return true;
 }
 
@@ -931,9 +991,27 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
     if (audio(**found) != audio(*replacement) || midiOnly(**found) || midiOnly(*replacement)) {
         return juce::Result::fail(audio(**found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
     }
-    edit("Replace source", [assetId, replacement](Project& project) {
+    const bool lua = replacement->extension.equalsIgnoreCase(".lua");
+    edit("Replace source", [assetId, replacement, lua](Project& project) {
         for (auto& asset : project.assets) {
             if (asset != nullptr && asset->id == assetId) { asset = replacement; }
+        }
+        // Slider curves and their bake belong to the old script.
+        const auto clear = [&](Composition& composition) {
+            for (auto& track : composition.tracks) {
+                for (auto& clip : track.clips) {
+                    if (clip.asset != assetId) { continue; }
+                    clip.luaBake.reset();
+                    if (!lua) { std::erase_if(clip.properties, [](const auto& item) { return item.first.starts_with("slider."); }); }
+                }
+            }
+        };
+        clear(project);
+        for (auto& definition : project.definitions) {
+            if (definition == nullptr) { continue; }
+            auto copy = std::make_shared<CompositionDefinition>(*definition);
+            clear(*copy);
+            definition = std::move(copy);
         }
     });
     return juce::Result::ok();
@@ -2640,8 +2718,14 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
                 }
                 const auto frames = BakedSourceArchive::decode(bake->archive);
                 if (!frames) { return juce::Result::fail(juce::String(frames.error)); }
-                bake->source = std::make_shared<const PreparedSource>(frames.source);
-                clip.luaBake = std::move(bake);
+                // Only a bake matching this clip's current sliders is kept; a
+                // stale one is dropped and the editor bakes again.
+                const auto plan = luaSliderPlan(**found, clip, project.tempo());
+                if (plan.has_value() && plan->key == bake->key && frames.source->frameCount() == plan->settings.frameCount()
+                    && frames.source->frameRate() == plan->settings.frameRate) {
+                    bake->source = std::make_shared<const PreparedSource>(frames.source);
+                    clip.luaBake = std::move(bake);
+                }
             }
             const auto clipEffects = loadEffects(*item, clip.effects, identities);
             if (clipEffects.failed()) {

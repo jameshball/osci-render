@@ -73,8 +73,8 @@ public:
         animation.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         animation.onChange = [this] { settingsChanged(); };
         const std::array<std::tuple<juce::Slider*, const char*, double, double, double, double, const char*>, 4> timing {{
-            {&stagger, "Text animation stagger", 0, 5, 0.01, settings.characterDelay, " s"},
-            {&duration, "Text animation duration", 0.01, 10, 0.01, settings.characterDuration, " s"},
+            {&stagger, "Text animation stagger", 0, 30, 0.01, settings.characterDelay, " s"},
+            {&duration, "Text animation duration", 0.01, 30, 0.01, settings.characterDuration, " s"},
             {&hold, "Text animation hold", 0, 30, 0.1, settings.hold, " s"},
             {&amount, "Text animation amount", -10, 10, 0.05, settings.amount, ""}}};
         for (const auto& [slider, name, low, high, step, value, suffix] : timing) {

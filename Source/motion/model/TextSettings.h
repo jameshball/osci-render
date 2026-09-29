@@ -37,9 +37,11 @@ struct TextSettings {
     }
     // Seconds from the first character's start to the end of the hold.
     double animationLength(int characters) const {
-        if (animation == Animation::wave) { return characterDuration; }
+        if (animation == Animation::wave) { return wavePeriod(); }
         return characterDelay * std::max(0, characters - 1) + characterDuration + hold;
     }
+    // Whole 30 fps frames, so the looping wave has no seam.
+    double wavePeriod() const { return std::max(1.0, std::round(characterDuration * 30)) / 30; }
     // One character's pose at time t: visibility, offset (em), scale and
     // rotation (degrees). index counts visible characters.
     struct Pose { bool visible = true; double x = 0, y = 0, scale = 1, rotation = 0; };
@@ -63,7 +65,8 @@ struct TextSettings {
                 break;
             }
             case Animation::wave: {
-                const auto phase = 2 * std::numbers::pi * (t / characterDuration - characterDelay * index / characterDuration);
+                const auto period = wavePeriod();
+                const auto phase = 2 * std::numbers::pi * (t / period - characterDelay * index / period);
                 result.y = 0.25 * amount * std::sin(phase);
                 break;
             }

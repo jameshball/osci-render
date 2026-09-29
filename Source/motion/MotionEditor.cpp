@@ -1270,7 +1270,7 @@ void MotionEditor::timerCallback() {
 }
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
-    sliderBakes.update();
+    sliderBakes.requestUpdate();
     if (processor.document.editingComposition() == 0) { scopeHistory.clear(); }
     if (scopeLabel.isBeingEdited() && scopeNameGeneration != processor.document.generation()) { scopeLabel.hideEditor(true); }
     if (!scopeLabel.isBeingEdited()) { scopeLabel.setText(processor.document.project().name, juce::dontSendNotification); }

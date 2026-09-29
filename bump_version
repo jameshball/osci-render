@@ -45,6 +45,7 @@ from typing import Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent
 CI_TRIGGER_MARKER = "[trigger-ci:bump-version]"
+CI_MOTION_MARKER = "[trigger-ci:motion]"
 CI_SKIP_VALIDATION_MARKER = "[skip-validation]"
 
 
@@ -207,6 +208,13 @@ def add_ci_trigger_marker(message: str) -> str:
     return f"{message}\n\n{CI_TRIGGER_MARKER}"
 
 
+def add_marker(message: str, marker: str) -> str:
+    message = message.rstrip()
+    if marker in message:
+        return message
+    return f"{message}\n\n{marker}"
+
+
 def add_skip_validation_marker(message: str) -> str:
     message = message.rstrip()
     if CI_SKIP_VALIDATION_MARKER in message:
@@ -331,7 +339,12 @@ def main(argv: Sequence[str]) -> int:
         if motion_new is not None:
             msg = msg[:-1] + f", osci-motion {motion_old}->{motion_new})"
 
-    msg = add_ci_trigger_marker(msg)
+    # Product releases and the osci-motion job trigger independently, so a
+    # motion-only bump does not rebuild and republish the other products.
+    if any(kind != "none" for kind in (osci_kind, sosci_kind, installer_kind)):
+        msg = add_ci_trigger_marker(msg)
+    if motion_kind != "none":
+        msg = add_marker(msg, CI_MOTION_MARKER)
     if ns.skip_validation:
         msg = add_skip_validation_marker(msg)
 

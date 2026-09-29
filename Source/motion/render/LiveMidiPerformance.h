@@ -118,8 +118,7 @@ public:
     }
     // Reset all controllers (CC 121): centre the bend, full expression.
     bool resetControllers(int channel, std::uint64_t sample) {
-        if (!validChannel(channel)) { return false; }
-        pitchBend(channel, 0, sample);
+        if (!validChannel(channel) || !pitchBend(channel, 0, sample)) { return false; }
         bends[static_cast<std::size_t>(channel - 1)].bent = false;
         expression[static_cast<std::size_t>(channel - 1)] = 1.0;
         sustain(channel, false, sample);

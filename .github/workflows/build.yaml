@@ -519,8 +519,10 @@ jobs:
   # products and may need fixes before they pass.
   motion:
     name: Build (osci-motion @ ${{ matrix.os }})
-    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:motion]')
     runs-on: ${{ matrix.os }}
+    # Windows and Linux builds of osci-motion have never been validated.
+    continue-on-error: ${{ matrix.os != 'macos-latest' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -602,7 +604,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           source ./ci/setup-env.sh
-          source ./ci/test.sh Motion MotionMidi MotionLive
+          source ./ci/test.sh Motion MotionMidi MotionLive MotionBake MotionRaster MotionVideo
 
       - name: Build osci-motion (Standalone)
         shell: bash
