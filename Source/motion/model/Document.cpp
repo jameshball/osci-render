@@ -576,14 +576,14 @@ void Document::apply(Project value) {
 }
 
 void Document::preview(Project project) {
-    pruneModulation(project);
+    pruneReferences(project);
     apply(mergeScope(std::move(project)));
 }
 
 void Document::edit(juce::String label, std::function<void(Project&)> operation) {
     auto after = project();
     operation(after);
-    pruneModulation(after);
+    pruneReferences(after);
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
@@ -594,7 +594,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
     const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0;
     auto after = project();
     operation(after);
-    pruneModulation(after);
+    pruneReferences(after);
     after = mergeScope(std::move(after));
     if (!joins) { undo.beginNewTransaction(label); }
     undo.perform(new Change(*this, state, std::move(after)));
@@ -606,7 +606,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
 bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {
     auto after = project();
     if (!operation(after)) { return false; }
-    pruneModulation(after);
+    pruneReferences(after);
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
@@ -1169,7 +1169,11 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
             if (curve.link.has_value()) { curve.link->source = remap(curve.link->source); }
         }
     });
-    pruneModulation(*copy);
+    for (auto& camera : copy->cameras) {
+        camera.target = remap(camera.target);
+        camera.parent = remap(camera.parent);
+    }
+    pruneReferences(*copy);
     // Only this definition is forked. Media and referenced child definitions
     // remain shared, while all authored identities within this scope are fresh.
     target->composition = copy->id;
@@ -1281,7 +1285,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         if (moved) { movedRoutes.insert(route.id); }
     }
     std::erase_if(candidate.routes, [&](const auto& route) { return movedRoutes.contains(route.id); });
-    pruneModulation(*definition);
+    pruneReferences(*definition);
     Clip instance;
     instance.id = ++highest; instance.composition = definition->id; instance.name = name.toStdString();
     instance.start = first; instance.duration = last - first; instance.offset = first;
@@ -1453,6 +1457,108 @@ juce::Result Document::clearMidi(Id clipId) {
     });
 }
 
+static bool hasCamera(const Project& project, Id id) {
+    return std::any_of(project.cameras.begin(), project.cameras.end(), [id](const auto& camera) { return camera.id == id; });
+}
+
+static bool isVisualClipOrGroup(const Project& project, Id id, bool groupsOnly) {
+    if (id == 0) { return true; }
+    if (findGroup(project, id) != nullptr) { return true; }
+    if (groupsOnly) { return false; }
+    for (const auto& track : project.tracks) {
+        if (track.kind != TrackKind::visual) { continue; }
+        for (const auto& clip : track.clips) { if (clip.id == id) { return true; } }
+    }
+    return false;
+}
+
+juce::Result Document::cutToCamera(Id camera, double time, Id& cutId) {
+    const auto& current = project();
+    if (!hasCamera(current, camera)) { return juce::Result::fail("Choose a camera to cut to."); }
+    if (!std::isfinite(time) || time < 0 || time >= current.duration) { return juce::Result::fail("Cuts must start inside the project."); }
+    cutId = newId();
+    const auto id = cutId;
+    tryEdit("Cut to camera", [time, camera, id](Project& updated) {
+        auto end = updated.duration;
+        for (const auto& cut : updated.cameraCuts) {
+            if (cut.start > time) { end = std::min(end, cut.start); }
+        }
+        std::erase_if(updated.cameraCuts, [time](const auto& cut) { return cut.start == time; });
+        for (auto& cut : updated.cameraCuts) {
+            if (cut.start < time && cut.end() > time) { cut.duration = spanUntil(cut.start, time); }
+        }
+        updated.cameraCuts.push_back({id, camera, time, spanUntil(time, end)});
+        std::sort(updated.cameraCuts.begin(), updated.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+        return true;
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::setCutCamera(Id cut, Id camera) {
+    if (!hasCamera(project(), camera)) { return juce::Result::fail("The camera no longer exists."); }
+    const auto changed = tryEdit("Change cut camera", [cut, camera](Project& updated) {
+        for (auto& item : updated.cameraCuts) {
+            if (item.id == cut && item.camera != camera) {
+                item.camera = camera;
+                return true;
+            }
+        }
+        return false;
+    });
+    return changed ? juce::Result::ok() : juce::Result::fail("The cut no longer exists or already shows that camera.");
+}
+
+juce::Result Document::setCutRange(Id cut, double start, double end, juce::String label) {
+    const auto& current = project();
+    const auto frame = current.frameRate > 0 ? 1.0 / current.frameRate : 1.0 / 30;
+    const auto found = std::find_if(current.cameraCuts.begin(), current.cameraCuts.end(), [cut](const auto& item) { return item.id == cut; });
+    if (found == current.cameraCuts.end()) { return juce::Result::fail("The cut no longer exists."); }
+    if (!std::isfinite(start) || !std::isfinite(end) || start < 0 || end > current.duration + 1.0e-9 || end - start < frame - 1.0e-9) {
+        return juce::Result::fail("A cut must stay inside the project and last at least one frame.");
+    }
+    for (const auto& other : current.cameraCuts) {
+        if (other.id != cut && start < other.end() && other.start < end) { return juce::Result::fail("Cuts cannot overlap; trim the neighbouring cut first."); }
+    }
+    if (found->start == start && found->end() == std::min(end, current.duration)) { return juce::Result::ok(); }
+    editCoalesced(label, "cut:" + juce::String(cut), [cut, start, end](Project& updated) {
+        for (auto& item : updated.cameraCuts) {
+            if (item.id == cut) {
+                item.start = start;
+                item.duration = spanUntil(start, std::min(end, updated.duration));
+            }
+        }
+        std::sort(updated.cameraCuts.begin(), updated.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::removeCut(Id cut) {
+    const auto removed = tryEdit("Remove camera cut", [cut](Project& updated) {
+        const auto before = updated.cameraCuts.size();
+        std::erase_if(updated.cameraCuts, [cut](const auto& item) { return item.id == cut; });
+        return updated.cameraCuts.size() != before;
+    });
+    return removed ? juce::Result::ok() : juce::Result::fail("The cut no longer exists.");
+}
+
+juce::Result Document::setCameraRig(Id camera, Id target, Id parent) {
+    const auto& current = project();
+    if (!hasCamera(current, camera)) { return juce::Result::fail("The camera no longer exists."); }
+    if (!isVisualClipOrGroup(current, target, false) || !isVisualClipOrGroup(current, parent, true)) { return juce::Result::fail("Aim at an object or group, and parent to a group."); }
+    const auto changed = tryEdit("Change camera rig", [camera, target, parent](Project& updated) {
+        for (auto& item : updated.cameras) {
+            if (item.id == camera && (item.target != target || item.parent != parent)) {
+                item.target = target;
+                item.parent = parent;
+                return true;
+            }
+        }
+        return false;
+    });
+    juce::ignoreUnused(changed);
+    return juce::Result::ok();
+}
+
 // Route depth lives on routes; the shape's own depth and switch are fixed.
 static void normaliseModulator(Modulator& modulator) {
     modulator.shape.enabled = true;
@@ -1465,7 +1571,7 @@ juce::Result Document::addModulator(Modulator modulator, Id& id) {
     modulator.id = newId();
     normaliseModulator(modulator);
     if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
-    if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasMidiClip(project(), modulator.source)) { return juce::Result::fail("The envelope's source clip does not exist."); }
+    if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasVisualClip(project(), modulator.source)) { return juce::Result::fail("The envelope's source clip does not exist."); }
     id = modulator.id;
     edit("Add modulator", [modulator](Project& project) { project.modulators.push_back(modulator); });
     return juce::Result::ok();
@@ -1477,7 +1583,7 @@ juce::Result Document::setModulator(Modulator modulator) {
     const auto found = std::find_if(list.begin(), list.end(), [&](const auto& item) { return item.id == modulator.id; });
     if (found == list.end()) { return juce::Result::fail("The modulator no longer exists."); }
     if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
-    if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasMidiClip(project(), modulator.source)) { return juce::Result::fail("The envelope's source clip does not exist."); }
+    if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasVisualClip(project(), modulator.source)) { return juce::Result::fail("The envelope's source clip does not exist."); }
     if (*found == modulator) { return juce::Result::ok(); }
     editCoalesced("Change modulator", "modulator:" + juce::String(modulator.id), [modulator](Project& project) {
         for (auto& item : project.modulators) {
@@ -1936,6 +2042,8 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
         auto* item = xml.createNewChildElement("camera");
         item->setAttribute("id", juce::String(camera.id));
         item->setAttribute("name", juce::String(camera.name));
+        if (camera.target != 0) { item->setAttribute("target", juce::String(camera.target)); }
+        if (camera.parent != 0) { item->setAttribute("parent", juce::String(camera.parent)); }
         for (const auto& [name, curve] : camera.properties) {
             saveProperty(*item, name, curve);
         }
@@ -2264,6 +2372,14 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
         camera.name = item->getStringAttribute("name", "Camera").toStdString();
         if (identity <= 0 || !identities.insert(camera.id).second) {
             return juce::Result::fail("Invalid camera identity.");
+        }
+        const auto target = item->getStringAttribute("target", "0").getLargeIntValue();
+        const auto parent = item->getStringAttribute("parent", "0").getLargeIntValue();
+        camera.target = target > 0 ? static_cast<Id>(target) : 0;
+        camera.parent = parent > 0 ? static_cast<Id>(parent) : 0;
+        if (target < 0 || parent < 0 || (camera.parent != 0 && findGroup(project, camera.parent) == nullptr)
+            || (camera.target != 0 && findGroup(project, camera.target) == nullptr && !hasVisualClip(project, camera.target))) {
+            return juce::Result::fail("A camera aims at or is parented to a missing object.");
         }
         std::set<std::string> properties;
         for (auto* property : item->getChildWithTagNameIterator("property")) {

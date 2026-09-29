@@ -508,6 +508,7 @@ public:
                 g.drawText(marker.name, bounds.reduced(6, 0), juce::Justification::centredLeft, true);
             }
         }
+        if (showsCameraBand()) { paintCameraBand(g); }
         if (snapGuide.has_value()) {
             const auto x = timeX(*snapGuide);
             if (x >= namesWidth && x <= getWidth()) {
@@ -534,6 +535,10 @@ public:
         grabKeyboardFocus();
         ensureTrackRows();
         cancelGesture();
+        if (inCameraBand(event.y)) {
+            cameraBandDown(event);
+            return;
+        }
         const auto* marker = markerAt(event.getPosition());
         if (event.mods.isPopupMenu() && event.x >= namesWidth && event.y < rulerHeight) {
             showMarkerMenu(marker != nullptr ? marker->id : 0, snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods));
@@ -550,7 +555,7 @@ public:
             return;
         }
         selectedMarker = 0;
-        if (event.y >= 26 && event.y < rulerHeight && event.x < namesWidth && onEditMarker) { onEditMarker(0, processor.position.load()); return; }
+        if (event.y >= 26 && event.y < cameraBandTop() && event.x < namesWidth && onEditMarker) { onEditMarker(0, processor.position.load()); return; }
         if (event.y < rulerHeight && event.x < namesWidth) {
             showToolMenu(true);
             return;
@@ -655,6 +660,10 @@ public:
     }
 
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (cutDrag.has_value()) {
+            cameraBandDrag(event);
+            return;
+        }
         if (keyDrag.has_value()) { dragKeys(event.x, event.mods); return; }
         if (marquee.has_value()) {
             marquee = juce::Rectangle<int>(marqueeStart, event.getPosition());
@@ -803,6 +812,11 @@ public:
 
     void mouseUp(const juce::MouseEvent&) override {
         snapGuide.reset();
+        if (cutDrag.has_value()) {
+            cutDrag.reset();
+            repaint();
+            return;
+        }
         if (keyDrag.has_value()) { endKeyDrag(); repaint(); return; }
         if (marquee.has_value()) { marquee.reset(); repaint(); return; }
         scrubbing = false;
@@ -861,6 +875,12 @@ public:
         }
         if (key == juce::KeyPress::escapeKey && (keyDrag.has_value() || marquee.has_value())) {
             cancelKeyDrag();
+            return true;
+        }
+        if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey) && selectedCut != 0) {
+            report(processor.document.removeCut(selectedCut));
+            selectedCut = 0;
+            repaint();
             return true;
         }
         if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey) && !selectedKeys.empty()) {
@@ -1298,6 +1318,156 @@ private:
             }
         }
     }
+    // The camera track: a band under the ruler (and markers) whose clips are
+    // the camera cuts. Shown once a project has cuts or a second camera.
+    static constexpr int cameraBandHeight = 22;
+    int cameraBandTop() const { return processor.document.project().markers.empty() ? 26 : 48; }
+    bool showsCameraBand() const {
+        const auto& project = processor.document.project();
+        return !project.cameraCuts.empty() || project.cameras.size() > 1;
+    }
+    bool inCameraBand(int y) const { return showsCameraBand() && y >= cameraBandTop() && y < cameraBandTop() + cameraBandHeight; }
+    juce::Rectangle<int> cutBounds(const motion::CameraCut& cut) const {
+        const auto left = std::max(namesWidth, timeX(cut.start));
+        const auto right = std::min(getWidth(), timeX(cut.end()));
+        if (right <= left) { return {}; }
+        return {left, cameraBandTop() + 2, right - left, cameraBandHeight - 4};
+    }
+    static juce::Colour cameraColour(const motion::Project& project, motion::Id camera) {
+        const auto found = std::find_if(project.cameras.begin(), project.cameras.end(), [camera](const auto& item) { return item.id == camera; });
+        const auto index = found == project.cameras.end() ? 0 : static_cast<int>(found - project.cameras.begin());
+        return juce::Colour::fromHSV(std::fmod(0.58f + 0.17f * static_cast<float>(index), 1.0f), 0.32f, 0.42f, 1.0f);
+    }
+    juce::String cameraName(motion::Id camera) const {
+        for (const auto& item : processor.document.project().cameras) {
+            if (item.id == camera) { return juce::String(item.name); }
+        }
+        return "Camera";
+    }
+    void paintCameraBand(juce::Graphics& g) const {
+        const auto& project = processor.document.project();
+        const auto top = cameraBandTop();
+        g.setColour(osci::Colours::surfaceRaised().darker(.15f));
+        g.fillRect(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
+        g.setColour(osci::Colours::text().withAlpha(.8f));
+        g.setFont(11.0f);
+        g.drawText("Cameras", 12, top, namesWidth - 24, cameraBandHeight, juce::Justification::centredLeft);
+        if (!project.cameras.empty()) {
+            g.setColour(osci::Colours::textMuted().withAlpha(.5f));
+            g.drawText(juce::String(project.cameras.front().name) + " (default)", namesWidth + 6, top, 240, cameraBandHeight, juce::Justification::centredLeft);
+        }
+        for (const auto& cut : project.cameraCuts) {
+            const auto bounds = cutBounds(cut);
+            if (bounds.isEmpty()) { continue; }
+            g.setColour(cameraColour(project, cut.camera).withAlpha(cut.id == selectedCut ? 1.0f : .85f));
+            g.fillRoundedRectangle(bounds.toFloat(), 3.0f);
+            if (cut.id == selectedCut) {
+                g.setColour(motion::style::accent());
+                g.drawRoundedRectangle(bounds.toFloat().reduced(.5f), 3.0f, 1.2f);
+            }
+            g.setColour(osci::Colours::text());
+            g.drawText(cameraName(cut.camera), bounds.reduced(6, 0), juce::Justification::centredLeft, true);
+        }
+    }
+    const motion::CameraCut* cutAt(juce::Point<int> point) const {
+        for (const auto& cut : processor.document.project().cameraCuts) {
+            if (cutBounds(cut).expanded(3, 0).contains(point)) { return &cut; }
+        }
+        return nullptr;
+    }
+    void cameraBandDown(const juce::MouseEvent& event) {
+        const auto time = std::clamp(snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods), 0.0, processor.document.project().duration);
+        const auto* cut = event.x >= namesWidth ? cutAt(event.getPosition()) : nullptr;
+        selectedCut = cut != nullptr ? cut->id : 0;
+        if (event.mods.isPopupMenu() || (cut == nullptr && event.x >= namesWidth && event.getNumberOfClicks() > 1)) {
+            showCutMenu(selectedCut, time);
+            repaint();
+            return;
+        }
+        if (cut == nullptr) {
+            processor.seek(time);
+            repaint();
+            return;
+        }
+        const auto bounds = cutBounds(*cut);
+        CutDrag drag;
+        drag.cut = cut->id;
+        drag.start = cut->start;
+        drag.end = cut->end();
+        drag.downX = event.x;
+        drag.mode = std::abs(event.x - bounds.getX()) <= 5 ? CutDrag::Mode::left : (std::abs(event.x - bounds.getRight()) <= 5 ? CutDrag::Mode::right : CutDrag::Mode::move);
+        cutDrag = drag;
+        repaint();
+    }
+    void cameraBandDrag(const juce::MouseEvent& event) {
+        auto& drag = *cutDrag;
+        const auto& project = processor.document.project();
+        const auto delta = (event.x - drag.downX) / pixelsPerSecond;
+        if (delta == 0) { return; }
+        auto start = drag.start, end = drag.end;
+        // Neighbouring cuts bound every gesture; nothing overlaps.
+        double lower = 0, upper = project.duration;
+        for (const auto& other : project.cameraCuts) {
+            if (other.id == drag.cut) { continue; }
+            if (other.end() <= drag.start + 1.0e-9) { lower = std::max(lower, other.end()); }
+            if (other.start >= drag.end - 1.0e-9) { upper = std::min(upper, other.start); }
+        }
+        const auto frame = project.frameRate > 0 ? 1.0 / project.frameRate : 1.0 / 30;
+        if (drag.mode == CutDrag::Mode::move) {
+            start = std::clamp(snapEdge(drag.start + delta, event.mods, project, {}), lower, upper - (drag.end - drag.start));
+            end = start + (drag.end - drag.start);
+        } else if (drag.mode == CutDrag::Mode::left) {
+            start = std::clamp(snapEdge(drag.start + delta, event.mods, project, {}), lower, drag.end - frame);
+        } else {
+            end = std::clamp(snapEdge(drag.end + delta, event.mods, project, {}), drag.start + frame, upper);
+        }
+        report(processor.document.setCutRange(drag.cut, start, end, drag.mode == CutDrag::Mode::move ? "Move camera cut" : "Trim camera cut"));
+        repaint();
+    }
+    void showCutMenu(motion::Id cut, double time) {
+        const auto& project = processor.document.project();
+        juce::PopupMenu menu, cutTo, show;
+        menu.setLookAndFeel(&getLookAndFeel());
+        for (std::size_t index = 0; index < project.cameras.size(); ++index) {
+            cutTo.addItem(100 + static_cast<int>(index), juce::String(project.cameras[index].name));
+            show.addItem(200 + static_cast<int>(index), juce::String(project.cameras[index].name));
+        }
+        menu.addSubMenu("Cut to camera here", cutTo, !project.cameras.empty());
+        if (cut != 0) {
+            menu.addSubMenu("Show camera", show);
+            menu.addItem(1, "Delete cut");
+        }
+        juce::Component::SafePointer<MotionTimelineView> safe(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [safe, cut, time](int result) {
+            if (safe == nullptr || result == 0) { return; }
+            auto& document = safe->processor.document;
+            const auto& cameras = document.project().cameras;
+            if (result == 1) {
+                safe->report(document.removeCut(cut));
+                safe->selectedCut = 0;
+            } else if (result >= 200 && result - 200 < static_cast<int>(cameras.size())) {
+                safe->report(document.setCutCamera(cut, cameras[static_cast<std::size_t>(result - 200)].id));
+            } else if (result >= 100 && result - 100 < static_cast<int>(cameras.size())) {
+                motion::Id created = 0;
+                safe->report(document.cutToCamera(cameras[static_cast<std::size_t>(result - 100)].id, time, created));
+                safe->selectedCut = created;
+            }
+            safe->repaint();
+        });
+    }
+    void report(const juce::Result& result) {
+        if (result.failed() && onError) { onError(result.getErrorMessage()); }
+    }
+    struct CutDrag {
+        enum class Mode { move, left, right };
+        motion::Id cut = 0;
+        double start = 0, end = 0;
+        int downX = 0;
+        Mode mode = Mode::move;
+    };
+    std::optional<CutDrag> cutDrag;
+    motion::Id selectedCut = 0;
+
     juce::Rectangle<int> markerBounds(const motion::Marker& marker) const {
         const auto x = timeX(marker.time);
         if (x < namesWidth || x >= getWidth()) { return {}; }
@@ -1308,7 +1478,7 @@ private:
         return {x, 27, std::max(3, right - x), 20};
     }
     const motion::Marker* markerAt(juce::Point<int> point) const {
-        if (point.y < 26 || point.y >= rulerHeight) { return nullptr; }
+        if (point.y < 26 || point.y >= cameraBandTop()) { return nullptr; }
         for (const auto& marker : processor.document.project().markers) {
             if (markerBounds(marker).contains(point)) { return &marker; }
         }
@@ -1704,7 +1874,7 @@ private:
             layoutRevision.reset();
         }
         if (!layoutRevision.has_value() || *layoutRevision != revision) {
-            rulerHeight = processor.document.project().markers.empty() ? 26 : 48;
+            rulerHeight = cameraBandTop() + (showsCameraBand() ? cameraBandHeight : 0);
             if (std::none_of(processor.document.project().markers.begin(), processor.document.project().markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
             rebuildRows();
             std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });

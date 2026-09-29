@@ -169,57 +169,126 @@ struct PreparedClip : PreparedClipStage {
     }
 };
 
+// A transform chain from a clip or group up through its parent groups, used
+// to place camera targets and parents. Groups run on the scope (project)
+// clock; a clip link maps project time to its content time.
+struct PreparedChain {
+    struct Link {
+        std::array<Curve, 13> curves;
+        std::shared_ptr<const PreparedSpatial> spatial;
+        double start = 0, offset = 0, rate = 1, bpm = 120;
+        bool clip = false;
+    };
+    std::vector<Link> links; // inner to outer
+    bool empty() const { return links.empty(); }
+    std::array<double, 3> apply(std::array<double, 3> position, double time) const {
+        osci::Point point(static_cast<float>(position[0]), static_cast<float>(position[1]), static_cast<float>(position[2]));
+        for (const auto& link : links) {
+            const auto local = link.clip ? link.offset + (time - link.start) * link.rate : time;
+            point = applyTransform(point, link.curves, local, link.bpm, false, link.spatial.get());
+        }
+        return {point.x, point.y, point.z};
+    }
+};
+
 struct PreparedCamera {
     Id id;
     std::array<Curve, 7> curves;
     double bpm = 120;
+    PreparedChain target, parent;
 
-    bool visible(osci::Point point, double time) const {
-        std::array<double, 6> values;
-        for (std::size_t index = 0; index < values.size(); ++index) {
-            values[index] = curves[index].evaluate(time, bpm);
-            if (!std::isfinite(values[index])) { return false; }
-        }
-        point.translate(-values[0], -values[1], -values[2]);
-        constexpr auto radians = std::numbers::pi / 180.0;
-        point.rotate(0.0f, 0.0f, -values[5] * radians);
-        point.rotate(0.0f, -values[4] * radians, 0.0f);
-        point.rotate(-values[3] * radians, 0.0f, 0.0f);
-        return std::isfinite(point.z) && -point.z > nearPlane;
-    }
-    static constexpr float nearPlane = 0.05f;
-    osci::Point projectPoint(osci::Point point, double time) const {
+    struct Frame {
+        std::array<double, 3> position, right, up, forward;
+        double focalLength = 1;
+    };
+    // The camera's world position and orthonormal basis at `time`: authored
+    // position/rotation (X, then Y, then Z), carried by the parent group,
+    // then aimed at the target's origin with Z rotation kept as roll.
+    std::optional<Frame> frame(double time) const {
         std::array<double, 7> values;
         for (std::size_t index = 0; index < values.size(); ++index) {
             values[index] = curves[index].evaluate(time, bpm);
-            if (!std::isfinite(values[index])) {
-                return { 0, 0, 0, 0, 0, 0 };
+            if (!std::isfinite(values[index])) { return std::nullopt; }
+        }
+        // Cubic interpolation can overshoot otherwise valid FOV key values.
+        if (values[6] <= 0.0 || values[6] >= 180.0) { return std::nullopt; }
+        constexpr auto radians = std::numbers::pi / 180.0;
+        const auto axis = [&](float x, float y, float z) {
+            osci::Point point(x, y, z);
+            point.rotate(static_cast<float>(values[3] * radians), static_cast<float>(values[4] * radians), static_cast<float>(values[5] * radians));
+            return std::array<double, 3> {point.x, point.y, point.z};
+        };
+        Frame result;
+        result.position = {values[0], values[1], values[2]};
+        result.right = axis(1, 0, 0);
+        result.up = axis(0, 1, 0);
+        result.forward = axis(0, 0, -1);
+        result.focalLength = 1.0 / std::tan(values[6] * radians * 0.5);
+        if (!parent.empty()) {
+            const auto origin = parent.apply(result.position, time);
+            const auto ahead = parent.apply(add(result.position, result.forward), time);
+            const auto above = parent.apply(add(result.position, result.up), time);
+            const auto forward = normalise(subtract(ahead, origin));
+            if (!forward.has_value()) { return std::nullopt; }
+            const auto right = normalise(cross(*forward, subtract(above, origin)));
+            if (!right.has_value()) { return std::nullopt; }
+            result.position = origin;
+            result.forward = *forward;
+            result.right = *right;
+            result.up = cross(*right, *forward);
+        }
+        if (!target.empty()) {
+            const auto aim = normalise(subtract(target.apply({0, 0, 0}, time), result.position));
+            if (aim.has_value()) {
+                // Level to world up unless looking straight up or down.
+                auto right = normalise(cross(*aim, {0, 1, 0}));
+                if (!right.has_value()) { right = normalise(cross(*aim, result.up)); }
+                if (right.has_value()) {
+                    const auto up = cross(*right, *aim);
+                    const auto roll = values[5] * radians;
+                    const auto c = std::cos(roll), s = std::sin(roll);
+                    result.forward = *aim;
+                    result.right = add(scale(*right, c), scale(up, s));
+                    result.up = add(scale(up, c), scale(*right, -s));
+                }
             }
         }
-        const auto fieldOfView = values[6];
-        // Cubic interpolation can overshoot otherwise valid FOV key values.
-        if (fieldOfView <= 0.0 || fieldOfView >= 180.0) {
-            return { 0, 0, 0, 0, 0, 0 };
-        }
-        point.translate(-values[0], -values[1], -values[2]);
-        constexpr auto radians = std::numbers::pi / 180.0;
-        // Point::rotate applies X, then Y, then Z. Invert in reverse order;
-        // negating all three angles in a single rotate call is not the inverse.
-        point.rotate(0.0f, 0.0f, -values[5] * radians);
-        point.rotate(0.0f, -values[4] * radians, 0.0f);
-        point.rotate(-values[3] * radians, 0.0f, 0.0f);
-        const auto depth = -point.z;
-        if (!std::isfinite(depth) || depth <= 0.05f) {
-            return { 0, 0, 0, 0, 0, 0 };
-        }
-        const auto focalLength = 1.0 / std::tan(fieldOfView * radians * 0.5);
-        point.x *= focalLength / depth;
-        point.y *= focalLength / depth;
+        return result;
+    }
+    bool visible(osci::Point point, double time) const {
+        const auto current = frame(time);
+        return current.has_value() && depthOf(*current, point) > nearPlane;
+    }
+    static constexpr float nearPlane = 0.05f;
+    osci::Point projectPoint(osci::Point point, double time) const {
+        const auto current = frame(time);
+        return current.has_value() ? project(*current, point) : osci::Point(0, 0, 0, 0, 0, 0);
+    }
+    static double depthOf(const Frame& frame, const osci::Point& point) {
+        return dot(subtract({point.x, point.y, point.z}, frame.position), frame.forward);
+    }
+    static osci::Point project(const Frame& frame, osci::Point point) {
+        const auto offset = subtract({point.x, point.y, point.z}, frame.position);
+        const auto depth = dot(offset, frame.forward);
+        if (!std::isfinite(depth) || depth <= 0.05) { return { 0, 0, 0, 0, 0, 0 }; }
+        point.x = static_cast<float>(dot(offset, frame.right) * frame.focalLength / depth);
+        point.y = static_cast<float>(dot(offset, frame.up) * frame.focalLength / depth);
         point.z = 1.0f;
-        if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
-            return { 0, 0, 0, 0, 0, 0 };
-        }
+        if (!std::isfinite(point.x) || !std::isfinite(point.y)) { return { 0, 0, 0, 0, 0, 0 }; }
         return point;
+    }
+
+private:
+    using Vector = std::array<double, 3>;
+    static Vector add(const Vector& a, const Vector& b) { return {a[0] + b[0], a[1] + b[1], a[2] + b[2]}; }
+    static Vector subtract(const Vector& a, const Vector& b) { return {a[0] - b[0], a[1] - b[1], a[2] - b[2]}; }
+    static Vector scale(const Vector& a, double factor) { return {a[0] * factor, a[1] * factor, a[2] * factor}; }
+    static double dot(const Vector& a, const Vector& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+    static Vector cross(const Vector& a, const Vector& b) { return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}; }
+    static std::optional<Vector> normalise(const Vector& a) {
+        const auto length = std::sqrt(dot(a, a));
+        if (!std::isfinite(length) || length < 1.0e-9) { return std::nullopt; }
+        return scale(a, 1.0 / length);
     }
 };
 
@@ -239,8 +308,51 @@ struct PreparedComposition {
         });
         const ClipTiming mainClock(0, project.duration);
         drivers.driveEffects(effects, project.effects, project, mainClock);
+        const auto chainFor = [&](Id id, bool groupsOnly) {
+            PreparedChain chain;
+            Id groupId = 0;
+            const auto load = [&](PreparedChain::Link& link, const std::map<std::string, Curve>& properties, Id owner) {
+                for (std::size_t index = 0; index < propertyNames.size(); ++index) {
+                    const auto found = properties.find(propertyNames[index]);
+                    link.curves[index] = found != properties.end() ? found->second : Curve(index >= 6 ? 1.0 : 0.0);
+                    drivers.drive(link.curves[index], project, mainClock, owner, propertyNames[index]);
+                }
+            };
+            for (const auto& track : project.tracks) {
+                if (groupsOnly || track.kind != TrackKind::visual) { continue; }
+                for (const auto& clip : track.clips) {
+                    if (clip.id != id) { continue; }
+                    PreparedChain::Link link;
+                    load(link, clip.properties, clip.id);
+                    link.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, link.curves);
+                    const auto timing = clip.timing(project.bpm);
+                    link.start = timing.start; link.offset = timing.offset; link.rate = timing.rate;
+                    link.bpm = clip.curveBpm(project.bpm);
+                    link.clip = true;
+                    chain.links.push_back(std::move(link));
+                    groupId = track.group;
+                }
+            }
+            if (chain.links.empty()) {
+                if (findGroup(project, id) == nullptr) { return chain; }
+                groupId = id;
+            }
+            while (groupId != 0 && chain.links.size() <= maximumGroupDepth) {
+                const auto* group = findGroup(project, groupId);
+                if (group == nullptr) { break; }
+                PreparedChain::Link link;
+                load(link, group->properties, group->id);
+                link.spatial = prepareSpatial(group->spatialPath, group->quaternionRotation, link.curves);
+                link.bpm = project.bpm;
+                chain.links.push_back(std::move(link));
+                groupId = group->parent;
+            }
+            return chain;
+        };
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
+            if (camera.target != 0) { item.target = chainFor(camera.target, false); }
+            if (camera.parent != 0) { item.parent = chainFor(camera.parent, true); }
             const Camera defaults;
             for (std::size_t index = 0; index < cameraPropertyNames.size(); ++index) {
                 const auto found = camera.properties.find(cameraPropertyNames[index]);
@@ -418,8 +530,9 @@ struct PreparedComposition {
         point = applyCompositionEffects(point, time);
         const auto* camera = activeCamera(time);
         if (camera != nullptr) {
-            if (!camera->visible(point, time)) { return std::nullopt; }
-            point = camera->projectPoint(point, time);
+            const auto frame = camera->frame(time);
+            if (!frame.has_value() || PreparedCamera::depthOf(*frame, point) <= PreparedCamera::nearPlane) { return std::nullopt; }
+            point = PreparedCamera::project(*frame, point);
         } else {
             // Empty camera collections retain the original fixed output framing.
             const auto depth = 4.0f - point.z;

@@ -24,6 +24,10 @@ struct Camera {
     Id id = 0;
     std::string name = "Camera";
     std::map<std::string, Curve> properties;
+    // Look-at: a clip or group whose origin the camera aims at, keeping its
+    // Z rotation as roll. Parent: a group whose transform carries the camera.
+    Id target = 0;
+    Id parent = 0;
 
     bool valid() const {
         if (id == 0 || properties.size() != cameraPropertyNames.size()) {

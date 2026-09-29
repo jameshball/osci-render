@@ -25,8 +25,9 @@ bool hasPropertyCurve(const CompositionType& composition, Id target, const std::
     return findPropertyCurve(composition, target, property) != nullptr;
 }
 
+// A visual media clip (the kind that can carry MIDI or be a camera target).
 template <typename CompositionType>
-bool hasMidiClip(const CompositionType& composition, Id clipId) {
+bool hasVisualClip(const CompositionType& composition, Id clipId) {
     for (const auto& track : composition.tracks) {
         for (const auto& clip : track.clips) {
             if (clip.id == clipId) { return track.kind == TrackKind::visual && clip.composition == 0; }
@@ -56,7 +57,7 @@ std::string validateModulation(const CompositionType& composition) {
     std::set<ModulatorId> modulators;
     for (const auto& modulator : composition.modulators) {
         if (!modulator.valid() || !modulators.insert(modulator.id).second) { return "Invalid or duplicate modulator settings."; }
-        if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasMidiClip(composition, modulator.source)) {
+        if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) {
             return "An envelope modulator follows a clip that does not exist in its composition.";
         }
     }
@@ -77,14 +78,15 @@ std::string validateModulation(const CompositionType& composition) {
     return error;
 }
 
-// Drops routes, links and envelope sources whose referents were deleted, so
-// removing a clip never leaves the composition unloadable.
+// Drops routes, links, envelope sources and camera targets/parents whose
+// referents were deleted, so removing a clip never leaves the composition
+// unloadable.
 template <typename CompositionType>
-void pruneModulation(CompositionType& composition) {
+void pruneReferences(CompositionType& composition) {
     std::set<ModulatorId> modulators;
     for (auto& modulator : composition.modulators) {
         modulators.insert(modulator.id);
-        if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasMidiClip(composition, modulator.source)) { modulator.source = 0; }
+        if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) { modulator.source = 0; }
     }
     std::erase_if(composition.routes, [&](const auto& route) {
         return !modulators.contains(route.modulator) || !hasPropertyCurve(composition, route.target, route.property);
@@ -98,6 +100,10 @@ void pruneModulation(CompositionType& composition) {
     for (const auto& [owner, name] : broken) {
         auto* curve = findPropertyCurve(composition, owner, name);
         if (curve != nullptr) { curve->link.reset(); }
+    }
+    for (auto& camera : composition.cameras) {
+        if (camera.parent != 0 && findGroup(composition, camera.parent) == nullptr) { camera.parent = 0; }
+        if (camera.target != 0 && findGroup(composition, camera.target) == nullptr && !hasVisualClip(composition, camera.target)) { camera.target = 0; }
     }
 }
 }

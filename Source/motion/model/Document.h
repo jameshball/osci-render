@@ -142,6 +142,17 @@ public:
     // elsewhere during a take do not discard it.
     juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration);
     juce::Result clearMidi(Id clipId);
+    // Camera cuts form the camera track: each shows one camera over a range.
+    // A cut at `time` ends the cut it falls in and lasts until the next cut.
+    juce::Result cutToCamera(Id camera, double time, Id& cutId);
+    juce::Result setCutCamera(Id cut, Id camera);
+    // Moves or trims a cut; it may not overlap another cut or leave the
+    // project, and keeps at least one frame.
+    juce::Result setCutRange(Id cut, double start, double end, juce::String label = "Move camera cut");
+    juce::Result removeCut(Id cut);
+    // Aims a camera at a clip or group origin (0: free) and/or places it in a
+    // group's space (0: world).
+    juce::Result setCameraRig(Id camera, Id target, Id parent);
     // Shared modulators and their routes live in the scope being edited.
     juce::Result addModulator(Modulator modulator, Id& id);
     juce::Result setModulator(Modulator modulator);

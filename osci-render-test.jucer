@@ -22,6 +22,8 @@
             resource="0" file="tests/MotionModulatorsTest.cpp"/>
       <FILE id="MotionSpatialT" name="MotionSpatialTest.cpp" compile="1"
             resource="0" file="tests/MotionSpatialTest.cpp"/>
+      <FILE id="MotionCameraRigT" name="MotionCameraRigTest.cpp" compile="1"
+            resource="0" file="tests/MotionCameraRigTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
       <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"
