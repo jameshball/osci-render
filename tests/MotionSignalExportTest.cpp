@@ -198,7 +198,7 @@ private:
         clip.properties["blue"] = motion::Curve(0.8);
         motion::Track track;
         track.id = 3;
-        track.insert(std::move(clip));
+        track.insert(std::move(clip), motion::Tempo(120));
         motion::Project project;
         project.duration = duration;
         project.assets.push_back(std::move(asset));

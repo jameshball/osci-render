@@ -50,7 +50,7 @@ public:
             clip.properties["weight"] = motion::Curve(layer.weight);
             motion::Track track;
             track.id = ++id;
-            track.insert(clip);
+            track.insert(clip, motion::Tempo(120));
             result.tracks.push_back(track);
         }
         return result;

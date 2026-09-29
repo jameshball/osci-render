@@ -26,16 +26,16 @@ public:
         explicit operator bool() const { return schedule != nullptr; }
     };
 
-    static Result prepare(const MidiNotes& notes, const Clip& clip, double projectBpm, double sampleRate, std::uint64_t releaseSamples, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) try {
-        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000
+    static Result prepare(const MidiNotes& notes, const Clip& clip, const Tempo& tempo, double sampleRate, std::uint64_t releaseSamples, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) try {
+        if (!tempo.valid()
             || !std::isfinite(sampleRate) || sampleRate < 1 || sampleRate > 768000
-            || !clip.valid() || !clip.timing(projectBpm).valid()
+            || !clip.valid() || !clip.timing(tempo).valid()
             || releaseSamples == 0 || releaseSamples > std::ceil(30 * sampleRate) + 1) {
             return {nullptr, "Invalid MIDI schedule timing or envelope release."};
         }
         const auto cancelled = [&] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
         if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
-        const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(projectBpm);
+        const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(tempo);
         if (!timing.valid()) { return {nullptr, "Invalid resolved MIDI timing."}; }
         const auto first = quantize(timing.start, sampleRate), end = quantize(timing.end(), sampleRate);
         if (!first || !end || *end <= *first) { return {nullptr, "MIDI clip must occupy at least one output sample."}; }
@@ -44,7 +44,7 @@ public:
         struct Event { std::int64_t sample; std::uint32_t voice; bool on; };
         std::vector<Event> events;
         events.reserve(notes.notes().size() * 2);
-        const auto secondsPerBeat = 60 / clip.curveBpm(projectBpm);
+        const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
         const auto resolve = [&](double beat) { return timing.start + (beat * secondsPerBeat - timing.offset) / timing.rate; };
         for (const auto& note : notes.notes()) {
             if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }

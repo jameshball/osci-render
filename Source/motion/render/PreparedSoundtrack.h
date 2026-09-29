@@ -23,7 +23,7 @@ public:
                 source.mix.push_back({stage.clipClock,
                     gain == stage.clip->properties.end() ? Curve(1) : gain->second,
                     pan == stage.clip->properties.end() ? Curve(0) : pan->second,
-                    stage.clip->curveBpm(stage.bpm)});
+                    stage.clip->curveBpm(stage.tempo)});
             }
             clips.push_back(std::move(source));
         }, cancel);

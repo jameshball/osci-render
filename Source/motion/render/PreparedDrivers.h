@@ -131,9 +131,9 @@ private:
         for (const auto& track : scope.tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.id != modulator.source || clip.midi == nullptr) { continue; }
-                const auto timing = clip.timing(scope.bpm);
+                const auto timing = clip.timing(scope.tempo());
                 if (!timing.valid()) { return; }
-                const auto secondsPerBeat = 60 / clip.curveBpm(scope.bpm);
+                const auto secondsPerBeat = 60 / clip.curveBpm(scope.tempo());
                 const auto resolve = [&](double beat) { return timing.start + (beat * secondsPerBeat - timing.offset) / timing.rate; };
                 for (const auto& note : clip.midi->notes()) {
                     if (note.pitch < modulator.lowestPitch || note.pitch > modulator.highestPitch) { continue; }

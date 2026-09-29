@@ -25,7 +25,7 @@ public:
             clip.id = 200 + index; clip.start = index * 3; clip.duration = 2;
             clip.offset = .75; clip.rate = 1.25;
             clip.properties["position.x"].setKey({1, .5, motion::Interpolation::linear});
-            if (index == 4) { expect(clip.anchorToBeats(project.bpm)); }
+            if (index == 4) { expect(clip.anchorToBeats(project.tempo())); }
             project.tracks[0].clips.push_back(clip);
         }
         auto independent = base; independent.id = 300; independent.start = 9; independent.duration = 2;
@@ -43,9 +43,9 @@ public:
         expectEquals(static_cast<int>(result.tracks[0].clips.size()), 3);
         expectEquals(result.tracks[0].clips[1].start, 4.0);
         const auto& last = result.tracks[0].clips[2];
-        expectWithinAbsoluteError(last.timing(result.bpm).start, 8.0, 1e-12);
-        expectWithinAbsoluteError(last.timing(result.bpm).offset, .75, 1e-12);
-        expectWithinAbsoluteError(last.timing(result.bpm).rate, 1.25, 1e-12);
+        expectWithinAbsoluteError(last.timing(result.tempo()).start, 8.0, 1e-12);
+        expectWithinAbsoluteError(last.timing(result.tempo()).offset, .75, 1e-12);
+        expectWithinAbsoluteError(last.timing(result.tempo()).rate, 1.25, 1e-12);
         expect(last.timeBase == motion::ClipTimeBase::beats);
         expectEquals(last.properties.at("position.x").evaluate(1), .5);
         expectEquals(result.tracks[1].clips[0].start, 9.0);
@@ -70,12 +70,12 @@ public:
         project.tracks.resize(1); project.tracks[0].clips.clear();
         for (int index = 0; index < 5; ++index) {
             auto clip = base; clip.id = 400 + index; clip.start = index * .7; clip.duration = .7;
-            if (index % 2 == 1) { expect(clip.anchorToBeats(project.bpm)); }
+            if (index % 2 == 1) { expect(clip.anchorToBeats(project.tempo())); }
             project.tracks[0].clips.push_back(clip);
         }
         document.reset(project);
         expect(document.removeClips({401, 403}, true).wasOk());
-        expectWithinAbsoluteError(document.project().tracks[0].clips.back().timing(137).start, 1.4, 1e-12);
+        expectWithinAbsoluteError(document.project().tracks[0].clips.back().timing(motion::Tempo(137)).start, 1.4, 1e-12);
         project.tracks[0].clips.clear();
         for (const auto [start, duration] : {std::pair{0.0, .3}, std::pair{.3, .4}, std::pair{.7, .1}}) {
             auto clip = base; clip.id = 500 + project.tracks[0].clips.size(); clip.start = start; clip.duration = duration;
@@ -152,7 +152,7 @@ public:
         project.definitions.push_back(definition);
         motion::Track track; track.id = 102;
         auto instance = motion::Document::makeCompositionClip(101, *definition, 0);
-        expect(track.insert(instance)); project.tracks.push_back(track);
+        expect(track.insert(instance, motion::Tempo(120))); project.tracks.push_back(track);
         document.reset(project);
         expect(document.setMarker(0, 8, "Main cue").wasOk());
         expect(document.enterComposition(100).wasOk());
@@ -254,7 +254,7 @@ public:
         clip.properties["position.x"].setKey({1, 0, motion::Interpolation::hold});
         clip.properties["position.x"].setKey({3, 1, motion::Interpolation::linear});
         clip.properties["position.x"].setKey({10, 8, motion::Interpolation::linear});
-        expect(clip.anchorToBeats(project.bpm));
+        expect(clip.anchorToBeats(project.tempo()));
         motion::Track track;
         track.id = 30;
         track.group = parent.id;
@@ -403,7 +403,7 @@ public:
         motion::Track track;
         track.id = document.newId();
         track.name = "Hero";
-        expect(track.insert(clip));
+        expect(track.insert(clip, motion::Tempo(120)));
         document.edit("Import", [&](motion::Project& project) {
             project.assets.push_back(asset);
             project.tracks.push_back(track);
@@ -549,7 +549,7 @@ private:
         definition->id = 100; definition->name = "Nested";
         nested.definitions.push_back(definition);
         motion::Track track; track.id = 102;
-        expect(track.insert(motion::Document::makeCompositionClip(101, *definition, 0)));
+        expect(track.insert(motion::Document::makeCompositionClip(101, *definition, 0), motion::Tempo(120)));
         nested.tracks.push_back(track);
         document.reset(nested);
         expect(document.enterComposition(100).wasOk());
@@ -792,7 +792,7 @@ private:
         track.id = 9001;
         track.name = "Soundtrack";
         track.kind = motion::TrackKind::audio;
-        expect(track.insert(clip));
+        expect(track.insert(clip, motion::Tempo(120)));
         project.tracks.push_back(track);
         juce::UndoManager undo;
         motion::Document document(undo);
@@ -891,7 +891,7 @@ private:
         camera.properties["position.x"].modulation = local;
         project.cameras.push_back(camera);
         const double time = 2.25;
-        const double localTime = clip.localTime(time);
+        const double localTime = clip.localTime(time, motion::Tempo(120));
         const auto localMovement = 0.1 * std::sin(localTime * 2 * std::numbers::pi);
         const auto projectMovement = 0.1 * std::sin(time * 2 * std::numbers::pi);
         motion::PreparedComposition prepared(project);
@@ -996,7 +996,7 @@ private:
         project.tracks[0].group = inner.id;
         expect(motion::validGroupHierarchy(project));
         motion::PreparedComposition nested(project);
-        const auto raw = sourceProject.assets[0]->source->sample(clip.localTime(3), 0.2);
+        const auto raw = sourceProject.assets[0]->source->sample(clip.localTime(3, motion::Tempo(120)), 0.2);
         const auto world = nested.clips[0].sample(3, 0.2);
         expectWithinAbsoluteError(world.x, (raw.x + 0.2f + 0.3f + 0.1f) * 2, 0.00001f);
         expectWithinAbsoluteError(world.r, 0.25f, 0.000001f);
@@ -1208,7 +1208,7 @@ private:
             expect(loaded.wasOk(), loaded.getErrorMessage());
             document.edit("Edit restored key", [pass](motion::Project& value) {
                 auto& clip = value.tracks.front().clips.front();
-                clip.properties.at("rotation.y").setKeyValue(clip.localTime(166.4), 90 + pass);
+                clip.properties.at("rotation.y").setKeyValue(clip.localTime(166.4, motion::Tempo(120)), 90 + pass);
             });
             const auto& curve = document.project().tracks.front().clips.front().properties.at("rotation.y");
             expectEquals(static_cast<int>(curve.keyframes().size()), 1);
@@ -1619,7 +1619,7 @@ private:
         global.properties["translateX"] = motion::Curve(0.1);
         project.effects = { global };
         motion::PreparedComposition composition(project);
-        const auto local = clip.localTime(3);
+        const auto local = clip.localTime(3, motion::Tempo(120));
         const auto raw = sourceProject.assets[0]->source->sample(local, 0.2);
         const auto expectedWorldX = ((raw.x + local / 10.0) * 2 + 0.25) * 2;
         const auto world = composition.clips[0].sample(3, 0.2);
@@ -1731,13 +1731,13 @@ private:
         independent.id = 4;
         independent.start = 3;
         independent.offset = 0;
-        expect(independent.stretch(4));
+        expect(independent.stretch(4, motion::Tempo(120)));
         project.tracks[0].clips.push_back(independent);
         motion::PreparedComposition instances(project);
         expect(instances.clips[0].source == instances.clips[1].source);
         expectEquals(instances.clips[1].sample(3, 0.3).x, first.x);
         const auto beforeTrim = instances.clips[1].sample(3.05, 0.3).x;
-        expect(project.tracks[0].clips[1].trim(3.05, 7));
+        expect(project.tracks[0].clips[1].trim(3.05, 7, motion::Tempo(120)));
         motion::PreparedComposition trimmed(project);
         expectWithinAbsoluteError(trimmed.clips[1].sample(3.05, 0.3).x, beforeTrim, 0.000001f);
 

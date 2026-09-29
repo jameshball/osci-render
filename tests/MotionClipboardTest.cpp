@@ -25,7 +25,7 @@ public:
             first = a.id; second = b.id;
             motion::Track row;
             row.id = track = document.newId(); row.name = "Row";
-            row.insert(a); row.insert(b);
+            row.insert(a, motion::Tempo(120)); row.insert(b, motion::Tempo(120));
             motion::Project project;
             project.duration = 10; project.assets = {asset}; project.tracks = {row};
             document.reset(std::move(project));

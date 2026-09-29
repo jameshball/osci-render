@@ -16,6 +16,7 @@ struct Asset {
 };
 struct Scope {
     double bpm = 120, duration = 20;
+    motion::Tempo tempo() const { return motion::Tempo(bpm); }
     std::vector<motion::Track> tracks;
     std::vector<motion::Group> groups;
     std::vector<motion::EffectInstance> effects;

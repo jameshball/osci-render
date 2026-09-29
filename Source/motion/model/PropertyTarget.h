@@ -70,14 +70,14 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
             }
         }
         for (auto& clip : track.clips) {
-            const auto timing = clip.timing(project.bpm);
+            const auto timing = clip.timing(project.tempo());
             for (auto& effect : clip.effects) {
                 if (effect.id == id) {
-                    return Target { effect.id, effect.name, timing.start, timing.duration(), timing.offset, timing.rate, &effect.properties, false, true, false, false, clip.curveBpm(project.bpm) };
+                    return Target { effect.id, effect.name, timing.start, timing.duration(), timing.offset, timing.rate, &effect.properties, false, true, false, false, clip.curveBpm(project.tempo()) };
                 }
             }
             if (clip.id == id) {
-                return Target { clip.id, clip.name, timing.start, timing.duration(), timing.offset, timing.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio, clip.curveBpm(project.bpm) };
+                return Target { clip.id, clip.name, timing.start, timing.duration(), timing.offset, timing.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio, clip.curveBpm(project.tempo()) };
             }
         }
     }

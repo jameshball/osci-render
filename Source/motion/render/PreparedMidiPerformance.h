@@ -16,10 +16,10 @@ public:
         std::string error;
         explicit operator bool() const { return performance != nullptr; }
     };
-    static Result prepare(const MidiNotes& notes, const Clip& clip, double bpm, double sampleRate, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) {
+    static Result prepare(const MidiNotes& notes, const Clip& clip, const Tempo& tempo, double sampleRate, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) {
         const auto envelope = PreparedMidiInstrument::prepareEnvelope(clip.instrument, sampleRate, cancel);
         if (!envelope) { return {nullptr, "Could not prepare the MIDI voice envelope."}; }
-        const auto schedule = PreparedMidiSchedule::prepare(notes, clip, bpm, sampleRate, envelope->releaseSamples(), cancel, resolvedTiming);
+        const auto schedule = PreparedMidiSchedule::prepare(notes, clip, tempo, sampleRate, envelope->releaseSamples(), cancel, resolvedTiming);
         if (!schedule) { return {nullptr, schedule.error}; }
         auto result = std::shared_ptr<PreparedMidiPerformance>(new PreparedMidiPerformance(*envelope, schedule.schedule, sampleRate));
         for (std::uint32_t index = 0; index < schedule.schedule->voiceCount(); ++index) {

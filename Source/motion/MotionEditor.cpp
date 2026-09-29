@@ -78,7 +78,7 @@ struct MotionVideoTemporaryFiles {
     juce::File signal() const { return directory.getChildFile("beam.wav"); }
     juce::File soundtrack() const { return directory.getChildFile("soundtrack.wav"); }
 };
-bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
+bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bpm) {
     return clip != nullptr && clip->valid() && std::isfinite(time) && time > clip->timing(bpm).start && time < clip->timing(bpm).end();
 }
 }
@@ -425,7 +425,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto& tracks = processor.document.project().tracks;
         const bool canSplit = std::any_of(tracks.begin(), tracks.end(), [&](const motion::Track& track) {
             return std::any_of(track.clips.begin(), track.clips.end(), [&](const motion::Clip& clip) {
-                return clip.id == selection && canSplitClip(&clip, time, processor.document.project().bpm);
+                return clip.id == selection && canSplitClip(&clip, time, processor.document.project().tempo());
             });
         });
         if (!canSplit) {
@@ -437,7 +437,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                 for (std::size_t index = 0; index < track.clips.size(); ++index) {
                     if (track.clips[index].id != selection) { continue; }
                     if (track.locked) { return false; }
-                    auto parts = track.clips[index].split(time, id, project.bpm);
+                    auto parts = track.clips[index].split(time, id, project.tempo());
                     if (!parts.has_value()) { return false; }
                     // The right half keeps the left's routes and internal links.
                     std::map<motion::Id, motion::Id> owners {{parts->first.id, id}};
@@ -447,7 +447,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                         effect.id = clone;
                     }
                     track.clips[index] = std::move(parts->first);
-                    if (!track.insert(std::move(parts->second), project.bpm)) { return false; }
+                    if (!track.insert(std::move(parts->second), project.tempo())) { return false; }
                     motion::cloneDrivers(project, owners, [this] { return processor.document.newId(); });
                     return true;
                 }
@@ -520,6 +520,26 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
                     if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
                 }
                 owner->dismissOverlay(dialog.getComponent());
+            });
+        };
+        showOverlay(std::move(overlay));
+    };
+    timeline.onEditTempo = [this](double beat, double bpm, std::optional<double> replacing) {
+        auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar);
+        auto* controls = panel.get();
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), replacing.has_value() ? "Edit tempo change" : "Add tempo change", juce::Point<int>(360, 150), true);
+        const juce::Component::SafePointer<MotionEditor> owner(this);
+        const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
+        const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(controls);
+        controls->onApply = [owner, overlayPointer, tempoPanel, beat, replacing](double value) {
+            juce::MessageManager::callAsync([owner, overlayPointer, tempoPanel, beat, replacing, value] {
+                if (owner == nullptr || overlayPointer == nullptr) { return; }
+                const auto result = owner->processor.document.setTempoChange(beat, value, replacing);
+                if (result.failed()) {
+                    if (tempoPanel != nullptr) { tempoPanel->setError(result.getErrorMessage()); }
+                    return;
+                }
+                owner->dismissOverlay(overlayPointer.getComponent());
             });
         };
         showOverlay(std::move(overlay));
@@ -1144,11 +1164,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             track.id = document.newId();
             track.name = asset->name.toStdString();
             track.kind = asset->audio != nullptr ? motion::TrackKind::audio : motion::TrackKind::visual;
-            track.insert(clip);
+            track.insert(clip, document.project().tempo());
             document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import object", [&](motion::Project& project) {
                 project.assets.push_back(asset);
                 project.tracks.push_back(track);
-                project.duration = std::max(project.duration, clip.timing(project.bpm).end());
+                project.duration = std::max(project.duration, clip.timing(project.tempo()).end());
             });
             owner->assetLibrary.refresh();
             owner->assetLibrary.selectAsset(asset->id);
@@ -1255,7 +1275,7 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
         for (const auto& clip : track.clips) {
             if (clip.id != id || clip.composition == 0) { continue; }
             definition = clip.composition;
-            const auto clock = clip.timing(project.bpm);
+            const auto clock = clip.timing(project.tempo());
             const auto position = processor.position.load();
             time = clock.localTime(position >= clock.start && position < clock.end() ? position : clock.start);
         }
@@ -1342,7 +1362,7 @@ void MotionEditor::refreshInspector() {
             }
         }
     }
-    splitButton.setEnabled(canSplitClip(selected, processor.position.load(), processor.document.project().bpm));
+    splitButton.setEnabled(canSplitClip(selected, processor.position.load(), processor.document.project().tempo()));
     const auto target = motion::findPropertyTarget(processor.document.project(), selection);
     const bool editable = target.has_value() && !target->camera && !target->isEffect;
     const auto tabName = editable && target->isGroup ? "Group" : (audioSelected() ? "Audio" : "Object");

@@ -145,7 +145,7 @@ private:
             clip.start = 0; clip.duration = 2; clip.offset = 0; clip.rate = 1;
             clip.instrument = {.05, .1, .35, .2};
             clip.midi = motion::MidiNotes::create({{1, 0, .8, 69, 127, 1}}).source;
-            const auto prepared = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, 120, rate);
+            const auto prepared = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, motion::Tempo(120), rate);
             expect(static_cast<bool>(prepared), juce::String(prepared.error));
             motion::LiveMidiPerformance live;
             expect(live.prepare(rate, clip.instrument));
@@ -614,7 +614,7 @@ private:
         motion::Clip clip; clip.id = 2; clip.asset = 1; clip.name = "MIDI line"; clip.duration = 1;
         clip.midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}}).source;
         clip.properties["red"] = motion::Curve(.2); clip.properties["green"] = motion::Curve(.4); clip.properties["blue"] = motion::Curve(.8);
-        motion::Track track; track.id = 3; track.insert(std::move(clip));
+        motion::Track track; track.id = 3; track.insert(std::move(clip), motion::Tempo(120));
         motion::Project project; project.duration = 1;
         project.assets.push_back(std::move(asset)); project.tracks.push_back(std::move(track));
         return project;

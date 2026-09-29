@@ -53,7 +53,7 @@ public:
         const bool locked = isLocked();
         title.setText(clip != nullptr ? juce::String(clip->name) : "Clip timing", juce::dontSendNotification);
         updating = true;
-        const auto timing = clip != nullptr ? clip->timing(processor.document.project().bpm) : motion::ClipTiming();
+        const auto timing = clip != nullptr ? clip->timing(processor.document.project().tempo()) : motion::ClipTiming();
         const std::array<double, 4> current {timing.start, timing.duration(), timing.offset, timing.rate};
         for (std::size_t i = 0; i < values.size(); ++i) {
             captions[i].setVisible(clip != nullptr);
@@ -108,7 +108,7 @@ private:
         if (text.isEmpty() || end == text.toRawUTF8() || *end != '\0' || !std::isfinite(value)) {
             error = "Enter a finite number."; refresh(); return;
         }
-        auto timing = clip->timing(processor.document.project().bpm);
+        auto timing = clip->timing(processor.document.project().tempo());
         if (index == 0) { timing.moveTo(value); }
         else if (index == 1) { timing.setDuration(value); }
         else if (index == 2) { timing.offset = value; }

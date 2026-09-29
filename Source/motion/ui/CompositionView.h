@@ -386,7 +386,7 @@ private:
         if (!pathKey.has_value() || pathKey->selection != selected || pathKey->time != time) { return false; }
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) {
-                if (clip.id == selected) { return clip.timing(processor.document.project().bpm).end() == time; }
+                if (clip.id == selected) { return clip.timing(processor.document.project().tempo()).end() == time; }
             }
         }
         return false;
@@ -461,7 +461,7 @@ private:
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.id != selected) { continue; }
-                if (track.locked || !motion::trackIsAudible(project, track) || (!clip.contains(time, project.bpm) && !atSelectedPathEnd(time))) { return false; }
+                if (track.locked || !motion::trackIsAudible(project, track) || (!clip.contains(time, project.tempo()) && !atSelectedPathEnd(time))) { return false; }
                 const auto prefix = tool == MotionTransformTool::move ? "position." : tool == MotionTransformTool::rotate ? "rotation." : "scale.";
                 for (const auto axis : std::string("xyz")) {
                     const auto found = clip.properties.find(std::string(prefix) + axis);

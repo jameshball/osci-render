@@ -4,6 +4,7 @@
 #include "Effects.h"
 #include "MidiNotes.h"
 #include "MidiInstrument.h"
+#include "Tempo.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -89,59 +90,70 @@ struct Clip {
 
     // Canonical fields above use beats for musical clips, seconds otherwise.
     // Resolved content remains seconds so visual curves and their tangents are
-    // never rewritten when the project tempo changes.
-    ClipTiming timing(double projectBpm) const {
+    // never rewritten when the project tempo changes. A musical clip spanning
+    // tempo changes plays its content at its average tempo; each clip inside
+    // one tempo segment lines up with the beat exactly.
+    ClipTiming timing(const Tempo& tempo) const {
         if (timeBase == ClipTimeBase::seconds) { return {start, end(), offset, rate}; }
-        const auto scale = 60 / projectBpm;
-        const auto first = start * scale;
-        const auto last = end() * scale;
-        return {first, last, offset * (60 / contentBpm), rate * (projectBpm / contentBpm)};
+        const auto first = tempo.seconds(start);
+        const auto last = tempo.seconds(end());
+        return {first, last, offset * (60 / contentBpm), rate * (tempo.averageBpm(start, end()) / contentBpm)};
     }
-    double curveBpm(double projectBpm) const { return timeBase == ClipTimeBase::beats ? contentBpm : projectBpm; }
-    bool setTiming(ClipTiming value, double projectBpm) {
-        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000 || !value.valid()) { return false; }
+    double curveBpm(const Tempo& tempo) const { return timeBase == ClipTimeBase::beats ? contentBpm : tempo.initialBpm(); }
+    bool setTiming(ClipTiming value, const Tempo& tempo) {
+        if (!tempo.valid() || !value.valid()) { return false; }
         auto next = *this;
-        const auto before = timing(projectBpm);
-        const auto placementScale = timeBase == ClipTimeBase::beats ? projectBpm / 60 : 1;
-        const auto contentScale = timeBase == ClipTimeBase::beats ? contentBpm / 60 : 1;
-        if (value.start != before.start) { next.start = value.start * placementScale; }
-        if (value.duration() != before.duration()) { next.duration = value.duration() * placementScale; }
-        if (value.offset != before.offset) { next.offset = value.offset * contentScale; }
-        if (value.rate != before.rate) { next.rate = value.rate * (contentScale / placementScale); }
-        if (!next.valid() || !next.timing(projectBpm).valid()) { return false; }
+        const auto before = timing(tempo);
+        if (timeBase == ClipTimeBase::beats) {
+            // Unchanged fields keep their exact canonical values; under a tempo
+            // map, a moved clip's beat length and average tempo can change.
+            const bool moved = value.start != before.start;
+            if (moved) { next.start = tempo.beats(value.start); }
+            if (value.duration() != before.duration() || (moved && !tempo.constant())) {
+                next.duration = tempo.constant() ? value.duration() * (tempo.initialBpm() / 60) : tempo.beats(value.end()) - next.start;
+            }
+            if (value.offset != before.offset) { next.offset = value.offset * (contentBpm / 60); }
+            if (value.rate != before.rate || (!tempo.constant() && (moved || value.duration() != before.duration()))) {
+                next.rate = value.rate * (contentBpm / tempo.averageBpm(next.start, next.end()));
+            }
+        } else {
+            next.start = value.start; next.duration = value.duration(); next.offset = value.offset; next.rate = value.rate;
+        }
+        if (!next.valid() || !next.timing(tempo).valid()) { return false; }
         start = next.start; duration = next.duration; offset = next.offset; rate = next.rate;
         return true;
     }
-    bool anchorToBeats(double projectBpm) {
-        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000 || !valid()) { return false; }
+    bool anchorToBeats(const Tempo& tempo) {
+        if (!tempo.valid() || !valid()) { return false; }
         if (timeBase == ClipTimeBase::beats) { return true; }
-        const auto before = timing(projectBpm);
+        const auto before = timing(tempo);
         if (!before.valid()) { return false; }
         auto next = *this;
-        next.timeBase = ClipTimeBase::beats; next.contentBpm = projectBpm;
-        next.start = before.start * (projectBpm / 60);
-        next.duration = before.duration() * (projectBpm / 60);
-        next.offset = before.offset * (projectBpm / 60);
+        next.timeBase = ClipTimeBase::beats;
+        next.start = tempo.beats(before.start);
+        next.duration = tempo.beats(before.end()) - next.start;
+        // Content keeps its seconds: author it at the placement's own tempo.
+        next.contentBpm = tempo.averageBpm(next.start, next.end());
+        next.offset = before.offset * (next.contentBpm / 60);
         // Reciprocal conversion can expand a touching interval by one ULP.
         // Move only inward, and check the actual start + duration endpoint:
         // accepting an overlap tolerance would also permit real overlaps.
-        const auto secondsPerBeat = 60 / projectBpm;
-        for (int step = 0; step < 4 && next.start * secondsPerBeat < before.start; ++step) {
+        for (int step = 0; step < 4 && tempo.seconds(next.start) < before.start; ++step) {
             next.start = std::nextafter(next.start, std::numeric_limits<double>::infinity());
         }
-        for (int step = 0; step < 4 && next.end() * secondsPerBeat > before.end(); ++step) {
+        for (int step = 0; step < 4 && tempo.seconds(next.end()) > before.end(); ++step) {
             const auto inwardEnd = std::nextafter(next.end(), 0.0);
             next.duration = inwardEnd - next.start;
         }
-        if (!next.valid() || !next.timing(projectBpm).valid()) { return false; }
-        const auto resolved = next.timing(projectBpm);
+        if (!next.valid() || !next.timing(tempo).valid()) { return false; }
+        const auto resolved = next.timing(tempo);
         if (resolved.start < before.start || resolved.end() > before.end()) { return false; }
         *this = std::move(next);
         return true;
     }
     double end() const { return start + duration; }
-    bool contains(double projectTime, double projectBpm = 120) const { const auto t = timing(projectBpm); return projectTime >= t.start && projectTime < t.end(); }
-    double localTime(double projectTime, double projectBpm = 120) const { return timing(projectBpm).localTime(projectTime); }
+    bool contains(double projectTime, const Tempo& tempo) const { const auto t = timing(tempo); return projectTime >= t.start && projectTime < t.end(); }
+    double localTime(double projectTime, const Tempo& tempo) const { return timing(tempo).localTime(projectTime); }
     bool valid() const {
         if (!instrument.valid()) { return false; }
         for (const auto& [name, curve] : properties) {
@@ -159,9 +171,9 @@ struct Clip {
 
     // Model mutations run on the editor thread. The renderer receives prepared
     // snapshots, never these growing containers.
-    bool trim(double newStart, double newEnd, double projectBpm = 120) {
-        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return false; }
-        if (timeBase == ClipTimeBase::beats) { newStart *= projectBpm / 60; newEnd *= projectBpm / 60; }
+    bool trim(double newStart, double newEnd, const Tempo& tempo) {
+        if (!tempo.valid()) { return false; }
+        if (timeBase == ClipTimeBase::beats) { newStart = tempo.beats(newStart); newEnd = tempo.beats(newEnd); }
         if (!std::isfinite(newStart) || !std::isfinite(newEnd) || newStart < 0.0 || newEnd <= newStart) {
             return false;
         }
@@ -175,9 +187,9 @@ struct Clip {
         return true;
     }
 
-    bool stretch(double newDuration, double projectBpm = 120) {
-        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return false; }
-        if (timeBase == ClipTimeBase::beats) { newDuration *= projectBpm / 60; }
+    bool stretch(double newDuration, const Tempo& tempo) {
+        if (!tempo.valid()) { return false; }
+        if (timeBase == ClipTimeBase::beats) { newDuration = tempo.beats(tempo.seconds(start) + newDuration) - start; }
         if (!std::isfinite(newDuration) || newDuration <= 0.0) {
             return false;
         }
@@ -192,9 +204,9 @@ struct Clip {
 
     // Both halves end exactly where the original boundaries were: neither can
     // round past the split point or the original end into a neighbour.
-    std::optional<std::pair<Clip, Clip>> split(double projectTime, Id rightId, double projectBpm = 120) const {
-        if (!std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) { return std::nullopt; }
-        if (timeBase == ClipTimeBase::beats) { projectTime *= projectBpm / 60; }
+    std::optional<std::pair<Clip, Clip>> split(double projectTime, Id rightId, const Tempo& tempo) const {
+        if (!tempo.valid()) { return std::nullopt; }
+        if (timeBase == ClipTimeBase::beats) { projectTime = tempo.beats(projectTime); }
         if (!valid() || rightId == 0 || rightId == id || !std::isfinite(projectTime)
             || projectTime <= start || projectTime >= end()) {
             return std::nullopt;
@@ -226,14 +238,14 @@ struct Track {
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.
-    bool canPlace(const Clip& candidate, Id replacing = 0, double projectBpm = 120) const {
-        if (!candidate.valid() || !std::isfinite(projectBpm) || projectBpm < 1 || projectBpm > 1000) {
+    bool canPlace(const Clip& candidate, Id replacing, const Tempo& tempo) const {
+        if (!candidate.valid() || !tempo.valid()) {
             return false;
         }
-        const auto proposed = candidate.timing(projectBpm);
+        const auto proposed = candidate.timing(tempo);
         if (!proposed.valid()) { return false; }
         for (const auto& clip : clips) {
-            const auto existing = clip.timing(projectBpm);
+            const auto existing = clip.timing(tempo);
             if (clip.id != replacing && (clip.id == candidate.id
                 || (proposed.start < existing.end() && existing.start < proposed.end()))) {
                 return false;
@@ -242,20 +254,20 @@ struct Track {
         return true;
     }
 
-    bool insert(Clip clip, double projectBpm = 120) {
-        if (!canPlace(clip, 0, projectBpm)) {
+    bool insert(Clip clip, const Tempo& tempo) {
+        if (!canPlace(clip, 0, tempo)) {
             return false;
         }
-        const auto position = std::lower_bound(clips.begin(), clips.end(), clip.timing(projectBpm).start,
-            [projectBpm](const Clip& existing, double time) { return existing.timing(projectBpm).start < time; });
+        const auto position = std::lower_bound(clips.begin(), clips.end(), clip.timing(tempo).start,
+            [&tempo](const Clip& existing, double time) { return existing.timing(tempo).start < time; });
         clips.insert(position, std::move(clip));
         return true;
     }
 
-    const Clip* at(double projectTime, double projectBpm = 120) const {
+    const Clip* at(double projectTime, const Tempo& tempo) const {
         // Tempo can change the ordering of mixed beat/seconds clips.
         for (const auto& clip : clips) {
-            if (clip.contains(projectTime, projectBpm)) { return &clip; }
+            if (clip.contains(projectTime, tempo)) { return &clip; }
         }
         return nullptr;
     }
@@ -264,8 +276,8 @@ struct Track {
 // Editor-thread operation: trim one clip and ripple only clips after its
 // original end. All displacement is resolved project seconds, so musical and
 // time-anchored clips retain their own authoring domains and source clocks.
-inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSeconds, double bpm) {
-    if (track.locked || clipId == 0 || !std::isfinite(deltaSeconds) || !std::isfinite(bpm) || bpm < 1 || bpm > 1000) {
+inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSeconds, const Tempo& bpm) {
+    if (track.locked || clipId == 0 || !std::isfinite(deltaSeconds) || !bpm.valid()) {
         return false;
     }
     auto candidate = track;
@@ -281,7 +293,7 @@ inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSe
     if (std::adjacent_find(identities.begin(), identities.end()) != identities.end()) {
         return false;
     }
-    std::sort(candidate.clips.begin(), candidate.clips.end(), [bpm](const auto& left, const auto& right) {
+    std::sort(candidate.clips.begin(), candidate.clips.end(), [&bpm](const auto& left, const auto& right) {
         return left.timing(bpm).start < right.timing(bpm).start;
     });
     double previousEnd = 0;
@@ -354,8 +366,8 @@ inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSe
 // Editor-thread operation: apply a shared project-time displacement atomically.
 // Track displacement is in model rows; callers with collapsed groups translate
 // their visible-row gesture before invoking this operation.
-inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, double bpm) {
-    if (ids.empty() || !std::isfinite(seconds) || !std::isfinite(bpm) || bpm < 1 || bpm > 1000) { return false; }
+inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, const Tempo& bpm) {
+    if (ids.empty() || !std::isfinite(seconds) || !bpm.valid()) { return false; }
     auto unique = ids;
     std::sort(unique.begin(), unique.end());
     if (unique.front() == 0 || std::adjacent_find(unique.begin(), unique.end()) != unique.end()) { return false; }

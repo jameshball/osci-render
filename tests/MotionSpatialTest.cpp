@@ -88,7 +88,7 @@ public:
             clip.properties["rotation.y"] = keyed({{0, 0}, {2, 0}});
             clip.properties["position.y"].modulation = {true, motion::ModulationWaveform::square, 0.5, 1};
             motion::Track track;
-            track.id = document.newId(); track.name = "Path"; track.insert(clip);
+            track.id = document.newId(); track.name = "Path"; track.insert(clip, motion::Tempo(120));
             motion::Project project;
             project.duration = 4; project.assets = {asset}; project.tracks = {track};
             document.reset(project);

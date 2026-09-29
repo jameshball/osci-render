@@ -29,7 +29,7 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
         if (selected != nullptr) { break; }
     }
     if (selected == nullptr) { return {}; }
-    const auto timing = selected->timing(project.bpm);
+    const auto timing = selected->timing(project.tempo());
     const auto start = std::max(0.0, timing.start), end = std::min(project.duration, timing.end());
     if (!timing.valid() || !(end > start)) { return {}; }
     std::vector<const Group*> parents;
@@ -81,8 +81,8 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
     path.points.reserve(times.size());
     bool broken = true;
     for (const auto& [time, flags] : times) {
-        const auto local = selected->localTime(time, project.bpm);
-        const auto bpm = selected->curveBpm(project.bpm);
+        const auto local = selected->localTime(time, project.tempo());
+        const auto bpm = selected->curveBpm(project.tempo());
         Vec3 position {value(selected->properties, 0, local, bpm), value(selected->properties, 1, local, bpm), value(selected->properties, 2, local, bpm)};
         for (const auto* group : parents) {
             std::array<double, 9> values;

@@ -328,9 +328,9 @@ struct PreparedComposition {
                     PreparedChain::Link link;
                     load(link, clip.properties, clip.id);
                     link.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, link.curves);
-                    const auto timing = clip.timing(project.bpm);
+                    const auto timing = clip.timing(project.tempo());
                     link.start = timing.start; link.offset = timing.offset; link.rate = timing.rate;
-                    link.bpm = clip.curveBpm(project.bpm);
+                    link.bpm = clip.curveBpm(project.tempo());
                     link.clip = true;
                     chain.links.push_back(std::move(link));
                     groupId = track.group;
@@ -381,7 +381,7 @@ struct PreparedComposition {
             item.id = clip.id; item.start = timing.start; item.end = timing.end(); item.offset = timing.offset; item.rate = timing.rate;
             item.scopeClock = stage.scopeClock;
             item.bpm = stage.bpm;
-            item.contentBpm = clip.curveBpm(stage.bpm);
+            item.contentBpm = clip.curveBpm(stage.tempo);
             for (std::size_t i = 0; i < propertyNames.size(); ++i) {
                 const auto curve = clip.properties.find(propertyNames[i]);
                 item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
@@ -443,7 +443,7 @@ struct PreparedComposition {
                 item.liveInstrument = found->second;
             }
             if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
-                const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, leaf.bpm, sampleRate, cancel, &leaf.clipClock);
+                const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, leaf.tempo, sampleRate, cancel, &leaf.clipClock);
                 if (!performance) {
                     preparationError = "MIDI clip \"" + juce::String(clip.name) + "\": " + juce::String(performance.error);
                     return;

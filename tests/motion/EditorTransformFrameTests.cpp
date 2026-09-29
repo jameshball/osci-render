@@ -15,6 +15,7 @@ void check(bool condition, const char* message) {
 bool near(Vec3 a, Vec3 b) { return (a - b).length() < 1.0e-9; }
 struct Project {
     double bpm = 120;
+    motion::Tempo tempo() const { return motion::Tempo(bpm); }
     std::vector<Track> tracks;
     std::vector<Group> groups;
     std::vector<EffectInstance> effects;

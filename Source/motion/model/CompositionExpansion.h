@@ -17,6 +17,7 @@ struct CompositionStage {
     double bpm = 120;
     const std::vector<Group>* groups = nullptr;
     const std::vector<EffectInstance>* effects = nullptr;
+    Tempo tempo;
 };
 
 struct CompositionExpansionResult {
@@ -58,7 +59,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
             if (!trackIsAudible(scope, track)) { continue; }
             for (const auto& clip : track.clips) {
                 if (cancel != nullptr && cancel->load()) { result.error = "Composition preparation cancelled."; return false; }
-                const auto timing = clip.timing(scope.bpm);
+                const auto timing = clip.timing(scope.tempo());
                 if (!clip.valid() || !timing.valid() || !std::isfinite(timing.rate * visible->rate)
                     || timing.rate * visible->rate <= 0) {
                     result.error = "Invalid timing while preparing a composition clip.";
@@ -76,7 +77,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
                 }
                 const auto mapped = timing.nestedIn(*visible);
                 if (!mapped.has_value()) { continue; }
-                stages.push_back({&track, &clip, *visible, *mapped, scope.bpm, &scope.groups, &scope.effects});
+                stages.push_back({&track, &clip, *visible, *mapped, scope.bpm, &scope.groups, &scope.effects, scope.tempo()});
                 if (clip.composition != 0) {
                     if (clip.midi != nullptr) {
                         result.error = "MIDI patterns must be assigned to media clips inside a reusable composition.";

@@ -189,10 +189,10 @@ public:
                 if (bounds.getWidth() > 32 && rowHeight >= 11) { g.setColour(osci::Colours::text().withAlpha(.9f)); g.setFont(10.0f); g.drawText(juce::MidiMessage::getMidiNoteName(note.pitch, true, true, 4), bounds.reduced(4, 0), juce::Justification::centredLeft); }
             }
             if (clip != nullptr) {
-                const auto timing = clip->timing(processor.document.project().bpm);
-                const auto scale = clip->curveBpm(processor.document.project().bpm) / 60;
-                const auto left = beatX(clip->localTime(timing.start, processor.document.project().bpm) * scale);
-                const auto right = beatX(clip->localTime(timing.end(), processor.document.project().bpm) * scale);
+                const auto timing = clip->timing(processor.document.project().tempo());
+                const auto scale = clip->curveBpm(processor.document.project().tempo()) / 60;
+                const auto left = beatX(clip->localTime(timing.start, processor.document.project().tempo()) * scale);
+                const auto right = beatX(clip->localTime(timing.end(), processor.document.project().tempo()) * scale);
                 g.setColour(osci::Colours::veryDark().withAlpha(.65f));
                 if (left > grid.getX()) { g.fillRect(grid.withRight(std::min(left, grid.getRight()))); }
                 if (right < grid.getRight()) { g.fillRect(grid.withLeft(std::max(right, grid.getX()))); }
@@ -211,8 +211,8 @@ public:
         }
         g.setColour(osci::Colours::text().withAlpha(.55f)); g.setFont(10.0f);
         g.drawText("Velocity", 5, lane.getY() + 4, keyboardWidth - 8, 15, juce::Justification::centredLeft);
-        if (clip != nullptr && clip->contains(processor.position.load(), processor.document.project().bpm)) {
-            const auto beat = clip->localTime(processor.position.load(), processor.document.project().bpm) * clip->curveBpm(processor.document.project().bpm) / 60;
+        if (clip != nullptr && clip->contains(processor.position.load(), processor.document.project().tempo())) {
+            const auto beat = clip->localTime(processor.position.load(), processor.document.project().tempo()) * clip->curveBpm(processor.document.project().tempo()) / 60;
             const auto x = beatX(beat);
             if (x >= keyboardWidth && x < getWidth()) { g.setColour(osci::Colours::accentColor().withAlpha(.65f)); g.drawVerticalLine(x, 30, static_cast<float>(lane.getBottom())); }
         }
@@ -239,8 +239,8 @@ public:
         const auto* clip = currentClip();
         if (clip == nullptr || clip->midi == nullptr) { return; }
         if (event.y >= 30 && event.y < gridBounds().getY() && event.x >= keyboardWidth) {
-            const auto local = beatAt(event.x) * 60 / clip->curveBpm(processor.document.project().bpm);
-            const auto timing = clip->timing(processor.document.project().bpm);
+            const auto local = beatAt(event.x) * 60 / clip->curveBpm(processor.document.project().tempo());
+            const auto timing = clip->timing(processor.document.project().tempo());
             processor.seek(std::clamp(timing.start + (local - timing.offset) / timing.rate, timing.start, timing.end())); return;
         }
         const auto id = hit(event.getPosition());
@@ -372,7 +372,7 @@ private:
         const auto* clip = currentClip();
         scrollBeat = 0; topPitch = 72; pixelsPerBeat = 80; rowHeight = 16;
         if (clip == nullptr) { return; }
-        double first = std::max(0.0, clip->localTime(clip->timing(processor.document.project().bpm).start, processor.document.project().bpm) * clip->curveBpm(processor.document.project().bpm) / 60);
+        double first = std::max(0.0, clip->localTime(clip->timing(processor.document.project().tempo()).start, processor.document.project().tempo()) * clip->curveBpm(processor.document.project().tempo()) / 60);
         double last = first + 8;
         if (clip->midi != nullptr && !clip->midi->notes().empty()) {
             first = clip->midi->notes().front().start; last = std::max(first + 4, clip->midi->length());

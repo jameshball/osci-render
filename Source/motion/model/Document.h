@@ -51,7 +51,10 @@ struct Composition {
     juce::String name = "Untitled";
     double duration = 180.0;
     double frameRate = 30.0;
-    double bpm = 120.0;
+    double bpm = 120.0; // initial tempo, from beat 0
+    // Stepped tempo changes after the initial tempo, by beat (immutable, shared).
+    std::shared_ptr<const std::vector<TempoChange>> tempoChanges;
+    Tempo tempo() const { return Tempo(bpm, tempoChanges); }
     TimeDisplay timeDisplay = TimeDisplay::seconds;
     int beatsPerBar = 4;
     double snapBeats = 0.25;
@@ -60,6 +63,7 @@ struct Composition {
         TimeGrid grid;
         grid.display = timeDisplay;
         grid.bpm = bpm;
+        grid.tempoChanges = tempoChanges;
         grid.frameRate = frameRate;
         grid.beatsPerBar = beatsPerBar;
         grid.snapBeats = snapBeats;
@@ -109,6 +113,9 @@ public:
     void editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
+    // Stepped tempo changes by beat; musical clips follow, seconds content stays.
+    juce::Result setTempoChange(double beat, double bpm, std::optional<double> replacing = std::nullopt);
+    juce::Result removeTempoChange(double beat);
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
     juce::Result setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings);
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
@@ -192,6 +199,7 @@ public:
 
 private:
     Id highestId() const;
+    juce::Result retempo(std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
     juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);
     void apply(Project value);
     Project mergeScope(Project view) const;

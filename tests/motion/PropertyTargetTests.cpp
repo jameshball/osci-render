@@ -6,6 +6,7 @@ namespace {
 struct Project {
     double duration = 120.0;
     double bpm = 120.0;
+    motion::Tempo tempo() const { return motion::Tempo(bpm); }
     std::vector<motion::Track> tracks;
     std::vector<motion::Camera> cameras;
     std::vector<motion::EffectInstance> effects;
@@ -77,7 +78,7 @@ int main() {
     check(invalidEffect.valid(), "negative clip-local range is supported");
     invalidEffect.properties["rippleDepth"] = motion::Curve(2);
     check(!invalidEffect.valid(), "out-of-range effect values are rejected");
-    const auto split = project.tracks[0].clips[0].split(10, 40);
+    const auto split = project.tracks[0].clips[0].split(10, 40, motion::Tempo(120));
     check(split.has_value() && split->second.effects.size() == 1, "split retains an independent effect stack value");
     auto right = split->second;
     right.effects[0].id = 41;

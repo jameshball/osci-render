@@ -124,7 +124,7 @@ public:
         const auto pattern = motion::MidiNotes::create({{1, 0, .25, 60, 127, 1}, {2, .125, .375, 60, 64, 1}});
         motion::Clip scheduledClip;
         scheduledClip.id = 1; scheduledClip.offset = .05; scheduledClip.duration = .3;
-        const auto scheduled = motion::PreparedMidiSchedule::prepare(*pattern.source, scheduledClip, 120, 48000, scheduledEnvelope->releaseSamples());
+        const auto scheduled = motion::PreparedMidiSchedule::prepare(*pattern.source, scheduledClip, motion::Tempo(120), 48000, scheduledEnvelope->releaseSamples());
         expect(bool(scheduled));
         if (scheduled) {
             for (std::uint32_t index = 0; index < scheduled.schedule->voiceCount(); ++index) {

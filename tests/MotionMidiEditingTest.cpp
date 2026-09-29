@@ -27,19 +27,19 @@ public:
         clip.properties["position.x"].setKey({.75, 2, motion::Interpolation::smooth});
         auto sibling = clip; sibling.id = document.newId(); sibling.start = 8;
         motion::Track track; track.id = document.newId(); track.name = "Instrument";
-        expect(track.insert(clip)); expect(track.insert(sibling));
+        expect(track.insert(clip, motion::Tempo(120))); expect(track.insert(sibling, motion::Tempo(120)));
         motion::Project initial; initial.bpm = 150; initial.assets = {geometry, midi}; initial.tracks = {track};
         document.reset(initial);
         const auto current = [&]() -> const motion::Clip& { return document.project().tracks[0].clips[0]; };
-        const auto timing = clip.timing(initial.bpm);
+        const auto timing = clip.timing(initial.tempo());
         expect(document.assignMidi(clip.id, midi->id).wasOk());
         expect(current().midi == midi->midi && current().midiAsset == midi->id);
         expect(current().asset == geometry->id && current().timeBase == motion::ClipTimeBase::beats);
         expectEquals(current().contentBpm, 150.0);
-        expectWithinAbsoluteError(current().timing(150).start, timing.start, 1e-12);
-        expectWithinAbsoluteError(current().timing(150).end(), timing.end(), 1e-12);
-        expectWithinAbsoluteError(current().timing(150).offset, timing.offset, 1e-12);
-        expectWithinAbsoluteError(current().timing(150).rate, timing.rate, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(150)).start, timing.start, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(150)).end(), timing.end(), 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(150)).offset, timing.offset, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(150)).rate, timing.rate, 1e-12);
         expectEquals(current().properties.at("position.x").evaluate(.75), 2.0);
         expect(undo.undo());
         expect(current().midi == nullptr && current().timeBase == motion::ClipTimeBase::seconds);
@@ -100,7 +100,7 @@ public:
             recordedDocument.reset(initial);
             const auto findRecorded = [&]() -> const motion::Clip& { return recordedDocument.project().tracks[0].clips[0]; };
             const auto original = findRecorded();
-            const auto originalTiming = original.timing(initial.bpm);
+            const auto originalTiming = original.timing(initial.tempo());
             const auto firstTake = motion::MidiNotes::create({{900, .25, .5, 67, 110, 2}});
             expect(static_cast<bool>(firstTake));
             const auto generation = recordedDocument.generation();
@@ -109,8 +109,8 @@ public:
             juce::ignoreUnused(recordRevision);
             const auto& firstRecorded = findRecorded();
             expect(firstRecorded.midi == firstTake.source && firstRecorded.midiAsset == 0 && firstRecorded.timeBase == motion::ClipTimeBase::beats);
-            expectWithinAbsoluteError(firstRecorded.timing(initial.bpm).start, originalTiming.start, 1e-12);
-            expectWithinAbsoluteError(firstRecorded.timing(initial.bpm).end(), originalTiming.end(), 1e-12);
+            expectWithinAbsoluteError(firstRecorded.timing(initial.tempo()).start, originalTiming.start, 1e-12);
+            expectWithinAbsoluteError(firstRecorded.timing(initial.tempo()).end(), originalTiming.end(), 1e-12);
             expect(firstRecorded.asset == original.asset);
             expectEquals(firstRecorded.properties.at("position.x").evaluate(.75), 2.0);
             expect(recordedUndo.getUndoDescription() == "Record MIDI notes");
@@ -204,12 +204,12 @@ public:
             adjacent.bpm = bpm;
             auto& first = adjacent.tracks[0].clips[0];
             first.start = bpm == 150 ? .3 : .1; first.duration = first.start;
-            const auto before = first.timing(bpm);
+            const auto before = first.timing(motion::Tempo(bpm));
             adjacent.tracks[0].clips[1].start = before.end();
             document.reset(adjacent);
             expect(document.assignMidi(clip.id, midi->id).wasOk());
-            expect(current().timing(bpm).start >= before.start && current().timing(bpm).end() <= before.end());
-            expectWithinAbsoluteError(current().timing(bpm).end(), before.end(), 1e-15);
+            expect(current().timing(motion::Tempo(bpm)).start >= before.start && current().timing(motion::Tempo(bpm)).end() <= before.end());
+            expectWithinAbsoluteError(current().timing(motion::Tempo(bpm)).end(), before.end(), 1e-15);
             expect(undo.undo()); expect(current().timeBase == motion::ClipTimeBase::seconds);
             expect(undo.redo()); expect(current().midi == midi->midi);
         }
@@ -223,25 +223,25 @@ public:
                 auto& authored = timingProject.tracks[0].clips[0];
                 authored.midi = audio ? nullptr : midi->midi;
                 authored.midiAsset = audio ? 0 : midi->id;
-                if (beats) { expect(authored.anchorToBeats(timingProject.bpm)); }
+                if (beats) { expect(authored.anchorToBeats(timingProject.tempo())); }
                 document.reset(timingProject);
                 const auto findClip = [&]() -> const motion::Clip& {
                     const auto& clips = document.project().tracks[0].clips;
                     return *std::find_if(clips.begin(), clips.end(), [&](const auto& candidate) { return candidate.id == clip.id; });
                 };
                 const auto original = findClip();
-                const auto originalTiming = original.timing(timingProject.bpm);
+                const auto originalTiming = original.timing(timingProject.tempo());
                 revision = document.revision();
                 expect(document.setClipTiming(clip.id, originalTiming).wasOk());
                 expect(document.revision() == revision && !undo.canUndo());
                 auto moved = originalTiming; moved.moveTo(20);
                 expect(document.setClipTiming(clip.id, moved).wasOk());
                 expect(document.project().tracks[0].clips.back().id == clip.id);
-                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).start, 20.0, 1e-12);
-                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).duration(), originalTiming.duration(), 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.tempo()).start, 20.0, 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.tempo()).duration(), originalTiming.duration(), 1e-12);
                 expectEquals(findClip().offset, original.offset);
                 expectEquals(findClip().rate, original.rate);
-                expectEquals(document.project().duration, findClip().timing(timingProject.bpm).end());
+                expectEquals(document.project().duration, findClip().timing(timingProject.tempo()).end());
                 expect(findClip().asset == original.asset && findClip().midi == original.midi && findClip().midiAsset == original.midiAsset);
                 expect(findClip().timeBase == original.timeBase && findClip().contentBpm == original.contentBpm);
                 expectEquals(findClip().properties.at("position.x").evaluate(.75), 2.0);
@@ -250,25 +250,25 @@ public:
                 expectEquals(document.project().duration, 12.0);
                 expect(undo.redo()); expect(document.project().tracks[0].clips.back().id == clip.id);
 
-                auto edited = findClip().timing(timingProject.bpm);
+                auto edited = findClip().timing(timingProject.tempo());
                 edited.setDuration(1.5);
                 expect(document.setClipTiming(clip.id, edited).wasOk());
-                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).duration(), 1.5, 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.tempo()).duration(), 1.5, 1e-12);
                 expectEquals(findClip().rate, original.rate);
                 expectEquals(findClip().offset, original.offset);
-                edited = findClip().timing(timingProject.bpm); edited.offset = -1.25;
+                edited = findClip().timing(timingProject.tempo()); edited.offset = -1.25;
                 expect(document.setClipTiming(clip.id, edited).wasOk());
-                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).offset, -1.25, 1e-12);
-                edited = findClip().timing(timingProject.bpm); edited.rate = 2.5;
+                expectWithinAbsoluteError(findClip().timing(timingProject.tempo()).offset, -1.25, 1e-12);
+                edited = findClip().timing(timingProject.tempo()); edited.rate = 2.5;
                 expect(document.setClipTiming(clip.id, edited).wasOk());
-                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).rate, 2.5, 1e-12);
-                expectWithinAbsoluteError(findClip().timing(timingProject.bpm).duration(), 1.5, 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.tempo()).rate, 2.5, 1e-12);
+                expectWithinAbsoluteError(findClip().timing(timingProject.tempo()).duration(), 1.5, 1e-12);
                 expect(undo.undo()); expectEquals(findClip().rate, original.rate);
                 expect(undo.undo()); expectEquals(findClip().offset, original.offset);
                 expect(undo.undo()); expectEquals(findClip().duration, original.duration);
 
                 beginTest("Invalid, overlapping and locked timing requests leave document and undo untouched");
-                const auto stable = findClip().timing(timingProject.bpm);
+                const auto stable = findClip().timing(timingProject.tempo());
                 revision = document.revision();
                 const auto undoName = undo.getUndoDescription();
                 auto overlap = stable; overlap.moveTo(8.5);
@@ -291,19 +291,19 @@ public:
         }
         beginTest("Beat timing converts resolved speed and offset at a different project tempo");
         auto slower = initial;
-        expect(slower.tracks[0].clips[0].anchorToBeats(150));
+        expect(slower.tracks[0].clips[0].anchorToBeats(motion::Tempo(150)));
         slower.bpm = 75; slower.tracks[0].clips[1].start = 20;
         document.reset(slower);
-        auto slowTiming = current().timing(75);
+        auto slowTiming = current().timing(motion::Tempo(75));
         slowTiming.moveTo(12); slowTiming.offset = 2; slowTiming.rate = .75;
         expect(document.setClipTiming(clip.id, slowTiming).wasOk());
-        expectWithinAbsoluteError(current().timing(75).start, 12.0, 1e-12);
-        expectWithinAbsoluteError(current().timing(75).duration(), 6.0, 1e-12);
-        expectWithinAbsoluteError(current().timing(75).offset, 2.0, 1e-12);
-        expectWithinAbsoluteError(current().timing(75).rate, .75, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(75)).start, 12.0, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(75)).duration(), 6.0, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(75)).offset, 2.0, 1e-12);
+        expectWithinAbsoluteError(current().timing(motion::Tempo(75)).rate, .75, 1e-12);
         expectEquals(current().contentBpm, 150.0);
         expect(undo.undo()); expectEquals(current().start, slower.tracks[0].clips[0].start);
-        expect(undo.redo()); expectWithinAbsoluteError(current().timing(75).rate, .75, 1e-12);
+        expect(undo.redo()); expectWithinAbsoluteError(current().timing(motion::Tempo(75)).rate, .75, 1e-12);
         testDuplication(initial);
     }
 
@@ -324,8 +324,8 @@ private:
                     clip.effects.push_back(motion::makeEffect(100, *motion::effectDefinition("rotate")));
                     clip.effects.back().properties["rotateZ"].setKey({1, .5, motion::Interpolation::linear});
                 }
-                if (beats) { expect(clip.anchorToBeats(project.bpm)); project.bpm = 75; }
-                project.duration = clip.timing(project.bpm).end();
+                if (beats) { expect(clip.anchorToBeats(project.tempo())); project.bpm = 75; }
+                project.duration = clip.timing(project.tempo()).end();
                 const auto original = clip;
                 const auto duration = project.duration;
                 document.reset(project);
@@ -337,7 +337,7 @@ private:
                 expect(copied.timeBase == original.timeBase && copied.duration == original.duration && copied.offset == original.offset && copied.rate == original.rate);
                 expect(copied.asset == original.asset && copied.midi == original.midi && copied.midiAsset == original.midiAsset);
                 expectEquals(copied.properties.at("position.x").evaluate(.75), 2.0);
-                expectEquals(document.project().duration, copied.timing(project.bpm).end());
+                expectEquals(document.project().duration, copied.timing(project.tempo()).end());
                 expect(document.project().assets[0] == initial.assets[0]);
                 if (!audio) {
                     expect(copied.effects[0].id != original.effects[0].id && copied.effects[0].id != copied.id);
@@ -388,7 +388,7 @@ private:
             second.clips[0].id = 301;
             second.clips[0].start = 2;
             second.clips[0].duration = 3;
-            second.clips[0].anchorToBeats(project.bpm);
+            second.clips[0].anchorToBeats(project.tempo());
             second.clips[0].effects.push_back(motion::makeEffect(302, *motion::effectDefinition("rotate")));
             project.tracks.push_back(second);
             document.reset(project);
@@ -397,8 +397,8 @@ private:
             expectEquals(static_cast<int>(copies.size()), 2);
             const auto& firstCopy = document.project().tracks[0].clips.back();
             const auto& secondCopy = document.project().tracks[1].clips.back();
-            expectWithinAbsoluteError(firstCopy.timing(project.bpm).start, 5.0, 1e-12);
-            expectWithinAbsoluteError(secondCopy.timing(project.bpm).start, 6.0, 1e-12);
+            expectWithinAbsoluteError(firstCopy.timing(project.tempo()).start, 5.0, 1e-12);
+            expectWithinAbsoluteError(secondCopy.timing(project.tempo()).start, 6.0, 1e-12);
             expect(secondCopy.timeBase == second.clips[0].timeBase);
             expect(secondCopy.effects[0].id != 302 && secondCopy.id != firstCopy.id);
             expectEquals(firstCopy.properties.at("position.x").evaluate(.75), 2.0);

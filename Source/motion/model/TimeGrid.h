@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "Tempo.h"
 
 namespace motion {
 enum class TimeDisplay { seconds, frames, beats };
@@ -17,6 +18,7 @@ enum class TimeDisplay { seconds, frames, beats };
 struct TimeGrid {
     TimeDisplay display = TimeDisplay::seconds;
     double bpm = 120, frameRate = 30;
+    std::shared_ptr<const std::vector<TempoChange>> tempoChanges;
     int beatsPerBar = 4;
     double snapBeats = 0.25;
     bool snapping = true;
@@ -24,6 +26,12 @@ struct TimeGrid {
     double snap(double seconds) const {
         if (!snapping || !std::isfinite(seconds)) { return seconds; }
         const auto subdivision = std::isfinite(snapBeats) && snapBeats > 0 ? snapBeats : 0.25;
+        if (display == TimeDisplay::beats && tempoChanges != nullptr && validTempo()) {
+            // Snap in beats so the grid follows every tempo change.
+            const auto clock = Tempo(bpm, tempoChanges);
+            const auto result = clock.seconds(std::round(clock.beats(seconds) / subdivision) * subdivision);
+            return std::isfinite(result) ? (result == 0 ? 0.0 : result) : seconds;
+        }
         const auto step = display == TimeDisplay::beats ? positiveProduct(beatSeconds(), subdivision) : frameSeconds();
         const auto units = seconds / step;
         // At this magnitude the grid is finer than representable time. Keeping
@@ -154,7 +162,8 @@ struct TimeGrid {
             const auto bar = numeric(parts[0], true), beat = numeric(parts[1], true);
             const auto tick = parts.size() == 3 ? numeric(parts[2], true) : std::optional<long double>(0);
             if (!bar || !beat || !tick || *bar < 1 || *beat < 1 || *beat > beatsPerBar || *tick > 959) { return std::nullopt; }
-            seconds = ((*bar - 1) * beatsPerBar + (*beat - 1) + *tick / 960) * (60.0L / bpm);
+            const auto beats = (*bar - 1) * beatsPerBar + (*beat - 1) + *tick / 960;
+            seconds = tempoChanges != nullptr && validTempo() ? static_cast<long double>(Tempo(bpm, tempoChanges).seconds(static_cast<double>(beats))) : beats * (60.0L / bpm);
         } else { return std::nullopt; }
         if (!std::isfinite(seconds) || seconds > std::numeric_limits<double>::max()) { return std::nullopt; }
         const auto result = static_cast<double>(seconds);
@@ -182,6 +191,11 @@ private:
         return std::isfinite(bpm) && bpm > 0 && std::isfinite(value) && value > 0 ? value : 0.5;
     }
     int meter() const { return beatsPerBar > 0 ? beatsPerBar : 4; }
+public:
+    // Ruler ticks in beats mode fall on beats, so they follow tempo changes.
+    double tickTime(double beat) const { return tempoChanges != nullptr && validTempo() ? Tempo(bpm, tempoChanges).seconds(beat) : beat * beatSeconds(); }
+    double beatAt(double seconds) const { return tempoChanges != nullptr && validTempo() ? Tempo(bpm, tempoChanges).beats(seconds) : seconds / beatSeconds(); }
+private:
     static double powerOfTwo(double value) {
         const auto result = std::exp2(std::ceil(std::log2(value)));
         return std::isfinite(result) ? std::max(result, std::numeric_limits<double>::denorm_min()) : std::numeric_limits<double>::max();
@@ -204,8 +218,9 @@ private:
         const auto frames = seconds / frameSeconds();
         return std::isfinite(frames) ? number(std::round(frames), 0) + "f" : "\xE2\x80\x94";
     }
+    bool validTempo() const { return std::isfinite(bpm) && bpm > 0; }
     std::string beatLabel(double seconds, bool showTicks) const {
-        const auto beats = seconds / beatSeconds();
+        const auto beats = tempoChanges != nullptr && validTempo() ? Tempo(bpm, tempoChanges).beats(seconds) : seconds / beatSeconds();
         if (!std::isfinite(beats)) { return "\xE2\x80\x94"; }
         // Round the fractional beat before decomposition, allowing a carry at
         // the next beat/bar without converting unbounded time to an integer.

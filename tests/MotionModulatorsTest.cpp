@@ -30,9 +30,9 @@ public:
             c.midi = motion::MidiNotes::create(notes).source;
             first = a.id; second = b.id; drums = c.id;
             motion::Track one, two, three;
-            one.id = document.newId(); one.name = "One"; one.insert(a);
-            two.id = document.newId(); two.name = "Two"; two.insert(b);
-            three.id = document.newId(); three.name = "Drums"; three.insert(c);
+            one.id = document.newId(); one.name = "One"; one.insert(a, motion::Tempo(120));
+            two.id = document.newId(); two.name = "Two"; two.insert(b, motion::Tempo(120));
+            three.id = document.newId(); three.name = "Drums"; three.insert(c, motion::Tempo(120));
             motion::Project project;
             project.duration = 10; project.bpm = 120; project.assets = {asset}; project.tracks = {one, two, three};
             document.reset(std::move(project));

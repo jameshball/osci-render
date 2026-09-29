@@ -41,6 +41,8 @@ public:
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition;
     std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, double)> onEditMarker;
+    // (beat, current bpm, beat of the change being edited, if any)
+    std::function<void(double, double, std::optional<double>)> onEditTempo;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
     mutable motion::Id selected = 0;
     void setSelection(motion::Id id) {
@@ -123,7 +125,7 @@ public:
             if (clip == nullptr) { continue; }
             const auto found = clip->properties.find(key.property);
             if (found == clip->properties.end()) { continue; }
-            const auto timing = clip->timing(project.bpm);
+            const auto timing = clip->timing(project.tempo());
             for (const auto& keyframe : found->second.keyframes()) {
                 if (!sameTime(keyframe.time, key.time) || timing.rate == 0) { continue; }
                 const auto time = timing.start + (keyframe.time - timing.offset) / timing.rate;
@@ -324,21 +326,21 @@ public:
         const auto kind = (*asset)->audio != nullptr ? motion::TrackKind::audio : motion::TrackKind::visual;
         auto clip = motion::Document::makeClip(processor.document.newId(), **asset, snapped);
         const auto id = clip.id;
-        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].locked || project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip, 0, project.bpm))) {
+        if (row >= 0 && row < static_cast<int>(project.tracks.size()) && (project.tracks[row].locked || project.tracks[row].kind != kind || !project.tracks[row].canPlace(clip, 0, project.tempo()))) {
             return;
         }
         const auto trackId = processor.document.newId();
         processor.document.edit(kind == motion::TrackKind::audio ? "Add audio clip" : "Add object clip", [&](motion::Project& updated) {
-            updated.duration = std::max(updated.duration, clip.timing(updated.bpm).end());
+            updated.duration = std::max(updated.duration, clip.timing(updated.tempo()).end());
             if (row >= 0 && row < static_cast<int>(updated.tracks.size())) {
-                updated.tracks[row].insert(std::move(clip), updated.bpm);
+                updated.tracks[row].insert(std::move(clip), updated.tempo());
             } else {
                 motion::Track track;
                 track.id = trackId;
                 track.group = group;
                 track.name = clip.name;
                 track.kind = kind;
-                track.insert(std::move(clip), updated.bpm);
+                track.insert(std::move(clip), updated.tempo());
                 updated.tracks.push_back(std::move(track));
             }
         });
@@ -358,19 +360,32 @@ public:
         const auto grid = processor.document.project().timeGrid();
         const auto step = grid.tickStep(pixelsPerSecond);
         const auto minorStep = grid.display == motion::TimeDisplay::beats ? grid.snapBeats * 60.0 / grid.bpm : 1.0 / grid.frameRate;
+        // In beats, ticks step through beats so they follow tempo changes.
+        const bool musical = grid.display == motion::TimeDisplay::beats && grid.tempoChanges != nullptr;
+        const auto tickAt = [&](double first, double stride, int index) {
+            return musical ? grid.tickTime(first + index * stride) : first + index * stride;
+        };
+        const auto firstOf = [&](double stride) {
+            return musical ? std::floor(grid.beatAt(scrollTime) / stride) * stride : std::floor(scrollTime / stride) * stride;
+        };
+        const auto beatsPerSecond = grid.bpm / 60.0;
+        const auto minorStride = musical ? grid.snapBeats : minorStep;
+        const auto majorStride = musical ? step * beatsPerSecond : step;
         if (grid.snapping && minorStep * pixelsPerSecond >= 9 && minorStep < step) {
-            const auto first = std::floor(scrollTime / minorStep) * minorStep;
-            const auto count = std::clamp(static_cast<int>(std::ceil(visibleSeconds / minorStep)) + 2, 0, 1000);
+            const auto first = firstOf(minorStride);
+            const auto count = std::clamp(static_cast<int>(std::ceil(visibleSeconds / minorStep * (musical ? 4 : 1))) + 2, 0, 2000);
             g.setColour(juce::Colours::white.withAlpha(0.035f));
             for (int tick = 0; tick < count; ++tick) {
-                const auto x = timeX(first + tick * minorStep);
+                const auto x = timeX(tickAt(first, minorStride, tick));
+                if (x > getWidth()) { break; }
                 if (x >= namesWidth) { g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight())); }
             }
         }
-        const auto firstTick = std::floor(scrollTime / step) * step;
-        const auto tickCount = std::clamp(static_cast<int>(std::ceil(visibleSeconds / step)) + 2, 0, 1000);
+        const auto firstTick = firstOf(majorStride);
+        const auto tickCount = std::clamp(static_cast<int>(std::ceil(visibleSeconds / step * (musical ? 4 : 1))) + 2, 0, 2000);
         for (int tick = 0; tick < tickCount; ++tick) {
-            const auto time = firstTick + tick * step;
+            const auto time = tickAt(firstTick, majorStride, tick);
+            if (timeX(time) > getWidth()) { break; }
             const auto x = timeX(time);
             if (x < namesWidth) {
                 continue;
@@ -417,7 +432,7 @@ public:
                         if (parent == row.id) {
                             g.setColour(motion::style::accent().withAlpha(motion::trackIsAudible(project, track) ? 0.35f : 0.1f));
                             for (const auto& clip : track.clips) {
-                                const auto timing = clip.timing(project.bpm);
+                                const auto timing = clip.timing(project.tempo());
                                 g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + height * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
                             }
                             break;
@@ -480,7 +495,7 @@ public:
             const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
             const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
             const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
-            const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().bpm));
+            const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().tempo()));
             const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), rowHeight)).toFloat().reduced(1, 4);
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
@@ -490,10 +505,24 @@ public:
             g.drawRoundedRectangle(bounds, 4, 1);
             g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
         }
-        if (rulerHeight > 26) {
+        if (showsMarkerBand()) {
             g.setColour(osci::Colours::textMuted());
             g.setFont(11.0f);
-            g.drawText("Markers", 12, 26, namesWidth - 24, 22, juce::Justification::centredLeft);
+            g.drawText(processor.document.project().tempoChanges != nullptr ? "Markers / tempo" : "Markers", 12, 26, namesWidth - 24, 22, juce::Justification::centredLeft);
+            const auto& project = processor.document.project();
+            if (project.tempoChanges != nullptr) {
+                const auto tempo = project.tempo();
+                for (const auto& change : *project.tempoChanges) {
+                    const auto x = timeX(tempo.seconds(change.beat));
+                    if (x < namesWidth || x >= getWidth()) { continue; }
+                    const auto colour = juce::Colour(0xff8fb6e8);
+                    g.setColour(colour.withAlpha(0.14f));
+                    g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
+                    g.setColour(colour);
+                    g.fillRect(x, 27, 2, 20);
+                    g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x99\xa9 ")) + juce::String(change.bpm, change.bpm == std::round(change.bpm) ? 0 : 2), x + 4, 27, 70, 20, juce::Justification::centredLeft, true);
+                }
+            }
             for (const auto& marker : processor.document.project().markers) {
                 const auto bounds = markerBounds(marker);
                 if (bounds.isEmpty()) { continue; }
@@ -695,7 +724,7 @@ public:
             return;
         }
         auto candidate = original;
-        const auto timing = original.timing(before->bpm);
+        const auto timing = original.timing(before->tempo());
         auto edited = timing;
         auto delta = (event.x - downX) / pixelsPerSecond;
         if (delta != 0.0 && !event.mods.isAltDown()) {
@@ -729,8 +758,8 @@ public:
         }
         if (mode == Mode::rippleLeft || mode == Mode::rippleRight) {
             auto updated = *before;
-            if (!motion::rippleTrim(updated.tracks[originalRow], original.id, mode == Mode::rippleLeft, delta, updated.bpm)) { return; }
-            for (const auto& item : updated.tracks[originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.bpm).end()); }
+            if (!motion::rippleTrim(updated.tracks[originalRow], original.id, mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
+            for (const auto& item : updated.tracks[originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
             changed = delta != 0;
             processor.document.preview(std::move(updated));
             expectedRevision = processor.document.revision();
@@ -742,7 +771,7 @@ public:
             double earliest = timing.start;
             for (const auto& track : updated.tracks) {
                 for (const auto& item : track.clips) {
-                    if (selectedClips.contains(item.id)) { earliest = std::min(earliest, item.timing(updated.bpm).start); }
+                    if (selectedClips.contains(item.id)) { earliest = std::min(earliest, item.timing(updated.tempo()).start); }
                 }
             }
             delta = std::max(delta, -earliest);
@@ -758,9 +787,9 @@ public:
                     if (y < rulerHeight || trackAtY(y + visibleDelta) != index + rows) { return; }
                 }
             }
-            if (!motion::moveClips(updated.tracks, {selectedClips.begin(), selectedClips.end()}, delta, rows, updated.bpm)) { return; }
+            if (!motion::moveClips(updated.tracks, {selectedClips.begin(), selectedClips.end()}, delta, rows, updated.tempo())) { return; }
             for (const auto& track : updated.tracks) {
-                for (const auto& item : track.clips) { updated.duration = std::max(updated.duration, item.timing(updated.bpm).end()); }
+                for (const auto& item : track.clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
             }
             changed = delta != 0 || rows != 0;
             processor.document.preview(std::move(updated));
@@ -782,7 +811,7 @@ public:
                 edited.setEnd(edited.end() + delta);
                 edited.rate *= timing.duration() / edited.duration();
             }
-            if (!candidate.setTiming(edited, before->bpm)) { return; }
+            if (!candidate.setTiming(edited, before->tempo())) { return; }
         }
         const auto target = mode == Mode::move
             ? (trackAtY(event.y) >= 0 ? trackAtY(event.y) : originalRow) : originalRow;
@@ -801,8 +830,8 @@ public:
         auto updated = *before;
         auto& source = updated.tracks[originalRow].clips;
         source.erase(std::remove_if(source.begin(), source.end(), [&](const auto& clip) { return clip.id == original.id; }), source.end());
-        if (updated.tracks[target].insert(candidate, updated.bpm)) {
-            updated.duration = std::max(updated.duration, candidate.timing(updated.bpm).end());
+        if (updated.tracks[target].insert(candidate, updated.tempo())) {
+            updated.duration = std::max(updated.duration, candidate.timing(updated.tempo()).end());
             changed = true;
             processor.document.preview(std::move(updated));
             expectedRevision = processor.document.revision();
@@ -943,7 +972,7 @@ private:
     // Project times of every key on a clip, restricted to its visible interval.
     std::vector<double> clipKeyTimes(const motion::Clip& clip, const std::string& property = {}) const {
         std::vector<double> times;
-        const auto timing = clip.timing(processor.document.project().bpm);
+        const auto timing = clip.timing(processor.document.project().tempo());
         if (!(timing.rate != 0)) { return times; }
         for (const auto& [name, curve] : clip.properties) {
             if (!property.empty() && name != property) { continue; }
@@ -980,9 +1009,9 @@ private:
         }
         auto label = juce::String(clip.name);
         if (active && tool == Tool::slip) {
-            label += "  offset " + juce::String(clip.timing(project.bpm).offset, 2) + "s";
+            label += "  offset " + juce::String(clip.timing(project.tempo()).offset, 2) + "s";
         } else if (active && tool == Tool::stretch) {
-            label += "  " + juce::String(clip.timing(project.bpm).rate, 2) + "x";
+            label += "  " + juce::String(clip.timing(project.tempo()).rate, 2) + "x";
         }
         auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f).withTrimmedBottom(7);
         if (audio) {
@@ -996,8 +1025,8 @@ private:
                 for (int x = left; x < right; ++x) {
                     const auto time = scrollTime + (x - namesWidth) / pixelsPerSecond;
                     const auto end = time + 1.0 / pixelsPerSecond;
-                    const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time, project.bpm), clip.localTime(end, project.bpm));
-                    const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time, project.bpm), clip.localTime(end, project.bpm));
+                    const auto a = (*asset)->audio->querySeconds(0, clip.localTime(time, project.tempo()), clip.localTime(end, project.tempo()));
+                    const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time, project.tempo()), clip.localTime(end, project.tempo()));
                     const auto low = std::clamp(std::min(a.minimum, b.minimum), -1.0f, 1.0f);
                     const auto high = std::clamp(std::max(a.maximum, b.maximum), -1.0f, 1.0f);
                     g.drawVerticalLine(x, centre - high * 6, centre - low * 6 + 0.5f);
@@ -1032,7 +1061,7 @@ private:
         g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
         const auto centre = y + height * .5f;
         for (const auto& clip : track.clips) {
-            const auto timing = clip.timing(project.bpm);
+            const auto timing = clip.timing(project.tempo());
             const auto left = timeX(timing.start), right = timeX(timing.end());
             g.setColour(clipColour(clip, track).withAlpha(.18f));
             g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
@@ -1106,7 +1135,7 @@ private:
         auto bestDistance = 7.0;
         for (const auto& clip : track.clips) {
             const auto found = clip.properties.find(lane->lane);
-            const auto timing = clip.timing(project.bpm);
+            const auto timing = clip.timing(project.tempo());
             if (found == clip.properties.end() || timing.rate == 0) { continue; }
             for (const auto& key : found->second.keyframes()) {
                 const auto distance = std::abs(timeX(timing.start + (key.time - timing.offset) / timing.rate) - point.x);
@@ -1124,7 +1153,7 @@ private:
             if (!row.isLane() || y + laneHeight / 2 < area.getY() || y + laneHeight / 2 > area.getBottom()) { continue; }
             for (const auto& clip : project.tracks[static_cast<std::size_t>(row.track)].clips) {
                 const auto found = clip.properties.find(row.lane);
-                const auto timing = clip.timing(project.bpm);
+                const auto timing = clip.timing(project.tempo());
                 if (found == clip.properties.end() || timing.rate == 0) { continue; }
                 for (const auto& key : found->second.keyframes()) {
                     const auto x = timeX(timing.start + (key.time - timing.offset) / timing.rate);
@@ -1146,7 +1175,7 @@ private:
                 continue;
             }
             for (auto& clip : track.clips) {
-                const auto timing = clip.timing(project.bpm);
+                const auto timing = clip.timing(project.tempo());
                 for (auto& [name, curve] : clip.properties) {
                     std::vector<motion::Keyframe> moving;
                     for (const auto& key : curve.keyframes()) {
@@ -1174,7 +1203,7 @@ private:
         if (processor.document.revision() != keyDrag->revision) { keyDrag.reset(); return; }
         const auto* clip = findClip(keyDrag->grabbed.clip, keyDrag->before);
         if (clip == nullptr) { return; }
-        const auto timing = clip->timing(keyDrag->before.bpm);
+        const auto timing = clip->timing(keyDrag->before.tempo());
         if (timing.rate == 0) { return; }
         const auto grabbedTime = timing.start + (keyDrag->grabbed.time - timing.offset) / timing.rate;
         auto delta = (x - keyDrag->downX) / pixelsPerSecond;
@@ -1185,7 +1214,7 @@ private:
         selectedKeys = keyDrag->keys;
         for (auto& key : selectedKeys) {
             const auto* owner = findClip(key.clip, keyDrag->before);
-            if (owner != nullptr) { key.time += delta * owner->timing(keyDrag->before.bpm).rate; }
+            if (owner != nullptr) { key.time += delta * owner->timing(keyDrag->before.tempo()).rate; }
         }
         processor.document.preview(std::move(updated));
         keyDrag->revision = processor.document.revision();
@@ -1231,12 +1260,12 @@ private:
         const auto& track = project.tracks[static_cast<std::size_t>(lane.track)];
         const motion::Clip* target = nullptr;
         for (const auto& clip : track.clips) {
-            const auto timing = clip.timing(project.bpm);
+            const auto timing = clip.timing(project.tempo());
             if (time >= timing.start && time <= timing.end()) { target = &clip; }
         }
         if (target == nullptr || track.locked) { return; }
         const auto clipId = target->id;
-        const auto local = target->timing(project.bpm).localTime(time);
+        const auto local = target->timing(project.tempo()).localTime(time);
         const auto property = lane.lane;
         const auto added = processor.document.tryEdit("Add keyframe", [&](motion::Project& updated) {
             auto* curve = motion::findPropertyCurve(updated, clipId, property);
@@ -1314,14 +1343,16 @@ private:
         revealSelection();
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) {
-                if (clip.id == duplicate) { revealTime(clip.timing(processor.document.project().bpm).start); return; }
+                if (clip.id == duplicate) { revealTime(clip.timing(processor.document.project().tempo()).start); return; }
             }
         }
     }
     // The camera track: a band under the ruler (and markers) whose clips are
     // the camera cuts. Shown once a project has cuts or a second camera.
     static constexpr int cameraBandHeight = 22;
-    int cameraBandTop() const { return processor.document.project().markers.empty() ? 26 : 48; }
+    // The marker band also carries tempo changes.
+    bool showsMarkerBand() const { return !processor.document.project().markers.empty() || processor.document.project().tempoChanges != nullptr; }
+    int cameraBandTop() const { return showsMarkerBand() ? 48 : 26; }
     bool showsCameraBand() const {
         const auto& project = processor.document.project();
         return !project.cameraCuts.empty() || project.cameras.size() > 1;
@@ -1513,6 +1544,16 @@ private:
         menu.addItem(3, "Add marker here...");
         menu.addItem(4, "Previous marker", !processor.document.project().markers.empty());
         menu.addItem(5, "Next marker", !processor.document.project().markers.empty());
+        menu.addSeparator();
+        const auto tempo = processor.document.project().tempo();
+        const auto beat = std::round(tempo.beats(time) * 4) / 4;
+        const auto* change = tempoChangeNear(time);
+        if (change != nullptr) {
+            menu.addItem(7, "Edit tempo change...");
+            menu.addItem(8, "Remove tempo change");
+        } else {
+            menu.addItem(6, "Add tempo change here...", beat > 0);
+        }
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
@@ -1521,7 +1562,33 @@ private:
             if ((result == 1 || result == 3) && owner->onEditMarker) { owner->onEditMarker(result == 1 ? id : 0, time); }
             if (result == 2) { const auto removed = owner->processor.document.removeMarker(id); if (removed.failed() && owner->onError) { owner->onError(removed.getErrorMessage()); } }
             if (result == 4 || result == 5) { owner->jumpMarker(result == 5); }
+            if (result == 6 || result == 7) { owner->editTempoChange(time); }
+            if (result == 8) {
+                const auto* existing = owner->tempoChangeNear(time);
+                if (existing != nullptr) {
+                    const auto removed = owner->processor.document.removeTempoChange(existing->beat);
+                    if (removed.failed() && owner->onError) { owner->onError(removed.getErrorMessage()); }
+                }
+            }
         });
+    }
+    // The tempo change whose flag is within a few pixels of `time`.
+    const motion::TempoChange* tempoChangeNear(double time) const {
+        const auto& project = processor.document.project();
+        if (project.tempoChanges == nullptr) { return nullptr; }
+        const auto tempo = project.tempo();
+        for (const auto& change : *project.tempoChanges) {
+            if (std::abs(timeX(tempo.seconds(change.beat)) - timeX(time)) <= 6) { return &change; }
+        }
+        return nullptr;
+    }
+    // Adds (or edits) a tempo change at the nearest quarter beat.
+    void editTempoChange(double time) {
+        const auto tempo = processor.document.project().tempo();
+        const auto* existing = tempoChangeNear(time);
+        const auto beat = existing != nullptr ? existing->beat : std::round(tempo.beats(time) * 4) / 4;
+        const auto current = existing != nullptr ? existing->bpm : tempo.bpmAt(time);
+        if (onEditTempo) { onEditTempo(beat, current, existing != nullptr ? std::optional<double>(existing->beat) : std::nullopt); }
     }
 
     void showClipMenu(motion::Id id) {
@@ -1776,7 +1843,7 @@ private:
         auto end = project.duration;
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
-                end = std::max(end, clip.timing(project.bpm).end());
+                end = std::max(end, clip.timing(project.tempo()).end());
             }
         }
         const auto duration = std::isfinite(end) ? std::max(0.001, end) : 1.0;
@@ -1965,7 +2032,7 @@ private:
         return y;
     }
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const {
-        const auto timing = clip.timing(processor.document.project().bpm);
+        const auto timing = clip.timing(processor.document.project().tempo());
         return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), rowHeight };
     }
     double snapTime(double time, juce::ModifierKeys modifiers) const {
@@ -1999,7 +2066,7 @@ private:
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (excludedClips.contains(clip.id)) { continue; }
-                const auto timing = clip.timing(project.bpm);
+                const auto timing = clip.timing(project.tempo());
                 consider(timing.start);
                 consider(timing.end());
                 if (!expandedTracks.contains(track.id) || timing.rate == 0) { continue; }

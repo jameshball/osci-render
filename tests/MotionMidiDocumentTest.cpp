@@ -29,14 +29,14 @@ public:
         auto clip = motion::Document::makeClip(document.newId(), *source, 0);
         clip.midiAsset = midi->id; clip.midi = midi->midi;
         auto sibling = clip; sibling.id = document.newId(); sibling.start = 10;
-        expect(clip.anchorToBeats(170));
+        expect(clip.anchorToBeats(motion::Tempo(170)));
         auto note = clip.midi->notes()[0];
         note.id = std::numeric_limits<std::uint64_t>::max();
         note.start = 1.0 / 7; note.duration = 11.0 / 13; note.pitch = 71;
         const auto edited = motion::MidiNotes::create({ note });
         expect(static_cast<bool>(edited)); clip.midi = edited.source;
         motion::Track track; track.id = document.newId(); track.name = "Instrument";
-        expect(track.insert(clip)); expect(track.insert(sibling));
+        expect(track.insert(clip, motion::Tempo(120))); expect(track.insert(sibling, motion::Tempo(120)));
         document.edit("Assign performance", [&](motion::Project& project) { project.assets = { source, midi }; project.tracks = { track }; });
         const auto xml = juce::parseXML(document.save().toString());
         expect(xml != nullptr);

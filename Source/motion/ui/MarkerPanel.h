@@ -56,3 +56,50 @@ private:
     juce::Label nameLabel, positionLabel, status;
     juce::TextButton apply {"Save marker"};
 };
+
+// Adds or edits one tempo change: the tempo from a beat onwards.
+class MotionTempoPanel final : public juce::Component {
+public:
+    MotionTempoPanel(double beat, double bpm, int beatsPerBar) {
+        const auto bar = std::max(1, beatsPerBar);
+        tempo.setName("Tempo change BPM");
+        tempo.setTitle("Tempo change BPM");
+        tempo.setText(juce::String(bpm, bpm == std::round(bpm) ? 0 : 2), false);
+        tempo.setFont(juce::FontOptions(14));
+        tempo.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+        tempo.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        tempo.setSelectAllWhenFocused(true);
+        tempo.setInputRestrictions(8, "0123456789.");
+        tempo.onTextChange = [this] { refresh(); };
+        tempo.onReturnKey = [this] { apply.triggerClick(); };
+        tempoLabel.setText("BPM", juce::dontSendNotification);
+        where.setText("From bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2) + " onwards", juce::dontSendNotification);
+        where.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        status.setFont(juce::FontOptions(12));
+        status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        apply.setTitle("Save tempo");
+        apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(tempo.getText().getDoubleValue()); } };
+        for (auto* component : std::initializer_list<juce::Component*>{&tempo, &tempoLabel, &where, &status, &apply}) { addAndMakeVisible(component); }
+        refresh();
+    }
+    std::function<void(double)> onApply;
+    void setError(const juce::String& message) { status.setText(message, juce::dontSendNotification); }
+    void resized() override {
+        auto bounds = getLocalBounds().reduced(12);
+        where.setBounds(bounds.removeFromTop(24));
+        auto row = bounds.removeFromTop(32);
+        tempoLabel.setBounds(row.removeFromLeft(72)); tempo.setBounds(row.reduced(0, 3));
+        apply.setBounds(bounds.removeFromBottom(30).removeFromRight(110));
+        status.setBounds(bounds);
+    }
+private:
+    void refresh() {
+        const auto value = tempo.getText().getDoubleValue();
+        const bool valid = std::isfinite(value) && value >= 1 && value <= 1000;
+        apply.setEnabled(valid);
+        status.setText(valid ? "" : "Tempo: 1-1000 BPM", juce::dontSendNotification);
+    }
+    juce::TextEditor tempo;
+    juce::Label tempoLabel, where, status;
+    juce::TextButton apply {"Save tempo"};
+};

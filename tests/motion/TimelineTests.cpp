@@ -64,8 +64,8 @@ int main() {
         check(!child.nestedIn(motion::ClipTiming(0, 5, 0, std::numeric_limits<double>::infinity())).has_value(), "invalid instance speed rejects");
         check(!motion::ClipTiming(0, 5, 0, 1e308).nestedIn(motion::ClipTiming(0, 5, 0, 1e308)).has_value(), "composed speed overflow rejects");
         motion::Clip musical; musical.id = 200; musical.start = 2; musical.duration = 6; musical.offset = 7; musical.rate = .5;
-        check(musical.anchorToBeats(120), "nested fixture has beat timing");
-        const auto musicalNested = musical.timing(120).nestedIn(instance);
+        check(musical.anchorToBeats(motion::Tempo(120)), "nested fixture has beat timing");
+        const auto musicalNested = musical.timing(motion::Tempo(120)).nestedIn(instance);
         check(musicalNested.has_value() && near(musicalNested->localTime(11), nested->localTime(11)), "beat and second children use the same resolved mapping");
     }
 
@@ -73,20 +73,20 @@ int main() {
         motion::Clip first; first.id = 101; first.start = 2; first.duration = 2;
         first.offset = 7; first.properties["position.x"].setKey({7, 42});
         motion::Clip second = first; second.id = 102; second.start = 5;
-        check(second.anchorToBeats(120), "selection fixture includes beat-based clip");
+        check(second.anchorToBeats(motion::Tempo(120)), "selection fixture includes beat-based clip");
         motion::Track track; track.id = 1;
-        check(track.insert(first) && track.insert(second), "selection fixture placement");
+        check(track.insert(first, motion::Tempo(120)) && track.insert(second, motion::Tempo(120)), "selection fixture placement");
         std::vector<motion::Track> tracks {track, motion::Track{}};
         tracks[1].id = 2;
-        check(motion::moveClips(tracks, {101, 102}, 3, 1, 120), "selection moves across tracks atomically");
+        check(motion::moveClips(tracks, {101, 102}, 3, 1, motion::Tempo(120)), "selection moves across tracks atomically");
         check(tracks[0].clips.empty() && tracks[1].clips.size() == 2, "every selected clip moves");
-        check(near(tracks[1].clips[0].timing(120).start, 5) && near(tracks[1].clips[1].timing(120).start, 8), "mixed time bases preserve shared second displacement");
-        check(near(tracks[1].clips[0].localTime(6), first.localTime(3)), "move carries source timing and animation");
+        check(near(tracks[1].clips[0].timing(motion::Tempo(120)).start, 5) && near(tracks[1].clips[1].timing(motion::Tempo(120)).start, 8), "mixed time bases preserve shared second displacement");
+        check(near(tracks[1].clips[0].localTime(6, motion::Tempo(120)), first.localTime(3, motion::Tempo(120))), "move carries source timing and animation");
         check(tracks[1].clips[0].properties.at("position.x").evaluate(7) == 42, "move preserves authored curves");
         const auto reject = [&](const std::vector<motion::Id>& ids, double delta, int rows) {
-            check(!motion::moveClips(tracks, ids, delta, rows, 120), "invalid selection move rejected");
+            check(!motion::moveClips(tracks, ids, delta, rows, motion::Tempo(120)), "invalid selection move rejected");
             check(tracks[0].clips.empty() && tracks[1].clips.size() == 2
-                && near(tracks[1].clips[0].timing(120).start, 5), "rejected move leaves all tracks unchanged");
+                && near(tracks[1].clips[0].timing(motion::Tempo(120)).start, 5), "rejected move leaves all tracks unchanged");
         };
         reject({101, 102}, -6, 0);
         reject({101, 102}, 0, 1);
@@ -104,9 +104,9 @@ int main() {
         reject({101, 102}, 0, -1);
         auto adjacent = first; adjacent.id = 103; adjacent.start = first.end();
         motion::Track touching; touching.id = 3;
-        check(touching.insert(first) && touching.insert(adjacent), "adjacent selection fixture");
+        check(touching.insert(first, motion::Tempo(120)) && touching.insert(adjacent, motion::Tempo(120)), "adjacent selection fixture");
         std::vector<motion::Track> pair {touching};
-        check(motion::moveClips(pair, {103, 101}, 1, 0, 120), "adjacent selected clips do not collide with their old positions");
+        check(motion::moveClips(pair, {103, 101}, 1, 0, motion::Tempo(120)), "adjacent selected clips do not collide with their old positions");
         check(pair[0].clips[0].id == 101 && pair[0].clips[1].id == 103
             && pair[0].clips[0].end() == pair[0].clips[1].start, "batch insertion remains ordered and exactly adjacent");
 
@@ -130,13 +130,13 @@ int main() {
         motion::Clip downstream; downstream.id = 203; downstream.start = 10; downstream.duration = 2; downstream.offset = 3; downstream.rate = .5;
         downstream.properties["position.x"].setKey({3, 4, motion::Interpolation::linear});
         auto final = downstream; final.id = 204; final.start = 15;
-        check(track.insert(earlier) && track.insert(selected) && track.insert(downstream) && track.insert(final), "ripple trim fixture placement");
+        check(track.insert(earlier, motion::Tempo(120)) && track.insert(selected, motion::Tempo(120)) && track.insert(downstream, motion::Tempo(120)) && track.insert(final, motion::Tempo(120)), "ripple trim fixture placement");
         const auto original = track;
-        check(motion::rippleTrim(track, 202, true, 1, 120), "leading ripple trim succeeds");
+        check(motion::rippleTrim(track, 202, true, 1, motion::Tempo(120)), "leading ripple trim succeeds");
         check(near(track.clips[0].start, 0) && near(track.clips[1].start, 5) && near(track.clips[1].duration, 1)
             && near(track.clips[1].offset, 1.75), "leading trim keeps placement and advances source offset");
         check(near(track.clips[2].start, 9) && near(track.clips[3].start, 14), "leading trim shifts downstream clips left");
-        check(near(track.clips[2].timing(120).start - track.clips[1].timing(120).end(), 3), "leading trim preserves the downstream gap");
+        check(near(track.clips[2].timing(motion::Tempo(120)).start - track.clips[1].timing(motion::Tempo(120)).end(), 3), "leading trim preserves the downstream gap");
         check(track.clips[0].start == original.clips[0].start && track.clips[2].offset == original.clips[2].offset
             && track.clips[2].rate == original.clips[2].rate && track.clips[2].properties.at("position.x").keyframes()[0].time == 3,
             "ripple movement leaves earlier and downstream source clocks and keys intact");
@@ -144,14 +144,14 @@ int main() {
             "ripple trim does not alter selected animation keys");
 
         track = original;
-        check(motion::rippleTrim(track, 202, false, 2, 120), "trailing ripple trim succeeds");
+        check(motion::rippleTrim(track, 202, false, 2, motion::Tempo(120)), "trailing ripple trim succeeds");
         check(near(track.clips[1].start, 5) && near(track.clips[1].duration, 4) && near(track.clips[1].offset, .25),
             "trailing trim changes only selected duration");
         check(near(track.clips[2].start, 12) && near(track.clips[3].start, 17), "trailing trim shifts downstream clips right");
-        check(near(track.clips[2].timing(120).start - track.clips[1].timing(120).end(), 3), "trailing trim preserves the downstream gap");
+        check(near(track.clips[2].timing(motion::Tempo(120)).start - track.clips[1].timing(motion::Tempo(120)).end(), 3), "trailing trim preserves the downstream gap");
 
         track = original;
-        check(motion::rippleTrim(track, 202, true, -.5, 120), "leading ripple extension accepts a negative source offset");
+        check(motion::rippleTrim(track, 202, true, -.5, motion::Tempo(120)), "leading ripple extension accepts a negative source offset");
         check(near(track.clips[1].start, 5) && near(track.clips[1].duration, 2.5) && near(track.clips[1].offset, -.5),
             "leading ripple extension keeps placement and permits a negative source offset");
         check(near(track.clips[2].start, 10.5) && near(track.clips[3].start, 15.5), "leading extension shifts downstream clips right");
@@ -160,54 +160,54 @@ int main() {
         mixed.id = 5;
         auto absolute = selected; absolute.id = 211; absolute.start = 3; absolute.duration = 2; absolute.offset = .5; absolute.rate = 1.25;
         auto musical = downstream; musical.id = 212; musical.start = 7; musical.duration = 2; musical.offset = .75; musical.rate = .8;
-        check(musical.anchorToBeats(137), "ripple trim fixture includes a beat-anchored downstream clip");
-        check(mixed.insert(earlier, 137) && mixed.insert(absolute, 137) && mixed.insert(musical, 137), "mixed-timebase ripple fixture placement");
-        const auto musicalStart = mixed.clips[2].timing(137).start;
+        check(musical.anchorToBeats(motion::Tempo(137)), "ripple trim fixture includes a beat-anchored downstream clip");
+        check(mixed.insert(earlier, motion::Tempo(137)) && mixed.insert(absolute, motion::Tempo(137)) && mixed.insert(musical, motion::Tempo(137)), "mixed-timebase ripple fixture placement");
+        const auto musicalStart = mixed.clips[2].timing(motion::Tempo(137)).start;
         const auto musicalOffset = mixed.clips[2].offset;
         const auto musicalRate = mixed.clips[2].rate;
-        check(motion::rippleTrim(mixed, 211, true, .4, 137), "mixed-timebase leading ripple trim succeeds");
+        check(motion::rippleTrim(mixed, 211, true, .4, motion::Tempo(137)), "mixed-timebase leading ripple trim succeeds");
         check(near(mixed.clips[1].start, 3) && near(mixed.clips[1].duration, 1.6) && near(mixed.clips[1].offset, 1),
             "mixed leading trim uses resolved seconds for content advance");
-        check(mixed.clips[2].timeBase == motion::ClipTimeBase::beats && near(mixed.clips[2].timing(137).start, musicalStart - .4)
+        check(mixed.clips[2].timeBase == motion::ClipTimeBase::beats && near(mixed.clips[2].timing(motion::Tempo(137)).start, musicalStart - .4)
             && mixed.clips[2].offset == musicalOffset && mixed.clips[2].rate == musicalRate,
             "mixed ripple preserves beat authoring and downstream source clock");
 
         motion::Track touchingMusical;
         auto beatHead = selected; beatHead.id = 220; beatHead.timeBase = motion::ClipTimeBase::beats;
         beatHead.start = 2; beatHead.duration = 3; beatHead.offset = .5; beatHead.contentBpm = 90;
-        auto touchingTail = downstream; touchingTail.id = 221; touchingTail.start = beatHead.timing(137).end();
-        check(touchingMusical.insert(beatHead, 137) && touchingMusical.insert(touchingTail, 137), "touching musical head fixture");
-        const auto headTiming = beatHead.timing(137);
-        check(motion::rippleTrim(touchingMusical, 220, true, .2, 137), "leading trim of a musical clip with a different content tempo");
-        check(near(touchingMusical.clips[0].timing(137).start, headTiming.start)
-            && near(touchingMusical.clips[0].timing(137).duration(), headTiming.duration() - .2)
-            && near(touchingMusical.clips[0].timing(137).offset, headTiming.offset + .2 * headTiming.rate),
+        auto touchingTail = downstream; touchingTail.id = 221; touchingTail.start = beatHead.timing(motion::Tempo(137)).end();
+        check(touchingMusical.insert(beatHead, motion::Tempo(137)) && touchingMusical.insert(touchingTail, motion::Tempo(137)), "touching musical head fixture");
+        const auto headTiming = beatHead.timing(motion::Tempo(137));
+        check(motion::rippleTrim(touchingMusical, 220, true, .2, motion::Tempo(137)), "leading trim of a musical clip with a different content tempo");
+        check(near(touchingMusical.clips[0].timing(motion::Tempo(137)).start, headTiming.start)
+            && near(touchingMusical.clips[0].timing(motion::Tempo(137)).duration(), headTiming.duration() - .2)
+            && near(touchingMusical.clips[0].timing(motion::Tempo(137)).offset, headTiming.offset + .2 * headTiming.rate),
             "musical head converts placement and source offset independently");
-        check(touchingMusical.clips[1].timing(137).start >= touchingMusical.clips[0].timing(137).end()
-            && near(touchingMusical.clips[1].timing(137).start, touchingMusical.clips[0].timing(137).end()),
+        check(touchingMusical.clips[1].timing(motion::Tempo(137)).start >= touchingMusical.clips[0].timing(motion::Tempo(137)).end()
+            && near(touchingMusical.clips[1].timing(motion::Tempo(137)).start, touchingMusical.clips[0].timing(motion::Tempo(137)).end()),
             "rounding keeps the musical head and absolute tail adjacent without overlap");
-        check(motion::rippleTrim(touchingMusical, 220, false, -.3, 137)
-            && near(touchingMusical.clips[0].timing(137).duration(), headTiming.duration() - .5),
+        check(motion::rippleTrim(touchingMusical, 220, false, -.3, motion::Tempo(137))
+            && near(touchingMusical.clips[0].timing(motion::Tempo(137)).duration(), headTiming.duration() - .5),
             "trailing ripple shortening retains valid touching boundaries");
 
         const auto unchanged = original;
         track = unchanged;
-        check(!motion::rippleTrim(track, 999, false, 1, 120) && sameTrack(track, unchanged), "missing ripple trim target is atomic");
-        check(!motion::rippleTrim(track, 202, true, 2, 120) && sameTrack(track, unchanged), "nonpositive ripple trim duration is atomic");
-        check(!motion::rippleTrim(track, 202, false, std::numeric_limits<double>::infinity(), 120) && sameTrack(track, unchanged), "nonfinite ripple trim is atomic");
+        check(!motion::rippleTrim(track, 999, false, 1, motion::Tempo(120)) && sameTrack(track, unchanged), "missing ripple trim target is atomic");
+        check(!motion::rippleTrim(track, 202, true, 2, motion::Tempo(120)) && sameTrack(track, unchanged), "nonpositive ripple trim duration is atomic");
+        check(!motion::rippleTrim(track, 202, false, std::numeric_limits<double>::infinity(), motion::Tempo(120)) && sameTrack(track, unchanged), "nonfinite ripple trim is atomic");
         track.locked = true;
         const auto locked = track;
-        check(!motion::rippleTrim(track, 202, false, 1, 120) && sameTrack(track, locked), "locked track rejects ripple trim atomically");
+        check(!motion::rippleTrim(track, 202, false, 1, motion::Tempo(120)) && sameTrack(track, locked), "locked track rejects ripple trim atomically");
         track = unchanged;
         track.clips[2].start = 6;
         const auto overlapping = track;
-        check(!motion::rippleTrim(track, 202, false, 1, 120) && sameTrack(track, overlapping), "overlapping track rejects ripple trim atomically");
+        check(!motion::rippleTrim(track, 202, false, 1, motion::Tempo(120)) && sameTrack(track, overlapping), "overlapping track rejects ripple trim atomically");
         track = unchanged;
         track.clips[2].rate = 0;
         const auto invalid = track;
-        check(!motion::rippleTrim(track, 202, false, 1, 120) && sameTrack(track, invalid), "invalid clip rejects ripple trim atomically");
+        check(!motion::rippleTrim(track, 202, false, 1, motion::Tempo(120)) && sameTrack(track, invalid), "invalid clip rejects ripple trim atomically");
         track = unchanged;
-        check(!motion::rippleTrim(track, 202, false, 1, 0) && sameTrack(track, unchanged), "invalid tempo rejects ripple trim atomically");
+        check(!motion::rippleTrim(track, 202, false, 1, motion::Tempo(0)) && sameTrack(track, unchanged), "invalid tempo rejects ripple trim atomically");
     }
     motion::Clip clip;
     clip.id = 1;
@@ -220,28 +220,28 @@ int main() {
     check(near(position.evaluate(5), 50), "linear animation is continuous");
     check(near(position.evaluate(-1), 0) && near(position.evaluate(11), 100), "end keys hold outside the keyed range");
     const auto original = clip;
-    check(clip.trim(12, 18), "trim accepts a positive range");
-    check(near(clip.localTime(15), original.localTime(15)), "trimming retains content time");
-    check(near(clip.properties.at("position.x").evaluate(clip.localTime(15)), 50), "trimming does not restart animation");
-    const auto parts = original.split(15, 2);
+    check(clip.trim(12, 18, motion::Tempo(120)), "trim accepts a positive range");
+    check(near(clip.localTime(15, motion::Tempo(120)), original.localTime(15, motion::Tempo(120))), "trimming retains content time");
+    check(near(clip.properties.at("position.x").evaluate(clip.localTime(15, motion::Tempo(120))), 50), "trimming does not restart animation");
+    const auto parts = original.split(15, 2, motion::Tempo(120));
     check(parts.has_value(), "split produces two instances");
     check(parts->first.asset == parts->second.asset, "split retains shared asset identity");
-    check(!parts->first.contains(15) && parts->second.contains(15), "split boundary has exactly one active clip");
-    check(near(parts->second.localTime(17), original.localTime(17)), "split preserves source timing");
+    check(!parts->first.contains(15, motion::Tempo(120)) && parts->second.contains(15, motion::Tempo(120)), "split boundary has exactly one active clip");
+    check(near(parts->second.localTime(17, motion::Tempo(120)), original.localTime(17, motion::Tempo(120))), "split preserves source timing");
     auto independent = parts->second;
     independent.properties["position.x"].setKey({5, 999});
     check(near(parts->first.properties.at("position.x").evaluate(5), 50), "split curves are independently editable");
     auto stretched = original;
-    check(stretched.stretch(20), "stretch accepts a longer duration");
-    check(near(stretched.localTime(20), original.localTime(15)), "stretch preserves normalized content position");
+    check(stretched.stretch(20, motion::Tempo(120)), "stretch accepts a longer duration");
+    check(near(stretched.localTime(20, motion::Tempo(120)), original.localTime(15, motion::Tempo(120))), "stretch preserves normalized content position");
     motion::Track track;
-    check(track.insert(parts->second) && track.insert(parts->first), "sequential clips insert in any order");
-    check(track.at(14)->id == 1 && track.at(15)->id == 2 && track.at(20) == nullptr, "lookup follows half-open clip intervals");
+    check(track.insert(parts->second, motion::Tempo(120)) && track.insert(parts->first, motion::Tempo(120)), "sequential clips insert in any order");
+    check(track.at(14, motion::Tempo(120))->id == 1 && track.at(15, motion::Tempo(120))->id == 2 && track.at(20, motion::Tempo(120)) == nullptr, "lookup follows half-open clip intervals");
     auto collision = original;
     collision.id = 3;
-    check(!track.insert(collision) && track.clips.size() == 2, "overlap rejection is non-destructive");
-    check(!original.split(10, 3) && !original.split(20, 3), "split rejects zero-length results");
-    check(!clip.stretch(0) && !clip.trim(4, 4), "invalid edits are rejected");
+    check(!track.insert(collision, motion::Tempo(120)) && track.clips.size() == 2, "overlap rejection is non-destructive");
+    check(!original.split(10, 3, motion::Tempo(120)) && !original.split(20, 3, motion::Tempo(120)), "split rejects zero-length results");
+    check(!clip.stretch(0, motion::Tempo(120)) && !clip.trim(4, 4, motion::Tempo(120)), "invalid edits are rejected");
     motion::Curve smooth;
     smooth.setKey({0, 0, motion::Interpolation::smooth});
     smooth.setKey({1, 1});
@@ -316,11 +316,11 @@ int main() {
                 track.id = 2;
                 motion::Clip after = clip;
                 after.id = 3; after.start = clip.end();
-                if (!track.insert(clip) || !track.insert(after)) { ++failures; continue; }
-                const auto parts = clip.split(splitFrame / 30.0, 4);
+                if (!track.insert(clip, motion::Tempo(120)) || !track.insert(after, motion::Tempo(120))) { ++failures; continue; }
+                const auto parts = clip.split(splitFrame / 30.0, 4, motion::Tempo(120));
                 if (!parts) { ++failures; continue; }
                 track.clips.erase(track.clips.begin());
-                if (!track.insert(parts->first) || !track.insert(parts->second)) { ++failures; }
+                if (!track.insert(parts->first, motion::Tempo(120)) || !track.insert(parts->second, motion::Tempo(120))) { ++failures; }
                 if (parts->first.end() > parts->second.start || parts->second.end() > clip.end()) { ++failures; }
             }
         }

@@ -50,7 +50,7 @@ public:
             }
         }
         if (selected == nullptr) { return juce::Result::fail("Select a visual clip to record notes."); }
-        const auto timing = selected->timing(project.bpm);
+        const auto timing = selected->timing(project.tempo());
         const auto rate = transport.rate();
         auto first = sampleIndex(timing.start, rate);
         auto last = sampleIndex(timing.end(), rate);
@@ -66,7 +66,7 @@ public:
         config.firstSample = static_cast<std::uint64_t>(*first); config.endSample = static_cast<std::uint64_t>(*last);
         config.sampleRate = rate; config.sourceRate = timing.rate;
         config.sourceOffset = timing.localTime(static_cast<double>(*first) / rate);
-        config.sourceBpm = selected->curveBpm(project.bpm);
+        config.sourceBpm = selected->curveBpm(project.tempo());
         const auto position = transport.position();
         const auto start = sampleIndex(position >= timing.start && position < timing.end() ? position : timing.start, rate);
         if (!start) { return juce::Result::fail("The playhead has invalid recording timing."); }

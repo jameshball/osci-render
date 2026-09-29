@@ -24,7 +24,7 @@ public:
             parent.id = group = document.newId();
             parent.properties["position.x"].base = 1;
             motion::Track track;
-            track.id = document.newId(); track.name = "Object"; track.insert(item);
+            track.id = document.newId(); track.name = "Object"; track.insert(item, motion::Tempo(120));
             motion::Camera a, b;
             a.id = first = document.newId(); a.name = "Front";
             b.id = second = document.newId(); b.name = "Side";
