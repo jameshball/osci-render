@@ -112,6 +112,7 @@ private:
     void stepFrames(int frames);
     void jumpToKey(bool forward);
     void splitAtPlayhead();
+    void recordArmedTrack();
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;

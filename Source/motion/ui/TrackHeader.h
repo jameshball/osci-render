@@ -25,6 +25,8 @@ public:
         mute.onClick = [this] { if (onMute) { onMute(id); } };
         solo.onClick = [this] { if (onSolo) { onSolo(id); } };
         lock.onClick = [this] { if (onLock) { onLock(id); } };
+        arm.onClick = [this] { if (onArm) { onArm(id); } };
+        arm.setOnColour(juce::Colour(0xffb04545));
         mute.setOnColour(juce::Colour(0xff8b6434));
         solo.setOnColour(juce::Colour(0xff347b52));
         lock.setOnColour(juce::Colour(0xff5c5f6b));
@@ -34,12 +36,14 @@ public:
         grip.addMouseListener(this, false);
         for (auto* child : std::initializer_list<juce::Component*> { &name, &mute, &solo, &grip }) { addAndMakeVisible(child); }
         addChildComponent(lock);
+        addChildComponent(arm);
     }
     void update(const motion::Track& track, bool group = false, bool collapsed = false, bool lanes = false, bool expanded = false) {
         isGroup = group;
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
+        arm.setVisible(!group && track.kind == motion::TrackKind::visual);
         grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor);
         grip.setTooltip(group ? "Group actions" : "Drag to reorder; click for track actions");
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
@@ -60,14 +64,20 @@ public:
         mute.setToggleState(track.muted, juce::dontSendNotification);
         solo.setToggleState(track.solo, juce::dontSendNotification);
         lock.setToggleState(track.locked, juce::dontSendNotification);
+        arm.setName("MIDI input track " + juce::String(track.id));
+        arm.setTitle(arm.getName());
+        arm.setToggleState(track.midiInput != 0, juce::dontSendNotification);
+        arm.setTooltip(track.midiInput == 0 ? "Play and record live MIDI on this track (choose a channel in the track menu)"
+            : "Live MIDI input: " + (track.midiInput == motion::Track::anyMidiChannel ? juce::String("any channel") : "channel " + juce::String(track.midiInput)));
     }
     // One compact line: [fold/lanes] [grip] name ... [M][S][L]
     void resized() override {
         auto bounds = getLocalBounds().reduced(3, 0);
         disclosure.setBounds(bounds.removeFromLeft(16));
         grip.setBounds(bounds.removeFromLeft(14));
-        auto buttons = bounds.removeFromRight(isGroup ? 38 : 57).withSizeKeepingCentre(isGroup ? 38 : 57, 18);
-        for (auto* button : { &mute, &solo, &lock }) {
+        const auto chips = isGroup ? 38 : (arm.isVisible() ? 76 : 57);
+        auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, 18);
+        for (auto* button : { &arm, &mute, &solo, &lock }) {
             if (!button->isVisible()) { continue; }
             button->setBounds(buttons.removeFromLeft(18));
             buttons.removeFromLeft(1);
@@ -86,7 +96,7 @@ public:
     }
     const motion::Id id;
     std::function<void(motion::Id, std::string)> onRename;
-    std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock;
+    std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock, onArm;
     std::function<std::uint64_t()> onDragRevision;
 private:
     bool isGroup = false;
@@ -111,5 +121,5 @@ private:
             }
         }
     } grip;
-    motion::style::Chip mute {"M"}, solo {"S"}, lock {"L"};
+    motion::style::Chip mute {"M"}, solo {"S"}, lock {"L"}, arm {juce::String(juce::CharPointer_UTF8("\xe2\x97\x8f"))};
 };

@@ -227,6 +227,11 @@ public:
                     refreshTracks();
                 };
                 header->onLock = [this](motion::Id id) { toggleLock(id); };
+                header->onArm = [this](motion::Id id) {
+                    const auto& tracks = processor.document.project().tracks;
+                    const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
+                    if (found != tracks.end()) { setMidiInput(id, found->midiInput == 0 ? motion::Track::anyMidiChannel : 0); }
+                };
                 header->onMute = [this](motion::Id id) { toggleTrack(id, false); };
                 header->onSolo = [this](motion::Id id) { toggleTrack(id, true); };
                 addAndMakeVisible(*header);
@@ -1706,6 +1711,13 @@ private:
             destinations.addItem(100 + static_cast<int>(groups.size()) - 1, juce::String(group.name), true, found->group == group.id);
         }
         menu.addSubMenu("Move to group", destinations);
+        if (found->kind == motion::TrackKind::visual) {
+            juce::PopupMenu input;
+            input.addItem(200, "Off", true, found->midiInput == 0);
+            input.addItem(200 + motion::Track::anyMidiChannel, "Any channel", true, found->midiInput == motion::Track::anyMidiChannel);
+            for (int channel = 1; channel <= 16; ++channel) { input.addItem(200 + channel, "Channel " + juce::String(channel), true, found->midiInput == channel); }
+            menu.addSubMenu("MIDI input", input);
+        }
         menu.addSeparator();
         menu.addItem(3, "Delete track");
         const auto generation = processor.document.generation();
@@ -1718,6 +1730,7 @@ private:
             if (track == current.end()) { return; }
             const auto index = static_cast<int>(track - current.begin());
             if (result == 4) { owner->createGroup(id, track->group); return; }
+            if (result >= 200 && result <= 200 + motion::Track::anyMidiChannel) { owner->setMidiInput(id, result - 200); return; }
             if (result >= 100 && result - 100 < static_cast<int>(groups.size())) {
                 owner->placeTrack(id, index, groups[result - 100]);
             } else if (result == 3) {
@@ -1734,6 +1747,18 @@ private:
                     }
                 }
             }
+        });
+    }
+    void setMidiInput(motion::Id id, int input) {
+        cancelGesture();
+        processor.document.tryEdit(input == 0 ? "Disarm MIDI input" : "Arm MIDI input", [id, input](motion::Project& project) {
+            for (auto& track : project.tracks) {
+                if (track.id == id && track.kind == motion::TrackKind::visual && track.midiInput != input) {
+                    track.midiInput = input;
+                    return true;
+                }
+            }
+            return false;
         });
     }
     void toggleLock(motion::Id id) {

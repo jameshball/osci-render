@@ -12,7 +12,7 @@ using ModulatorId = std::uint64_t;
 // any number of properties through routes, so several objects share a single
 // clock (an LFO, a random walk, the soundtrack, or an envelope that follows
 // the notes of a MIDI clip).
-enum class ModulatorKind { oscillator, envelope };
+enum class ModulatorKind { oscillator, envelope, controller };
 
 struct Modulator {
     ModulatorId id = 0;
@@ -28,22 +28,30 @@ struct Modulator {
     // 0 ignores velocity; 1 scales each note's envelope by velocity / 127.
     double velocity = 1.0;
     int lowestPitch = 0, highestPitch = 127;
+    // Controller: a CC number (0-127) or MidiControl::pitchBend (128) of the
+    // source clip's pattern, on one channel or any (0).
+    int controller = 1, controllerChannel = 0;
 
     bool operator==(const Modulator& other) const {
         return id == other.id && name == other.name && kind == other.kind && shape == other.shape && source == other.source
             && attack == other.attack && decay == other.decay && sustain == other.sustain && release == other.release
-            && velocity == other.velocity && lowestPitch == other.lowestPitch && highestPitch == other.highestPitch;
+            && velocity == other.velocity && lowestPitch == other.lowestPitch && highestPitch == other.highestPitch
+            && controller == other.controller && controllerChannel == other.controllerChannel;
     }
     bool valid() const {
         const auto time = [](double value) { return std::isfinite(value) && value >= 0 && value <= 60; };
-        return id != 0 && !name.empty() && name.size() <= 120 && (kind == ModulatorKind::oscillator || kind == ModulatorKind::envelope)
+        return id != 0 && !name.empty() && name.size() <= 120 && static_cast<int>(kind) >= 0 && static_cast<int>(kind) <= 2
+            && controller >= 0 && controller <= 128 && controllerChannel >= 0 && controllerChannel <= 16
             && shape.valid() && time(attack) && time(decay) && time(release) && std::isfinite(sustain) && sustain >= 0 && sustain <= 1
             && std::isfinite(velocity) && velocity >= 0 && velocity <= 1
             && lowestPitch >= 0 && highestPitch <= 127 && lowestPitch <= highestPitch;
     }
-    // Oscillators are bipolar (-1..1) like a property's own oscillator;
-    // envelopes and soundtrack loudness are unipolar (0..1).
-    bool unipolar() const { return kind == ModulatorKind::envelope || shape.waveform == ModulationWaveform::soundtrack; }
+    // Oscillators and pitch bend are bipolar (-1..1); envelopes, controllers
+    // and soundtrack loudness are unipolar (0..1).
+    bool unipolar() const {
+        if (kind == ModulatorKind::controller) { return controller != 128; }
+        return kind == ModulatorKind::envelope || shape.waveform == ModulationWaveform::soundtrack;
+    }
 };
 
 // A modulator driving one property: value += amount * m (add) or
@@ -73,6 +81,7 @@ struct PreparedModulator {
     double bpm = 120;
     std::shared_ptr<const SoundtrackEnvelope> soundtrack; // project time
     std::vector<Note> notes; // composition seconds, sorted by start
+    std::vector<std::pair<double, double>> steps; // controller: (seconds, value), sorted
     double attack = 0, decay = 0, sustain = 0, release = 0;
 
     // Indexes, for each interval between note starts and release ends, the
@@ -110,6 +119,10 @@ struct PreparedModulator {
         if (kind == ModulatorKind::oscillator) {
             if (shape.waveform == ModulationWaveform::soundtrack) { return soundtrack != nullptr ? soundtrack->at(projectTime) : 0.0; }
             return shape.value(time, bpm);
+        }
+        if (kind == ModulatorKind::controller) {
+            const auto after = std::upper_bound(steps.begin(), steps.end(), time, [](double value, const auto& step) { return value < step.first; });
+            return after == steps.begin() ? 0.0 : (after - 1)->second;
         }
         // Loudest active note wins, so chords do not pile up past 1.
         const auto next = std::upper_bound(boundaries.begin(), boundaries.end(), time);

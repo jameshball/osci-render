@@ -2,6 +2,7 @@
 
 #include "CompositionRenderer.h"
 #include "LiveMidiPerformance.h"
+#include "LiveMidiInputs.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 
 namespace motion {
@@ -13,7 +14,9 @@ inline bool applyLiveMidi(LiveMidiPerformance& performance, const unsigned char*
     switch (data[0] & 0xf0) {
         case 0x80: return performance.noteOff(channel, data[1], sample);
         case 0x90: return performance.noteOn(channel, data[1], data[2], sample);
+        case 0xe0: return performance.pitchBend(channel, (data[2] << 7 | data[1]) - 8192, sample);
         case 0xb0:
+            if (data[1] == 11) { return performance.setExpression(channel, data[2]); }
             if (data[1] == 64) { return performance.sustain(channel, data[2] >= 64, sample); }
             if (data[1] == 120) { return performance.allSoundOff(channel); }
             if (data[1] == 123) { return performance.allNotesOff(channel, sample); }
@@ -29,7 +32,7 @@ inline bool applyLiveMidi(LiveMidiPerformance& performance, const unsigned char*
 class LiveMidiInputCursor {
 public:
     explicit LiveMidiInputCursor(const juce::MidiBuffer& buffer) : next(buffer.cbegin()), end(buffer.cend()) {}
-    bool dispatch(LiveMidiPerformance* performance, int offset, std::uint64_t absoluteClock) {
+    bool dispatch(LiveMidiPerformance* performance, int offset, std::uint64_t absoluteClock, LiveMidiInputs* inputs = nullptr) {
         bool changed = false;
         while (next != end && (*next).samplePosition <= offset) {
             const auto message = *next;
@@ -37,6 +40,7 @@ public:
                 const auto accepted = applyLiveMidi(*performance, message.data, message.numBytes, absoluteClock);
                 changed = changed || accepted;
             }
+            if (inputs != nullptr) { changed = inputs->apply(message.data, message.numBytes, absoluteClock, &applyLiveMidi) || changed; }
             ++next;
         }
         return changed;

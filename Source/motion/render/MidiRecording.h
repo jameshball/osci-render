@@ -24,6 +24,7 @@ public:
         std::uint64_t firstSample = 0, endSample = 0;
         double sampleRate = 0, sourceOffset = 0, sourceRate = 1, sourceBpm = 120;
         std::optional<std::uint64_t> transportStart;
+        int channel = 0; // 0: every channel; 1-16 keeps only that channel's messages
         bool valid() const {
             return token != 0 && target != 0 && (!transportStart || (*transportStart >= firstSample && *transportStart < endSample)) && std::isfinite(sampleRate) && sampleRate >= 1 && sampleRate <= 768000
                 && endSample > firstSample && static_cast<double>(endSample - firstSample) / sampleRate <= 3600

@@ -26,6 +26,8 @@
             resource="0" file="tests/MotionCameraRigTest.cpp"/>
       <FILE id="MotionTempoMapT" name="MotionTempoMapTest.cpp" compile="1"
             resource="0" file="tests/MotionTempoMapTest.cpp"/>
+      <FILE id="MotionMidiExprT" name="MotionMidiExpressionTest.cpp" compile="1"
+            resource="0" file="tests/MotionMidiExpressionTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
       <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"

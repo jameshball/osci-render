@@ -115,6 +115,7 @@ private:
         if (modulator->kind == ModulatorKind::oscillator && modulator->shape.waveform == ModulationWaveform::soundtrack && loudness) {
             prepared->soundtrack = loudness();
         }
+        if (modulator->kind == ModulatorKind::controller) { collectSteps(*prepared, *modulator, scope); }
         if (modulator->kind == ModulatorKind::envelope) {
             prepared->attack = modulator->attack;
             prepared->decay = modulator->decay;
@@ -125,6 +126,25 @@ private:
         std::shared_ptr<const PreparedModulator> result = std::move(prepared);
         cache.emplace(id, result);
         return result;
+    }
+
+    // Controller changes as held steps in composition seconds.
+    static void collectSteps(PreparedModulator& prepared, const Modulator& modulator, const Composition& scope) {
+        for (const auto& track : scope.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != modulator.source || clip.midi == nullptr) { continue; }
+                const auto timing = clip.timing(scope.tempo());
+                if (!timing.valid()) { return; }
+                const auto secondsPerBeat = 60 / clip.curveBpm(scope.tempo());
+                for (const auto& control : clip.midi->controls()) {
+                    if (control.number != modulator.controller || (modulator.controllerChannel != 0 && control.channel != modulator.controllerChannel)) { continue; }
+                    const auto seconds = timing.start + (control.beat * secondsPerBeat - timing.offset) / timing.rate;
+                    prepared.steps.emplace_back(std::clamp(seconds, timing.start, timing.end()), control.normalised());
+                }
+                std::stable_sort(prepared.steps.begin(), prepared.steps.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+                return;
+            }
+        }
     }
 
     static void collectNotes(PreparedModulator& prepared, const Modulator& modulator, const Composition& scope) {

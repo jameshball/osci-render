@@ -393,7 +393,7 @@ private:
         const unsigned char on[] {0x90, 69, 127};
         expect(!motion::applyLiveMidi(live, nullptr, 3, 0));
         for (const int size : {-1, 0, 1, 2, 4}) { expect(!motion::applyLiveMidi(live, on, size, 0)); }
-        for (const auto message : {std::array<unsigned char, 3>{0xf0, 1, 2}, {0xe0, 0, 64}, {0xa0, 69, 100},
+        for (const auto message : {std::array<unsigned char, 3>{0xf0, 1, 2}, {0xe0, 0, 128}, {0xa0, 69, 100},
             {0xb0, 1, 127}, {0x90, 128, 127}, {0x90, 69, 128}, {0x10, 69, 127}}) {
             expect(!motion::applyLiveMidi(live, message.data(), 3, 0));
         }

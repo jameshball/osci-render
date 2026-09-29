@@ -5,8 +5,9 @@
 #include <deque>
 
 namespace motion {
-// Off-thread notes-only conversion. Raw expression stays in the take; warning
-// counts identify events whose full playback semantics are not retained here.
+// Off-thread conversion of a take into notes, sustain-held note lengths, and
+// persistent controller changes (pitch bend and continuous controllers). The
+// warning count covers messages with no stored meaning (aftertouch, program).
 struct MidiTakeNotes {
     struct Result {
         std::shared_ptr<const MidiNotes> source;
@@ -34,6 +35,7 @@ struct MidiTakeNotes {
             previous = event.sample;
         }
         std::vector<MidiNote> notes = base != nullptr ? base->notes() : std::vector<MidiNote>{};
+        std::vector<MidiControl> controls = base != nullptr ? base->controls() : std::vector<MidiControl>{};
         const auto originalCount = notes.size();
         std::unordered_set<std::uint64_t> used;
         for (const auto& note : notes) { used.insert(note.id); }
@@ -73,6 +75,7 @@ struct MidiTakeNotes {
         for (const auto& event : take.events) {
             if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
             const int index = event.bytes[0] & 15, kind = event.bytes[0] & 0xf0;
+            if (take.config.channel != 0 && index + 1 != take.config.channel) { continue; }
             const int key = event.bytes[1], value = event.bytes[2];
             auto& channel = (*channels)[static_cast<std::size_t>(index)];
             const auto beat = take.config.beatAt(event.sample);
@@ -92,7 +95,12 @@ struct MidiTakeNotes {
                     while (!channel.held[static_cast<std::size_t>(pitch)].empty()) { release(channel, index, pitch, beat); }
                 }
                 channel.sustain = sustain;
+            } else if (kind == 0xe0) {
+                controls.push_back({beat, index + 1, MidiControl::pitchBend, (value << 7 | key) - 8192});
+            } else if (kind == 0xb0) {
+                controls.push_back({beat, index + 1, key, value});
             } else { ++warnings; }
+            if (controls.size() > MidiNotes::maximumControls) { full = true; }
             if (full) { return {nullptr, 0, warnings, "MIDI content exceeds the note or identity limit."}; }
         }
         const auto end = take.config.beatAt(take.endSample);
@@ -109,7 +117,7 @@ struct MidiTakeNotes {
         }
         if (full) { return {nullptr, 0, warnings, "MIDI content exceeds the note or identity limit."}; }
         const auto added = notes.size() - originalCount;
-        auto result = MidiNotes::create(std::move(notes));
+        auto result = MidiNotes::create(std::move(notes), std::move(controls));
         if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
         return {std::move(result.source), added, warnings, std::move(result.error)};
     } catch (const std::bad_alloc&) {

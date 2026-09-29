@@ -40,6 +40,7 @@ public:
         if (!transport.ready()) { return juce::Result::fail("Start an audio output device and wait for source preparation before recording."); }
         const auto& project = document.project();
         const Clip* selected = nullptr;
+        int channel = 0;
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.id != id) { continue; }
@@ -47,6 +48,8 @@ public:
                     return juce::Result::fail("Choose an unlocked, audible visual clip to record notes.");
                 }
                 selected = &clip;
+                // A track listening to one channel records only that channel.
+                channel = track.midiInput == Track::anyMidiChannel ? 0 : track.midiInput;
             }
         }
         if (selected == nullptr) { return juce::Result::fail("Select a visual clip to record notes."); }
@@ -67,6 +70,7 @@ public:
         config.sampleRate = rate; config.sourceRate = timing.rate;
         config.sourceOffset = timing.localTime(static_cast<double>(*first) / rate);
         config.sourceBpm = selected->curveBpm(project.tempo());
+        config.channel = channel;
         const auto position = transport.position();
         const auto start = sampleIndex(position >= timing.start && position < timing.end() ? position : timing.start, rate);
         if (!start) { return juce::Result::fail("The playhead has invalid recording timing."); }

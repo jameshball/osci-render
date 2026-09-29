@@ -63,6 +63,7 @@ public:
             bool initialTempo = false;
             std::size_t events = 0, noteOns = 0;
             std::vector<MidiNote> notes;
+            std::vector<MidiControl> controls;
             unsigned tracksRead = 0;
             std::size_t chunksRead = 0;
             while (!file.empty()) {
@@ -121,6 +122,11 @@ public:
                             notes.push_back({ on.id, startBeat, beat - startBeat, on.pitch, on.velocity, on.channel });
                             heads[key] = on.next;
                             if (heads[key] < 0) { tails[key] = -1; }
+                        } else if (type == 0xe0 || (type == 0xb0 && first != 64 && first < 120)) {
+                            // Pitch bend and continuous controllers persist with the notes.
+                            if (controls.size() >= MidiNotes::maximumControls) { throw Error("MIDI file exceeds the 400000 controller-change import limit."); }
+                            const auto value = type == 0xe0 ? static_cast<int>((second << 7) | first) - 8192 : static_cast<int>(second);
+                            controls.push_back({beat, static_cast<int>(channel), type == 0xe0 ? MidiControl::pitchBend : static_cast<int>(first), value});
                         } else { ++result.ignoredEvents; }
                     } else {
                         // SMF meta and SysEx events cancel channel running status.
@@ -158,7 +164,7 @@ public:
             if (tracksRead != trackCount) { throw Error("MIDI contains fewer track chunks than its header declares."); }
             checkCancel(cancel);
             std::sort(notes.begin(), notes.end(), [](const auto& a, const auto& b) { return a.start != b.start ? a.start < b.start : a.id < b.id; });
-            const auto prepared = MidiNotes::create(std::move(notes));
+            const auto prepared = MidiNotes::create(std::move(notes), std::move(controls));
             if (!prepared) { result.error = prepared.error; return result; }
             checkCancel(cancel);
             result.source = prepared.source;

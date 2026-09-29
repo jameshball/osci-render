@@ -137,6 +137,7 @@ struct PreparedClip : PreparedClipStage {
     std::shared_ptr<const PreparedMidiPerformance> midi;
     std::shared_ptr<const PreparedMidiInstrument> liveInstrument;
     std::vector<PreparedClipStage> ancestors; // inner-to-outer
+    Id rootTrack = 0; // the main timeline track this clip plays on
 
     Id editorId() const { return ancestors.empty() ? id : ancestors.back().id; }
     bool active(double time) const { return time >= start && time < end; }
@@ -414,7 +415,7 @@ struct PreparedComposition {
             if (index == 0) { return project; }
             return *definitions.at(stages[index - 1].clip->composition);
         };
-        std::map<std::array<double, 4>, std::shared_ptr<const PreparedMidiInstrument>> instruments;
+        std::map<std::array<double, 5>, std::shared_ptr<const PreparedMidiInstrument>> instruments;
         const auto expanded = expandComposition(project, [&](const auto&, const auto& stages) {
             if (preparationError.isNotEmpty()) { return; }
             const auto& leaf = stages.back();
@@ -424,6 +425,7 @@ struct PreparedComposition {
             if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr && (*asset)->liveIdentity == nullptr)) { return; }
             PreparedClip item;
             static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1, scopeOf(stages, stages.size() - 1));
+            item.rootTrack = stages.front().track->id;
             item.liveIdentity = (*asset)->liveIdentity;
             item.source = (*asset)->source;
             if (item.source == nullptr) {
@@ -455,6 +457,12 @@ struct PreparedComposition {
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
         if (preparationError.isNotEmpty()) { clips.clear(); return; }
+        for (const auto& track : project.tracks) {
+            if (track.midiInput == 0 || track.kind != TrackKind::visual) { continue; }
+            const auto clip = std::find_if(clips.begin(), clips.end(), [&](const auto& item) { return item.rootTrack == track.id && item.liveInstrument != nullptr; });
+            if (clip == clips.end()) { continue; }
+            liveTracks.push_back({track.id, track.midiInput == Track::anyMidiChannel ? 0 : track.midiInput, clip->liveInstrument});
+        }
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal, so the envelope is built there alone.
         if (purpose == CompositionPurpose::signal) { attachSoundtrack(cancel); }
@@ -567,6 +575,9 @@ struct PreparedComposition {
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
+    // Tracks armed for live MIDI (at most LiveMidiInputs::maximumRoutes are used).
+    struct LiveTrack { Id track; int channel; std::shared_ptr<const PreparedMidiInstrument> instrument; };
+    std::vector<LiveTrack> liveTracks;
 
 private:
     // Loudness at 240 Hz: rectified peak per bin, then a fast-attack /

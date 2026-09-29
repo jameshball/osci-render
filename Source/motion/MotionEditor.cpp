@@ -1416,6 +1416,7 @@ void MotionEditor::registerCommands() {
         const auto end = processor.document.project().duration;
         processor.seek(end); timeline.revealTime(end);
     });
+    addCommand(3, "Record armed track", juce::KeyPress('r', shift, 0), "Shift+R", [this] { recordArmedTrack(); });
     addCommand(3, "Previous frame", juce::KeyPress(juce::KeyPress::leftKey), "Left", [this] { stepFrames(-1); });
     addCommand(3, "Next frame", juce::KeyPress(juce::KeyPress::rightKey), "Right", [this] { stepFrames(1); });
     addCommand(3, "Back ten frames", juce::KeyPress(juce::KeyPress::leftKey, shift, 0), "Shift+Left", [this] { stepFrames(-10); });
@@ -1483,6 +1484,36 @@ void MotionEditor::jumpToKey(bool forward) {
     const auto time = std::clamp(*best, 0.0, processor.document.project().duration);
     processor.seek(time);
     timeline.revealTime(time);
+}
+
+// Records into the first armed track's clip under the playhead (or the next
+// clip after it), through the same take pipeline as the Notes editor.
+void MotionEditor::recordArmedTrack() {
+    auto& session = processor.midiRecordingSession();
+    if (session.busy()) {
+        session.stop();
+        return;
+    }
+    const auto& project = processor.document.project();
+    const auto tempo = project.tempo();
+    const auto time = processor.position.load();
+    for (const auto& track : project.tracks) {
+        if (track.midiInput == 0 || track.kind != motion::TrackKind::visual) { continue; }
+        const motion::Clip* target = nullptr;
+        for (const auto& clip : track.clips) {
+            const auto timing = clip.timing(tempo);
+            if (clip.composition != 0 || timing.end() <= time) { continue; }
+            if (target == nullptr || timing.start < target->timing(tempo).start) { target = &clip; }
+        }
+        if (target == nullptr) {
+            statusBar.show("The armed track has no clip at or after the playhead to record into.");
+            return;
+        }
+        const auto started = session.start(target->id);
+        if (started.failed()) { statusBar.show(started.getErrorMessage()); } else { statusBar.show("Recording into " + juce::String(target->name) + ". Shift+R stops.", MotionStatusBar::Kind::notice); }
+        return;
+    }
+    statusBar.show("Arm a track for MIDI input first (the red dot in its header).");
 }
 
 void MotionEditor::splitAtPlayhead() {

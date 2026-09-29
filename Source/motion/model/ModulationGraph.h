@@ -66,8 +66,8 @@ std::string validateModulation(const CompositionType& composition) {
     std::set<ModulatorId> modulators;
     for (const auto& modulator : composition.modulators) {
         if (!modulator.valid() || !modulators.insert(modulator.id).second) { return "Invalid or duplicate modulator settings."; }
-        if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) {
-            return "An envelope modulator follows a clip that does not exist in its composition.";
+        if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) {
+            return "A MIDI modulator follows a clip that does not exist in its composition.";
         }
     }
     std::set<std::pair<std::uint64_t, std::string>> routed;
@@ -123,7 +123,7 @@ void pruneReferences(CompositionType& composition) {
     std::set<ModulatorId> modulators;
     for (auto& modulator : composition.modulators) {
         modulators.insert(modulator.id);
-        if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) { modulator.source = 0; }
+        if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) { modulator.source = 0; }
     }
     std::erase_if(composition.routes, [&](const auto& route) {
         return !modulators.contains(route.modulator) || !drivableProperty(composition, route.target, route.property);

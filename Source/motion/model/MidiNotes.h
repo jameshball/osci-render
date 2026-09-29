@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <limits>
 
 namespace motion {
 // MIDI content uses quarter-note beats. Clip placement and the project's tempo
@@ -25,6 +26,22 @@ struct MidiNote {
     }
 };
 
+// A continuous controller (number 0-127, value 0-127) or pitch bend (number
+// pitchBend, value -8192..8191) change at a beat. Values hold until the next
+// change on the same channel and number.
+struct MidiControl {
+    static constexpr int pitchBend = 128;
+    double beat = 0;
+    int channel = 1, number = 1, value = 0;
+    bool operator==(const MidiControl&) const = default;
+    bool valid() const {
+        return std::isfinite(beat) && beat >= 0 && beat <= 1000000 && channel >= 1 && channel <= 16 && number >= 0 && number <= pitchBend
+            && (number == pitchBend ? value >= -8192 && value <= 8191 : value >= 0 && value <= 127);
+    }
+    // Controllers 0..1; pitch bend -1..1.
+    double normalised() const { return number == pitchBend ? value / 8192.0 : value / 127.0; }
+};
+
 struct MidiNoteEvent {
     double beat = 0;
     std::uint64_t note = 0;
@@ -38,13 +55,18 @@ struct MidiNoteEvent {
 class MidiNotes {
 public:
     static constexpr std::size_t maximumNotes = 100000;
+    static constexpr std::size_t maximumControls = 400000;
     struct Result {
         std::shared_ptr<const MidiNotes> source;
         std::string error;
         explicit operator bool() const { return source != nullptr; }
     };
-    static Result create(std::vector<MidiNote> notes) {
+    static Result create(std::vector<MidiNote> notes, std::vector<MidiControl> controls = {}) {
         if (notes.size() > maximumNotes) { return {nullptr, "MIDI content exceeds 100000 notes."}; }
+        if (controls.size() > maximumControls) { return {nullptr, "MIDI content exceeds 400000 controller changes."}; }
+        for (const auto& control : controls) {
+            if (!control.valid()) { return {nullptr, "Controller changes need a finite beat, a channel 1-16 and an in-range value."}; }
+        }
         try {
             // Import/build vectors may grow geometrically. Retain only bounded
             // content, not an arbitrary caller-provided spare capacity.
@@ -63,6 +85,9 @@ public:
             });
             auto result = std::shared_ptr<MidiNotes>(new MidiNotes());
             result->noteData = std::move(notes);
+            std::stable_sort(controls.begin(), controls.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+            result->controlData = std::move(controls);
+            result->indexControls();
             result->eventData.reserve(result->noteData.size() * 2);
             for (const auto& note : result->noteData) {
                 result->lengthBeats = std::max(result->lengthBeats, note.end());
@@ -83,6 +108,22 @@ public:
     }
 
     const std::vector<MidiNote>& notes() const { return noteData; }
+    const std::vector<MidiControl>& controls() const { return controlData; }
+    bool sameContent(const MidiNotes& other) const { return noteData == other.noteData && controlData == other.controlData; }
+    bool hasControl(int number, int channel) const {
+        const auto key = controlKey(number, channel);
+        return key < controlOffsets.size() - 1 && controlOffsets[key + 1] > controlOffsets[key];
+    }
+    // The value in effect at `beat` (the latest change at or before it), or
+    // `fallback` before the first change. Channel 0 means any channel.
+    // Allocation-free binary search, safe on the audio thread.
+    double controlAt(int number, int channel, double beat, double fallback) const {
+        const auto key = controlKey(number, channel);
+        if (key + 1 >= controlOffsets.size()) { return fallback; }
+        const auto first = controlIndex.begin() + controlOffsets[key], last = controlIndex.begin() + controlOffsets[key + 1];
+        const auto after = std::upper_bound(first, last, beat, [this](double value, std::uint32_t index) { return value < controlData[index].beat; });
+        return after == first ? fallback : controlData[*(after - 1)].normalised();
+    }
     const std::vector<MidiNoteEvent>& events() const { return eventData; }
     double length() const { return lengthBeats; }
 
@@ -103,7 +144,7 @@ public:
         auto next = noteData;
         const auto found = std::find_if(next.begin(), next.end(), [&](const auto& item) { return item.id == note.id; });
         if (found == next.end()) { next.push_back(note); } else { *found = note; }
-        return create(std::move(next));
+        return create(std::move(next), controlData);
     } catch (const std::bad_alloc&) {
         return {nullptr, "Not enough memory to edit MIDI notes."};
     }
@@ -115,7 +156,7 @@ public:
         for (const auto& note : noteData) {
             if (!selected.ids.contains(note.id)) { next.push_back(note); }
         }
-        return create(std::move(next));
+        return create(std::move(next), controlData);
     } catch (const std::bad_alloc&) {
         return {nullptr, "Not enough memory to edit MIDI notes."};
     }
@@ -130,7 +171,7 @@ public:
                 note.pitch += pitchOffset;
             }
         }
-        return create(std::move(next));
+        return create(std::move(next), controlData);
     } catch (const std::bad_alloc&) {
         return {nullptr, "Not enough memory to edit MIDI notes."};
     }
@@ -149,6 +190,30 @@ private:
         return result;
     }
     MidiNotes() = default;
+    // One bucket per (number, channel 0-16), channel 0 collecting every channel.
+    static std::size_t controlKey(int number, int channel) {
+        return number < 0 || number > MidiControl::pitchBend || channel < 0 || channel > 16 ? std::numeric_limits<std::size_t>::max() - 1
+            : static_cast<std::size_t>(number) * 17 + static_cast<std::size_t>(channel);
+    }
+    void indexControls() {
+        constexpr std::size_t buckets = (MidiControl::pitchBend + 1) * 17;
+        std::vector<std::uint32_t> counts(buckets, 0);
+        for (const auto& control : controlData) {
+            ++counts[controlKey(control.number, control.channel)];
+            ++counts[controlKey(control.number, 0)];
+        }
+        controlOffsets.assign(buckets + 1, 0);
+        for (std::size_t key = 0; key < buckets; ++key) { controlOffsets[key + 1] = controlOffsets[key] + counts[key]; }
+        controlIndex.assign(controlOffsets.back(), 0);
+        auto cursor = controlOffsets;
+        for (std::uint32_t index = 0; index < controlData.size(); ++index) {
+            const auto& control = controlData[index];
+            controlIndex[cursor[controlKey(control.number, control.channel)]++] = index;
+            controlIndex[cursor[controlKey(control.number, 0)]++] = index;
+        }
+    }
+    std::vector<MidiControl> controlData;
+    std::vector<std::uint32_t> controlOffsets, controlIndex;
     std::vector<MidiNote> noteData;
     std::vector<MidiNoteEvent> eventData;
     double lengthBeats = 0;

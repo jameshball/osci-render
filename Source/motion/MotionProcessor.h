@@ -68,6 +68,7 @@ private:
     motion::BeamTransitionGuard transitionGuard;
     motion::BeamRenderer beam;
     motion::LiveMidiPerformance liveMidi;
+    motion::LiveMidiInputs liveInputs;
     motion::MidiRecording midiRecording;
     std::unique_ptr<motion::MidiRecordingSession> midiSession;
 public:

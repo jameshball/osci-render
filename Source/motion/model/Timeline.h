@@ -235,6 +235,10 @@ struct Track {
     bool locked = false;
     Id group = 0;
     TrackKind kind = TrackKind::visual;
+    // Live MIDI input: 0 off, 1-16 one channel, 17 any channel. Armed visual
+    // tracks play and record what arrives, drawn inside the composition.
+    int midiInput = 0;
+    static constexpr int anyMidiChannel = 17;
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.

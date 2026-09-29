@@ -109,7 +109,11 @@ public:
         const auto noteTrack = simpleTrack(); controls.insert(controls.end(), noteTrack.begin(), noteTrack.end());
         const auto ignored = prepare(file({ controls }));
         expect(static_cast<bool>(ignored), juce::String(ignored.error));
-        if (ignored) { expectEquals(ignored.ignoredEvents, 5); }
+        // Sustain, program change, meta text and SysEx are excluded; pitch bend is kept.
+        if (ignored) {
+            expectEquals(ignored.ignoredEvents, 4);
+            expectEquals(static_cast<int>(ignored.source->controls().size()), 1);
+        }
 
         beginTest("SMF extended headers and bounded unknown chunks are honoured");
         auto extendedHeader = file({ simpleTrack() });

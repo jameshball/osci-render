@@ -34,6 +34,8 @@ public:
     void reset() {
         voices.fill(Voice{});
         pedals.fill(false);
+        bends.fill(Bend{});
+        expression.fill(1.0);
         lastEvent = 0;
         // Identities intentionally survive resets to prevent false continuity.
     }
@@ -53,7 +55,7 @@ public:
                     || (voice.released == chosen->released && voice.id < chosen->id)) { chosen = &voice; }
             }
         }
-        *chosen = Voice {++nextIdentity, sample, 0, channel, pitch, velocity, true, false};
+        *chosen = Voice {++nextIdentity, sample, 0, channel, pitch, velocity, true, false, bends[static_cast<std::size_t>(channel - 1)].integral(sample)};
         return true;
     }
     bool noteOff(int channel, int pitch, std::uint64_t sample) {
@@ -79,6 +81,28 @@ public:
             }
         }
         return true;
+    }
+    // Pitch bend (-8192..8191) glides every voice on the channel by up to the
+    // instrument's bend range; phase keeps integrating the bent frequency.
+    bool pitchBend(int channel, int value, std::uint64_t sample) {
+        if (!validChannel(channel) || value < -8192 || value > 8191 || !acceptTime(sample)) { return false; }
+        auto& bend = bends[static_cast<std::size_t>(channel - 1)];
+        bend.anchor = bend.integral(sample);
+        bend.anchorSample = sample;
+        bend.factor = std::exp2(instrument.settings.bendRange * (value / 8192.0) / 12);
+        bend.bent = true;
+        return true;
+    }
+    // Expression (CC 11) scales each voice's share of the drawing time.
+    bool setExpression(int channel, int value) {
+        if (!validChannel(channel) || value < 0 || value > 127) { return false; }
+        expression[static_cast<std::size_t>(channel - 1)] = value / 127.0;
+        return true;
+    }
+    std::size_t activeCount(std::uint64_t sample) const {
+        std::size_t count = 0;
+        for (const auto& voice : voices) { if (active(voice, sample)) { ++count; } }
+        return count;
     }
     bool allNotesOff(int channel, std::uint64_t sample) {
         if (!validChannel(channel) || !instrument.envelope || !acceptTime(sample)) { return false; }
@@ -107,11 +131,16 @@ public:
         auto cursor = allocationPhase * static_cast<double>(count);
         for (const auto& voice : voices) {
             if (!active(voice, sample)) { continue; }
-            const auto gain = envelopeValue(voice, sample).gain * (voice.velocity / 127.0);
+            const auto channel = static_cast<std::size_t>(voice.channel - 1);
+            const auto gain = envelopeValue(voice, sample).gain * (voice.velocity / 127.0) * expression[channel];
             if (cursor < gain) {
                 const auto value = instrument.pitches[static_cast<std::size_t>(voice.pitch)]->at(sample - voice.start,
                     voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max());
-                return {voice.id, value.phase, value.phaseSpan};
+                const auto& bend = bends[channel];
+                if (!bend.bent) { return {voice.id, value.phase, value.phaseSpan}; }
+                const auto step = value.frequency / instrument.sampleRate;
+                const auto cycles = step * (bend.integral(sample) - voice.integralStart);
+                return {voice.id, cycles - std::floor(cycles), step * bend.factor};
             }
             cursor -= gain;
         }
@@ -122,6 +151,15 @@ private:
         std::uint64_t id = 0, start = 0, heldSamples = 0;
         int channel = 0, pitch = 0, velocity = 0;
         bool held = false, released = false;
+        double integralStart = 0; // bend integral at note-on
+    };
+    struct Bend {
+        double factor = 1, anchor = 0;
+        std::uint64_t anchorSample = 0;
+        bool bent = false;
+        double integral(std::uint64_t sample) const {
+            return anchor + (static_cast<double>(sample) - static_cast<double>(anchorSample)) * factor;
+        }
     };
     static bool validChannel(int channel) { return channel >= 1 && channel <= 16; }
     bool acceptTime(std::uint64_t sample) {
@@ -146,6 +184,8 @@ private:
     }
     std::array<Voice, 32> voices {};
     std::array<bool, 16> pedals {};
+    std::array<Bend, 16> bends {};
+    std::array<double, 16> expression {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
     PreparedMidiInstrument instrument;
     std::uint64_t nextIdentity = 0, lastEvent = 0;
 };
