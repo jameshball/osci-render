@@ -9,6 +9,7 @@ on:
       - osci-render.jucer
       - sosci.jucer
       - osci-installer.jucer
+      - osci-motion.jucer
       - packaging/osci-render.iss
       - packaging/sosci.iss
       - packaging/osci-render.pkgproj
@@ -508,3 +509,105 @@ jobs:
             --artifact-kind "${KIND}" \
             --artifact "${ARTIFACT}" \
             --notes "Auto-published by CI from $(git log -1 --format=%H)"
+
+  # osci-motion: standalone-only app (no plugin formats, so no pluginval) with
+  # no installer packaging and no release publishing yet. This job only builds
+  # it and runs its tests. [skip-validation] skips the tests but still builds.
+  #
+  # NOTE: osci-motion has NEVER been built or validated on Windows or Linux.
+  # Those matrix entries mirror how the build job above builds the other
+  # products and may need fixes before they pass.
+  motion:
+    name: Build (osci-motion @ ${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.message, '\n'), '[trigger-ci:bump-version]')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-24.04 and windows-2022 are unvalidated for osci-motion (see note above).
+        os: [macos-latest, ubuntu-24.04, windows-2022]
+    steps:
+      - name: Fix up git URLs
+        run: echo -e '[url "https://github.com/"]\n  insteadOf = "git@github.com:"' >> ~/.gitconfig
+        shell: bash
+
+      - uses: actions/checkout@v1
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          submodules: recursive
+
+      - name: Set platform variables
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == ubuntu* ]]; then
+            echo "OS=linux" >> $GITHUB_ENV
+            echo "CFLAGS=-mavx" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == macos* ]]; then
+            echo "OS=mac" >> $GITHUB_ENV
+          else
+            echo "OS=win" >> $GITHUB_ENV
+          fi
+
+      - name: Extract project version
+        shell: bash
+        run: |
+          echo "osci-motion version: $(python3 ci/extract_version.py osci-motion.jucer)"
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: matrix.os == 'macos-latest'
+        with:
+          xcode-version: latest
+
+      # The Release configuration signs with the Developer ID Application identity.
+      - name: Import application certificates
+        if: matrix.os == 'macos-latest'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          keychain: oscirender
+          keychain-password: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          p12-file-base64: ${{ secrets.APPLE_APPLICATION_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_APPLICATION_CERTIFICATE_PASSWORD }}
+
+      - name: Setup NuGet.exe for use with actions
+        if: matrix.os == 'windows-2022'
+        uses: NuGet/setup-nuget@v1.0.5
+
+      - name: NuGet Sources
+        if: matrix.os == 'windows-2022'
+        run: nuget sources
+
+      - name: Check commit message for skip-validation marker
+        id: ci_flags
+        shell: bash
+        run: |
+          MSG=$(git log -1 --pretty=%B || true)
+          if [[ "$MSG" == *"[skip-validation]"* ]]; then
+            echo "skip_validation=true" >> "$GITHUB_OUTPUT"
+            echo "Commit requests skip-validation: Motion tests will be skipped."
+          else
+            echo "skip_validation=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Standalone C++20 Motion model/render/editor tests; needs clang++ or g++ on PATH.
+      - name: Run Motion portable tests
+        if: steps.ci_flags.outputs.skip_validation != 'true'
+        shell: bash
+        run: python3 scripts/test_motion_portable.py
+
+      - name: Run Motion unit tests
+        if: steps.ci_flags.outputs.skip_validation != 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
+          source ./ci/test.sh Motion MotionMidi MotionLive
+
+      - name: Build osci-motion (Standalone)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ./ci/setup-env.sh
+          source ./ci/build.sh osci-motion premium
