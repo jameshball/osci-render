@@ -744,13 +744,7 @@ private:
         return found != keys.end() && found->time == time ? &*found : nullptr;
     }
 
-    static bool sameCurve(const motion::Curve& a, const motion::Curve& b) {
-        return a.base == b.base && a.modulation == b.modulation && a.keyframes().size() == b.keyframes().size()
-            && std::equal(a.keyframes().begin(), a.keyframes().end(), b.keyframes().begin(), [](const auto& x, const auto& y) {
-                return x.time == y.time && x.value == y.value && x.interpolation == y.interpolation
-                    && x.incomingSlope == y.incomingSlope && x.outgoingSlope == y.outgoingSlope;
-            });
-    }
+    static bool sameCurve(const motion::Curve& a, const motion::Curve& b) { return a.sameAuthoring(b); }
 
     bool dragMatches(const motion::PropertyTarget& clip) const {
         if (clip.start != drag->start || clip.duration != drag->duration || clip.offset != drag->offset || clip.rate != drag->rate) {
