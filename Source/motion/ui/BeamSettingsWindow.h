@@ -17,6 +17,7 @@ public:
         title.setBorderSize({});
         addAndMakeVisible(title);
         presets.setName("Scope presets");
+        presets.setTitle("Scope presets");
         presets.setButtonText("Presets");
         presets.setTooltip("Apply timing suited to a kind of display.");
         presets.onClick = [this] { showPresets(); };
