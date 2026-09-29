@@ -10,8 +10,12 @@ Versioning scheme here is 4-part: A.B.C.D
 
 By default, the installer gets a patch bump whenever the script is run.
 
+osci-motion (--motion) is optional and defaults to none. It is a
+standalone-only app with no installer packaging (.iss/.pkgproj), so only
+osci-motion.jucer is bumped for it.
+
 Usage:
-    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--installer {major,minor,patch,none}] [--message MSG] [--skip-validation]
+    ./bump_version --osci {major,minor,patch,none} --sosci {major,minor,patch,none} [--installer {major,minor,patch,none}] [--motion {major,minor,patch,none}] [--message MSG] [--skip-validation]
 
 Examples:
     ./bump_version --osci patch --sosci patch
@@ -19,6 +23,7 @@ Examples:
     ./bump_version --sosci none
     ./bump_version --osci patch --sosci patch --installer none
     ./bump_version --osci patch --sosci none --skip-validation   # low-cost CI run (build only)
+    ./bump_version --osci none --sosci none --installer none --motion patch   # osci-motion only
 
 Notes:
 - Requires a clean working tree.
@@ -229,6 +234,15 @@ def parse_args(argv: Sequence[str]) -> tuple[argparse.Namespace, list[str]]:
         default="patch",
         help="Bump kind for osci-installer (default: patch)",
     )
+    parser.add_argument(
+        "--motion",
+        choices=["major", "minor", "patch", "none"],
+        default="none",
+        help=(
+            "Bump kind for osci-motion (default: none). osci-motion has no "
+            "installer packaging, so only osci-motion.jucer is updated."
+        ),
+    )
 
     parser.add_argument(
         "--message",
@@ -255,12 +269,14 @@ def main(argv: Sequence[str]) -> int:
     osci_kind = ns.osci
     sosci_kind = ns.sosci
     installer_kind = ns.installer
+    motion_kind = ns.motion
 
     ensure_clean_working_tree()
 
     osci_jucer = REPO_ROOT / "osci-render.jucer"
     sosci_jucer = REPO_ROOT / "sosci.jucer"
     installer_jucer = REPO_ROOT / "osci-installer.jucer"
+    motion_jucer = REPO_ROOT / "osci-motion.jucer"
     osci_iss = REPO_ROOT / "packaging" / "osci-render.iss"
     sosci_iss = REPO_ROOT / "packaging" / "sosci.iss"
     osci_pkgproj = REPO_ROOT / "packaging" / "osci-render.pkgproj"
@@ -274,6 +290,11 @@ def main(argv: Sequence[str]) -> int:
     sosci_new = sosci_old.bump(sosci_kind)
     installer_new = installer_old.bump(installer_kind)
 
+    # osci-motion is only read when a bump is requested, so osci/sosci-only
+    # runs behave exactly as before.
+    motion_old = get_jucer_version(motion_jucer) if motion_kind != "none" else None
+    motion_new = motion_old.bump(motion_kind) if motion_old is not None else None
+
     changed: list[Path] = []
 
     if set_jucer_version(osci_jucer, osci_new):
@@ -282,6 +303,8 @@ def main(argv: Sequence[str]) -> int:
         changed.append(sosci_jucer)
     if set_jucer_version(installer_jucer, installer_new):
         changed.append(installer_jucer)
+    if motion_new is not None and set_jucer_version(motion_jucer, motion_new):
+        changed.append(motion_jucer)
 
     if set_iss_version(osci_iss, osci_new):
         changed.append(osci_iss)
@@ -293,7 +316,7 @@ def main(argv: Sequence[str]) -> int:
     if set_pkgproj_versions(sosci_pkgproj, sosci_new):
         changed.append(sosci_pkgproj)
 
-    if osci_new == osci_old and sosci_new == sosci_old and installer_new == installer_old:
+    if osci_new == osci_old and sosci_new == sosci_old and installer_new == installer_old and motion_new == motion_old:
         raise FatalError("No version bump requested (all products unchanged).")
 
     stage_files(changed)
@@ -305,12 +328,20 @@ def main(argv: Sequence[str]) -> int:
             f"sosci {sosci_old}->{sosci_new}, "
             f"osci-installer {installer_old}->{installer_new})"
         )
+        if motion_new is not None:
+            msg = msg[:-1] + f", osci-motion {motion_old}->{motion_new})"
 
     msg = add_ci_trigger_marker(msg)
     if ns.skip_validation:
         msg = add_skip_validation_marker(msg)
 
     commit(msg)
+
+    if motion_new is not None:
+        print(
+            f"osci-motion {motion_old}->{motion_new} "
+            "(osci-motion.jucer only; osci-motion has no installer packaging)"
+        )
 
     return 0
 
