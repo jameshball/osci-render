@@ -366,11 +366,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         selectCurveTarget(id, property, true);
     };
     curveEditor.onPropertyChosen = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve); };
-    curveEditor.onPreview = [this](const motion::Curve* curve) {
+    curveEditor.onPreview = [this](const motion::PropertyMap* curves) {
         auto preview = processor.document.project();
-        if (curve != nullptr) {
-            auto* target = motion::findPropertyCurve(preview, curveTarget, curvePropertyName);
-            if (target != nullptr) { *target = *curve; }
+        if (curves != nullptr) {
+            for (const auto& [name, curve] : *curves) {
+                auto* target = motion::findPropertyCurve(preview, curveTarget, name);
+                if (target != nullptr) { *target = curve; }
+            }
         }
         processor.previewComposition(preview);
         composition.preview(preview);

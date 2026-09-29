@@ -379,6 +379,7 @@
             file="Source/motion/ui/CameraPanel.h"/>
       <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"
             file="Source/motion/model/PropertyTarget.h"/>
+      <FILE id="MotKeyEdit" name="KeyEdit.h" compile="0" resource="0" file="Source/motion/model/KeyEdit.h"/>
       <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
       <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
             resource="0" file="Source/motion/render/PreparedEffects.h"/>
