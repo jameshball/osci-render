@@ -1,10 +1,13 @@
 #pragma once
 
-#include "Modulation.h"
+#include "Modulators.h"
+#include <memory>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <limits>
+#include <optional>
+#include <string>
 #include <vector>
 
 namespace motion {
@@ -34,6 +37,42 @@ struct Keyframe {
     }
 };
 
+// Drives a property from another property in the same composition:
+// value = source(time - delay) * scale + offset, replacing this property's
+// keys. Its own oscillator and routed modulators still apply afterwards.
+struct PropertyLink {
+    std::uint64_t source = 0;
+    std::string property;
+    double scale = 1, offset = 0, delay = 0;
+    bool operator==(const PropertyLink&) const = default;
+    bool valid() const {
+        return source != 0 && !property.empty() && std::isfinite(scale) && std::isfinite(offset) && std::isfinite(delay)
+            && std::abs(scale) <= 1000000 && std::abs(offset) <= 1000000 && std::abs(delay) <= 3600;
+    }
+};
+
+class Curve;
+// Runtime-only inputs attached to prepared curve copies: routed modulators
+// and a resolved link. Never saved or compared. Clocks map the curve's own
+// time to its composition's time and to project time.
+struct CurveDrivers {
+    struct Route {
+        std::shared_ptr<const PreparedModulator> modulator;
+        double amount = 1;
+        ModulationMode mode = ModulationMode::add;
+    };
+    // composition = start + (local - offset) / rate; project likewise through
+    // the composition's own clock.
+    double start = 0, offset = 0, rate = 1;
+    double projectStart = 0, projectOffset = 0, projectRate = 1;
+    std::vector<Route> routes;
+    std::shared_ptr<const Curve> linkSource;
+    double linkStart = 0, linkOffset = 0, linkRate = 1, linkBpm = 120; // composition -> source local
+    PropertyLink link;
+    double compositionTime(double local) const { return rate == 0 ? 0 : start + (local - offset) / rate; }
+    double projectTime(double composition) const { return projectRate == 0 ? 0 : projectStart + (composition - projectOffset) / projectRate; }
+};
+
 // Curve time is content-local. Clip placement never rewrites its keys.
 class Curve {
 public:
@@ -41,13 +80,27 @@ public:
     explicit Curve(double initialValue) : base(initialValue) {}
 
     double evaluate(double time, double bpm = 120) const {
-        const auto authored = evaluateBase(time);
+        return evaluateWith(linked() ? linkedValue(time) : evaluateBase(time), time, bpm);
+    }
+    bool linked() const { return drivers != nullptr && drivers->linkSource != nullptr; }
+
+    // Applies this property's oscillator and routed modulators to a given
+    // authored value (keys, a link, or a spatial path's coordinate).
+    double evaluateWith(double authored, double time, double bpm = 120) const {
         const auto baseValue = std::isfinite(authored) ? authored : (std::isfinite(base) ? base : 0.0);
-        if (!modulation.enabled || !modulation.valid()) {
-            return baseValue;
+        auto value = baseValue;
+        if (modulation.enabled && modulation.valid()) {
+            const auto movement = modulation.amount * modulation.value(time, bpm);
+            value = modulation.mode == ModulationMode::add ? value + movement : value * (1 + movement);
         }
-        const auto movement = modulation.amount * modulation.value(time, bpm);
-        const auto value = modulation.mode == ModulationMode::add ? baseValue + movement : baseValue * (1 + movement);
+        if (drivers != nullptr && !drivers->routes.empty()) {
+            const auto composition = drivers->compositionTime(time);
+            const auto project = drivers->projectTime(composition);
+            for (const auto& route : drivers->routes) {
+                const auto movement = route.amount * route.modulator->value(composition, project);
+                value = route.mode == ModulationMode::add ? value + movement : value * (1 + movement);
+            }
+        }
         return std::isfinite(value) ? value : baseValue;
     }
 
@@ -125,7 +178,7 @@ public:
     }
 
     bool valid() const {
-        if (!std::isfinite(base) || !modulation.valid()) {
+        if (!std::isfinite(base) || !modulation.valid() || (link.has_value() && !link->valid())) {
             return false;
         }
         return std::all_of(keys.begin(), keys.end(), [](const Keyframe& key) { return key.valid(); });
@@ -134,8 +187,31 @@ public:
     const std::vector<Keyframe>& keyframes() const { return keys; }
     double base = 0.0;
     Modulation modulation;
+    std::optional<PropertyLink> link;
+    std::shared_ptr<const CurveDrivers> drivers; // runtime only
+
+    // Authored content equality: keys, base, oscillator and link; runtime
+    // drivers are ignored.
+    bool sameAuthoring(const Curve& other) const {
+        if (base != other.base || !(modulation == other.modulation) || link != other.link || keys.size() != other.keys.size()) { return false; }
+        for (std::size_t index = 0; index < keys.size(); ++index) {
+            const auto& a = keys[index];
+            const auto& b = other.keys[index];
+            if (a.time != b.time || a.value != b.value || a.interpolation != b.interpolation || a.incomingSlope != b.incomingSlope
+                || a.outgoingSlope != b.outgoingSlope || a.incomingInfluence != b.incomingInfluence || a.outgoingInfluence != b.outgoingInfluence) {
+                return false;
+            }
+        }
+        return true;
+    }
 
 private:
+    double linkedValue(double time) const {
+        const auto& d = *drivers;
+        const auto composition = d.compositionTime(time) - d.link.delay;
+        const auto sourceLocal = d.linkOffset + (composition - d.linkStart) * d.linkRate;
+        return d.linkSource->evaluate(sourceLocal, d.linkBpm) * d.link.scale + d.link.offset;
+    }
     static double hermite(double a, double b, double span, double t, double outSlope, double inSlope) {
         const auto t2 = t * t, t3 = t2 * t;
         return (2.0 * t3 - 3.0 * t2 + 1.0) * a + (t3 - 2.0 * t2 + t) * span * outSlope

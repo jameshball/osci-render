@@ -48,10 +48,15 @@ public:
         const bool editable = found.has_value() && !found->isEffect;
         if (gesture.has_value() && processor.document.revision() != gesture->revision) { cancelGesture(); }
         const auto specs = editable ? motion::propertySpecs(*found) : std::span<const motion::PropertySpec>{};
-        const auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->isAudio)) : juce::String();
+        const auto modes = currentModes();
+        motionModes = modes.has_value();
+        const auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
         if (signature != layoutSignature) {
             layoutSignature = signature;
             build(specs);
+        }
+        for (auto& row : rows) {
+            if (row->mode != nullptr && modes.has_value()) { row->mode->setToggleState(row->group == "Position" ? modes->first : modes->second, juce::dontSendNotification); }
         }
         title.setText(editable ? juce::String(found->name.data(), found->name.size()) : "Nothing selected", juce::dontSendNotification);
         kind.setText(!editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object", juce::dontSendNotification);
@@ -104,6 +109,8 @@ private:
         std::vector<std::unique_ptr<Field>> fields;
         osci::KeyframeButton key;
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
+        // Position: one spatial path; Rotation: quaternion orientation.
+        std::unique_ptr<motion::style::Chip> mode;
         void paint(juce::Graphics& g) override {
             g.setFont(motion::style::small());
             g.setColour(motion::style::muted());
@@ -111,7 +118,8 @@ private:
         }
         void resized() override {
             auto area = getLocalBounds();
-            area.removeFromTop(17);
+            if (mode != nullptr) { mode->setBounds(area.removeFromTop(16).removeFromRight(44).reduced(0, 1)); } else { area.removeFromTop(16); }
+            area.removeFromTop(1);
             auto line = area.removeFromTop(motion::style::controlHeight);
             next.setBounds(line.removeFromRight(12));
             key.setBounds(line.removeFromRight(18));
@@ -149,6 +157,16 @@ private:
                 row->addAndMakeVisible(row->next);
                 auto* raw = row.get();
                 row->key.onClick = [this, raw] { toggleKeys(*raw); };
+                if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
+                    const bool path = row->group == "Position";
+                    row->mode = std::make_unique<motion::style::Chip>(path ? "Path" : "Quat");
+                    row->mode->setName(namePrefix + (path ? "Spatial path" : "Quaternion rotation"));
+                    row->mode->setTitle(row->mode->getName());
+                    row->mode->setTooltip(path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out). Keys all three axes together."
+                                               : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock. Keys all three axes together.");
+                    row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState()); };
+                    row->addAndMakeVisible(*row->mode);
+                }
                 row->previous.onClick = [this, raw] { jumpToKey(*raw, false); };
                 row->next.onClick = [this, raw] { jumpToKey(*raw, true); };
                 row->addAndMakeVisible(row->key);
@@ -284,6 +302,51 @@ private:
         processor.seek(std::clamp(projectTime, 0.0, processor.document.project().duration));
     }
 
+    // (spatial path, quaternion rotation) of the target clip or group.
+    std::optional<std::pair<bool, bool>> currentModes() const {
+        const auto& project = processor.document.project();
+        for (const auto& group : project.groups) {
+            if (group.id == target) { return std::make_pair(group.spatialPath, group.quaternionRotation); }
+        }
+        for (const auto& track : project.tracks) {
+            if (track.kind != motion::TrackKind::visual) { continue; }
+            for (const auto& clip : track.clips) {
+                if (clip.id == target) { return std::make_pair(clip.spatialPath, clip.quaternionRotation); }
+            }
+        }
+        return std::nullopt;
+    }
+    // Turning a mode on keys every axis wherever any axis has a key, so the
+    // three curves share key times and the path or orientation applies.
+    void setMotionMode(bool path, bool enabled) {
+        const auto id = target;
+        const std::string prefix = path ? "position." : "rotation.";
+        processor.document.edit(path ? (enabled ? "Use spatial path" : "Use separate position axes") : (enabled ? "Use quaternion rotation" : "Use Euler rotation"),
+            [id, path, enabled, prefix](motion::Project& project) {
+            const auto apply = [&](auto& owner) {
+                (path ? owner.spatialPath : owner.quaternionRotation) = enabled;
+                if (!enabled) { return; }
+                std::set<double> times;
+                for (const auto axis : {"x", "y", "z"}) {
+                    for (const auto& key : owner.properties[prefix + axis].keyframes()) { times.insert(key.time); }
+                }
+                for (const auto axis : {"x", "y", "z"}) {
+                    auto& curve = owner.properties[prefix + axis];
+                    const auto copy = curve;
+                    for (const auto time : times) {
+                        if (std::none_of(copy.keyframes().begin(), copy.keyframes().end(), [time](const auto& key) { return key.time == time; })) {
+                            curve.setKeyValue(time, copy.evaluateBase(time));
+                        }
+                    }
+                }
+            };
+            for (auto& group : project.groups) { if (group.id == id) { apply(group); } }
+            for (auto& track : project.tracks) {
+                for (auto& clip : track.clips) { if (clip.id == id) { apply(clip); } }
+            }
+        });
+    }
+
     MotionProcessor& processor;
     juce::Viewport viewport;
     juce::Component content;
@@ -293,5 +356,5 @@ private:
     juce::String layoutSignature = "none", namePrefix;
     std::optional<Gesture> gesture;
     double gestureTime = 0;
-    bool changed = false, empty = true, showsHeader = true;
+    bool changed = false, empty = true, showsHeader = true, motionModes = false;
 };

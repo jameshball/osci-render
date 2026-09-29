@@ -23,6 +23,7 @@ struct Group {
     std::map<std::string, Curve> properties;
     std::vector<EffectInstance> effects;
     bool muted = false, solo = false;
+    bool spatialPath = false, quaternionRotation = false;
 
     bool valid() const {
         if (id == 0 || parent == id || properties.size() != propertyNames.size()) {

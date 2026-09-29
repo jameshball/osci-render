@@ -4,6 +4,7 @@
 #include "PropertySchema.h"
 #include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
+#include "ModulationGraph.h"
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
 #include "../import/RasterSourcePreparer.h"
@@ -354,6 +355,14 @@ void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& 
     modulation->setAttribute("beatsPerCycle", exactBakeNumber(curve.modulation.beatsPerCycle));
     modulation->setAttribute("seed", juce::String(static_cast<juce::int64>(curve.modulation.seed)));
     modulation->setAttribute("mode", static_cast<int>(curve.modulation.mode));
+    if (curve.link.has_value()) {
+        auto* link = property->createNewChildElement("link");
+        link->setAttribute("source", juce::String(curve.link->source));
+        link->setAttribute("property", juce::String(curve.link->property));
+        link->setAttribute("scale", exactBakeNumber(curve.link->scale));
+        link->setAttribute("offset", exactBakeNumber(curve.link->offset));
+        link->setAttribute("delay", exactBakeNumber(curve.link->delay));
+    }
     for (const auto& key : curve.keyframes()) {
         auto* point = property->createNewChildElement("key");
         point->setAttribute("time", exactBakeNumber(key.time));
@@ -394,6 +403,17 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
         if (!modulation.valid()) {
             return juce::Result::fail("Modulation requires a known waveform/mode, finite amount, 0.001-1000 Hz, phase 0-1, and 0.0625-64 beats per cycle.");
         }
+    }
+    for (auto* item : property.getChildWithTagNameIterator("link")) {
+        PropertyLink link;
+        const auto source = item->getStringAttribute("source").getLargeIntValue();
+        link.source = source > 0 ? static_cast<Id>(source) : 0;
+        link.property = item->getStringAttribute("property").toStdString();
+        link.scale = item->getDoubleAttribute("scale", 1);
+        link.offset = item->getDoubleAttribute("offset", 0);
+        link.delay = item->getDoubleAttribute("delay", 0);
+        if (curve.link.has_value() || !link.valid()) { return juce::Result::fail("Invalid or duplicate property link."); }
+        curve.link = std::move(link);
     }
     for (auto* point : property.getChildWithTagNameIterator("key")) {
         const auto interpolation = point->getIntAttribute("interpolation");
@@ -554,9 +574,15 @@ void Document::apply(Project value) {
     sendChangeMessage();
 }
 
+void Document::preview(Project project) {
+    pruneModulation(project);
+    apply(mergeScope(std::move(project)));
+}
+
 void Document::edit(juce::String label, std::function<void(Project&)> operation) {
     auto after = project();
     operation(after);
+    pruneModulation(after);
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
@@ -567,6 +593,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
     const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0;
     auto after = project();
     operation(after);
+    pruneModulation(after);
     after = mergeScope(std::move(after));
     if (!joins) { undo.beginNewTransaction(label); }
     undo.perform(new Change(*this, state, std::move(after)));
@@ -578,6 +605,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
 bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {
     auto after = project();
     if (!operation(after)) { return false; }
+    pruneModulation(after);
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
@@ -857,8 +885,10 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     auto candidate = state;
     std::vector<Id> ids;
     for (auto& [index, copy] : copies) {
-        const auto required = static_cast<Id>(copy.effects.size()) + 1;
+        const auto required = static_cast<Id>(copy.effects.size() + state.routes.size()) + 1;
         if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for duplicated clips."); }
+        const auto original = copy.id;
+        std::map<Id, Id> owners;
         auto timing = copy.timing(state.bpm);
         timing.moveTo(timing.start + (last - first));
         if (copies.size() == 1) {
@@ -867,7 +897,21 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
             return juce::Result::fail("The duplicated selection has invalid timing.");
         }
         copy.id = ++highest;
-        for (auto& effect : copy.effects) { effect.id = ++highest; }
+        owners.emplace(original, copy.id);
+        for (auto& effect : copy.effects) {
+            const auto old = effect.id;
+            effect.id = ++highest;
+            owners.emplace(old, effect.id);
+        }
+        // A duplicate keeps its routed modulators, like its own keys.
+        for (const auto& route : state.routes) {
+            const auto owner = owners.find(route.target);
+            if (owner == owners.end()) { continue; }
+            auto duplicate = route;
+            duplicate.id = ++highest;
+            duplicate.target = owner->second;
+            candidate.routes.push_back(std::move(duplicate));
+        }
         if (!candidate.tracks[index].insert(copy, state.bpm)) {
             return juce::Result::fail("There is not enough free space after the selection. Move the following clips first.");
         }
@@ -1056,7 +1100,8 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     const auto found = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [&](const auto& value) { return value->id == target->composition; });
     if (found == candidate.definitions.end()) { return juce::Result::fail("The referenced composition no longer exists."); }
     auto copy = std::make_shared<CompositionDefinition>(**found);
-    std::size_t required = 1 + copy->groups.size() + copy->tracks.size() + copy->cameras.size() + copy->cameraCuts.size() + copy->effects.size() + copy->markers.size();
+    std::size_t required = 1 + copy->groups.size() + copy->tracks.size() + copy->cameras.size() + copy->cameraCuts.size() + copy->effects.size() + copy->markers.size()
+        + copy->modulators.size() + copy->routes.size();
     for (const auto& group : copy->groups) { required += group.effects.size(); }
     for (const auto& track : copy->tracks) {
         required += track.effects.size() + track.clips.size();
@@ -1064,12 +1109,20 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     }
     auto highest = highestId();
     if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining composition identities."); }
-    const auto effects = [&](auto& values) { for (auto& value : values) { value.id = ++highest; } };
+    // Every renumbered property owner, so routes and links can follow.
+    std::map<Id, Id> owners;
+    const auto effects = [&](auto& values) {
+        for (auto& value : values) {
+            const auto old = value.id;
+            value.id = ++highest;
+            owners.emplace(old, value.id);
+        }
+    };
     copy->id = ++highest;
     copy->name += " copy";
     std::map<Id, Id> groups, cameras;
     for (auto& group : copy->groups) {
-        const auto old = group.id; group.id = ++highest; groups.emplace(old, group.id); effects(group.effects);
+        const auto old = group.id; group.id = ++highest; groups.emplace(old, group.id); owners.emplace(old, group.id); effects(group.effects);
     }
     for (auto& group : copy->groups) {
         if (group.parent != 0) {
@@ -1083,15 +1136,39 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
             if (!groups.contains(track.group)) { return juce::Result::fail("Invalid composition group reference."); }
             track.group = groups.at(track.group);
         }
-        for (auto& clip : track.clips) { clip.id = ++highest; effects(clip.effects); }
+        for (auto& clip : track.clips) {
+            const auto old = clip.id;
+            clip.id = ++highest;
+            owners.emplace(old, clip.id);
+            effects(clip.effects);
+        }
     }
-    for (auto& camera : copy->cameras) { const auto old = camera.id; camera.id = ++highest; cameras.emplace(old, camera.id); }
+    for (auto& camera : copy->cameras) { const auto old = camera.id; camera.id = ++highest; cameras.emplace(old, camera.id); owners.emplace(old, camera.id); }
     for (auto& cut : copy->cameraCuts) {
         if (!cameras.contains(cut.camera)) { return juce::Result::fail("Invalid composition camera reference."); }
         cut.id = ++highest; cut.camera = cameras.at(cut.camera);
     }
     for (auto& marker : copy->markers) { marker.id = ++highest; }
     effects(copy->effects);
+    const auto remap = [&](Id id) { const auto found = owners.find(id); return found != owners.end() ? found->second : Id(0); };
+    std::map<Id, Id> modulators;
+    for (auto& modulator : copy->modulators) {
+        const auto old = modulator.id;
+        modulator.id = ++highest;
+        modulators.emplace(old, modulator.id);
+        modulator.source = remap(modulator.source);
+    }
+    for (auto& route : copy->routes) {
+        route.id = ++highest;
+        route.modulator = modulators.contains(route.modulator) ? modulators.at(route.modulator) : 0;
+        route.target = remap(route.target);
+    }
+    forEachPropertyMap(*copy, [&](Id, auto& properties) {
+        for (auto& [name, curve] : properties) {
+            if (curve.link.has_value()) { curve.link->source = remap(curve.link->source); }
+        }
+    });
+    pruneModulation(*copy);
     // Only this definition is forked. Media and referenced child definitions
     // remain shared, while all authored identities within this scope are fresh.
     target->composition = copy->id;
@@ -1156,6 +1233,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     std::size_t required = 3 + definition->tracks.size() + requiredGroups.size();
     for (const auto& track : definition->tracks) { required += track.effects.size(); }
     for (const auto& group : state.groups) { if (requiredGroups.contains(group.id)) { required += group.effects.size(); } }
+    required += 2 * state.routes.size() + state.modulators.size();
     if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining composition identities."); }
     definition->id = ++highest;
     std::map<Id, Id> groupIds;
@@ -1172,6 +1250,37 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         if (track.group != 0) { track.group = groupIds.at(track.group); }
         for (auto& effect : track.effects) { effect.id = ++highest; }
     }
+    // Routes follow their targets: clip (and clip effect) routes move into the
+    // definition; routes on copied groups are copied. Each modulator they use
+    // is copied once, so the definition owns its own clocks.
+    std::set<Id> movedTargets(selected.begin(), selected.end());
+    for (const auto& track : definition->tracks) {
+        for (const auto& clip : track.clips) { for (const auto& effect : clip.effects) { movedTargets.insert(effect.id); } }
+    }
+    std::map<Id, Id> modulatorIds;
+    std::set<Id> movedRoutes;
+    for (const auto& route : state.routes) {
+        const auto group = groupIds.find(route.target);
+        const bool moved = movedTargets.contains(route.target);
+        if (!moved && group == groupIds.end()) { continue; }
+        if (!modulatorIds.contains(route.modulator)) {
+            const auto source = std::find_if(state.modulators.begin(), state.modulators.end(), [&](const auto& item) { return item.id == route.modulator; });
+            if (source == state.modulators.end()) { continue; }
+            auto copy = *source;
+            copy.id = ++highest;
+            if (copy.kind == ModulatorKind::envelope && !selected.contains(copy.source)) { copy.source = 0; }
+            modulatorIds.emplace(route.modulator, copy.id);
+            definition->modulators.push_back(std::move(copy));
+        }
+        auto copy = route;
+        copy.id = ++highest;
+        copy.modulator = modulatorIds.at(route.modulator);
+        if (!moved) { copy.target = group->second; }
+        definition->routes.push_back(std::move(copy));
+        if (moved) { movedRoutes.insert(route.id); }
+    }
+    std::erase_if(candidate.routes, [&](const auto& route) { return movedRoutes.contains(route.id); });
+    pruneModulation(*definition);
     Clip instance;
     instance.id = ++highest; instance.composition = definition->id; instance.name = name.toStdString();
     instance.start = first; instance.duration = last - first; instance.offset = first;
@@ -1341,6 +1450,102 @@ juce::Result Document::clearMidi(Id clipId) {
         clip.midiAsset = 0;
         return juce::Result::ok();
     });
+}
+
+// Route depth lives on routes; the shape's own depth and switch are fixed.
+static void normaliseModulator(Modulator& modulator) {
+    modulator.shape.enabled = true;
+    modulator.shape.amount = 1;
+    modulator.shape.mode = ModulationMode::add;
+    modulator.shape.soundtrack.reset();
+}
+
+juce::Result Document::addModulator(Modulator modulator, Id& id) {
+    modulator.id = newId();
+    normaliseModulator(modulator);
+    if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
+    if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasMidiClip(project(), modulator.source)) { return juce::Result::fail("The envelope's source clip does not exist."); }
+    id = modulator.id;
+    edit("Add modulator", [modulator](Project& project) { project.modulators.push_back(modulator); });
+    return juce::Result::ok();
+}
+
+juce::Result Document::setModulator(Modulator modulator) {
+    normaliseModulator(modulator);
+    const auto& list = project().modulators;
+    const auto found = std::find_if(list.begin(), list.end(), [&](const auto& item) { return item.id == modulator.id; });
+    if (found == list.end()) { return juce::Result::fail("The modulator no longer exists."); }
+    if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
+    if (modulator.kind == ModulatorKind::envelope && modulator.source != 0 && !hasMidiClip(project(), modulator.source)) { return juce::Result::fail("The envelope's source clip does not exist."); }
+    if (*found == modulator) { return juce::Result::ok(); }
+    editCoalesced("Change modulator", "modulator:" + juce::String(modulator.id), [modulator](Project& project) {
+        for (auto& item : project.modulators) {
+            if (item.id == modulator.id) { item = modulator; }
+        }
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::removeModulator(Id id) {
+    const auto removed = tryEdit("Delete modulator", [id](Project& project) {
+        const auto before = project.modulators.size();
+        std::erase_if(project.modulators, [id](const auto& item) { return item.id == id; });
+        std::erase_if(project.routes, [id](const auto& route) { return route.modulator == id; });
+        return project.modulators.size() != before;
+    });
+    return removed ? juce::Result::ok() : juce::Result::fail("The modulator no longer exists.");
+}
+
+juce::Result Document::addRoute(ModulationRoute route, Id& id) {
+    route.id = newId();
+    const auto& current = project();
+    const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == route.modulator; });
+    if (!route.valid() || !hasModulator || !hasPropertyCurve(current, route.target, route.property)) { return juce::Result::fail("A route needs an existing modulator and property."); }
+    id = route.id;
+    edit("Route modulator", [route](Project& project) { project.routes.push_back(route); });
+    return juce::Result::ok();
+}
+
+juce::Result Document::setRoute(const ModulationRoute& route) {
+    const auto& list = project().routes;
+    const auto found = std::find_if(list.begin(), list.end(), [&](const auto& item) { return item.id == route.id; });
+    if (found == list.end()) { return juce::Result::fail("The route no longer exists."); }
+    if (!route.valid() || found->modulator != route.modulator || found->target != route.target || found->property != route.property) {
+        return juce::Result::fail("Only a route's amount and mode can change.");
+    }
+    if (*found == route) { return juce::Result::ok(); }
+    editCoalesced("Change route", "route:" + juce::String(route.id), [route](Project& project) {
+        for (auto& item : project.routes) {
+            if (item.id == route.id) { item = route; }
+        }
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::removeRoute(Id id) {
+    const auto removed = tryEdit("Delete route", [id](Project& project) {
+        const auto before = project.routes.size();
+        std::erase_if(project.routes, [id](const auto& route) { return route.id == id; });
+        return project.routes.size() != before;
+    });
+    return removed ? juce::Result::ok() : juce::Result::fail("The route no longer exists.");
+}
+
+juce::Result Document::setLink(Id target, const std::string& property, std::optional<PropertyLink> link) {
+    const auto& current = project();
+    const auto* curve = findPropertyCurve(current, target, property);
+    if (curve == nullptr) { return juce::Result::fail("The property no longer exists."); }
+    if (link.has_value()) {
+        if (!link->valid() || !hasPropertyCurve(current, link->source, link->property)) { return juce::Result::fail("Choose an existing property to link to."); }
+        if (linkCreatesCycle(current, target, property, *link)) { return juce::Result::fail("That link would make the property depend on itself."); }
+    }
+    if (curve->link == link) { return juce::Result::ok(); }
+    const auto label = link.has_value() ? (curve->link.has_value() ? "Change property link" : "Link property") : "Unlink property";
+    editCoalesced(label, "link:" + juce::String(target) + ":" + juce::String(property), [target, property, link](Project& project) {
+        auto* edited = findPropertyCurve(project, target, property);
+        if (edited != nullptr) { edited->link = link; }
+    });
+    return juce::Result::ok();
 }
 
 juce::Result Document::addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id) {
@@ -1666,6 +1871,8 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
         item->setAttribute("parent", juce::String(group.parent));
         item->setAttribute("muted", group.muted);
         item->setAttribute("solo", group.solo);
+        if (group.spatialPath) { item->setAttribute("spatialPath", true); }
+        if (group.quaternionRotation) { item->setAttribute("quaternionRotation", true); }
         saveEffects(*item, group.effects);
         for (const auto& [name, curve] : group.properties) {
             saveProperty(*item, name, curve);
@@ -1696,6 +1903,8 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
             item->setAttribute("duration", exactBakeNumber(clip.duration));
             item->setAttribute("offset", exactBakeNumber(clip.offset));
             item->setAttribute("rate", exactBakeNumber(clip.rate));
+            if (clip.spatialPath) { item->setAttribute("spatialPath", true); }
+            if (clip.quaternionRotation) { item->setAttribute("quaternionRotation", true); }
             if (track.kind == TrackKind::visual && clip.composition == 0) {
                 auto* instrument = item->createNewChildElement("instrument");
                 instrument->setAttribute("attack", exactBakeNumber(clip.instrument.attack));
@@ -1742,6 +1951,35 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
         item->setAttribute("camera", juce::String(cut.camera));
         item->setAttribute("start", exactBakeNumber(cut.start));
         item->setAttribute("duration", exactBakeNumber(cut.duration));
+    }
+    for (const auto& modulator : state.modulators) {
+        auto* item = xml.createNewChildElement("modulator");
+        item->setAttribute("id", juce::String(modulator.id));
+        item->setAttribute("name", juce::String(modulator.name));
+        item->setAttribute("kind", modulator.kind == ModulatorKind::envelope ? "envelope" : "oscillator");
+        item->setAttribute("waveform", static_cast<int>(modulator.shape.waveform));
+        item->setAttribute("rateHz", exactBakeNumber(modulator.shape.rateHz));
+        item->setAttribute("phase", exactBakeNumber(modulator.shape.phase));
+        item->setAttribute("tempoSync", modulator.shape.tempoSync);
+        item->setAttribute("beatsPerCycle", exactBakeNumber(modulator.shape.beatsPerCycle));
+        item->setAttribute("seed", juce::String(static_cast<juce::int64>(modulator.shape.seed)));
+        item->setAttribute("source", juce::String(modulator.source));
+        item->setAttribute("attack", exactBakeNumber(modulator.attack));
+        item->setAttribute("decay", exactBakeNumber(modulator.decay));
+        item->setAttribute("sustain", exactBakeNumber(modulator.sustain));
+        item->setAttribute("release", exactBakeNumber(modulator.release));
+        item->setAttribute("velocity", exactBakeNumber(modulator.velocity));
+        item->setAttribute("lowestPitch", modulator.lowestPitch);
+        item->setAttribute("highestPitch", modulator.highestPitch);
+    }
+    for (const auto& route : state.routes) {
+        auto* item = xml.createNewChildElement("route");
+        item->setAttribute("id", juce::String(route.id));
+        item->setAttribute("modulator", juce::String(route.modulator));
+        item->setAttribute("target", juce::String(route.target));
+        item->setAttribute("property", juce::String(route.property));
+        item->setAttribute("amount", exactBakeNumber(route.amount));
+        item->setAttribute("mode", static_cast<int>(route.mode));
     }
     return xml;
 }
@@ -1846,6 +2084,8 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
         group.name = item->getStringAttribute("name", "Group").toStdString();
         group.muted = item->getBoolAttribute("muted", false);
         group.solo = item->getBoolAttribute("solo", false);
+        group.spatialPath = item->getBoolAttribute("spatialPath", false);
+        group.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
         const auto effects = loadEffects(*item, group.effects, identities);
         if (effects.failed()) {
             return effects;
@@ -1908,6 +2148,8 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
             clip.duration = item->getDoubleAttribute("duration");
             clip.offset = item->getDoubleAttribute("offset");
             clip.rate = item->getDoubleAttribute("rate", 1);
+            clip.spatialPath = item->getBoolAttribute("spatialPath", false);
+            clip.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
             const auto found = std::find_if(assets.begin(), assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
             if (clip.id == 0 || !identities.insert(clip.id).second) { return juce::Result::fail("Invalid clip identity."); }
             if (clip.composition != 0) {
@@ -2072,6 +2314,54 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
     if (!validGroupHierarchy(project)) {
         return juce::Result::fail("Groups require existing parents and track references, no cycles, and at most 32 nesting levels.");
     }
+    const auto identity = [](const juce::XmlElement& item, const char* name) {
+        const auto value = item.getStringAttribute(name).getLargeIntValue();
+        return value > 0 ? static_cast<Id>(value) : Id(0);
+    };
+    for (auto* item : xml.getChildWithTagNameIterator("modulator")) {
+        Modulator modulator;
+        modulator.id = identity(*item, "id");
+        modulator.name = item->getStringAttribute("name").toStdString();
+        const auto kind = item->getStringAttribute("kind");
+        const auto tempoSync = item->getIntAttribute("tempoSync", -1);
+        const auto seed = item->getStringAttribute("seed", "0").getLargeIntValue();
+        if ((kind != "oscillator" && kind != "envelope") || tempoSync < 0 || tempoSync > 1 || seed < 0 || seed > static_cast<juce::int64>(std::numeric_limits<std::uint32_t>::max())) {
+            return juce::Result::fail("Invalid modulator settings.");
+        }
+        modulator.kind = kind == "envelope" ? ModulatorKind::envelope : ModulatorKind::oscillator;
+        modulator.shape.enabled = true;
+        modulator.shape.amount = 1;
+        modulator.shape.waveform = static_cast<ModulationWaveform>(item->getIntAttribute("waveform", -1));
+        modulator.shape.rateHz = item->getDoubleAttribute("rateHz", 1);
+        modulator.shape.phase = item->getDoubleAttribute("phase", 0);
+        modulator.shape.tempoSync = tempoSync != 0;
+        modulator.shape.beatsPerCycle = item->getDoubleAttribute("beatsPerCycle", 1);
+        modulator.shape.seed = static_cast<std::uint32_t>(seed);
+        modulator.source = identity(*item, "source");
+        modulator.attack = item->getDoubleAttribute("attack", -1);
+        modulator.decay = item->getDoubleAttribute("decay", -1);
+        modulator.sustain = item->getDoubleAttribute("sustain", -1);
+        modulator.release = item->getDoubleAttribute("release", -1);
+        modulator.velocity = item->getDoubleAttribute("velocity", -1);
+        modulator.lowestPitch = item->getIntAttribute("lowestPitch", -1);
+        modulator.highestPitch = item->getIntAttribute("highestPitch", -1);
+        if (!modulator.valid() || !identities.insert(modulator.id).second) { return juce::Result::fail("Invalid modulator settings or identity."); }
+        project.modulators.push_back(std::move(modulator));
+    }
+    for (auto* item : xml.getChildWithTagNameIterator("route")) {
+        ModulationRoute route;
+        route.id = identity(*item, "id");
+        route.modulator = identity(*item, "modulator");
+        route.target = identity(*item, "target");
+        route.property = item->getStringAttribute("property").toStdString();
+        route.amount = item->getDoubleAttribute("amount", 1);
+        const auto mode = item->getIntAttribute("mode", -1);
+        route.mode = static_cast<ModulationMode>(mode);
+        if (mode < 0 || mode > 1 || !route.valid() || !identities.insert(route.id).second) { return juce::Result::fail("Invalid modulation route settings or identity."); }
+        project.routes.push_back(std::move(route));
+    }
+    const auto modulation = validateModulation(project);
+    if (!modulation.empty()) { return juce::Result::fail(juce::String(modulation)); }
     return juce::Result::ok();
 }
 juce::Result Document::load(const juce::XmlElement& xml) {

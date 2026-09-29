@@ -82,6 +82,10 @@ struct Clip {
 
     ClipTimeBase timeBase = ClipTimeBase::seconds;
     double contentBpm = 120;
+    // Position keys aligned on all three axes travel one spatial path; aligned
+    // rotation keys interpolate as orientations, free of gimbal lock.
+    bool spatialPath = false;
+    bool quaternionRotation = false;
 
     // Canonical fields above use beats for musical clips, seconds otherwise.
     // Resolved content remains seconds so visual curves and their tangents are

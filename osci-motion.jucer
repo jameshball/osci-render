@@ -366,6 +366,10 @@
       <FILE id="mottimegrid" name="TimeGrid.h" compile="0" resource="0" file="Source/motion/model/TimeGrid.h"/>
       <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
             file="Source/motion/model/Modulation.h"/>
+      <FILE id="motmodulators" name="Modulators.h" compile="0" resource="0"
+            file="Source/motion/model/Modulators.h"/>
+      <FILE id="motmodgraph" name="ModulationGraph.h" compile="0" resource="0"
+            file="Source/motion/model/ModulationGraph.h"/>
       <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
       <FILE id="MotTimeline" name="Timeline.h" compile="0" resource="0" file="Source/motion/model/Timeline.h"/>
       <FILE id="motgroupmodel" name="Group.h" compile="0" resource="0" file="Source/motion/model/Group.h"/>
@@ -382,6 +386,10 @@
       <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
       <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
             resource="0" file="Source/motion/render/PreparedEffects.h"/>
+      <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
+            resource="0" file="Source/motion/render/PreparedDrivers.h"/>
+      <FILE id="MotModulatorPanels" name="ModulatorPanels.h" compile="0"
+            resource="0" file="Source/motion/ui/ModulatorPanels.h"/>
       <FILE id="MotEffectLibrary" name="EffectLibrary.h" compile="0" resource="0"
             file="Source/motion/ui/EffectLibrary.h"/>
       <FILE id="MotEffectsPanel" name="EffectsPanel.h" compile="0" resource="0"

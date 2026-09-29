@@ -71,6 +71,8 @@ struct Composition {
     std::vector<Marker> markers;
     std::vector<EffectInstance> effects;
     std::vector<Group> groups;
+    std::vector<Modulator> modulators;
+    std::vector<ModulationRoute> routes;
 };
 
 struct CompositionDefinition : Composition {
@@ -137,7 +139,16 @@ public:
     // elsewhere during a take do not discard it.
     juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration);
     juce::Result clearMidi(Id clipId);
-    void preview(Project project) { apply(mergeScope(std::move(project))); }
+    // Shared modulators and their routes live in the scope being edited.
+    juce::Result addModulator(Modulator modulator, Id& id);
+    juce::Result setModulator(Modulator modulator);
+    juce::Result removeModulator(Id id);
+    juce::Result addRoute(ModulationRoute route, Id& id);
+    juce::Result setRoute(const ModulationRoute& route);
+    juce::Result removeRoute(Id id);
+    // Links (or unlinks, with nullopt) a property; refuses cycles.
+    juce::Result setLink(Id target, const std::string& property, std::optional<PropertyLink> link);
+    void preview(Project project);
     juce::String coalescingControl;
     std::uint64_t coalescingRevision = 0;
     double coalescingTime = 0;

@@ -18,6 +18,10 @@
             resource="0" file="tests/MotionBeamRendererTest.cpp"/>
       <FILE id="MotionClipboardT" name="MotionClipboardTest.cpp" compile="1"
             resource="0" file="tests/MotionClipboardTest.cpp"/>
+      <FILE id="MotionModulatorsT" name="MotionModulatorsTest.cpp" compile="1"
+            resource="0" file="tests/MotionModulatorsTest.cpp"/>
+      <FILE id="MotionSpatialT" name="MotionSpatialTest.cpp" compile="1"
+            resource="0" file="tests/MotionSpatialTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
       <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"

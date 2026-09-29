@@ -5,6 +5,8 @@
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
 #include "PreparedMidiPerformance.h"
+#include "PreparedDrivers.h"
+#include "../model/SpatialMotion.h"
 #include "SampleClock.h"
 #include <array>
 #include <numbers>
@@ -21,11 +23,41 @@ inline osci::Point applySourceColour(osci::Point point, const std::array<Curve, 
     return point;
 }
 
-inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true) {
+inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool quaternion, const std::array<Curve, 13>& curves) {
+    auto spatial = std::make_shared<PreparedSpatial>();
+    if (path) { spatial->path = PreparedPath::prepare(curves[0], curves[1], curves[2]); }
+    if (quaternion) { spatial->orientation = PreparedOrientation::prepare(curves[3], curves[4], curves[5]); }
+    if (spatial->path == nullptr && spatial->orientation == nullptr) { return nullptr; }
+    return spatial;
+}
+
+inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
     point.scale(curves[6].evaluate(time, bpm), curves[7].evaluate(time, bpm), curves[8].evaluate(time, bpm));
     constexpr auto radians = std::numbers::pi / 180.0;
-    point.rotate(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
-    point.translate(curves[0].evaluate(time, bpm), curves[1].evaluate(time, bpm), curves[2].evaluate(time, bpm));
+    if (spatial != nullptr && spatial->orientation != nullptr) {
+        // Keys set the orientation; modulation and links add Euler offsets in
+        // object space before it.
+        std::array<double, 3> extra {};
+        for (std::size_t axis = 0; axis < 3; ++axis) {
+            const auto& curve = curves[3 + axis];
+            const auto keyed = curve.evaluateBase(time);
+            extra[axis] = (curve.linked() ? curve.evaluate(time, bpm) : curve.evaluateWith(keyed, time, bpm)) - keyed;
+        }
+        if (extra[0] != 0 || extra[1] != 0 || extra[2] != 0) { point.rotate(extra[0] * radians, extra[1] * radians, extra[2] * radians); }
+        const auto rotated = spatial->orientation->at(time).rotate(point.x, point.y, point.z);
+        point.x = static_cast<float>(rotated[0]);
+        point.y = static_cast<float>(rotated[1]);
+        point.z = static_cast<float>(rotated[2]);
+    } else {
+        point.rotate(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
+    }
+    if (spatial != nullptr && spatial->path != nullptr) {
+        const auto position = spatial->path->at(time);
+        const auto axis = [&](std::size_t index) { return curves[index].linked() ? curves[index].evaluate(time, bpm) : curves[index].evaluateWith(position[index], time, bpm); };
+        point.translate(axis(0), axis(1), axis(2));
+    } else {
+        point.translate(curves[0].evaluate(time, bpm), curves[1].evaluate(time, bpm), curves[2].evaluate(time, bpm));
+    }
     if (applyColour) { point = applySourceColour(point, curves, time, bpm); }
     if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
         || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
@@ -38,19 +70,21 @@ struct PreparedGroup {
     Id id;
     std::array<Curve, 13> curves;
     std::vector<PreparedEffect> effects;
+    std::shared_ptr<const PreparedSpatial> spatial;
 
     explicit PreparedGroup(const Group& group) : id(group.id), effects(prepareEffects(group.effects)) {
         for (std::size_t index = 0; index < propertyNames.size(); ++index) {
             const auto found = group.properties.find(propertyNames[index]);
             curves[index] = found == group.properties.end() ? Curve(index >= 6 ? 1 : 0) : found->second;
         }
+        spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
     double weight(double time, double bpm = 120) const {
         const auto value = curves[12].evaluate(time, bpm);
         return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
     }
     osci::Point apply(osci::Point point, double time, double bpm = 120) const {
-        return applyEffects(effects, applyTransform(point, curves, time, bpm), time, bpm);
+        return applyEffects(effects, applyTransform(point, curves, time, bpm, true, spatial.get()), time, bpm);
     }
 };
 
@@ -62,6 +96,7 @@ struct PreparedClipStage {
     std::array<Curve, 13> curves;
     std::vector<PreparedEffect> effects, trackEffects, compositionEffects;
     std::vector<PreparedGroup> groups;
+    std::shared_ptr<const PreparedSpatial> spatial;
     double bpm = 120, contentBpm = 120;
     std::optional<ClipTiming> scopeClock;
 
@@ -86,7 +121,7 @@ struct PreparedClipStage {
         const auto local = localTime(time);
         point = applySourceColour(point, curves, local, contentBpm);
         point = applyEffects(effects, point, local, contentBpm);
-        point = applyTransform(point, curves, local, contentBpm, false);
+        point = applyTransform(point, curves, local, contentBpm, false, spatial.get());
         point = applyEffects(trackEffects, point, scopeTime(time), bpm);
         for (const auto& group : groups) { point = group.apply(point, scopeTime(time), bpm); }
         return applyEffects(compositionEffects, point, scopeTime(time), bpm);
@@ -199,12 +234,18 @@ inline double beamCycleRate(double frameRate) {
 struct PreparedComposition {
     explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
+        PreparedDrivers drivers([this, cancel, purpose]() -> std::shared_ptr<const SoundtrackEnvelope> {
+            return purpose == CompositionPurpose::signal ? loudnessEnvelope(cancel) : nullptr;
+        });
+        const ClipTiming mainClock(0, project.duration);
+        drivers.driveEffects(effects, project.effects, project, mainClock);
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
             const Camera defaults;
             for (std::size_t index = 0; index < cameraPropertyNames.size(); ++index) {
                 const auto found = camera.properties.find(cameraPropertyNames[index]);
                 item.curves[index] = found != camera.properties.end() ? found->second : defaults.properties.at(cameraPropertyNames[index]);
+                drivers.drive(item.curves[index], project, mainClock, camera.id, cameraPropertyNames[index]);
             }
             item.bpm = project.bpm;
             cameras.push_back(std::move(item));
@@ -216,7 +257,9 @@ struct PreparedComposition {
             }
         }
         std::sort(cameraCuts.begin(), cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
-        const auto prepareStage = [&](const CompositionStage& stage, bool root) {
+        std::map<Id, const Composition*> definitions;
+        for (const auto& definition : project.definitions) { definitions.emplace(definition->id, definition.get()); }
+        const auto prepareStage = [&](const CompositionStage& stage, bool root, const Composition& scope) {
             const auto& clip = *stage.clip;
             const auto& timing = stage.clipClock;
             PreparedClipStage item;
@@ -227,18 +270,34 @@ struct PreparedComposition {
             for (std::size_t i = 0; i < propertyNames.size(); ++i) {
                 const auto curve = clip.properties.find(propertyNames[i]);
                 item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
+                drivers.drive(item.curves[i], scope, stage.scopeClock, clip.id, propertyNames[i]);
             }
+            item.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, item.curves);
             item.effects = prepareEffects(clip.effects);
+            drivers.driveEffects(item.effects, clip.effects, scope, stage.scopeClock);
             item.trackEffects = prepareEffects(stage.track->effects);
-            if (!root) { item.compositionEffects = prepareEffects(*stage.effects); }
+            drivers.driveEffects(item.trackEffects, stage.track->effects, scope, stage.scopeClock);
+            if (!root) {
+                item.compositionEffects = prepareEffects(*stage.effects);
+                drivers.driveEffects(item.compositionEffects, *stage.effects, scope, stage.scopeClock);
+            }
             auto groupId = stage.track->group;
             while (groupId != 0 && item.groups.size() < maximumGroupDepth) {
                 const auto group = std::find_if(stage.groups->begin(), stage.groups->end(), [groupId](const auto& value) { return value.id == groupId; });
                 if (group == stage.groups->end()) { break; }
                 item.groups.emplace_back(*group);
+                auto& prepared = item.groups.back();
+                for (std::size_t i = 0; i < propertyNames.size(); ++i) { drivers.drive(prepared.curves[i], scope, stage.scopeClock, group->id, propertyNames[i]); }
+                drivers.driveEffects(prepared.effects, group->effects, scope, stage.scopeClock);
                 groupId = group->parent;
             }
             return item;
+        };
+        // Stage k is authored in the root for k == 0, otherwise in the
+        // definition instanced by stage k - 1.
+        const auto scopeOf = [&](const auto& stages, std::size_t index) -> const Composition& {
+            if (index == 0) { return project; }
+            return *definitions.at(stages[index - 1].clip->composition);
         };
         std::map<std::array<double, 4>, std::shared_ptr<const PreparedMidiInstrument>> instruments;
         const auto expanded = expandComposition(project, [&](const auto&, const auto& stages) {
@@ -249,14 +308,14 @@ struct PreparedComposition {
             const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
             if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr && (*asset)->liveIdentity == nullptr)) { return; }
             PreparedClip item;
-            static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1);
+            static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1, scopeOf(stages, stages.size() - 1));
             item.liveIdentity = (*asset)->liveIdentity;
             item.source = (*asset)->source;
             if (item.source == nullptr) {
                 item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> {(*asset)->drawing}, 30.0);
             }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
-                item.ancestors.push_back(prepareStage(stages[index - 1], index == 1));
+                item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
             }
             if (purpose == CompositionPurpose::signal) {
                 const auto key = clip.instrument.key();
@@ -408,24 +467,8 @@ private:
         for (const auto& camera : cameras) { for (const auto& curve : camera.curves) { needed = needed || uses(curve); } }
         scanEffects(effects);
         if (!needed) { return; }
-        auto envelope = std::make_shared<SoundtrackEnvelope>();
-        const auto bins = static_cast<std::size_t>(std::ceil(std::max(0.0, duration) * envelope->rate)) + 2;
-        envelope->values.assign(bins, 0.0f);
-        constexpr int probes = 24;
-        float follower = 0, loudest = 0;
-        for (std::size_t bin = 0; bin < bins; ++bin) {
-            if (cancel != nullptr && (bin & 1023) == 0 && cancel->load()) { return; }
-            float peak = 0;
-            for (int probe = 0; probe < probes; ++probe) {
-                const auto sample = soundtrack.sample((static_cast<double>(bin) + probe / static_cast<double>(probes)) / envelope->rate);
-                peak = std::max({peak, std::abs(static_cast<float>(sample.left)), std::abs(static_cast<float>(sample.right))});
-            }
-            follower = peak > follower ? follower + (peak - follower) * .6f : follower * .93f;
-            envelope->values[bin] = follower;
-            loudest = std::max(loudest, follower);
-        }
-        if (loudest > 0) { for (auto& value : envelope->values) { value /= loudest; } }
-        const std::shared_ptr<const SoundtrackEnvelope> shared = envelope;
+        const auto shared = loudnessEnvelope(cancel);
+        if (shared == nullptr) { return; }
         const auto attach = [&](Curve& curve, double start, double offset, double rate) {
             if (uses(curve)) { curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock{shared, start, offset, rate}); }
         };
@@ -450,6 +493,32 @@ private:
         for (auto& camera : cameras) { for (auto& curve : camera.curves) { attach(curve, 0, 0, 1); } }
         attachEffects(effects, 0, 0, 1);
     }
+    // Computed once, on first use, for curves and modulators that follow it.
+    std::shared_ptr<const SoundtrackEnvelope> loudnessEnvelope(const std::atomic<bool>* cancel) {
+        if (loudness != nullptr || loudnessBuilt) { return loudness; }
+        loudnessBuilt = true;
+        auto envelope = std::make_shared<SoundtrackEnvelope>();
+        const auto bins = static_cast<std::size_t>(std::ceil(std::max(0.0, duration) * envelope->rate)) + 2;
+        envelope->values.assign(bins, 0.0f);
+        constexpr int probes = 24;
+        float follower = 0, loudest = 0;
+        for (std::size_t bin = 0; bin < bins; ++bin) {
+            if (cancel != nullptr && (bin & 1023) == 0 && cancel->load()) { return nullptr; }
+            float peak = 0;
+            for (int probe = 0; probe < probes; ++probe) {
+                const auto sample = soundtrack.sample((static_cast<double>(bin) + probe / static_cast<double>(probes)) / envelope->rate);
+                peak = std::max({peak, std::abs(static_cast<float>(sample.left)), std::abs(static_cast<float>(sample.right))});
+            }
+            follower = peak > follower ? follower + (peak - follower) * .6f : follower * .93f;
+            envelope->values[bin] = follower;
+            loudest = std::max(loudest, follower);
+        }
+        if (loudest > 0) { for (auto& value : envelope->values) { value /= loudest; } }
+        loudness = std::move(envelope);
+        return loudness;
+    }
+    std::shared_ptr<const SoundtrackEnvelope> loudness;
+    bool loudnessBuilt = false;
     struct PreparedCameraCut {
         double start, end;
         std::size_t cameraIndex;

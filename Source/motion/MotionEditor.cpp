@@ -84,7 +84,7 @@ bool canSplitClip(const motion::Clip* clip, double time, double bpm) {
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor), propertyInspector(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraPanel(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
     beamSettingsWindow.setLookAndFeel(&lookAndFeel);
@@ -182,7 +182,20 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     frameView.onClick = [this] { composition.frameSelection(); };
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
-    addChildComponent(modulationPanel);
+    graphSide.addAndMakeVisible(modulationPanel);
+    graphSide.addAndMakeVisible(routingPanel);
+    graphSideViewport.setViewedComponent(&graphSide, false);
+    graphSideViewport.setScrollBarsShown(true, false);
+    graphSideViewport.setScrollBarThickness(6);
+    addChildComponent(graphSideViewport);
+    routingPanel.onLayoutChanged = [this] { layoutGraphSide(); };
+    addChildComponent(modulatorLibrary);
+    routingPanel.onError = [this](const juce::String& text) { statusBar.show(text); };
+    modulatorLibrary.onError = [this](const juce::String& text) { statusBar.show(text); };
+    routingPanel.onShowModulator = [this](motion::Id id) {
+        modulatorLibrary.select(id);
+        libraryTabs.setSelectedIndex(2);
+    };
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
     addAndMakeVisible(timingButton);
@@ -297,12 +310,16 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     libraryTabs.setName("Library tabs");
     inspectorTabs.setName("Inspector tabs");
     inspectorTabs.setTabSpacing(58, 8);
+    libraryTabs.setTabSpacing(40, 7);
     libraryTabs.addTab("Assets");
     libraryTabs.addTab("Effects");
+    libraryTabs.addTab("Modulators");
     libraryTabs.onSelectionChanged = [this](int index) {
         assetLibrary.setVisible(index == 0);
         importButton.setVisible(index == 0);
         effectLibrary.setVisible(index == 1);
+        modulatorLibrary.setVisible(index == 2);
+        if (index == 2) { modulatorLibrary.refresh(); }
         resized();
     };
     effectLibrary.onInsert = [this](const std::string& type) {
@@ -340,7 +357,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
         notesEditor.setVisible(index == 2);
-        modulationPanel.setVisible(index == 1);
+        graphSideViewport.setVisible(index == 1);
         curveProperty.setVisible(index == 1);
         resized();
         if (index == 2) { notesEditor.fitContents(); }
@@ -361,6 +378,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         curvePropertyName = curveProperties[index];
         curveEditor.setSelection(curveTarget, curvePropertyName);
         modulationPanel.setTarget(curveTarget, curvePropertyName);
+        routingPanel.setTarget(curveTarget, curvePropertyName);
+        layoutGraphSide();
     };
     cameraPanel.onPropertySelected = [this](motion::Id id, std::string property) {
         selectCurveTarget(id, property, true);
@@ -633,7 +652,8 @@ void MotionEditor::resized() {
     this->timeline.setBounds(timeline.withTrimmedTop(3));
     notesEditor.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
-    modulationPanel.setBounds(graph.removeFromRight(285));
+    graphSideViewport.setBounds(graph.removeFromRight(285));
+    layoutGraphSide();
     graph.removeFromRight(3);
     curveEditor.setBounds(graph);
     timelineDivider.setBounds(area.removeFromBottom(7));
@@ -642,6 +662,7 @@ void MotionEditor::resized() {
     libraryHeader.setBounds(library.removeFromTop(30));
     libraryTabs.setBounds(libraryHeader.getBounds());
     effectLibrary.setBounds(library.reduced(4, 0));
+    modulatorLibrary.setBounds(library);
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
@@ -1723,6 +1744,15 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curvePropertyName = curveProperties[static_cast<std::size_t>(selectedIndex)];
     curveEditor.setSelection(id, curvePropertyName);
     modulationPanel.setTarget(id, curvePropertyName);
+    routingPanel.setTarget(id, curvePropertyName);
+    layoutGraphSide();
+}
+
+void MotionEditor::layoutGraphSide() {
+    const auto width = graphSideViewport.getWidth() - 8;
+    modulationPanel.setBounds(0, 0, width, 188);
+    routingPanel.setBounds(0, 191, width, routingPanel.preferredHeight());
+    graphSide.setSize(width, routingPanel.getBottom());
 }
 
 

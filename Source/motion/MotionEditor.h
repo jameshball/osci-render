@@ -12,6 +12,7 @@
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
 #include "ui/ModulationPanel.h"
+#include "ui/ModulatorPanels.h"
 #include "ui/PlaybackHealth.h"
 #include "ui/PropertyInspector.h"
 #include "ui/StatusBar.h"
@@ -124,6 +125,12 @@ private:
     MotionEffectLibrary effectLibrary;
     MotionEffectsPanel effectsPanel;
     MotionModulationPanel modulationPanel;
+    MotionRoutingPanel routingPanel;
+    // The graph's side column scrolls: oscillator settings, then routing.
+    juce::Viewport graphSideViewport;
+    juce::Component graphSide;
+    void layoutGraphSide();
+    MotionModulatorLibrary modulatorLibrary;
     osci::TabBar libraryTabs;
     osci::TabBar inspectorTabs;
     osci::TabBar timelineTabs;
