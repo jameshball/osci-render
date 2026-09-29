@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify authored beam settings and inspect the benchmark with upsampling enabled.
+"""Verify authored beam settings and scope timing, and inspect the benchmark with upsampling enabled.
 
 Requires the UI-authored Phase / Space benchmark. Override its location with
 MOTION_BENCHMARK_PROJECT. Only a copy in the automation artifact directory changes.
@@ -55,11 +55,20 @@ def intensity():
     return next(node for node in nodes(snapshot()) if node.get("name") == "Line Intensity" and node.get("class") == "juce::Slider")
 
 
+def scope_field(label):
+    return next(node for node in nodes(snapshot()) if node.get("class") == "MotionScrubField" and "Scope " + label in (node.get("name"), node.get("componentName")))
+
+
 def saved():
     data = project.read_bytes()
     assert struct.unpack_from("<I", data)[0] == 0x21324356
     length = struct.unpack_from("<I", data, 4)[0]
     return ET.fromstring(data[8:8 + length])
+
+
+def saved_scope():
+    composition = saved().find("composition")
+    return [float(composition.get(name)) for name in ("scopeDwell", "scopeTravel", "scopeSettle")]
 
 
 def open_project():
@@ -72,33 +81,42 @@ def open_settings():
 
 
 def close_settings():
-    step("close beam settings", "press", "Escape", "--name", "Beam settings", "--class", "SettingsWindow", "--exact")
+    step("close beam settings", "press", "Escape", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
 
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     open_project()
     open_settings()
-    step("save baseline", "press", "Command+s", "--name", "Beam settings", "--class", "SettingsWindow", "--exact")
+    step("save baseline", "press", "Command+s", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
     if saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") != "1":
         step("enable upsampling", "click", "--name", "Upsample Audio", "--exact")
     step("set beam intensity", "set-value", intensity()["ref"], "6")
-    step("save beam settings", "press", "Command+s", "--name", "Beam settings", "--class", "SettingsWindow", "--exact")
+    step("open scope presets", "click", "--name", "Scope presets", "--exact")
+    step("choose laser timing", "click", "--name", "Laser (slow galvo)", "--role", "menuItem", "--exact")
+    command("wait-for-locator", "--name", "Undo Apply Laser (slow galvo) scope timing", "--role", "label", "--exact")
+    step("set scope dwell", "set-value", scope_field("dwell")["ref"], "80")
+    step("save beam settings", "press", "Command+s", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
     state = saved()
     assert state.find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") == "1"
     assert float(state.find("beam/effects/parameter[@id='intensity']/parameter").get("value")) == 6
     assert state.find("recording/recordingSettings") is not None
+    assert saved_scope() == [80, 400, 150], saved_scope()
     step("change intensity without saving", "set-value", intensity()["ref"], "2")
     step("disable upsampling without saving", "click", "--name", "Upsample Audio", "--exact")
+    step("change settle without saving", "set-value", scope_field("settle")["ref"], "0")
     close_settings()
     open_project()
     open_settings()
     assert abs(float(intensity()["value"]) - 6) < .001
-    step("reopened beam settings", "screenshot", "--name", "Beam settings", "--class", "SettingsWindow", "--exact", "--file", session.artifact_dir / "beam-settings.png")
+    assert abs(float(scope_field("dwell")["value"]) - 80) < .001
+    assert abs(float(scope_field("settle")["value"]) - 150) < .001
+    step("reopened beam settings", "screenshot", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact", "--file", session.artifact_dir / "beam-settings.png")
     # Resave restored runtime state, so this checks restoration rather than merely
     # inspecting the bytes written before changing the controls.
-    step("resave restored beam", "press", "Command+s", "--name", "Beam settings", "--class", "SettingsWindow", "--exact")
+    step("resave restored beam", "press", "Command+s", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
     assert saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") == "1"
+    assert saved_scope() == [80, 400, 150], saved_scope()
     close_settings()
     for moment in [64, 96, 128, 179]:
         field = next(node for node in nodes(snapshot()) if node.get("componentName") == "Timeline position")
@@ -110,6 +128,6 @@ try:
         # Clear persistence from the previous shot before comparing static output.
         command("wait", "--ms", "4000")
         step("upsampled frame " + str(moment), "screenshot", "--file", session.artifact_dir / f"upsampled-{moment:03}.png")
-    print("Beam settings restored after unsaved changes; upsampled output captured for visual review")
+    print("Beam settings and scope timing restored after unsaved changes; upsampled output captured for visual review")
 finally:
     session.stop_app()

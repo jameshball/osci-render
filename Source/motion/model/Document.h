@@ -11,6 +11,7 @@
 #include "BakeSettings.h"
 #include "RasterSettings.h"
 #include "TextSettings.h"
+#include "ScopeProfile.h"
 #include "../render/PreparedAudio.h"
 #include <atomic>
 #include "../../audio/synth/PreparedDrawing.h"
@@ -80,6 +81,8 @@ struct CompositionDefinition : Composition {
 };
 
 struct Project : Composition {
+    // The output display belongs to the whole project, not to one composition.
+    ScopeProfile scope;
     std::vector<std::shared_ptr<const Asset>> assets;
     std::vector<std::shared_ptr<const CompositionDefinition>> definitions;
 };

@@ -499,6 +499,7 @@ struct Document::Change : juce::UndoableAction {
 Project Document::mergeScope(Project view) const {
     if (scopeId == 0) { return view; }
     auto whole = state;
+    whole.scope = view.scope;
     whole.assets = std::move(view.assets);
     whole.definitions = std::move(view.definitions);
     const auto found = std::find_if(whole.definitions.begin(), whole.definitions.end(), [this](const auto& value) { return value->id == scopeId; });
@@ -1986,6 +1987,9 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
 
 juce::XmlElement Document::save() const {
     auto xml = saveCompositionContent(state);
+    xml.setAttribute("scopeDwell", exactBakeNumber(state.scope.dwellMicros));
+    xml.setAttribute("scopeTravel", exactBakeNumber(state.scope.travelMicrosPerUnit));
+    xml.setAttribute("scopeSettle", exactBakeNumber(state.scope.settleMicros));
     for (const auto& asset : state.assets) {
         auto* item = xml.createNewChildElement("asset");
         item->setAttribute("id", juce::String(asset->id));
@@ -2375,6 +2379,11 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     if (importCancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
     if (!xml.hasTagName("composition")) { return juce::Result::fail("Missing composition."); }
     Project project;
+    const ScopeProfile defaults;
+    project.scope.dwellMicros = xml.getDoubleAttribute("scopeDwell", defaults.dwellMicros);
+    project.scope.travelMicrosPerUnit = xml.getDoubleAttribute("scopeTravel", defaults.travelMicrosPerUnit);
+    project.scope.settleMicros = xml.getDoubleAttribute("scopeSettle", defaults.settleMicros);
+    if (!project.scope.valid()) { return juce::Result::fail("Invalid scope timing profile."); }
     std::set<Id> identities, compositionIds;
     for (auto* item : xml.getChildWithTagNameIterator("definition")) {
         const auto identity = item->getStringAttribute("id").getLargeIntValue();

@@ -67,6 +67,19 @@ public:
     static int litNear(const std::vector<osci::Point>& points, float x, float radius) {
         return static_cast<int>(std::count_if(points.begin(), points.end(), [&](const auto& p) { return !dark(p) && std::abs(p.x - x) < radius; }));
     }
+    // The renderer's jump length: doubles from the float endpoints.
+    static double jump(const osci::Point& a, const osci::Point& b) {
+        const auto dx = static_cast<double>(a.x) - b.x, dy = static_cast<double>(a.y) - b.y;
+        return std::sqrt(dx * dx + dy * dy);
+    }
+    // Total dark travel of the current plan, including the return jump.
+    static double travelled(const motion::BeamRenderer& beam) {
+        double total = 0;
+        for (const auto& segment : beam.plannedSegments()) {
+            if (segment.kind == motion::BeamRenderer::Kind::move) { total += jump(segment.from, segment.to); }
+        }
+        return total;
+    }
 
     void runTest() override {
         beginTest("Cycle rates are whole multiples of the frame rate at or above 45 Hz");
@@ -173,25 +186,29 @@ public:
         }
 
         beginTest("Random access, sequential playback and signal export are sample-identical");
-        {
+        for (const auto& profile : {motion::ScopeProfile{}, motion::scopeProfilePresets[1].profile, motion::ScopeProfile{37.5, 55.25, 20}}) {
             const auto shape = square(1, .1f);
-            auto layers = project({{shape, -.4}, {strokes(2, 12), .2, .3}, {shape, .5, -.4, .7}});
+            auto layers = project({{shape, -.4}, {strokes(2, 12), .2, .3}, {shape, .5, -.4, .7}, {strokes(3, 5), -.6, -.5}, {shape, .1, .6}});
             layers.frameRate = 24;
+            layers.scope = profile;
             layers.tracks[0].clips[0].properties["position.x"].setKey({0, -.4, motion::Interpolation::linear});
             layers.tracks[0].clips[0].properties["position.x"].setKey({2, .4, motion::Interpolation::linear});
             const double rate = 44100;
             const motion::PreparedComposition composition(layers, rate);
+            const auto label = "profile " + juce::String(profile.dwellMicros) + "/" + juce::String(profile.travelMicrosPerUnit) + "/" + juce::String(profile.settleMicros);
             expectEquals(composition.beamRate, 48.0);
             motion::BeamRenderer sequential;
             std::vector<osci::Point> reference;
             for (std::int64_t index = 0; index < 20000; ++index) { reference.push_back(sequential.sample(composition, index / rate, index, rate, true, 1)); }
             std::mt19937 random(7);
             motion::BeamRenderer jumping;
+            int differences = 0;
             for (int trial = 0; trial < 400; ++trial) {
                 const auto index = static_cast<std::int64_t>(random() % reference.size());
                 const auto point = jumping.sample(composition, index / rate, index, rate, true, 1);
-                expect(point.x == reference[index].x && point.y == reference[index].y && point.r == reference[index].r, "index " + juce::String(index));
+                if (point.x != reference[index].x || point.y != reference[index].y || point.r != reference[index].r) { ++differences; }
             }
+            expectEquals(differences, 0, label);
             juce::TemporaryFile exported(".wav");
             const std::atomic<bool> cancel{false};
             const auto result = motion::SignalExporter::write(composition, exported.getFile(), rate, cancel);
@@ -207,8 +224,101 @@ public:
                     const auto& p = reference[static_cast<std::size_t>(i)];
                     if (samples.getSample(0, i) != p.x || samples.getSample(1, i) != p.y || samples.getSample(2, i) != p.r) { ++mismatches; }
                 }
-                expectEquals(mismatches, 0);
+                expectEquals(mismatches, 0, label);
             }
+        }
+
+        beginTest("Scope profiles set dwell, settle and travel samples");
+        {
+            const auto shape = square(1, .02f);
+            const auto nan = std::numeric_limits<double>::quiet_NaN();
+            for (const auto& profile : {motion::ScopeProfile{}, motion::scopeProfilePresets[1].profile, motion::scopeProfilePresets[2].profile, motion::ScopeProfile{0, 0, 0}, motion::ScopeProfile{nan, 30, 0}}) {
+                // Invalid profiles fall back to the analog scope defaults.
+                const auto effective = profile.valid() ? profile : motion::ScopeProfile{};
+                const auto label = "profile " + juce::String(profile.dwellMicros) + "/" + juce::String(profile.travelMicrosPerUnit) + "/" + juce::String(profile.settleMicros);
+                for (const double rate : {48000.0, 192000.0}) {
+                    auto layers = project({{shape, -.5}, {shape, .5}});
+                    layers.scope = profile;
+                    const motion::PreparedComposition composition(layers, rate);
+                    motion::BeamRenderer beam;
+                    cycle(composition, rate, 3, beam);
+                    const auto dwell = std::max<std::int64_t>(1, std::llround(effective.dwellMicros / 1.0e6 * rate));
+                    const auto settle = static_cast<std::int64_t>(std::llround(effective.settleMicros / 1.0e6 * rate));
+                    const auto travel = [&](const motion::BeamRenderer::Segment& move) {
+                        return std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(jump(move.from, move.to) * (effective.travelMicrosPerUnit / 1.0e6) * rate)));
+                    };
+                    const auto segments = beam.plannedSegments();
+                    using Kind = motion::BeamRenderer::Kind;
+                    expect(segments.size() >= 8, label);
+                    if (segments.size() < 8) { continue; }
+                    // Arrive and settle, draw, dwell, jump, arrive and settle, draw, dwell, return.
+                    const std::array<Kind, 8> kinds {Kind::hold, Kind::draw, Kind::hold, Kind::move, Kind::hold, Kind::draw, Kind::hold, Kind::move};
+                    for (std::size_t i = 0; i < kinds.size(); ++i) { expect(segments[i].kind == kinds[i], label + " segment " + juce::String(static_cast<int>(i))); }
+                    expectEquals(segments[0].count, dwell + settle, label + " arrival");
+                    expectEquals(segments[2].count, dwell, label + " departure");
+                    expectEquals(segments[4].count, dwell + settle, label + " arrival after the jump");
+                    expectEquals(segments[6].count, dwell, label + " final departure");
+                    expectWithinAbsoluteError(jump(segments[3].from, segments[3].to), 1.0, 1e-6, label);
+                    expectEquals(segments[3].count, travel(segments[3]), label + " jump");
+                    expectEquals(segments[7].count, travel(segments[7]), label + " return");
+                }
+            }
+            // Slow displays need more time per jump, so dense scenes span more cycles.
+            std::vector<Layer> dense;
+            for (int i = 0; i < 20; ++i) { dense.push_back({strokes(static_cast<motion::Id>(i + 1), 60), (i % 5) * .4 - .8, (i / 5) * .4 - .6}); }
+            auto slow = project(dense), fast = project(dense);
+            slow.scope = motion::scopeProfilePresets[1].profile;
+            fast.scope = motion::scopeProfilePresets[2].profile;
+            motion::BeamRenderer slowBeam, fastBeam;
+            cycle(motion::PreparedComposition(slow, 192000), 192000, 0, slowBeam);
+            cycle(motion::PreparedComposition(fast, 192000), 192000, 0, fastBeam);
+            expect(slowBeam.plannedInterleave() > fastBeam.plannedInterleave(), "laser " + juce::String(slowBeam.plannedInterleave()) + " vs fast " + juce::String(fastBeam.plannedInterleave()));
+        }
+
+        beginTest("Tour improvement never lengthens the greedy tour and shortens a greedy trap");
+        {
+            // Nearest-neighbour takes the close pair first and must cross back.
+            const auto shape = square(1, .02f);
+            const motion::PreparedComposition trap(project({{shape, 0, 0}, {shape, .3, 0}, {shape, .35, .3}, {shape, -.3, .05}, {shape, .65, 0}}), 48000);
+            motion::BeamRenderer greedy, improved;
+            greedy.setOrderImprovement(false);
+            cycle(trap, 48000, 2, greedy);
+            cycle(trap, 48000, 2, improved);
+            logMessage("Greedy trap travel: greedy " + juce::String(travelled(greedy), 4) + ", improved " + juce::String(travelled(improved), 4));
+            expectWithinAbsoluteError(travelled(greedy), 2.2839, 1e-3);
+            expectWithinAbsoluteError(travelled(improved), 2.0748, 1e-3);
+            std::mt19937 random(11);
+            const auto uniform = [&random] { return static_cast<double>(random() % 20001) / 10000.0 - 1.0; };
+            double greedyTotal = 0, improvedTotal = 0;
+            int shorter = 0, longer = 0, scenes = 0;
+            for (int scene = 0; scene < 40; ++scene) {
+                const auto count = 3 + static_cast<int>(random() % 30);
+                std::vector<Layer> layers;
+                for (int i = 0; i < count; ++i) {
+                    // Open strokes, so direction matters as well as order.
+                    const auto x = uniform() * .8;
+                    const auto y = uniform() * .8;
+                    const auto dx = static_cast<float>(uniform() * .25);
+                    const auto dy = static_cast<float>(uniform() * .25);
+                    layers.push_back({polygon(static_cast<motion::Id>(i + 1), {{0, 0}, {dx, dy}}, false), x, y});
+                }
+                const motion::PreparedComposition composition(project(layers), 48000);
+                motion::BeamRenderer before, after;
+                before.setOrderImprovement(false);
+                cycle(composition, 48000, 1, before);
+                cycle(composition, 48000, 1, after);
+                if (before.plannedLayers() != after.plannedLayers()) { continue; }
+                ++scenes;
+                greedyTotal += travelled(before);
+                improvedTotal += travelled(after);
+                if (travelled(after) > travelled(before) + 1e-6) { ++longer; }
+                if (travelled(after) < travelled(before) - 1e-6) { ++shorter; }
+            }
+            logMessage("Random stroke scenes: greedy travel " + juce::String(greedyTotal, 2) + ", improved " + juce::String(improvedTotal, 2)
+                + " (" + juce::String(100.0 * (1.0 - improvedTotal / greedyTotal), 1) + "% shorter); shorter in " + juce::String(shorter) + " of " + juce::String(scenes));
+            expectEquals(scenes, 40, "every scene keeps all of its layers");
+            expectEquals(longer, 0);
+            expect(shorter >= 30);
         }
 
         beginTest("Twenty dense text-like layers all stay visible every cycle");
@@ -353,6 +463,44 @@ public:
             const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             expect(std::isfinite(checksum));
             logMessage("20 animated layers, 1 s at 192 kHz: " + juce::String(seconds * 1000, 1) + " ms (" + juce::String(seconds * 100, 2) + "% of realtime)");
+        }
+
+        beginTest("Planning cost at the layer limit stays a small share of a cycle");
+        {
+            std::mt19937 random(5);
+            const auto uniform = [&random] { return static_cast<double>(random() % 20001) / 10000.0 - 1.0; };
+            for (const std::size_t count : {std::size_t{20}, motion::BeamRenderer::maximumLayers}) {
+                std::vector<Layer> layers;
+                for (std::size_t i = 0; i < count; ++i) {
+                    const auto x = uniform() * .9;
+                    const auto y = uniform() * .9;
+                    const auto dx = static_cast<float>(uniform() * .05);
+                    const auto dy = static_cast<float>(uniform() * .05);
+                    layers.push_back({polygon(static_cast<motion::Id>(i + 1), {{0, 0}, {dx, dy}}, false), x, y});
+                }
+                const double rate = 192000;
+                const motion::PreparedComposition composition(project(layers), rate);
+                const auto period = 1.0 / composition.beamRate;
+                const int plans = count > 100 ? 20 : 200;
+                std::array<double, 2> perPlan {};
+                for (const bool improving : {false, true}) {
+                    motion::BeamRenderer beam;
+                    beam.setOrderImprovement(improving);
+                    double checksum = 0;
+                    const auto start = std::chrono::steady_clock::now();
+                    for (int plan = 0; plan < plans; ++plan) {
+                        // A reset forces a full plan: span search, measurement, ordering and budgets.
+                        beam.reset();
+                        const auto first = motion::BeamRenderer::cycleStart(plan, rate, composition.beamRate);
+                        checksum += beam.sample(composition, first / rate, first, rate, true, 1).x;
+                    }
+                    perPlan[improving ? 1 : 0] = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() / plans;
+                    expect(std::isfinite(checksum));
+                }
+                logMessage(juce::String(static_cast<int>(count)) + " layers, one plan: greedy " + juce::String(perPlan[0] * 1.0e6, 1) + " us, improved "
+                    + juce::String(perPlan[1] * 1.0e6, 1) + " us (" + juce::String(100.0 * perPlan[1] / period, 2) + "% of a " + juce::String(period * 1000, 2) + " ms cycle)");
+                expect(perPlan[1] < period * .25, "planning must leave the audio thread most of each cycle");
+            }
         }
     }
 };

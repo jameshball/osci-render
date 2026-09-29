@@ -232,7 +232,7 @@ inline double beamCycleRate(double frameRate) {
 }
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         PreparedDrivers drivers([this, cancel, purpose]() -> std::shared_ptr<const SoundtrackEnvelope> {
             return purpose == CompositionPurpose::signal ? loudnessEnvelope(cancel) : nullptr;
@@ -444,6 +444,7 @@ struct PreparedComposition {
     double bpm = 120;
     double sampleRate = 48000;
     double beamRate = 60;
+    ScopeProfile scope;
     bool hasMidi = false;
     std::uint64_t publicationRevision = 0;
     juce::String preparationError;
