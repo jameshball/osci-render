@@ -105,15 +105,15 @@ struct Clip {
         auto next = *this;
         const auto before = timing(tempo);
         if (timeBase == ClipTimeBase::beats) {
-            // Unchanged fields keep their exact canonical values; under a tempo
-            // map, a moved clip's beat length and average tempo can change.
+            // Unchanged fields keep their exact canonical values. A pure move
+            // keeps its length and content speed in beats, like its bars.
             const bool moved = value.start != before.start;
             if (moved) { next.start = tempo.beats(value.start); }
-            if (value.duration() != before.duration() || (moved && !tempo.constant())) {
+            if (value.duration() != before.duration()) {
                 next.duration = tempo.constant() ? value.duration() * (tempo.initialBpm() / 60) : tempo.beats(value.end()) - next.start;
             }
             if (value.offset != before.offset) { next.offset = value.offset * (contentBpm / 60); }
-            if (value.rate != before.rate || (!tempo.constant() && (moved || value.duration() != before.duration()))) {
+            if (value.rate != before.rate || (!tempo.constant() && value.duration() != before.duration())) {
                 next.rate = value.rate * (contentBpm / tempo.averageBpm(next.start, next.end()));
             }
         } else {
@@ -173,6 +173,7 @@ struct Clip {
     // snapshots, never these growing containers.
     bool trim(double newStart, double newEnd, const Tempo& tempo) {
         if (!tempo.valid()) { return false; }
+        const auto original = timing(tempo);
         if (timeBase == ClipTimeBase::beats) { newStart = tempo.beats(newStart); newEnd = tempo.beats(newEnd); }
         if (!std::isfinite(newStart) || !std::isfinite(newEnd) || newStart < 0.0 || newEnd <= newStart) {
             return false;
@@ -184,7 +185,17 @@ struct Clip {
         offset = newOffset;
         start = newStart;
         duration = newEnd - newStart;
+        keepContent(original, tempo);
         return true;
+    }
+    // Under a tempo map a musical clip plays its content at its own average
+    // tempo, which a trim or split changes. Re-derive offset and rate so the
+    // remaining content shows exactly what it showed before, at every time.
+    void keepContent(const ClipTiming& original, const Tempo& tempo) {
+        if (timeBase != ClipTimeBase::beats || tempo.constant()) { return; }
+        const auto first = tempo.seconds(start);
+        offset = original.localTime(first) * (contentBpm / 60);
+        rate = original.rate * (contentBpm / tempo.averageBpm(start, end()));
     }
 
     bool stretch(double newDuration, const Tempo& tempo) {
@@ -211,6 +222,7 @@ struct Clip {
             || projectTime <= start || projectTime >= end()) {
             return std::nullopt;
         }
+        const auto original = timing(tempo);
         auto left = *this;
         auto right = *this;
         left.duration = spanUntil(start, projectTime);
@@ -219,6 +231,8 @@ struct Clip {
         right.start = projectTime;
         right.duration = spanUntil(projectTime, end());
         if (!(left.duration > 0) || !(right.duration > 0)) { return std::nullopt; }
+        left.keepContent(original, tempo);
+        right.keepContent(original, tempo);
         return std::make_pair(std::move(left), std::move(right));
     }
 };

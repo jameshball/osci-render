@@ -140,6 +140,10 @@ public:
     juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
     juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result renameAsset(Id assetId, juce::String name);
+    // Swaps a source's media in place (same identity, so every clip keeps its
+    // timing, keys and effects). The kind must match: visual for visual,
+    // audio for audio.
+    juce::Result replaceAsset(Id assetId, std::shared_ptr<const Asset> replacement);
     // Removes the listed sources (or every unused source when empty) that no
     // clip, composition or MIDI assignment references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);

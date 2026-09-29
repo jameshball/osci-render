@@ -110,6 +110,57 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
     return juce::Result::ok();
 }
 
+// Per-character animation: each glyph is posed per frame about its own centre,
+// and every frame shares the resting layout's normalisation, so the finished
+// text matches the static source exactly.
+juce::Result prepareAnimatedText(Asset& asset, const juce::GlyphArrangement& glyphs, float em, const std::atomic<bool>* cancel, std::atomic<double>* progress) {
+    std::vector<juce::Path> paths;
+    for (int index = 0; index < glyphs.getNumGlyphs(); ++index) {
+        juce::Path glyph;
+        glyphs.getGlyph(index).createPath(glyph);
+        if (!glyph.isEmpty()) { paths.push_back(std::move(glyph)); }
+    }
+    if (paths.empty()) { return juce::Result::fail("The source contains no drawable geometry."); }
+    juce::Path rest;
+    for (const auto& glyph : paths) { rest.addPath(glyph); }
+    ImportShapes restShapes;
+    SvgParser::pathToShapes(rest, restShapes, false);
+    float minX = std::numeric_limits<float>::max(), minY = minX, maxX = std::numeric_limits<float>::lowest(), maxY = maxX;
+    for (const auto& shape : restShapes) {
+        for (const auto t : {0.0f, 1.0f}) {
+            const auto point = shape->nextVector(t);
+            minX = std::min(minX, point.x); maxX = std::max(maxX, point.x);
+            minY = std::min(minY, point.y); maxY = std::max(maxY, point.y);
+        }
+    }
+    const auto centreX = (minX + maxX) / 2, centreY = (minY + maxY) / 2;
+    const auto scale = 1.8f / std::max(maxX - minX, maxY - minY);
+    constexpr double frameRate = 30;
+    const auto& settings = asset.textSettings;
+    const auto frames = static_cast<int>(std::clamp(std::ceil(settings.animationLength(static_cast<int>(paths.size())) * frameRate), 1.0, static_cast<double>(Document::maximumSourceFrames)));
+    return prepareSourceFrames(asset, frames, frameRate, [&](int frame, ImportShapes& shapes) {
+        juce::Path posed;
+        const auto time = frame / frameRate;
+        for (std::size_t index = 0; index < paths.size(); ++index) {
+            const auto pose = settings.pose(static_cast<int>(index), time);
+            if (!pose.visible || pose.scale <= 0) { continue; }
+            const auto bounds = paths[index].getBounds();
+            // Glyph space is y-down; a positive pose offset moves up the screen.
+            const auto transform = juce::AffineTransform::translation(-bounds.getCentreX(), -bounds.getCentreY())
+                .scaled(static_cast<float>(pose.scale))
+                .rotated(static_cast<float>(-pose.rotation * std::numbers::pi / 180))
+                .translated(bounds.getCentreX() + static_cast<float>(pose.x) * em, bounds.getCentreY() - static_cast<float>(pose.y) * em);
+            posed.addPath(paths[index], transform);
+        }
+        SvgParser::pathToShapes(posed, shapes, false);
+        for (auto& shape : shapes) {
+            shape->translate(-centreX, -centreY, 0);
+            shape->scale(scale, scale, 1);
+        }
+        return importCancelled(cancel) ? juce::Result::fail("Source preparation cancelled.") : juce::Result::ok();
+    }, cancel, progress);
+}
+
 bool finiteNumber(const juce::var& value) {
     return (value.isInt() || value.isInt64() || value.isDouble()) && std::isfinite(static_cast<double>(value));
 }
@@ -626,6 +677,49 @@ void Document::reset(Project project) {
     apply(std::move(project));
 }
 
+// In musical time, project-time items keep their beat when the tempo map
+// changes: markers, cuts, effect ranges and project-level keys (with slopes
+// scaled by the local tempo ratio), and the composition's length in bars.
+static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
+    const auto remap = [&](double time) { return after.seconds(before.beats(time)); };
+    const auto stretch = [&](double time) { return before.bpmAt(time) / after.bpmAt(remap(time)); };
+    const auto scaleCurve = [&](Curve& curve) {
+        auto keys = curve.keyframes();
+        for (const auto& key : keys) { curve.removeKey(key.time); }
+        for (auto key : keys) {
+            const auto ratio = stretch(key.time);
+            key.time = remap(key.time);
+            key.incomingSlope /= ratio;
+            key.outgoingSlope /= ratio;
+            curve.setKey(key);
+        }
+    };
+    const auto scaleEffects = [&](std::vector<EffectInstance>& effects) {
+        for (auto& effect : effects) {
+            for (auto& [name, curve] : effect.properties) { scaleCurve(curve); }
+            if (effect.range.has_value()) {
+                const auto end = remap(effect.range->end());
+                effect.range->start = remap(effect.range->start);
+                effect.range->duration = end - effect.range->start;
+            }
+        }
+    };
+    next.duration = remap(next.duration);
+    for (auto& marker : next.markers) { marker.time = std::min(remap(marker.time), next.duration); }
+    for (auto& cut : next.cameraCuts) {
+        const auto end = remap(cut.end());
+        cut.start = remap(cut.start);
+        cut.duration = spanUntil(cut.start, end);
+    }
+    for (auto& camera : next.cameras) { for (auto& [name, curve] : camera.properties) { scaleCurve(curve); } }
+    for (auto& group : next.groups) {
+        for (auto& [name, curve] : group.properties) { scaleCurve(curve); }
+        scaleEffects(group.effects);
+    }
+    for (auto& track : next.tracks) { scaleEffects(track.effects); }
+    scaleEffects(next.effects);
+}
+
 juce::Result Document::setTempoChange(double beat, double bpm, std::optional<double> replacing) {
     const auto& current = project();
     std::vector<TempoChange> changes;
@@ -652,8 +746,10 @@ juce::Result Document::removeTempoChange(double beat) {
 // Musical clips follow the new map; overlapping results are refused.
 juce::Result Document::retempo(std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label) {
     auto next = project();
+    const auto before = next.tempo();
     next.tempoChanges = std::move(changes);
     const auto tempo = next.tempo();
+    if (next.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, tempo); }
     for (auto& track : next.tracks) {
         std::sort(track.clips.begin(), track.clips.end(), [&tempo](const auto& a, const auto& b) { return a.timing(tempo).start < b.timing(tempo).start; });
         double previousEnd = 0;
@@ -680,47 +776,7 @@ juce::Result Document::changeTempo(double bpm) {
     // position, like beat-anchored clips. Seconds projects keep seconds.
     const auto before = state.tempo();
     const auto after = next.tempo();
-    if (state.timeDisplay == TimeDisplay::beats) {
-        // Project times keep their beat; slopes follow the local tempo ratio.
-        const auto remap = [&](double time) { return after.seconds(before.beats(time)); };
-        const auto stretch = [&](double time) { return before.bpmAt(time) / after.bpmAt(remap(time)); };
-        const auto scaleCurve = [&](Curve& curve) {
-            auto keys = curve.keyframes();
-            for (const auto& key : keys) { curve.removeKey(key.time); }
-            for (auto key : keys) {
-                const auto ratio = stretch(key.time);
-                key.time = remap(key.time);
-                key.incomingSlope /= ratio;
-                key.outgoingSlope /= ratio;
-                curve.setKey(key);
-            }
-        };
-        const auto scaleEffects = [&](std::vector<EffectInstance>& effects) {
-            for (auto& effect : effects) {
-                for (auto& [name, curve] : effect.properties) { scaleCurve(curve); }
-                if (effect.range.has_value()) {
-                    const auto end = remap(effect.range->end());
-                    effect.range->start = remap(effect.range->start);
-                    effect.range->duration = end - effect.range->start;
-                }
-            }
-        };
-        // The composition keeps its length in bars as well.
-        next.duration = remap(next.duration);
-        for (auto& marker : next.markers) { marker.time = std::min(remap(marker.time), next.duration); }
-        for (auto& cut : next.cameraCuts) {
-            const auto end = remap(cut.end());
-            cut.start = remap(cut.start);
-            cut.duration = spanUntil(cut.start, end);
-        }
-        for (auto& camera : next.cameras) { for (auto& [name, curve] : camera.properties) { scaleCurve(curve); } }
-        for (auto& group : next.groups) {
-            for (auto& [name, curve] : group.properties) { scaleCurve(curve); }
-            scaleEffects(group.effects);
-        }
-        for (auto& track : next.tracks) { scaleEffects(track.effects); }
-        scaleEffects(next.effects);
-    }
+    if (state.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, after); }
     for (auto& track : next.tracks) {
         std::sort(track.clips.begin(), track.clips.end(), [&after](const auto& a, const auto& b) { return a.timing(after).start < b.timing(after).start; });
         double previousEnd = 0;
@@ -790,6 +846,24 @@ std::size_t Document::assetUses(Id assetId) const {
     midi(whole);
     for (const auto& definition : whole.definitions) { if (definition != nullptr) { midi(*definition); } }
     return count;
+}
+
+juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> replacement) {
+    const auto& assets = project().assets;
+    const auto found = std::find_if(assets.begin(), assets.end(), [assetId](const auto& asset) { return asset != nullptr && asset->id == assetId; });
+    if (found == assets.end()) { return juce::Result::fail("The source no longer exists."); }
+    if (replacement == nullptr || replacement->id != assetId) { return juce::Result::fail("Invalid replacement source."); }
+    const auto audio = [](const Asset& asset) { return asset.audio != nullptr; };
+    const auto midiOnly = [](const Asset& asset) { return asset.midi != nullptr && asset.drawing == nullptr && asset.source == nullptr; };
+    if (audio(**found) != audio(*replacement) || midiOnly(**found) || midiOnly(*replacement)) {
+        return juce::Result::fail(audio(**found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
+    }
+    edit("Replace source", [assetId, replacement](Project& project) {
+        for (auto& asset : project.assets) {
+            if (asset != nullptr && asset->id == assetId) { asset = replacement; }
+        }
+    });
+    return juce::Result::ok();
 }
 
 juce::Result Document::renameAsset(Id assetId, juce::String name) {
@@ -1255,7 +1329,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     // The new instance trims this source to the selected interval.
     definition->name = name;
     definition->duration = state.duration;
-    definition->bpm = state.bpm; definition->frameRate = state.frameRate;
+    definition->bpm = state.bpm; definition->tempoChanges = state.tempoChanges; definition->frameRate = state.frameRate;
     definition->timeDisplay = state.timeDisplay; definition->beatsPerBar = state.beatsPerBar;
     definition->snapBeats = state.snapBeats; definition->gridSnap = state.gridSnap;
     double first = std::numeric_limits<double>::infinity(), last = 0;
@@ -1277,6 +1351,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         // scoped independently inside the definition after this operation.
         copy.muted = !trackIsAudible(state, track);
         copy.solo = false;
+        copy.midiInput = 0; // live input reaches main-timeline tracks only
         auto group = track.group;
         while (group != 0) {
             requiredGroups.insert(group);
@@ -2030,6 +2105,7 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
             glyphs.addGlyphArrangement(row);
             baseline += font.getHeight() * static_cast<float>(asset.textSettings.lineSpacing);
         }
+        if (asset.textSettings.animated()) { return prepareAnimatedText(asset, glyphs, font.getHeight(), cancel, progress); }
         juce::Path path;
         glyphs.createPath(path);
         SvgParser::pathToShapes(path, shapes, true);
@@ -2244,6 +2320,13 @@ juce::XmlElement Document::save() const {
                 text->setAttribute("alignment", asset->textSettings.alignment);
                 text->setAttribute("lineSpacing", exactBakeNumber(asset->textSettings.lineSpacing));
                 text->setAttribute("tracking", exactBakeNumber(asset->textSettings.tracking));
+                if (asset->textSettings.animated()) {
+                    text->setAttribute("animation", static_cast<int>(asset->textSettings.animation));
+                    text->setAttribute("characterDelay", exactBakeNumber(asset->textSettings.characterDelay));
+                    text->setAttribute("characterDuration", exactBakeNumber(asset->textSettings.characterDuration));
+                    text->setAttribute("hold", exactBakeNumber(asset->textSettings.hold));
+                    text->setAttribute("amount", exactBakeNumber(asset->textSettings.amount));
+                }
             }
             // Keep mixed-content payloads last. JUCE's single-line binary XML
             // writer can attempt a null newline when wrapping attributes on an
@@ -2290,6 +2373,7 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
     for (auto* item : xml.getChildWithTagNameIterator("tempo")) {
         tempoChanges.push_back({item->getDoubleAttribute("beat", -1), item->getDoubleAttribute("bpm", -1)});
     }
+    if (tempoChanges.size() > 10000) { return juce::Result::fail("A composition supports at most 10000 tempo changes."); }
     if (!tempoChanges.empty()) { project.tempoChanges = std::make_shared<const std::vector<TempoChange>>(std::move(tempoChanges)); }
     if (!project.tempo().valid()) { return juce::Result::fail("Tempo changes need increasing beats after the start and 1-1000 BPM."); }
     const auto projectEffects = loadEffects(xml, project.effects, identities);
@@ -2658,6 +2742,12 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
                 asset->textSettings.alignment = text->getIntAttribute("alignment", -1);
                 asset->textSettings.lineSpacing = text->getDoubleAttribute("lineSpacing", -1);
                 asset->textSettings.tracking = text->getDoubleAttribute("tracking", -1);
+                const TextSettings defaults;
+                asset->textSettings.animation = static_cast<TextSettings::Animation>(text->getIntAttribute("animation", 0));
+                asset->textSettings.characterDelay = text->getDoubleAttribute("characterDelay", defaults.characterDelay);
+                asset->textSettings.characterDuration = text->getDoubleAttribute("characterDuration", defaults.characterDuration);
+                asset->textSettings.hold = text->getDoubleAttribute("hold", defaults.hold);
+                asset->textSettings.amount = text->getDoubleAttribute("amount", defaults.amount);
             }
         }
         const bool luaSource = asset->extension.equalsIgnoreCase(".lua");

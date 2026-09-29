@@ -43,7 +43,11 @@ public:
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
-        arm.setVisible(!group && track.kind == motion::TrackKind::visual);
+        const auto armable = !group && track.kind == motion::TrackKind::visual && armingAvailable;
+        if (arm.isVisible() != armable) {
+            arm.setVisible(armable);
+            resized();
+        }
         grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor);
         grip.setTooltip(group ? "Group actions" : "Drag to reorder; click for track actions");
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
@@ -97,6 +101,8 @@ public:
     const motion::Id id;
     std::function<void(motion::Id, std::string)> onRename;
     std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock, onArm;
+    // Live input reaches main-timeline tracks only.
+    bool armingAvailable = true;
     std::function<std::uint64_t()> onDragRevision;
 private:
     bool isGroup = false;

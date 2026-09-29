@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Modulation.h"
+#include "Tempo.h"
+#include <optional>
 #include <algorithm>
 #include <set>
 #include <string>
@@ -79,6 +81,7 @@ struct PreparedModulator {
     ModulatorKind kind = ModulatorKind::oscillator;
     Modulation shape;
     double bpm = 120;
+    std::optional<Tempo> tempo; // set when the composition has tempo changes
     std::shared_ptr<const SoundtrackEnvelope> soundtrack; // project time
     std::vector<Note> notes; // composition seconds, sorted by start
     std::vector<std::pair<double, double>> steps; // controller: (seconds, value), sorted
@@ -118,7 +121,7 @@ struct PreparedModulator {
         if (!std::isfinite(time)) { return 0; }
         if (kind == ModulatorKind::oscillator) {
             if (shape.waveform == ModulationWaveform::soundtrack) { return soundtrack != nullptr ? soundtrack->at(projectTime) : 0.0; }
-            return shape.value(time, bpm);
+            return shape.tempoSync && tempo.has_value() ? shape.valueAtBeats(tempo->beats(time)) : shape.value(time, bpm);
         }
         if (kind == ModulatorKind::controller) {
             const auto after = std::upper_bound(steps.begin(), steps.end(), time, [](double value, const auto& step) { return value < step.first; });

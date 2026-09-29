@@ -46,11 +46,14 @@ private:
         juce::String preparationError;
         std::optional<motion::TextSettings> textSettings;
         std::optional<int> fractalDepth;
+        motion::Id relink = 0; // source replaced in place by this file
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();
     void showBlenderSettings(motion::Id id = 0);
     void chooseSourceFile();
+    bool importSourceFile(const juce::File& file, motion::Id relink);
+    void replaceSourceFile(motion::Id asset);
     std::deque<SourceRequest> preparationRequests;
     bool preparationSettingsOpen = false;
     struct ProjectLoad {

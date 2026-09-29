@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Modulators.h"
+#include "Tempo.h"
 #include <memory>
 #include <algorithm>
 #include <cmath>
@@ -66,6 +67,9 @@ struct CurveDrivers {
     double start = 0, offset = 0, rate = 1;
     double projectStart = 0, projectOffset = 0, projectRate = 1;
     std::vector<Route> routes;
+    // Composition tempo map for tempo-synced oscillators on composition-time
+    // curves (groups, cameras, track and composition effects).
+    std::optional<Tempo> tempo;
     std::shared_ptr<const Curve> linkSource;
     double linkStart = 0, linkOffset = 0, linkRate = 1, linkBpm = 120; // composition -> source local
     PropertyLink link;
@@ -90,7 +94,8 @@ public:
         const auto baseValue = std::isfinite(authored) ? authored : (std::isfinite(base) ? base : 0.0);
         auto value = baseValue;
         if (modulation.enabled && modulation.valid()) {
-            const auto movement = modulation.amount * modulation.value(time, bpm);
+            const bool mapped = modulation.tempoSync && drivers != nullptr && drivers->tempo.has_value();
+            const auto movement = modulation.amount * (mapped ? modulation.valueAtBeats(drivers->tempo->beats(drivers->compositionTime(time))) : modulation.value(time, bpm));
             value = modulation.mode == ModulationMode::add ? value + movement : value * (1 + movement);
         }
         if (drivers != nullptr && !drivers->routes.empty()) {

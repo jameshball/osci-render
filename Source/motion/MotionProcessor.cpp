@@ -229,9 +229,9 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     motion::LiveMidiInputCursor events(midi);
     for (int i = 0; i < count; ++i) {
         if (events.dispatch(audition != nullptr ? &liveMidi : nullptr, i, liveMidiSample, &liveInputs)) { transitionGuard.begin(); }
-        liveInputs.clockOffset = static_cast<std::int64_t>(liveMidiSample) - static_cast<std::int64_t>(oscillatorSample);
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
+        liveInputs.clockOffset = static_cast<std::int64_t>(liveMidiSample) - static_cast<std::int64_t>(oscillatorSample);
         auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running, liveFrames)
             : drawing ? beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames, liveInputs.count > 0 ? &liveInputs : nullptr) : osci::Point(0, 0, 0, 0, 0, 0);
         point = transitionGuard.apply(point);

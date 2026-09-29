@@ -71,7 +71,14 @@ struct Modulation {
             return soundtrack != nullptr ? soundtrack->at(time) : 0.0;
         }
         const auto frequency = tempoSync ? bpm / (60 * beatsPerCycle) : rateHz;
-        const auto cycles = time * frequency + phase;
+        return atCycles(time * frequency + phase);
+    }
+    // Tempo-synced value at a musical position, for clocks that follow a map.
+    double valueAtBeats(double beats) const {
+        if (!enabled || !valid() || !tempoSync || waveform == ModulationWaveform::soundtrack) { return 0; }
+        return atCycles(beats / beatsPerCycle + phase);
+    }
+    double atCycles(double cycles) const {
         if (!std::isfinite(cycles)) {
             return 0;
         }

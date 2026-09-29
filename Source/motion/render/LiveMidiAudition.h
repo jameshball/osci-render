@@ -20,7 +20,7 @@ inline bool applyLiveMidi(LiveMidiPerformance& performance, const unsigned char*
             if (data[1] == 64) { return performance.sustain(channel, data[2] >= 64, sample); }
             if (data[1] == 120) { return performance.allSoundOff(channel); }
             if (data[1] == 123) { return performance.allNotesOff(channel, sample); }
-            if (data[1] == 121) { return performance.sustain(channel, false, sample); }
+            if (data[1] == 121) { return performance.resetControllers(channel, sample); }
             return false;
         default: return false;
     }

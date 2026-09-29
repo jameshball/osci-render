@@ -455,6 +455,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             return false;
         });
     };
+    assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
         const auto& definitions = processor.document.mainProject().definitions;
         const auto found = std::find_if(definitions.begin(), definitions.end(), [id](const auto& value) { return value->id == id; });
@@ -755,6 +756,18 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int, int) {
 }
 
 bool MotionEditor::openSourceFile(const juce::File& file) {
+    return importSourceFile(file, 0);
+}
+
+void MotionEditor::replaceSourceFile(motion::Id asset) {
+    chooser = std::make_unique<juce::FileChooser>("Replace source", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.lsystem;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner, asset](const juce::FileChooser& chosen) {
+        if (owner != nullptr && chosen.getResult().existsAsFile()) { owner->importSourceFile(chosen.getResult(), asset); }
+    });
+}
+
+bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink) {
     const auto extension = file.getFileExtension().toLowerCase();
     if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua" && extension != ".lsystem" && !motion::Document::isRasterSource(extension)
         && !motion::Document::isMidiSource(extension) && extension != ".gpla" && extension != ".json" && extension != ".lottie"
@@ -765,6 +778,11 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
         return false;
     }
     SourceRequest request {file, processor.position.load(), processor.document.generation(), {}};
+    request.relink = relink;
+    if (relink != 0 && motion::Document::isMidiSource(extension)) {
+        statusBar.show("MIDI files are assigned to clips, not swapped in as their media.");
+        return false;
+    }
     if (extension == ".lua" || extension == ".lsystem" || motion::Document::isRasterSource(extension)) {
         preparationRequests.push_back(std::move(request));
         showNextPreparationSettings();
@@ -1012,7 +1030,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 560 : 440, editLua ? 550 : fractal ? 170 : video ? 444 : 400), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 620 : 440, editLua ? 550 : text ? 470 : fractal ? 170 : video ? 444 : 400), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -1151,6 +1169,15 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 });
                 owner->assetLibrary.refresh();
                 owner->assetLibrary.selectAsset(asset->id);
+                return;
+            }
+            if (request.relink != 0) {
+                asset->id = request.relink;
+                const auto replaced = document.replaceAsset(request.relink, asset);
+                if (replaced.failed()) { owner->statusBar.show(replaced.getErrorMessage()); return; }
+                owner->assetLibrary.refresh();
+                owner->assetLibrary.selectAsset(asset->id);
+                owner->statusBar.show("Replaced the source; its clips kept their timing, keys and effects.", MotionStatusBar::Kind::notice);
                 return;
             }
             asset->id = document.newId();
@@ -1505,15 +1532,13 @@ void MotionEditor::recordArmedTrack() {
             if (clip.composition != 0 || timing.end() <= time) { continue; }
             if (target == nullptr || timing.start < target->timing(tempo).start) { target = &clip; }
         }
-        if (target == nullptr) {
-            statusBar.show("The armed track has no clip at or after the playhead to record into.");
-            return;
-        }
+        if (target == nullptr) { continue; }
         const auto started = session.start(target->id);
         if (started.failed()) { statusBar.show(started.getErrorMessage()); } else { statusBar.show("Recording into " + juce::String(target->name) + ". Shift+R stops.", MotionStatusBar::Kind::notice); }
         return;
     }
-    statusBar.show("Arm a track for MIDI input first (the red dot in its header).");
+    const auto armed = std::any_of(project.tracks.begin(), project.tracks.end(), [](const auto& track) { return track.midiInput != 0; });
+    statusBar.show(armed ? "No armed track has a clip at or after the playhead to record into." : "Arm a track for MIDI input first (the red dot in its header).");
 }
 
 void MotionEditor::splitAtPlayhead() {

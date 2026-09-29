@@ -65,7 +65,30 @@ public:
             combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
             combo->onChange = [this] { settingsChanged(); };
         }
-        const std::array<juce::String, 5> captions {"Font", "Style", "Alignment", "Line spacing", "Tracking"};
+        animation.setName("Text animation");
+        animation.setTitle("Text animation");
+        animation.addItemList({"No animation", "Type on", "Rise", "Pop", "Wave", "Scatter"}, 1);
+        animation.setSelectedId(static_cast<int>(settings.animation) + 1, juce::dontSendNotification);
+        animation.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
+        animation.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+        animation.onChange = [this] { settingsChanged(); };
+        const std::array<std::tuple<juce::Slider*, const char*, double, double, double, double, const char*>, 4> timing {{
+            {&stagger, "Text animation stagger", 0, 5, 0.01, settings.characterDelay, " s"},
+            {&duration, "Text animation duration", 0.01, 10, 0.01, settings.characterDuration, " s"},
+            {&hold, "Text animation hold", 0, 30, 0.1, settings.hold, " s"},
+            {&amount, "Text animation amount", -10, 10, 0.05, settings.amount, ""}}};
+        for (const auto& [slider, name, low, high, step, value, suffix] : timing) {
+            slider->setName(name);
+            slider->setTitle(name);
+            slider->setRange(low, high, step);
+            slider->setValue(value, juce::dontSendNotification);
+            slider->setSliderStyle(juce::Slider::IncDecButtons);
+            slider->setTextBoxStyle(juce::Slider::TextBoxLeft, false, 56, 26);
+            slider->setTextValueSuffix(suffix);
+            slider->onValueChange = [this] { settingsChanged(); };
+            addAndMakeVisible(slider);
+        }
+        const std::array<juce::String, 10> captions {"Font", "Style", "Alignment", "Line spacing", "Tracking", "Animation", "Stagger", "Per character", "Hold", "Amount"};
         for (std::size_t i = 0; i < labels.size(); ++i) {
             labels[i].setText(captions[i], juce::dontSendNotification);
             labels[i].setFont(juce::FontOptions(13));
@@ -74,7 +97,7 @@ public:
         }
         apply.setButtonText("Apply text");
         apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(text.getText(), settings); } };
-        for (auto* component : std::initializer_list<juce::Component*>{&text, &help, &error, &status, &apply, &family, &style, &alignment, &lineSpacing, &tracking}) { addAndMakeVisible(component); }
+        for (auto* component : std::initializer_list<juce::Component*>{&text, &help, &error, &status, &apply, &family, &style, &alignment, &lineSpacing, &tracking, &animation}) { addAndMakeVisible(component); }
         refresh();
     }
     std::function<void(juce::String, motion::TextSettings)> onApply;
@@ -100,6 +123,16 @@ public:
             labels[i + 2].setBounds(cell.removeFromTop(20));
             controls[i]->setBounds(cell.reduced(0, 3));
         }
+        // Per-character animation, baked at 30 fps into the source's frames.
+        auto animationRow = area.removeFromTop(52);
+        const auto fifth = animationRow.getWidth() / 5;
+        const std::array<juce::Component*, 5> animated {&animation, &stagger, &duration, &hold, &amount};
+        for (std::size_t i = 0; i < animated.size(); ++i) {
+            auto cell = animationRow.removeFromLeft(fifth).reduced(2, 0);
+            labels[i + 5].setBounds(cell.removeFromTop(20));
+            animated[i]->setBounds(cell.reduced(0, 3));
+            animated[i]->setEnabled(i == 0 || settings.animated());
+        }
         text.setBounds(area.reduced(0, 6));
     }
 private:
@@ -115,6 +148,12 @@ private:
         settings.alignment = alignment.getSelectedId() - 1;
         settings.lineSpacing = std::round(lineSpacing.getValue() * 20.0) / 20.0;
         settings.tracking = std::round(tracking.getValue() * 100.0) / 100.0;
+        settings.animation = static_cast<motion::TextSettings::Animation>(animation.getSelectedId() - 1);
+        settings.characterDelay = stagger.getValue();
+        settings.characterDuration = duration.getValue();
+        settings.hold = hold.getValue();
+        settings.amount = amount.getValue();
+        resized();
         text.applyFontToAllText(settings.font(16));
         updateTextLayout();
         refresh();
@@ -130,9 +169,9 @@ private:
     motion::TextSettings settings;
     juce::StringArray families;
     juce::String missingFamily;
-    juce::ComboBox family, style, alignment;
-    juce::Slider lineSpacing, tracking;
-    std::array<juce::Label, 5> labels;
+    juce::ComboBox family, style, alignment, animation;
+    juce::Slider lineSpacing, tracking, stagger, duration, hold, amount;
+    std::array<juce::Label, 10> labels;
     juce::TextEditor text;
     juce::Label help, error, status;
     juce::TextButton apply;

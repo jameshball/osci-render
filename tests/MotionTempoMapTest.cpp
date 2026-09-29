@@ -105,6 +105,56 @@ public:
             expect(document.project().tempoChanges == nullptr);
             expect(document.setTempoChange(10, 200).wasOk(), "a change after the clip's start that does not overlap is fine");
         }
+        beginTest("Splits, trims and moves across tempo changes keep content continuous");
+        {
+            const auto tempo = halfTimeAtBar3();
+            motion::Clip clip;
+            clip.id = 1; clip.timeBase = motion::ClipTimeBase::beats; clip.contentBpm = 120;
+            clip.start = 4; clip.duration = 8; // 2 s .. 8 s, across the change at beat 8
+            const auto whole = clip.timing(tempo);
+            const auto parts = clip.split(4.0, 2, tempo); // at beat 8
+            expect(parts.has_value());
+            for (const auto time : {2.5, 3.9, 4.0, 5.0, 7.5}) {
+                const auto& half = time < 4.0 ? parts->first : parts->second;
+                expectWithinAbsoluteError(half.timing(tempo).localTime(time), whole.localTime(time), 1.0e-9);
+            }
+            auto trimmed = clip;
+            expect(trimmed.trim(3.0, 8.0, tempo));
+            expectWithinAbsoluteError(trimmed.timing(tempo).localTime(6.0), whole.localTime(6.0), 1.0e-9);
+            // A pure move keeps the clip's length in beats (its bars).
+            motion::Clip short_;
+            short_.id = 3; short_.timeBase = motion::ClipTimeBase::beats; short_.contentBpm = 120; short_.start = 0; short_.duration = 4;
+            auto timing = short_.timing(tempo);
+            timing.moveTo(tempo.seconds(12));
+            expect(short_.setTiming(timing, tempo));
+            expectWithinAbsoluteError(short_.duration, 4.0, 1.0e-9);
+            expectWithinAbsoluteError(short_.start, 12.0, 1.0e-9);
+        }
+        beginTest("Tempo changes keep markers on their beats; compositions keep the map; synced LFOs follow it");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project project;
+            project.duration = 20;
+            project.timeDisplay = motion::TimeDisplay::beats;
+            project.markers.push_back({document.newId(), 6, "Bar four"}); // beat 12 at 120
+            motion::Group group;
+            group.id = document.newId();
+            group.properties["position.x"].modulation = {true, motion::ModulationWaveform::saw, 1, 1, 0, true, 4};
+            project.groups.push_back(group);
+            document.reset(project);
+            expect(document.setTempoChange(8, 60).wasOk());
+            const auto tempo = document.project().tempo();
+            expectWithinAbsoluteError(tempo.beats(document.project().markers[0].time), 12.0, 1.0e-9);
+            motion::PreparedComposition prepared(document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry);
+            juce::ignoreUnused(prepared);
+            // A group LFO of 4 beats: at beat 10 (6 s under the map) it is halfway: saw = 0.
+            motion::PreparedGroup preparedGroup(document.project().groups[0]);
+            motion::PreparedDrivers drivers(nullptr);
+            drivers.drive(preparedGroup.curves[0], document.project(), motion::ClipTiming(0, 20), group.id, "position.x");
+            expectWithinAbsoluteError(preparedGroup.curves[0].evaluate(tempo.seconds(10)), 0.0, 1.0e-9);
+            expectWithinAbsoluteError(preparedGroup.curves[0].evaluate(tempo.seconds(11)), 0.5, 1.0e-9);
+        }
         beginTest("Changing the initial tempo keeps project-time items on their beats");
         {
             juce::UndoManager undo;

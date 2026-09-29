@@ -69,7 +69,10 @@ public:
         config.firstSample = static_cast<std::uint64_t>(*first); config.endSample = static_cast<std::uint64_t>(*last);
         config.sampleRate = rate; config.sourceRate = timing.rate;
         config.sourceOffset = timing.localTime(static_cast<double>(*first) / rate);
-        config.sourceBpm = selected->curveBpm(project.tempo());
+        // A seconds clip is anchored to beats at its average tempo when the
+        // take lands; convert the take at that same tempo.
+        const auto tempo = project.tempo();
+        config.sourceBpm = selected->timeBase == ClipTimeBase::beats ? selected->contentBpm : tempo.averageBpm(tempo.beats(timing.start), tempo.beats(timing.end()));
         config.channel = channel;
         const auto position = transport.position();
         const auto start = sampleIndex(position >= timing.start && position < timing.end() ? position : timing.start, rate);

@@ -210,8 +210,8 @@ private:
     // Lengths and endpoints from probes; appends the layer.
     void measure(const PreparedComposition& composition, Layer layer, double voices) {
         auto& items = *layers;
+        const auto* source = layer.source;
         {
-            const auto* source = layer.source;
             // Vector drawings know their exact length; probes only measure how
             // the clip's transforms, effects and camera scale it on screen. The
             // ratio of projected to source distance is uniform under affine

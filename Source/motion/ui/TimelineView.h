@@ -239,6 +239,7 @@ public:
                 found = headers.end() - 1;
             }
             const auto lanes = group ? false : !animatedProperties(track).empty();
+            (*found)->armingAvailable = processor.document.editingComposition() == 0;
             (*found)->update(track, group, collapsedGroups.contains(track.id), lanes, expandedTracks.contains(track.id));
         };
         for (const auto& track : project.tracks) { updateHeader(track, false); }
@@ -378,7 +379,7 @@ public:
         const auto majorStride = musical ? step * beatsPerSecond : step;
         if (grid.snapping && minorStep * pixelsPerSecond >= 9 && minorStep < step) {
             const auto first = firstOf(minorStride);
-            const auto count = std::clamp(static_cast<int>(std::ceil(visibleSeconds / minorStep * (musical ? 4 : 1))) + 2, 0, 2000);
+            const auto count = musical ? 4000 : std::clamp(static_cast<int>(std::ceil(visibleSeconds / minorStep)) + 2, 0, 1000);
             g.setColour(juce::Colours::white.withAlpha(0.035f));
             for (int tick = 0; tick < count; ++tick) {
                 const auto x = timeX(tickAt(first, minorStride, tick));
@@ -387,7 +388,7 @@ public:
             }
         }
         const auto firstTick = firstOf(majorStride);
-        const auto tickCount = std::clamp(static_cast<int>(std::ceil(visibleSeconds / step * (musical ? 4 : 1))) + 2, 0, 2000);
+        const auto tickCount = musical ? 4000 : std::clamp(static_cast<int>(std::ceil(visibleSeconds / step)) + 2, 0, 1000);
         for (int tick = 0; tick < tickCount; ++tick) {
             const auto time = tickAt(firstTick, majorStride, tick);
             if (timeX(time) > getWidth()) { break; }
@@ -1711,7 +1712,7 @@ private:
             destinations.addItem(100 + static_cast<int>(groups.size()) - 1, juce::String(group.name), true, found->group == group.id);
         }
         menu.addSubMenu("Move to group", destinations);
-        if (found->kind == motion::TrackKind::visual) {
+        if (found->kind == motion::TrackKind::visual && processor.document.editingComposition() == 0) {
             juce::PopupMenu input;
             input.addItem(200, "Off", true, found->midiInput == 0);
             input.addItem(200 + motion::Track::anyMidiChannel, "Any channel", true, found->midiInput == motion::Track::anyMidiChannel);

@@ -51,7 +51,7 @@ public:
     std::function<void(motion::Id)> onSelectUses;
     std::function<void(const juce::String&)> onMessage;
 
-    std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition;
+    std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
     std::function<juce::String(motion::Id)> liveStatus;
@@ -226,6 +226,7 @@ private:
         menu.addSectionHeader(assets[static_cast<std::size_t>(row)]->name);
         menu.addItem(1, "Insert at playhead");
         menu.addItem(2, "Rename...");
+        menu.addItem(6, "Replace with file...");
         menu.addItem(3, uses == 0 ? "Not used by any clip" : "Select " + juce::String(static_cast<int>(uses)) + (uses == 1 ? " clip using it" : " clips using it"), uses != 0);
         menu.addSeparator();
         menu.addItem(4, uses == 0 ? "Remove source" : "Remove source (in use)", uses == 0);
@@ -235,6 +236,7 @@ private:
             if (owner == nullptr || result == 0 || owner->document.generation() != generation) { return; }
             if (result == 1 && owner->onInsert) { owner->onInsert(id); }
             if (result == 2) { owner->beginRename(id); }
+            if (result == 6 && owner->onReplace) { owner->onReplace(id); }
             if (result == 3 && owner->onSelectUses) { owner->onSelectUses(id); }
             if (result == 4 || result == 5) {
                 int removed = 0;

@@ -68,7 +68,10 @@ private:
                 drivers->linkBpm = source->curveBpm(scope.bpm);
             }
         }
-        if (drivers->routes.empty() && drivers->linkSource == nullptr) { return; }
+        // Composition-time curves keep tempo-synced oscillators on the map.
+        const bool compositionTime = target->start == 0 && target->offset == 0 && target->rate == 1 && target->contentBpm == 0;
+        if (scope.tempoChanges != nullptr && compositionTime && curve.modulation.enabled && curve.modulation.tempoSync) { drivers->tempo = scope.tempo(); }
+        if (drivers->routes.empty() && drivers->linkSource == nullptr && !drivers->tempo.has_value()) { return; }
         curve.drivers = std::move(drivers);
     }
 
@@ -112,6 +115,7 @@ private:
         prepared->shape.amount = 1;
         prepared->shape.mode = ModulationMode::add;
         prepared->bpm = scope.bpm;
+        if (scope.tempoChanges != nullptr) { prepared->tempo = scope.tempo(); }
         if (modulator->kind == ModulatorKind::oscillator && modulator->shape.waveform == ModulationWaveform::soundtrack && loudness) {
             prepared->soundtrack = loudness();
         }
