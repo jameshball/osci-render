@@ -62,6 +62,29 @@ public:
             expect(f.undo.undo());
             expectEquals(static_cast<int>(f.document.project().tracks[0].clips.size()), 2);
         }
+        beginTest("Several clips retime together in one undo step, checked after all move");
+        {
+            Fixture f; f.initialise();
+            const motion::Tempo tempo(120);
+            auto a = f.clip(f.first)->timing(tempo);
+            auto b = f.clip(f.second)->timing(tempo);
+            a.moveTo(3);
+            b.moveTo(7);
+            // Moving the first clip alone would overlap the second one.
+            expect(f.document.setClipTiming(f.first, a).failed());
+            expect(f.document.setClipTimings({{f.first, a}, {f.second, b}}).wasOk());
+            expectEquals(f.clip(f.first)->start, 3.0);
+            expectEquals(f.clip(f.second)->start, 7.0);
+            expect(f.undo.getUndoDescription() == "Change clip timing");
+            expect(f.undo.undo());
+            expectEquals(f.clip(f.first)->start, 0.0);
+            expectEquals(f.clip(f.second)->start, 4.0);
+            b.moveTo(4);
+            const auto description = f.undo.getUndoDescription();
+            expect(f.document.setClipTimings({{f.first, a}, {f.second, b}}).failed(), "Overlapping results are rejected");
+            expectEquals(f.clip(f.first)->start, 0.0);
+            expect(f.undo.getUndoDescription() == description, "A rejected batch adds no undo step");
+        }
         beginTest("Pasting onto occupied time creates one overflow track below the original");
         {
             Fixture f; f.initialise();

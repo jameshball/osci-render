@@ -29,6 +29,7 @@ private:
         data->setProperty("preparing", isPreparing && isPreparing());
         if (device == nullptr) {
             setButtonText("No audio");
+            removeColour(juce::TextButton::textColourOffId);
             description = "No active standalone audio device. Open Audio settings to choose an output.";
         } else {
             const auto load = standalone->deviceManager.getCpuUsage();
@@ -37,8 +38,10 @@ private:
             const auto block = device->getCurrentBufferSizeSamples();
             const auto percent = juce::String(load * 100, 1);
             setButtonText("DSP " + juce::String(juce::roundToInt(load * 100)) + "%");
-            const auto heavy = load > 0.8 || xruns > 0;
-            setColour(juce::TextButton::textColourOffId, heavy ? juce::Colour(0xffff8a5c) : findColour(juce::Label::textColourId));
+            // Orange while the callback is heavy or has just dropped out.
+            const auto heavy = load > 0.8 || xruns > lastXruns;
+            lastXruns = xruns;
+            if (heavy) { setColour(juce::TextButton::textColourOffId, juce::Colour(0xffff8a5c)); } else { removeColour(juce::TextButton::textColourOffId); }
             description = "Audio callback load: " + percent + "%\nDevice: " + device->getName()
                 + "\nSample rate: " + juce::String(rate, 0) + " Hz\nBuffer: " + juce::String(block) + " samples"
                 + "\nReported underruns/overruns: " + juce::String(xruns)
@@ -55,5 +58,6 @@ private:
         diagnostics.setText(juce::JSON::toString(juce::var(data.release()), true), juce::dontSendNotification);
     }
     juce::Label diagnostics;
+    int lastXruns = 0;
     juce::String description = "Waiting for audio-device measurements.";
 };

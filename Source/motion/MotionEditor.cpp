@@ -385,6 +385,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     cameraPanel.onPropertySelected = [this](motion::Id id, std::string property) {
         selectCurveTarget(id, property, true);
     };
+    cameraPanel.onModulate = [this](motion::Id id, std::string property) {
+        selectCurveTarget(id, property, true);
+        timelineTabs.setSelectedIndex(1);
+    };
     curveEditor.onPropertyChosen = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve); };
     curveEditor.onPreview = [this](const motion::PropertyMap* curves) {
         auto preview = processor.document.project();
@@ -612,7 +616,7 @@ void MotionEditor::resized() {
     // Menus keep their natural width; the transport follows them.
     int menuWidth = 0;
     const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
-    for (int index = 0; index < names.size(); ++index) { menuWidth += getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
+    for (int index = 0; index < names.size(); ++index) { menuWidth += menuBar.getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
     auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 470), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 235));
     menuBar.setBounds(top.withRight(transport.getX()));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
@@ -1414,7 +1418,7 @@ void MotionEditor::registerCommands() {
     addCommand(2, "Trim clip end to playhead", juce::KeyPress(']', juce::ModifierKeys::altModifier, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
     addCommand(2, "Show keyframe lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
     addCommand(2, "Edit notes", juce::KeyPress(), {}, [this] { timelineTabs.setSelectedIndex(2); });
-    addCommand(2, "Edit curves", juce::KeyPress(), {}, [this] { timelineTabs.setSelectedIndex(1); });
+    addCommand(2, "Show graph", juce::KeyPress(juce::KeyPress::F3Key, juce::ModifierKeys::shiftModifier, 0), "Shift+F3", [this] { timelineTabs.setSelectedIndex(1); });
     addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { processor.playing.store(!processor.playing.load()); });
     addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { processor.seek(0); timeline.revealTime(0); });
     addCommand(3, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] {
@@ -1520,29 +1524,44 @@ void MotionEditor::recordArmedTrack() {
 }
 
 void MotionEditor::placeClipAtPlayhead(bool start, bool trim) {
+    // Like After Effects, [ ] and Alt+[ ] act on every selected clip at once.
     const auto& project = processor.document.project();
     const auto tempo = project.tempo();
+    const auto time = processor.position.load();
+    auto ids = timeline.selectedClipIds();
+    if (ids.empty() && selection != 0) { ids.insert(selection); }
+    std::vector<std::pair<motion::Id, motion::ClipTiming>> timings;
+    int skipped = 0;
     for (const auto& track : project.tracks) {
         for (const auto& clip : track.clips) {
-            if (clip.id != selection) { continue; }
+            if (!ids.contains(clip.id)) { continue; }
             auto timing = clip.timing(tempo);
-            const auto time = processor.position.load();
             if (trim) {
                 if (start) {
-                    if (time >= timing.end()) { return; }
+                    if (time >= timing.end()) { ++skipped; continue; }
                     timing.offset = timing.localTime(time);
                     timing.setStart(time);
                 } else {
-                    if (time <= timing.start) { return; }
+                    if (time <= timing.start) { ++skipped; continue; }
                     timing.setEnd(time);
                 }
             } else {
-                timing.moveTo(start ? time : time - timing.duration());
+                const auto target = start ? time : time - timing.duration();
+                if (target < 0) { ++skipped; continue; }
+                timing.moveTo(target);
             }
-            const auto result = processor.document.setClipTiming(clip.id, timing);
-            if (result.failed()) { statusBar.show(result.getErrorMessage()); }
-            return;
+            timings.emplace_back(clip.id, timing);
         }
+    }
+    if (timings.empty()) {
+        if (skipped > 0) { statusBar.show(trim ? "The playhead is outside the selected clips." : "The selected clips cannot start before 0."); }
+        return;
+    }
+    const auto result = processor.document.setClipTimings(timings);
+    if (result.failed()) {
+        statusBar.show(result.getErrorMessage());
+    } else if (skipped > 0) {
+        statusBar.show(juce::String(skipped) + (skipped == 1 ? " clip was" : " clips were") + " left unchanged.", MotionStatusBar::Kind::notice);
     }
 }
 

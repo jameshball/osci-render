@@ -96,8 +96,7 @@ public:
             for (auto& field : row->fields) {
                 const auto property = std::string(field->spec.id);
                 const auto* curve = found->curve(property);
-                const auto routed = std::any_of(processor.document.project().routes.begin(), processor.document.project().routes.end(), [&](const auto& route) { return route.target == target && route.property == property; });
-                modulated = modulated || routed || (curve != nullptr && (curve->modulation.enabled || curve->link.has_value()));
+                modulated = modulated || isModulated(property);
                 if (curve == nullptr) { continue; }
                 field->editor.setValue(curve->evaluateBase(time));
                 anyAnimated = anyAnimated || curve->animated();
@@ -178,6 +177,14 @@ private:
         motion::Id target;
     };
 
+    // Driven by its own oscillator, a link or a shared modulator route.
+    bool isModulated(const std::string& property) const {
+        const auto& project = processor.document.project();
+        const auto routed = std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == target && route.property == property; });
+        const auto found = motion::findPropertyTarget(project, target);
+        const auto* curve = found.has_value() ? found->curve(property) : nullptr;
+        return routed || (curve != nullptr && (curve->modulation.enabled || curve->link.has_value()));
+    }
     void build(std::span<const motion::PropertySpec> specs) {
         rows.clear();
         content.removeAllChildren();
@@ -201,7 +208,14 @@ private:
                 row->addAndMakeVisible(row->modulate);
                 auto* raw = row.get();
                 row->modulate.onClick = [this, raw] {
-                    if (!raw->fields.empty() && onModulate) { onModulate(target, std::string(raw->fields.front()->spec.id)); }
+                    if (raw->fields.empty() || !onModulate) { return; }
+                    // Open the first axis that is actually driven.
+                    auto property = std::string(raw->fields.front()->spec.id);
+                    for (const auto& field : raw->fields) {
+                        const auto id = std::string(field->spec.id);
+                        if (isModulated(id)) { property = id; break; }
+                    }
+                    onModulate(target, property);
                 };
                 row->key.onClick = [this, raw] { toggleKeys(*raw); };
                 if (motionModes && (row->group == "Position" || row->group == "Rotation")) {

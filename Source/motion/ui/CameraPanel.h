@@ -76,11 +76,12 @@ public:
         inspector.setShowsHeader(false);
         inspector.setNamePrefix("camera ");
         inspector.onPropertySelected = [this](motion::Id id, const std::string& property) { if (onPropertySelected) { onPropertySelected(id, property); } };
+        inspector.onModulate = [this](motion::Id id, const std::string& property) { if (onModulate) { onModulate(id, property); } };
         addAndMakeVisible(inspector);
         refresh();
     }
 
-    std::function<void(motion::Id, std::string)> onPropertySelected;
+    std::function<void(motion::Id, std::string)> onPropertySelected, onModulate;
     motion::Id selectedCameraId() const { return selected; }
     void restoreSelection(motion::Id id) { selected = id; refresh(); }
 

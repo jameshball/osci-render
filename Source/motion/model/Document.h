@@ -119,6 +119,8 @@ public:
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
     juce::Result setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings);
     juce::Result setClipTiming(Id clipId, ClipTiming resolvedSeconds);
+    // Several clips in one undo step; placement is checked after every change applies.
+    juce::Result setClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings);
     juce::Result duplicateClip(Id sourceId, Id& duplicateId);
     juce::Result makeSourceUnique(Id clipId, const std::shared_ptr<const Asset>& expected, const std::shared_ptr<Asset>& copy);
     std::size_t compositionReferenceCount(Id definition) const;

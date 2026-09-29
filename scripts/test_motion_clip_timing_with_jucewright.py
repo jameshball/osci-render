@@ -117,7 +117,7 @@ try:
     _, clips = saved()
     assert float(clips['3'].get('offset')) == 1.25
     step("select second clip", "click", "--class", "MotionTimelineView", "--position", "920,46")
-    # The Clip tab must remain open while changing the selected timeline clip.
+    # The Timing tab must remain open while changing the selected timeline clip.
     command("wait-for-locator", "--name", "Clip timing inspector", "--exact")
     edit("Clip duration", 180)
     result, clips = saved()

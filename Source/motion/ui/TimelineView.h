@@ -154,6 +154,7 @@ public:
         if (!selectedKeys.empty()) { deleteSelectedKeys(); return; }
         if (!selectedClips.empty()) { deleteSelectedClips(false); }
     }
+    const std::set<motion::Id>& selectedClipIds() const { return selectedClips; }
     void selectClips(const std::vector<motion::Id>& ids) {
         selectedKeys.clear();
         selectedClips = {ids.begin(), ids.end()};
@@ -715,7 +716,7 @@ public:
 
     void mouseDrag(const juce::MouseEvent& event) override {
         if (resizingNames) {
-            namesWidth = std::clamp(event.x, 140, std::min(420, getWidth() / 2));
+            namesWidth = std::clamp(event.x, 140, std::max(140, std::min(420, getWidth() / 2)));
             refreshTracks();
             repaint();
             return;

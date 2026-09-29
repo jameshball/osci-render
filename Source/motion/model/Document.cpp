@@ -1623,6 +1623,45 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     return juce::Result::ok();
 }
 
+juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming>>& timings) {
+    if (timings.size() == 1) { return setClipTiming(timings.front().first, timings.front().second); }
+    const auto& state = project();
+    const auto tempo = state.tempo();
+    auto tracks = state.tracks;
+    bool changed = false;
+    for (const auto& [clipId, timing] : timings) {
+        if (!timing.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
+        bool found = false;
+        for (auto& track : tracks) {
+            for (auto& clip : track.clips) {
+                if (clip.id != clipId) { continue; }
+                if (track.locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
+                auto next = clip;
+                if (!next.setTiming(timing, tempo)) { return juce::Result::fail("The requested timing is invalid."); }
+                changed = changed || next.start != clip.start || next.duration != clip.duration || next.offset != clip.offset || next.rate != clip.rate;
+                clip = std::move(next);
+                found = true;
+            }
+        }
+        if (!found) { return juce::Result::fail("A selected clip no longer exists."); }
+    }
+    for (const auto& track : tracks) {
+        for (const auto& clip : track.clips) {
+            if (!track.canPlace(clip, clip.id, tempo)) { return juce::Result::fail("The requested timing overlaps another clip on the same track."); }
+        }
+    }
+    if (!changed) { return juce::Result::ok(); }
+    edit("Change clip timing", [tracks = std::move(tracks)](Project& project) mutable {
+        const auto tempo = project.tempo();
+        for (auto& track : tracks) {
+            for (const auto& clip : track.clips) { project.duration = std::max(project.duration, clip.timing(tempo).end()); }
+            std::sort(track.clips.begin(), track.clips.end(), [&tempo](const auto& a, const auto& b) { return a.timing(tempo).start < b.timing(tempo).start; });
+        }
+        project.tracks = std::move(tracks);
+    });
+    return juce::Result::ok();
+}
+
 juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
     const auto& state = project();
     if (!resolvedSeconds.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
