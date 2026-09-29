@@ -323,17 +323,6 @@ def mouths():
     save()
 
 
-def sphere():
-    import_source("Sphere.obj", bar(8), duration=bar(30) - bar(8))
-    rename_track("Globe")
-    # A large, dim backdrop rather than a competing subject.
-    # Beam time is shared between layers, so it only appears in the groove.
-    set_properties({"position.z": -2.2, "scale.x": 1.5, "scale.y": 1.5, "scale.z": 1.5, "rotation.x": 18,
-                    "red": 0.15, "green": 0.4, "blue": 0.9, "weight": 0.12})
-    modulate("Rotation Y", "Saw", 180, beats=32)
-    save()
-
-
 def type_hits():
     # "do" on the downbeat, "da" on beat two, "dahh!" on beat four.
     groove = {"red": 0.35, "green": 1, "blue": 0.6, "scale.x": 0.15, "scale.y": 0.15, "scale.z": 0.15, "weight": 1.4}
@@ -367,11 +356,9 @@ def ornaments():
     import_source("Lissajous.lua", bar(12), duration=bar(30) - bar(12), bake=6.4)
     rename_track("Figure left")
     set_properties({"position.x": -0.8, "position.y": -0.52, "scale.x": 0.26, "scale.y": 0.26, "scale.z": 0.26, "weight": 0.8})
-    duplicate_to(bar(96), duration=bar(112) - bar(96))
     import_source("Lissajous.lua", bar(12), duration=bar(30) - bar(12), bake=6.4, offset=3.2)
     rename_track("Figure right")
     set_properties({"position.x": 0.8, "position.y": -0.52, "scale.x": 0.26, "scale.y": 0.26, "scale.z": 0.26, "weight": 0.8})
-    duplicate_to(bar(96), duration=bar(112) - bar(96))
     import_source("Equaliser.gif", bar(16), duration=bar(30) - bar(16))
     rename_track("Meter")
     set_properties({"position.y": 0.82, "scale.x": 0.13, "scale.y": 0.13, "scale.z": 0.13, "red": 0.35, "green": 1, "blue": 0.6, "weight": 0.7})
@@ -476,7 +463,7 @@ def finale_colour():
     save()
 
 
-PHASES = [("setup", setup), ("intro", intro), ("mouths", mouths), ("sphere", sphere), ("type", type_hits),
+PHASES = [("setup", setup), ("intro", intro), ("mouths", mouths), ("type", type_hits),
           ("ornaments", ornaments), ("drop", drop), ("breakdown", breakdown), ("endings", endings),
           ("cameras", cameras), ("colour", finale_colour)]
 try:

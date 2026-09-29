@@ -66,6 +66,9 @@ public:
             if (curve != nullptr && selectedTime.has_value() && findKey(*curve, *selectedTime) == nullptr) {
                 selectedTime.reset();
             }
+            if (!selectedTime.has_value()) {
+                companions.clear();
+            }
             std::erase_if(companions, [curve](double time) { return curve == nullptr || findKey(*curve, time) == nullptr; });
             if (!userView) {
                 fit();
@@ -229,6 +232,9 @@ public:
         }
         const auto previousPrimary = selectedTime;
         const auto hit = hitKey(*clip, *curve, event.position);
+        if (previousPrimary.has_value()) {
+            std::erase(companions, *previousPrimary);
+        }
         if (hit.has_value() && event.mods.isShiftDown() && event.mods.isLeftButtonDown()) {
             // Shift toggles a key in the selection without dragging.
             if (isCompanion(*hit)) {
@@ -251,8 +257,8 @@ public:
         }
         if (hit.has_value() && (isCompanion(*hit) || (previousPrimary.has_value() && *previousPrimary == *hit))) {
             // Grabbing a selected key keeps the group and makes it primary.
+            std::erase(companions, *hit);
             if (previousPrimary.has_value() && *previousPrimary != *hit) {
-                std::erase(companions, *hit);
                 companions.push_back(*previousPrimary);
             }
         } else {
@@ -384,29 +390,47 @@ public:
         }
         key.value = constrainedValue(*clip, key.value);
         if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
-        drag->preview = drag->originalCurve;
-        drag->preview.removeKey(drag->original.time);
+        // Build the candidate aside so a rejected move leaves the last good preview intact.
+        auto candidate = drag->originalCurve;
+        candidate.removeKey(drag->original.time);
+        std::vector<motion::Keyframe> moved;
         if (drag->mode == DragMode::key && !drag->companions.empty()) {
             // The whole selection moves by the primary key's time and value delta.
             const auto timeDelta = key.time - drag->original.time, valueDelta = key.value - drag->original.value;
-            std::vector<motion::Keyframe> moved;
             for (const auto time : drag->companions) {
                 const auto* original = findKey(drag->originalCurve, time);
-                if (original == nullptr) { continue; }
+                if (original == nullptr) {
+                    continue;
+                }
                 auto companion = *original;
                 companion.time += timeDelta;
                 companion.value = constrainedValue(*clip, companion.value + valueDelta);
-                drag->preview.removeKey(time);
+                const auto projectTime = clip->start + (companion.time - clip->offset) / clip->rate;
+                if (projectTime < clip->start - 1.0e-9 || projectTime > clip->end() + 1.0e-9) {
+                    return;
+                }
+                candidate.removeKey(time);
                 moved.push_back(companion);
             }
             for (const auto& companion : moved) {
-                if (findKey(drag->preview, companion.time) != nullptr || std::abs(companion.time - key.time) < 1.0e-9) { return; }
+                if (findKey(candidate, companion.time) != nullptr || std::abs(companion.time - key.time) < 1.0e-9) {
+                    return;
+                }
             }
-            if (findKey(drag->preview, key.time) != nullptr) { return; }
-            for (const auto& companion : moved) { drag->preview.setKey(companion); }
-            companions.clear();
-            for (const auto& companion : moved) { companions.push_back(companion.time); }
+            if (findKey(candidate, key.time) != nullptr) {
+                return;
+            }
         }
+        for (const auto& companion : moved) {
+            candidate.setKey(companion);
+        }
+        if (!moved.empty()) {
+            companions.clear();
+            for (const auto& companion : moved) {
+                companions.push_back(companion.time);
+            }
+        }
+        drag->preview = std::move(candidate);
         drag->preview.setKey(key);
         selectedTime = key.time;
         repaint();
@@ -471,6 +495,7 @@ public:
         if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey) {
             if (drag.has_value()) {
                 selectedTime = drag->original.time;
+                companions = drag->companions;
                 cancelDrag();
             }
             return deleteSelected();
@@ -765,25 +790,32 @@ private:
         const auto id = targetId;
         const auto property = propertyName;
         const auto original = *key;
+        // The selection is captured when the menu opens.
+        auto times = companions;
+        times.push_back(original.time);
         juce::Component::SafePointer<MotionCurveEditor> safe(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe, id, property, original](int result) {
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe, id, property, times](int result) {
             if (safe == nullptr || result < 1 || result > 4) {
                 return;
             }
             const auto* current = findCurve(motion::findPropertyTarget(safe->processor.document.project(), id), property);
-            const auto* currentKey = current != nullptr ? findKey(*current, original.time) : nullptr;
-            if (currentKey == nullptr || (safe->companions.empty() && currentKey->interpolation == static_cast<motion::Interpolation>(result - 1))) {
+            const auto next = static_cast<motion::Interpolation>(result - 1);
+            // No undo step when every selected key already uses the choice.
+            const auto needed = current != nullptr && std::any_of(times.begin(), times.end(), [current, next](double time) {
+                const auto* found = findKey(*current, time);
+                return found != nullptr && found->interpolation != next;
+            });
+            if (!needed) {
                 return;
             }
-            auto times = safe->companions;
-            times.push_back(original.time);
-            safe->processor.document.edit(times.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, property, times, result](motion::Project& project) {
+            safe->processor.document.edit(times.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, property, times, next](motion::Project& project) {
                 for (const auto time : times) {
                     auto* target = mutableCurve(project, id, property);
                     const auto* found = target != nullptr ? findKey(*target, time) : nullptr;
-                    if (found == nullptr) { continue; }
+                    if (found == nullptr) {
+                        continue;
+                    }
                     auto updated = *found;
-                    const auto next = static_cast<motion::Interpolation>(result - 1);
                     const auto& keys = target->keyframes();
                     const auto index = static_cast<std::size_t>(found - keys.data());
                     // Bezier handles start on the automatic tangents: the shape holds.

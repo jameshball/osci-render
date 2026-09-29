@@ -597,7 +597,7 @@ void MotionEditor::resized() {
     endButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     // Narrow windows drop the BPM caption and tighten the readouts so the
     // timing menu never collapses to nothing.
-    const auto compact = transport.getWidth() < 390;
+    const auto compact = transport.getWidth() < 360;
     if (compact != compactTransport) {
         compactTransport = compact;
         refreshTiming();
@@ -608,7 +608,7 @@ void MotionEditor::resized() {
     tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
     tempoLabel.setVisible(!compact);
     tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34));
-    timingButton.setBounds(transport.removeFromLeft(compact ? std::max(0, transport.getWidth()) : 140).reduced(0, 3));
+    timingButton.setBounds(transport.removeFromLeft(compact ? std::clamp(transport.getWidth(), 0, 140) : 140).reduced(0, 3));
     area.removeFromTop(3);
     statusBar.setBounds(area.removeFromBottom(20));
     area.removeFromBottom(2);

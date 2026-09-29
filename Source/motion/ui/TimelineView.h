@@ -675,7 +675,7 @@ public:
         if (markerDragging != 0) {
             auto updated = *before;
             const auto delta = (event.x - downX) / pixelsPerSecond;
-            const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapEdge(markerOriginalTime + delta, event.mods, *before, {}), 0.0, updated.duration);
+            const auto time = delta == 0 ? markerOriginalTime : std::clamp(snapEdge(markerOriginalTime + delta, event.mods, *before, {}, nullptr, markerDragging), 0.0, updated.duration);
             if (std::any_of(updated.markers.begin(), updated.markers.end(), [this, time](const auto& marker) { return marker.id != markerDragging && std::abs(marker.time - time) < 1.0e-9; })) { return; }
             for (auto& marker : updated.markers) { if (marker.id == markerDragging) { marker.time = time; } }
             std::sort(updated.markers.begin(), updated.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
@@ -1803,7 +1803,11 @@ private:
     }
     // Magnetic targets within 8 px: the playhead, markers, other clips' edges
     // and keys shown in lanes. Keys being dragged and excluded clips are skipped.
-    std::optional<double> magnet(double time, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr, bool includePlayhead = true) const {
+    std::optional<double> magnet(double time, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr, bool includePlayhead = true, motion::Id excludedMarker = 0) const {
+        // Free mode (grid snapping off) turns magnets off too; Alt bypasses both per drag.
+        if (!project.gridSnap) {
+            return std::nullopt;
+        }
         const auto reach = 8.0 / pixelsPerSecond;
         std::optional<double> best;
         auto bestDistance = reach;
@@ -1817,7 +1821,11 @@ private:
         if (includePlayhead) {
             consider(processor.position.load());
         }
-        for (const auto& marker : project.markers) { consider(marker.time); }
+        for (const auto& marker : project.markers) {
+            if (marker.id != excludedMarker) {
+                consider(marker.time);
+            }
+        }
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (excludedClips.contains(clip.id)) { continue; }
@@ -1838,12 +1846,12 @@ private:
         return best;
     }
     // Snaps a moving edge: magnets first, then the grid; Alt bypasses both.
-    double snapEdge(double time, juce::ModifierKeys modifiers, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr) {
+    double snapEdge(double time, juce::ModifierKeys modifiers, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr, motion::Id excludedMarker = 0) {
         if (modifiers.isAltDown()) {
             snapGuide.reset();
             return time;
         }
-        const auto target = magnet(time, project, excludedClips, movingKeys);
+        const auto target = magnet(time, project, excludedClips, movingKeys, true, excludedMarker);
         snapGuide = target;
         return target.value_or(project.timeGrid().snap(time));
     }
