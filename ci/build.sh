@@ -3,8 +3,8 @@
 PLUGIN="$1"
 VERSION="$2"
 
-# sosci has only one variant, so we omit the version suffix from its artifact names
-if [ "$PLUGIN" = "sosci" ]; then
+# sosci and osci-motion have only one variant, so we omit the version suffix from their artifact names
+if [ "$PLUGIN" = "sosci" ] || [ "$PLUGIN" = "osci-motion" ]; then
   OUTPUT_NAME="$PLUGIN"
 else
   OUTPUT_NAME="$PLUGIN-$VERSION"
@@ -61,7 +61,7 @@ fi
 # Build LuaJIT before Projucer resave. Projucer's post-export shell command has
 # a 60-second timeout, which is too tight for a cold universal macOS LuaJIT build
 # on GitHub runners.
-if [ "$PLUGIN" = "osci-render" ] && [ "$OS" != "win" ]; then
+if { [ "$PLUGIN" = "osci-render" ] || [ "$PLUGIN" = "osci-motion" ]; } && [ "$OS" != "win" ]; then
   "$ROOT/luajit_linux_macos.sh"
 fi
 
@@ -79,7 +79,10 @@ fi
 platform_build
 
 if [ "$OS" = "linux" ]; then
-  cp -r "$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$PLUGIN.vst3" "$ROOT/ci/bin/$PLUGIN.vst3"
+  # osci-motion is standalone-only (no VST3).
+  if [ "$PLUGIN" != "osci-motion" ]; then
+    cp -r "$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$PLUGIN.vst3" "$ROOT/ci/bin/$PLUGIN.vst3"
+  fi
   cp -r "$ROOT/Builds/$PLUGIN/LinuxMakefile/build/$PLUGIN"      "$ROOT/ci/bin/$PLUGIN"
 fi
 
@@ -159,6 +162,8 @@ if [ "$OS" = "linux" ]; then
   if [ "$PLUGIN" = "osci-render" ]; then
     INSTRUMENT_TARGET="$PLUGIN-instrument"
     zip -r "${OUTPUT_NAME}.zip" "$PLUGIN" "$PLUGIN.vst3" "$INSTRUMENT_TARGET.vst3"
+  elif [ "$PLUGIN" = "osci-motion" ]; then
+    zip -r "${OUTPUT_NAME}.zip" "$PLUGIN"
   else
     zip -r "${OUTPUT_NAME}.zip" "$PLUGIN" "$PLUGIN.vst3"
   fi

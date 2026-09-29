@@ -2,6 +2,21 @@
 
 PLUGIN="osci-render-test"
 
+# Optional test categories (e.g. `source ./ci/test.sh Motion MotionMidi`).
+# With none, every test runs, as before.
+TEST_CATEGORIES=("$@")
+
+run_test_binary() {
+  if [ ${#TEST_CATEGORIES[@]} -eq 0 ]; then
+    "$@"
+  else
+    for category in "${TEST_CATEGORIES[@]}"; do
+      echo "Running test category: $category"
+      "$@" "$category" || exit 1
+    done
+  fi
+}
+
 python3 -m unittest discover -s "$ROOT/ci" -p 'test_publish_release.py'
 
 # Build LuaJIT before Projucer resave (the test project needs it but can't
@@ -28,7 +43,7 @@ if [ "$OS" = "mac" ]; then
   find .
   echo "Running the test"
   # Run the test
-  ./"$PLUGIN"
+  run_test_binary ./"$PLUGIN"
 fi
 
 # Build linux version
@@ -39,7 +54,7 @@ if [ "$OS" = "linux" ]; then
   cd build
   echo "Running the test"
   # Run the test using the binary
-  xvfb-run -a -s "-screen 0 1280x720x24" ./$PLUGIN
+  run_test_binary xvfb-run -a -s "-screen 0 1280x720x24" ./$PLUGIN
 fi
 
 # Build Win version
@@ -56,7 +71,7 @@ if [ "$OS" = "win" ]; then
   echo "Running the test"
   ls
   # Run the test using the .exe file
-  ./osci-render-test.exe
+  run_test_binary ./osci-render-test.exe
 fi
 
 cd "$ROOT"
