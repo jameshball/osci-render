@@ -122,9 +122,9 @@ try:
     assert clip.get("spatialPath") == "1", clip.attrib
     _, y = clip_property(saved(), 3, "position.y")
     assert len(y.findall("key")) == 2, "enabling the path keys every axis at the shared times"
-    # The Position row's modulation chip opens that property in the graph.
+    # The Position row's modulation chip opens the axis that is driven: the LFO routes into Y.
     step("modulate position", "click", "--name", "Modulate position", "--exact")
-    command("wait-for-value", "--name", "Animated property", "--value", "Position X", "--timeout-ms", 5000)
+    command("wait-for-value", "--name", "Animated property", "--value", "Position Y", "--timeout-ms", 5000)
     command("wait-for-locator", "--name", "Route modulator", "--exact", "--timeout-ms", 5000)
     step("modulate screenshot", "screenshot", "--file", session.artifact_dir / "modulate.png")
     # Deleting the modulator removes its route; undo restores both.
