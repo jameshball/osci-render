@@ -7,6 +7,9 @@ MotionProcessor::MotionProcessor()
     : CommonAudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     addAllParameters();
     rgbEnabled = true;
+    // Undo keeps whole-project snapshots (shared media is not copied); bound
+    // the history to about 256 MiB while always keeping the last 20 steps.
+    getUndoManager().setMaxNumberOfStoredUnits(256 * 1024, 20);
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
     blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
     midiSession = std::make_unique<motion::MidiRecordingSession>(document, midiRecording, motion::MidiRecordingSession::Transport{

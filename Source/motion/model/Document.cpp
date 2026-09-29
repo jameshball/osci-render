@@ -540,10 +540,57 @@ juce::Result loadEffects(const juce::XmlElement& owner, std::vector<EffectInstan
 
 }
 
+// Approximate bytes a snapshot holds by value (curves, keys, clips, tracks).
+// Shared, immutable payloads are counted separately, per step, only when that
+// step alone keeps them alive.
+static std::size_t curveBytes(const Curve& curve) {
+    return sizeof(Curve) + curve.keyframes().size() * (sizeof(Keyframe) + sizeof(double));
+}
+static std::size_t propertyBytes(const std::map<std::string, Curve>& properties) {
+    std::size_t bytes = 0;
+    for (const auto& [name, curve] : properties) { bytes += name.size() + curveBytes(curve); }
+    return bytes;
+}
+static std::size_t compositionBytes(const Composition& composition) {
+    std::size_t bytes = sizeof(Composition);
+    const auto effects = [&](const std::vector<EffectInstance>& list) {
+        for (const auto& effect : list) { bytes += sizeof(EffectInstance) + propertyBytes(effect.properties); }
+    };
+    effects(composition.effects);
+    for (const auto& group : composition.groups) { bytes += sizeof(Group) + propertyBytes(group.properties); effects(group.effects); }
+    for (const auto& track : composition.tracks) {
+        bytes += sizeof(Track);
+        effects(track.effects);
+        for (const auto& clip : track.clips) { bytes += sizeof(Clip) + clip.name.size() + propertyBytes(clip.properties); effects(clip.effects); }
+    }
+    for (const auto& camera : composition.cameras) { bytes += sizeof(Camera) + propertyBytes(camera.properties); }
+    bytes += composition.markers.size() * sizeof(Marker) + composition.cameraCuts.size() * sizeof(CameraCut);
+    bytes += composition.modulators.size() * sizeof(Modulator) + composition.routes.size() * sizeof(ModulationRoute);
+    return bytes;
+}
+static std::size_t assetBytes(const Asset& asset) {
+    // Encoded data plus a rough allowance for the prepared frames.
+    return sizeof(Asset) + asset.data.getSize() + 2 * asset.bakedData.getSize() + 4 * asset.data.getSize();
+}
+
 struct Document::Change : juce::UndoableAction {
     Change(Document& owner, Project before, Project after) : owner(owner), before(std::move(before)), after(std::move(after)) {}
     bool perform() override { owner.apply(after); return true; }
     bool undo() override { owner.apply(before); return true; }
+    // KiB, so the undo manager can bound history by memory as well as count.
+    int getSizeInUnits() override {
+        auto bytes = compositionBytes(before) + compositionBytes(after);
+        const auto unique = [&](const auto& mine, const auto& theirs, const auto& size) {
+            for (const auto& item : mine) {
+                if (item != nullptr && std::find(theirs.begin(), theirs.end(), item) == theirs.end()) { bytes += size(*item); }
+            }
+        };
+        unique(before.assets, after.assets, [](const Asset& asset) { return assetBytes(asset); });
+        unique(after.assets, before.assets, [](const Asset& asset) { return assetBytes(asset); });
+        unique(before.definitions, after.definitions, [](const Composition& definition) { return compositionBytes(definition); });
+        unique(after.definitions, before.definitions, [](const Composition& definition) { return compositionBytes(definition); });
+        return static_cast<int>(std::clamp<std::size_t>(bytes / 1024, 1, static_cast<std::size_t>(std::numeric_limits<int>::max() / 4)));
+    }
     Document& owner;
     Project before, after;
 };

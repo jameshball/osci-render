@@ -161,6 +161,26 @@ public:
             expect(f.document.pasteKeys(f.second, {{"position.x", 0, keys[0]}}, 4).failed());
             expect(f.undo.getUndoDescription() == description);
         }
+        beginTest("Undo history is bounded by memory while keeping recent steps");
+        {
+            juce::UndoManager undo(300, 3);
+            motion::Document document(undo);
+            motion::Project project;
+            motion::Camera camera;
+            camera.id = document.newId();
+            project.cameras = {camera};
+            document.reset(project);
+            // Each step adds 2000 keys (~100 KiB per snapshot pair).
+            for (int step = 0; step < 20; ++step) {
+                document.edit("Add keys", [step](motion::Project& updated) {
+                    auto& curve = updated.cameras[0].properties["position.x"];
+                    for (int key = 0; key < 2000; ++key) { curve.setKey({step * 10000.0 + key, 1.0, motion::Interpolation::linear}); }
+                });
+            }
+            int kept = 0;
+            while (undo.canUndo() && kept < 50) { undo.undo(); ++kept; }
+            expect(kept >= 3 && kept < 20, "kept " + juce::String(kept) + " of 20 steps");
+        }
         beginTest("Replacing a source swaps its media under the same identity");
         {
             Fixture f; f.initialise();
