@@ -505,10 +505,63 @@ public:
         testAudioImports(document.project());
         testAudioExports(document.project());
         testTiming(document.project());
+        testScopeProfile(document.project());
         testRippleDelete(document.project());
     }
 
 private:
+    void testScopeProfile(const motion::Project& source) {
+        beginTest("Scope timing round trips exactly, edits from nested compositions and rejects invalid values");
+        juce::UndoManager undo;
+        motion::Document document(undo);
+        document.reset(source);
+        expect(document.project().scope == motion::ScopeProfile{});
+        const motion::ScopeProfile awkward {1.0 / 3, 0.1 + 0.2, 123.456789012345};
+        document.edit("Scope", [awkward](motion::Project& project) { project.scope = awkward; });
+        const auto xml = document.save();
+        juce::UndoManager loadedUndo;
+        motion::Document loaded(loadedUndo);
+        expect(loaded.load(xml).wasOk());
+        expect(loaded.project().scope == awkward, "every scope time reloads bit-exactly");
+        expect(motion::PreparedComposition(loaded.project()).scope == awkward, "prepared compositions carry the profile");
+        expect(undo.undo());
+        expect(document.project().scope == motion::ScopeProfile{});
+        expect(undo.redo());
+        expect(document.project().scope == awkward);
+
+        auto legacy = xml;
+        for (const auto* attribute : {"scopeDwell", "scopeTravel", "scopeSettle"}) { legacy.removeAttribute(attribute); }
+        expect(loaded.load(legacy).wasOk());
+        expect(loaded.project().scope == motion::ScopeProfile{}, "projects without a profile use the analog scope defaults");
+        expect(loaded.load(xml).wasOk());
+        const auto unchanged = loaded.save().toString();
+        for (const auto* attribute : {"scopeDwell", "scopeTravel", "scopeSettle"}) {
+            for (const auto* value : {"-1", "nan", "inf", "1e9"}) {
+                auto invalid = xml;
+                invalid.setAttribute(attribute, value);
+                expect(loaded.load(invalid).failed(), juce::String(attribute) + "=" + value);
+                expectEquals(loaded.save().toString(), unchanged);
+            }
+        }
+
+        motion::Project nested;
+        auto definition = std::make_shared<motion::CompositionDefinition>();
+        definition->id = 100; definition->name = "Nested";
+        nested.definitions.push_back(definition);
+        motion::Track track; track.id = 102;
+        expect(track.insert(motion::Document::makeCompositionClip(101, *definition, 0)));
+        nested.tracks.push_back(track);
+        document.reset(nested);
+        expect(document.enterComposition(100).wasOk());
+        const motion::ScopeProfile laser = motion::scopeProfilePresets[1].profile;
+        document.edit("Scope", [laser](motion::Project& project) { project.scope = laser; });
+        expect(document.project().scope == laser);
+        expect(document.enterComposition(0).wasOk());
+        expect(document.mainProject().scope == laser, "the profile belongs to the project, whichever composition is open");
+        expect(undo.undo());
+        expect(document.mainProject().scope == motion::ScopeProfile{});
+    }
+
     void testTiming(const motion::Project& source) {
         beginTest("Musical grid settings round trip without retiming object clips or keys");
         juce::UndoManager undo;

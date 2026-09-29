@@ -5,6 +5,7 @@
 #include "ui/TimelineView.h"
 #include "ui/CompositionView.h"
 #include "ui/AssetLibrary.h"
+#include "ui/BeamSettingsWindow.h"
 #include "ui/CurveEditor.h"
 #include "ui/NotesEditor.h"
 #include "ui/CameraPanel.h"
@@ -113,7 +114,8 @@ private:
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
-    SettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, 550, 500, 1500 };
+    MotionScopeProfilePanel scopeProfilePanel { processor };
+    MotionBeamSettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, scopeProfilePanel, 550, 500, 1500 };
     MotionTimelineView timeline;
     MotionCompositionView composition;
     MotionAssetLibrary assetLibrary;

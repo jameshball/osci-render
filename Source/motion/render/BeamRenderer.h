@@ -17,8 +17,9 @@ namespace motion {
 // weight times projected path length, so equally weighted layers keep equal
 // brightness per unit length. Faded layers reserve their full-weight share so a
 // fade never brightens the rest of the scene. Layers are ordered to minimise
-// dark travel, and every jump dwells dark at both ends so reconstruction
-// filters and slow scopes settle before the next stroke lights. When complete
+// dark travel, and every jump dwells dark at both ends, then settles, so
+// reconstruction filters and slow scopes arrive before the next stroke lights;
+// the project's scope profile calibrates those times. When complete
 // strokes do not fit one cycle, a plan spans several aligned cycles instead of
 // undersampling, trading refresh rate for complete, unbroken drawings.
 class BeamRenderer {
@@ -28,10 +29,11 @@ public:
     // Vector lengths are exact; probes only measure the transform's scale.
     // Point frames sum lit probe steps. Both run once per cycle per layer.
     static constexpr int lengthProbes = 9, pointLengthProbes = 48;
-    static constexpr double dwellSeconds = 12.0e-6;
-    static constexpr double travelSecondsPerUnit = 30.0e-6;
     static constexpr double minimumLayerLength = 0.05;
     static constexpr std::int64_t maximumSpan = 8;
+    // Tour improvement stops after this many candidate checks and moved
+    // layers, bounding planning cost however many layers are visible.
+    static constexpr std::int64_t maximumOrderingWork = 65536;
 
     enum class Kind : std::uint8_t { draw, midi, move, hold };
     struct Segment {
@@ -61,6 +63,8 @@ public:
     BeamRenderer() : segments(std::make_unique<std::array<Segment, maximumSegments>>()), layers(std::make_unique<std::array<Layer, maximumLayers>>()) {}
 
     void reset() { planned = false; }
+    // Diagnostic: plans keep the greedy travel order when disabled.
+    void setOrderImprovement(bool enabled) { improving = enabled; planned = false; }
 
     // index is the oscillator sample. time is the timeline time of that sample;
     // when advancing, the cycle latches the timeline time of its first sample.
@@ -108,6 +112,19 @@ public:
     std::int64_t plannedInterleave() const { return planSpan; }
 
 private:
+    // Scope profile times in samples at the plan's rate.
+    struct Timing {
+        std::int64_t dwell = 1, settle = 0;
+        double travelSeconds = 0, rate = 0;
+        std::int64_t travel(const osci::Point& a, const osci::Point& b) const { return travel(distance(a, b)); }
+        std::int64_t travel(double length) const { return std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(length * travelSeconds * rate))); }
+    };
+    static Timing timingFor(const ScopeProfile& requested, double rate) {
+        const auto profile = requested.valid() ? requested : ScopeProfile{};
+        const auto samples = [rate](double micros) { return static_cast<std::int64_t>(std::llround(micros / 1.0e6 * rate)); };
+        return {std::max<std::int64_t>(1, samples(profile.dwellMicros)), std::max<std::int64_t>(0, samples(profile.settleMicros)), profile.travelMicrosPerUnit / 1.0e6, rate};
+    }
+
     struct Layer {
         const PreparedClip* clip;
         const PreparedSource* source;
@@ -120,6 +137,12 @@ private:
 
     static double distance(const osci::Point& a, const osci::Point& b) {
         const auto dx = static_cast<double>(a.x) - b.x, dy = static_cast<double>(a.y) - b.y;
+        const auto value = std::sqrt(dx * dx + dy * dy);
+        return std::isfinite(value) ? value : 2.0;
+    }
+    // distance() on cached endpoints, for the ordering inner loop.
+    static double span(double ax, double ay, double bx, double by) {
+        const auto dx = ax - bx, dy = ay - by;
         const auto value = std::sqrt(dx * dx + dy * dy);
         return std::isfinite(value) ? value : 2.0;
     }
@@ -190,19 +213,19 @@ private:
             push({Kind::hold, first, std::max<std::int64_t>(0, total), nullptr, nullptr, 0, false, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}});
             return;
         }
-        const auto dwell = std::max<std::int64_t>(1, static_cast<std::int64_t>(std::llround(dwellSeconds * rate)));
-        const auto travel = [&](const osci::Point& a, const osci::Point& b) {
-            return std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(distance(a, b) * travelSecondsPerUnit * rate)));
-        };
+        const auto timing = timingFor(composition.scope, rate);
+        const auto dwell = timing.dwell, settle = timing.settle;
+        const auto travel = [&](const osci::Point& a, const osci::Point& b) { return timing.travel(a, b); };
         order();
-        const auto entry = [&](std::size_t index) { return items[index].midi ? items[index].start : (reversedFlags[index] ? items[index].end : items[index].start); };
-        const auto exit = [&](std::size_t index) { return items[index].midi ? items[index].start : (reversedFlags[index] ? items[index].start : items[index].end); };
+        improveOrder();
+        const auto entry = [&](std::size_t index) { return entryOf(index); };
+        const auto exit = [&](std::size_t index) { return exitOf(index); };
         // Too many layers for this cycle drop from the end of the travel order.
         std::int64_t budget = 0;
         std::array<std::int64_t, maximumLayers> counts{};
         while (layerCount > 0) {
-            std::int64_t overhead = dwell;
-            for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + travel(exit(i - 1), entry(i)); }
+            std::int64_t overhead = dwell + settle;
+            for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + settle + travel(exit(i - 1), entry(i)); }
             overhead += dwell + travel(exit(layerCount - 1), entry(0));
             budget = total - overhead;
             std::int64_t minimum = 0;
@@ -246,14 +269,15 @@ private:
         const auto hold = [&](const osci::Point& at, std::int64_t count) {
             if (count > 0) { push({Kind::hold, cursor, count, nullptr, nullptr, 0, false, dark(at), dark(at)}); cursor += count; }
         };
-        hold(entry(0), dwell);
+        // The beam arrives from the previous cycle's return jump.
+        hold(entry(0), dwell + settle);
         for (std::size_t i = 0; i < layerCount; ++i) {
             if (i > 0) {
                 hold(exit(i - 1), dwell);
                 const auto steps = travel(exit(i - 1), entry(i));
                 push({Kind::move, cursor, steps, nullptr, nullptr, 0, false, dark(exit(i - 1)), dark(entry(i))});
                 cursor += steps;
-                hold(entry(i), dwell);
+                hold(entry(i), dwell + settle);
             }
             const auto& layer = items[i];
             push({layer.midi ? Kind::midi : Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end});
@@ -269,13 +293,13 @@ private:
     }
 
     // Cycles needed to draw every visible layer's complete strokes once,
-    // from minimum traversal budgets plus dwell and travel, capped at the
-    // maximum span. Cheap: no geometry is transformed.
+    // from minimum traversal budgets plus dwell, settle and a unit of travel
+    // per jump, capped at the maximum span. Cheap: no geometry is transformed.
     static std::int64_t spanFor(const PreparedComposition& composition, double time, double rate, std::int64_t cycleSamples, const LiveSourceFrames* liveFrames) {
         if (cycleSamples <= 0) { return 1; }
-        const auto dwell = std::max<std::int64_t>(1, static_cast<std::int64_t>(std::llround(dwellSeconds * rate)));
-        const auto jump = 2 * dwell + std::max<std::int64_t>(1, static_cast<std::int64_t>(std::ceil(travelSecondsPerUnit * rate)));
-        double demand = static_cast<double>(dwell);
+        const auto timing = timingFor(composition.scope, rate);
+        const auto jump = 2 * timing.dwell + timing.settle + timing.travel(1.0);
+        double demand = static_cast<double>(timing.dwell + timing.settle);
         std::size_t counted = 0;
         for (const auto& clip : composition.clips) {
             if (counted == maximumLayers) { break; }
@@ -310,6 +334,67 @@ private:
             }
             std::swap(items[placed], items[best]);
             reversedFlags[placed] = bestReversed;
+        }
+    }
+
+    osci::Point entryOf(std::size_t index) const {
+        const auto& layer = (*layers)[index];
+        return layer.midi ? layer.start : (reversedFlags[index] ? layer.end : layer.start);
+    }
+    osci::Point exitOf(std::size_t index) const {
+        const auto& layer = (*layers)[index];
+        return layer.midi ? layer.start : (reversedFlags[index] ? layer.start : layer.end);
+    }
+
+    // Bounded 2-opt over the closed tour, including the return jump. Reversing
+    // positions i..j also flips each layer's direction, so interior jumps keep
+    // their lengths and only the two boundary jumps change; i == j flips one
+    // layer. The first layer stays first, improving moves are taken in scan
+    // order and work is capped, so the tour is a deterministic function of the
+    // greedy order, never longer than it, at bounded cost. Allocates nothing.
+    void improveOrder() {
+        if (!improving || layerCount < 2) { return; }
+        for (std::size_t i = 0; i < layerCount; ++i) {
+            const auto entry = entryOf(i), exit = exitOf(i);
+            ends[i] = {entry.x, entry.y, exit.x, exit.y};
+        }
+        std::int64_t work = 0;
+        bool improved = true;
+        while (improved && work < maximumOrderingWork) {
+            improved = false;
+            for (std::size_t i = 1; i < layerCount && work < maximumOrderingWork; ++i) {
+                const auto& before = ends[i - 1];
+                const auto& first = ends[i];
+                auto removed = span(before.exitX, before.exitY, first.entryX, first.entryY);
+                for (std::size_t j = i; j < layerCount && work < maximumOrderingWork; ++j) {
+                    ++work;
+                    const auto& last = ends[j];
+                    const auto& after = ends[j + 1 == layerCount ? 0 : j + 1];
+                    const auto change = span(before.exitX, before.exitY, last.exitX, last.exitY) + span(first.entryX, first.entryY, after.entryX, after.entryY)
+                        - removed - span(last.exitX, last.exitY, after.entryX, after.entryY);
+                    if (change < -1.0e-9) {
+                        reverse(i, j);
+                        work += static_cast<std::int64_t>(j - i + 1);
+                        improved = true;
+                        removed = span(before.exitX, before.exitY, first.entryX, first.entryY);
+                    }
+                }
+            }
+        }
+    }
+    void reverse(std::size_t first, std::size_t last) {
+        auto& items = *layers;
+        for (auto i = first, j = last; i < j; ++i, --j) {
+            std::swap(items[i], items[j]);
+            std::swap(reversedFlags[i], reversedFlags[j]);
+            std::swap(ends[i], ends[j]);
+        }
+        for (auto i = first; i <= last; ++i) {
+            if (!items[i].midi) {
+                reversedFlags[i] = !reversedFlags[i];
+                std::swap(ends[i].entryX, ends[i].exitX);
+                std::swap(ends[i].entryY, ends[i].exitY);
+            }
         }
     }
 
@@ -385,9 +470,12 @@ private:
     std::unique_ptr<std::array<Segment, maximumSegments>> segments;
     std::unique_ptr<std::array<Layer, maximumLayers>> layers;
     std::array<bool, maximumLayers> reversedFlags{};
+    // Entry and exit of each ordered layer while the tour is improved.
+    struct Ends { double entryX, entryY, exitX, exitY; };
+    std::array<Ends, maximumLayers> ends{};
     std::size_t segmentCount = 0, layerCount = 0, lastSegment = 0;
     std::int64_t planSpan = 1;
-    bool planned = false, planAdvancing = true;
+    bool planned = false, planAdvancing = true, improving = true;
     std::int64_t planFirst = 0, planEnd = 0;
     double planRate = 0, planTime = 0, planCycleRate = 0;
     std::uint64_t planGeneration = 0;
