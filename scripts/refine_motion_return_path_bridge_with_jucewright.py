@@ -93,7 +93,7 @@ def select_track(id_, time):
             x = 170 + round(time * (area["w"] - 190) / 185.6)
             y = target["bounds"]["y"] - area["y"] + 8
             step("select track " + str(id_), "click", "--class", "MotionTimelineView", "--position", f"{x},{y}")
-            tab("Object")
+            tab("Properties")
             return
         direction = .3 if target is not None and target["bounds"]["y"] < area["y"] + 26 else -.3
         command("wheel", area["x"] + 250, area["y"] + 65, "--dy", direction)

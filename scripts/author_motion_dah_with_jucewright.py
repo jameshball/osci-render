@@ -81,10 +81,10 @@ def import_source(name, start, duration, properties, animation=None):
         command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
         step("trace animated raster", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", name, "--class", "juce::Label", "--exact")
-    tab("Clip")
+    tab("Timing")
     edit("Clip duration", duration)
     if properties or animation:
-        tab("Object")
+        tab("Properties")
         for property_, value in properties.items():
             edit(property_, value)
         for property_, keys in (animation or {}).items():
@@ -99,7 +99,7 @@ def import_source(name, start, duration, properties, animation=None):
 
 def repeat_selected(start, duration):
     step("repeat selected motif", "press", "command + d", "--class", "MotionTimelineView")
-    tab("Clip")
+    tab("Timing")
     edit("Clip start", start)
     edit("Clip duration", duration)
 

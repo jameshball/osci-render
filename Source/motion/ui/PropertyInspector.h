@@ -31,6 +31,8 @@ public:
     // Content time of a key selected elsewhere (e.g. a motion-path key), if any.
     std::function<std::optional<double>(motion::Id)> selectedKeyTime;
     std::function<void()> onKeyTimeEdited;
+    // The row's modulation chip: open the graph (oscillator, routes, link) for this property.
+    std::function<void(motion::Id, const std::string&)> onModulate;
 
     // Embedded inspectors (e.g. in the camera panel) supply their own title.
     // Distinguishes controls of several inspectors for automation and access.
@@ -90,9 +92,12 @@ public:
         if (!editable) { repaint(); return; }
         const auto time = keyTime(*found);
         for (auto& row : rows) {
-            bool allKeyed = true, anyAnimated = false;
+            bool allKeyed = true, anyAnimated = false, modulated = false;
             for (auto& field : row->fields) {
-                const auto* curve = found->curve(std::string(field->spec.id));
+                const auto property = std::string(field->spec.id);
+                const auto* curve = found->curve(property);
+                const auto routed = std::any_of(processor.document.project().routes.begin(), processor.document.project().routes.end(), [&](const auto& route) { return route.target == target && route.property == property; });
+                modulated = modulated || routed || (curve != nullptr && (curve->modulation.enabled || curve->link.has_value()));
                 if (curve == nullptr) { continue; }
                 field->editor.setValue(curve->evaluateBase(time));
                 anyAnimated = anyAnimated || curve->animated();
@@ -102,6 +107,7 @@ public:
                 : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
             row->previous.setEnabled(anyAnimated);
             row->next.setEnabled(anyAnimated);
+            row->modulate.setToggleState(modulated, juce::dontSendNotification);
         }
         repaint();
     }
@@ -134,6 +140,7 @@ private:
         juce::String group;
         std::vector<std::unique_ptr<Field>> fields;
         osci::KeyframeButton key;
+        motion::style::Chip modulate {"~"};
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         // Position: one spatial path; Rotation: quaternion orientation.
         std::unique_ptr<motion::style::Chip> mode;
@@ -145,7 +152,12 @@ private:
         }
         void resized() override {
             auto area = getLocalBounds();
-            if (mode != nullptr) { mode->setBounds(area.removeFromTop(16).removeFromRight(44).reduced(0, 1)); } else { area.removeFromTop(16); }
+            auto heading = area.removeFromTop(16);
+            modulate.setBounds(heading.removeFromRight(20).reduced(0, 1));
+            if (mode != nullptr) {
+                heading.removeFromRight(motion::style::gap);
+                mode->setBounds(heading.removeFromRight(44).reduced(0, 1));
+            }
             area.removeFromTop(1);
             auto line = area.removeFromTop(motion::style::controlHeight);
             next.setBounds(line.removeFromRight(12));
@@ -182,7 +194,15 @@ private:
                 row->next.setTooltip("Go to the next key");
                 row->addAndMakeVisible(row->previous);
                 row->addAndMakeVisible(row->next);
+                row->modulate.setClickingTogglesState(false);
+                row->modulate.setName("Modulate " + namePrefix + row->group.toLowerCase());
+                row->modulate.setTitle(row->modulate.getName());
+                row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph with its oscillator, modulator routes and link. Lit when something drives it.");
+                row->addAndMakeVisible(row->modulate);
                 auto* raw = row.get();
+                row->modulate.onClick = [this, raw] {
+                    if (!raw->fields.empty() && onModulate) { onModulate(target, std::string(raw->fields.front()->spec.id)); }
+                };
                 row->key.onClick = [this, raw] { toggleKeys(*raw); };
                 if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                     const bool path = row->group == "Position";

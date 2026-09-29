@@ -137,13 +137,13 @@ def import_source(name, start, duration=None, bake=None, offset=None):
         step("trace " + name, "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
     label = "Undo Import soundtrack" if name.endswith(".flac") else "Undo Import MIDI file" if name.endswith(".mid") else "Undo Import object"
     command("wait-for-locator", "--name", label, "--role", "label", "--exact", "--timeout-ms", 120000)
-    timing(duration=duration, offset=offset, back="Audio" if name.endswith(".flac") else "Object")
+    timing(duration=duration, offset=offset, back="Properties")
 
 
-def timing(start=None, duration=None, offset=None, back="Object"):
+def timing(start=None, duration=None, offset=None, back="Properties"):
     if start is None and duration is None and offset is None:
         return
-    tab("Clip")
+    tab("Timing")
     if start is not None:
         edit_label("Clip start", start)
     if duration is not None:
@@ -202,7 +202,7 @@ def add_effect(effect, parameters=None, scope=None):
     for parameter, value in (parameters or {}).items():
         step(f"{effect} {parameter}", "set-value", "--name", "Effect " + parameter, "--role", "slider", str(value))
     library_tab("Assets")
-    tab("Object")
+    tab("Properties")
 
 
 def rename_track(name):
@@ -230,7 +230,7 @@ def camera(name, values, moments=None):
     set_properties(values, "camera ")
     for group, keyed in (moments or {}).items():
         keys(name, group, keyed, "camera ")
-    tab("Object")
+    tab("Properties")
 
 
 def cut(seconds, name):
@@ -238,7 +238,7 @@ def cut(seconds, name):
     seek(seconds)
     step("edit " + name, "select-option", "--name", "Camera to edit", "--text", name)
     step("cut to " + name, "click", "--name", "Cut here", "--exact")
-    tab("Object")
+    tab("Properties")
 
 
 def key_effect(parameter, moments):
@@ -459,7 +459,7 @@ def finale_colour():
     key_effect("hue", [(bar(96), 0), (bar(112), 170)])
     library_tab("Assets")
     step("scope clip", "select-option", "--name", "Effect scope", "--text", "Clip")
-    tab("Object")
+    tab("Properties")
     save()
 
 

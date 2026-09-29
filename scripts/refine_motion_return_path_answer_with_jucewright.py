@@ -93,7 +93,7 @@ def select_track(id_, time):
             x = 170 + round(time * (area["w"] - 190) / 185.6)
             y = target["bounds"]["y"] - area["y"] + 8
             step("select track " + str(id_), "click", "--class", "MotionTimelineView", "--position", f"{x},{y}")
-            tab("Object")
+            tab("Properties")
             return
         direction = .3 if target is not None and target["bounds"]["y"] < area["y"] + 48 else -.3
         command("wheel", area["x"] + 250, area["y"] + 65, "--dy", direction)
@@ -114,8 +114,8 @@ try:
     source = session.root_dir / "research/osci-motion/benchmark-sources/Answer pulse.svg"
     step("import answer pulse", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Answer pulse.svg", "--class", "juce::Label", "--exact")
-    tab("Clip"); edit("Clip duration",25.6)
-    tab("Object")
+    tab("Timing"); edit("Clip duration",25.6)
+    tab("Properties")
     for prop,value in {"red":.2,"green":.8,"blue":1,"position.y":0,"position.z":0}.items():
         edit(prop,value)
     animation = {

@@ -98,7 +98,7 @@ def select_clip(name, time):
     x = 170 + round(time * (area["w"] - 170 - 20) / 185.6)
     y = target["bounds"]["y"] - area["y"] + 8
     step("select " + name, "click", "--class", "MotionTimelineView", "--position", f"{x},{y}")
-    tab("Object")
+    tab("Properties")
 
 
 def keys(property_, values):

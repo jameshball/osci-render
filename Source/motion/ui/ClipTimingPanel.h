@@ -59,7 +59,7 @@ public:
             captions[i].setVisible(clip != nullptr);
             values[i].setVisible(clip != nullptr);
             values[i].setEnabled(clip != nullptr && !locked);
-            if (!values[i].isBeingEdited()) { values[i].setText(juce::String(current[i], 6), juce::dontSendNotification); }
+            if (!values[i].isBeingEdited()) { values[i].setText(format(current[i]), juce::dontSendNotification); }
         }
         updating = false;
         details.setText(clip != nullptr ? "Ends at " + juce::String(timing.end(), 3) + " s\n"
@@ -82,6 +82,12 @@ public:
         details.setBounds(area.removeFromTop(55));
         area.removeFromTop(8);
         status.setBounds(area.removeFromTop(70));
+    }
+    // Three decimals, more only when the value needs them (no trailing zeros).
+    static juce::String format(double value) {
+        auto text = juce::String(value, 6);
+        while (text.contains(".") && text.endsWithChar('0') && text.length() - text.indexOfChar('.') > 4) { text = text.dropLastCharacters(1); }
+        return text;
     }
 private:
     const motion::Clip* findClip() const {

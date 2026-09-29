@@ -3,9 +3,9 @@
 #include "../MotionProcessor.h"
 #include "PropertyInspector.h"
 
-// Output cameras: choose, add, rename and delete cameras, place cuts on the
-// output, review the cut list, and edit the chosen camera's animated lens and
-// transform through the shared property inspector.
+// Output cameras: choose, add, rename and delete cameras, aim or parent them,
+// cut to them at the playhead (cuts are edited in the timeline's Cameras
+// band), and edit the chosen camera's lens and transform.
 class MotionCameraPanel : public juce::Component {
 public:
     explicit MotionCameraPanel(MotionProcessor& owner) : processor(owner), inspector(owner) {
@@ -67,7 +67,7 @@ public:
         lookAtLabel.setText("Look at", juce::dontSendNotification);
         parentLabel.setText("Parent", juce::dontSendNotification);
         cutButton.setButtonText("Cut here");
-        cutButton.setTooltip("Use this camera from the current frame until the next camera cut");
+        cutButton.setTooltip("Use this camera from the current frame until the next cut. Cuts appear in the timeline's Cameras band, where they move, trim and switch camera.");
         cutButton.onClick = [this] { cutHere(); };
         addAndMakeVisible(cutButton);
         status.setFont(motion::style::small());
@@ -114,18 +114,7 @@ public:
         const auto prefix = processor.document.editingComposition() == 0 ? "On output: " : "Preview only: ";
         status.setText(juce::String(prefix) + (output == nullptr ? "default view" : juce::String(output->name) + (active == selected ? " (editing)" : "")), juce::dontSendNotification);
         cutButton.setEnabled(camera != nullptr && frameTime() < project.duration);
-        if (cuts != project.cameraCuts) { cuts = project.cameraCuts; rebuildCuts(); }
         repaint();
-    }
-
-    void paint(juce::Graphics& g) override {
-        g.setFont(motion::style::small());
-        g.setColour(motion::style::muted());
-        g.drawText("Cuts", cutsArea.withHeight(16), juce::Justification::centredLeft);
-        if (cutRows.empty()) {
-            g.setColour(motion::style::subtle());
-            g.drawText("No cuts: the first camera is used throughout.", cutsArea.withTrimmedTop(16).withHeight(20), juce::Justification::centredLeft);
-        }
     }
     void resized() override {
         auto area = getLocalBounds().reduced(motion::style::padding + 2, 6);
@@ -149,40 +138,10 @@ public:
         cutButton.setBounds(output.removeFromRight(76));
         status.setBounds(output);
         area.removeFromTop(motion::style::padding);
-        const auto listHeight = 18 + std::max(20, std::min(5, static_cast<int>(cutRows.size())) * 22);
-        cutsArea = area.removeFromTop(listHeight);
-        auto rows = cutsArea.withTrimmedTop(18);
-        for (std::size_t index = 0; index < cutRows.size(); ++index) {
-            cutRows[index]->setVisible(index < 5);
-            if (index < 5) { cutRows[index]->setBounds(rows.removeFromTop(22)); }
-        }
-        area.removeFromTop(motion::style::padding);
         inspector.setBounds(area.withTrimmedLeft(-motion::style::padding - 2).withTrimmedRight(-motion::style::padding - 2));
     }
 
 private:
-    // One cut: click to seek to it; the cross removes it.
-    struct CutRow final : juce::Component {
-        juce::String text;
-        std::function<void()> onSeek, onRemove;
-        juce::TextButton remove {"x"};
-        CutRow() {
-            remove.setTooltip("Remove this cut");
-            remove.onClick = [this] { if (onRemove) { onRemove(); } };
-            addAndMakeVisible(remove);
-        }
-        void paint(juce::Graphics& g) override {
-            g.setColour(isMouseOver() ? motion::style::raised() : juce::Colours::transparentBlack);
-            g.fillRoundedRectangle(getLocalBounds().toFloat(), motion::style::radius);
-            g.setColour(motion::style::text());
-            g.setFont(motion::style::body());
-            g.drawText(text, getLocalBounds().reduced(6, 0).withTrimmedRight(22), juce::Justification::centredLeft);
-        }
-        void resized() override { remove.setBounds(getLocalBounds().removeFromRight(20).reduced(1, 2)); }
-        void mouseUp(const juce::MouseEvent& event) override { if (event.eventComponent == this && onSeek) { onSeek(); } }
-        void mouseEnter(const juce::MouseEvent&) override { repaint(); }
-        void mouseExit(const juce::MouseEvent&) override { repaint(); }
-    };
 
     static const motion::Camera* findCamera(const motion::Project& project, motion::Id id) {
         const auto found = std::find_if(project.cameras.begin(), project.cameras.end(), [id](const auto& camera) { return camera.id == id; });
@@ -196,25 +155,6 @@ private:
         const auto& project = processor.document.project();
         const auto time = std::clamp(processor.position.load(), 0.0, project.duration);
         return project.frameRate > 0.0 ? std::clamp(std::round(time * project.frameRate) / project.frameRate, 0.0, project.duration) : time;
-    }
-    void rebuildCuts() {
-        cutRows.clear();
-        const auto& project = processor.document.project();
-        const auto grid = project.timeGrid();
-        for (const auto& cut : cuts) {
-            auto row = std::make_unique<CutRow>();
-            const auto* camera = findCamera(project, cut.camera);
-            row->text = juce::String(grid.positionLabel(cut.start)) + "   " + (camera != nullptr ? juce::String(camera->name) : juce::String("?"));
-            row->setName("Camera cut " + juce::String(cut.id));
-            row->remove.setName("Remove camera cut " + juce::String(cut.id));
-            const auto id = cut.id;
-            const auto start = cut.start;
-            row->onSeek = [this, start] { processor.seek(start); };
-            row->onRemove = [this, id] { removeCut(id); };
-            addAndMakeVisible(*row);
-            cutRows.push_back(std::move(row));
-        }
-        resized();
     }
     void addCamera() {
         name.hideEditor(true);
@@ -233,10 +173,6 @@ private:
             std::erase_if(project.cameraCuts, [id](const auto& cut) { return cut.camera == id; });
             return project.cameras.size() != before;
         });
-        refresh();
-    }
-    void removeCut(motion::Id id) {
-        processor.document.removeCut(id);
         refresh();
     }
     void cutHere() {
@@ -282,9 +218,6 @@ private:
     MotionProcessor& processor;
     motion::Id selected = 0, editingName = 0;
     std::vector<std::pair<motion::Id, std::string>> listedCameras;
-    std::vector<motion::CameraCut> cuts;
-    std::vector<std::unique_ptr<CutRow>> cutRows;
-    juce::Rectangle<int> cutsArea;
     juce::ComboBox cameraChoice, lookAt, parent;
     juce::Label lookAtLabel, parentLabel;
     std::vector<std::pair<motion::Id, juce::String>> listedTargets, listedParents;

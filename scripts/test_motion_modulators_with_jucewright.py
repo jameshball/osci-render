@@ -115,13 +115,18 @@ try:
     # A spatial path for the leader, from the inspector's Position row.
     step("timeline for leader", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("select leader again", "click", "--class", "MotionTimelineView", "--position", "300,42")
-    step("object inspector", "click", "--name", "Object", "--class", "osci::TabBar::Tab", "--exact")
+    step("object inspector", "click", "--name", "Properties", "--class", "osci::TabBar::Tab", "--exact")
     step("spatial path", "click", "--name", "Spatial path", "--exact")
     wait_undo("Use spatial path")
     clip, _ = clip_property(saved(), 3, "position.x")
     assert clip.get("spatialPath") == "1", clip.attrib
     _, y = clip_property(saved(), 3, "position.y")
     assert len(y.findall("key")) == 2, "enabling the path keys every axis at the shared times"
+    # The Position row's modulation chip opens that property in the graph.
+    step("modulate position", "click", "--name", "Modulate position", "--exact")
+    command("wait-for-value", "--name", "Animated property", "--value", "Position X", "--timeout-ms", 5000)
+    command("wait-for-locator", "--name", "Route modulator", "--exact", "--timeout-ms", 5000)
+    step("modulate screenshot", "screenshot", "--file", session.artifact_dir / "modulate.png")
     # Deleting the modulator removes its route; undo restores both.
     step("modulator tab again", "click", "--name", "Modulators", "--class", "osci::TabBar::Tab", "--exact")
     step("delete modulator", "click", "--name", "Delete modulator", "--exact")

@@ -97,7 +97,7 @@ def select_clip(name, time):
     x = 170 + round(time * (area["w"] - 170 - 20) / 185.6)
     y = target["bounds"]["y"] - area["y"] + 8
     step("select " + name, "click", "--class", "MotionTimelineView", "--position", f"{x},{y}")
-    tab("Object")
+    tab("Properties")
 
 
 def keys(property_, values):
@@ -139,10 +139,10 @@ def import_source(name, start, duration, properties, animation=None):
         command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
         step("trace animated raster", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", name, "--class", "juce::Label", "--exact")
-    tab("Clip")
+    tab("Timing")
     edit("Clip duration", duration)
     if properties or animation:
-        tab("Object")
+        tab("Properties")
         for property_, value in properties.items():
             edit(property_, value)
         for property_, keys in (animation or {}).items():
@@ -157,7 +157,7 @@ def import_source(name, start, duration, properties, animation=None):
 
 def repeat_selected(start, duration):
     step("repeat selected motif", "press", "command + d", "--class", "MotionTimelineView")
-    tab("Clip")
+    tab("Timing")
     edit("Clip start", start)
     edit("Clip duration", duration)
 
@@ -165,9 +165,9 @@ def repeat_selected(start, duration):
 
 def extend(name,at,end):
     select_clip(name,at)
-    tab("Clip")
+    tab("Timing")
     edit("Clip duration",end)
-    tab("Object")
+    tab("Properties")
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
@@ -182,14 +182,14 @@ try:
     keys("rotation.z",[(51.2,0),(57.6,25),(64,-30),(76.8,0),(102.4,0),(128,-25),(153.6,0),(179.2,0)])
     extend("Receiver.obj",27,51.2)
     repeat_selected(102.4,83.2)
-    tab("Object")
+    tab("Properties")
     keys("position.x",[(102.4,.65),(115.2,.45),(128,.4),(153.6,.35),(179.2,.15)])
     keys("weight",[(102.4,.1),(115.2,.4),(153.6,.4),(179.2,.4),(184,0)])
     extend("Relay corridor.obj",34,44.8)
     keys("weight",[(32,.15),(44.8,.6),(57.6,.9),(70.4,1),(76.7,0)])
     keys("rotation.y",[(51.2,20),(64,-15),(70.4,10),(76.7,80)])
-    select_clip("Relay packet.json",27);tab("Clip");edit("Clip duration",51.2);tab("Object")
-    select_clip("Reply.lua",24);tab("Clip");edit("Clip duration",54.4);tab("Object")
+    select_clip("Relay packet.json",27);tab("Timing");edit("Clip duration",51.2);tab("Properties")
+    select_clip("Reply.lua",24);tab("Timing");edit("Clip duration",54.4);tab("Properties")
     keys("weight",[(51.2,.65),(64,.25),(76.7,0)])
     import_source("Interference.lua",51.2,25.6,{"red":1,"green":.2,"blue":.12,"scale.x":.7,"scale.y":.7,"scale.z":.7}, {
         "weight":[(51.2,0),(57.6,.35),(64,.7),(73.6,1),(76.7,0)],

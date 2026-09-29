@@ -106,6 +106,10 @@ public:
         record.setEnabled(recording ? !processor.midiRecordingSession().stopping() : available && !isLocked() && clip->composition == 0);
         record.setColour(juce::TextButton::buttonColourId, recording ? juce::Colour(0xff8b3039) : osci::Colours::surfaceRaised());
         cancelRecording.setVisible(recording);
+        // Clip-bound actions appear once a visual clip is chosen.
+        record.setVisible(clip != nullptr || recording);
+        audition.setVisible(clip != nullptr);
+        envelopeButton.setVisible(clip != nullptr);
         const auto& status = processor.midiRecordingSession().message();
         recordingStatus.setText(error.isNotEmpty() ? error : status, juce::dontSendNotification);
         recordingStatus.setColour(juce::Label::textColourId, error.isNotEmpty() || processor.midiRecordingSession().hasError() ? juce::Colours::orange : osci::Colours::textMuted());

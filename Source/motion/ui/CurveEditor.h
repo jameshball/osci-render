@@ -216,7 +216,7 @@ public:
                 drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : juce::Colour(0xff70da91));
             }
             const auto x = timeX(processor.position.load());
-            g.setColour(juce::Colour(0xffe7bc6c));
+            g.setColour(motion::style::playhead());
             g.drawLine(x, area.getY(), x, area.getBottom(), 1.0f);
             if (snapGuide.has_value()) {
                 const auto guide = timeX(*snapGuide);

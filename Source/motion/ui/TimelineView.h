@@ -78,7 +78,12 @@ public:
     double pixelsPerSecond = 70;
     double scrollTime = 0;
     mutable int scrollRows = 0;
-    static constexpr int namesWidth = 170;
+    // Track names column; drag its edge to resize (140-420 px).
+    int namesWidth = 170;
+    bool resizingNames = false;
+    // The resize handle is the strip just inside the names column, so clicks
+    // on keys and clips at the start of the timeline are never taken.
+    bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
     mutable int rulerHeight = 26;
     static constexpr int rowHeight = 32;
     static constexpr int laneHeight = 22;
@@ -263,7 +268,7 @@ public:
             const auto y = rowY(row);
             header->setVisible(found != rows.end() && row >= scrollRows && y < getHeight());
             const auto indent = found != rows.end() ? std::min(48, found->depth * 8) : 0;
-            header->setBounds(indent, y, namesWidth - 1 - indent, rowHeight - 1);
+            header->setBounds(indent, y, namesWidth - 5 - indent, rowHeight - 1);
         }
     }
     bool isInterestedInDragSource(const SourceDetails& details) override {
@@ -570,6 +575,10 @@ public:
         grabKeyboardFocus();
         ensureTrackRows();
         cancelGesture();
+        if (onNamesEdge(event) && event.mods.isLeftButtonDown()) {
+            resizingNames = true;
+            return;
+        }
         if (inCameraBand(event.y)) {
             cameraBandDown(event);
             return;
@@ -679,8 +688,18 @@ public:
     }
 
     void mouseMove(const juce::MouseEvent& event) override {
+        if (onNamesEdge(event)) {
+            setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+            return;
+        }
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
+        juce::String tip;
+        if (clip != nullptr) {
+            const auto timing = clip->timing(processor.document.project().tempo());
+            tip = juce::String(clip->name) + "\n" + juce::String(timing.start, 2) + "s - " + juce::String(timing.end(), 2) + "s (" + juce::String(timing.duration(), 2) + "s)";
+        }
+        if (getTooltip() != tip) { setTooltip(tip); }
         if (event.y < rulerHeight && event.x < namesWidth) {
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
         } else if (markerAt(event.getPosition()) != nullptr) {
@@ -695,6 +714,12 @@ public:
     }
 
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (resizingNames) {
+            namesWidth = std::clamp(event.x, 140, std::min(420, getWidth() / 2));
+            refreshTracks();
+            repaint();
+            return;
+        }
         if (cutDrag.has_value()) {
             cameraBandDrag(event);
             return;
@@ -847,6 +872,10 @@ public:
 
     void mouseUp(const juce::MouseEvent&) override {
         snapGuide.reset();
+        if (resizingNames) {
+            resizingNames = false;
+            return;
+        }
         if (cutDrag.has_value()) {
             cutDrag.reset();
             repaint();
@@ -1390,8 +1419,19 @@ private:
         g.setFont(11.0f);
         g.drawText("Cameras", 12, top, namesWidth - 24, cameraBandHeight, juce::Justification::centredLeft);
         if (!project.cameras.empty()) {
+            // Between cuts the first camera shows; label each visible gap.
             g.setColour(osci::Colours::textMuted().withAlpha(.5f));
-            g.drawText(juce::String(project.cameras.front().name) + " (default)", namesWidth + 6, top, 240, cameraBandHeight, juce::Justification::centredLeft);
+            const auto label = juce::String(project.cameras.front().name) + " (default)";
+            double from = 0;
+            const auto gap = [&](double end) {
+                const auto left = std::max(namesWidth, timeX(from)) + 6, right = std::min(getWidth(), timeX(end)) - 4;
+                if (right - left > 60) { g.drawText(label, left, top, right - left, cameraBandHeight, juce::Justification::centredLeft, true); }
+            };
+            for (const auto& cut : project.cameraCuts) {
+                if (cut.start > from) { gap(cut.start); }
+                from = std::max(from, cut.end());
+            }
+            if (from < project.duration) { gap(project.duration); }
         }
         for (const auto& cut : project.cameraCuts) {
             const auto bounds = cutBounds(cut);

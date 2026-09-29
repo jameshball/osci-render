@@ -115,14 +115,15 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(playbackHealth);
     playbackHealth.isPreparing = [this] { return processor.isPreparingComposition(); };
     playbackHealth.onClick = [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); };
-    menus.addTopLevelMenu("Interface");
+    menus.addTopLevelMenu("View");
     menus.addCommonInterfaceMenuItems(5, processor, *this);
     registerCommands();
     initialiseMenuBar(menus);
+    menuBar.setLookAndFeel(&menuLookAndFeel);
     for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &splitButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs, &statusBar }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &curveProperty, &timelineDivider, &previewDivider, &cameraPanel, &inspectorTabs, &statusBar }) {
         addAndMakeVisible(component);
     }
     addChildComponent(scopeBack);
@@ -144,7 +145,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         processor.document.edit("Rename composition", [name](motion::Project& project) { project.name = name; });
     };
     addAndMakeVisible(compositionTitle);
-    compositionTitle.setText("Composition", juce::dontSendNotification);
+    compositionTitle.setText("Scene", juce::dontSendNotification);
     compositionTitle.setFont(juce::FontOptions(15.0f));
     compositionTitle.setBorderSize(juce::BorderSize<int>(0));
     addAndMakeVisible(transformTool);
@@ -221,9 +222,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
-    monitorOutput.addItem("Music monitor", 1);
-    monitorOutput.addItem("XY signal", 2);
-    monitorOutput.addItem("XYRGB signal (5 ch)", 3);
+    monitorOutput.addItem("Speakers: soundtrack", 1);
+    monitorOutput.addItem("Outputs: XY signal", 2);
+    monitorOutput.addItem("Outputs: XYRGB signal (5 ch)", 3);
     refreshOutputChoices();
     monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
     monitorOutput.setTooltip("Physical audio output. The visualiser always receives the beam signal. XYRGB requires five enabled output channels.");
@@ -334,10 +335,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addChildComponent(cancelExport);
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
-    inspectorTabs.addTab("Object");
+    inspectorTabs.addTab("Properties");
     inspectorTabs.addTab("Effects");
     inspectorTabs.addTab("Camera");
-    inspectorTabs.addTab("Clip");
+    inspectorTabs.addTab("Timing");
     addChildComponent(clipTimingPanel);
     inspectorTabs.onSelectionChanged = [this](int index) {
         cameraPanel.setVisible(index == 2);
@@ -420,41 +421,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         });
     };
     playButton.onClick = [this] { processor.playing.store(!processor.playing.load()); };
-    splitButton.onClick = [this] {
-        const auto time = processor.position.load();
-        const auto& tracks = processor.document.project().tracks;
-        const bool canSplit = std::any_of(tracks.begin(), tracks.end(), [&](const motion::Track& track) {
-            return std::any_of(track.clips.begin(), track.clips.end(), [&](const motion::Clip& clip) {
-                return clip.id == selection && canSplitClip(&clip, time, processor.document.project().tempo());
-            });
-        });
-        if (!canSplit) {
-            return;
-        }
-        const auto id = processor.document.newId();
-        processor.document.tryEdit("Split clip", [&](motion::Project& project) {
-            for (auto& track : project.tracks) {
-                for (std::size_t index = 0; index < track.clips.size(); ++index) {
-                    if (track.clips[index].id != selection) { continue; }
-                    if (track.locked) { return false; }
-                    auto parts = track.clips[index].split(time, id, project.tempo());
-                    if (!parts.has_value()) { return false; }
-                    // The right half keeps the left's routes and internal links.
-                    std::map<motion::Id, motion::Id> owners {{parts->first.id, id}};
-                    for (auto& effect : parts->second.effects) {
-                        const auto clone = processor.document.newId();
-                        owners.emplace(effect.id, clone);
-                        effect.id = clone;
-                    }
-                    track.clips[index] = std::move(parts->first);
-                    if (!track.insert(std::move(parts->second), project.tempo())) { return false; }
-                    motion::cloneDrivers(project, owners, [this] { return processor.document.newId(); });
-                    return true;
-                }
-            }
-            return false;
-        });
-    };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
         const auto& definitions = processor.document.mainProject().definitions;
@@ -599,6 +565,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
     composition.onSelection = timeline.onSelection;
     propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false); };
+    propertyInspector.onModulate = [this](motion::Id id, const std::string& property) {
+        selectCurveTarget(id, property, false);
+        timelineTabs.setSelectedIndex(1);
+    };
     propertyInspector.selectedKeyTime = [this](motion::Id id) { return composition.selectedKeyContentTime(id); };
     propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
     processor.document.addChangeListener(this);
@@ -613,6 +583,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
 }
 
 MotionEditor::~MotionEditor() {
+    menuBar.setLookAndFeel(nullptr);
     processor.blenderInputs().cancelAllCaptures();
     stopTimer();
     visualiser.openSettings = {};
@@ -670,7 +641,6 @@ void MotionEditor::resized() {
     auto header = timeline.removeFromTop(30);
     timelineHeader.setBounds(header);
     timelineTabs.setBounds(header.removeFromLeft(270));
-    splitButton.setBounds(header.removeFromLeft(65).reduced(2, 3));
     curveProperty.setBounds(header.removeFromLeft(165).reduced(2));
     cancelExport.setBounds(header.removeFromRight(62).reduced(2));
     exportBar.setBounds(header.removeFromRight(180).reduced(2));
@@ -690,7 +660,9 @@ void MotionEditor::resized() {
     graph.removeFromRight(3);
     curveEditor.setBounds(graph);
     timelineDivider.setBounds(area.removeFromBottom(7));
-    libraryBounds = area.removeFromLeft(190);
+    // Side panels widen on large windows; the preview keeps the rest.
+    const auto extra = std::max(0, getWidth() - 1440);
+    libraryBounds = area.removeFromLeft(std::clamp(190 + extra / 10, 190, 280));
     auto library = libraryBounds;
     libraryHeader.setBounds(library.removeFromTop(30));
     libraryTabs.setBounds(libraryHeader.getBounds());
@@ -699,7 +671,7 @@ void MotionEditor::resized() {
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
     assetLibrary.setBounds(library.reduced(4, 0));
     area.removeFromLeft(3);
-    inspectorBounds = area.removeFromRight(300);
+    inspectorBounds = area.removeFromRight(std::clamp(300 + extra * 3 / 20, 300, 420));
     auto inspector = inspectorBounds;
     inspectorHeader.setBounds(inspector.removeFromTop(30));
     inspectorTabs.setBounds(inspectorHeader.getBounds());
@@ -1392,11 +1364,8 @@ void MotionEditor::refreshInspector() {
             }
         }
     }
-    splitButton.setEnabled(canSplitClip(selected, processor.position.load(), processor.document.project().tempo()));
     const auto target = motion::findPropertyTarget(processor.document.project(), selection);
     const bool editable = target.has_value() && !target->camera && !target->isEffect;
-    const auto tabName = editable && target->isGroup ? "Group" : (audioSelected() ? "Audio" : "Object");
-    if (inspectorTabs.getTabNames()[0] != tabName) { inspectorTabs.setTabName(0, tabName); }
     propertyInspector.setTarget(editable ? selection : 0);
 }
 
@@ -1437,6 +1406,12 @@ void MotionEditor::registerCommands() {
         timeline.selectClips(duplicates);
     });
     menus.addMenuSeparator(2);
+    // After Effects conventions: [ and ] move the clip's start or end to the
+    // playhead; Alt+[ and Alt+] trim it there.
+    addCommand(2, "Move clip start to playhead", juce::KeyPress('[', 0, 0), "[", [this] { placeClipAtPlayhead(true, false); });
+    addCommand(2, "Move clip end to playhead", juce::KeyPress(']', 0, 0), "]", [this] { placeClipAtPlayhead(false, false); });
+    addCommand(2, "Trim clip start to playhead", juce::KeyPress('[', juce::ModifierKeys::altModifier, 0), "Alt+[", [this] { placeClipAtPlayhead(true, true); });
+    addCommand(2, "Trim clip end to playhead", juce::KeyPress(']', juce::ModifierKeys::altModifier, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
     addCommand(2, "Show keyframe lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
     addCommand(2, "Edit notes", juce::KeyPress(), {}, [this] { timelineTabs.setSelectedIndex(2); });
     addCommand(2, "Edit curves", juce::KeyPress(), {}, [this] { timelineTabs.setSelectedIndex(1); });
@@ -1544,8 +1519,67 @@ void MotionEditor::recordArmedTrack() {
     statusBar.show(armed ? "No armed track has a clip at or after the playhead to record into." : "Arm a track for MIDI input first (the red dot in its header).");
 }
 
+void MotionEditor::placeClipAtPlayhead(bool start, bool trim) {
+    const auto& project = processor.document.project();
+    const auto tempo = project.tempo();
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id != selection) { continue; }
+            auto timing = clip.timing(tempo);
+            const auto time = processor.position.load();
+            if (trim) {
+                if (start) {
+                    if (time >= timing.end()) { return; }
+                    timing.offset = timing.localTime(time);
+                    timing.setStart(time);
+                } else {
+                    if (time <= timing.start) { return; }
+                    timing.setEnd(time);
+                }
+            } else {
+                timing.moveTo(start ? time : time - timing.duration());
+            }
+            const auto result = processor.document.setClipTiming(clip.id, timing);
+            if (result.failed()) { statusBar.show(result.getErrorMessage()); }
+            return;
+        }
+    }
+}
+
 void MotionEditor::splitAtPlayhead() {
-    splitButton.triggerClick();
+    const auto time = processor.position.load();
+    const auto& tracks = processor.document.project().tracks;
+    const bool canSplit = std::any_of(tracks.begin(), tracks.end(), [&](const motion::Track& track) {
+        return std::any_of(track.clips.begin(), track.clips.end(), [&](const motion::Clip& clip) {
+            return clip.id == selection && canSplitClip(&clip, time, processor.document.project().tempo());
+        });
+    });
+    if (!canSplit) {
+        return;
+    }
+    const auto id = processor.document.newId();
+    processor.document.tryEdit("Split clip", [&](motion::Project& project) {
+        for (auto& track : project.tracks) {
+            for (std::size_t index = 0; index < track.clips.size(); ++index) {
+                if (track.clips[index].id != selection) { continue; }
+                if (track.locked) { return false; }
+                auto parts = track.clips[index].split(time, id, project.tempo());
+                if (!parts.has_value()) { return false; }
+                // The right half keeps the left's routes and internal links.
+                std::map<motion::Id, motion::Id> owners {{parts->first.id, id}};
+                for (auto& effect : parts->second.effects) {
+                    const auto clone = processor.document.newId();
+                    owners.emplace(effect.id, clone);
+                    effect.id = clone;
+                }
+                track.clips[index] = std::move(parts->first);
+                if (!track.insert(std::move(parts->second), project.tempo())) { return false; }
+                motion::cloneDrivers(project, owners, [this] { return processor.document.newId(); });
+                return true;
+            }
+        }
+        return false;
+    });
 }
 
 void MotionEditor::showShortcuts() {

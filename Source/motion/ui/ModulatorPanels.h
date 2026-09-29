@@ -195,6 +195,12 @@ public:
         routesTitle.setText("Drives", juce::dontSendNotification);
         routesTitle.setFont(motion::style::strong());
         addAndMakeVisible(routesTitle);
+        hint.setText("No modulators. Add an LFO, random, envelope or controller, then route it from the Graph.", juce::dontSendNotification);
+        hint.setTooltip("One modulator drives many properties from a single clock: an LFO, a random walk, the soundtrack's loudness, or a MIDI clip's notes (envelope) and controllers.");
+        hint.setFont(motion::style::small());
+        hint.setColour(juce::Label::textColourId, motion::style::muted());
+        hint.setJustificationType(juce::Justification::topLeft);
+        addAndMakeVisible(hint);
         processor.document.addChangeListener(this);
         refresh();
     }
@@ -210,6 +216,8 @@ public:
         if (selected != 0 && std::none_of(modulators.begin(), modulators.end(), [this](const auto& item) { return item.id == selected; })) { selected = 0; }
         if (selected == 0 && !modulators.empty()) { selected = modulators.front().id; }
         list.clear(juce::dontSendNotification);
+        list.setVisible(!modulators.empty());
+        hint.setVisible(modulators.empty());
         for (std::size_t index = 0; index < modulators.size(); ++index) {
             list.addItem(juce::String(modulators[index].name) + "  (" + motion::ui::describeModulator(modulators[index]) + ")", static_cast<int>(index) + 1);
             if (modulators[index].id == selected) { list.setSelectedItemIndex(static_cast<int>(index), juce::dontSendNotification); }
@@ -272,6 +280,7 @@ public:
         addEnvelope.setBounds(buttons.removeFromLeft(third).reduced(1, 0));
         addController.setBounds(buttons.reduced(1, 0));
         area.removeFromTop(motion::style::padding);
+        if (hint.isVisible()) { hint.setBounds(area.removeFromTop(48)); }
         list.setBounds(area.removeFromTop(motion::style::controlHeight));
         area.removeFromTop(motion::style::gap);
         if (current() == nullptr) { return; }
@@ -411,7 +420,7 @@ private:
     juce::TextButton addOscillator, addEnvelope, addController, remove;
     juce::ComboBox list, waveform, clock, source, controller, channel;
     std::vector<motion::Id> sourceIds;
-    juce::Label name, routesTitle;
+    juce::Label name, routesTitle, hint;
     motion::ui::LabelledScrub rate, phase, seed, attack, decay, sustain, release, velocity, lowest, highest;
     std::vector<std::unique_ptr<RouteRow>> routes;
 };

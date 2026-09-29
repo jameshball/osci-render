@@ -93,7 +93,7 @@ def select_track(id_, time):
             x = 170 + round(time * (area["w"] - 190) / 185.6)
             y = target["bounds"]["y"] - area["y"] + 8
             step("select track " + str(id_), "click", "--class", "MotionTimelineView", "--position", f"{x},{y}")
-            tab("Object")
+            tab("Properties")
             return
         direction = .3 if target is not None and target["bounds"]["y"] < area["y"] + 48 else -.3
         command("wheel", area["x"] + 250, area["y"] + 65, "--dy", direction)
@@ -107,8 +107,8 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", name, "--timeout-ms", 60000)
     step("size workspace", "resize-window", "--w", 1600, "--h", 1000)
     select_track(22,60)
-    tab("Clip"); edit("Clip duration",67.2)
-    tab("Object")
+    tab("Timing"); edit("Clip duration",67.2)
+    tab("Properties")
     for moment,value in [(76.7,.05),(80,.06),(89.5,.03)]:
         seek(moment); edit("weight",value)
     for prop,initial,final in [("scale.x",.5,.1),("scale.y",.5,.3),("scale.z",.5,.3),("position.y",-.05,-.1)]:

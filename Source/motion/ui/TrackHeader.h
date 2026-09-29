@@ -79,11 +79,15 @@ public:
         auto bounds = getLocalBounds().reduced(3, 0);
         disclosure.setBounds(bounds.removeFromLeft(16));
         grip.setBounds(bounds.removeFromLeft(14));
-        const auto chips = isGroup ? 38 : (arm.isVisible() ? 76 : 57);
-        auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, 18);
+        // Compact 15 px switches leave the name as much room as possible.
+        constexpr int chip = 15;
+        int count = 0;
+        for (auto* button : { &arm, &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
+        const auto chips = count * (chip + 1);
+        auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, 16);
         for (auto* button : { &arm, &mute, &solo, &lock }) {
             if (!button->isVisible()) { continue; }
-            button->setBounds(buttons.removeFromLeft(18));
+            button->setBounds(buttons.removeFromLeft(chip));
             buttons.removeFromLeft(1);
         }
         name.setBounds(bounds.reduced(2, 0).withSizeKeepingCentre(bounds.getWidth() - 4, 18));

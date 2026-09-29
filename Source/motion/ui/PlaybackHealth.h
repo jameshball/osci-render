@@ -10,7 +10,7 @@ class MotionPlaybackHealth final : public juce::TextButton, private juce::Timer 
 public:
     MotionPlaybackHealth() {
         setName("Playback health");
-        setButtonText("Audio --");
+        setButtonText("No audio");
         setWantsKeyboardFocus(false);
         diagnostics.setName("Playback diagnostics");
         addChildComponent(diagnostics);
@@ -28,7 +28,7 @@ private:
         data->setProperty("available", device != nullptr);
         data->setProperty("preparing", isPreparing && isPreparing());
         if (device == nullptr) {
-            setButtonText("Audio --");
+            setButtonText("No audio");
             description = "No active standalone audio device. Open Audio settings to choose an output.";
         } else {
             const auto load = standalone->deviceManager.getCpuUsage();
@@ -36,7 +36,9 @@ private:
             const auto rate = device->getCurrentSampleRate();
             const auto block = device->getCurrentBufferSizeSamples();
             const auto percent = juce::String(load * 100, 1);
-            setButtonText("Audio " + juce::String(juce::roundToInt(load * 100)) + "%");
+            setButtonText("DSP " + juce::String(juce::roundToInt(load * 100)) + "%");
+            const auto heavy = load > 0.8 || xruns > 0;
+            setColour(juce::TextButton::textColourOffId, heavy ? juce::Colour(0xffff8a5c) : findColour(juce::Label::textColourId));
             description = "Audio callback load: " + percent + "%\nDevice: " + device->getName()
                 + "\nSample rate: " + juce::String(rate, 0) + " Hz\nBuffer: " + juce::String(block) + " samples"
                 + "\nReported underruns/overruns: " + juce::String(xruns)

@@ -21,6 +21,11 @@
 #include <deque>
 #include <variant>
 
+// The menu bar at the same type size as the rest of the workspace.
+struct MotionMenuLookAndFeel final : osci::LookAndFeel {
+    juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return juce::Font(juce::FontOptions(14.0f)); }
+};
+
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
 public:
     explicit MotionEditor(MotionProcessor& processor);
@@ -116,10 +121,12 @@ private:
     void stepFrames(int frames);
     void jumpToKey(bool forward);
     void splitAtPlayhead();
+    void placeClipAtPlayhead(bool start, bool trim);
     void recordArmedTrack();
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
+    MotionMenuLookAndFeel menuLookAndFeel;
     motion::LuaSliderBakes sliderBakes { processor.document };
     MotionScopeProfilePanel scopeProfilePanel { processor };
     MotionBeamSettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, scopeProfilePanel, 550, 500, 1500 };
@@ -155,7 +162,6 @@ private:
     motion::style::IconButton playButton { "Play", motion::style::IconButton::Icon::play };
     motion::style::IconButton startButton { "Go to start", motion::style::IconButton::Icon::start };
     motion::style::IconButton endButton { "Go to end", motion::style::IconButton::Icon::end };
-    juce::TextButton splitButton { "Split" };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
@@ -197,7 +203,7 @@ private:
     MainMenuBarModel menus;
     osci::PanelHeader libraryHeader { "Assets" };
     osci::PanelHeader viewportHeader;
-    osci::PanelHeader outputHeader { "Output" };
+    osci::PanelHeader outputHeader { "Scope" };
     osci::PanelHeader inspectorHeader { "Inspector" };
     osci::PanelHeader timelineHeader { "Timeline" };
     juce::Rectangle<int> libraryBounds, viewportBounds, inspectorBounds, timelineBounds;

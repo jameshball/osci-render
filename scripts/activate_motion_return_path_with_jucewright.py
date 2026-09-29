@@ -93,7 +93,7 @@ def select_track(id_, time):
             x = 170 + round(time * (area["w"] - 190) / 185.6)
             y = target["bounds"]["y"] - area["y"] + 8
             step("select track " + str(id_), "click", "--class", "MotionTimelineView", "--position", f"{x},{y}")
-            tab("Object")
+            tab("Properties")
             return
         direction = .3 if target is not None and target["bounds"]["y"] < area["y"] + 48 else -.3
         command("wheel", area["x"] + 250, area["y"] + 65, "--dy", direction)
@@ -121,7 +121,7 @@ try:
     step("bridge beam samples", "select-option", "--name", "Image samples per frame", "--class", "juce::ComboBox", "--exact", "--text", "2048")
     step("bake bridge video", "click", "--name", "Prepare video", "--exact")
     command("wait-for-locator", "--name", "Bridge activation.mp4", "--class", "juce::Label", "--exact", "--timeout-ms", 120000)
-    tab("Object")
+    tab("Properties")
     for prop,value in {"scale.x":.6,"scale.y":.6,"scale.z":.6,"weight":.8}.items():
         edit(prop,value)
     select_track(3,140)

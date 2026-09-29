@@ -125,7 +125,7 @@ public:
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
             g.setFont(14);
-            g.drawText(processor.document.project().tracks.empty() ? "Drop an object here" : "No visible objects", getLocalBounds(), juce::Justification::centred);
+            g.drawText(emptyMessage(), getLocalBounds(), juce::Justification::centred);
             return;
         }
         juce::Graphics::ScopedSaveState sceneState(g);
@@ -375,6 +375,24 @@ public:
     }
 
 private:
+    // Why the scene is empty at the playhead, and where the next visual starts.
+    juce::String emptyMessage() const {
+        const auto& project = processor.document.project();
+        const auto now = processor.position.load();
+        std::optional<double> next;
+        bool any = false;
+        for (const auto& track : project.tracks) {
+            if (track.kind == motion::TrackKind::audio) { continue; }
+            for (const auto& clip : track.clips) {
+                any = true;
+                const auto start = clip.timing(project.tempo()).start;
+                if (start > now && (!next.has_value() || start < *next)) { next = start; }
+            }
+        }
+        if (!any) { return "Drop an object here"; }
+        const auto at = "Nothing on screen at " + juce::String(now, 2) + "s";
+        return next.has_value() ? at + "  -  next clip at " + juce::String(*next, 2) + "s" : at;
+    }
     double editingTime() const {
         if (pathKey.has_value() && (pathKey->selection != selected || pathKey->generation != processor.document.generation()
             || pathKey->scope != processor.document.editingComposition() || pathKey->seekSerial != processor.seekRevision() || pathKey->revision != processor.document.revision() || processor.playing.load())) {
