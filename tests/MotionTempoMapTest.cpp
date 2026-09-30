@@ -1,6 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
+#include "../Source/motion/model/MidiTakeNotes.h"
 
 class MotionTempoMapTest : public juce::UnitTest {
 public:
@@ -25,6 +26,95 @@ public:
             for (const auto seconds : {0.0, 1.5, 4.0, 7.25, 30.0}) { expectWithinAbsoluteError(tempo.seconds(tempo.beats(seconds)), seconds, 1.0e-12); }
             expect(!motion::Tempo(120, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{8, 60}, {4, 90}})).valid());
             expect(!motion::Tempo(120, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{0, 60}})).valid());
+        }
+        beginTest("Ramps glide linearly in beats and convert exactly both ways");
+        {
+            const motion::Tempo ramp(120, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{8, 60, true}, {16, 180}}));
+            expect(ramp.valid());
+            expectWithinAbsoluteError(ramp.bpmAtBeat(4), 90.0, 1.0e-12);
+            expectWithinAbsoluteError(ramp.bpmAtBeat(12), 60.0, 1.0e-12, "after the ramp the tempo holds");
+            expectWithinAbsoluteError(ramp.bpmAtBeat(20), 180.0, 1.0e-12, "a step still steps");
+            // Numerically integrate dt = 60 / bpm(beat) over the ramp.
+            double numeric = 0;
+            const int steps = 200000;
+            for (int i = 0; i < steps; ++i) { numeric += 60 / ramp.bpmAtBeat((i + 0.5) * 8.0 / steps) * 8.0 / steps; }
+            expectWithinAbsoluteError(ramp.seconds(8), numeric, 1.0e-9);
+            expectWithinAbsoluteError(ramp.seconds(12), ramp.seconds(8) + 4.0, 1.0e-12);
+            for (const auto seconds : {0.0, 0.7, 3.0, 5.5, 9.0, 20.0}) { expectWithinAbsoluteError(ramp.seconds(ramp.beats(seconds)), seconds, 1.0e-9); }
+            expectWithinAbsoluteError(ramp.bpmAt(ramp.seconds(4)), 90.0, 1.0e-9);
+            // A flat "ramp" is the same as a hold.
+            const motion::Tempo flat(100, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{4, 100, true}}));
+            expectWithinAbsoluteError(flat.seconds(10), 6.0, 1.0e-12);
+        }
+        beginTest("Musical clip content follows the map exactly, through steps and ramps");
+        {
+            for (const auto& tempo : {halfTimeAtBar3(), motion::Tempo(120, std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{8, 60, true}}))}) {
+                motion::Clip clip;
+                clip.id = 1; clip.timeBase = motion::ClipTimeBase::beats; clip.contentBpm = 120;
+                clip.start = 4; clip.duration = 8; clip.offset = 1; // one content beat in
+                const auto timing = clip.timing(tempo);
+                expect(timing.warp.has_value());
+                for (const auto beat : {4.0, 5.5, 8.0, 9.25, 12.0}) {
+                    // Content authored at 120 BPM: half a second per beat, from beat 1.
+                    const auto time = tempo.seconds(beat);
+                    expectWithinAbsoluteError(timing.localTime(time), (1 + beat - 4) * 0.5, 1.0e-9);
+                    expectWithinAbsoluteError(timing.projectTime(timing.localTime(time)), time, 1.0e-9);
+                }
+                // The average rate agrees with the warp at both ends.
+                expectWithinAbsoluteError(timing.offset + timing.rate * timing.duration(), timing.localTime(timing.end()), 1.0e-9);
+                // A composition instance on the map carries its warp into a child.
+                const motion::ClipTiming child(1, 3, 0.25, 2);
+                const auto nested = child.nestedIn(timing);
+                expect(nested.has_value() && nested->warp.has_value());
+                for (const auto time : {tempo.seconds(6.1), tempo.seconds(7.9), tempo.seconds(8.5)}) {
+                    if (time >= nested->start && time < nested->end()) { expectWithinAbsoluteError(nested->localTime(time), child.localTime(timing.localTime(time)), 1.0e-9); }
+                }
+            }
+            // A warped child inside a linear instance keeps its exact warp.
+            const auto tempo = halfTimeAtBar3();
+            motion::Clip inner;
+            inner.id = 2; inner.timeBase = motion::ClipTimeBase::beats; inner.contentBpm = 120; inner.start = 6; inner.duration = 4;
+            const auto innerTiming = inner.timing(tempo);
+            const motion::ClipTiming instance(10, 30, 0, 1);
+            const auto nested = innerTiming.nestedIn(instance);
+            expect(nested.has_value() && nested->warp.has_value());
+            for (const auto local : {3.5, 4.0, 5.0}) { expectWithinAbsoluteError(nested->localTime(10 + local), innerTiming.localTime(local), 1.0e-9); }
+        }
+        beginTest("Recorded MIDI lands on the beats of a musical clip under a tempo map");
+        {
+            const auto tempo = halfTimeAtBar3();
+            motion::Clip clip;
+            clip.id = 7; clip.timeBase = motion::ClipTimeBase::beats; clip.contentBpm = 120; clip.start = 4; clip.duration = 8;
+            const auto timing = clip.timing(tempo);
+            motion::MidiRecording::Take take;
+            const double rate = 1000;
+            take.config.token = 1; take.config.target = 7; take.config.sampleRate = rate; take.config.sourceBpm = 120;
+            take.config.firstSample = static_cast<std::uint64_t>(timing.start * rate); take.config.endSample = static_cast<std::uint64_t>(timing.end() * rate);
+            take.config.sourceRate = timing.rate; take.config.sourceOffset = timing.localTime(timing.start);
+            take.firstSample = take.config.firstSample; take.endSample = take.config.endSample;
+            // A note on project beat 10 (after the change, 6 s) is clip beat 6.
+            const auto on = static_cast<std::uint64_t>(tempo.seconds(10) * rate);
+            take.events = {{on, {0x90, 60, 100}, 3}, {on + 500, {0x80, 60, 0}, 3}};
+            const auto notes = motion::MidiTakeNotes::convert(take, {}, nullptr, &timing);
+            expect(notes && notes.source->notes().size() == 1, juce::String(notes.error));
+            if (notes) { expectWithinAbsoluteError(notes.source->notes()[0].start, 6.0, 1.0e-9); }
+        }
+        beginTest("Ramps save, reload and survive edits of their change");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project project;
+            project.duration = 20;
+            document.reset(project);
+            expect(document.setTempoChange(8, 90, std::nullopt, true).wasOk());
+            expect(document.project().tempoChanges->front().ramp);
+            expect(document.setTempoChange(10, 100, 8.0).wasOk(), "moving a change keeps its ramp");
+            expect(document.project().tempoChanges->front().ramp && document.project().tempoChanges->front().beat == 10);
+            motion::Project loaded;
+            expect(motion::Document::prepareLoad(document.save(), loaded).wasOk());
+            expect(loaded.tempoChanges != nullptr && loaded.tempoChanges->front().ramp);
+            expect(document.setTempoChange(10, 100, std::nullopt, false).wasOk());
+            expect(!document.project().tempoChanges->front().ramp);
         }
         beginTest("Musical clips place by the map; content spans at its average tempo");
         {

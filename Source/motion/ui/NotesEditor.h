@@ -245,7 +245,7 @@ public:
         if (event.y >= 30 && event.y < gridBounds().getY() && event.x >= keyboardWidth) {
             const auto local = beatAt(event.x) * 60 / clip->curveBpm(processor.document.project().tempo());
             const auto timing = clip->timing(processor.document.project().tempo());
-            processor.seek(std::clamp(timing.start + (local - timing.offset) / timing.rate, timing.start, timing.end())); return;
+            processor.seek(std::clamp(timing.projectTime(local), timing.start, timing.end())); return;
         }
         const auto id = hit(event.getPosition());
         if (id == 0) {

@@ -362,7 +362,7 @@ private:
             }
         }
         if (!best.has_value()) { return; }
-        const auto projectTime = found->start + (*best - found->offset) / found->rate;
+        const auto projectTime = found->projectTime(*best);
         processor.seek(std::clamp(projectTime, 0.0, processor.document.project().duration));
     }
 

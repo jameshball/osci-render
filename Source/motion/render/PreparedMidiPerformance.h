@@ -26,7 +26,7 @@ public:
         const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(tempo);
         const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
         const auto sampleAt = [&](double beat) {
-            const auto seconds = timing.start + (beat * secondsPerBeat - timing.offset) / timing.rate;
+            const auto seconds = timing.projectTime(beat * secondsPerBeat);
             return std::max(0.0, std::round(seconds * sampleRate));
         };
         for (const auto& control : notes.controls()) {

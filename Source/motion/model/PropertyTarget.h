@@ -24,10 +24,19 @@ struct BasicPropertyTarget {
     bool isGroup = false;
     bool isAudio = false;
     double contentBpm = 0;
+    // A musical clip under a tempo map follows the beats exactly.
+    std::optional<ClipTiming::BeatWarp> warp;
     double curveBpm(double projectBpm) const { return contentBpm > 0 ? contentBpm : projectBpm; }
 
     double end() const { return start + duration; }
-    double localTime(double projectTime) const { return offset + (projectTime - start) * rate; }
+    ClipTiming clock() const {
+        ClipTiming timing(start, start + duration, offset, rate);
+        timing.warp = warp;
+        return timing;
+    }
+    double localTime(double projectTime) const { return clock().localTime(projectTime); }
+    // Scope time of a content-local time (the inverse of localTime).
+    double projectTime(double local) const { return clock().projectTime(local); }
     auto curve(const std::string& property) const -> std::conditional_t<std::is_const_v<Map>, const Curve*, Curve*> {
         if (properties == nullptr) {
             return nullptr;
@@ -73,11 +82,11 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
             const auto timing = clip.timing(project.tempo());
             for (auto& effect : clip.effects) {
                 if (effect.id == id) {
-                    return Target { effect.id, effect.name, timing.start, timing.duration(), timing.offset, timing.rate, &effect.properties, false, true, false, false, clip.curveBpm(project.tempo()) };
+                    return Target { effect.id, effect.name, timing.start, timing.duration(), timing.offset, timing.rate, &effect.properties, false, true, false, false, clip.curveBpm(project.tempo()), timing.warp };
                 }
             }
             if (clip.id == id) {
-                return Target { clip.id, clip.name, timing.start, timing.duration(), timing.offset, timing.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio, clip.curveBpm(project.tempo()) };
+                return Target { clip.id, clip.name, timing.start, timing.duration(), timing.offset, timing.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio, clip.curveBpm(project.tempo()), timing.warp };
             }
         }
     }

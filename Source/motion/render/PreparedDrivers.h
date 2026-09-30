@@ -45,12 +45,8 @@ private:
         const auto target = findPropertyTarget(scope, owner);
         if (!target.has_value()) { return; }
         auto drivers = std::make_shared<CurveDrivers>();
-        drivers->start = target->start;
-        drivers->offset = target->offset;
-        drivers->rate = target->rate;
-        drivers->projectStart = scopeClock.start;
-        drivers->projectOffset = scopeClock.offset;
-        drivers->projectRate = scopeClock.rate;
+        drivers->clock = target->clock();
+        drivers->projectClock = scopeClock;
         for (const auto& route : scope.routes) {
             if (route.target != owner || route.property != property) { continue; }
             auto modulator = prepare(scope, scopeClock, route.modulator);
@@ -62,9 +58,7 @@ private:
             if (sourceCurve != nullptr) {
                 drivers->link = *curve.link;
                 drivers->linkSource = std::move(sourceCurve);
-                drivers->linkStart = source->start;
-                drivers->linkOffset = source->offset;
-                drivers->linkRate = source->rate;
+                drivers->linkClock = source->clock();
                 drivers->linkBpm = source->curveBpm(scope.bpm);
             }
         }
@@ -97,9 +91,8 @@ private:
         const auto envelope = loudness ? loudness() : nullptr;
         const auto target = findPropertyTarget(scope, owner);
         if (envelope == nullptr || !target.has_value() || scopeClock.rate == 0) { return; }
-        // local -> composition -> project, composed into one affine clock.
-        const auto start = scopeClock.start + (target->start - scopeClock.offset) / scopeClock.rate;
-        curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock {envelope, start, target->offset, target->rate * scopeClock.rate});
+        // local -> composition -> project.
+        curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock {envelope, target->clock(), scopeClock});
     }
 
     std::shared_ptr<const PreparedModulator> prepare(const Composition& scope, const ClipTiming& scopeClock, ModulatorId id) {
@@ -142,7 +135,7 @@ private:
                 const auto secondsPerBeat = 60 / clip.curveBpm(scope.tempo());
                 for (const auto& control : clip.midi->controls()) {
                     if (control.number != modulator.controller || (modulator.controllerChannel != 0 && control.channel != modulator.controllerChannel)) { continue; }
-                    const auto seconds = timing.start + (control.beat * secondsPerBeat - timing.offset) / timing.rate;
+                    const auto seconds = timing.projectTime(control.beat * secondsPerBeat);
                     prepared.steps.emplace_back(std::clamp(seconds, timing.start, timing.end()), control.normalised());
                 }
                 std::stable_sort(prepared.steps.begin(), prepared.steps.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -158,7 +151,7 @@ private:
                 const auto timing = clip.timing(scope.tempo());
                 if (!timing.valid()) { return; }
                 const auto secondsPerBeat = 60 / clip.curveBpm(scope.tempo());
-                const auto resolve = [&](double beat) { return timing.start + (beat * secondsPerBeat - timing.offset) / timing.rate; };
+                const auto resolve = [&](double beat) { return timing.projectTime(beat * secondsPerBeat); };
                 for (const auto& note : clip.midi->notes()) {
                     if (note.pitch < modulator.lowestPitch || note.pitch > modulator.highestPitch) { continue; }
                     const auto start = std::max(timing.start, resolve(note.start));

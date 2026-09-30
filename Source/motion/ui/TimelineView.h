@@ -133,7 +133,7 @@ public:
             const auto timing = clip->timing(project.tempo());
             for (const auto& keyframe : found->second.keyframes()) {
                 if (!sameTime(keyframe.time, key.time) || timing.rate == 0) { continue; }
-                const auto time = timing.start + (keyframe.time - timing.offset) / timing.rate;
+                const auto time = timing.projectTime(keyframe.time);
                 earliest = std::min(earliest, time);
                 timed.push_back({time, {key.property, 0, keyframe}});
             }
@@ -1013,7 +1013,7 @@ private:
         for (const auto& [name, curve] : clip.properties) {
             if (!property.empty() && name != property) { continue; }
             for (const auto& key : curve.keyframes()) {
-                const auto time = timing.start + (key.time - timing.offset) / timing.rate;
+                const auto time = timing.projectTime(key.time);
                 if (time >= timing.start - 1.0e-9 && time <= timing.end() + 1.0e-9) { times.push_back(time); }
             }
         }
@@ -1126,7 +1126,7 @@ private:
             // Key shape encodes its outgoing interpolation: square hold,
             // diamond linear, circle auto/Bezier.
             for (std::size_t k = 0; k < keys.size(); ++k) {
-                const auto time = timing.start + (keys[k].time - timing.offset) / timing.rate;
+                const auto time = timing.projectTime(keys[k].time);
                 const auto x = static_cast<float>(timeX(time));
                 const bool chosen = isKeySelected(clip.id, row.lane, keys[k].time);
                 g.setColour(chosen ? juce::Colours::white : motion::style::key());
@@ -1174,7 +1174,7 @@ private:
             const auto timing = clip.timing(project.tempo());
             if (found == clip.properties.end() || timing.rate == 0) { continue; }
             for (const auto& key : found->second.keyframes()) {
-                const auto distance = std::abs(timeX(timing.start + (key.time - timing.offset) / timing.rate) - point.x);
+                const auto distance = std::abs(timeX(timing.projectTime(key.time)) - point.x);
                 if (distance < bestDistance) { bestDistance = distance; best = KeyRef{clip.id, lane->lane, key.time}; }
             }
         }
@@ -1192,7 +1192,7 @@ private:
                 const auto timing = clip.timing(project.tempo());
                 if (found == clip.properties.end() || timing.rate == 0) { continue; }
                 for (const auto& key : found->second.keyframes()) {
-                    const auto x = timeX(timing.start + (key.time - timing.offset) / timing.rate);
+                    const auto x = timeX(timing.projectTime(key.time));
                     if (x >= area.getX() && x <= area.getRight()) { result.push_back({clip.id, row.lane, key.time}); }
                 }
             }
@@ -1221,7 +1221,7 @@ private:
                     if (moving.empty()) { continue; }
                     for (const auto& key : moving) { curve.removeKey(key.time); }
                     for (auto key : moving) {
-                        key.time += delta * timing.rate;
+                        key.time = timing.localTime(timing.projectTime(key.time) + delta);
                         const auto& remaining = curve.keyframes();
                         if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return sameTime(other.time, key.time); })) { return false; }
                         curve.setKey(key);
@@ -1241,7 +1241,7 @@ private:
         if (clip == nullptr) { return; }
         const auto timing = clip->timing(keyDrag->before.tempo());
         if (timing.rate == 0) { return; }
-        const auto grabbedTime = timing.start + (keyDrag->grabbed.time - timing.offset) / timing.rate;
+        const auto grabbedTime = timing.projectTime(keyDrag->grabbed.time);
         auto delta = (x - keyDrag->downX) / pixelsPerSecond;
         if (delta != 0) { delta = snapEdge(grabbedTime + delta, modifiers, keyDrag->before, {}, &keyDrag->keys) - grabbedTime; }
         auto updated = keyDrag->before;
@@ -2145,7 +2145,7 @@ private:
                         const bool moving = movingKeys != nullptr && std::any_of(movingKeys->begin(), movingKeys->end(), [&](const auto& item) {
                             return item.clip == clip.id && item.property == name && sameTime(item.time, key.time);
                         });
-                        if (!moving) { consider(timing.start + (key.time - timing.offset) / timing.rate); }
+                        if (!moving) { consider(timing.projectTime(key.time)); }
                     }
                 }
             }

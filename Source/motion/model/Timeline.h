@@ -4,6 +4,7 @@
 #include "Effects.h"
 #include "MidiNotes.h"
 #include "MidiInstrument.h"
+#include "ClipTiming.h"
 #include "Tempo.h"
 #include <algorithm>
 #include <cmath>
@@ -27,42 +28,6 @@ inline double spanUntil(double start, double end) {
 using Id = std::uint64_t;
 
 enum class ClipTimeBase { seconds, beats };
-
-struct ClipTiming {
-    ClipTiming(double first = 0, double last = 0, double sourceOffset = 0, double speed = 1)
-        : start(first), offset(sourceOffset), rate(speed), finish(last), length(last - first) {}
-    double start, offset, rate;
-    double end() const { return finish; }
-    double duration() const { return length; }
-    void moveTo(double value) { start = value; finish = value + length; }
-    void setStart(double value) { start = value; length = finish - start; }
-    void setEnd(double value) { finish = value; length = finish - start; }
-    void setDuration(double value) { length = value; finish = start + value; }
-    double localTime(double time) const { return offset + (time - start) * rate; }
-    // Resolve this child interval through a composition instance. Both inputs
-    // are seconds at their own scope; authored curves remain in source time.
-    // Clipping the visible interval also advances the source offset, so a trim
-    // cannot restart the child's animation.
-    std::optional<ClipTiming> nestedIn(const ClipTiming& instance) const {
-        if (!valid() || !instance.valid()) { return std::nullopt; }
-        const auto mappedStart = instance.start + (start - instance.offset) / instance.rate;
-        const auto mappedEnd = instance.start + (end() - instance.offset) / instance.rate;
-        if (!std::isfinite(mappedStart) || !std::isfinite(mappedEnd)) { return std::nullopt; }
-        const auto first = std::max(instance.start, mappedStart);
-        const auto last = std::min(instance.end(), mappedEnd);
-        if (first >= last) { return std::nullopt; }
-        ClipTiming resolved(first, last, localTime(instance.localTime(first)), rate * instance.rate);
-        return resolved.valid() ? std::optional<ClipTiming>(resolved) : std::nullopt;
-    }
-    bool valid() const {
-        return std::isfinite(start) && start >= 0 && std::isfinite(length) && length > 0
-            && std::isfinite(finish) && finish > start && std::isfinite(offset) && std::isfinite(rate) && rate > 0;
-    }
-private:
-    // Keep the converted boundary itself: start + (end - start) can round to
-    // a different value and invent overlaps between exactly adjacent clips.
-    double finish, length;
-};
 
 struct LuaClipBake;
 
@@ -95,14 +60,16 @@ struct Clip {
 
     // Canonical fields above use beats for musical clips, seconds otherwise.
     // Resolved content remains seconds so visual curves and their tangents are
-    // never rewritten when the project tempo changes. A musical clip spanning
-    // tempo changes plays its content at its average tempo; each clip inside
-    // one tempo segment lines up with the beat exactly.
+    // never rewritten when the project tempo changes. Under a tempo map a
+    // musical clip's content follows the beats exactly, through steps and
+    // ramps alike.
     ClipTiming timing(const Tempo& tempo) const {
         if (timeBase == ClipTimeBase::seconds) { return {start, end(), offset, rate}; }
         const auto first = tempo.seconds(start);
         const auto last = tempo.seconds(end());
-        return {first, last, offset * (60 / contentBpm), rate * (tempo.averageBpm(start, end()) / contentBpm)};
+        ClipTiming resolved(first, last, offset * (60 / contentBpm), rate * (tempo.averageBpm(start, end()) / contentBpm));
+        if (!tempo.constant()) { resolved.warp = ClipTiming::BeatWarp {tempo, 0, 1, start, rate * 60 / contentBpm}; }
+        return resolved;
     }
     double curveBpm(const Tempo& tempo) const { return timeBase == ClipTimeBase::beats ? contentBpm : tempo.initialBpm(); }
     bool setTiming(ClipTiming value, const Tempo& tempo) {
@@ -118,7 +85,7 @@ struct Clip {
                 next.duration = tempo.constant() ? value.duration() * (tempo.initialBpm() / 60) : tempo.beats(value.end()) - next.start;
             }
             if (value.offset != before.offset) { next.offset = value.offset * (contentBpm / 60); }
-            if (value.rate != before.rate || (!tempo.constant() && value.duration() != before.duration())) {
+            if (value.rate != before.rate) {
                 next.rate = value.rate * (contentBpm / tempo.averageBpm(next.start, next.end()));
             }
         } else {
@@ -178,7 +145,6 @@ struct Clip {
     // snapshots, never these growing containers.
     bool trim(double newStart, double newEnd, const Tempo& tempo) {
         if (!tempo.valid()) { return false; }
-        const auto original = timing(tempo);
         if (timeBase == ClipTimeBase::beats) { newStart = tempo.beats(newStart); newEnd = tempo.beats(newEnd); }
         if (!std::isfinite(newStart) || !std::isfinite(newEnd) || newStart < 0.0 || newEnd <= newStart) {
             return false;
@@ -190,17 +156,7 @@ struct Clip {
         offset = newOffset;
         start = newStart;
         duration = newEnd - newStart;
-        keepContent(original, tempo);
         return true;
-    }
-    // Under a tempo map a musical clip plays its content at its own average
-    // tempo, which a trim or split changes. Re-derive offset and rate so the
-    // remaining content shows exactly what it showed before, at every time.
-    void keepContent(const ClipTiming& original, const Tempo& tempo) {
-        if (timeBase != ClipTimeBase::beats || tempo.constant()) { return; }
-        const auto first = tempo.seconds(start);
-        offset = original.localTime(first) * (contentBpm / 60);
-        rate = original.rate * (contentBpm / tempo.averageBpm(start, end()));
     }
 
     bool stretch(double newDuration, const Tempo& tempo) {
@@ -227,7 +183,6 @@ struct Clip {
             || projectTime <= start || projectTime >= end()) {
             return std::nullopt;
         }
-        const auto original = timing(tempo);
         auto left = *this;
         auto right = *this;
         left.duration = spanUntil(start, projectTime);
@@ -236,8 +191,6 @@ struct Clip {
         right.start = projectTime;
         right.duration = spanUntil(projectTime, end());
         if (!(left.duration > 0) || !(right.duration > 0)) { return std::nullopt; }
-        left.keepContent(original, tempo);
-        right.keepContent(original, tempo);
         return std::make_pair(std::move(left), std::move(right));
     }
 };

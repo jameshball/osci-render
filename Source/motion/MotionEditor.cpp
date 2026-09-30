@@ -1484,7 +1484,7 @@ void MotionEditor::jumpToKey(bool forward) {
     std::optional<double> best;
     for (const auto& [name, curve] : *target->properties) {
         for (const auto& key : curve.keyframes()) {
-            const auto time = target->start + (key.time - target->offset) / target->rate;
+            const auto time = target->projectTime(key.time);
             const bool candidate = forward ? time > now + 1.0e-6 : time < now - 1.0e-6;
             if (candidate && (!best.has_value() || (forward ? time < *best : time > *best))) { best = time; }
         }

@@ -45,7 +45,7 @@ public:
         std::vector<Event> events;
         events.reserve(notes.notes().size() * 2);
         const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
-        const auto resolve = [&](double beat) { return timing.start + (beat * secondsPerBeat - timing.offset) / timing.rate; };
+        const auto resolve = [&](double beat) { return timing.projectTime(beat * secondsPerBeat); };
         for (const auto& note : notes.notes()) {
             if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
             const auto on = quantize(resolve(note.start), sampleRate), off = quantize(resolve(note.end()), sampleRate);

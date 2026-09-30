@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ClipTiming.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -27,9 +28,11 @@ struct SoundtrackEnvelope {
 };
 struct SoundtrackClock {
     std::shared_ptr<const SoundtrackEnvelope> envelope;
-    double start = 0, offset = 0, rate = 1; // project = start + (local - offset) / rate
+    // project = scope.projectTime(clip.projectTime(local)); the default clocks
+    // are identities.
+    ClipTiming clip, scope;
     double at(double localTime) const {
-        return envelope == nullptr || rate == 0 ? 0 : envelope->at(start + (localTime - offset) / rate);
+        return envelope == nullptr ? 0 : envelope->at(scope.projectTime(clip.projectTime(localTime)));
     }
 };
 enum class ModulationMode { add, multiply };

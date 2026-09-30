@@ -46,8 +46,8 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
             return false;
         }
         // Definitions stop at their duration; a longer instance leaves silence.
-        const auto scopeStart = clock.start - clock.offset / clock.rate;
-        const auto scopeEnd = clock.start + (scope.duration - clock.offset) / clock.rate;
+        const auto scopeStart = clock.projectTime(0);
+        const auto scopeEnd = clock.projectTime(scope.duration);
         if (!std::isfinite(scopeStart) || !std::isfinite(scopeEnd)
             || (scopeEnd <= scopeStart && scopeStart >= clock.start && scopeStart < clock.end())) {
             result.error = "Composition timing exceeds the supported numeric range.";
@@ -65,8 +65,8 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
                     result.error = "Invalid timing while preparing a composition clip.";
                     return false;
                 }
-                const auto mappedStart = visible->start + (timing.start - visible->offset) / visible->rate;
-                const auto mappedEnd = visible->start + (timing.end() - visible->offset) / visible->rate;
+                const auto mappedStart = visible->projectTime(timing.start);
+                const auto mappedEnd = visible->projectTime(timing.end());
                 const auto first = std::max(visible->start, mappedStart);
                 const auto last = std::min(visible->end(), mappedEnd);
                 if (!std::isfinite(mappedStart) || !std::isfinite(mappedEnd)

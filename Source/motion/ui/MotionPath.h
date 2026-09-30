@@ -54,7 +54,7 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
             const Keyframe* previous = nullptr;
             for (const auto& key : found->second.keyframes()) {
                 if (++keyCount > 2048) { return false; }
-                const auto time = own ? timing.start + (key.time - timing.offset) / timing.rate : key.time;
+                const auto time = own ? timing.projectTime(key.time) : key.time;
                 if (time >= start && time <= end) {
                     auto& flags = times[time];
                     flags.key = flags.key || own;

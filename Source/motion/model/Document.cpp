@@ -823,13 +823,16 @@ static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
     scaleEffects(next.effects);
 }
 
-juce::Result Document::setTempoChange(double beat, double bpm, std::optional<double> replacing) {
+juce::Result Document::setTempoChange(double beat, double bpm, std::optional<double> replacing, std::optional<bool> ramp) {
     const auto& current = project();
     std::vector<TempoChange> changes;
     if (current.tempoChanges != nullptr) { changes = *current.tempoChanges; }
+    // An edit keeps the change's ramp unless told otherwise.
+    const auto previous = std::find_if(changes.begin(), changes.end(), [&](const auto& change) { return change.beat == replacing.value_or(beat); });
+    const auto glide = ramp.value_or(previous != changes.end() && previous->ramp);
     if (replacing.has_value()) { std::erase_if(changes, [&](const auto& change) { return change.beat == *replacing; }); }
     std::erase_if(changes, [beat](const auto& change) { return change.beat == beat; });
-    changes.push_back({beat, bpm});
+    changes.push_back({beat, bpm, glide});
     std::sort(changes.begin(), changes.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
     auto shared = std::make_shared<const std::vector<TempoChange>>(std::move(changes));
     if (!Tempo(current.bpm, shared).valid()) { return juce::Result::fail("A tempo change needs a position after the start and 1-1000 BPM."); }
@@ -2329,6 +2332,7 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
             auto* item = xml.createNewChildElement("tempo");
             item->setAttribute("beat", exactBakeNumber(change.beat));
             item->setAttribute("bpm", exactBakeNumber(change.bpm));
+            if (change.ramp) { item->setAttribute("ramp", true); }
         }
     }
     saveEffects(xml, state.effects);
@@ -2566,7 +2570,7 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
     }
     std::vector<TempoChange> tempoChanges;
     for (auto* item : xml.getChildWithTagNameIterator("tempo")) {
-        tempoChanges.push_back({item->getDoubleAttribute("beat", -1), item->getDoubleAttribute("bpm", -1)});
+        tempoChanges.push_back({item->getDoubleAttribute("beat", -1), item->getDoubleAttribute("bpm", -1), item->getBoolAttribute("ramp", false)});
     }
     if (tempoChanges.size() > 10000) { return juce::Result::fail("A composition supports at most 10000 tempo changes."); }
     if (!tempoChanges.empty()) { project.tempoChanges = std::make_shared<const std::vector<TempoChange>>(std::move(tempoChanges)); }

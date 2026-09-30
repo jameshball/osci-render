@@ -97,6 +97,7 @@ struct PreparedGroup {
 struct PreparedClipStage {
     Id id = 0;
     double start = 0, end = 0, offset = 0, rate = 1;
+    ClipTiming clock; // main seconds -> content, exact under a tempo map
     std::array<Curve, 13> curves;
     std::vector<PreparedEffect> effects, trackEffects, compositionEffects;
     std::vector<PreparedGroup> groups;
@@ -105,7 +106,7 @@ struct PreparedClipStage {
     std::optional<ClipTiming> scopeClock;
 
     double scopeTime(double time) const { return scopeClock.has_value() ? scopeClock->localTime(time) : time; }
-    double localTime(double time) const { return offset + (time - start) * rate; }
+    double localTime(double time) const { return clock.localTime(time); }
     double localWeight(double time) const {
         const auto value = curves[12].evaluate(localTime(time), contentBpm);
         return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0;
@@ -181,7 +182,8 @@ struct PreparedChain {
     struct Link {
         std::array<Curve, 13> curves;
         std::shared_ptr<const PreparedSpatial> spatial;
-        double start = 0, offset = 0, rate = 1, bpm = 120;
+        ClipTiming clock;
+        double bpm = 120;
         bool clip = false;
     };
     std::vector<Link> links; // inner to outer
@@ -189,7 +191,7 @@ struct PreparedChain {
     std::array<double, 3> apply(std::array<double, 3> position, double time) const {
         osci::Point point(static_cast<float>(position[0]), static_cast<float>(position[1]), static_cast<float>(position[2]));
         for (const auto& link : links) {
-            const auto local = link.clip ? link.offset + (time - link.start) * link.rate : time;
+            const auto local = link.clip ? link.clock.localTime(time) : time;
             point = applyTransform(point, link.curves, local, link.bpm, false, link.spatial.get());
         }
         return {point.x, point.y, point.z};
@@ -331,7 +333,7 @@ struct PreparedComposition {
                     load(link, clip.properties, clip.id);
                     link.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, link.curves);
                     const auto timing = clip.timing(project.tempo());
-                    link.start = timing.start; link.offset = timing.offset; link.rate = timing.rate;
+                    link.clock = timing;
                     link.bpm = clip.curveBpm(project.tempo());
                     link.clip = true;
                     chain.links.push_back(std::move(link));
@@ -381,6 +383,7 @@ struct PreparedComposition {
             const auto& timing = stage.clipClock;
             PreparedClipStage item;
             item.id = clip.id; item.start = timing.start; item.end = timing.end(); item.offset = timing.offset; item.rate = timing.rate;
+            item.clock = timing;
             item.scopeClock = stage.scopeClock;
             item.bpm = stage.bpm;
             item.contentBpm = clip.curveBpm(stage.tempo);
@@ -598,29 +601,29 @@ private:
         if (!needed) { return; }
         const auto shared = loudnessEnvelope(cancel);
         if (shared == nullptr) { return; }
-        const auto attach = [&](Curve& curve, double start, double offset, double rate) {
-            if (uses(curve)) { curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock{shared, start, offset, rate}); }
+        // Each clock maps main seconds to the curve's own time; the default
+        // clock is the identity.
+        const auto attach = [&](Curve& curve, const ClipTiming& clock) {
+            if (uses(curve)) { curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock{shared, clock, {}}); }
         };
-        const auto attachEffects = [&](std::vector<PreparedEffect>& list, double start, double offset, double rate) {
-            for (auto& effect : list) { for (auto& curve : effect.curves) { attach(curve, start, offset, rate); } }
+        const auto attachEffects = [&](std::vector<PreparedEffect>& list, const ClipTiming& clock) {
+            for (auto& effect : list) { for (auto& curve : effect.curves) { attach(curve, clock); } }
         };
         const auto attachStage = [&](PreparedClipStage& stage) {
-            for (auto& curve : stage.curves) { attach(curve, stage.start, stage.offset, stage.rate); }
-            attachEffects(stage.effects, stage.start, stage.offset, stage.rate);
+            for (auto& curve : stage.curves) { attach(curve, stage.clock); }
+            attachEffects(stage.effects, stage.clock);
             // Track, group and composition scopes run on the scope clock.
-            const auto scopeStart = stage.scopeClock.has_value() ? stage.scopeClock->start : 0.0;
-            const auto scopeOffset = stage.scopeClock.has_value() ? stage.scopeClock->offset : 0.0;
-            const auto scopeRate = stage.scopeClock.has_value() ? stage.scopeClock->rate : 1.0;
-            attachEffects(stage.trackEffects, scopeStart, scopeOffset, scopeRate);
-            attachEffects(stage.compositionEffects, scopeStart, scopeOffset, scopeRate);
+            const auto scope = stage.scopeClock.value_or(ClipTiming {});
+            attachEffects(stage.trackEffects, scope);
+            attachEffects(stage.compositionEffects, scope);
             for (auto& group : stage.groups) {
-                for (auto& curve : group.curves) { attach(curve, scopeStart, scopeOffset, scopeRate); }
-                attachEffects(group.effects, scopeStart, scopeOffset, scopeRate);
+                for (auto& curve : group.curves) { attach(curve, scope); }
+                attachEffects(group.effects, scope);
             }
         };
         for (auto& clip : clips) { attachStage(clip); for (auto& ancestor : clip.ancestors) { attachStage(ancestor); } }
-        for (auto& camera : cameras) { for (auto& curve : camera.curves) { attach(curve, 0, 0, 1); } }
-        attachEffects(effects, 0, 0, 1);
+        for (auto& camera : cameras) { for (auto& curve : camera.curves) { attach(curve, {}); } }
+        attachEffects(effects, {});
     }
     // Computed once, on first use, for curves and modulators that follow it.
     std::shared_ptr<const SoundtrackEnvelope> loudnessEnvelope(const std::atomic<bool>* cancel) {

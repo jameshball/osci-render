@@ -422,7 +422,7 @@ public:
         const auto minimum = clip->offset, maximum = clip->localTime(clip->end());
         std::optional<motion::KeyEditResult> result;
         if (drag->mode == DragMode::scaleLeft || drag->mode == DragMode::scaleRight) {
-            const auto edgeTime = clip->start + (drag->edge - clip->offset) / clip->rate;
+            const auto edgeTime = clip->projectTime(drag->edge);
             const auto target = snapKeyTime(*clip, edgeTime + (event.position.x - drag->down.x) / plot().getWidth() * (viewEnd - viewStart), event.mods, {});
             result = motion::keyedit::scaleKeyTimes(drag->originals, dragSelection(), drag->pivot, drag->edge, clip->localTime(target), minimum, maximum);
         } else if (drag->mode != DragMode::key) {
@@ -452,7 +452,7 @@ public:
             // A drag cannot silently replace an unselected key: double-click adds
             // and explicit deletion remain the ways to change the number of keys.
             const auto& original = drag->original;
-            const auto originalProjectTime = clip->start + (original.time - clip->offset) / clip->rate;
+            const auto originalProjectTime = clip->projectTime(original.time);
             const auto delta = (event.position.x - drag->down.x) / plot().getWidth() * (viewEnd - viewStart);
             const auto time = clip->localTime(snapKeyTime(*clip, originalProjectTime + delta, event.mods, propertyName));
             const auto value = constrainedValue(*clip, original.value + (drag->down.y - event.position.y) / plot().getHeight() * (high - low), propertyName);
@@ -807,7 +807,7 @@ private:
         if (!(last > first)) {
             return std::nullopt;
         }
-        const auto left = timeX(clip.start + (first - clip.offset) / clip.rate), right = timeX(clip.start + (last - clip.offset) / clip.rate);
+        const auto left = timeX(clip.projectTime(first)), right = timeX(clip.projectTime(last));
         return SelectionBox { juce::Rectangle<float>::leftTopRightBottom(left, top, right, bottom).expanded(12.0f, 8.0f), first, last };
     }
     static juce::Rectangle<float> scaleHandle(const SelectionBox& box, bool right) {
@@ -856,7 +856,7 @@ private:
     }
     double valueAt(float y) const { return low + (plot().getBottom() - y) / plot().getHeight() * (high - low); }
     juce::Point<float> keyPoint(const motion::PropertyTarget& clip, const motion::Keyframe& key) const {
-        return { timeX(clip.start + (key.time - clip.offset) / clip.rate), valueY(key.value) };
+        return { timeX(clip.projectTime(key.time)), valueY(key.value) };
     }
     // Signed content-time length of the segment a handle belongs to, or 0.
     static double segmentSpan(const motion::Curve& curve, const motion::Keyframe& key, DragMode mode) {
@@ -940,7 +940,7 @@ private:
             for (const auto& key : curve.keyframes()) {
                 const auto selected = std::any_of(moving.begin(), moving.end(), [&](const KeyRef& item) { return item.property == name && item.time == key.time; });
                 if (!selected) {
-                    consider(clip.start + (key.time - clip.offset) / clip.rate);
+                    consider(clip.projectTime(key.time));
                 }
             }
         }
@@ -994,7 +994,7 @@ private:
         auto first = clip->start, last = clip->end();
         for (const auto* framed : curves) {
             for (const auto& key : framed->keyframes()) {
-                const auto time = clip->start + (key.time - clip->offset) / clip->rate;
+                const auto time = clip->projectTime(key.time);
                 if (std::isfinite(time)) { first = std::min(first, time); last = std::max(last, time); }
             }
         }

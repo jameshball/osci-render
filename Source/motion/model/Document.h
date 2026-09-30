@@ -114,7 +114,7 @@ public:
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     // Stepped tempo changes by beat; musical clips follow, seconds content stays.
-    juce::Result setTempoChange(double beat, double bpm, std::optional<double> replacing = std::nullopt);
+    juce::Result setTempoChange(double beat, double bpm, std::optional<double> replacing = std::nullopt, std::optional<bool> ramp = std::nullopt);
     juce::Result removeTempoChange(double beat);
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);
     juce::Result setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ClipTiming.h"
 #include "Modulators.h"
 #include "Tempo.h"
 #include <memory>
@@ -62,19 +63,18 @@ struct CurveDrivers {
         double amount = 1;
         ModulationMode mode = ModulationMode::add;
     };
-    // composition = start + (local - offset) / rate; project likewise through
-    // the composition's own clock.
-    double start = 0, offset = 0, rate = 1;
-    double projectStart = 0, projectOffset = 0, projectRate = 1;
+    // clock: composition <-> curve local; projectClock: project <-> composition.
+    ClipTiming clock, projectClock;
     std::vector<Route> routes;
     // Composition tempo map for tempo-synced oscillators on composition-time
     // curves (groups, cameras, track and composition effects).
     std::optional<Tempo> tempo;
     std::shared_ptr<const Curve> linkSource;
-    double linkStart = 0, linkOffset = 0, linkRate = 1, linkBpm = 120; // composition -> source local
+    ClipTiming linkClock; // composition -> source local
+    double linkBpm = 120;
     PropertyLink link;
-    double compositionTime(double local) const { return rate == 0 ? 0 : start + (local - offset) / rate; }
-    double projectTime(double composition) const { return projectRate == 0 ? 0 : projectStart + (composition - projectOffset) / projectRate; }
+    double compositionTime(double local) const { return clock.projectTime(local); }
+    double projectTime(double composition) const { return projectClock.projectTime(composition); }
 };
 
 // Curve time is content-local. Clip placement never rewrites its keys.
@@ -214,7 +214,7 @@ private:
     double linkedValue(double time) const {
         const auto& d = *drivers;
         const auto composition = d.compositionTime(time) - d.link.delay;
-        const auto sourceLocal = d.linkOffset + (composition - d.linkStart) * d.linkRate;
+        const auto sourceLocal = d.linkClock.localTime(composition);
         return d.linkSource->evaluate(sourceLocal, d.linkBpm) * d.link.scale + d.link.offset;
     }
     static double hermite(double a, double b, double span, double t, double outSlope, double inSlope) {

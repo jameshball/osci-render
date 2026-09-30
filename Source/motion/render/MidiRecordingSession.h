@@ -81,6 +81,7 @@ public:
         if (!config.valid()) { return juce::Result::fail("Recordings need a valid source clock and a clip of at most one hour."); }
         generation = config.generation; scope = document.editingComposition();
         target = id; base = selected->midi; mapping = mappingOf(project, *selected);
+        clock = timing;
         status = "Starting recording..."; error = false; cancelled = stopRequested = false;
         transport.monitor(id);
         if (!transport.arm(config)) {
@@ -143,8 +144,9 @@ public:
         const auto task = job;
         auto captured = std::make_shared<const MidiRecording::Take>(std::move(*take));
         const auto previous = base;
-        worker.addJob([task, captured, previous] {
-            try { task->result = MidiTakeNotes::convert(*captured, previous, &task->cancelled); }
+        const auto timing = clock;
+        worker.addJob([task, captured, previous, timing] {
+            try { task->result = MidiTakeNotes::convert(*captured, previous, &task->cancelled, timing.has_value() ? &*timing : nullptr); }
             catch (const std::exception& e) { task->result.error = e.what(); }
             task->finished.store(true, std::memory_order_release);
         });
@@ -157,10 +159,11 @@ private:
     struct Mapping {
         double start = 0, duration = 0, offset = 0, rate = 0, contentBpm = 0, bpm = 0;
         ClipTimeBase timeBase = ClipTimeBase::seconds;
+        const std::vector<TempoChange>* tempoMap = nullptr;
         bool operator==(const Mapping&) const = default;
     };
     static Mapping mappingOf(const Project& project, const Clip& clip) {
-        return {clip.start, clip.duration, clip.offset, clip.rate, clip.contentBpm, project.bpm, clip.timeBase};
+        return {clip.start, clip.duration, clip.offset, clip.rate, clip.contentBpm, project.bpm, clip.timeBase, project.tempoChanges.get()};
     }
     bool targetUnchanged() const {
         const auto& project = document.project();
@@ -180,6 +183,7 @@ private:
     std::shared_ptr<const MidiNotes> base;
     std::uint64_t token = 0, generation = 0;
     Mapping mapping;
+    std::optional<ClipTiming> clock;
     Id target = 0, scope = 0;
     bool stopRequested = false, cancelled = false, error = false;
     juce::String status;

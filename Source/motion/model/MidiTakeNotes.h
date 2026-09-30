@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ClipTiming.h"
 #include "MidiNotes.h"
 #include "../render/MidiRecording.h"
 #include <deque>
@@ -15,7 +16,13 @@ struct MidiTakeNotes {
         std::string error;
         explicit operator bool() const { return source != nullptr; }
     };
-    static Result convert(const MidiRecording::Take& take, std::shared_ptr<const MidiNotes> base = {}, const std::atomic<bool>* cancel = nullptr) try {
+    // `clock` is the target clip's timing: under a tempo map a musical clip's
+    // beats follow the map, so each event is read through it exactly.
+    static Result convert(const MidiRecording::Take& take, std::shared_ptr<const MidiNotes> base = {}, const std::atomic<bool>* cancel = nullptr, const ClipTiming* clock = nullptr) try {
+        const auto beatAt = [&](std::uint64_t sample) {
+            if (clock == nullptr || !clock->warp.has_value()) { return take.config.beatAt(sample); }
+            return clock->localTime(static_cast<double>(sample) / take.config.sampleRate) * take.config.sourceBpm / 60;
+        };
         const auto cancelled = [&] { return cancel != nullptr && cancel->load(); };
         if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
         if (take.failure != MidiRecording::Failure::none || !take.config.valid()
@@ -78,7 +85,7 @@ struct MidiTakeNotes {
             if (take.config.channel != 0 && index + 1 != take.config.channel) { continue; }
             const int key = event.bytes[1], value = event.bytes[2];
             auto& channel = (*channels)[static_cast<std::size_t>(index)];
-            const auto beat = take.config.beatAt(event.sample);
+            const auto beat = beatAt(event.sample);
             if (kind == 0x90 && value != 0) { channel.held[static_cast<std::size_t>(key)].push_back({beat, value}); }
             else if (kind == 0x80 || kind == 0x90) { release(channel, index, key, beat); }
             else if (kind == 0xb0 && (key == 64 || key == 121)) {
@@ -103,7 +110,7 @@ struct MidiTakeNotes {
             if (controls.size() > MidiNotes::maximumControls) { full = true; }
             if (full) { return {nullptr, 0, warnings, "MIDI content exceeds the note or identity limit."}; }
         }
-        const auto end = take.config.beatAt(take.endSample);
+        const auto end = beatAt(take.endSample);
         for (int index = 0; index < 16; ++index) {
             auto& channel = (*channels)[static_cast<std::size_t>(index)];
             channel.sustain = false;
