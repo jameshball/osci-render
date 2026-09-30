@@ -71,6 +71,7 @@ public:
         cutButton.onClick = [this] { cutHere(); };
         addAndMakeVisible(cutButton);
         status.setFont(motion::style::small());
+        status.setTooltip("Which camera the output uses at the playhead. Cuts are moved, trimmed and switched in the timeline's Cameras band.");
         status.setColour(juce::Label::textColourId, motion::style::muted());
         addAndMakeVisible(status);
         inspector.setShowsHeader(false);

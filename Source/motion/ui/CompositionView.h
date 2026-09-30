@@ -125,7 +125,7 @@ public:
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
             g.setFont(14);
-            g.drawText(emptyMessage(), getLocalBounds(), juce::Justification::centred);
+            g.drawText(prepared == nullptr ? juce::String("Preparing...") : emptyMessage(), getLocalBounds(), juce::Justification::centred);
             return;
         }
         juce::Graphics::ScopedSaveState sceneState(g);
@@ -380,16 +380,20 @@ private:
         const auto& project = processor.document.project();
         const auto now = processor.position.load();
         std::optional<double> next;
-        bool any = false;
+        bool any = false, hidden = false;
+        const auto soloing = std::any_of(project.tracks.begin(), project.tracks.end(), [](const auto& track) { return track.solo; });
         for (const auto& track : project.tracks) {
             if (track.kind == motion::TrackKind::audio) { continue; }
+            const auto silenced = track.muted || (soloing && !track.solo);
             for (const auto& clip : track.clips) {
                 any = true;
-                const auto start = clip.timing(project.tempo()).start;
-                if (start > now && (!next.has_value() || start < *next)) { next = start; }
+                const auto timing = clip.timing(project.tempo());
+                if (silenced && timing.start <= now && now < timing.end()) { hidden = true; }
+                if (!silenced && timing.start > now && (!next.has_value() || timing.start < *next)) { next = timing.start; }
             }
         }
         if (!any) { return "Drop an object here"; }
+        if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
         const auto at = "Nothing on screen at " + juce::String(now, 2) + "s";
         return next.has_value() ? at + "  -  next clip at " + juce::String(*next, 2) + "s" : at;
     }
