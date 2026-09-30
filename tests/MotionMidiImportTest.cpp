@@ -36,13 +36,14 @@ public:
         event(track, 120, { 60, 20 }); // Running-status overlapping note-on.
         event(track, 120, { 60, 0 }); // Velocity-zero off pairs first on FIFO.
         event(track, 120, { 0x82, 60, 0 });
-        event(track, 0, { 0xff, 0x51, 3, 0x07, 0xa1, 0x20 }); // Later tempo ignored.
+        event(track, 0, { 0xff, 0x51, 3, 0x07, 0xa1, 0x20 }); // 500000us => 120 BPM from beat 0.75.
         end(track);
         const auto result = prepare(file({ track }), 170);
         expect(static_cast<bool>(result), juce::String(result.error));
         if (result) {
             expectWithinAbsoluteError(result.suggestedBpm, 100.0, 1e-12);
-            expectEquals(result.ignoredEvents, 1);
+            expectEquals(result.ignoredEvents, 0);
+            expect(result.tempoChanges.size() == 1 && result.tempoChanges[0].beat == 0.75 && std::abs(result.tempoChanges[0].bpm - 120) < 1e-9, "later tempo events become tempo changes");
             const auto& notes = result.source->notes();
             expectEquals(static_cast<int>(notes.size()), 2);
             if (notes.size() == 2) {

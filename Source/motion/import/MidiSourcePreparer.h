@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/MidiNotes.h"
+#include "../model/Tempo.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -25,6 +26,9 @@ public:
     struct Result {
         std::shared_ptr<const MidiNotes> source;
         double suggestedBpm = 120;
+        // Tempo events after the first beat (PPQ files only), in quarter-note
+        // beats, sorted, one per beat; the last event at a beat wins.
+        std::vector<TempoChange> tempoChanges;
         int ignoredEvents = 0;
         std::string error;
         explicit operator bool() const { return source != nullptr; }
@@ -144,10 +148,16 @@ public:
                                 const auto high = payload.byte(), middle = payload.byte(), low = payload.byte();
                                 const auto tempo = (static_cast<unsigned>(high) << 16) | (static_cast<unsigned>(middle) << 8) | low;
                                 if (tempo == 0) { throw Error("MIDI tempo must have a positive microsecond duration."); }
-                                if (!smpte && ticks == 0 && !initialTempo) {
-                                    result.suggestedBpm = 60000000.0 / tempo;
+                                // Microsecond tempos land just off whole numbers: keep 0.001 BPM.
+                                const auto bpm = std::round(60000000000.0 / tempo) / 1000;
+                                if (smpte || bpm < 1 || bpm > 1000) {
+                                    ++result.ignoredEvents;
+                                } else if (ticks == 0) {
+                                    if (!initialTempo) { result.suggestedBpm = bpm; }
                                     initialTempo = true;
-                                } else { ++result.ignoredEvents; }
+                                } else {
+                                    result.tempoChanges.push_back({static_cast<double>(ticks) * beatsPerTick, bpm});
+                                }
                             } else { ++result.ignoredEvents; }
                         } else if (status == 0xf0 || status == 0xf7) {
                             const auto count = track.vlq();
@@ -168,12 +178,31 @@ public:
             if (!prepared) { result.error = prepared.error; return result; }
             checkCancel(cancel);
             result.source = prepared.source;
+            // Tracks can repeat a tempo event: one change per beat (the last
+            // wins), and none that restates the tempo already in force.
+            std::stable_sort(result.tempoChanges.begin(), result.tempoChanges.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+            std::vector<TempoChange> changes;
+            for (const auto& change : result.tempoChanges) {
+                if (!changes.empty() && changes.back().beat == change.beat) { changes.back() = change; } else { changes.push_back(change); }
+            }
+            auto current = result.suggestedBpm;
+            std::erase_if(changes, [&current](const auto& change) {
+                const auto same = change.bpm == current;
+                current = change.bpm;
+                return same;
+            });
+            result.tempoChanges = std::move(changes);
             return result;
-        } catch (const std::bad_alloc&) { return { nullptr, 120, 0, "Not enough memory to import MIDI notes." }; }
-        catch (const std::exception& error) { return { nullptr, 120, 0, error.what() }; }
-        catch (...) { return { nullptr, 120, 0, "MIDI import failed." }; }
+        } catch (const std::bad_alloc&) { return failure("Not enough memory to import MIDI notes."); }
+        catch (const std::exception& error) { return failure(error.what()); }
+        catch (...) { return failure("MIDI import failed."); }
     }
 private:
+    static Result failure(std::string message) {
+        Result result;
+        result.error = std::move(message);
+        return result;
+    }
     struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
     static void checkCancel(const std::atomic<bool>* cancel) {
         if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) { throw Error("MIDI import cancelled."); }

@@ -15,6 +15,8 @@
 #include "ui/ModulationPanel.h"
 #include "ui/ModulatorPanels.h"
 #include "render/LuaSliderBakes.h"
+#include "model/TapTempo.h"
+#include "model/TempoDetection.h"
 #include "ui/PlaybackHealth.h"
 #include "ui/PropertyInspector.h"
 #include "ui/StatusBar.h"
@@ -167,6 +169,15 @@ private:
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
     juce::Label tempoValue, tempoLabel;
     juce::TextButton timingButton;
+    // Tap tempo: taps preview the tempo; it commits once tapping pauses.
+    juce::TextButton tapButton {"Tap"};
+    motion::TapTempo tapTempo;
+    std::optional<double> tappedBpm;
+    std::unique_ptr<juce::TimedCallback> tapCommit;
+    bool detectingTempo = false;
+    motion::Id soundtrackClip() const;
+    void detectTempo();
+    void tap();
     bool compactTransport = false;
     juce::ComboBox monitorOutput;
     juce::TextButton canvasButton { "Canvas" };

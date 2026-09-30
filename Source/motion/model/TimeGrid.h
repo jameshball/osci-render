@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Tempo.h"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -78,6 +79,22 @@ struct TimeGrid {
         if (display == TimeDisplay::frames) { return frameLabel(seconds); }
         if (display == TimeDisplay::beats) { return beatLabel(seconds, true); }
         return number(seconds, 3, std::abs(seconds) >= 1.0e12) + "s";
+    }
+
+    // A span in the ruler's units: seconds, frames, or bars.beats.ticks of
+    // length (a one-bar span reads 1.0.000) measured on the tempo map.
+    std::string durationLabel(double start, double end) const {
+        if (!std::isfinite(start) || !std::isfinite(end)) { return "\xE2\x80\x94"; }
+        if (display == TimeDisplay::frames) { return number(std::round((end - start) / frameSeconds()), 0) + "f"; }
+        if (display != TimeDisplay::beats) { return number(end - start, 3, std::abs(end - start) >= 1.0e12) + "s"; }
+        const auto tempo = validTempo() ? Tempo(bpm, tempoChanges) : Tempo(120);
+        const auto beats = tempo.beats(end) - tempo.beats(start);
+        if (!std::isfinite(beats)) { return "\xE2\x80\x94"; }
+        auto whole = std::floor(beats);
+        auto ticks = std::round((beats - whole) * 960.0);
+        if (ticks >= 960) { whole += 1; ticks = 0; }
+        const auto fraction = number(ticks, 0);
+        return number(std::floor(whole / meter()), 0) + "." + number(std::fmod(whole, static_cast<double>(meter())), 0) + "." + std::string(3 - fraction.size(), '0') + fraction;
     }
 
     // Parsing is an authoring operation. Invalid clock settings reject input;
@@ -169,6 +186,36 @@ struct TimeGrid {
         const auto result = static_cast<double>(seconds);
         if (!std::isfinite(result) || (seconds > 0 && result == 0)) { return std::nullopt; }
         return result;
+    }
+
+    // The inverse of durationLabel: a length starting at `start`. Musical
+    // lengths read bars.beats.ticks (1.2 is one bar and two beats) on the
+    // tempo map; "s" or "f" suffixes and other displays read linear lengths.
+    std::optional<double> parseDuration(const std::string& input, double start) const {
+        std::string text;
+        for (const auto c : input) { if (c != ' ' && c != '\t') { text += c; } }
+        if (text.empty() || text.size() > 128) { return std::nullopt; }
+        if (display != TimeDisplay::beats || text.back() == 's' || text.back() == 'f') { return parsePosition(text); }
+        if (!validTempo() || meter() <= 0 || !std::isfinite(start)) { return std::nullopt; }
+        std::vector<double> parts;
+        std::string part;
+        for (std::size_t i = 0; i <= text.size(); ++i) {
+            if (i == text.size() || text[i] == '.') {
+                if (part.empty() || part.size() > 9) { return std::nullopt; }
+                parts.push_back(std::stod(part));
+                part.clear();
+            } else if (text[i] >= '0' && text[i] <= '9') {
+                part += text[i];
+            } else {
+                return std::nullopt;
+            }
+        }
+        if (parts.size() > 3 || (parts.size() == 3 && parts[2] > 959)) { return std::nullopt; }
+        const auto beats = parts[0] * meter() + (parts.size() > 1 ? parts[1] : 0) + (parts.size() > 2 ? parts[2] / 960 : 0);
+        if (!(beats > 0)) { return std::nullopt; }
+        const Tempo tempo(bpm, tempoChanges);
+        const auto length = tempo.seconds(tempo.beats(start) + beats) - start;
+        return std::isfinite(length) && length > 0 ? std::optional<double>(length) : std::nullopt;
     }
 
 private:

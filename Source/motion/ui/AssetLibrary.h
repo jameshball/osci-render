@@ -228,6 +228,12 @@ private:
         menu.addItem(2, "Rename...");
         menu.addItem(6, "Replace with file...");
         menu.addItem(3, uses == 0 ? "Not used by any clip" : "Select " + juce::String(static_cast<int>(uses)) + (uses == 1 ? " clip using it" : " clips using it"), uses != 0);
+        const auto& source = *assets[static_cast<std::size_t>(row)];
+        if (source.midi != nullptr) {
+            const auto changes = source.midiTempoChanges != nullptr ? static_cast<int>(source.midiTempoChanges->size()) : 0;
+            menu.addItem(7, "Use this file's tempo (" + juce::String(source.midiSuggestedBpm, source.midiSuggestedBpm == std::round(source.midiSuggestedBpm) ? 0 : 2) + " BPM"
+                + (changes > 0 ? ", " + juce::String(changes) + (changes == 1 ? " change)" : " changes)") : ")"));
+        }
         menu.addSeparator();
         menu.addItem(4, uses == 0 ? "Remove source" : "Remove source (in use)", uses == 0);
         menu.addItem(5, "Remove all unused sources");
@@ -238,6 +244,7 @@ private:
             if (result == 2) { owner->beginRename(id); }
             if (result == 6 && owner->onReplace) { owner->onReplace(id); }
             if (result == 3 && owner->onSelectUses) { owner->onSelectUses(id); }
+            if (result == 7) { owner->adoptMidiTempo(id); }
             if (result == 4 || result == 5) {
                 int removed = 0;
                 const auto outcome = owner->document.removeUnusedAssets(result == 4 ? std::vector<motion::Id>{id} : std::vector<motion::Id>{}, removed);
@@ -246,6 +253,13 @@ private:
                 }
             }
         });
+    }
+    // Replace the project's tempo map with a MIDI file's, in one undo step.
+    void adoptMidiTempo(motion::Id id) {
+        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& item) { return item != nullptr && item->id == id; });
+        if (found == assets.end() || (*found)->midi == nullptr) { return; }
+        const auto result = document.setTempoMap((*found)->midiSuggestedBpm, (*found)->midiTempoChanges, "Use MIDI tempo");
+        if (onMessage) { onMessage(result.failed() ? result.getErrorMessage() : "Tempo now follows " + (*found)->name + "."); }
     }
     // Rename by identity: the list may have changed while the menu was open.
     void beginRename(motion::Id id) {

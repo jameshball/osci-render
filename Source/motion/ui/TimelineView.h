@@ -524,10 +524,20 @@ public:
             const auto& project = processor.document.project();
             if (project.tempoChanges != nullptr) {
                 const auto tempo = project.tempo();
+                double previousBeat = 0, previousBpm = project.bpm;
                 for (const auto& change : *project.tempoChanges) {
                     const auto x = timeX(tempo.seconds(change.beat));
-                    if (x < namesWidth || x >= getWidth()) { continue; }
                     const auto colour = juce::Colour(0xff8fb6e8);
+                    // A ramp draws as a slope from the previous tempo point.
+                    if (change.ramp) {
+                        const auto from = static_cast<float>(std::max(namesWidth, timeX(tempo.seconds(previousBeat))));
+                        const auto rising = change.bpm >= previousBpm;
+                        g.setColour(colour.withAlpha(0.55f));
+                        g.drawLine(from, rising ? 45.0f : 29.0f, static_cast<float>(std::min(x, getWidth())), rising ? 29.0f : 45.0f, 1.5f);
+                    }
+                    previousBeat = change.beat;
+                    previousBpm = change.bpm;
+                    if (x < namesWidth || x >= getWidth()) { continue; }
                     g.setColour(colour.withAlpha(0.14f));
                     g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
                     g.setColour(colour);
@@ -698,7 +708,8 @@ public:
         juce::String tip;
         if (clip != nullptr) {
             const auto timing = clip->timing(processor.document.project().tempo());
-            tip = juce::String(clip->name) + "\n" + juce::String(timing.start, 2) + "s - " + juce::String(timing.end(), 2) + "s (" + juce::String(timing.duration(), 2) + "s)";
+            const auto grid = processor.document.project().timeGrid();
+            tip = juce::String(clip->name) + "\n" + grid.positionLabel(timing.start) + " - " + grid.positionLabel(timing.end()) + "  (" + grid.durationLabel(timing.start, timing.end()) + ")";
         }
         if (getTooltip() != tip) { setTooltip(tip); }
         if (event.y < rulerHeight && event.x < namesWidth) {
@@ -1597,6 +1608,7 @@ private:
         const auto* change = tempoChangeNear(time);
         if (change != nullptr) {
             menu.addItem(7, "Edit tempo change...");
+            menu.addItem(9, "Glide into this tempo", true, change->ramp);
             menu.addItem(8, "Remove tempo change");
         } else {
             menu.addItem(6, "Add tempo change here...", beat > 0);
@@ -1610,6 +1622,13 @@ private:
             if (result == 2) { const auto removed = owner->processor.document.removeMarker(id); if (removed.failed() && owner->onError) { owner->onError(removed.getErrorMessage()); } }
             if (result == 4 || result == 5) { owner->jumpMarker(result == 5); }
             if (result == 6 || result == 7) { owner->editTempoChange(time); }
+            if (result == 9) {
+                const auto* existing = owner->tempoChangeNear(time);
+                if (existing != nullptr) {
+                    const auto changed = owner->processor.document.setTempoChange(existing->beat, existing->bpm, existing->beat, !existing->ramp);
+                    if (changed.failed() && owner->onError) { owner->onError(changed.getErrorMessage()); }
+                }
+            }
             if (result == 8) {
                 const auto* existing = owner->tempoChangeNear(time);
                 if (existing != nullptr) {

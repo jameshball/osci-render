@@ -93,6 +93,7 @@ public:
 
     double sampleRate() const { return rate; }
     std::size_t channelCount() const { return pcm.size(); }
+    std::span<const float> channel(std::size_t index) const { return pcm[index]; }
     std::size_t frameCount() const { return frames; }
     double duration() const { return static_cast<double>(frames) / rate; }
 

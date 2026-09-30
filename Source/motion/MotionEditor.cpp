@@ -285,6 +285,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         processor.seek(*requested);
         timeline.revealTime(*requested);
     };
+    tapButton.setName("Tap tempo");
+    tapButton.setTitle("Tap tempo");
+    tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the soundtrack in the timing menu.");
+    tapButton.setWantsKeyboardFocus(false);
+    tapButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
+    tapButton.onClick = [this] { tap(); };
+    addAndMakeVisible(tapButton);
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
     tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
@@ -444,7 +451,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             });
     };
     assetLibrary.onOpenComposition = [this](motion::Id id) { enterComposition(id, true); };
-    assetLibrary.onMessage = [this](const juce::String& message) { statusBar.show(message, message.startsWith("Removed") ? MotionStatusBar::Kind::notice : MotionStatusBar::Kind::warning); };
+    assetLibrary.onMessage = [this](const juce::String& message) { statusBar.show(message, message.startsWith("Removed") || message.startsWith("Tempo now") ? MotionStatusBar::Kind::notice : MotionStatusBar::Kind::warning); };
     assetLibrary.onSelectUses = [this](motion::Id id) {
         std::vector<motion::Id> clips;
         for (const auto& track : processor.document.project().tracks) {
@@ -496,16 +503,19 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         showOverlay(std::move(overlay));
     };
     timeline.onEditTempo = [this](double beat, double bpm, std::optional<double> replacing) {
-        auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar);
+        const auto& changes = processor.document.project().tempoChanges;
+        const auto existing = changes != nullptr && replacing.has_value() ? std::find_if(changes->begin(), changes->end(), [&](const auto& change) { return change.beat == *replacing; }) : std::vector<motion::TempoChange>::const_iterator();
+        const auto ramped = changes != nullptr && replacing.has_value() && existing != changes->end() && existing->ramp;
+        auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, ramped);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), replacing.has_value() ? "Edit tempo change" : "Add tempo change", juce::Point<int>(360, 150), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), replacing.has_value() ? "Edit tempo change" : "Add tempo change", juce::Point<int>(360, 180), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
         const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(controls);
-        controls->onApply = [owner, overlayPointer, tempoPanel, beat, replacing](double value) {
-            juce::MessageManager::callAsync([owner, overlayPointer, tempoPanel, beat, replacing, value] {
+        controls->onApply = [owner, overlayPointer, tempoPanel, beat, replacing](double value, bool glide) {
+            juce::MessageManager::callAsync([owner, overlayPointer, tempoPanel, beat, replacing, value, glide] {
                 if (owner == nullptr || overlayPointer == nullptr) { return; }
-                const auto result = owner->processor.document.setTempoChange(beat, value, replacing);
+                const auto result = owner->processor.document.setTempoChange(beat, value, replacing, glide);
                 if (result.failed()) {
                     if (tempoPanel != nullptr) { tempoPanel->setError(result.getErrorMessage()); }
                     return;
@@ -617,7 +627,7 @@ void MotionEditor::resized() {
     int menuWidth = 0;
     const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
     for (int index = 0; index < names.size(); ++index) { menuWidth += menuBar.getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
-    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 470), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 235));
+    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 512), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 256));
     menuBar.setBounds(top.withRight(transport.getX()));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
@@ -635,6 +645,8 @@ void MotionEditor::resized() {
     tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
     tempoLabel.setVisible(!compact);
     tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34));
+    tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
+    transport.removeFromLeft(4);
     timingButton.setBounds(transport.removeFromLeft(compact ? std::clamp(transport.getWidth(), 0, 140) : 140).reduced(0, 3));
     area.removeFromTop(3);
     statusBar.setBounds(area.removeFromBottom(20));
@@ -1162,6 +1174,12 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (asset->midi != nullptr) {
                 document.edit("Import MIDI file", [&](motion::Project& project) { project.assets.push_back(asset); });
                 owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
+                // Point at the file's tempo when it differs from the project's.
+                const auto& project = document.project();
+                if (asset->midiSuggestedBpm != project.bpm || asset->midiTempoChanges != nullptr) {
+                    owner->statusBar.show(asset->name + " is written at " + juce::String(asset->midiSuggestedBpm, 1) + " BPM"
+                        + (asset->midiTempoChanges != nullptr ? " with tempo changes" : "") + ". Right-click it in Assets to use its tempo.", MotionStatusBar::Kind::notice);
+                }
                 return;
             }
             auto clip = motion::Document::makeClip(document.newId(), *asset, time);
@@ -1930,6 +1948,9 @@ void MotionEditor::showTimingMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
     menu.setLookAndFeel(&getLookAndFeel());
+    menu.addSectionHeader("Tempo");
+    menu.addItem(600, detectingTempo ? "Detecting tempo..." : "Detect tempo from soundtrack", !detectingTempo && soundtrackClip() != 0);
+    menu.addSeparator();
     menu.addSectionHeader("Time display");
     menu.addItem(101, "Seconds", true, project.timeDisplay == motion::TimeDisplay::seconds);
     menu.addItem(102, "Frames", true, project.timeDisplay == motion::TimeDisplay::frames);
@@ -1953,6 +1974,7 @@ void MotionEditor::showTimingMenu() {
     const auto generation = processor.document.generation();
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(timingButton), [owner, generation, divisions, rates](int result) {
         if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
+        if (result == 600) { owner->detectTempo(); return; }
         const auto& current = owner->processor.document.project();
         const auto subdivision = result == 300 ? static_cast<double>(current.beatsPerBar)
             : (result > 300 && result < 307 ? divisions[static_cast<std::size_t>(result - 300)] : current.snapBeats);
@@ -1972,6 +1994,87 @@ void MotionEditor::showTimingMenu() {
                 if (std::abs(state.snapBeats - state.beatsPerBar) < 1.0e-9) { state.snapBeats = result - 400; }
                 state.beatsPerBar = result - 400;
             } else if (result >= 500 && result < 508) { state.frameRate = rates[static_cast<std::size_t>(result - 500)]; }
+        });
+    });
+}
+
+void MotionEditor::tap() {
+    const auto bpm = tapTempo.tap(juce::Time::getMillisecondCounterHiRes() / 1000);
+    tapButton.setButtonText(tapTempo.count() > 1 ? juce::String(static_cast<int>(tapTempo.count())) : "Tap");
+    if (bpm.has_value()) {
+        tappedBpm = bpm;
+        tempoValue.setText(juce::String(*bpm, 1), juce::dontSendNotification);
+    }
+    if (tapCommit == nullptr) {
+        tapCommit = std::make_unique<juce::TimedCallback>([this] {
+            tapCommit->stopTimer();
+            tapButton.setButtonText("Tap");
+            tapTempo.reset();
+            if (!tappedBpm.has_value()) { return; }
+            const auto bpm = *tappedBpm;
+            tappedBpm.reset();
+            const auto result = processor.document.changeTempo(bpm);
+            if (result.failed()) { statusBar.show(result.getErrorMessage()); } else { statusBar.show("Tempo " + juce::String(bpm, 1) + " BPM from tapping.", MotionStatusBar::Kind::notice); }
+            refreshTiming();
+        });
+    }
+    tapCommit->startTimer(1600);
+}
+
+// The first clip on an audio track: the piece the picture is cut to.
+motion::Id MotionEditor::soundtrackClip() const {
+    for (const auto& track : processor.document.mainProject().tracks) {
+        if (track.kind != motion::TrackKind::audio) { continue; }
+        for (const auto& clip : track.clips) { return clip.id; }
+    }
+    return 0;
+}
+
+// Analyses the soundtrack off the message thread, then sets a steady tempo
+// and slides the soundtrack onto the bar grid in one undo step.
+void MotionEditor::detectTempo() {
+    const auto& project = processor.document.mainProject();
+    const auto id = soundtrackClip();
+    std::shared_ptr<const motion::PreparedAudio> audio;
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id != id) { continue; }
+            for (const auto& asset : project.assets) { if (asset != nullptr && asset->id == clip.asset) { audio = asset->audio; } }
+        }
+    }
+    if (audio == nullptr || processor.document.editingComposition() != 0) {
+        statusBar.show(audio == nullptr ? "Import a soundtrack first." : "Tempo is set on the main composition. Go back to it first.");
+        return;
+    }
+    detectingTempo = true;
+    statusBar.show("Detecting tempo...", MotionStatusBar::Kind::notice);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const auto generation = processor.document.generation();
+    const auto beatsPerBar = project.beatsPerBar;
+    juce::Thread::launch([owner, audio, id, generation, beatsPerBar] {
+        std::vector<float> mono(audio->frameCount());
+        const auto channels = audio->channelCount();
+        for (std::size_t channel = 0; channel < channels; ++channel) {
+            const auto samples = audio->channel(channel);
+            for (std::size_t i = 0; i < mono.size(); ++i) { mono[i] += samples[i] / static_cast<float>(channels); }
+        }
+        const auto estimate = motion::TempoDetection::estimate(mono, audio->sampleRate(), beatsPerBar);
+        juce::MessageManager::callAsync([owner, estimate, id, generation] {
+            if (owner == nullptr) { return; }
+            owner->detectingTempo = false;
+            if (owner->processor.document.generation() != generation) { return; }
+            if (!estimate.has_value()) {
+                owner->statusBar.show("Could not find a steady tempo in the soundtrack. Set it by hand or tap it.");
+                return;
+            }
+            double moved = 0;
+            const auto result = owner->processor.document.setTempoFromAudio(id, estimate->bpm, estimate->firstDownbeat, moved);
+            if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
+            const auto bpm = juce::String(estimate->bpm, estimate->bpm == std::round(estimate->bpm) ? 0 : 2);
+            const auto other = estimate->bpm * 2 <= 200 ? estimate->bpm * 2 : estimate->bpm / 2;
+            owner->statusBar.show("Tempo " + bpm + " BPM from the soundtrack" + (estimate->confidence < 0.4 ? " (low confidence - check it)" : "")
+                + ". If it feels " + (other > estimate->bpm ? "twice as fast" : "half as fast") + ", type " + juce::String(other, other == std::round(other) ? 0 : 2) + " in BPM"
+                + (moved > 0 ? ". Moved it " + juce::String(moved, 3) + " s so its first downbeat is on a bar." : "; its downbeats are already on the bars."), MotionStatusBar::Kind::notice);
         });
     });
 }

@@ -60,7 +60,12 @@ private:
 // Adds or edits one tempo change: the tempo from a beat onwards.
 class MotionTempoPanel final : public juce::Component {
 public:
-    MotionTempoPanel(double beat, double bpm, int beatsPerBar) {
+    MotionTempoPanel(double beat, double bpm, int beatsPerBar, bool ramped = false) {
+        ramp.setName("Ramp into tempo");
+        ramp.setTitle("Ramp into tempo");
+        ramp.setButtonText("Glide from the previous tempo");
+        ramp.setToggleState(ramped, juce::dontSendNotification);
+        ramp.setTooltip("Off: the tempo jumps here. On: it changes smoothly (linearly in beats) from the previous tempo point and arrives here.");
         const auto bar = std::max(1, beatsPerBar);
         tempo.setName("Tempo change BPM");
         tempo.setTitle("Tempo change BPM");
@@ -78,17 +83,18 @@ public:
         status.setFont(juce::FontOptions(12));
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.setTitle("Save tempo");
-        apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(tempo.getText().getDoubleValue()); } };
-        for (auto* component : std::initializer_list<juce::Component*>{&tempo, &tempoLabel, &where, &status, &apply}) { addAndMakeVisible(component); }
+        apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(tempo.getText().getDoubleValue(), ramp.getToggleState()); } };
+        for (auto* component : std::initializer_list<juce::Component*>{&tempo, &tempoLabel, &where, &ramp, &status, &apply}) { addAndMakeVisible(component); }
         refresh();
     }
-    std::function<void(double)> onApply;
+    std::function<void(double, bool)> onApply;
     void setError(const juce::String& message) { status.setText(message, juce::dontSendNotification); }
     void resized() override {
         auto bounds = getLocalBounds().reduced(12);
         where.setBounds(bounds.removeFromTop(24));
         auto row = bounds.removeFromTop(32);
         tempoLabel.setBounds(row.removeFromLeft(72)); tempo.setBounds(row.reduced(0, 3));
+        ramp.setBounds(bounds.removeFromTop(28));
         apply.setBounds(bounds.removeFromBottom(30).removeFromRight(110));
         status.setBounds(bounds);
     }
@@ -101,5 +107,6 @@ private:
     }
     juce::TextEditor tempo;
     juce::Label tempoLabel, where, status;
+    juce::ToggleButton ramp;
     juce::TextButton apply {"Save tempo"};
 };

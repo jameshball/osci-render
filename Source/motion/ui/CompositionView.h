@@ -394,8 +394,9 @@ private:
         }
         if (!any) { return "Drop an object here"; }
         if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
-        const auto at = "Nothing on screen at " + juce::String(now, 2) + "s";
-        return next.has_value() ? at + "  -  next clip at " + juce::String(*next, 2) + "s" : at;
+        const auto grid = project.timeGrid();
+        const auto at = "Nothing on screen at " + juce::String(grid.positionLabel(now));
+        return next.has_value() ? at + "  -  next clip at " + juce::String(grid.positionLabel(*next)) : at;
     }
     double editingTime() const {
         if (pathKey.has_value() && (pathKey->selection != selected || pathKey->generation != processor.document.generation()

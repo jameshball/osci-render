@@ -36,6 +36,8 @@ struct Asset {
     std::shared_ptr<const MidiNotes> midi;
     double midiImportBpm = 120;
     double midiSuggestedBpm = 120;
+    // The file's tempo changes after its first beat (runtime, re-derived on load).
+    std::shared_ptr<const std::vector<TempoChange>> midiTempoChanges;
     int midiIgnoredEvents = 0;
 };
 
@@ -113,6 +115,11 @@ public:
     void editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation);
     void reset(Project project);
     juce::Result changeTempo(double bpm);
+    // Replace the initial tempo and every change in one undo step.
+    juce::Result setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
+    // A steady tempo from audio analysis, and the soundtrack clip moved so its
+    // first downbeat (content seconds) lands on a bar line. One undo step.
+    juce::Result setTempoFromAudio(Id soundtrackClip, double bpm, double downbeat, double& moved);
     // Stepped tempo changes by beat; musical clips follow, seconds content stays.
     juce::Result setTempoChange(double beat, double bpm, std::optional<double> replacing = std::nullopt, std::optional<bool> ramp = std::nullopt);
     juce::Result removeTempoChange(double beat);

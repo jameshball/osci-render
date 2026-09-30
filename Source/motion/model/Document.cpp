@@ -851,37 +851,27 @@ juce::Result Document::removeTempoChange(double beat) {
 
 // Musical clips follow the new map; overlapping results are refused.
 juce::Result Document::retempo(std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label) {
-    auto next = project();
-    const auto before = next.tempo();
-    next.tempoChanges = std::move(changes);
-    const auto tempo = next.tempo();
-    if (next.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, tempo); }
-    for (auto& track : next.tracks) {
-        std::sort(track.clips.begin(), track.clips.end(), [&tempo](const auto& a, const auto& b) { return a.timing(tempo).start < b.timing(tempo).start; });
-        double previousEnd = 0;
-        for (const auto& clip : track.clips) {
-            const auto timing = clip.timing(tempo);
-            if (!timing.valid() || timing.start < previousEnd) {
-                return juce::Result::fail("That tempo would overlap clips on " + juce::String(track.name) + ". Move them apart first.");
-            }
-            previousEnd = timing.end();
-            next.duration = std::max(next.duration, previousEnd);
-        }
-    }
-    edit(label, [next = std::move(next)](Project& project) { project = next; });
-    return juce::Result::ok();
+    return setTempoMap(project().bpm, std::move(changes), std::move(label));
 }
 
 juce::Result Document::changeTempo(double bpm) {
-    const auto& state = project();
     if (!std::isfinite(bpm) || bpm < 1 || bpm > 1000) { return juce::Result::fail("Tempo must be between 1 and 1000 BPM."); }
-    if (bpm == state.bpm) { return juce::Result::ok(); }
-    auto next = state;
-    next.bpm = bpm;
-    // In musical time, everything placed in project time keeps its bar
-    // position, like beat-anchored clips. Seconds projects keep seconds.
+    if (bpm == project().bpm) { return juce::Result::ok(); }
+    return setTempoMap(bpm, project().tempoChanges, "Change tempo");
+}
+
+// Builds the project under a new tempo map: project-time items keep their
+// beats in musical display, clips re-sort and overlaps are refused.
+static juce::Result retimed(const Project& state, double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, Project& next) {
+    if (changes != nullptr && changes->empty()) { changes.reset(); }
+    next = state;
+    next.bpm = initialBpm;
+    next.tempoChanges = std::move(changes);
     const auto before = state.tempo();
     const auto after = next.tempo();
+    if (!after.valid()) { return juce::Result::fail("Tempo must be between 1 and 1000 BPM, with changes after the start at increasing beats."); }
+    // In musical time, everything placed in project time keeps its bar
+    // position, like beat-anchored clips. Seconds projects keep seconds.
     if (state.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, after); }
     for (auto& track : next.tracks) {
         std::sort(track.clips.begin(), track.clips.end(), [&after](const auto& a, const auto& b) { return a.timing(after).start < b.timing(after).start; });
@@ -889,14 +879,53 @@ juce::Result Document::changeTempo(double bpm) {
         for (const auto& clip : track.clips) {
             const auto timing = clip.timing(after);
             if (!clip.valid() || !timing.valid() || timing.start < previousEnd) {
-                return juce::Result::fail("Tempo change would overlap clips on " + juce::String(track.name) + ". Move the clips apart or onto separate tracks first.");
+                return juce::Result::fail("That tempo would overlap clips on " + juce::String(track.name) + ". Move them apart or onto separate tracks first.");
             }
             previousEnd = timing.end();
             next.duration = std::max(next.duration, previousEnd);
         }
     }
-    edit("Change tempo", [next = std::move(next)](Project& project) { project = next; });
     return juce::Result::ok();
+}
+
+juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label) {
+    Project next;
+    const auto result = retimed(project(), initialBpm, std::move(changes), next);
+    if (result.failed()) { return result; }
+    edit(label, [next = std::move(next)](Project& project) { project = next; });
+    return juce::Result::ok();
+}
+
+juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat, double& moved) {
+    moved = 0;
+    Project next;
+    const auto result = retimed(project(), bpm, nullptr, next);
+    if (result.failed()) { return result; }
+    const auto tempo = next.tempo();
+    for (auto& track : next.tracks) {
+        for (auto& clip : track.clips) {
+            if (clip.id != clipId) { continue; }
+            if (track.locked) { return juce::Result::fail("Unlock the soundtrack's track first."); }
+            // Move the clip later (never cutting audio) until its first
+            // downbeat sits on a bar line; a pickup lands in the bar before.
+            auto timing = clip.timing(tempo);
+            const auto bar = 60 / bpm * std::max(1, next.beatsPerBar);
+            const auto shift = std::fmod(timing.projectTime(downbeat), bar);
+            if (shift > 0.005 && bar - shift > 0.005) {
+                moved = bar - shift;
+                timing.moveTo(timing.start + moved);
+                auto placed = clip;
+                if (!placed.setTiming(timing, tempo) || !track.canPlace(placed, clip.id, tempo)) {
+                    return juce::Result::fail("There is no room to move the soundtrack onto the bar grid.");
+                }
+                clip = placed;
+                next.duration = std::max(next.duration, timing.end());
+            }
+            edit("Set tempo from soundtrack", [next = std::move(next)](Project& project) { project = next; });
+            return juce::Result::ok();
+        }
+    }
+    return juce::Result::fail("The soundtrack clip no longer exists.");
 }
 
 Id Document::highestId() const {
@@ -2108,6 +2137,7 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
         if (!prepared) { return juce::Result::fail(prepared.error); }
         asset.midi = prepared.source;
         asset.midiSuggestedBpm = prepared.suggestedBpm;
+        asset.midiTempoChanges = prepared.tempoChanges.empty() ? nullptr : std::make_shared<const std::vector<TempoChange>>(prepared.tempoChanges);
         asset.midiIgnoredEvents = prepared.ignoredEvents;
         asset.source.reset();
         asset.drawing.reset();

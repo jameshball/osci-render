@@ -12,11 +12,11 @@ public:
         setName("Clip timing inspector");
         title.setFont(juce::FontOptions(14.0f, juce::Font::bold));
         addAndMakeVisible(title);
-        const std::array<const char*, 4> labels {"Start (s)", "Duration (s)", "Source offset (s)", "Speed"};
+        const std::array<const char*, 4> labels {"Start", "Duration", "Source offset (s)", "Speed"};
         const std::array<const char*, 4> names {"Clip start", "Clip duration", "Clip source offset", "Clip speed"};
         const std::array<const char*, 4> hints {
-            "Move the clip without changing its source offset or animation.",
-            "Change the right edge without stretching the source or animation.",
+            "Move the clip without changing its source offset or animation. Uses the ruler's units; add s for seconds.",
+            "Change the right edge without stretching the source or animation. Musical lengths read bars.beats (1.2 is a bar and two beats); add s for seconds.",
             "Slip the source and its animation inside the existing clip.",
             "Playback multiplier. 1 is normal speed; 2 is twice as fast. Clip duration stays unchanged."
         };
@@ -54,19 +54,20 @@ public:
         title.setText(clip != nullptr ? juce::String(clip->name) : "Clip timing", juce::dontSendNotification);
         updating = true;
         const auto timing = clip != nullptr ? clip->timing(processor.document.project().tempo()) : motion::ClipTiming();
-        const std::array<double, 4> current {timing.start, timing.duration(), timing.offset, timing.rate};
+        const auto grid = processor.document.project().timeGrid();
+        const std::array<juce::String, 4> current {juce::String(grid.positionLabel(timing.start)), juce::String(grid.durationLabel(timing.start, timing.end())), format(timing.offset), format(timing.rate)};
         for (std::size_t i = 0; i < values.size(); ++i) {
             captions[i].setVisible(clip != nullptr);
             values[i].setVisible(clip != nullptr);
             values[i].setEnabled(clip != nullptr && !locked);
-            if (!values[i].isBeingEdited()) { values[i].setText(format(current[i]), juce::dontSendNotification); }
+            if (!values[i].isBeingEdited()) { values[i].setText(current[i], juce::dontSendNotification); }
         }
         updating = false;
-        details.setText(clip != nullptr ? "Ends at " + juce::String(timing.end(), 3) + " s\n"
+        details.setText(clip != nullptr ? "Ends at " + juce::String(grid.positionLabel(timing.end())) + "\n"
             + (clip->timeBase == motion::ClipTimeBase::beats ? "Beat anchored - follows project tempo." : "Time anchored - keeps its position in seconds.")
             : "Select a clip in the timeline to edit its timing.", juce::dontSendNotification);
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : osci::Colours::text().withAlpha(.6f));
-        status.setText(error.isNotEmpty() ? error : locked ? "Track locked. Timing is read-only." : "Times are in seconds. Edits preserve existing keyframes and notes.", juce::dontSendNotification);
+        status.setText(error.isNotEmpty() ? error : locked ? "Track locked. Timing is read-only." : "Edits preserve existing keyframes and notes.", juce::dontSendNotification);
         status.setVisible(clip != nullptr || error.isNotEmpty());
         resized();
     }
@@ -109,12 +110,24 @@ private:
         const auto* clip = findClip();
         if (clip == nullptr || isLocked() || editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { refresh(); return; }
         const auto text = values[index].getText().trim();
-        char* end = nullptr;
-        const auto value = std::strtod(text.toRawUTF8(), &end);
-        if (text.isEmpty() || end == text.toRawUTF8() || *end != '\0' || !std::isfinite(value)) {
-            error = "Enter a finite number."; refresh(); return;
-        }
         auto timing = clip->timing(processor.document.project().tempo());
+        const auto grid = processor.document.project().timeGrid();
+        std::optional<double> parsed;
+        if (index == 0) {
+            parsed = grid.parsePosition(text.toStdString());
+        } else if (index == 1) {
+            parsed = grid.parseDuration(text.toStdString(), timing.start);
+        } else {
+            char* end = nullptr;
+            const auto number = std::strtod(text.toRawUTF8(), &end);
+            if (!text.isEmpty() && end != text.toRawUTF8() && *end == '\0' && std::isfinite(number)) { parsed = number; }
+        }
+        if (!parsed.has_value()) {
+            error = index < 2 ? "Enter a time like the ruler shows (" + juce::String(grid.positionLabel(timing.start)) + "), or seconds with s." : "Enter a finite number.";
+            refresh();
+            return;
+        }
+        const auto value = *parsed;
         if (index == 0) { timing.moveTo(value); }
         else if (index == 1) { timing.setDuration(value); }
         else if (index == 2) { timing.offset = value; }
