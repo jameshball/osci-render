@@ -155,15 +155,16 @@ TODO
 ### Linux
 
 - Clone osci-render
+- Fetch all submodules
 - Install required packages
   - `sudo apt update`
   - `sudo apt install libasound2-dev libjack-jackd2-dev ladspa-sdk libcurl4-openssl-dev libfreetype6-dev libx11-dev libxcomposite-dev libxcursor-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libwebkit2gtk-4.0-dev libglu1-mesa-dev mesa-common-dev g++ make`
-- Download JUCE from here https://juce.com/download/
+- Download JUCE from here https://juce.com/download/ (for musl libc, rebuild the Projucer extra)
 - Unzip the file
 - Run `Projucer` from where you unzipped: `./JUCE/Projucer`
 - Open `osci-render.jucer` in Projucer
 - Go to File > Save Project to create a Makefile
-- Go to the `LinuxMakefile` folder: `cd osci-render/Builds/LinuxMakefile`
+- Go to the `LinuxMakefile` folder: `cd osci-render/Builds/osci-render/LinuxMakefile`
 - Build the project: `make CONFIG=Release` for release, or `make CONFIG=Debug` for testing
 - Go to the build folder: `cd build`
 - Run `osci-render` executable, or use the VST3 file
