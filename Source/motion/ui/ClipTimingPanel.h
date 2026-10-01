@@ -66,13 +66,13 @@ public:
         updating = true;
         const auto timing = clip != nullptr ? clip->timing(processor.document.project().tempo()) : motion::ClipTiming();
         const auto grid = processor.document.project().timeGrid();
-        const std::array<juce::String, 4> current {juce::String(grid.positionLabel(timing.start)), juce::String(grid.durationLabel(timing.start, timing.end())), format(timing.offset), format(timing.rate)};
+        const std::array<juce::String, 4> current {juce::String(grid.positionLabel(timing.start)), juce::String(grid.durationLabel(timing.start, timing.end())), format(timing.offset) + "s", format(timing.rate)};
         for (std::size_t i = 0; i < values.size(); ++i) {
             values[i].setEnabled(clip != nullptr && !locked);
             if (!values[i].isBeingEdited()) { values[i].setText(current[i], juce::dontSendNotification); }
         }
         updating = false;
-        details.setText(clip == nullptr ? juce::String() : (clip->timeBase == motion::ClipTimeBase::beats ? "Beat anchored (follows tempo)" : "Time anchored (keeps its seconds)")
+        details.setText(clip == nullptr ? juce::String() : (clip->timeBase == motion::ClipTimeBase::beats ? "Follows the tempo" : "Fixed in seconds")
             + juce::String::fromUTF8("  \u00b7  ends ") + juce::String(grid.positionLabel(timing.end())), juce::dontSendNotification);
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : motion::style::muted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
@@ -131,9 +131,11 @@ private:
         } else if (index == 1) {
             parsed = grid.parseDuration(text.toStdString(), timing.start);
         } else {
+            // Offset is in seconds; its "s" is optional.
+            const auto digits = index == 2 && text.endsWithIgnoreCase("s") ? text.dropLastCharacters(1).trim() : text;
             char* end = nullptr;
-            const auto number = std::strtod(text.toRawUTF8(), &end);
-            if (!text.isEmpty() && end != text.toRawUTF8() && *end == '\0' && std::isfinite(number)) { parsed = number; }
+            const auto number = std::strtod(digits.toRawUTF8(), &end);
+            if (!digits.isEmpty() && end != digits.toRawUTF8() && *end == '\0' && std::isfinite(number)) { parsed = number; }
         }
         if (!parsed.has_value()) {
             error = index < 2 ? "Enter a time like the ruler shows (" + juce::String(grid.positionLabel(timing.start)) + "), or seconds with s." : "Enter a finite number.";

@@ -147,14 +147,16 @@ public:
             g.drawText("Result", getWidth() - 90, 3, 65, 22, juce::Justification::centredLeft);
         }
         g.setFont(11.0f);
-        for (int i = 0; i <= 4; ++i) {
-            const auto fraction = i / 4.0;
-            const auto value = low + fraction * (high - low);
-            const auto y = valueY(value);
-            g.setColour(juce::Colours::white.withAlpha(0.07f));
-            g.drawLine(area.getX(), y, area.getRight(), y);
-            g.setColour(osci::Colours::text().withAlpha(0.65f));
-            g.drawText(juce::String(value, 2), 2, juce::roundToInt(y) - 8, 53, 16, juce::Justification::centredRight);
+        {
+            const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
+            const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
+            for (auto value = std::ceil(low / valueTick) * valueTick; value <= high + valueTick * 1e-6; value += valueTick) {
+                const auto y = valueY(value);
+                g.setColour(juce::Colours::white.withAlpha(std::abs(value) < valueTick * 1e-6 ? 0.14f : 0.07f));
+                g.drawLine(area.getX(), y, area.getRight(), y);
+                g.setColour(osci::Colours::text().withAlpha(0.65f));
+                g.drawText(juce::String(std::abs(value) < valueTick * 1e-6 ? 0.0 : value, decimals), 2, juce::roundToInt(y) - 8, 53, 16, juce::Justification::centredRight);
+            }
         }
         const auto grid = processor.document.project().timeGrid();
         const auto step = grid.tickStep(area.getWidth() / (viewEnd - viewStart));
@@ -222,8 +224,9 @@ public:
                     path.lineTo(timeX(time), y);
                 }
             }
-            g.setColour(juce::Colour(0xff70da91));
-            g.strokePath(path, juce::PathStrokeType(1.7f));
+            const auto colour = primaryColour(*clip);
+            g.setColour(colour);
+            g.strokePath(path, juce::PathStrokeType(2.0f));
             if (curve.modulation.enabled) {
                 juce::Path result;
                 for (int i = 0; i <= steps; ++i) {
@@ -249,7 +252,7 @@ public:
                 }
             }
             for (const auto& key : curve.keyframes()) {
-                drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : juce::Colour(0xff70da91));
+                drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : colour);
             }
             const auto x = timeX(processor.position.load());
             g.setColour(motion::style::playhead());
@@ -781,6 +784,23 @@ private:
             result.emplace_back(std::string(spec.id), axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : motion::style::axisZ());
         }
         return result;
+    }
+    // The edited curve's colour: its axis colour (as in the channel list),
+    // or the key green for single-value properties.
+    juce::Colour primaryColour(const motion::PropertyTarget& target) const {
+        const auto* spec = target.isEffect ? nullptr : motion::findPropertySpec(motion::propertySpecs(target), propertyName);
+        const auto axis = spec == nullptr || spec->axis.empty() ? ' ' : spec->axis[0];
+        return axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : axis == 'Z' || axis == 'B' ? motion::style::axisZ() : juce::Colour(0xff70da91);
+    }
+    // Round value ticks: steps of 1, 2 or 5 times a power of ten.
+    static double valueStep(double span, int wanted) {
+        const auto raw = span / std::max(1, wanted);
+        if (!(raw > 0) || !std::isfinite(raw)) { return 1; }
+        const auto magnitude = std::pow(10.0, std::floor(std::log10(raw)));
+        for (const auto factor : {1.0, 2.0, 5.0, 10.0}) {
+            if (raw <= factor * magnitude) { return factor * magnitude; }
+        }
+        return 10 * magnitude;
     }
     bool isSibling(const motion::PropertyTarget& target, const std::string& property) const {
         const auto group = siblings(target);

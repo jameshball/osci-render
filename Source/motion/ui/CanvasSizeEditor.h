@@ -70,7 +70,7 @@ class MotionCanvasSettings final : public juce::Component {
 public:
     MotionCanvasSettings(VisualiserRenderSize size, double fps) : canvas(size) {
         for (auto* component : std::initializer_list<juce::Component*> { &canvas, &note, &error, &apply }) { addAndMakeVisible(component); }
-        note.setText("Frames the output preview and sets the default video size.\n" + juce::String(fps, 3) + " fps / Change frame rate in Time and grid.", juce::dontSendNotification);
+        note.setText("Frames the output preview and sets the default video size.\n" + juce::String(fps, 3) + " fps / Change it in the Timing menu.", juce::dontSendNotification);
         error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
         canvas.onChange = [this] { error.setText({}, juce::dontSendNotification); };
         apply.onClick = [this] {

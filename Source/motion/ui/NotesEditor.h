@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "MotionStyle.h"
 #include <set>
 
 // Clip-local beat editor. Gestures preview immutable note content locally and
@@ -30,6 +31,8 @@ public:
         audition.setTooltip("Play this clip alone using a connected MIDI keyboard. Does not change notes or exports. MIDI input devices are selected in Audio settings.");
         audition.onClick = [this] { processor.setMidiAudition(audition.getToggleState() ? target : 0); refresh(); };
         envelopeButton.onClick = [this] { if (onEditInstrument) { onEditInstrument(target); } };
+        // The empty state's one action, styled as the primary button.
+        create.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.45f));
         create.onClick = [this] { report(processor.document.assignMidi(target, 0)); refresh(); fit(); };
         fitButton.onClick = [this] { fit(); repaint(); };
         remove.onClick = [this] { report(processor.document.clearMidi(target)); refresh(); };
@@ -104,7 +107,7 @@ public:
         updating = false;
         record.setButtonText(recording ? (processor.midiRecordingSession().stopping() ? "Finishing..." : "Stop recording") : "Record notes");
         record.setEnabled(recording ? !processor.midiRecordingSession().stopping() : available && !isLocked() && clip->composition == 0);
-        record.setColour(juce::TextButton::buttonColourId, recording ? juce::Colour(0xff8b3039) : osci::Colours::surfaceRaised());
+        if (recording) { record.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff8b3039)); } else { record.removeColour(juce::TextButton::buttonColourId); }
         cancelRecording.setVisible(recording);
         // Clip-bound actions appear once a visual clip is chosen.
         record.setVisible(clip != nullptr || recording);

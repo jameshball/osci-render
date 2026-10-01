@@ -102,15 +102,30 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
 #if JUCE_MAC || JUCE_WINDOWS
     beamSettingsWindow.setUsingNativeTitleBar(true);
 #endif
+    // File is built when opened (it lists recent projects); the rest are
+    // command lists.
     menus.addTopLevelMenu("File");
-    menus.addProjectMenuItems(0, processor, *this);
-    menus.addMenuSeparator(0);
-    menus.addMenuItem(0, "Export XYRGB signal...", [this] { exportSignal(); });
-#if OSCI_PREMIUM
-    menus.addMenuItem(0, "Export video...", [this] { exportVideo(); });
-#endif
+    menus.customMenuLogic = [this](juce::PopupMenu& menu, int index) {
+        if (index == 0) { buildFileMenu(menu); }
+        if (index == 4) {
+            juce::PopupMenu output;
+            for (int id = 1; id <= 3; ++id) { output.addItem(2000 + id, monitorOutput.getItemText(id - 1), monitorOutput.isItemEnabled(id), monitorOutput.getSelectedId() == id); }
+            menu.addSubMenu("Audio interface plays", output);
+            menu.addSeparator();
+        }
+        if (index == timingMenuIndex) { menu = timingMenu(); }
+    };
+    menus.customMenuSelectedLogic = [this](int id, int index) {
+        if (index == 4 && id > 2000 && id <= 2003) {
+            monitorOutput.setSelectedId(id - 2000);
+            return true;
+        }
+        return (index == 0 && fileMenuItemSelected(id)) || (index == timingMenuIndex && applyTiming(id));
+    };
     menus.addTopLevelMenu("Edit");
-    menus.addEditMenuItems(1, processor);
+    // Undo and redo keys are handled by the shared editor; these list them.
+    menus.addMenuItem(1, "Undo", [this] { processor.getUndoManager().undo(); }, motion::style::shortcutText("Cmd+Z"));
+    menus.addMenuItem(1, "Redo", [this] { processor.getUndoManager().redo(); }, motion::style::shortcutText("Cmd+Shift+Z"));
     menus.addTopLevelMenu("Clip");
     menus.addTopLevelMenu("Transport");
     menus.addTopLevelMenu("Audio");
@@ -120,7 +135,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     playbackHealth.isPreparing = [this] { return processor.isPreparingComposition(); };
     playbackHealth.onClick = [this] { osci::showOverlayMessage(*this, "Playback health", playbackHealth.summary(), osci::ErrorOverlay::Icon::None, {520, 380}, juce::Justification::centredLeft); };
     menus.addTopLevelMenu("View");
-    menus.addCommonInterfaceMenuItems(5, processor, *this);
+    menus.addTopLevelMenu("Timing");
     registerCommands();
     initialiseMenuBar(menus);
     menuBar.setLookAndFeel(&menuLookAndFeel);
@@ -148,10 +163,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         if (processor.document.editingComposition() == 0 || processor.document.generation() != scopeNameGeneration || name.isEmpty() || name.length() > 200) { return; }
         processor.document.edit("Rename composition", [name](motion::Project& project) { project.name = name; });
     };
-    addAndMakeVisible(compositionTitle);
-    compositionTitle.setText("Scene", juce::dontSendNotification);
-    compositionTitle.setFont(juce::FontOptions(15.0f));
-    compositionTitle.setBorderSize(juce::BorderSize<int>(0));
+    for (const auto& [label, text] : std::initializer_list<std::pair<juce::Label*, const char*>> {{&compositionTitle, "Scene"}, {&outputTitle, "Scope"}}) {
+        addAndMakeVisible(label);
+        label->setText(text, juce::dontSendNotification);
+        label->setFont(juce::FontOptions(15.0f));
+        label->setBorderSize(juce::BorderSize<int>(0));
+    }
+    outputHeader.setName("Scope");
     // Tools live inside the Scene, Blender style; the header keeps its title
     // and the view presets.
     addAndMakeVisible(sceneTools);
@@ -174,7 +192,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     sceneView.setName("Scene view");
     sceneView.setTooltip("Look along an axis (numpad 1, 3, 7), frame the selection (F) or reset the view (0)");
     sceneView.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
-    sceneView.onClick = [this] { showSceneViewMenu(); };
+    sceneView.onClick = [this] { showSceneViewMenu(false); };
+    composition.onContextMenu = [this] { showSceneViewMenu(true); };
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
     graphSide.addAndMakeVisible(modulationPanel);
@@ -254,8 +273,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     tempoValue.setFont(motion::style::body());
     tempoLabel.setFont(motion::style::small());
     tempoLabel.setColour(juce::Label::textColourId, motion::style::muted());
-    timingButton.setName("Time and grid");
-    timingButton.setTitle("Time and grid");
+    timingButton.setName("Timing");
+    timingButton.setTitle("Timing");
     timingButton.setTooltip("Time display, snapping, meter and frame rate. Alt temporarily bypasses snapping.");
     timingButton.onClick = [this] { showTimingMenu(); };
     refreshTiming();
@@ -363,7 +382,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
         notesEditor.setVisible(index == 2);
-        graphSideViewport.setVisible(index == 1);
+        graphSideViewport.setVisible(index == 1 && curveTarget != 0);
         curveList.setVisible(index == 1);
         if (index == 1) { refreshCurveList(); }
         resized();
@@ -566,6 +585,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     timeline.onTimingRequested = [this](motion::Id id) { select(id); inspectorTabs.setSelectedIndex(0); };
     timeline.onLoopSelection = [this] { loopSelection(); };
+    timeline.onCommand = [this](const juce::String& name) {
+        for (const auto& command : commands) {
+            if (command.name == name) { command.action(); return; }
+        }
+    };
     timeline.onRevealSource = [this](motion::Id asset) {
         libraryTabs.setSelectedIndex(0);
         assetLibrary.refresh();
@@ -670,7 +694,9 @@ void MotionEditor::resized() {
     tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34));
     tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
     transport.removeFromLeft(4);
-    timingButton.setBounds(transport.removeFromLeft(compact ? std::clamp(transport.getWidth(), 0, 140) : 140).reduced(0, 3));
+    // Too narrow to read, the button gives way to the menu bar's Timing menu.
+    timingButton.setVisible(transport.getWidth() >= 80);
+    timingButton.setBounds(transport.removeFromLeft(std::min(transport.getWidth(), 120)).reduced(0, 3));
     area.removeFromTop(3);
     statusBar.setBounds(area.removeFromBottom(20));
     area.removeFromBottom(2);
@@ -695,9 +721,13 @@ void MotionEditor::resized() {
     auto graph = timeline.withTrimmedTop(3);
     curveList.setBounds(graph.removeFromLeft(std::clamp(graph.getWidth() / 7, 150, 210)));
     graph.removeFromLeft(2);
-    graphSideViewport.setBounds(graph.removeFromRight(285));
-    layoutGraphSide();
-    graph.removeFromRight(3);
+    // Modulation and routing need a target; without one the graph takes the room.
+    graphSideViewport.setVisible(timelineTabs.getCurrentTabIndex() == 1 && curveTarget != 0);
+    if (curveTarget != 0) {
+        graphSideViewport.setBounds(graph.removeFromRight(285));
+        layoutGraphSide();
+        graph.removeFromRight(3);
+    }
     curveEditor.setBounds(graph);
     timelineDivider.setBounds(area.removeFromBottom(7));
     // Side panels widen on large windows; the preview keeps the rest.
@@ -724,11 +754,19 @@ void MotionEditor::resized() {
     previewDivider.setBounds(area.removeFromLeft(7));
     auto output = area;
     outputHeader.setBounds(output.removeFromTop(30));
-    auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(68).reduced(4, 3);
+    // A tight header drops its title before any control: the picture says
+    // what the panel is.
+    const auto controlsWidth = visualiserControls != nullptr && visualiserControls->getParentComponent() == this ? visualiser.controlsPreferredWidth() + 4 : 0;
+    const auto titled = outputHeader.getWidth() - 8 >= 68 + controlsWidth + 64 + 6 + 120;
+    outputTitle.setVisible(titled);
+    outputTitle.setBounds(outputHeader.getBounds().reduced(8, 3).withWidth(60));
+    auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(titled ? 68 : 0).reduced(4, 3);
+    // The scope's buttons keep their size; the output menu gives way first
+    // (it is also in the Audio menu), then the buttons.
+    const auto pickerFits = monitorBounds.getWidth() - controlsWidth - 64 - 6 >= 90;
+    monitorOutput.setVisible(pickerFits);
     if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
-        // The scope's buttons keep their size; the output menu gives way first
-        // (down to 90 px), then the buttons.
-        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 64 - 6 - 90 - 4));
+        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 64 - 6 - (pickerFits ? 90 + 4 : 0)));
         visualiserControls->setBounds(monitorBounds.removeFromRight(width).withSizeKeepingCentre(width, 24));
         monitorBounds.removeFromRight(4);
         visualiserControls->toFront(false);
@@ -1274,8 +1312,8 @@ void MotionEditor::timerCallback() {
         const juce::String dot(juce::CharPointer_UTF8("  \xc2\xb7  "));
         auto statistics = juce::String(rate / 1000.0, rate == std::floor(rate / 1000.0) * 1000.0 ? 0 : 1) + " kHz" + dot + juce::String(beamRate, beamRate == std::floor(beamRate) ? 0 : 2) + " Hz beam";
         if (processor.playing.load() || layers > 0) {
-            statistics += dot + juce::String(layers) + (layers == 1 ? " layer" : " layers");
-            if (interleave > 1) { statistics += dot + "dense: each layer every " + juce::String(interleave) + " cycles"; }
+            statistics += dot + "drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects");
+            if (interleave > 1) { statistics += dot + "dense: each object every " + juce::String(interleave) + " cycles"; }
         }
         statusBar.setStatistics(statistics);
     }
@@ -1481,9 +1519,40 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     return CommonPluginEditor::keyPressed(key);
 }
 
+// Menu 0 (File) is built by buildFileMenu, so its commands only bind keys.
 void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action) {
-    menus.addMenuItem(menu, name, action, shortcut);
-    commands.push_back({std::move(name), std::move(shortcut), key, std::move(action)});
+    if (menu != 0) { menus.addMenuItem(menu, name, action, motion::style::shortcutText(shortcut)); }
+    commands.push_back({menu, std::move(name), std::move(shortcut), key, std::move(action)});
+}
+
+void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
+    menu.addItem(motion::style::menuItem("New Project", 1001, "Cmd+N"));
+    menu.addItem(motion::style::menuItem("Open Project...", 1002, "Cmd+O"));
+    menus.addRecentProjectsSubmenu(menu, processor, 1100, 1099);
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Save Project", 1003, "Cmd+S"));
+    menu.addItem(motion::style::menuItem("Save Project As...", 1004, "Cmd+Shift+S"));
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Import Source...", 1005, "Cmd+I"));
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Export XYRGB Signal...", 1006, {}));
+#if OSCI_PREMIUM
+    menu.addItem(motion::style::menuItem("Export Video...", 1007, {}));
+#endif
+}
+
+bool MotionEditor::fileMenuItemSelected(int id) {
+    if (menus.handleRecentProjectMenuItem(id, processor, *this, 1100, 1099)) { return true; }
+    switch (id) {
+        case 1001: resetToDefault(); return true;
+        case 1002: CommonPluginEditor::openProject(); return true;
+        case 1003: saveProject(); return true;
+        case 1004: saveProjectAs(); return true;
+        case 1005: chooseSourceFile(); return true;
+        case 1006: exportSignal(); return true;
+        case 1007: exportVideo(); return true;
+        default: return false;
+    }
 }
 
 void MotionEditor::registerCommands() {
@@ -1580,7 +1649,18 @@ void MotionEditor::registerCommands() {
     addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight - 8); });
     menus.addToggleMenuItem(5, "Follow playhead", [this] { timeline.followEnabled = !timeline.followEnabled; saveLayout(); }, [this] { return timeline.followEnabled; });
     menus.addMenuSeparator(5);
+   #if JUCE_MAC
+    const juce::String fullScreenKeys = "Ctrl+Cmd+F";
+    commands.push_back({5, "Full screen", fullScreenKeys, juce::KeyPress('f', command | juce::ModifierKeys::ctrlModifier, 0), [this] { toggleFullScreen(); }});
+   #else
+    const juce::String fullScreenKeys = "F11";
+   #endif
+    menus.addToggleMenuItem(5, "Full Screen", [this] { toggleFullScreen(); }, [this] { return isFullScreen(); }, motion::style::shortcutText(fullScreenKeys));
+    menus.addMenuItem(5, "Reset Window Size and Position", [this] { resetWindowSizeAndPosition(); });
+    menus.addMenuSeparator(5);
     addCommand(5, "Keyboard shortcuts...", juce::KeyPress('/', command, 0), "Cmd+/", [this] { showShortcuts(); });
+    // File items live in the File menu built by buildFileMenu; these bind keys.
+    addCommand(0, "Import source...", juce::KeyPress('i', command, 0), "Cmd+I", [this] { chooseSourceFile(); });
 }
 
 void MotionEditor::copySelection(bool cut) {
@@ -1620,23 +1700,46 @@ void MotionEditor::stepFrames(int frames) {
     timeline.revealTime(next);
 }
 
-void MotionEditor::showSceneViewMenu() {
+// The Views button's menu; right-clicking the Scene adds keying for the
+// selection.
+void MotionEditor::showSceneViewMenu(bool atMouse) {
     juce::PopupMenu menu;
     menu.setLookAndFeel(&getLookAndFeel());
     const std::array<std::pair<const char*, const char*>, 8> items {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"},
         {"Bottom", "Ctrl+7"}, {"Frame selection", "F"}, {"Reset view", "0"}}};
-    for (int index = 0; index < static_cast<int>(items.size()); ++index) {
-        if (index == 6) { menu.addSeparator(); }
-        menu.addItem(motion::style::menuItem(items[static_cast<std::size_t>(index)].first, index + 1, items[static_cast<std::size_t>(index)].second));
+    juce::PopupMenu views;
+    for (int index = 0; index < 6; ++index) { views.addItem(motion::style::menuItem(items[static_cast<std::size_t>(index)].first, index + 1, items[static_cast<std::size_t>(index)].second)); }
+    if (atMouse) {
+        menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
+        menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
+        menu.addSubMenu("View from", views);
+        if (selection != 0) {
+            menu.addSeparator();
+            const std::array<std::pair<const char*, const char*>, 4> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key drawing weight", "Alt+Shift+T"}}};
+            for (int index = 0; index < 4; ++index) { menu.addItem(motion::style::menuItem(keys[static_cast<std::size_t>(index)].first, 20 + index, keys[static_cast<std::size_t>(index)].second)); }
+            menu.addSeparator();
+            menu.addItem(motion::style::menuItem("Show in timeline", 30, {}));
+        }
+    } else {
+        for (int index = 0; index < 6; ++index) { menu.addItem(motion::style::menuItem(items[static_cast<std::size_t>(index)].first, index + 1, items[static_cast<std::size_t>(index)].second)); }
+        menu.addSeparator();
+        menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
+        menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
     }
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(sceneView), [owner](int result) {
+    const auto options = atMouse ? juce::PopupMenu::Options().withTargetComponent(composition).withMousePosition() : juce::PopupMenu::Options().withTargetComponent(sceneView);
+    menu.showMenuAsync(options, [owner](int result) {
         if (owner == nullptr || result == 0) { return; }
         using Preset = MotionCompositionView::ViewPreset;
         const std::array<Preset, 6> presets {Preset::front, Preset::right, Preset::top, Preset::back, Preset::left, Preset::bottom};
         if (result >= 1 && result <= 6) { owner->composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
         if (result == 7) { owner->composition.frameSelection(); }
         if (result == 8) { owner->composition.resetView(); }
+        const std::array<const char*, 4> groups {"Position", "Rotation", "Scale", "Drawing"};
+        if (result >= 20 && result < 24 && !owner->propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
+            owner->statusBar.show("The selection has no such property to key.");
+        }
+        if (result == 30) { owner->timelineTabs.setSelectedIndex(0); owner->timeline.revealSelection(); }
     });
 }
 
@@ -1665,7 +1768,8 @@ void MotionEditor::setLoopEdge(bool start) {
     const auto first = start ? time : (project.hasLoop() ? project.loopStart : 0.0);
     const auto last = start ? (project.hasLoop() && project.loopEnd > time ? project.loopEnd : project.duration) : time;
     if (last - first < 1 / std::max(1.0, project.frameRate)) { statusBar.show(start ? "The loop start must be at least a frame before its end." : "The loop end must be at least a frame after its start."); return; }
-    setLoop(first, last, true, start ? "Set loop start" : "Set loop end");
+    // Like a DAW's loop markers, I and O move the range; L switches looping.
+    setLoop(first, last, project.looping, start ? "Set loop start" : "Set loop end");
 }
 
 void MotionEditor::loopSelection() {
@@ -1689,6 +1793,11 @@ bool MotionEditor::setLoop(double start, double end, bool enabled, juce::String 
     const auto frame = current.frameRate > 0 ? 1 / current.frameRate : 1.0 / 30;
     if (!(end - start >= frame) || start < 0) { return false; }
     if (current.loopStart == start && current.loopEnd == end && current.looping == enabled) { return true; }
+    // Switching looping on or off is transport state, not an edit.
+    if (current.loopStart == start && current.loopEnd == end) {
+        processor.document.changeView([enabled](motion::Composition& state) { state.looping = enabled; });
+        return true;
+    }
     const motion::Document::ViewChange view(processor.document);
     processor.document.edit(label, [start, end, enabled](motion::Project& state) {
         state.loopStart = start; state.loopEnd = end; state.looping = enabled;
@@ -1844,28 +1953,36 @@ void MotionEditor::splitAtPlayhead() {
 }
 
 void MotionEditor::showShortcuts() {
-    juce::String text;
-    for (const auto& command : commands) {
-        if (command.shortcut.isNotEmpty()) { text << command.shortcut.paddedRight(' ', 14) << command.name << "\n"; }
+    using Overlay = MotionShortcutsOverlay;
+    std::vector<Overlay::Section> sections;
+    const std::array<std::pair<int, const char*>, 5> menuOrder {{{3, "Transport"}, {1, "Edit"}, {2, "Clip and keys"}, {5, "View"}, {0, "File"}}};
+    for (const auto& [menu, title] : menuOrder) {
+        Overlay::Section section {title, {}};
+        if (menu == 0) {
+            for (const auto& [keys, action] : std::initializer_list<std::pair<const char*, const char*>> {{"Cmd+N", "New project"}, {"Cmd+O", "Open project"}, {"Cmd+S", "Save project"}, {"Cmd+Shift+S", "Save project as"}}) {
+                section.entries.push_back({keys, action});
+            }
+        }
+        if (menu == 1) {
+            section.entries.push_back({"Cmd+Z", "Undo"});
+            section.entries.push_back({"Cmd+Shift+Z", "Redo"});
+        }
+        for (const auto& command : commands) {
+            if (command.menu == menu && command.shortcut.isNotEmpty()) { section.entries.push_back({command.shortcut, command.name.trimCharactersAtEnd(".")}); }
+        }
+        sections.push_back(std::move(section));
     }
-    text << "\nTimeline\n"
-         << "V / B / S / R   Move, ripple trim, slip, stretch tools\n"
-         << "M               Add marker      J / K  previous / next key or marker\n"
-         << "Drag empty space  Select clips (Shift adds)    Alt  bypass snapping\n"
-         << "Row bottom edge Drag to resize; double-click resets\n"
-         << "\nScrolling (timeline, graph, notes)\n"
-         << "Wheel / trackpad Pan (Shift: horizontal)\n"
-         << "Cmd+wheel, pinch Zoom time around the pointer\n"
-         << "Alt+wheel       Track height / value range / key height\n"
-         << "\nGraph\n"
-         << "Double-click    Add key        Drag keys; Shift or a box selects several\n"
-         << "Box edges       Scale keys     Right-click  interpolation\n"
-         << "F / Shift+F     Frame all / this curve   Drag the time axis to scrub\n"
-         << "\nScene\n"
-         << "G / R / S       Move, rotate, scale    F  frame    0  reset view\n"
-         << "1 / 3 / 7       Front, right, top (Ctrl: opposite)  N  fly    P  motion path\n"
-         << "Two fingers     Orbit (Shift: pan; Cmd or pinch: zoom)   Wheel  zoom\n";
-    osci::showOverlayMessage(*this, "Keyboard shortcuts", text, osci::ErrorOverlay::Icon::None, {620, 560}, juce::Justification::centredLeft);
+    sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"},
+        {"Drag empty space", "Select clips (Shift adds)"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
+        {"Double-click a lane", "Add a key"}}});
+    sections.push_back({"Scrolling and zoom (timeline, graph, notes)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
+        {"Alt+wheel", "Track height, value range or key height"}}});
+    sections.push_back({"Graph", {{"Double-click", "Add a key"}, {"Drag a box", "Select keys (Shift adds)"}, {"Drag box edges", "Scale key times"},
+        {"F / Shift+F", "Frame all curves / this curve"}, {"Right-click a key", "Interpolation and easing"}, {"Drag the time axis", "Scrub"}}});
+    sections.push_back({"Scene", {{"G / R / S", "Move, rotate and scale tools"}, {"F", "Frame the selection"}, {"0", "Reset the view"},
+        {"1 / 3 / 7", "Front, right and top views (Ctrl: opposite side)"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
+        {"Two fingers / wheel", "Orbit / zoom"}, {"Shift + two fingers", "Pan"}, {"Alt+drag", "Orbit with the mouse"}}});
+    showOverlay(std::make_unique<Overlay>(std::move(sections)));
 }
 
 void MotionEditor::exportVideo() {
@@ -2114,6 +2231,8 @@ void MotionEditor::exportSignal() {
 }
 
 void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen) {
+    const auto hadTarget = curveTarget != 0;
+    const juce::ScopeGuard relayout {[this, hadTarget] { if ((curveTarget != 0) != hadTarget) { resized(); } }};
     curveTarget = id;
     cameraCurve = camera;
     curveProperties.clear();
@@ -2226,13 +2345,19 @@ void MotionEditor::refreshTiming() {
         else if (std::abs(project.snapBeats - 1.0 / 6) < 1.0e-9) { grid = "1/16 T"; }
         else { grid = "1/" + juce::String(4.0 / project.snapBeats, 0); }
     }
-    // The compact transport shows only the grid; the readout already shows the display unit.
-    timingButton.setButtonText((compactTransport ? grid : juce::String(display) + " / " + grid) + " " + juce::String::charToString(0x25be));
+    // Named for what it holds; the ruler and readout show the units, the
+    // magnet the snapping, and the tooltip both.
+    timingButton.setButtonText("Timing " + juce::String::charToString(0x25be));
+    timingButton.setTooltip("Showing " + juce::String(display).toLowerCase() + ", snapping " + (project.gridSnap ? "to " + grid.toLowerCase() : juce::String("off"))
+        + ". Detect tempo, time display, snapping, meter and frame rate. Alt bypasses snapping while dragging.");
     timeline.repaint();
     curveEditor.repaint();
 }
 
-void MotionEditor::showTimingMenu() {
+// The Timing menu, shared by the transport button and the menu bar.
+static const std::array<double, 8> timingRates { 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120 };
+
+juce::PopupMenu MotionEditor::timingMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
     menu.setLookAndFeel(&getLookAndFeel());
@@ -2245,48 +2370,66 @@ void MotionEditor::showTimingMenu() {
     menu.addItem(103, "Bars / beats", true, project.timeDisplay == motion::TimeDisplay::beats);
     menu.addSeparator();
     menu.addItem(200, "Snap to grid", true, project.gridSnap);
-    const std::array<double, 7> divisions { static_cast<double>(project.beatsPerBar), 1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6 };
     const std::array<const char*, 7> names { "1 bar", "1 beat", "1/8 note", "1/16 note", "1/32 note", "1/8 triplet", "1/16 triplet" };
     juce::PopupMenu beatGrid;
-    for (std::size_t i = 0; i < divisions.size(); ++i) { beatGrid.addItem(300 + static_cast<int>(i), names[i], true, std::abs(project.snapBeats - divisions[i]) < 1.0e-9); }
+    for (std::size_t i = 0; i < names.size(); ++i) { beatGrid.addItem(300 + static_cast<int>(i), names[i], true, std::abs(project.snapBeats - snapDivision(static_cast<int>(i))) < 1.0e-9); }
     menu.addSubMenu("Beat grid", beatGrid, project.timeDisplay == motion::TimeDisplay::beats);
     juce::PopupMenu meter;
     for (const auto beats : { 2, 3, 4, 5, 6, 7 }) { meter.addItem(400 + beats, juce::String(beats) + "/4", true, project.beatsPerBar == beats); }
     menu.addSubMenu("Meter", meter);
-    const std::array<double, 8> rates { 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120 };
     const std::array<const char*, 8> rateNames { "23.976 fps", "24 fps", "25 fps", "29.97 fps", "30 fps", "50 fps", "60 fps", "120 fps" };
     juce::PopupMenu frames;
-    for (std::size_t i = 0; i < rates.size(); ++i) { frames.addItem(500 + static_cast<int>(i), rateNames[i], true, std::abs(project.frameRate - rates[i]) < 1.0e-9); }
+    for (std::size_t i = 0; i < timingRates.size(); ++i) { frames.addItem(500 + static_cast<int>(i), rateNames[i], true, std::abs(project.frameRate - timingRates[i]) < 1.0e-9); }
     menu.addSubMenu("Frame rate", frames);
+    return menu;
+}
+
+double MotionEditor::snapDivision(int index) const {
+    const std::array<double, 7> divisions { static_cast<double>(processor.document.project().beatsPerBar), 1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6 };
+    return divisions[static_cast<std::size_t>(std::clamp(index, 0, 6))];
+}
+
+void MotionEditor::showTimingMenu() {
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const auto generation = processor.document.generation();
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(timingButton), [owner, generation, divisions, rates](int result) {
-        if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
-        if (result == 600) { owner->detectTempo(); return; }
-        const auto& current = owner->processor.document.project();
-        const auto subdivision = result == 300 ? static_cast<double>(current.beatsPerBar)
-            : (result > 300 && result < 307 ? divisions[static_cast<std::size_t>(result - 300)] : current.snapBeats);
-        if (result >= 101 && result <= 103 && static_cast<int>(current.timeDisplay) == result - 101) { return; }
-        if (result >= 300 && result < 307 && current.gridSnap && std::abs(current.snapBeats - subdivision) < 1.0e-9) { return; }
-        if (result >= 402 && result <= 407 && current.beatsPerBar == result - 400) { return; }
-        if (result >= 500 && result < 508 && std::abs(current.frameRate - rates[static_cast<std::size_t>(result - 500)]) < 1.0e-9) { return; }
-        // Display and snapping are view state; meter and frame rate are not.
-        std::optional<motion::Document::ViewChange> view;
-        if (result < 400) { view.emplace(owner->processor.document); }
-        owner->processor.document.edit("Change timeline grid", [result, subdivision, rates](motion::Project& state) {
-            if (result >= 101 && result <= 103) {
-                state.timeDisplay = static_cast<motion::TimeDisplay>(result - 101);
-            } else if (result == 200) {
-                state.gridSnap = !state.gridSnap;
-            } else if (result >= 300 && result < 307) {
-                state.snapBeats = subdivision;
-                state.gridSnap = true;
-            } else if (result >= 402 && result <= 407) {
-                if (std::abs(state.snapBeats - state.beatsPerBar) < 1.0e-9) { state.snapBeats = result - 400; }
-                state.beatsPerBar = result - 400;
-            } else if (result >= 500 && result < 508) { state.frameRate = rates[static_cast<std::size_t>(result - 500)]; }
-        });
+    timingMenu().showMenuAsync(juce::PopupMenu::Options().withTargetComponent(timingButton), [owner, generation](int result) {
+        if (owner != nullptr && owner->processor.document.generation() == generation) { owner->applyTiming(result); }
     });
+}
+
+// Display and snapping are view options (no undo step); meter and frame
+// rate are edits.
+bool MotionEditor::applyTiming(int result) {
+    if (result == 600) { detectTempo(); return true; }
+    const auto& current = processor.document.project();
+    if (result >= 101 && result <= 103) {
+        const auto display = static_cast<motion::TimeDisplay>(result - 101);
+        if (current.timeDisplay != display) { processor.document.changeView([display](motion::Composition& state) { state.timeDisplay = display; }); }
+        return true;
+    }
+    if (result == 200) {
+        processor.document.changeView([](motion::Composition& state) { state.gridSnap = !state.gridSnap; });
+        return true;
+    }
+    if (result >= 300 && result < 307) {
+        const auto subdivision = snapDivision(result - 300);
+        processor.document.changeView([subdivision](motion::Composition& state) { state.snapBeats = subdivision; state.gridSnap = true; });
+        return true;
+    }
+    if (result >= 402 && result <= 407) {
+        if (current.beatsPerBar == result - 400) { return true; }
+        processor.document.edit("Change meter", [result](motion::Project& state) {
+            if (std::abs(state.snapBeats - state.beatsPerBar) < 1.0e-9) { state.snapBeats = result - 400; }
+            state.beatsPerBar = result - 400;
+        });
+        return true;
+    }
+    if (result >= 500 && result < 508) {
+        const auto rate = timingRates[static_cast<std::size_t>(result - 500)];
+        if (std::abs(current.frameRate - rate) >= 1.0e-9) { processor.document.edit("Change frame rate", [rate](motion::Project& state) { state.frameRate = rate; }); }
+        return true;
+    }
+    return false;
 }
 
 void MotionEditor::tap() {

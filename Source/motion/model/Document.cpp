@@ -589,8 +589,19 @@ static std::size_t assetBytes(const Asset& asset) {
 
 struct Document::Change : juce::UndoableAction {
     Change(Document& owner, Project before, Project after) : owner(owner), before(std::move(before)), after(std::move(after)) {}
-    bool perform() override { owner.apply(after); return true; }
-    bool undo() override { owner.apply(before); return true; }
+    // Redo and undo keep the current view options; the first perform sets them.
+    bool perform() override {
+        const juce::ScopedValueSetter<bool> carry(owner.carryOptions, performed);
+        owner.apply(after);
+        performed = true;
+        return true;
+    }
+    bool undo() override {
+        const juce::ScopedValueSetter<bool> carry(owner.carryOptions, true);
+        owner.apply(before);
+        return true;
+    }
+    bool performed = false;
     // KiB, so the undo manager can bound history by memory as well as count.
     int getSizeInUnits() override {
         auto bytes = compositionBytes(before) + compositionBytes(after);
@@ -725,6 +736,29 @@ static void clampLoop(Project& project) {
     if (!project.hasLoop()) { project.loopStart = project.loopEnd = 0; project.looping = false; }
 }
 
+// Time display, snapping and the loop switch are view options: undo and redo
+// keep the current ones (like track heights).
+static void carryViewOptions(Project& next, const Project& current) {
+    const auto copy = [](Composition& to, const Composition& from) {
+        to.timeDisplay = from.timeDisplay;
+        to.snapBeats = from.snapBeats;
+        to.gridSnap = from.gridSnap;
+        to.looping = from.looping;
+    };
+    const auto same = [](const Composition& a, const Composition& b) {
+        return a.timeDisplay == b.timeDisplay && a.snapBeats == b.snapBeats && a.gridSnap == b.gridSnap && a.looping == b.looping;
+    };
+    copy(next, current);
+    for (auto& definition : next.definitions) {
+        if (definition == nullptr) { continue; }
+        const auto found = std::find_if(current.definitions.begin(), current.definitions.end(), [&](const auto& item) { return item != nullptr && item->id == definition->id; });
+        if (found == current.definitions.end() || same(*definition, **found)) { continue; }
+        auto updated = std::make_shared<CompositionDefinition>(*definition);
+        copy(*updated, **found);
+        definition = std::move(updated);
+    }
+}
+
 // Track heights are view state: every snapshot shows the current heights, so
 // undo and redo never resize rows. A new document starts from its own.
 static void carryTrackHeights(Project& next, const Project& current) {
@@ -759,6 +793,7 @@ void Document::apply(Project value) {
     if (carryView) {
         carryTrackHeights(value, state);
         carryLuaBakes(value, state);
+        if (carryOptions) { carryViewOptions(value, state); }
     }
     state = std::move(value);
     refreshScope();
@@ -808,6 +843,14 @@ bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operati
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
     return true;
+}
+
+void Document::changeView(std::function<void(Composition&)> change) {
+    auto next = project();
+    change(next);
+    clampLoop(next);
+    const ViewChange view(*this);
+    apply(mergeScope(std::move(next)));
 }
 
 void Document::commit(juce::String label, Project before) {

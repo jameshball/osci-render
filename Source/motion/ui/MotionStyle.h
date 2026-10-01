@@ -15,11 +15,30 @@ inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
 
 inline juce::Font small() { return juce::Font(juce::FontOptions(11.0f)); }
+// A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
+// Ctrl+Shift+F9 elsewhere. Mouse gestures ("Alt+wheel") keep their words.
+inline juce::String shortcutText(const juce::String& raw) {
+   #if JUCE_MAC
+    if (raw.containsIgnoreCase("wheel") || raw.containsIgnoreCase("drag") || raw.containsIgnoreCase("click") || raw.contains(" ")) { return raw.replace("Cmd", juce::String::fromUTF8("\u2318")); }
+    auto parts = juce::StringArray::fromTokens(raw, "+", "");
+    if (raw.endsWith("+")) { parts.removeEmptyStrings(); parts.add("+"); }
+    if (parts.size() < 2) { return raw; }
+    const auto key = parts[parts.size() - 1];
+    parts.remove(parts.size() - 1);
+    juce::String result;
+    for (const auto& [name, glyph] : std::initializer_list<std::pair<const char*, const char*>> {{"Ctrl", "\u2303"}, {"Alt", "\u2325"}, {"Shift", "\u21e7"}, {"Cmd", "\u2318"}}) {
+        if (parts.contains(name)) { result << juce::String::fromUTF8(glyph); }
+    }
+    return result + key;
+   #else
+    return raw.replace("Cmd", "Ctrl");
+   #endif
+}
 // A menu item showing its shortcut on the right.
 inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const juce::String& shortcut) {
     juce::PopupMenu::Item item(text);
     item.itemID = id;
-    item.shortcutKeyDescription = shortcut;
+    item.shortcutKeyDescription = shortcutText(shortcut);
     return item;
 }
 inline juce::Font body() { return juce::Font(juce::FontOptions(12.0f)); }
@@ -163,6 +182,11 @@ public:
         const auto active = getToggleState();
         g.setColour(active ? on : (highlighted || down ? osci::Colours::surfaceRaised().brighter(.15f) : osci::Colours::veryDark()));
         g.fillRoundedRectangle(bounds, 3.0f);
+        if (!active) {
+            // An outline marks it as a toggle, not a heading.
+            g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
+            g.drawRoundedRectangle(bounds.reduced(.5f), 3.0f, 1.0f);
+        }
         g.setColour(active ? juce::Colours::white : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .8f));
         g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
         g.drawText(label, getLocalBounds(), juce::Justification::centred, false);

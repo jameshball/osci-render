@@ -116,7 +116,7 @@ try:
     # Detect tempo and downbeat from a 128 BPM loop whose first downbeat is 0.3 s in.
     step("import loop", "drop-files", "--file", loop, "--class", "MotionEditor", "--exact")
     wait_undo("Import soundtrack", 60000)
-    step("timing menu", "click", "--name", "Time and grid", "--exact")
+    step("timing menu", "click", "--name", "Timing", "--class", "juce::MenuBarComponent::AccessibleItemComponent", "--exact")
     step("detect", "click", "--name", "Detect tempo from soundtrack", "--role", "menuItem", "--exact")
     wait_undo("Set tempo from soundtrack", 60000)
     tree = saved()

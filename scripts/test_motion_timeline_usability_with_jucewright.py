@@ -121,13 +121,16 @@ try:
     step("fit", "press", "F", "--class", "MotionTimelineView")
     command("wait", "--ms", 300)
 
-    # Loop: I and O at the playhead, then the transport button switches it off.
+    # Loop: I and O set the range at the playhead, L switches looping on, and
+    # the transport button switches it off.
     seek(2)
     step("loop start", "press", "i", "--class", "MotionTimelineView")
     seek(6)
     step("loop end", "press", "o", "--class", "MotionTimelineView")
     state = saved()
-    assert float(state.get("loopStart")) == 2 and float(state.get("loopEnd")) == 6 and state.get("looping") in ("1", "true"), state.attrib
+    assert float(state.get("loopStart")) == 2 and float(state.get("loopEnd")) == 6 and state.get("looping") in ("0", "false"), state.attrib
+    step("loop on", "press", "l", "--class", "MotionTimelineView")
+    assert saved().get("looping") in ("1", "true")
     step("loop button", "click", "--name", "Loop playback", "--class", "motion::style::IconButton", "--exact")
     assert saved().get("looping") in ("0", "false")
     step("loop again", "press", "l", "--class", "MotionTimelineView")
@@ -183,9 +186,13 @@ try:
     step("select first clip", "click", "--class", "MotionTimelineView", "--position", f"{170 + round(1 * pixels)},{track_row(10) + 16}")
     step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     command("wait-for-locator", "--name", "Curve Drawing weight", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
-    step("animated only", "click", "--name", "Animated channels only", "--exact")
+    # Only animated channels are listed until the filter is switched off.
     hidden = find(lambda n: n.get("name") == "Curve Position X")
-    assert hidden is None or not hidden.get("visible"), "unanimated channels stay listed"
+    assert hidden is None or not hidden.get("visible"), "unanimated channels are listed"
+    step("all channels", "click", "--name", "Animated channels only", "--exact")
+    shown = find(lambda n: n.get("name") == "Curve Position X")
+    assert shown is not None and shown.get("visible"), "switching the filter off lists every channel"
+    step("animated only", "click", "--name", "Animated channels only", "--exact")
     step("graph list", "screenshot", "--file", session.artifact_dir / "graph-list.png")
 
     # Cmd+A in the Graph selects the curve's keys; F9 eases them.
@@ -200,6 +207,17 @@ try:
     # Alt+Shift+P keys position at the playhead, as in After Effects.
     step("key position", "press", "alt + shift + p", "--class", "MotionCurveEditor")
     keyed = keys("position.x")
+    assert len(keyed) == 1 and abs(float(keyed[0].get("time")) - 1) < 1e-6, [k.attrib for k in keyed]
+    # The shortcuts reference opens with its filter focused.
+    step("shortcuts", "press", "command + /", "--class", "MotionEditor")
+    command("wait-for-locator", "--name", "Filter shortcuts", "--exact", "--timeout-ms", 5000)
+    step("shortcuts screenshot", "screenshot", "--file", session.artifact_dir / "shortcuts.png")
+    step("close shortcuts", "press", "Escape", "--name", "Filter shortcuts", "--class", "juce::TextEditor", "--exact")
+    command("wait", "--ms", 800)
+    # Right-clicking the Scene offers views and keying for the selection.
+    step("scene menu", "right-click", "--class", "MotionCompositionView")
+    step("key rotation from scene", "click", "--name", "Key rotation", "--role", "menuItem", "--exact")
+    keyed = keys("rotation.x")
     assert len(keyed) == 1 and abs(float(keyed[0].get("time")) - 1) < 1e-6, [k.attrib for k in keyed]
     print("Timeline usability passed.", flush=True)
 finally:

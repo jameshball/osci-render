@@ -87,6 +87,7 @@ try:
     step("select leader", "click", "--class", "MotionTimelineView", "--position", "300,42")
     step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("taller graph", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
+    step("all channels", "click", "--name", "Animated channels only", "--exact")
     step("choose position y", "click", "--name", "Curve Position Y", "--exact")
     step("route menu", "click", "--name", "Route modulator", "--exact")
     step("route lfo", "click", "--name", "LFO 1", "--role", "menuItem", "--exact")

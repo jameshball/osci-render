@@ -95,6 +95,9 @@ try:
         raise RuntimeError("Audio gain undo failed")
     step("show gain graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("gain graph screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-gain.png")
+    # The output picker shows in the Scope header when there is room (it is
+    # also in the Audio menu).
+    step("widen workspace", "resize-window", "--w", 1440, "--h", 800)
     step("select XY output", "select-option", "--name", "Audio output mode", "--text", "Beam X/Y")
     if os.environ.get("MOTION_TEST_XYRGB") == "1":
         step("enable five channel output", "select-option", "--name", "Audio output mode", "--text", "Beam XYRGB (5 ch)")

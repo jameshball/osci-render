@@ -60,7 +60,7 @@ try:
     step("reselect middle clip", "click", "--class", "MotionTimelineView", "--position", "600,46")
     step("open ripple menu", "click", "--class", "MotionTimelineView", "--position", "600,46", "--button", "right")
     step("ripple command screenshot", "screenshot", "--file", session.artifact_dir / "ripple-menu.png")
-    step("ripple delete middle", "click", "--name", "Ripple delete on selected tracks (Shift+Delete)", "--role", "menuItem", "--exact")
+    step("ripple delete middle", "click", "--name", "Ripple delete clip", "--role", "menuItem", "--exact")
     assert sorted(float(c.get("start")) for c in saved_clips()) == [0, 0, 5]
     step("ripple result", "screenshot", "--file", session.artifact_dir / "ripple-result.png")
     step("undo ripple", "click", "--name", "Undo", "--exact")

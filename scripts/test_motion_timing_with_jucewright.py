@@ -50,11 +50,16 @@ def wait_undo(text):
 
 
 def choose(item, submenu=None):
-    step("open timing menu", "click", "--name", "Time and grid", "--exact")
+    step("open timing menu", "click", "--name", "Timing", "--class", "juce::MenuBarComponent::AccessibleItemComponent", "--exact")
     if submenu is not None:
         step("open " + submenu, "click", "--name", submenu, "--role", "menuItem", "--exact")
     step("choose " + item, "click", "--name", item, "--role", "menuItem", "--exact")
-    wait_undo("Change timeline grid")
+    # Meter and frame rate are edits; display and snapping are view options
+    # with no undo step.
+    if submenu in ("Meter", "Frame rate"):
+        wait_undo("Change meter" if submenu == "Meter" else "Change frame rate")
+    else:
+        command("wait", "--ms", 250)
 
 
 def position(expected):
@@ -126,8 +131,10 @@ try:
     step("seek frame", "click", "--class", "MotionTimelineView", "--position", "230,12")
     position("21f")
     step("frame ruler screenshot", "screenshot", "--file", session.artifact_dir / "frame-timeline.png")
-    step("undo frame display", "click", "--name", "Undo", "--exact")
-    step("redo frame display", "click", "--name", "Redo", "--exact")
+    # Undo reverts the frame rate but keeps the display, like any view option.
+    step("undo frame rate", "click", "--name", "Undo", "--exact")
+    command("wait", "--ms", 300)
+    step("redo frame rate", "click", "--name", "Redo", "--exact")
     position("21f")
     print("Motion timing workflow smoke passed", flush=True)
 finally:

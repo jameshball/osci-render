@@ -590,9 +590,10 @@ private:
         expectWithinAbsoluteError(loaded.project().snapBeats, 1.0 / 3, 1.0e-12);
         expect(!loaded.project().gridSnap);
         expect(undo.undo());
-        expect(document.project().timeDisplay == source.timeDisplay);
+        expectEquals(document.project().beatsPerBar, source.beatsPerBar);
+        expect(document.project().timeDisplay == motion::TimeDisplay::beats, "the display is a view option undo keeps");
         expect(undo.redo());
-        expect(document.project().timeDisplay == motion::TimeDisplay::beats);
+        expectEquals(document.project().beatsPerBar, 3);
         beginTest("Invalid timing settings reject atomically");
         const auto unchanged = loaded.save().toString();
         for (const auto* attribute : { "timeDisplay", "beatsPerBar", "snapBeats", "gridSnap", "bpm", "fps" }) {

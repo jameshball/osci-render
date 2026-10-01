@@ -21,6 +21,7 @@ public:
     }
     motion::Id selected = 0;
     std::function<void(bool)> onNavigationChanged;
+    std::function<void()> onContextMenu;
     std::function<void(MotionTransformTool)> onToolChanged;
     void setTool(MotionTransformTool value) {
         cancelGesture();
@@ -182,6 +183,10 @@ public:
         cameraAtDown = camera;
         down = event.position;
         if (navigationDrag) { return; }
+        if (event.mods.isPopupMenu()) {
+            if (onContextMenu) { onContextMenu(); }
+            return;
+        }
         if (!event.mods.isLeftButtonDown() || prepared == nullptr) {
             return;
         }
@@ -312,6 +317,22 @@ public:
             if (curve->animated()) { curve->setKeyValue(localTime, value); }
             else { curve->base = value; }
             anyChange = true;
+        }
+        // Position, rotation and scale key as one property, as in After
+        // Effects: when any axis is animated, every axis gets this key.
+        if (anyChange) {
+            const auto scaling = gesture == Gesture::uniformScale || gesture == Gesture::scaleAxis;
+            const std::string prefix = scaling ? "scale." : gesture == Gesture::rotateAxis ? "rotation." : "position.";
+            const auto localTime = pathKey.has_value() && pathKey->selection == editSelection ? pathKey->contentTime : target->localTime(editTime);
+            std::array<motion::Curve*, 3> axes {};
+            bool animated = false;
+            for (int axis = 0; axis < 3; ++axis) {
+                axes[static_cast<std::size_t>(axis)] = target->curve(prefix + "xyz"[axis]);
+                animated = animated || (axes[static_cast<std::size_t>(axis)] != nullptr && axes[static_cast<std::size_t>(axis)]->animated());
+            }
+            for (auto* curve : axes) {
+                if (animated && curve != nullptr) { curve->setKeyValue(localTime, curve->evaluateBase(localTime)); }
+            }
         }
         changed = anyChange;
         processor.document.preview(std::move(project));

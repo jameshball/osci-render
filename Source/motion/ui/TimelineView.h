@@ -40,8 +40,7 @@ public:
         snapButton.setTitle("Snapping");
         snapButton.setTooltip("Snapping to the grid, clip edges, markers and the playhead. Hold Alt while dragging to bypass it.");
         snapButton.onClick = [this] {
-            const motion::Document::ViewChange view(processor.document);
-            processor.document.edit("Change timeline grid", [](motion::Project& project) { project.gridSnap = !project.gridSnap; });
+            processor.document.changeView([](motion::Composition& state) { state.gridSnap = !state.gridSnap; });
         };
         addAndMakeVisible(snapButton);
         headerArea.setInterceptsMouseClicks(false, true);
@@ -49,6 +48,8 @@ public:
         setWantsKeyboardFocus(true);
         // Shortcuts are listed in Help > Keyboard shortcuts rather than a hover wall.
     }
+    // Runs one of the editor's commands by name (Cut, Copy, Paste...).
+    std::function<void(const juce::String&)> onCommand;
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
     std::function<void(const juce::String&)> onError;
@@ -982,7 +983,7 @@ public:
             g.setColour(colour.withAlpha(.05f));
             g.fillRect(bounds.getX(), rulerHeight, bounds.getWidth(), getHeight() - rulerHeight);
         }
-        g.setColour(colour.withAlpha(on ? .75f : .35f));
+        g.setColour(colour.withAlpha(on ? .75f : .6f));
         g.fillRoundedRectangle(bounds.toFloat(), 2.0f);
         g.fillRect(bounds.getX(), loopTop - 4, 2, loopHeight + 4);
         g.fillRect(bounds.getRight() - 2, loopTop - 4, 2, loopHeight + 4);
@@ -994,8 +995,7 @@ public:
         if (bounds.isEmpty() || event.y < loopTop - 4 || event.y >= loopTop + loopHeight || event.x < bounds.getX() - 5 || event.x > bounds.getRight() + 5) { return false; }
         const auto& project = processor.document.project();
         if (event.getNumberOfClicks() > 1) {
-            const motion::Document::ViewChange view(processor.document);
-            processor.document.tryEdit(project.looping ? "Stop looping" : "Loop playback", [](motion::Project& state) { state.looping = !state.looping; return true; });
+            processor.document.changeView([](motion::Composition& state) { state.looping = !state.looping; });
             return true;
         }
         const auto mode = std::abs(event.x - bounds.getX()) <= 5 ? LoopDrag::Mode::left : std::abs(event.x - bounds.getRight()) <= 5 ? LoopDrag::Mode::right : LoopDrag::Mode::move;
@@ -2129,18 +2129,25 @@ private:
 
     void showClipMenu(motion::Id id) {
         juce::PopupMenu menu;
-        menu.addItem(1, selectedClips.size() > 1 ? "Duplicate clips" : "Duplicate clip");
-        menu.addItem(2, "Edit clip timing");
+        const auto many = selectedClips.size() > 1;
         motion::Id asset = 0, definition = 0;
         bool locked = false;
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; definition = clip.composition; locked = track.locked; } }
         }
-        menu.addItem(9, selectedClips.size() > 1 ? "Loop selected clips (Shift+L)" : "Loop this clip (Shift+L)");
+        // The editor's own commands, so the menu and shortcuts agree.
+        const std::array<std::pair<const char*, const char*>, 4> edits {{{"Cut", "Cmd+X"}, {"Copy", "Cmd+C"}, {"Paste", "Cmd+V"}, {"Split at playhead", "Cmd+K"}}};
+        for (int index = 0; index < static_cast<int>(edits.size()); ++index) {
+            menu.addItem(motion::style::menuItem(edits[static_cast<std::size_t>(index)].first, 20 + index, edits[static_cast<std::size_t>(index)].second).setEnabled(index != 1 ? !locked : true));
+        }
+        menu.addItem(motion::style::menuItem(many ? "Duplicate clips" : "Duplicate clip", 1, "Cmd+D").setEnabled(!locked));
+        menu.addSeparator();
+        menu.addItem(2, "Edit clip timing");
+        menu.addItem(motion::style::menuItem(many ? "Loop selected clips" : "Loop this clip", 9, "Shift+L"));
         if (asset != 0) { menu.addItem(10, "Show source in Assets"); }
         menu.addSeparator();
-        menu.addItem(7, "Delete clips (keep gaps)", !locked);
-        menu.addItem(8, "Ripple delete on selected tracks (Shift+Delete)", !locked);
+        menu.addItem(motion::style::menuItem(many ? "Delete clips" : "Delete clip", 7, "Delete").setEnabled(!locked));
+        menu.addItem(motion::style::menuItem(many ? "Ripple delete clips" : "Ripple delete clip", 8, "Shift+Delete").setEnabled(!locked));
         const auto references = motion::sourceReferenceCount(processor.document.mainProject(), asset);
         if (definition == 0) { menu.addItem(3, "Make this clip's source unique", !locked && asset != 0 && references > 1); }
         menu.addSeparator();
@@ -2151,7 +2158,10 @@ private:
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, revision](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
-            if (result == 1) {
+            if (result >= 20 && result < 24 && owner->onCommand) {
+                const std::array<const char*, 4> names {"Cut", "Copy", "Paste", "Split at playhead"};
+                owner->onCommand(names[static_cast<std::size_t>(result - 20)]);
+            } else if (result == 1) {
                 owner->duplicateClip(id);
             } else if (result == 2 && owner->onTimingRequested) {
                 owner->onTimingRequested(id);
@@ -2400,7 +2410,6 @@ private:
         menu.addItem(5, "Ripple trim edges on this track (B)", true, tool == Tool::ripple);
         menu.addSeparator();
         menu.addItem(4, "Fit project (F)");
-        menu.addSectionHeader("Alt: disable snapping   Escape: cancel");
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
         const auto options = juce::PopupMenu::Options().withTargetComponent(this);
         const auto placement = atHeader ? options.withTargetScreenArea(localAreaToGlobal(juce::Rectangle<int>(0, 0, namesWidth, rulerHeight))) : options.withMousePosition();

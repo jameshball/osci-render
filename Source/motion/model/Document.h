@@ -174,6 +174,9 @@ public:
         bool previous;
     };
     bool viewOnlyChange() const { return viewChange; }
+    // Time display, snapping and the loop switch: applied without an undo
+    // step, and kept by later undo and redo.
+    void changeView(std::function<void(Composition&)> change);
     void setTrackHeights(const std::vector<std::pair<Id, int>>& heights);
     // Removes the listed sources (or every unused source when empty) that no
     // clip, composition or MIDI assignment references; one undo step.
@@ -259,7 +262,7 @@ private:
     Id lastId = 0;
     std::uint64_t projectGeneration = 0;
     std::uint64_t stateRevision = 0;
-    bool carryView = true;
+    bool carryView = true, carryOptions = false;
     bool viewChange = false;
     juce::UndoManager& undo;
 };

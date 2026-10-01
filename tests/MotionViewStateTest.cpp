@@ -87,6 +87,22 @@ public:
             expect(motion::Document::prepareLoad(document.save(), loaded).wasOk());
             expect(!loaded.hasLoop() && !loaded.looping, "an inverted loop is dropped");
         }
+        beginTest("Display, snapping and the loop switch change without undo steps and survive undo");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            document.reset(twoTracks(document));
+            document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::beats; state.gridSnap = false; });
+            expect(!undo.canUndo(), "a view option is not an edit");
+            document.edit("Rename", [](motion::Project& project) { project.tracks[0].name = "Renamed"; });
+            document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::frames; state.looping = true; });
+            expect(undo.undo());
+            expect(document.project().timeDisplay == motion::TimeDisplay::frames && !document.project().gridSnap && document.project().looping, "undo keeps the current view options");
+            expect(undo.redo());
+            expect(document.project().timeDisplay == motion::TimeDisplay::frames, "redo keeps them too");
+            document.edit("Show bars", [](motion::Project& project) { project.timeDisplay = motion::TimeDisplay::beats; });
+            expect(document.project().timeDisplay == motion::TimeDisplay::beats, "an edit can still set them");
+        }
         beginTest("Imported sources with a taken name are numbered");
         {
             motion::Project project;

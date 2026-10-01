@@ -24,6 +24,7 @@ public:
         animatedOnly.setName("Animated channels only");
         animatedOnly.setTitle(animatedOnly.getName());
         animatedOnly.setTooltip("Show only keyed or modulated channels, like After Effects' U");
+        animatedOnly.setToggleState(true, juce::dontSendNotification);
         animatedOnly.onClick = [this] { layout(); };
         addAndMakeVisible(animatedOnly);
     }

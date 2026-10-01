@@ -22,6 +22,7 @@
 #include "ui/PlaybackHealth.h"
 #include "ui/PropertyInspector.h"
 #include "ui/StatusBar.h"
+#include "ui/ShortcutsOverlay.h"
 #include <deque>
 #include <variant>
 
@@ -111,11 +112,16 @@ private:
     juce::File commandLineRender;
     bool commandLineRenderStarted = false, commandLineProjectRequested = false, projectLoadFailed = false;
     void showTimingMenu();
+    juce::PopupMenu timingMenu();
+    bool applyTiming(int result);
+    double snapDivision(int index) const;
+    static constexpr int timingMenuIndex = 6;
     void refreshTiming();
     void refreshOutputChoices();
     // Keyboard shortcuts are data: each command appears in a menu with its
     // shortcut and is dispatched from keyPressed when no focused view used it.
     struct Command {
+        int menu = 0;
         juce::String name, shortcut;
         juce::KeyPress key;
         std::function<void()> action;
@@ -123,6 +129,8 @@ private:
     std::vector<Command> commands;
     void addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action);
     void registerCommands();
+    void buildFileMenu(juce::PopupMenu& menu);
+    bool fileMenuItemSelected(int id);
     void copySelection(bool cut);
     void pasteClipboard();
     void stepFrames(int frames);
@@ -177,7 +185,7 @@ private:
     juce::Label compositionTitle;
     MotionSceneToolbar sceneTools;
     juce::TextButton sceneView { "Views" };
-    void showSceneViewMenu();
+    void showSceneViewMenu(bool atMouse);
     MotionPlaybackHealth playbackHealth;
 
     juce::TextButton importButton { "Add source" };
@@ -239,7 +247,9 @@ private:
     MainMenuBarModel menus;
     osci::PanelHeader libraryHeader { "Assets" };
     osci::PanelHeader viewportHeader;
-    osci::PanelHeader outputHeader { "Scope" };
+    // Titled by outputTitle, which gives way when the header is tight.
+    osci::PanelHeader outputHeader;
+    juce::Label outputTitle;
     osci::PanelHeader inspectorHeader { "Inspector" };
     osci::PanelHeader timelineHeader { "Timeline" };
     juce::Rectangle<int> libraryBounds, viewportBounds, inspectorBounds, timelineBounds;
