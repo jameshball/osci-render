@@ -26,6 +26,8 @@ public:
     std::function<bool(motion::Id)> isSelected;
     std::function<void(MotionTransformTool)> onToolChanged;
     void setTool(MotionTransformTool value) {
+        // Choosing a transform tool ends fly navigation, like any modal tool.
+        setNavigating(false);
         cancelGesture();
         tool = value;
         hoverHandle = -1;
@@ -546,7 +548,7 @@ private:
         g.setFont(juce::FontOptions(11));
         g.setColour(osci::Colours::textMuted());
         g.drawFittedText(motionPath.tooComplex ? "Path hidden: more than 2,048 transform keys"
-            : "Position path (before effects) | Click a key to seek", getLocalBounds().removeFromTop(26).reduced(10, 0), juce::Justification::centredLeft, 2);
+            : "Position path (before effects) | Click a key to seek", getLocalBounds().removeFromTop(26).withTrimmedLeft(48).reduced(10, 0), juce::Justification::centredLeft, 2);
     }
     bool seekMotionKey(juce::Point<float> position) {
         updateMotionPath();

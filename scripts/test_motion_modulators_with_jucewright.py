@@ -92,7 +92,7 @@ try:
     step("route menu", "click", "--name", "Route modulator", "--exact")
     step("route lfo", "click", "--name", "LFO 1", "--role", "menuItem", "--exact")
     wait_undo("Route modulator")
-    step("route amount", "set-value", "--name", "Routed amount LFO 1", "0.25")
+    step("route amount", "set-value", "--name", "Routed amount LFO 1", "0.4")
     wait_undo("Change route")
     # Link the follower's position x to the leader's, delayed by half a second.
     step("timeline for follower", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
@@ -109,7 +109,7 @@ try:
     modulator = tree.find("modulator")
     assert modulator is not None and modulator.get("waveform") == "2" and float(modulator.get("rateHz")) == 2, ET.tostring(modulator)
     route = tree.find("route")
-    assert route is not None and route.get("target") == "3" and route.get("property") == "position.y" and float(route.get("amount")) == 0.25, ET.tostring(route)
+    assert route is not None and route.get("target") == "3" and route.get("property") == "position.y" and float(route.get("amount")) == 0.4, ET.tostring(route)
     _, linked = clip_property(tree, 5, "position.x")
     link = linked.find("link")
     assert link is not None and link.get("source") == "3" and link.get("property") == "position.x" and float(link.get("delay")) == 0.5, ET.tostring(linked)

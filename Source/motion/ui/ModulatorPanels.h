@@ -591,8 +591,9 @@ private:
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&route), [safe, id, property](int result) {
             if (safe == nullptr || result == 0) { return; }
             auto& document = safe->processor.document;
-            // Rotations get a visible default depth; everything else one unit.
-            const auto amount = property.starts_with("rotation.") ? 45.0 : (property.starts_with("red") || property.starts_with("green") || property.starts_with("blue") ? 0.5 : 1.0);
+            // A visible but contained default depth: a quarter unit keeps a
+            // moved or scaled object on the canvas; rotations swing 45 degrees.
+            const auto amount = property.starts_with("rotation.") ? 45.0 : (property.starts_with("red") || property.starts_with("green") || property.starts_with("blue") ? 0.5 : 0.25);
             const motion::ModulationRoute route {0, 0, id, property, amount, motion::ModulationMode::add};
             if (result == 1 || result == 2) {
                 motion::Modulator created;

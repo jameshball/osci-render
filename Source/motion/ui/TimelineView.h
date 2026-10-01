@@ -2401,6 +2401,12 @@ private:
 
     void showToolMenu(bool atHeader = false) {
         juce::PopupMenu menu;
+        // On empty space, the edits people look for first.
+        if (!atHeader) {
+            menu.addItem(motion::style::menuItem("Paste", 10, "Cmd+V"));
+            menu.addItem(11, "Add track");
+            menu.addSeparator();
+        }
         menu.addSectionHeader("Clip editing tool");
         menu.addItem(1, "Move / trim edges (V)", true, tool == Tool::move);
         menu.addItem(2, "Slip content inside clip (S)", true, tool == Tool::slip);
@@ -2414,8 +2420,10 @@ private:
                 return;
             }
             owner->cancelGesture();
-            if (result == 4) {
-                owner->fitProject();
+            if (result == 10 && owner->onCommand) {
+                owner->onCommand("Paste");
+            } else if (result == 11) {
+                owner->addTrack.triggerClick();
             } else {
                 owner->tool = result == 5 ? Tool::ripple : result == 1 ? Tool::move : (result == 2 ? Tool::slip : Tool::stretch);
                 owner->repaint();

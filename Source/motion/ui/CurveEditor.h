@@ -3,6 +3,7 @@
 #include "../MotionProcessor.h"
 #include "../model/KeyEdit.h"
 #include "../model/KeyEasing.h"
+#include "../render/PreparedDrivers.h"
 #include "../model/PropertyTarget.h"
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
@@ -140,6 +141,10 @@ public:
             return;
         }
         const auto& curve = *displayed(*clip, propertyName);
+        // Routed modulators and links count as modulation too: the Result
+        // curve shows what the property actually does.
+        const auto drivers = resultDrivers(curve);
+        const auto modulated = curve.modulation.enabled || drivers != nullptr;
         const auto area = plot();
         g.setFont(motion::style::strong());
         g.drawText(propertyLabel(*clip), 12, 3, 160, 22, juce::Justification::centredLeft);
@@ -150,7 +155,7 @@ public:
         const juce::String owner(clip->name.data(), clip->name.size());
         g.drawText(clip->camera ? "Camera: " + owner : clip->isEffect ? "Effect: " + owner : clip->isGroup ? "Group: " + owner : owner, 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
         g.setFont(13.0f);
-        if (curve.modulation.enabled) {
+        if (modulated) {
             g.setColour(juce::Colour(0xff70da91));
             g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
             g.setColour(juce::Colour(0xff80baff));
@@ -240,11 +245,13 @@ public:
             const auto colour = primaryColour(*clip);
             g.setColour(colour);
             g.strokePath(path, juce::PathStrokeType(2.0f));
-            if (curve.modulation.enabled) {
+            if (modulated) {
+                auto withDrivers = curve;
+                withDrivers.drivers = drivers;
                 juce::Path result;
                 for (int i = 0; i <= steps; ++i) {
                     const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-                    const auto value = constrainedValue(*clip, curve.evaluate(clip->localTime(time), clip->curveBpm(processor.document.project().bpm)), propertyName);
+                    const auto value = constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time), clip->curveBpm(processor.document.project().bpm)), propertyName);
                     if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
                 }
                 g.setColour(juce::Colour(0xff80baff));
@@ -805,6 +812,23 @@ private:
         const auto axis = spec == nullptr || spec->axis.empty() ? ' ' : spec->axis[0];
         return axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : axis == 'Z' || axis == 'B' ? motion::style::axisZ() : juce::Colour(0xff70da91);
     }
+    // The edited property's routed modulators and link, prepared once per
+    // document revision (null when nothing drives it).
+    std::shared_ptr<const motion::CurveDrivers> resultDrivers(const motion::Curve& curve) {
+        const auto& document = processor.document;
+        const auto key = std::make_tuple(document.generation(), document.revision(), targetId, propertyName);
+        if (key != driversKey) {
+            driversKey = key;
+            auto copy = curve;
+            copy.drivers.reset();
+            motion::PreparedDrivers prepared(nullptr);
+            prepared.drive(copy, document.project(), motion::ClipTiming {}, targetId, propertyName);
+            cachedDrivers = copy.drivers;
+        }
+        return cachedDrivers;
+    }
+    std::tuple<std::uint64_t, std::uint64_t, motion::Id, std::string> driversKey;
+    std::shared_ptr<const motion::CurveDrivers> cachedDrivers;
     // Round value ticks: steps of 1, 2 or 5 times a power of ten.
     static double valueStep(double span, int wanted) {
         const auto raw = span / std::max(1, wanted);
