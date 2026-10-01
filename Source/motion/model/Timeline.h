@@ -210,6 +210,12 @@ struct Track {
     // Live MIDI input: 0 off, 1-16 one channel, 17 any channel. Armed visual
     // tracks play and record what arrives, drawn inside the composition.
     int midiInput = 0;
+    // Timeline row height in pixels (0: the default). View state: saved with
+    // the project, changed without undo and kept across undo/redo.
+    int height = 0;
+    static constexpr int minimumHeight = 22, maximumHeight = 240;
+    // Label colour index for the timeline (0: automatic, by clip kind).
+    int label = 0;
     static constexpr int anyMidiChannel = 17;
 
     // Overlap requires an explicit transition (added by the transition model).

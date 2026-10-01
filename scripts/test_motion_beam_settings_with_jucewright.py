@@ -17,7 +17,32 @@ from jucewright_osci_browser.session import BrowserSession
 session = BrowserSession(parse_args())
 source = Path(os.environ.get("MOTION_BENCHMARK_PROJECT", "/private/tmp/phase-space-polished-reviewed/Phase Space polished.osci-motion"))
 project = session.artifact_dir / "Phase Space beam.osci-motion"
-shutil.copyfile(source, project)
+
+
+def encoded(data):
+    alphabet = ".ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+"
+    value = int.from_bytes(data, "little")
+    return str(len(data)) + "." + "".join(alphabet[(value >> bit) & 63] for bit in range(0, len(data) * 8, 6))
+
+
+if source.exists():
+    shutil.copyfile(source, project)
+else:
+    # Without the benchmark, a three-minute study with one diamond stands in.
+    root = ET.Element("motion-project", schema="1")
+    composition = ET.SubElement(root, "composition", name="Phase Space", duration="180", bpm="120", fps="30")
+    asset = ET.SubElement(composition, "asset", id="1", name="Hero diamond.obj", extension=".obj")
+    asset.text = encoded(b"v 0 1 0\nv 1 0 0\nv 0 -1 0\nv -1 0 0\nl 1 2 3 4 1\n")
+    track = ET.SubElement(composition, "track", id="2", name="Hero diamond.obj", kind="visual")
+    clip = ET.SubElement(track, "clip", id="3", asset="1", name="Hero diamond.obj", start="0", duration="180", offset="0", rate="1", timeBase="seconds", contentBpm="120")
+    for group, base in (("position", 0), ("rotation", 0), ("scale", 1)):
+        for axis in "xyz":
+            ET.SubElement(clip, "property", name=f"{group}.{axis}", base=str(base))
+    for prop, base in (("red", 1), ("green", 1), ("blue", 1), ("weight", 1)):
+        ET.SubElement(clip, "property", name=prop, base=str(base))
+    ET.SubElement(composition, "camera", id="9", name="Camera")
+    xml = ET.tostring(root, encoding="utf-8")
+    project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 if session.build_app_requested:
     session.build_app()
 if not session.find_jucewright():

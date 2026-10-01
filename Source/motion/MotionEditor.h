@@ -7,6 +7,8 @@
 #include "ui/AssetLibrary.h"
 #include "ui/BeamSettingsWindow.h"
 #include "ui/CurveEditor.h"
+#include "ui/CurveList.h"
+#include "ui/SceneToolbar.h"
 #include "ui/NotesEditor.h"
 #include "ui/CameraPanel.h"
 #include "ui/ClipTimingPanel.h"
@@ -28,7 +30,7 @@ struct MotionMenuLookAndFeel final : osci::LookAndFeel {
     juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return juce::Font(juce::FontOptions(14.0f)); }
 };
 
-class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener {
+class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener, private juce::FocusChangeListener {
 public:
     explicit MotionEditor(MotionProcessor& processor);
     ~MotionEditor() override;
@@ -55,12 +57,13 @@ private:
         std::optional<motion::TextSettings> textSettings;
         std::optional<int> fractalDepth;
         motion::Id relink = 0; // source replaced in place by this file
+        motion::Id track = 0;  // dropped on this timeline track (0: a new track)
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     void showNextPreparationSettings();
     void showBlenderSettings(motion::Id id = 0);
     void chooseSourceFile();
-    bool importSourceFile(const juce::File& file, motion::Id relink);
+    bool importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement = std::nullopt);
     void replaceSourceFile(motion::Id asset);
     std::deque<SourceRequest> preparationRequests;
     bool preparationSettingsOpen = false;
@@ -94,7 +97,9 @@ private:
     std::uint64_t scopeNameGeneration = 0;
     void refreshInspector();
     bool audioSelected() const;
-    void selectCurveTarget(motion::Id id, const std::string& property, bool camera);
+    // `chosen`: the user picked this property; otherwise a new target opens
+    // on its first animated channel.
+    void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);
     void exportSignal();
     void exportVideo();
     struct ExportState;
@@ -122,6 +127,17 @@ private:
     void pasteClipboard();
     void stepFrames(int frames);
     void jumpToKey(bool forward);
+    void jumpToEdit(bool forward);
+    void toggleLoop();
+    void setLoopEdge(bool start);
+    void loopSelection();
+    void setLoop(double start, double end, bool enabled, juce::String label);
+    void loadLayout();
+    void saveLayout();
+    // The panel holding keyboard focus is outlined, so it is clear where
+    // shortcuts go.
+    void globalFocusChanged(juce::Component*) override { repaint(); }
+    juce::Rectangle<int> focusedPanel() const;
     void splitAtPlayhead();
     void placeClipAtPlayhead(bool start, bool trim);
     void recordArmedTrack();
@@ -151,19 +167,24 @@ private:
     osci::TabBar libraryTabs;
     osci::TabBar inspectorTabs;
     osci::TabBar timelineTabs;
-    juce::ComboBox curveProperty;
+    MotionCurveList curveList;
+    std::set<std::string> shownCurves;
+    void refreshCurveList();
     osci::PanelDivider timelineDivider { false }, previewDivider { true };
     double timelineFraction = 0.34, previewFraction = 0.5;
     double dividerStart = 0;
     int previewWidth = 1, workspaceHeight = 1;
     juce::Label compositionTitle;
-    juce::ComboBox transformTool;
+    MotionSceneToolbar sceneTools;
+    juce::TextButton sceneView { "Views" };
+    void showSceneViewMenu();
     MotionPlaybackHealth playbackHealth;
-    juce::TextButton navigateView { "Navigate" }, frameView { "Fit" }, pathView { "Path" };
+
     juce::TextButton importButton { "Add source" };
     motion::style::IconButton playButton { "Play", motion::style::IconButton::Icon::play };
     motion::style::IconButton startButton { "Go to start", motion::style::IconButton::Icon::start };
     motion::style::IconButton endButton { "Go to end", motion::style::IconButton::Icon::end };
+    motion::style::IconButton loopButton { "Loop playback", motion::style::IconButton::Icon::loop };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
@@ -175,6 +196,9 @@ private:
     std::optional<double> tappedBpm;
     std::unique_ptr<juce::TimedCallback> tapCommit;
     bool detectingTempo = false;
+    double lastPaintedPosition = -1;
+    int idleTicks = 0;
+    juce::Component* visualiserControls = nullptr;
     motion::Id soundtrackClip() const;
     void detectTempo();
     void tap();

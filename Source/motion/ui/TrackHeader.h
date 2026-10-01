@@ -40,6 +40,9 @@ public:
     }
     void update(const motion::Track& track, bool group = false, bool collapsed = false, bool lanes = false, bool expanded = false) {
         isGroup = group;
+        const auto& labels = motion::style::trackLabels();
+        const auto colour = !group && track.label > 0 && track.label < static_cast<int>(labels.size()) ? juce::Colour(labels[static_cast<std::size_t>(track.label)].argb).brighter(.5f) : juce::Colours::transparentBlack;
+        if (colour != labelColour) { labelColour = colour; repaint(); }
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
@@ -74,9 +77,16 @@ public:
         arm.setTooltip(track.midiInput == 0 ? "Play and record live MIDI on this track (choose a channel in the track menu)"
             : "Live MIDI input: " + (track.midiInput == motion::Track::anyMidiChannel ? juce::String("any channel") : "channel " + juce::String(track.midiInput)));
     }
+    void paint(juce::Graphics& g) override {
+        if (!labelColour.isTransparent()) {
+            g.setColour(labelColour);
+            g.fillRect(0, 2, 3, std::min(getHeight(), 28) - 4);
+        }
+    }
     // One compact line: [fold/lanes] [grip] name ... [M][S][L]
     void resized() override {
-        auto bounds = getLocalBounds().reduced(3, 0);
+        // Controls stay on one top line however tall the row is.
+        auto bounds = getLocalBounds().removeFromTop(std::min(getHeight(), 28)).reduced(3, 0);
         disclosure.setBounds(bounds.removeFromLeft(16));
         grip.setBounds(bounds.removeFromLeft(14));
         // Compact 15 px switches leave the name as much room as possible.
@@ -93,6 +103,11 @@ public:
         name.setBounds(bounds.reduced(2, 0).withSizeKeepingCentre(bounds.getWidth() - 4, 18));
     }
     void mouseDown(const juce::MouseEvent& event) override {
+        // Right-click anywhere on the header opens the track's menu.
+        if (event.mods.isPopupMenu()) {
+            if (onMenu) { onMenu(id); }
+            return;
+        }
         if (event.eventComponent == &name && onSelect) { onSelect(id); }
     }
     void mouseDrag(const juce::MouseEvent& event) override {
@@ -110,6 +125,7 @@ public:
     std::function<std::uint64_t()> onDragRevision;
 private:
     bool isGroup = false;
+    juce::Colour labelColour = juce::Colours::transparentBlack;
     class Disclosure : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {
             g.setColour(osci::Colours::text().withAlpha(over ? 1.0f : 0.65f));

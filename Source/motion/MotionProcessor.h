@@ -39,6 +39,9 @@ public:
     std::atomic<bool> playing { false };
     std::atomic<bool> freezeWhenStopped { true };
     std::atomic<double> position { 0.0 };
+    // Loop playback (seconds); the editor mirrors the project's loop range.
+    std::atomic<double> loopStart { 0.0 }, loopEnd { 0.0 };
+    std::atomic<bool> looping { false };
     void seek(double seconds) { seekSerial.fetch_add(1); requestedPosition.store(std::max(0.0, seconds)); }
     std::uint64_t seekRevision() const { return seekSerial.load(); }
     void collectPreparedState() { composition.collect(); liveSources.collect(); }

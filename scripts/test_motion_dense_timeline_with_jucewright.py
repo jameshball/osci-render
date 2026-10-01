@@ -63,7 +63,8 @@ def visible_header(tree, name):
     node = track(tree, name)
     assert node is not None, "Layer not exposed: " + name
     bounds, area = node["bounds"], timeline(tree)
-    assert bounds["y"] >= area["y"] + 26 and bounds["y"] + bounds["h"] <= area["y"] + area["h"], (name, bounds, area)
+    # Rows end above the 12px horizontal scroll strip.
+    assert bounds["y"] >= area["y"] + 26 and bounds["y"] + bounds["h"] <= area["y"] + area["h"] - 12, (name, bounds, area)
     return node
 
 
@@ -103,13 +104,13 @@ try:
     visible_header(tree, names[-1])
     # The final page must retain all the fully fitting rows, rather than allowing
     # the last track to scroll to the top over a large blank area.
-    visible_rows = max(1, (area["h"] - 26) // 32)
+    visible_rows = max(1, (area["h"] - 26 - 12) // 32)
     visible_header(tree, names[-visible_rows])
     step("compact last page", "screenshot", "--file", session.artifact_dir / "compact-last-page.png")
     step("fit compact project", "press", "F", "--class", "MotionTimelineView")
     visible_header(snapshot(), names[0])
     area = timeline(snapshot())
-    full_rows, partial = divmod(area["h"] - 26, 32)
+    full_rows, partial = divmod(area["h"] - 26 - 12, 32)
     assert partial >= 4, "Fixture needs a partially visible bottom row"
     # Fit uses a 20px right margin and the project's 180-second duration.
     pps = (area["w"] - 170 - 20) / 180

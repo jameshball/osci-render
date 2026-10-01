@@ -48,6 +48,15 @@ inline juce::Colour visualClip() { return juce::Colour(0xff34524a); }
 inline juce::Colour audioClip() { return juce::Colour(0xff2f4657); }
 inline juce::Colour compositionClip() { return juce::Colour(0xff4a4260); }
 inline juce::Colour midiClip() { return juce::Colour(0xff55503a); }
+// Track label colours (After Effects / Premiere style), muted for clip fills.
+// Index 0 means "automatic" (by clip kind).
+struct TrackLabel { const char* name; std::uint32_t argb; };
+inline const std::array<TrackLabel, 9>& trackLabels() {
+    static const std::array<TrackLabel, 9> labels {{
+        {"Automatic", 0}, {"Red", 0xff6e3a3a}, {"Orange", 0xff735033}, {"Yellow", 0xff6b6331}, {"Green", 0xff34524a},
+        {"Aqua", 0xff2f5a5e}, {"Blue", 0xff2f4657}, {"Purple", 0xff4a4260}, {"Pink", 0xff66405a}}};
+    return labels;
+}
 
 // A borderless chevron for compact previous/next navigation.
 class ChevronButton final : public juce::Button {
@@ -114,6 +123,30 @@ private:
 };
 
 // A small toggle chip whose label never ellipsises (track M / S / L).
+// A magnet: snapping on (lit) or off.
+class MagnetButton final : public juce::Button {
+public:
+    MagnetButton() : juce::Button("Snapping") { setWantsKeyboardFocus(false); }
+    void paintButton(juce::Graphics& g, bool over, bool down) override {
+        const auto bounds = getLocalBounds().toFloat().reduced(2);
+        if (getToggleState()) {
+            g.setColour(motion::style::accent().withAlpha(.3f));
+            g.fillRoundedRectangle(bounds, 3);
+        } else if (over || down) {
+            g.setColour(juce::Colours::white.withAlpha(.08f));
+            g.fillRoundedRectangle(bounds, 3);
+        }
+        const auto c = bounds.getCentre();
+        juce::Path magnet;
+        magnet.startNewSubPath(c.x - 5, c.y - 5);
+        magnet.lineTo(c.x - 5, c.y + 1);
+        magnet.addCentredArc(c.x, c.y + 1, 5, 5, 0, juce::MathConstants<float>::pi * 1.5f, juce::MathConstants<float>::halfPi);
+        magnet.lineTo(c.x + 5, c.y - 5);
+        g.setColour(getToggleState() ? juce::Colours::white : osci::Colours::text().withAlpha(.6f));
+        g.strokePath(magnet, juce::PathStrokeType(2.0f));
+    }
+};
+
 class Chip final : public juce::Button {
 public:
     explicit Chip(const juce::String& text) : juce::Button(text), label(text) { setClickingTogglesState(true); }

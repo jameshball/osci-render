@@ -68,6 +68,17 @@ public:
     void updateRenderModeFromProcessor();
     void setTimelineController(std::shared_ptr<TimelineController> controller);
     void parserChanged() override;
+    // Hands the control row (record, texture output, settings, popout, full
+    // screen and the media timeline) to a host that places it elsewhere; the
+    // picture then fills the component. Without this, the row sits under the
+    // picture as before.
+    // The host adds the bar as its own child. While full screen, the bar comes
+    // back under the picture so the controls stay on screen.
+    juce::Component& detachControls(juce::Component& host);
+    int controlsPreferredWidth();
+    // Called when the detached bar's preferred width changes (a recording
+    // stopwatch or ffmpeg download) or it returns from full screen.
+    std::function<void()> onControlsChanged;
     void parameterValueChanged(int parameterIndex, float newValue) override;
     void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
@@ -156,6 +167,23 @@ private:
     osci::SvgButton record{"Record", BinaryData::record_svg, juce::Colours::red, juce::Colours::red.withAlpha(0.01f)};
 
     juce::Rectangle<int> buttonRow;
+
+    // The control row's container; a child of this component unless detached.
+    class ControlBar final : public juce::Component {
+    public:
+        // Empty parts of the row behave like the picture (click to pause).
+        explicit ControlBar(VisualiserComponent& visualiser) : owner(visualiser) { setName("Visualiser controls"); setInterceptsMouseClicks(false, true); }
+        void paint(juce::Graphics& g) override;
+        void resized() override { owner.layoutControls(); }
+    private:
+        VisualiserComponent& owner;
+    };
+    ControlBar controls { *this };
+    bool controlsDetached = false;
+    juce::Component::SafePointer<juce::Component> controlsHost;
+    int lastControlsWidth = 0;
+    int placeControls(juce::Rectangle<int> area, bool apply);
+    void layoutControls();
 
     void popoutWindow(bool saveOpenPreference = true);
     void newOpenGLContextCreated() override;

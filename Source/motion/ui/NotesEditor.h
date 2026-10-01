@@ -324,16 +324,36 @@ public:
         }
         return false;
     }
+    // The timeline's convention: wheel and trackpad pan (Shift makes the
+    // wheel horizontal), Cmd/Ctrl+wheel or a pinch zooms time, Alt+wheel
+    // changes the key height.
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override {
         if (event.mods.isCommandDown() || event.mods.isCtrlDown()) {
-            const auto under = beatAt(event.x);
-            pixelsPerBeat = std::clamp(pixelsPerBeat * std::exp(wheel.deltaY * 2), 12.0, 600.0);
-            scrollBeat = std::max(0.0, under - (event.x - keyboardWidth) / pixelsPerBeat);
-        } else if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY)) {
-            scrollBeat = std::max(0.0, scrollBeat - (event.mods.isShiftDown() ? wheel.deltaY : wheel.deltaX) * 4);
-        } else { topPitch = std::clamp(topPitch + juce::roundToInt(wheel.deltaY * 12), std::min(127, gridBounds().getHeight() / rowHeight), 127); }
+            zoomAround(event.x, std::exp((std::abs(wheel.deltaY) > std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.5));
+        } else if (event.mods.isAltDown()) {
+            rowHeight = std::clamp(juce::roundToInt(rowHeight * std::exp(wheel.deltaY * 2)), 6, 40);
+        } else {
+            const auto dx = event.mods.isShiftDown() ? wheel.deltaY + wheel.deltaX : wheel.deltaX;
+            const auto dy = event.mods.isShiftDown() ? 0.0f : wheel.deltaY;
+            if (dx != 0) { scrollBeat = std::max(0.0, scrollBeat - dx * 256 / pixelsPerBeat); }
+            if (dy != 0) {
+                pitchScroll += dy * 256 / rowHeight;
+                const auto rowsMoved = static_cast<int>(pitchScroll);
+                pitchScroll -= rowsMoved;
+                topPitch = std::clamp(topPitch + rowsMoved, std::min(127, gridBounds().getHeight() / rowHeight), 127);
+            }
+        }
         repaint();
     }
+    void mouseMagnify(const juce::MouseEvent& event, float scale) override {
+        if (scale > 0) { zoomAround(event.x, scale); repaint(); }
+    }
+    void zoomAround(int x, double factor) {
+        const auto under = beatAt(x);
+        pixelsPerBeat = std::clamp(pixelsPerBeat * factor, 12.0, 600.0);
+        scrollBeat = std::max(0.0, under - (x - keyboardWidth) / pixelsPerBeat);
+    }
+    double pitchScroll = 0;
 private:
     void timerCallback() override {
         const auto message = processor.midiRecordingSession().message();

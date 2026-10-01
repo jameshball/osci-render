@@ -20,6 +20,25 @@ public:
         setName("Animation curve editor");
         setWantsKeyboardFocus(true);
     }
+    // Curves shown faintly behind the edited group (from the channel list).
+    void setContextCurves(std::map<std::string, juce::Colour> curves) {
+        if (curves == contextCurves) { return; }
+        contextCurves = std::move(curves);
+        repaint();
+    }
+    // Page-follows the playhead during playback unless the view was just moved.
+    void followPlayhead(double time, bool playing) {
+        if (!playing) { following = false; followPaused = false; return; }
+        if (!following) { following = true; followPaused = false; }
+        const auto inside = time >= viewStart && time <= viewEnd;
+        if (followPaused) { followPaused = !inside; return; }
+        if (!inside && !drag.has_value()) {
+            const auto span = viewEnd - viewStart;
+            userView = true;
+            setView(time - span * 0.02, time + span * 0.98);
+            repaint();
+        }
+    }
 
     struct ViewState {
         motion::Id target = 0;
@@ -150,8 +169,24 @@ public:
             g.setColour(osci::Colours::text().withAlpha(0.65f));
             g.drawText(juce::String(grid.label(time, step)), juce::roundToInt(x) - 34, juce::roundToInt(area.getBottom()) + 3, 68, 17, juce::Justification::centred);
         }
-        g.setColour(osci::Colours::text().withAlpha(0.5f));
-        g.drawText("Double-click: key | Drag: move | Shift/box: select | Edge handles: scale | Right-click: curve | Cmd+wheel: time zoom | F: frame all | Shift+F: this curve", 12, getHeight() - 19, getWidth() - 24, 17, juce::Justification::centredLeft);
+        {
+            // Channels shown from the list, faint and not editable.
+            juce::Graphics::ScopedSaveState context(g);
+            g.reduceClipRegion(area.toNearestInt().expanded(5));
+            const auto steps = std::max(2, juce::roundToInt(area.getWidth() / 3));
+            for (const auto& [name, colour] : contextCurves) {
+                const auto* other = clip->curve(name);
+                if (other == nullptr || name == propertyName || isSibling(*clip, name)) { continue; }
+                juce::Path shape;
+                for (int i = 0; i <= steps; ++i) {
+                    const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
+                    const auto y = valueY(other->evaluateBase(clip->localTime(time)));
+                    if (i == 0) { shape.startNewSubPath(timeX(time), y); } else { shape.lineTo(timeX(time), y); }
+                }
+                g.setColour(colour.withAlpha(.3f));
+                g.strokePath(shape, juce::PathStrokeType(1.0f));
+            }
+        }
         {
             // Sibling axes are editable too, drawn in their axis colour under the primary curve.
             juce::Graphics::ScopedSaveState ghosts(g);
@@ -264,6 +299,12 @@ public:
             return;
         }
         const auto left = !event.mods.isPopupMenu() && event.mods.isLeftButtonDown();
+        // The time axis under the plot scrubs the playhead.
+        if (left && event.position.y > plot().getBottom() + 2) {
+            scrubbing = true;
+            scrubTo(event.position.x, event.mods);
+            return;
+        }
         if (left && selectedTime.has_value()) {
             const auto* selected = findKey(*curve, *selectedTime);
             if (selected != nullptr) {
@@ -387,7 +428,14 @@ public:
         refresh();
     }
 
+    void scrubTo(float x, juce::ModifierKeys modifiers) {
+        auto time = std::clamp(projectTime(x), 0.0, processor.document.project().duration);
+        if (!modifiers.isAltDown()) { time = processor.document.project().timeGrid().snap(time); }
+        processor.seek(time);
+        repaint();
+    }
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (scrubbing) { scrubTo(event.position.x, event.mods); return; }
         if (marquee.has_value()) {
             // The box selects across every curve of the group; the first key on
             // the primary curve becomes primary.
@@ -478,6 +526,7 @@ public:
     }
 
     void mouseUp(const juce::MouseEvent&) override {
+        if (scrubbing) { scrubbing = false; return; }
         snapGuide.reset();
         if (marquee.has_value()) {
             marquee.reset();
@@ -552,31 +601,52 @@ public:
         return false;
     }
 
+    // The same wheel convention as the timeline: wheel and trackpad pan
+    // (Shift makes the wheel horizontal), Cmd/Ctrl+wheel or a pinch zooms
+    // time around the pointer, Alt+wheel zooms values.
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override {
         if (drag.has_value()) {
             return;
         }
         userView = true;
-        if (event.mods.isCommandDown()) {
-            const auto anchor = projectTime(event.position.x);
-            const auto ratio = (anchor - viewStart) / (viewEnd - viewStart);
-            const auto duration = processor.document.project().duration;
-            const auto maximumSpan = duration >= viewLimit / 2 ? viewLimit * 2 : std::max(1.0, duration * 4.0);
-            const auto span = std::clamp((viewEnd - viewStart) * std::exp(-wheel.deltaY * 3.0), 1.0 / std::max(1.0, processor.document.project().frameRate), maximumSpan);
-            const auto start = anchor - span * ratio;
-            setView(start, start + span);
-        } else if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY)) {
-            const auto shift = -(wheel.deltaX + wheel.deltaY) * (viewEnd - viewStart) * 0.2;
-            setView(viewStart + shift, viewEnd + shift);
-        } else {
+        if (following) { followPaused = true; }
+        if (event.mods.isCommandDown() || event.mods.isCtrlDown()) {
+            zoomTime(event.position.x, std::exp((std::abs(wheel.deltaY) > std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.5));
+        } else if (event.mods.isAltDown()) {
             const auto anchor = valueAt(event.position.y);
             const auto ratio = (anchor - low) / (high - low);
-            const auto span = std::clamp((high - low) * std::exp(-wheel.deltaY * 3.0), 0.0001, 1.0e9);
+            const auto span = std::clamp((high - low) * std::exp(-wheel.deltaY * 2.5), 0.0001, 1.0e9);
             low = anchor - span * ratio;
             high = low + span;
             normalizeValueRange();
+        } else {
+            const auto dx = event.mods.isShiftDown() ? wheel.deltaY + wheel.deltaX : wheel.deltaX;
+            const auto dy = event.mods.isShiftDown() ? 0.0f : wheel.deltaY;
+            const auto seconds = -dx * 256 / plot().getWidth() * (viewEnd - viewStart);
+            if (dx != 0) { setView(viewStart + seconds, viewEnd + seconds); }
+            if (dy != 0) {
+                const auto shift = dy * 256 / plot().getHeight() * (high - low);
+                low += shift; high += shift;
+                normalizeValueRange();
+            }
         }
         repaint();
+    }
+    void mouseMagnify(const juce::MouseEvent& event, float scale) override {
+        if (drag.has_value() || !(scale > 0)) { return; }
+        userView = true;
+        if (following) { followPaused = true; }
+        zoomTime(event.position.x, scale);
+        repaint();
+    }
+    void zoomTime(float x, double factor) {
+        const auto anchor = projectTime(x);
+        const auto ratio = (anchor - viewStart) / (viewEnd - viewStart);
+        const auto duration = processor.document.project().duration;
+        const auto maximumSpan = duration >= viewLimit / 2 ? viewLimit * 2 : std::max(1.0, duration * 4.0);
+        const auto span = std::clamp((viewEnd - viewStart) / factor, 1.0 / std::max(1.0, processor.document.project().frameRate), maximumSpan);
+        const auto start = anchor - span * ratio;
+        setView(start, start + span);
     }
 
 private:
@@ -1127,6 +1197,8 @@ private:
     juce::Point<float> marqueeStart;
     std::optional<Drag> drag;
     std::optional<double> snapGuide;     // Project time of the magnet a drag is snapped to.
+    std::map<std::string, juce::Colour> contextCurves;
+    bool following = false, followPaused = false, scrubbing = false;
     double viewStart = 0.0, viewEnd = 1.0;
     double low = -1.0, high = 1.0;
 };

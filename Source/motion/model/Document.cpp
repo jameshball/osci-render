@@ -718,9 +718,48 @@ static void carryLuaBakes(Project& next, const Project& current) {
     }
 }
 
+// A loop never reaches past the composition; one that no longer fits is dropped.
+static void clampLoop(Project& project) {
+    if (!project.hasLoop()) { return; }
+    project.loopEnd = std::min(project.loopEnd, project.duration);
+    if (!project.hasLoop()) { project.loopStart = project.loopEnd = 0; project.looping = false; }
+}
+
+// Track heights are view state: every snapshot shows the current heights, so
+// undo and redo never resize rows. A new document starts from its own.
+static void carryTrackHeights(Project& next, const Project& current) {
+    std::map<Id, int> heights;
+    const auto collect = [&](const Composition& composition) { for (const auto& track : composition.tracks) { heights[track.id] = track.height; } };
+    collect(current);
+    for (const auto& definition : current.definitions) { if (definition != nullptr) { collect(*definition); } }
+    const auto differs = [&](const Composition& composition) {
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
+            const auto found = heights.find(track.id);
+            return found != heights.end() && found->second != track.height;
+        });
+    };
+    const auto carry = [&](Composition& composition) {
+        for (auto& track : composition.tracks) {
+            const auto found = heights.find(track.id);
+            if (found != heights.end()) { track.height = found->second; }
+        }
+    };
+    if (differs(next)) { carry(next); }
+    for (auto& definition : next.definitions) {
+        // Shared definitions are copied only when a height actually differs.
+        if (definition == nullptr || !differs(*definition)) { continue; }
+        auto copy = std::make_shared<CompositionDefinition>(*definition);
+        carry(*copy);
+        definition = std::move(copy);
+    }
+}
+
 void Document::apply(Project value) {
     ++stateRevision;
-    carryLuaBakes(value, state);
+    if (carryView) {
+        carryTrackHeights(value, state);
+        carryLuaBakes(value, state);
+    }
     state = std::move(value);
     refreshScope();
     if (onChanged) {
@@ -731,6 +770,7 @@ void Document::apply(Project value) {
 
 void Document::preview(Project project) {
     pruneReferences(project);
+    clampLoop(project);
     apply(mergeScope(std::move(project)));
 }
 
@@ -738,6 +778,7 @@ void Document::edit(juce::String label, std::function<void(Project&)> operation)
     auto after = project();
     operation(after);
     pruneReferences(after);
+    clampLoop(after);
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
@@ -749,6 +790,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
     auto after = project();
     operation(after);
     pruneReferences(after);
+    clampLoop(after);
     after = mergeScope(std::move(after));
     if (!joins) { undo.beginNewTransaction(label); }
     undo.perform(new Change(*this, state, std::move(after)));
@@ -761,6 +803,7 @@ bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operati
     auto after = project();
     if (!operation(after)) { return false; }
     pruneReferences(after);
+    clampLoop(after);
     after = mergeScope(std::move(after));
     undo.beginNewTransaction(label);
     undo.perform(new Change(*this, state, std::move(after)));
@@ -777,7 +820,10 @@ void Document::reset(Project project) {
     ++projectGeneration;
     undo.clearUndoHistory();
     lastId = highestProjectIdentity(project, lastId);
+    // A different document: nothing carries over from the previous one.
+    carryView = false;
     apply(std::move(project));
+    carryView = true;
 }
 
 // In musical time, project-time items keep their beat when the tempo map
@@ -808,6 +854,7 @@ static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
         }
     };
     next.duration = remap(next.duration);
+    if (next.hasLoop()) { next.loopStart = remap(next.loopStart); next.loopEnd = remap(next.loopEnd); }
     for (auto& marker : next.markers) { marker.time = std::min(remap(marker.time), next.duration); }
     for (auto& cut : next.cameraCuts) {
         const auto end = remap(cut.end());
@@ -981,6 +1028,33 @@ std::size_t Document::assetUses(Id assetId) const {
     midi(whole);
     for (const auto& definition : whole.definitions) { if (definition != nullptr) { midi(*definition); } }
     return count;
+}
+
+bool Document::setTrackHeight(Id trackId, int height) {
+    height = height == 0 ? 0 : std::clamp(height, Track::minimumHeight, Track::maximumHeight);
+    bool found = false;
+    const auto update = [&](Composition& composition) {
+        bool changed = false;
+        for (auto& track : composition.tracks) {
+            if (track.id == trackId) { found = true; changed = track.height != height; track.height = height; }
+        }
+        return changed;
+    };
+    auto next = state;
+    bool changed = update(next);
+    for (auto& definition : next.definitions) {
+        const auto owns = definition != nullptr && std::any_of(definition->tracks.begin(), definition->tracks.end(), [trackId](const auto& track) { return track.id == trackId; });
+        if (!owns) { continue; }
+        auto copy = std::make_shared<CompositionDefinition>(*definition);
+        if (update(*copy)) { definition = std::move(copy); changed = true; }
+    }
+    if (!found || !changed) { return found; }
+    // View state: no undo step, no revision bump and no change broadcast (it
+    // affects neither playback nor any other view); the timeline relayouts
+    // itself and the next save writes it.
+    state = std::move(next);
+    refreshScope();
+    return true;
 }
 
 bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
@@ -2357,6 +2431,11 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
     xml.setAttribute("beatsPerBar", state.beatsPerBar);
     xml.setAttribute("snapBeats", exactBakeNumber(state.snapBeats));
     xml.setAttribute("gridSnap", state.gridSnap);
+    if (state.hasLoop()) {
+        xml.setAttribute("loopStart", exactBakeNumber(state.loopStart));
+        xml.setAttribute("loopEnd", exactBakeNumber(state.loopEnd));
+        xml.setAttribute("looping", state.looping);
+    }
     if (state.tempoChanges != nullptr) {
         for (const auto& change : *state.tempoChanges) {
             auto* item = xml.createNewChildElement("tempo");
@@ -2390,6 +2469,8 @@ static juce::XmlElement saveCompositionContent(const Composition& state) {
         row->setAttribute("group", juce::String(track.group));
         row->setAttribute("kind", track.kind == TrackKind::audio ? "audio" : "visual");
         if (track.midiInput != 0) { row->setAttribute("midiInput", track.midiInput); }
+        if (track.height != 0) { row->setAttribute("height", track.height); }
+        if (track.label != 0) { row->setAttribute("label", track.label); }
         saveEffects(*row, track.effects);
         for (const auto& clip : track.clips) {
             auto* item = row->createNewChildElement("clip");
@@ -2592,6 +2673,11 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
     project.beatsPerBar = xml.getIntAttribute("beatsPerBar", 4);
     project.snapBeats = xml.getDoubleAttribute("snapBeats", 0.25);
     project.gridSnap = snap != 0;
+    project.loopStart = xml.getDoubleAttribute("loopStart", 0);
+    project.loopEnd = xml.getDoubleAttribute("loopEnd", 0);
+    project.looping = xml.getBoolAttribute("looping", false);
+    project.loopEnd = std::min(project.loopEnd, project.duration);
+    if (!project.hasLoop()) { project.loopStart = project.loopEnd = 0; project.looping = false; }
     if (!std::isfinite(project.duration) || project.duration <= 0 || !std::isfinite(project.frameRate)
         || project.frameRate < 0.001 || project.frameRate > 1000 || !std::isfinite(project.bpm) || project.bpm < 1 || project.bpm > 1000
         || display < 0 || display > 2 || snap < 0 || snap > 1 || project.beatsPerBar < 1 || project.beatsPerBar > 32
@@ -2657,6 +2743,9 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
         track.solo = row->getBoolAttribute("solo", false);
         track.locked = row->getBoolAttribute("locked", false);
         track.midiInput = row->getIntAttribute("midiInput", 0);
+        track.height = std::clamp(row->getIntAttribute("height", 0), 0, Track::maximumHeight);
+        if (track.height != 0) { track.height = std::max(track.height, Track::minimumHeight); }
+        track.label = std::clamp(row->getIntAttribute("label", 0), 0, 8);
         if (track.midiInput < 0 || track.midiInput > Track::anyMidiChannel || (track.midiInput != 0 && track.kind != TrackKind::visual)) {
             return juce::Result::fail("MIDI input needs a visual track and a channel 1-16 (or any).");
         }

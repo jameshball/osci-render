@@ -96,6 +96,20 @@ public:
         repaint();
     }
     void resetView() { cancelGesture(); camera = {}; repaint(); }
+    // Blender's numpad views: look along an axis at the current pivot and
+    // distance.
+    enum class ViewPreset { front, back, right, left, top, bottom };
+    void setViewPreset(ViewPreset preset) {
+        cancelGesture();
+        setNavigating(false);
+        const auto distance = std::clamp(camera.distance() > 0 ? camera.distance() : 4.0, motion::editor::Camera::minimumDistance, motion::editor::Camera::maximumDistance);
+        const auto pi = juce::MathConstants<double>::pi;
+        const auto limit = motion::editor::Camera::pitchLimit;
+        camera.pitch = preset == ViewPreset::top ? -limit : preset == ViewPreset::bottom ? limit : 0.0;
+        camera.yaw = preset == ViewPreset::back ? pi : preset == ViewPreset::right ? -pi / 2 : preset == ViewPreset::left ? pi / 2 : 0.0;
+        camera.position = camera.pivot - camera.forward() * distance;
+        repaint();
+    }
 
     std::function<void(motion::Id)> onSelection;
     void refresh() { pathDirty = true; prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); repaint(); }
@@ -113,15 +127,19 @@ public:
             drawWorldLine(g, { static_cast<double>(line), -5, 0 }, { static_cast<double>(line), 5, 0 });
             drawWorldLine(g, { -5, static_cast<double>(line), 0 }, { 5, static_cast<double>(line), 0 });
         }
-        g.setColour(osci::Colours::veryDark());
-        g.fillRect(getLocalBounds().removeFromBottom(30));
-        g.setColour(osci::Colours::textMuted());
-        g.setFont(12.0f);
-        const auto help = navigating ? "WASD / arrows | Q E up/down | Shift faster | Esc finish"
-            : dragHint.isNotEmpty() ? dragHint : tool == MotionTransformTool::scale ? "Drag centre to scale all axes | S scale | Esc cancel"
-            : tool == MotionTransformTool::rotate ? "Drag a coloured ring | R rotate | Esc cancel"
-            : "Drag arrows to move | G move | Alt-drag orbit";
-        g.drawFittedText(help, getLocalBounds().removeFromBottom(30).reduced(10, 0), juce::Justification::centredLeft, 2);
+        // Context hints only while flying or dragging (the tool strip's tooltips
+        // cover the rest), like Blender's status hints.
+        const juce::String help = navigating ? "WASD / arrows move | Q E down / up | Shift faster | Esc finishes"
+            : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
+        if (help.isNotEmpty()) {
+            auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
+            strip = strip.withSizeKeepingCentre(std::min(strip.getWidth(), juce::GlyphArrangement::getStringWidthInt(juce::Font(juce::FontOptions(12.0f)), help) + 24), strip.getHeight());
+            g.setColour(osci::Colours::veryDark().withAlpha(.85f));
+            g.fillRoundedRectangle(strip.toFloat(), 4);
+            g.setColour(osci::Colours::textMuted());
+            g.setFont(12.0f);
+            g.drawFittedText(help, strip.reduced(8, 0), juce::Justification::centred, 1);
+        }
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
             g.setFont(14);
@@ -357,6 +375,14 @@ public:
             if (validGesture()) { cancelGesture(); return true; }
             if (navigationDrag) { camera = cameraAtDown; navigationDrag = false; repaint(); return true; }
         }
+        // Views along an axis: numpad 1, 3, 7 (Ctrl for the opposite side), or
+        // 1, 3, 7 on the number row as with Blender's emulated numpad.
+        const auto code = key.getKeyCode();
+        const auto opposite = key.getModifiers().isCtrlDown();
+        const auto plain = !key.getModifiers().isAnyModifierKeyDown();
+        if (!navigating && (code == juce::KeyPress::numberPad1 || (plain && code == '1'))) { setViewPreset(opposite ? ViewPreset::back : ViewPreset::front); return true; }
+        if (!navigating && (code == juce::KeyPress::numberPad3 || (plain && code == '3'))) { setViewPreset(opposite ? ViewPreset::left : ViewPreset::right); return true; }
+        if (!navigating && (code == juce::KeyPress::numberPad7 || (plain && code == '7'))) { setViewPreset(opposite ? ViewPreset::bottom : ViewPreset::top); return true; }
         if (key.getModifiers().isCommandDown() || key.getModifiers().isCtrlDown()) {
             cancelGesture();
             setNavigating(false);
@@ -371,6 +397,7 @@ public:
         if (key.getKeyCode() == 'F') { frameSelection(); return true; }
         if (key.getKeyCode() == 'N') { setNavigating(true); return true; }
         if (key.getKeyCode() == '0') { resetView(); return true; }
+
         return false;
     }
 

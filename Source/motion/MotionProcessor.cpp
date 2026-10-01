@@ -17,7 +17,14 @@ MotionProcessor::MotionProcessor()
         [this] { return midiDeviceReady.load() && !isSuspended() && !legalNoticePending.load() && !isPreparingComposition() && !preparationFailed.load(); },
         [this](motion::Id id) { setMidiAudition(id); }, [this](const auto& config) { return armMidiRecording(config); }
     });
-    document.onChanged = [this] { requestComposition(document.project()); };
+    document.onChanged = [this] {
+        // The loop range reaches the audio thread with every edit, editor or not.
+        const auto& project = document.project();
+        loopStart.store(project.loopStart);
+        loopEnd.store(project.loopEnd);
+        looping.store(project.looping && project.hasLoop());
+        requestComposition(project);
+    };
     document.onChanged();
 }
 
@@ -225,6 +232,14 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     if (running != wasPlaying || drawing != wasDrawing) { transitionGuard.begin(); }
     wasPlaying = running;
     wasDrawing = drawing;
+    juce::int64 loopStartSample = 0, loopEndSample = 0;
+    // A take records straight through: no loop while recording MIDI.
+    const auto takeOpen = midiRecording.state() == motion::MidiRecording::State::armed || midiRecording.state() == motion::MidiRecording::State::recording;
+    if (looping.load(std::memory_order_relaxed) && !takeOpen) {
+        const auto first = motion::sampleIndex(std::clamp(loopStart.load(std::memory_order_relaxed), 0.0, prepared->duration), sampleRate);
+        const auto last = motion::sampleIndex(std::clamp(loopEnd.load(std::memory_order_relaxed), 0.0, prepared->duration), sampleRate);
+        if (first.has_value() && last.has_value() && *last > *first) { loopStartSample = static_cast<juce::int64>(*first); loopEndSample = static_cast<juce::int64>(*last); }
+    }
     const auto mode = outputMode.load();
     const auto audible = !muteParameter->getBoolValue();
     const auto* volumes = volumeEffect->getAnimatedValuesReadPointer(0, count);
@@ -259,7 +274,13 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
             transitionGuard.begin();
         } else { ++liveMidiSample; }
         if (running) {
-            if (++audioSample >= durationSamples) {
+            ++audioSample;
+            // Crossing the loop end jumps back to its start; starting after
+            // the loop plays on to the end.
+            if (loopEndSample > loopStartSample && audioSample == loopEndSample) {
+                audioSample = loopStartSample;
+                transitionGuard.begin();
+            } else if (audioSample >= durationSamples) {
                 audioSample = 0;
                 transitionGuard.begin();
             }

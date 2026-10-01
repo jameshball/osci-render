@@ -35,10 +35,20 @@ public:
             processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
         };
         addAndMakeVisible(addTrack);
+        snapButton.setName("Snapping");
+        snapButton.setTitle("Snapping");
+        snapButton.setTooltip("Snapping to the grid, clip edges, markers and the playhead. Hold Alt while dragging to bypass it.");
+        snapButton.onClick = [this] {
+            processor.document.edit("Change timeline grid", [](motion::Project& project) { project.gridSnap = !project.gridSnap; });
+        };
+        addAndMakeVisible(snapButton);
+        headerArea.setInterceptsMouseClicks(false, true);
+        addAndMakeVisible(headerArea);
         setWantsKeyboardFocus(true);
         // Shortcuts are listed in Help > Keyboard shortcuts rather than a hover wall.
     }
-    std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition;
+    std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
+    std::function<void()> onLoopSelection;
     std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, double)> onEditMarker;
     // (beat, current bpm, beat of the change being edited, if any)
@@ -57,17 +67,17 @@ public:
     }
     struct ViewState {
         double zoom = 70, scroll = 0;
-        int row = 0;
+        int scrollY = 0;
         motion::Id primary = 0;
         std::set<motion::Id> selected, collapsed, expanded;
     };
     ViewState viewState() const {
         ensureTrackRows();
-        return {pixelsPerSecond, scrollTime, scrollRows, selected, selectedClips, collapsedGroups, expandedTracks};
+        return {pixelsPerSecond, scrollTime, scrollY, selected, selectedClips, collapsedGroups, expandedTracks};
     }
     void restoreView(const ViewState& state) {
         ensureTrackRows();
-        pixelsPerSecond = state.zoom; scrollTime = state.scroll; scrollRows = state.row;
+        pixelsPerSecond = state.zoom; scrollTime = state.scroll; scrollY = state.scrollY;
         selectedMarker = 0;
         selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed; expandedTracks = state.expanded;
         std::erase_if(collapsedGroups, [this](auto id) { return motion::findGroup(processor.document.project(), id) == nullptr; });
@@ -77,16 +87,34 @@ public:
     }
     double pixelsPerSecond = 70;
     double scrollTime = 0;
-    mutable int scrollRows = 0;
+    // Vertical scroll in pixels of row content below the ruler.
+    mutable int scrollY = 0;
+    // Rows without their own height use this; Alt+wheel scales it.
+    int defaultTrackHeight = 32;
+    std::function<void(int)> onDefaultTrackHeight;
     // Track names column; drag its edge to resize (140-420 px).
     int namesWidth = 170;
     bool resizingNames = false;
     // The resize handle is the strip just inside the names column, so clicks
     // on keys and clips at the start of the timeline are never taken.
     bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
+    // The track whose bottom edge (in the names column) is under the pointer.
+    int trackEdgeAt(juce::Point<int> point) const {
+        ensureTrackRows();
+        if (point.x >= namesWidth - 5 || point.y < rulerHeight) { return -1; }
+        for (int row = firstVisibleRow(); row < static_cast<int>(rows.size()); ++row) {
+            const auto bottom = rowY(row) + heightAt(row);
+            if (bottom > getHeight() + resizeStrip) { break; }
+            if (!rows[static_cast<std::size_t>(row)].isLane() && rows[static_cast<std::size_t>(row)].track >= 0 && point.y >= bottom - resizeStrip - 1 && point.y <= bottom + 1) { return rows[static_cast<std::size_t>(row)].track; }
+        }
+        return -1;
+    }
+    struct HeightDrag { motion::Id track; int startHeight, downY, original; };
+    std::optional<HeightDrag> heightDrag;
     mutable int rulerHeight = 26;
-    static constexpr int rowHeight = 32;
     static constexpr int laneHeight = 22;
+    // The bottom strip of each track row resizes it.
+    static constexpr int resizeStrip = 4;
 
     // Selection may originate in the preview, library or an import, not only
     // from a row already on screen. Keep its layer reachable in a dense project.
@@ -112,9 +140,10 @@ public:
         if (expanded) { layoutRevision.reset(); ensureTrackRows(); }
         const auto found = std::find_if(rows.begin(), rows.end(), [trackId](const auto& row) { return row.id == trackId && !row.isLane(); });
         if (found == rows.end()) { return; }
-        const auto row = static_cast<int>(found - rows.begin());
-        if (row < scrollRows) { scrollRows = row; }
-        else if (row >= scrollRows + visibleRowCount()) { scrollRows = row - visibleRowCount() + 1; }
+        const auto row = static_cast<std::size_t>(found - rows.begin());
+        const auto top = rowTops[row], bottom = top + heightOf(row), view = viewHeight();
+        if (top < scrollY) { scrollY = top; }
+        else if (bottom > scrollY + view) { scrollY = std::min(top, bottom - view); }
         if (expanded) { refreshTracks(); } else { resized(); repaint(); }
     }
 
@@ -155,6 +184,21 @@ public:
         if (!selectedClips.empty()) { deleteSelectedClips(false); }
     }
     const std::set<motion::Id>& selectedClipIds() const { return selectedClips; }
+    // Where a dropped file lands: the snapped time under the pointer and the
+    // track there (0 for empty space); nothing outside the track area.
+    std::optional<std::pair<double, motion::Id>> dropTarget(juce::Point<int> point) const {
+        if (point.x < namesWidth || point.y < rulerHeight || point.y >= rulerHeight + viewHeight() || point.x >= getWidth()) { return std::nullopt; }
+        const auto time = snapTime(std::max(0.0, scrollTime + (point.x - namesWidth) / pixelsPerSecond), juce::ModifierKeys::getCurrentModifiers());
+        const auto row = trackAtY(point.y);
+        const auto& tracks = processor.document.project().tracks;
+        return std::make_pair(time, row >= 0 && row < static_cast<int>(tracks.size()) ? tracks[static_cast<std::size_t>(row)].id : motion::Id(0));
+    }
+    // Selects the marker at a time (after a J/K jump).
+    void selectMarkerAt(double time) {
+        for (const auto& marker : processor.document.project().markers) {
+            if (std::abs(marker.time - time) < 1.0e-6) { selectMarker(marker.id); repaint(); return; }
+        }
+    }
     void selectClips(const std::vector<motion::Id>& ids) {
         selectedKeys.clear();
         selectedClips = {ids.begin(), ids.end()};
@@ -183,12 +227,33 @@ public:
         refreshTracks();
     }
     void zoomBy(double factor) {
-        const auto centreX = std::max(0, (getWidth() - namesWidth) / 2);
+        // Around the playhead when it is in view, like Premiere; else the centre.
+        const auto playheadX = timeX(processor.position.load()) - namesWidth;
+        const auto centreX = playheadX >= 0 && playheadX <= getWidth() - namesWidth ? playheadX : std::max(0, (getWidth() - namesWidth) / 2);
         const auto anchor = scrollTime + centreX / pixelsPerSecond;
-        pixelsPerSecond = std::clamp(pixelsPerSecond * factor, 0.000001, 500.0);
-        scrollTime = std::max(0.0, anchor - centreX / pixelsPerSecond);
-        repaint();
+        const auto zoom = std::clamp(pixelsPerSecond * factor, 0.000001, 500.0);
+        animateView(zoom, std::max(0.0, anchor - centreX / zoom));
     }
+    // Keyboard zoom and Fit glide to their view (about 140 ms, eased) rather
+    // than jumping; wheel and pinch zoom stay immediate.
+    void animateView(double zoom, double scroll) {
+        animationFrom = {pixelsPerSecond, scrollTime};
+        animationTo = {zoom, scroll};
+        animationStart = juce::Time::getMillisecondCounterHiRes();
+        viewAnimation.startTimerHz(60);
+    }
+    juce::TimedCallback viewAnimation {[this] {
+        const auto t = std::clamp((juce::Time::getMillisecondCounterHiRes() - animationStart) / 140.0, 0.0, 1.0);
+        const auto eased = 1 - std::pow(1 - t, 3);
+        // Zoom moves in log space so it feels even at any scale.
+        pixelsPerSecond = std::exp(std::lerp(std::log(animationFrom.first), std::log(animationTo.first), eased));
+        scrollTime = std::lerp(animationFrom.second, animationTo.second, eased);
+        if (t >= 1) { viewAnimation.stopTimer(); }
+        resized();
+        repaint();
+    }};
+    std::pair<double, double> animationFrom, animationTo;
+    double animationStart = 0;
     void fitToProject() { fitProject(); }
 
     void revealTime(double seconds) {
@@ -240,7 +305,7 @@ public:
                 };
                 header->onMute = [this](motion::Id id) { toggleTrack(id, false); };
                 header->onSolo = [this](motion::Id id) { toggleTrack(id, true); };
-                addAndMakeVisible(*header);
+                headerArea.addAndMakeVisible(*header);
                 headers.push_back(std::move(header));
                 found = headers.end() - 1;
             }
@@ -262,14 +327,20 @@ public:
     void resized() override {
         ensureTrackRows();
         addTrack.setBounds(namesWidth - 27, 2, 24, 22);
-        scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
+        snapButton.setBounds(namesWidth - 53, 2, 24, 22);
+        scrollY = std::clamp(scrollY, 0, maximumScrollY());
+        // Headers live in a container clipped below the ruler, so rows scroll
+        // smoothly under it.
+        headerArea.setBounds(0, rulerHeight, namesWidth - 5, viewHeight());
         for (auto& header : headers) {
             const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id && !row.isLane(); });
-            const auto row = static_cast<int>(found - rows.begin());
-            const auto y = rowY(row);
-            header->setVisible(found != rows.end() && row >= scrollRows && y < getHeight());
-            const auto indent = found != rows.end() ? std::min(48, found->depth * 8) : 0;
-            header->setBounds(indent, y, namesWidth - 5 - indent, rowHeight - 1);
+            if (found == rows.end()) { header->setVisible(false); continue; }
+            const auto row = static_cast<std::size_t>(found - rows.begin());
+            const auto y = rowY(static_cast<int>(row)) - rulerHeight;
+            const auto height = heightOf(row);
+            header->setVisible(y + height > 0 && y < headerArea.getHeight());
+            const auto indent = std::min(48, found->depth * 8);
+            header->setBounds(indent, y, namesWidth - 5 - indent, height - resizeStrip);
         }
     }
     bool isInterestedInDragSource(const SourceDetails& details) override {
@@ -407,17 +478,21 @@ public:
             g.setColour(osci::Colours::text().withAlpha(0.7f));
             g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, 26, juce::Justification::centredLeft);
         }
+        paintLoop(g);
         g.setColour(osci::Colours::surfaceRaised());
         g.fillRect(0, 0, namesWidth, rulerHeight);
         g.setColour(osci::Colours::text());
-        g.drawText(toolName(), 12, 0, namesWidth - 54, 26, juce::Justification::centredLeft);
+        g.drawText(toolName(), 12, 0, namesWidth - 80, 26, juce::Justification::centredLeft);
+        snapButton.setToggleState(processor.document.project().gridSnap, juce::dontSendNotification);
         juce::Path toolArrow;
-        toolArrow.addTriangle(namesWidth - 47.0f, 11.0f, namesWidth - 39.0f, 11.0f, namesWidth - 43.0f, 15.0f);
+        toolArrow.addTriangle(namesWidth - 73.0f, 11.0f, namesWidth - 65.0f, 11.0f, namesWidth - 69.0f, 15.0f);
         g.fillPath(toolArrow);
         const auto& tracks = processor.document.project().tracks;
         const auto& project = processor.document.project();
-        scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
-        for (int visible = scrollRows; visible < static_cast<int>(rows.size()); ++visible) {
+        scrollY = std::clamp(scrollY, 0, maximumScrollY());
+        g.saveState();
+        g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
+        for (int visible = firstVisibleRow(); visible < static_cast<int>(rows.size()); ++visible) {
             const auto y = rowY(visible);
             if (y >= getHeight()) {
                 break;
@@ -462,10 +537,12 @@ public:
                 paintClip(g, clip, tracks[static_cast<std::size_t>(index)], index, opacity);
             }
         }
+        g.restoreState();
         if (dropPosition.has_value() && dropTrack) {
             g.setColour(osci::Colours::accentColor());
-            const auto boundary = std::clamp(visualRowAt(dropPosition->y + rowHeight / 2), 0, static_cast<int>(rows.size()));
-            if (groupAtY(dropPosition->y) != 0) { g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), rowHeight, 2); } else { g.fillRect(0, rowY(boundary) - 1, getWidth(), 2); }
+            const auto under = visualRowAt(dropPosition->y);
+            const auto boundary = std::clamp(under >= 0 && under < static_cast<int>(rows.size()) && dropPosition->y >= rowY(under) + heightAt(under) / 2 ? under + 1 : under, 0, static_cast<int>(rows.size()));
+            if (groupAtY(dropPosition->y) != 0) { g.drawRect(0, rowY(under), getWidth(), heightAt(under), 2); } else { g.fillRect(0, rowY(boundary) - 1, getWidth(), 2); }
         } else if (dropPosition.has_value() && !dropEffect.empty()) {
             int row = 0;
             const auto* clip = clipAt(*dropPosition, row);
@@ -473,9 +550,9 @@ public:
             const auto group = groupAtY(dropPosition->y);
             if (group != 0) {
                 g.setColour(osci::Colours::accentColor());
-                g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), rowHeight, 2);
+                g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), heightAt(visualRowAt(dropPosition->y)), 2);
             } else if (row >= 0 && row < static_cast<int>(tracks.size()) && tracks[row].kind == motion::TrackKind::visual && (clip != nullptr || dropPosition->x < namesWidth)) {
-                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, rowHeight);
+                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, trackHeight(row));
                 g.setColour(osci::Colours::accentColor());
                 g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
             }
@@ -508,7 +585,7 @@ public:
             const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
             const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
             const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().tempo()));
-            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), rowHeight)).toFloat().reduced(1, 4);
+            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), defaultTrackHeight)).toFloat().reduced(1, 4);
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
             g.setColour((allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080)).withAlpha(0.2f));
@@ -568,6 +645,24 @@ public:
                 g.drawDashedLine(juce::Line<float>(static_cast<float>(x), static_cast<float>(rulerHeight), static_cast<float>(x), static_cast<float>(getHeight())), dashes, 2, 1.0f);
             }
         }
+        // The row edge under the pointer (or being dragged) shows where it resizes.
+        const auto edgeTrack = heightDrag.has_value() ? -2 : hoveredEdge;
+        if (edgeTrack >= 0 || heightDrag.has_value()) {
+            const auto index = heightDrag.has_value() ? trackIndex(heightDrag->track) : edgeTrack;
+            if (index >= 0) {
+                g.setColour(motion::style::accent().withAlpha(.8f));
+                g.fillRect(0, trackY(index) + trackHeight(index) - 2, getWidth(), 2);
+            }
+        }
+        g.setColour(osci::Colours::veryDark().darker(.25f));
+        g.fillRect(0, getHeight() - scrollStrip, getWidth(), scrollStrip);
+        paintScrollBars(g);
+        if (clipMarquee.has_value()) {
+            g.setColour(motion::style::accent().withAlpha(.1f));
+            g.fillRect(*clipMarquee);
+            g.setColour(motion::style::accent().withAlpha(.6f));
+            g.drawRect(*clipMarquee);
+        }
         const auto playhead = timeX(processor.position.load());
         if (playhead >= namesWidth && playhead <= getWidth()) {
             g.setColour(juce::Colour(0xff7de5a0));
@@ -590,10 +685,24 @@ public:
             resizingNames = true;
             return;
         }
+        const auto edge = trackEdgeAt(event.getPosition());
+        if (edge >= 0 && edge < static_cast<int>(processor.document.project().tracks.size()) && event.mods.isLeftButtonDown()) {
+            const auto& track = processor.document.project().tracks[static_cast<std::size_t>(edge)];
+            if (event.getNumberOfClicks() > 1) {
+                // Double-click an edge: back to the default height.
+                processor.document.setTrackHeight(track.id, 0);
+                layoutRows(); resized(); repaint();
+                return;
+            }
+            heightDrag = HeightDrag {track.id, trackHeight(edge), event.y, track.height};
+            return;
+        }
         if (inCameraBand(event.y)) {
             cameraBandDown(event);
             return;
         }
+        if (event.mods.isLeftButtonDown() && loopDown(event)) { return; }
+        if (barDown(event)) { return; }
         const auto* marker = markerAt(event.getPosition());
         if (event.mods.isPopupMenu() && event.x >= namesWidth && event.y < rulerHeight) {
             showMarkerMenu(marker != nullptr ? marker->id : 0, snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods));
@@ -670,7 +779,10 @@ public:
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
         if (clip == nullptr) {
-            selectClip(0);
+            // Empty space: drag a box to select clips (Shift or Cmd adds).
+            clipMarqueeBase = event.mods.isShiftDown() || event.mods.isCommandDown() ? selectedClips : std::set<motion::Id>{};
+            if (clipMarqueeBase.empty()) { selectClip(0); }
+            if (event.x >= namesWidth) { clipMarquee = juce::Rectangle<int>(event.getPosition(), event.getPosition()); clipMarqueeStart = event.getPosition(); }
             return;
         }
         if (event.mods.isShiftDown() || event.mods.isCommandDown()) {
@@ -703,6 +815,28 @@ public:
             setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
             return;
         }
+        const auto bar = barAt(event.getPosition());
+        if (bar != hoveredBar) { hoveredBar = bar; repaint(); }
+        if (bar != 0) {
+            const auto thumb = horizontalThumb();
+            setMouseCursor(bar == 1 && (std::abs(event.x - thumb.getX()) <= 5 || std::abs(event.x - thumb.getRight()) <= 5) ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);
+            setTooltip(bar == 1 ? "Drag to scroll; drag either end to zoom" : "Drag to scroll tracks");
+            return;
+        }
+        const auto edgeTrack = trackEdgeAt(event.getPosition());
+        if (edgeTrack != hoveredEdge) { hoveredEdge = edgeTrack; repaint(); }
+        const auto loop = loopBounds();
+        if (!loop.isEmpty() && event.y >= loopTop - 4 && event.y < loopTop + loopHeight && event.x >= loop.getX() - 5 && event.x <= loop.getRight() + 5) {
+            const auto edge = std::abs(event.x - loop.getX()) <= 5 || std::abs(event.x - loop.getRight()) <= 5;
+            setMouseCursor(edge ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::DraggingHandCursor);
+            setTooltip("Loop: drag to move, drag an end to resize, double-click to switch looping on or off");
+            return;
+        }
+        if (edgeTrack >= 0) {
+            setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
+            setTooltip("Drag to resize this track; double-click for the default height. Alt+wheel resizes every track.");
+            return;
+        }
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
         juce::String tip;
@@ -712,6 +846,8 @@ public:
             tip = juce::String(clip->name) + "\n" + grid.positionLabel(timing.start) + " - " + grid.positionLabel(timing.end()) + "  (" + grid.durationLabel(timing.start, timing.end()) + ")";
         }
         if (getTooltip() != tip) { setTooltip(tip); }
+        const auto hovered = clip != nullptr ? clip->id : 0;
+        if (hovered != hoveredClip) { hoveredClip = hovered; repaint(); }
         if (event.y < rulerHeight && event.x < namesWidth) {
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
         } else if (markerAt(event.getPosition()) != nullptr) {
@@ -725,7 +861,194 @@ public:
         }
     }
 
+    // Overlay scroll bars: vertical for rows, horizontal for time (Premiere
+    // style: drag the thumb to scroll, its ends to zoom).
+    static constexpr int barSize = 8, scrollStrip = barSize + 4;
+    double timelineSpan() const {
+        const auto& project = processor.document.project();
+        auto end = project.duration;
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) { end = std::max(end, clip.timing(project.tempo()).end()); }
+        }
+        const auto visible = std::max(1, getWidth() - namesWidth) / pixelsPerSecond;
+        return std::max({end * 1.05, scrollTime + visible, 0.001});
+    }
+    juce::Rectangle<int> horizontalBar() const { return {namesWidth + 2, getHeight() - barSize - 2, std::max(0, getWidth() - namesWidth - 4), barSize}; }
+    juce::Rectangle<int> horizontalThumb() const {
+        const auto bar = horizontalBar();
+        const auto span = timelineSpan();
+        const auto visible = std::max(1, getWidth() - namesWidth) / pixelsPerSecond;
+        const auto width = std::max(24, juce::roundToInt(bar.getWidth() * std::min(1.0, visible / span)));
+        const auto x = bar.getX() + juce::roundToInt((bar.getWidth() - width) * std::clamp(scrollTime / std::max(1e-9, span - visible), 0.0, 1.0));
+        return {x, bar.getY(), std::min(width, bar.getWidth()), bar.getHeight()};
+    }
+    bool horizontalBarShown() const { return std::max(1, getWidth() - namesWidth) / pixelsPerSecond < timelineSpan() * 0.999 || scrollTime > 0; }
+    juce::Rectangle<int> verticalBar() const { return {getWidth() - barSize - 2, rulerHeight + 2, barSize, std::max(0, viewHeight() - 4)}; }
+    juce::Rectangle<int> verticalThumb() const {
+        const auto bar = verticalBar();
+        const auto total = std::max(1, contentHeight + bottomRoom);
+        const auto height = std::max(24, juce::roundToInt(bar.getHeight() * std::min(1.0, static_cast<double>(viewHeight()) / total)));
+        const auto y = bar.getY() + juce::roundToInt((bar.getHeight() - height) * std::clamp(static_cast<double>(scrollY) / std::max(1, maximumScrollY()), 0.0, 1.0));
+        return {bar.getX(), y, bar.getWidth(), std::min(height, bar.getHeight())};
+    }
+    bool verticalBarShown() const { return maximumScrollY() > 0; }
+    void paintScrollBars(juce::Graphics& g) const {
+        const auto draw = [&](juce::Rectangle<int> bar, juce::Rectangle<int> thumb, bool hot) {
+            g.setColour(juce::Colours::white.withAlpha(.04f));
+            g.fillRoundedRectangle(bar.toFloat(), barSize * .5f);
+            g.setColour(juce::Colours::white.withAlpha(hot ? .4f : .2f));
+            g.fillRoundedRectangle(thumb.toFloat(), barSize * .5f);
+        };
+        if (horizontalBarShown()) { draw(horizontalBar(), horizontalThumb(), barDrag.has_value() || hoveredBar == 1); }
+        if (verticalBarShown()) { draw(verticalBar(), verticalThumb(), barDrag.has_value() || hoveredBar == 2); }
+    }
+    struct BarDrag { enum class Mode { scrollTime, zoomLeft, zoomRight, scrollRows } mode; int down; double scrollTime, pixelsPerSecond; int scrollY; };
+    std::optional<BarDrag> barDrag;
+    int hoveredBar = 0;
+    int barAt(juce::Point<int> point) const {
+        if (horizontalBarShown() && horizontalBar().expanded(0, 3).contains(point)) { return 1; }
+        if (verticalBarShown() && verticalBar().expanded(3, 0).contains(point)) { return 2; }
+        return 0;
+    }
+    bool barDown(const juce::MouseEvent& event) {
+        const auto bar = barAt(event.getPosition());
+        if (bar == 0 || !event.mods.isLeftButtonDown()) { return false; }
+        if (bar == 1) {
+            auto thumb = horizontalThumb();
+            if (!thumb.contains(event.x, thumb.getCentreY())) {
+                // Click beside the thumb: centre the view there.
+                const auto span = timelineSpan();
+                const auto visible = std::max(1, getWidth() - namesWidth) / pixelsPerSecond;
+                scrollTime = std::max(0.0, (event.x - horizontalBar().getX()) / static_cast<double>(horizontalBar().getWidth()) * span - visible / 2);
+                userScrolled();
+                thumb = horizontalThumb();
+            }
+            const auto mode = event.x <= thumb.getX() + 5 ? BarDrag::Mode::zoomLeft : event.x >= thumb.getRight() - 5 ? BarDrag::Mode::zoomRight : BarDrag::Mode::scrollTime;
+            barDrag = BarDrag {mode, event.x, scrollTime, pixelsPerSecond, scrollY};
+        } else {
+            if (!verticalThumb().contains(verticalThumb().getCentreX(), event.y)) {
+                scrollY = std::clamp(juce::roundToInt((event.y - verticalBar().getY()) / static_cast<double>(std::max(1, verticalBar().getHeight())) * maximumScrollY()), 0, maximumScrollY());
+            }
+            barDrag = BarDrag {BarDrag::Mode::scrollRows, event.y, scrollTime, pixelsPerSecond, scrollY};
+        }
+        resized();
+        repaint();
+        return true;
+    }
+    void barDragged(const juce::MouseEvent& event) {
+        const auto& drag = *barDrag;
+        if (drag.mode == BarDrag::Mode::scrollRows) {
+            const auto bar = verticalBar(), thumb = verticalThumb();
+            const auto travel = std::max(1, bar.getHeight() - thumb.getHeight());
+            scrollY = std::clamp(drag.scrollY + juce::roundToInt((event.y - drag.down) / static_cast<double>(travel) * maximumScrollY()), 0, maximumScrollY());
+            resized();
+            repaint();
+            return;
+        }
+        const auto bar = horizontalBar();
+        const auto span = timelineSpan();
+        const auto secondsPerPixel = span / std::max(1, bar.getWidth());
+        const auto delta = (event.x - drag.down) * secondsPerPixel;
+        const auto width = std::max(1, getWidth() - namesWidth);
+        const auto visible = width / drag.pixelsPerSecond;
+        if (drag.mode == BarDrag::Mode::scrollTime) {
+            scrollTime = std::max(0.0, drag.scrollTime + delta);
+        } else if (drag.mode == BarDrag::Mode::zoomRight) {
+            pixelsPerSecond = std::clamp(width / std::max(1.0 / 120, visible + delta), 0.000001, 500.0);
+            scrollTime = drag.scrollTime;
+        } else {
+            const auto end = drag.scrollTime + visible;
+            const auto start = std::clamp(drag.scrollTime + delta, 0.0, end - 1.0 / 120);
+            pixelsPerSecond = std::clamp(width / (end - start), 0.000001, 500.0);
+            scrollTime = start;
+        }
+        userScrolled();
+        repaint();
+    }
+
+    // The loop brace: a bar along the bottom of the time ruler.
+    static constexpr int loopTop = 20, loopHeight = 6;
+    juce::Rectangle<int> loopBounds() const {
+        const auto& project = processor.document.project();
+        if (!project.hasLoop()) { return {}; }
+        const auto left = std::max(namesWidth, timeX(project.loopStart)), right = std::min(getWidth(), timeX(project.loopEnd));
+        return right > left ? juce::Rectangle<int>(left, loopTop, right - left, loopHeight) : juce::Rectangle<int>();
+    }
+    void paintLoop(juce::Graphics& g) const {
+        const auto bounds = loopBounds();
+        if (bounds.isEmpty()) { return; }
+        const auto on = processor.document.project().looping;
+        const auto colour = on ? motion::style::accent() : osci::Colours::textMuted();
+        if (on) {
+            g.setColour(colour.withAlpha(.05f));
+            g.fillRect(bounds.getX(), rulerHeight, bounds.getWidth(), getHeight() - rulerHeight);
+        }
+        g.setColour(colour.withAlpha(on ? .75f : .35f));
+        g.fillRoundedRectangle(bounds.toFloat(), 2.0f);
+        g.fillRect(bounds.getX(), loopTop - 4, 2, loopHeight + 4);
+        g.fillRect(bounds.getRight() - 2, loopTop - 4, 2, loopHeight + 4);
+    }
+    struct LoopDrag { enum class Mode { move, left, right } mode; double start, end; int downX; motion::Project before; std::uint64_t revision; bool changed; };
+    std::optional<LoopDrag> loopDrag;
+    bool loopDown(const juce::MouseEvent& event) {
+        const auto bounds = loopBounds();
+        if (bounds.isEmpty() || event.y < loopTop - 4 || event.y >= loopTop + loopHeight || event.x < bounds.getX() - 5 || event.x > bounds.getRight() + 5) { return false; }
+        const auto& project = processor.document.project();
+        if (event.getNumberOfClicks() > 1) {
+            processor.document.tryEdit(project.looping ? "Stop looping" : "Loop playback", [](motion::Project& state) { state.looping = !state.looping; return true; });
+            return true;
+        }
+        const auto mode = std::abs(event.x - bounds.getX()) <= 5 ? LoopDrag::Mode::left : std::abs(event.x - bounds.getRight()) <= 5 ? LoopDrag::Mode::right : LoopDrag::Mode::move;
+        loopDrag = LoopDrag {mode, project.loopStart, project.loopEnd, event.x, project, processor.document.revision(), false};
+        return true;
+    }
+    void loopDragged(const juce::MouseEvent& event) {
+        auto& drag = *loopDrag;
+        if (processor.document.revision() != drag.revision) { loopDrag.reset(); return; }
+        const auto delta = (event.x - drag.downX) / pixelsPerSecond;
+        auto updated = drag.before;
+        const auto length = drag.end - drag.start;
+        const auto frame = updated.frameRate > 0 ? 1 / updated.frameRate : 1.0 / 30;
+        if (drag.mode == LoopDrag::Mode::move) {
+            updated.loopStart = std::clamp(snapEdge(drag.start + delta, event.mods, drag.before, {}), 0.0, std::max(0.0, updated.duration - length));
+            updated.loopEnd = updated.loopStart + length;
+        } else if (drag.mode == LoopDrag::Mode::left) {
+            updated.loopStart = std::clamp(snapEdge(drag.start + delta, event.mods, drag.before, {}), 0.0, std::max(0.0, drag.end - frame));
+        } else {
+            updated.loopEnd = std::clamp(snapEdge(drag.end + delta, event.mods, drag.before, {}), std::min(drag.start + frame, updated.duration), updated.duration);
+        }
+        drag.changed = updated.loopStart != drag.before.loopStart || updated.loopEnd != drag.before.loopEnd;
+        processor.document.preview(std::move(updated));
+        drag.revision = processor.document.revision();
+        repaint();
+    }
+    void mouseExit(const juce::MouseEvent&) override {
+        if (hoveredBar != 0) { hoveredBar = 0; repaint(); }
+        if (hoveredEdge >= 0) { hoveredEdge = -1; repaint(); }
+        if (hoveredClip != 0) { hoveredClip = 0; repaint(); }
+    }
+    // Project times of every clip start and end (edit points), sorted.
+    std::vector<double> editPoints() const {
+        std::vector<double> times;
+        const auto& project = processor.document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                const auto timing = clip.timing(project.tempo());
+                times.push_back(timing.start);
+                times.push_back(timing.end());
+            }
+        }
+        std::sort(times.begin(), times.end());
+        return times;
+    }
     void mouseDrag(const juce::MouseEvent& event) override {
+        if (barDrag.has_value()) { barDragged(event); return; }
+        if (loopDrag.has_value()) { loopDragged(event); return; }
+        if (heightDrag.has_value()) {
+            processor.document.setTrackHeight(heightDrag->track, std::clamp(heightDrag->startHeight + event.y - heightDrag->downY, motion::Track::minimumHeight, motion::Track::maximumHeight));
+            layoutRows(); resized(); repaint();
+            return;
+        }
         if (resizingNames) {
             namesWidth = std::clamp(event.x, 140, std::max(140, std::min(420, getWidth() / 2)));
             refreshTracks();
@@ -737,6 +1060,29 @@ public:
             return;
         }
         if (keyDrag.has_value()) { dragKeys(event.x, event.mods); return; }
+        if (clipMarquee.has_value()) {
+            clipMarquee = juce::Rectangle<int>(clipMarqueeStart, event.getPosition());
+            auto chosen = clipMarqueeBase;
+            motion::Id first = 0;
+            const auto& tracks = processor.document.project().tracks;
+            for (int row = firstVisibleRow(); row < static_cast<int>(rows.size()) && rowY(row) < getHeight(); ++row) {
+                const auto& item = rows[static_cast<std::size_t>(row)];
+                if (item.isLane() || item.track < 0) { continue; }
+                for (const auto& clip : tracks[static_cast<std::size_t>(item.track)].clips) {
+                    if (!clipBounds(clip, item.track).intersects(*clipMarquee)) { continue; }
+                    chosen.insert(clip.id);
+                    if (first == 0) { first = clip.id; }
+                }
+            }
+            if (chosen != selectedClips) {
+                selectedKeys.clear();
+                selectedClips = chosen;
+                // The inspector keeps its clip while it stays in the box.
+                notifySelection(chosen.contains(selected) ? selected : first != 0 ? first : (chosen.empty() ? 0 : *chosen.begin()));
+            }
+            repaint();
+            return;
+        }
         if (marquee.has_value()) {
             marquee = juce::Rectangle<int>(marqueeStart, event.getPosition());
             selectedKeys = marqueeBase;
@@ -884,6 +1230,13 @@ public:
 
     void mouseUp(const juce::MouseEvent&) override {
         snapGuide.reset();
+        if (heightDrag.has_value()) { heightDrag.reset(); return; }
+        if (barDrag.has_value()) { barDrag.reset(); repaint(); return; }
+        if (loopDrag.has_value()) {
+            if (loopDrag->changed && processor.document.revision() == loopDrag->revision) { processor.document.commit("Move loop", std::move(loopDrag->before)); }
+            loopDrag.reset();
+            return;
+        }
         if (resizingNames) {
             resizingNames = false;
             return;
@@ -895,6 +1248,7 @@ public:
         }
         if (keyDrag.has_value()) { endKeyDrag(); repaint(); return; }
         if (marquee.has_value()) { marquee.reset(); repaint(); return; }
+        if (clipMarquee.has_value()) { clipMarquee.reset(); repaint(); return; }
         scrubbing = false;
         if (!gestureIsCurrent()) {
             return;
@@ -911,6 +1265,14 @@ public:
 
     void mouseDoubleClick(const juce::MouseEvent& event) override {
         cancelGesture();
+        const auto edge = trackEdgeAt(event.getPosition());
+        if (edge >= 0 && edge < static_cast<int>(processor.document.project().tracks.size())) {
+            // Double-click a row's bottom edge: back to the default height.
+            heightDrag.reset();
+            processor.document.setTrackHeight(processor.document.project().tracks[static_cast<std::size_t>(edge)].id, 0);
+            layoutRows(); resized(); repaint();
+            return;
+        }
         const auto* lane = event.y >= rulerHeight ? laneAtY(event.y) : nullptr;
         if (lane != nullptr) {
             if (event.x >= namesWidth && !keyAt(event.getPosition()).has_value()) { addKeyAt(*lane, event.x, event.mods); }
@@ -923,24 +1285,89 @@ public:
         if (clip != nullptr && clip->composition != 0 && onEnterComposition) { onEnterComposition(clip->id); }
     }
 
+    // One convention across the timeline, graph and notes: the wheel and
+    // trackpad pan (Shift makes the wheel horizontal), Cmd/Ctrl+wheel or a
+    // pinch zooms time around the pointer, Alt+wheel changes track height.
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override {
         ensureTrackRows();
         if (before.has_value() || scrubbing) {
             return;
         }
         if (event.mods.isCommandDown() || event.mods.isCtrlDown()) {
-            const auto anchorX = std::clamp(event.x - namesWidth, 0, std::max(0, getWidth() - namesWidth));
-            const auto anchorTime = scrollTime + anchorX / pixelsPerSecond;
-            pixelsPerSecond = std::clamp(pixelsPerSecond * std::exp(wheel.deltaY * 3), 0.000001, 500.0);
-            scrollTime = std::max(0.0, anchorTime - anchorX / pixelsPerSecond);
-        } else if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY)) {
-            scrollTime = std::max(0.0, scrollTime - (wheel.deltaX + wheel.deltaY) * 8);
+            zoomAround(event.x, std::exp((std::abs(wheel.deltaY) > std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.5));
+        } else if (event.mods.isAltDown()) {
+            scaleTrackHeights(event.y, std::exp(wheel.deltaY * 2));
         } else {
-            const auto last = maximumScrollRow();
-            scrollRows = std::clamp(scrollRows + (wheel.deltaY < 0 ? 1 : -1), 0, last);
+            const auto dx = event.mods.isShiftDown() ? wheel.deltaY + wheel.deltaX : wheel.deltaX;
+            const auto dy = event.mods.isShiftDown() ? 0.0f : wheel.deltaY;
+            constexpr double pixelsPerUnit = 256;
+            if (dx != 0) { scrollTime = std::max(0.0, scrollTime - dx * pixelsPerUnit / pixelsPerSecond); }
+            if (dy != 0) { scrollY = std::clamp(scrollY - juce::roundToInt(dy * pixelsPerUnit), 0, maximumScrollY()); }
+            if (dx != 0) { userScrolled(); }
         }
         resized();
         repaint();
+    }
+    void mouseMagnify(const juce::MouseEvent& event, float scale) override {
+        if (before.has_value() || scrubbing || !(scale > 0)) { return; }
+        zoomAround(event.x, scale);
+    }
+    // Keeps the time under `x` fixed while zooming.
+    void zoomAround(int x, double factor) {
+        const auto anchorX = std::clamp(x - namesWidth, 0, std::max(0, getWidth() - namesWidth));
+        const auto anchorTime = scrollTime + anchorX / pixelsPerSecond;
+        pixelsPerSecond = std::clamp(pixelsPerSecond * factor, 0.000001, 500.0);
+        scrollTime = std::max(0.0, anchorTime - anchorX / pixelsPerSecond);
+        userScrolled();
+        repaint();
+    }
+    void userScrolled() {
+        viewAnimation.stopTimer();
+        if (following) { followPaused = true; }
+        if (onUserScroll) { onUserScroll(); }
+    }
+    // Vertical zoom: every row without its own height, keeping the row under
+    // the pointer in place.
+    void scaleTrackHeights(int y, double factor) {
+        const auto row = visualRowAt(y);
+        const auto offset = row >= 0 && row < static_cast<int>(rows.size()) ? rowY(row) : 0;
+        const auto next = std::clamp(juce::roundToInt(defaultTrackHeight * factor), motion::Track::minimumHeight, 120);
+        if (next == defaultTrackHeight) { return; }
+        // Tracks with their own height scale with the rest.
+        const auto ratio = static_cast<double>(next) / defaultTrackHeight;
+        for (const auto& track : processor.document.project().tracks) {
+            if (track.height > 0) { processor.document.setTrackHeight(track.id, juce::roundToInt(track.height * ratio)); }
+        }
+        setDefaultTrackHeight(next);
+        if (row >= 0 && row < static_cast<int>(rows.size())) { scrollY = std::clamp(scrollY + rowY(row) - offset, 0, maximumScrollY()); }
+    }
+    void setDefaultTrackHeight(int height) {
+        defaultTrackHeight = std::clamp(height, motion::Track::minimumHeight, 120);
+        layoutRows();
+        if (onDefaultTrackHeight) { onDefaultTrackHeight(defaultTrackHeight); }
+        resized();
+        repaint();
+    }
+    std::function<void()> onUserScroll;
+
+    // Page-follows the playhead during playback, like Premiere and Ableton. A
+    // manual scroll while playing pauses following until the playhead is back
+    // in view (or playback restarts).
+    bool followEnabled = true;
+    void followPlayhead(double time, bool playing) {
+        if (!playing) { following = false; followPaused = false; return; }
+        if (!following) { following = true; followPaused = false; }
+        const auto x = timeX(time);
+        const auto right = getWidth() - 16;
+        if (followPaused) {
+            if (x >= namesWidth && x <= right) { followPaused = false; }
+            return;
+        }
+        if (!followEnabled || before.has_value() || scrubbing || getWidth() <= namesWidth) { return; }
+        if (x > right || x < namesWidth) {
+            scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
+            repaint();
+        }
     }
 
     bool keyPressed(const juce::KeyPress& key) override {
@@ -951,6 +1378,23 @@ public:
         }
         if (key == juce::KeyPress::escapeKey && (keyDrag.has_value() || marquee.has_value())) {
             cancelKeyDrag();
+            return true;
+        }
+        if (key == juce::KeyPress::escapeKey && loopDrag.has_value()) {
+            if (loopDrag->changed && processor.document.revision() == loopDrag->revision) { processor.document.preview(std::move(loopDrag->before)); }
+            loopDrag.reset();
+            return true;
+        }
+        if (key == juce::KeyPress::escapeKey && heightDrag.has_value()) {
+            processor.document.setTrackHeight(heightDrag->track, heightDrag->original);
+            heightDrag.reset();
+            layoutRows(); resized(); repaint();
+            return true;
+        }
+        if (key == juce::KeyPress::escapeKey && clipMarquee.has_value()) {
+            clipMarquee.reset();
+            selectedClips = clipMarqueeBase;
+            notifySelection(selectedClips.empty() ? 0 : *selectedClips.begin());
             return true;
         }
         if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey) && selectedCut != 0) {
@@ -972,10 +1416,6 @@ public:
             if (character == 'm' && onEditMarker) {
                 cancelGesture();
                 onEditMarker(0, std::clamp(processor.position.load(), 0.0, processor.document.project().duration));
-                return true;
-            }
-            if (character == '[' || character == ']') {
-                jumpMarker(character == ']');
                 return true;
             }
             if (character == 'v' || character == 's' || character == 'r' || character == 'b') {
@@ -1011,6 +1451,7 @@ public:
 
 private:
     juce::Colour clipColour(const motion::Clip& clip, const motion::Track& track) const {
+        if (track.label > 0 && track.label < static_cast<int>(motion::style::trackLabels().size())) { return juce::Colour(motion::style::trackLabels()[static_cast<std::size_t>(track.label)].argb); }
         if (track.kind == motion::TrackKind::audio) { return motion::style::audioClip(); }
         if (clip.composition != 0) { return motion::style::compositionClip(); }
         if (clip.midi != nullptr) { return motion::style::midiClip(); }
@@ -1038,7 +1479,7 @@ private:
         const auto active = selectedClips.contains(clip.id);
         const bool audio = track.kind == motion::TrackKind::audio;
         const auto base = clipColour(clip, track);
-        g.setColour((active ? base.brighter(.35f) : base).withAlpha(opacity));
+        g.setColour((active ? base.brighter(.35f) : clip.id == hoveredClip ? base.brighter(.15f) : base).withAlpha(opacity));
         g.fillRoundedRectangle(bounds, motion::style::radius);
         g.setColour((active ? motion::style::key() : base.brighter(.5f)).withAlpha(opacity * (active ? 1.0f : .55f)));
         g.drawRoundedRectangle(bounds, motion::style::radius, active ? 1.4f : 1.0f);
@@ -1194,7 +1635,7 @@ private:
     std::vector<KeyRef> keysInside(juce::Rectangle<int> area) const {
         std::vector<KeyRef> result;
         const auto& project = processor.document.project();
-        for (int visible = scrollRows; visible < static_cast<int>(rows.size()); ++visible) {
+        for (int visible = firstVisibleRow(); visible < static_cast<int>(rows.size()); ++visible) {
             const auto& row = rows[static_cast<std::size_t>(visible)];
             const auto y = rowY(visible);
             if (!row.isLane() || y + laneHeight / 2 < area.getY() || y + laneHeight / 2 > area.getBottom()) { continue; }
@@ -1666,6 +2107,8 @@ private:
         for (const auto& track : processor.document.project().tracks) {
             for (const auto& clip : track.clips) { if (clip.id == id) { asset = clip.asset; definition = clip.composition; locked = track.locked; } }
         }
+        menu.addItem(9, selectedClips.size() > 1 ? "Loop selected clips (Shift+L)" : "Loop this clip (Shift+L)");
+        if (asset != 0) { menu.addItem(10, "Show source in Assets"); }
         menu.addSeparator();
         menu.addItem(7, "Delete clips (keep gaps)", !locked);
         menu.addItem(8, "Ripple delete on selected tracks (Shift+Delete)", !locked);
@@ -1697,6 +2140,12 @@ private:
                 owner->onEnterComposition(id);
             } else if (result == 7 || result == 8) {
                 owner->deleteSelectedClips(result == 8);
+            } else if (result == 9 && owner->onLoopSelection) {
+                owner->onLoopSelection();
+            } else if (result == 10 && owner->onRevealSource) {
+                for (const auto& track : owner->processor.document.project().tracks) {
+                    for (const auto& clip : track.clips) { if (clip.id == id) { owner->onRevealSource(clip.asset); } }
+                }
             } else if (result == 6) {
                 motion::Id definitionId = 0;
                 const auto copied = owner->processor.document.makeCompositionUnique(id, definitionId);
@@ -1772,6 +2221,13 @@ private:
             destinations.addItem(100 + static_cast<int>(groups.size()) - 1, juce::String(group.name), true, found->group == group.id);
         }
         menu.addSubMenu("Move to group", destinations);
+        juce::PopupMenu labels;
+        for (std::size_t index = 0; index < motion::style::trackLabels().size(); ++index) {
+            const auto& label = motion::style::trackLabels()[index];
+            const auto colour = label.argb == 0 ? osci::Colours::textMuted() : juce::Colour(label.argb).brighter(.6f);
+            labels.addColouredItem(300 + static_cast<int>(index), label.name, colour, true, found->label == static_cast<int>(index));
+        }
+        menu.addSubMenu("Label colour", labels);
         if (found->kind == motion::TrackKind::visual && processor.document.editingComposition() == 0) {
             juce::PopupMenu input;
             input.addItem(200, "Off", true, found->midiInput == 0);
@@ -1792,6 +2248,16 @@ private:
             const auto index = static_cast<int>(track - current.begin());
             if (result == 4) { owner->createGroup(id, track->group); return; }
             if (result >= 200 && result <= 200 + motion::Track::anyMidiChannel) { owner->setMidiInput(id, result - 200); return; }
+            if (result >= 300 && result < 300 + static_cast<int>(motion::style::trackLabels().size())) {
+                const auto label = result - 300;
+                owner->processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {
+                    for (auto& item : project.tracks) {
+                        if (item.id == id && item.label != label) { item.label = label; return true; }
+                    }
+                    return false;
+                });
+                return;
+            }
             if (result >= 100 && result - 100 < static_cast<int>(groups.size())) {
                 owner->placeTrack(id, index, groups[result - 100]);
             } else if (result == 3) {
@@ -1866,7 +2332,7 @@ private:
         const auto& tracks = processor.document.project().tracks;
         const auto row = trackAtY(y);
         const auto group = groupAtY(y);
-        const auto boundary = row >= 0 ? row + (y - trackY(row) >= rowHeight / 2 ? 1 : 0) : static_cast<int>(tracks.size());
+        const auto boundary = row >= 0 ? row + (y - trackY(row) >= trackHeight(row) / 2 ? 1 : 0) : static_cast<int>(tracks.size());
         placeTrack(id, boundary, group != 0 ? group : (row >= 0 ? tracks[row].group : 0));
     }
     void insertEffect(const std::string& type, juce::Point<int> position) {
@@ -1933,9 +2399,8 @@ private:
             }
         }
         const auto duration = std::isfinite(end) ? std::max(0.001, end) : 1.0;
-        pixelsPerSecond = std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0);
-        scrollTime = 0.0;
-        scrollRows = 0;
+        scrollY = 0;
+        animateView(std::clamp(std::max(1, getWidth() - namesWidth - 20) / duration, 0.000001, 500.0), 0.0);
         resized();
         repaint();
     }
@@ -2033,7 +2498,7 @@ private:
             std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });
             layoutRevision = revision;
         }
-        scrollRows = std::clamp(scrollRows, 0, maximumScrollRow());
+        scrollY = std::clamp(scrollY, 0, maximumScrollY());
     }
     // Lanes list every animated property on a track's clips, in schema order.
     static std::vector<std::string> animatedProperties(const motion::Track& track) {
@@ -2068,30 +2533,48 @@ private:
                 rows.push_back(std::move(lane));
             }
         }
+        layoutRows();
     }
-    int heightOf(std::size_t row) const { return rows[row].isLane() ? laneHeight : rowHeight; }
-    int visibleRowCount() const {
-        int count = 0, used = 0;
-        for (auto row = static_cast<std::size_t>(std::max(0, scrollRows)); row < rows.size() && used + heightOf(row) <= getHeight() - rulerHeight; ++row) { used += heightOf(row); ++count; }
-        return std::max(1, count);
+    // Row heights: lanes are fixed; tracks use their own height or the
+    // default; groups use the default.
+    int heightOf(std::size_t row) const {
+        if (rows[row].isLane()) { return laneHeight; }
+        const auto& tracks = processor.document.project().tracks;
+        const auto index = rows[row].track;
+        const auto own = index >= 0 && index < static_cast<int>(tracks.size()) ? tracks[static_cast<std::size_t>(index)].height : 0;
+        return own > 0 ? own : defaultTrackHeight;
     }
-    int maximumScrollRow() const {
-        int used = 0;
-        for (int row = static_cast<int>(rows.size()) - 1; row >= 0; --row) {
-            used += heightOf(static_cast<std::size_t>(row));
-            if (used > getHeight() - rulerHeight) { return std::min(static_cast<int>(rows.size()) - 1, row + 1); }
-        }
-        return 0;
+    int heightAt(int row) const { return row >= 0 && row < static_cast<int>(rows.size()) ? heightOf(static_cast<std::size_t>(row)) : defaultTrackHeight; }
+    int trackIndex(motion::Id id) const {
+        const auto& tracks = processor.document.project().tracks;
+        const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
+        return found == tracks.end() ? -1 : static_cast<int>(found - tracks.begin());
     }
+    int trackHeight(int track) const {
+        const auto& tracks = processor.document.project().tracks;
+        const auto own = track >= 0 && track < static_cast<int>(tracks.size()) ? tracks[static_cast<std::size_t>(track)].height : 0;
+        return own > 0 ? own : defaultTrackHeight;
+    }
+    void layoutRows() const {
+        rowTops.resize(rows.size());
+        int top = 0;
+        for (std::size_t row = 0; row < rows.size(); ++row) { rowTops[row] = top; top += heightOf(row); }
+        contentHeight = top;
+    }
+    // Rows end above the horizontal scroll strip.
+    int viewHeight() const { return std::max(0, getHeight() - rulerHeight - scrollStrip); }
+    // A little room below the last track to drop new ones into, without
+    // pushing whole rows off the last page.
+    static constexpr int bottomRoom = 12;
+    int maximumScrollY() const { return std::max(0, contentHeight + bottomRoom - viewHeight()); }
+    int firstVisibleRow() const { return std::max(0, visualRowAt(rulerHeight)); }
     int visualRowAt(int y) const {
         ensureTrackRows();
         if (y < rulerHeight) { return -1; }
-        auto top = rulerHeight;
-        for (auto row = static_cast<std::size_t>(std::max(0, scrollRows)); row < rows.size(); ++row) {
-            if (y < top + heightOf(row)) { return static_cast<int>(row); }
-            top += heightOf(row);
-        }
-        return static_cast<int>(rows.size()) + (y - top) / rowHeight;
+        const auto content = y - rulerHeight + scrollY;
+        if (content >= contentHeight) { return static_cast<int>(rows.size()) + (content - contentHeight) / std::max(1, defaultTrackHeight); }
+        const auto found = std::upper_bound(rowTops.begin(), rowTops.end(), content);
+        return static_cast<int>(found - rowTops.begin()) - 1;
     }
     int trackAtY(int y) const {
         const auto row = visualRowAt(y);
@@ -2108,21 +2591,17 @@ private:
     int trackY(int track) const {
         ensureTrackRows();
         const auto found = std::find_if(rows.begin(), rows.end(), [track](const auto& row) { return row.track == track && !row.isLane(); });
-        return found == rows.end() ? -rowHeight : rowY(static_cast<int>(found - rows.begin()));
+        return found == rows.end() ? -defaultTrackHeight : rowY(static_cast<int>(found - rows.begin()));
     }
     int timeX(double time) const { return namesWidth + boundedPixel((time - scrollTime) * pixelsPerSecond); }
     int rowY(int row) const {
-        auto y = rulerHeight;
-        if (row >= scrollRows) {
-            for (auto index = static_cast<std::size_t>(std::max(0, scrollRows)); static_cast<int>(index) < row && index < rows.size(); ++index) { y += heightOf(index); }
-        } else {
-            for (auto index = static_cast<std::size_t>(std::max(0, row)); static_cast<int>(index) < scrollRows && index < rows.size(); ++index) { y -= heightOf(index); }
-        }
-        return y;
+        if (row < 0) { return rulerHeight - scrollY; }
+        const auto top = row < static_cast<int>(rowTops.size()) ? rowTops[static_cast<std::size_t>(row)] : contentHeight + (row - static_cast<int>(rowTops.size())) * defaultTrackHeight;
+        return rulerHeight - scrollY + top;
     }
     juce::Rectangle<int> clipBounds(const motion::Clip& clip, int row) const {
         const auto timing = clip.timing(processor.document.project().tempo());
-        return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), rowHeight };
+        return { timeX(timing.start), trackY(row), std::max(2, boundedPixel(timing.duration() * pixelsPerSecond)), trackHeight(row) };
     }
     double snapTime(double time, juce::ModifierKeys modifiers) const {
         return modifiers.isAltDown() ? time : processor.document.project().timeGrid().snap(time);
@@ -2182,6 +2661,7 @@ private:
         return target.value_or(project.timeGrid().snap(time));
     }
     std::optional<double> snapGuide;
+    bool following = false, followPaused = false;
     void seek(int x, juce::ModifierKeys modifiers) {
         // The playhead itself is excluded as a magnet while scrubbing it.
         const auto raw = scrollTime + (x - namesWidth) / pixelsPerSecond;
@@ -2191,9 +2671,13 @@ private:
         repaint();
     }
     juce::TextButton addTrack;
+    motion::style::MagnetButton snapButton;
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
     bool dropTrack = false;
     mutable std::vector<Row> rows;
+    mutable std::vector<int> rowTops;
+    mutable int contentHeight = 0;
+    juce::Component headerArea;
     mutable std::set<motion::Id> expandedTracks;
     mutable std::set<motion::Id> collapsedGroups;
     mutable std::uint64_t layoutGeneration = 0;
@@ -2224,7 +2708,11 @@ private:
         bool changed = false;
     };
     std::optional<KeyDrag> keyDrag;
-    std::optional<juce::Rectangle<int>> marquee;
+    std::optional<juce::Rectangle<int>> marquee, clipMarquee;
+    juce::Point<int> clipMarqueeStart;
+    std::set<motion::Id> clipMarqueeBase;
+    motion::Id hoveredClip = 0;
+    int hoveredEdge = -1;
     juce::Point<int> marqueeStart;
     std::vector<KeyRef> marqueeBase;
 };

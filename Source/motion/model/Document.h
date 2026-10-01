@@ -61,6 +61,11 @@ struct Composition {
     int beatsPerBar = 4;
     double snapBeats = 0.25;
     bool gridSnap = true;
+    // Loop playback range in project seconds (like Ableton's loop brace or
+    // After Effects' work area). Kept when looping is switched off.
+    double loopStart = 0, loopEnd = 0;
+    bool looping = false;
+    bool hasLoop() const { return std::isfinite(loopStart) && std::isfinite(loopEnd) && loopStart >= 0 && loopEnd > loopStart; }
     TimeGrid timeGrid() const {
         TimeGrid grid;
         grid.display = timeDisplay;
@@ -156,6 +161,9 @@ public:
     // Installs a Lua clip's slider bake (a cache: no undo step). False when the
     // clip no longer exists.
     bool setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake);
+    // A track's row height (0: default). View state: no undo step, and undo
+    // or redo keep the current heights.
+    bool setTrackHeight(Id trackId, int height);
     // Removes the listed sources (or every unused source when empty) that no
     // clip, composition or MIDI assignment references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);
@@ -226,6 +234,7 @@ private:
     Id lastId = 0;
     std::uint64_t projectGeneration = 0;
     std::uint64_t stateRevision = 0;
+    bool carryView = true;
     juce::UndoManager& undo;
 };
 }

@@ -75,7 +75,7 @@ try:
         raise RuntimeError(f"Object did not move right: {initial[0]} -> {moved}")
     step("undo preview move", "click", "--name", "Undo", "--exact")
     assert [property_value("position." + axis) for axis in "xyz"] == initial
-    step("frame selection", "click", "--name", "Fit", "--class", "juce::TextButton", "--exact")
+    step("frame selection", "click", "--name", "Frame composition selection", "--exact")
     assert [property_value("position." + axis) for axis in "xyz"] == initial
     step("reset editing view", "press", "0", "--class", "MotionCompositionView")
     step("key position", "click", "--name", "Key position", "--exact")

@@ -74,9 +74,9 @@ try:
     assert markers()["Verse"] == 3
     step("jump to verse", "click", "--class", "MotionTimelineView", "--position", "400,36")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "3.000s", "--timeout-ms", 5000)
-    step("next marker shortcut", "press", "]", "--class", "MotionTimelineView")
+    step("next marker shortcut", "press", "k", "--class", "MotionTimelineView")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "6.000s", "--timeout-ms", 5000)
-    step("previous marker shortcut", "press", "[", "--class", "MotionTimelineView")
+    step("previous marker shortcut", "press", "j", "--class", "MotionTimelineView")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "3.000s", "--timeout-ms", 5000)
     step("delete selected marker", "press", "backspace", "--class", "MotionTimelineView")
     assert markers() == {"Chorus": 6}

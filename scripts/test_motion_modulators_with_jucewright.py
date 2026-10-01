@@ -87,7 +87,7 @@ try:
     step("select leader", "click", "--class", "MotionTimelineView", "--position", "300,42")
     step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("taller graph", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
-    step("choose position y", "select-option", "--name", "Animated property", "--text", "Position Y")
+    step("choose position y", "click", "--name", "Curve Position Y", "--exact")
     step("route menu", "click", "--name", "Route modulator", "--exact")
     step("route lfo", "click", "--name", "LFO 1", "--role", "menuItem", "--exact")
     wait_undo("Route modulator")
@@ -97,7 +97,7 @@ try:
     step("timeline for follower", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("select follower", "click", "--class", "MotionTimelineView", "--position", "300,74")
     step("graph for follower", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
-    step("choose position x", "select-option", "--name", "Animated property", "--text", "Position X")
+    step("choose position x", "click", "--name", "Curve Position X", "--exact")
     step("link menu", "click", "--name", "Link property", "--exact")
     step("leader submenu", "click", "--name", "Leader", "--role", "menuItem", "--exact")
     step("link leader x", "click", "--name", "Position X", "--role", "menuItem", "--exact")
@@ -124,7 +124,7 @@ try:
     assert len(y.findall("key")) == 2, "enabling the path keys every axis at the shared times"
     # The Position row's modulation chip opens the axis that is driven: the LFO routes into Y.
     step("modulate position", "click", "--name", "Modulate position", "--exact")
-    command("wait-for-value", "--name", "Animated property", "--value", "Position Y", "--timeout-ms", 5000)
+    command("wait-for-locator", "--name", "Curve Position Y", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
     command("wait-for-locator", "--name", "Route modulator", "--exact", "--timeout-ms", 5000)
     step("modulate screenshot", "screenshot", "--file", session.artifact_dir / "modulate.png")
     # Deleting the modulator removes its route; undo restores both.

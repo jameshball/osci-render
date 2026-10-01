@@ -103,7 +103,9 @@ public:
         status.setColour(juce::Label::textColourId, hasError && importStatus.isEmpty() ? juce::Colours::orange : osci::Colours::text().withAlpha(0.6f));
         const auto row = list.getSelectedRow();
         const auto midi = validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->midi : nullptr;
-        juce::String help = midi != nullptr ? "Select a visual clip, then assign these notes. Or drag this MIDI file onto a clip." : "Double-click or press Enter to insert. Drag onto the timeline to place a copy.";
+        // Only say something the row does not already show; the generic
+        // how-to lives in the list's tooltip.
+        juce::String help = midi != nullptr ? "Select a visual clip, then assign these notes. Or drag this MIDI file onto a clip." : juce::String();
         if (validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr && liveStatus) {
             help = liveStatus(assetId(row)) + "\nEnter to insert. Drag to place.";
         }
@@ -131,7 +133,9 @@ public:
         }
         const auto row = list.getSelectedRow();
         const bool live = validAssetRow(row) && assets[static_cast<std::size_t>(row)]->liveIdentity != nullptr;
-        status.setBounds(area.removeFromBottom(hasError || assignMidi.isVisible() ? 126 : live ? 92 : 68).reduced(6, 4));
+        // The status line takes room only when it has something to say.
+        const auto statusHeight = status.getText().isEmpty() && importStatus.isEmpty() ? 0 : hasError || assignMidi.isVisible() ? 126 : live ? 92 : 68;
+        status.setBounds(area.removeFromBottom(statusHeight).reduced(6, statusHeight > 0 ? 4 : 0));
         if (assignMidi.isVisible()) { assignMidi.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         if (bakeSettings.isVisible()) { bakeSettings.setBounds(area.removeFromBottom(30).reduced(6, 2)); }
         list.setBounds(area);
@@ -176,6 +180,9 @@ private:
             graphics.fillRect(bounds.withWidth(2).reduced(0, 5));
         }
         bounds.reduce(8, 3);
+        // A small picture of the source, like a project panel thumbnail.
+        paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
+        bounds.removeFromLeft(8);
         graphics.setColour(osci::Colours::text());
         graphics.setFont(13.0f);
         graphics.drawText(getNameForRow(row), bounds.removeFromTop(20), juce::Justification::centredLeft);
@@ -194,6 +201,82 @@ private:
             }
         }
         graphics.drawText(detail, bounds, juce::Justification::centredLeft);
+    }
+
+    void paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const {
+        graphics.setColour(juce::Colours::black.withAlpha(.35f));
+        graphics.fillRoundedRectangle(box.toFloat(), 3.0f);
+        const auto area = box.toFloat().reduced(4);
+        graphics.setColour(motion::style::key().withAlpha(.85f));
+        if (definitionRow(row)) {
+            // A composition: stacked layers.
+            for (int layer = 0; layer < 3; ++layer) {
+                graphics.drawRoundedRectangle(area.withHeight(area.getHeight() * .3f).translated(0, area.getHeight() * .35f * static_cast<float>(layer)), 1.5f, 1.0f);
+            }
+            return;
+        }
+        const auto& asset = *assets[static_cast<std::size_t>(row)];
+        if (asset.audio != nullptr) {
+            graphics.setColour(juce::Colour(0xff97c7df).withAlpha(.6f));
+            const auto columns = static_cast<int>(area.getWidth());
+            for (int x = 0; x < columns; ++x) {
+                const auto from = asset.audio->duration() * x / columns, to = asset.audio->duration() * (x + 1) / columns;
+                const auto peak = asset.audio->querySeconds(0, from, to);
+                const auto high = std::clamp(peak.maximum, -1.0f, 1.0f), low = std::clamp(peak.minimum, -1.0f, 1.0f);
+                graphics.drawVerticalLine(juce::roundToInt(area.getX()) + x, area.getCentreY() - high * area.getHeight() * .4f, area.getCentreY() - low * area.getHeight() * .4f + 1);
+            }
+            return;
+        }
+        if (asset.midi != nullptr) {
+            // Note bars over the file's pitch range and length.
+            const auto& notes = asset.midi->notes();
+            if (notes.empty()) { return; }
+            int low = 127, high = 0;
+            double end = 0;
+            for (const auto& note : notes) { low = std::min(low, note.pitch); high = std::max(high, note.pitch); end = std::max(end, note.start + note.duration); }
+            const auto rows = static_cast<float>(std::max(1, high - low + 1));
+            for (const auto& note : notes) {
+                const auto x = area.getX() + static_cast<float>(note.start / end) * area.getWidth();
+                const auto y = area.getBottom() - (static_cast<float>(note.pitch - low) + 1) / rows * area.getHeight();
+                graphics.fillRect(x, y, std::max(1.0f, static_cast<float>(note.duration / end) * area.getWidth()), std::max(1.0f, area.getHeight() / rows));
+            }
+            return;
+        }
+        // Animated sources show a frame from their middle (vector or baked points).
+        const auto source = asset.source;
+        const auto drawing = asset.drawing;
+        if ((source == nullptr || source->frameCount() == 0) && (drawing == nullptr || drawing->empty())) { return; }
+        const auto frame = source != nullptr ? source->frameCount() / 2 : 0;
+        const auto sampleAt = [&](double phase, double span) { return source != nullptr && source->frameCount() > 0 ? source->sampleFrame(frame, phase, span) : drawing->sample(phase, span); };
+        // Trace the first frame, breaking the path at jumps between strokes.
+        constexpr int steps = 400;
+        std::vector<juce::Point<float>> points;
+        float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
+        std::vector<bool> lit;
+        for (int index = 0; index <= steps; ++index) {
+            const auto point = sampleAt(static_cast<double>(index) / steps, 0);
+            points.emplace_back(point.x, point.y);
+            lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
+            left = std::min(left, point.x); right = std::max(right, point.x);
+            top = std::min(top, point.y); bottom = std::max(bottom, point.y);
+        }
+        const auto scale = std::min(area.getWidth() / std::max(1e-6f, right - left), area.getHeight() / std::max(1e-6f, bottom - top));
+        const auto map = [&](juce::Point<float> point) {
+            return juce::Point<float>(area.getCentreX() + (point.x - (left + right) * .5f) * scale, area.getCentreY() - (point.y - (top + bottom) * .5f) * scale);
+        };
+        // Baked point frames mark travel dark; vector shapes carry no colour,
+        // so a long step between samples marks the jump between strokes.
+        const auto pointFrames = source != nullptr && source->frameCount() > 0 && source->drawingAt(frame) == nullptr;
+        const auto jump = std::max(right - left, bottom - top) * .2f;
+        juce::Path path;
+        bool open = false;
+        for (std::size_t index = 0; index < points.size(); ++index) {
+            const auto dark = pointFrames && !lit[index];
+            const auto far = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
+            if (dark) { open = false; continue; }
+            if (open && !far) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }
+        }
+        graphics.strokePath(path, juce::PathStrokeType(1.0f));
     }
 
     void listBoxItemClicked(int row, const juce::MouseEvent& event) override {

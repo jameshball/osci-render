@@ -174,7 +174,7 @@ def keys(track, group, moments, prefix=""):
 def modulate(label, waveform, amount, beats=None, hertz=None, mode="Add"):
     """Graph tab: choose the property, then configure its modulation."""
     tab("Graph")
-    step("graph " + label, "select-option", "--name", "Animated property", "--text", label)
+    step("graph " + label, "click", "--name", "Curve " + label, "--exact")
     enable = find(lambda node: node.get("componentName") == "Enable modulation")
     if not enable.get("checked", enable.get("toggleState", False)):
         step("enable modulation", "click", enable["ref"])
