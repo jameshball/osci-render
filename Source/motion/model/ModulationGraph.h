@@ -30,9 +30,9 @@ bool hasPropertyCurve(const CompositionType& composition, Id target, const std::
 // pan, and Lua sliders, use their authored curves only.
 template <typename CompositionType>
 bool drivableProperty(const CompositionType& composition, Id target, const std::string& property) {
-    // Lua sliders bake off the audio thread from their own keys and oscillator.
+    // Lua sliders take routes and links too: their bakes follow them.
     const auto found = findPropertyTarget(composition, target);
-    return found.has_value() && !found->isAudio && !property.starts_with("slider.") && found->curve(property) != nullptr;
+    return found.has_value() && !found->isAudio && found->curve(property) != nullptr;
 }
 
 // A visual media clip (the kind that can carry MIDI or be a camera target).

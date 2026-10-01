@@ -5,6 +5,8 @@
 #include "../model/PropertySchema.h"
 #include "../import/LuaBaker.h"
 #include "../import/BakedSourceArchive.h"
+#include "PreparedDrivers.h"
+#include <functional>
 #include <map>
 
 namespace motion {
@@ -28,6 +30,101 @@ public:
 
     using Plan = LuaSliderPlan;
     static std::optional<Plan> planFor(const Asset& asset, const Clip& clip, const Tempo& tempo) { return luaSliderPlan(asset, clip, tempo); }
+    // As above, with routed modulators and property links attached to the
+    // slider curves, so they reach the script like any other property. The
+    // key then covers the routes, their modulators (and MIDI sources) and the
+    // linked curves. Soundtrack loudness is not available at bake time.
+    static std::optional<Plan> planFor(const Asset& asset, const Clip& clip, const Composition& composition) {
+        auto plan = luaSliderPlan(asset, clip, composition.tempo());
+        if (!plan.has_value()) { return plan; }
+        PreparedDrivers drivers(nullptr);
+        juce::MemoryOutputStream key;
+        bool driven = false;
+        const auto writeCurve = [&key](const Curve& curve) {
+            key.writeDouble(curve.base);
+            key.writeBool(curve.modulation.enabled);
+            key.writeInt(static_cast<int>(curve.modulation.waveform));
+            for (const auto value : {curve.modulation.amount, curve.modulation.rateHz, curve.modulation.phase, curve.modulation.beatsPerCycle}) { key.writeDouble(value); }
+            key.writeBool(curve.modulation.tempoSync);
+            key.writeInt64(curve.modulation.seed);
+            key.writeInt(static_cast<int>(curve.modulation.mode));
+            for (const auto& point : curve.keyframes()) {
+                for (const auto value : {point.time, point.value, point.incomingSlope, point.outgoingSlope, point.incomingInfluence, point.outgoingInfluence}) { key.writeDouble(value); }
+                key.writeInt(static_cast<int>(point.interpolation));
+            }
+        };
+        const auto writeClip = [&](Id id) {
+            for (const auto& track : composition.tracks) {
+                for (const auto& other : track.clips) {
+                    if (other.id != id) { continue; }
+                    const auto timing = other.timing(composition.tempo());
+                    for (const auto value : {timing.start, timing.end(), timing.offset, timing.rate}) { key.writeDouble(value); }
+                    // The notes themselves, so a saved bake still matches after loading.
+                    if (other.midi == nullptr) { continue; }
+                    for (const auto& note : other.midi->notes()) {
+                        for (const auto value : {note.start, note.duration}) { key.writeDouble(value); }
+                        for (const auto value : {note.pitch, note.velocity, note.channel}) { key.writeInt(value); }
+                    }
+                    for (const auto& control : other.midi->controls()) {
+                        key.writeDouble(control.beat);
+                        for (const auto value : {control.channel, control.number, control.value}) { key.writeInt(value); }
+                    }
+                }
+            }
+        };
+        // Routes on (owner, property), then its link, following link sources
+        // as deep as the drivers do.
+        std::function<void(Id, const std::string&, const Curve*, int)> writeDrivers = [&](Id owner, const std::string& property, const Curve* curve, int depth) {
+            for (const auto& route : composition.routes) {
+                if (route.target != owner || route.property != property) { continue; }
+                key.writeDouble(route.amount);
+                key.writeInt(static_cast<int>(route.mode));
+                for (const auto& modulator : composition.modulators) {
+                    if (modulator.id != route.modulator) { continue; }
+                    key.writeInt(static_cast<int>(modulator.kind));
+                    // The shape's own depth, mode and switch are unused (and unsaved).
+                    key.writeInt(static_cast<int>(modulator.shape.waveform));
+                    for (const auto value : {modulator.shape.rateHz, modulator.shape.phase, modulator.shape.beatsPerCycle}) { key.writeDouble(value); }
+                    key.writeBool(modulator.shape.tempoSync);
+                    key.writeInt64(modulator.shape.seed);
+                    for (const auto value : {modulator.attack, modulator.decay, modulator.sustain, modulator.release, modulator.velocity}) { key.writeDouble(value); }
+                    for (const auto value : {modulator.lowestPitch, modulator.highestPitch, modulator.controller, modulator.controllerChannel}) { key.writeInt(value); }
+                    writeClip(modulator.source);
+                }
+            }
+            if (curve == nullptr || !curve->link.has_value() || depth > 64) { return; }
+            key.writeInt64(static_cast<juce::int64>(curve->link->source));
+            key.writeString(juce::String(curve->link->property));
+            for (const auto value : {curve->link->scale, curve->link->offset, curve->link->delay}) { key.writeDouble(value); }
+            const auto* source = findPropertyCurve(composition, curve->link->source, curve->link->property);
+            if (source != nullptr) { writeCurve(*source); }
+            writeClip(curve->link->source);
+            writeDrivers(curve->link->source, curve->link->property, source, depth + 1);
+        };
+        for (auto& [name, curve] : plan->sliders) {
+            const auto routed = std::any_of(composition.routes.begin(), composition.routes.end(), [&](const auto& route) { return route.target == clip.id && route.property == name; });
+            if (!routed && !curve.link.has_value()) { continue; }
+            driven = true;
+            key.writeString(juce::String(name));
+            writeDrivers(clip.id, name, &curve, 0);
+            drivers.drive(curve, composition, ClipTiming {}, clip.id, name);
+        }
+        if (driven) {
+            // Drivers run in composition time: the clip's placement and the
+            // tempo map decide where they land in the bake.
+            writeClip(clip.id);
+            key.writeDouble(composition.bpm);
+            if (composition.tempoChanges != nullptr) {
+                for (const auto& change : *composition.tempoChanges) {
+                    for (const auto value : {change.beat, change.bpm}) { key.writeDouble(value); }
+                    key.writeBool(change.ramp);
+                }
+            }
+            key.writeString(juce::String(plan->key));
+            plan->key = juce::SHA256(key.getData(), key.getDataSize()).toHexString().toStdString();
+        }
+        return plan;
+    }
 
     // Starts bakes for clips whose frames are missing or stale, and clears
     // bakes from clips that no longer have sliders.
@@ -36,11 +133,10 @@ public:
         std::map<Id, Plan> wanted;
         std::vector<Id> clear;
         const auto scan = [&](const Composition& composition) {
-            const auto tempo = composition.tempo();
             for (const auto& track : composition.tracks) {
                 for (const auto& clip : track.clips) {
                     const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-                    auto plan = asset == project.assets.end() || clip.composition != 0 ? std::nullopt : planFor(**asset, clip, tempo);
+                    auto plan = asset == project.assets.end() || clip.composition != 0 ? std::nullopt : planFor(**asset, clip, composition);
                     if (!plan.has_value()) {
                         if (clip.luaBake != nullptr) { clear.push_back(clip.id); }
                         continue;
@@ -132,7 +228,7 @@ private:
                 for (const auto& clip : track.clips) {
                     if (clip.id != job.plan.clip || clip.composition != 0) { continue; }
                     const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-                    const auto plan = asset == project.assets.end() ? std::nullopt : planFor(**asset, clip, composition.tempo());
+                    const auto plan = asset == project.assets.end() ? std::nullopt : planFor(**asset, clip, composition);
                     wanted = plan.has_value() && plan->key == job.plan.key;
                 }
             }

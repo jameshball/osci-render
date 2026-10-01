@@ -92,6 +92,40 @@ public:
         bakes.update();
         expect(document.project().tracks[0].clips[0].luaBake == nullptr);
 
+        beginTest("Routed modulators and links reach slider bakes and their key");
+        {
+            document.edit("Route an LFO", [&](motion::Project& updated) {
+                updated.tracks[0].clips[0].properties["slider.a"].base = 0.25;
+                motion::Modulator lfo;
+                lfo.id = 7001; lfo.name = "LFO"; lfo.shape.waveform = motion::ModulationWaveform::square; lfo.shape.rateHz = 1;
+                updated.modulators.push_back(lfo);
+                motion::ModulationRoute route;
+                route.id = 7002; route.modulator = lfo.id; route.target = updated.tracks[0].clips[0].id; route.property = "slider.a"; route.amount = 0.5;
+                updated.routes.push_back(route);
+            });
+            const auto& routed = document.project().tracks[0].clips[0];
+            const auto plain = motion::LuaSliderBakes::planFor(*asset, routed, motion::Tempo(120));
+            const auto driven = motion::LuaSliderBakes::planFor(*asset, routed, document.project());
+            expect(plain.has_value() && driven.has_value() && plain->key != driven->key, "a route changes what the bake must contain");
+            if (driven.has_value()) {
+                // A square LFO swings the slider by the route's amount around its base.
+                const auto& slider = driven->sliders.at("slider.a");
+                expect(std::abs(slider.evaluate(0.1, 120) - slider.evaluate(0.6, 120)) > 0.5, "the routed LFO moves the slider");
+            }
+            document.edit("Deepen route", [](motion::Project& updated) { updated.routes[0].amount = 0.25; });
+            const auto deeper = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], document.project());
+            expect(deeper.has_value() && driven.has_value() && deeper->key != driven->key, "editing the route re-bakes");
+            motion::Project reopened;
+            expect(motion::Document::prepareLoad(document.save(), reopened).wasOk());
+            const auto again = motion::LuaSliderBakes::planFor(*reopened.assets[0], reopened.tracks[0].clips[0], reopened);
+            expect(again.has_value() && deeper.has_value() && again->key == deeper->key, "a saved routed bake still matches after loading");
+            document.edit("Move clip", [](motion::Project& updated) { updated.tracks[0].clips[0].start = 1; });
+            const auto moved = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], document.project());
+            expect(moved.has_value() && deeper.has_value() && moved->key != deeper->key, "moving a routed clip re-bakes");
+            expect(document.changeTempo(90).wasOk());
+            const auto retimed = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], document.project());
+            expect(retimed.has_value() && moved.has_value() && retimed->key != moved->key, "a tempo change re-bakes routed sliders");
+        }
         beginTest("Replacing a Lua source with another kind removes its sliders");
         document.edit("Slider again", [&](motion::Project& updated) { updated.tracks[0].clips[0].properties["slider.b"].base = 0.5; });
         auto shape = std::make_shared<motion::Asset>();
