@@ -46,7 +46,7 @@ private:
                 + "\nSample rate: " + juce::String(rate, 0) + " Hz\nBuffer: " + juce::String(block) + " samples"
                 + "\nReported underruns/overruns: " + juce::String(xruns)
                 + "\n\nLoad is a smoothed callback measurement, not total system CPU. "
-                  "Underruns/overruns include device reports and JUCE deadline estimates since the device counters were reset. "
+                  "Underruns/overruns include what the audio device reports and blocks that missed their deadline since the device counters were reset. "
                   "A low average does not rule out brief overloads.";
             data->setProperty("device", device->getName());
             data->setProperty("cpu_load", load);

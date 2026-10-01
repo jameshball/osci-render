@@ -96,8 +96,6 @@ public:
         scope.changeItemText(1, label("Clip", clipName));
         scope.changeItemText(2, label("Track", trackName));
         scope.changeItemText(4, label("Group", groupName));
-        // Renaming the shown item blanks the box; choose it again.
-        scope.setSelectedId(0, juce::dontSendNotification);
         scope.setSelectedId(chosen, juce::dontSendNotification);
     }
     bool validOwner() const { return scope.getSelectedId() == 3 || (ownerId() != 0 && motion::findEffectOwner(processor.document.project(), ownerId()) != nullptr); }

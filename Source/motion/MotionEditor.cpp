@@ -197,6 +197,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     sceneView.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     sceneView.onClick = [this] { showSceneViewMenu(false); };
     composition.onContextMenu = [this] { showSceneViewMenu(true); };
+    composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
+    composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
     graphSide.addAndMakeVisible(modulationPanel);
@@ -395,10 +397,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     notesEditor.setVisible(false);
     addChildComponent(curveList);
     for (const auto& name : motion::propertyNames) { curveProperties.emplace_back(name); }
+    modulationPanel.onLayoutChanged = [this] { layoutGraphSide(); };
     curveList.onChoose = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
     curveList.onShow = [this](const std::string& property, bool show) {
-        if (show) { shownCurves.insert(property); } else { shownCurves.erase(property); }
+        // Siblings of the edited channel are shown by default, so their eye hides them.
+        if (show) { shownCurves.insert(property); hiddenCurves.erase(property); } else { shownCurves.erase(property); hiddenCurves.insert(property); }
         refreshCurveList();
+        curveEditor.repaint();
     };
     cameraPanel.onPropertySelected = [this](motion::Id id, std::string property) {
         selectCurveTarget(id, property, true, true);
@@ -668,27 +673,35 @@ void MotionEditor::resized() {
     CommonPluginEditor::resized();
     auto area = getLocalBounds().reduced(3);
     auto top = area.removeFromTop(30);
-    undoRedoControls.setBounds(top.removeFromRight(undoRedoControls.getPreferredWidth()));
-    playbackHealth.setBounds(top.removeFromRight(96).reduced(3));
-    // Transport sits centred in the menu row, leaving the full height below
-    // for the workspace.
     // Menus keep their natural width; the transport follows them.
     int menuWidth = 0;
     const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
     for (int index = 0; index < names.size(); ++index) { menuWidth += menuBar.getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
-    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 390), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 195));
+    // Narrow windows keep the Output picker: the undo description shortens
+    // and the DSP meter (also Audio > Playback health) gives way first.
+    const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - 96 - (46 + 130);
+    const auto wide = spare >= undoRedoControls.getPreferredWidth();
+    undoRedoControls.setBounds(top.removeFromRight(wide ? undoRedoControls.getPreferredWidth() : 110));
+    playbackHealth.setVisible(wide);
+    if (wide) { playbackHealth.setBounds(top.removeFromRight(96).reduced(3)); }
+    // Transport sits centred in the menu row, leaving the full height below
+    // for the workspace.
+    // The transport goes compact (no BPM caption, tighter readout) before the
+    // Output picker would have to hide.
+    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 130 >= 390 ? 390 : 310;
+    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
     // What the audio interface plays sits with the other audio state (the
     // DSP meter), not in the Scope; without room it lives in the Audio menu.
     {
+        // Narrower windows drop the label, then shrink the picker.
         auto output = top.withLeft(transport.getRight() + 12);
-        const auto fits = output.getWidth() >= 46 + 130;
-        outputLabel.setVisible(fits);
-        monitorOutput.setVisible(fits);
-        if (fits) {
-            output = output.removeFromRight(46 + 130);
-            outputLabel.setBounds(output.removeFromLeft(46));
-            monitorOutput.setBounds(output.reduced(0, 4));
-        }
+        const auto labelled = output.getWidth() >= 46 + 130;
+        const auto pickerWidth = labelled ? 130 : std::min(130, output.getWidth());
+        outputLabel.setVisible(labelled);
+        monitorOutput.setVisible(pickerWidth >= 100);
+        output = output.removeFromRight(pickerWidth + (labelled ? 46 : 0));
+        if (labelled) { outputLabel.setBounds(output.removeFromLeft(46)); }
+        monitorOutput.setBounds(output.reduced(0, 4));
     }
     menuBar.setBounds(top.withRight(transport.getX()));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
@@ -1389,6 +1402,7 @@ void MotionEditor::timerCallback() {
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     sliderBakes.requestUpdate();
+    refreshOutputChoices();
     if (curveList.isVisible()) { refreshCurveList(); }
     if (processor.document.editingComposition() == 0) { scopeHistory.clear(); }
     if (scopeLabel.isBeingEdited() && scopeNameGeneration != processor.document.generation()) { scopeLabel.hideEditor(true); }
@@ -2290,7 +2304,7 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
         if (found != curveProperties.end()) { selectedIndex = static_cast<std::size_t>(found - curveProperties.begin()); }
     }
     curvePropertyName = curveProperties[selectedIndex];
-    if (previousTarget != id) { shownCurves.clear(); }
+    if (previousTarget != id) { shownCurves.clear(); hiddenCurves.clear(); }
     curveEditor.setSelection(id, curvePropertyName);
     modulationPanel.setTarget(id, curvePropertyName);
     routingPanel.setTarget(id, curvePropertyName);
@@ -2336,7 +2350,18 @@ void MotionEditor::refreshCurveList() {
         colours[name] = channel.colour;
         channels.push_back(std::move(channel));
     }
-    curveList.setChannels(std::move(channels), curvePropertyName, shownCurves);
+    // The edited channel's siblings (its other axes) are drawn and editable
+    // unless hidden; other channels are drawn faintly once shown.
+    juce::String primaryGroup;
+    for (const auto& channel : channels) { if (channel.id == curvePropertyName) { primaryGroup = channel.group; } }
+    auto shown = shownCurves;
+    for (const auto& channel : channels) {
+        const auto sibling = channel.id != curvePropertyName && primaryGroup.isNotEmpty() && channel.group == primaryGroup;
+        if (sibling && !hiddenCurves.contains(channel.id)) { shown.insert(channel.id); }
+        if (sibling && hiddenCurves.contains(channel.id)) { shown.erase(channel.id); }
+    }
+    curveList.setChannels(std::move(channels), curvePropertyName, shown);
+    curveEditor.setHiddenCurves(hiddenCurves);
     std::map<std::string, juce::Colour> context;
     for (const auto& name : shownCurves) { if (colours.contains(name)) { context[name] = colours[name]; } }
     curveEditor.setContextCurves(std::move(context));
@@ -2344,8 +2369,8 @@ void MotionEditor::refreshCurveList() {
 
 void MotionEditor::layoutGraphSide() {
     const auto width = graphSideViewport.getWidth() - 8;
-    modulationPanel.setBounds(0, 0, width, 188);
-    routingPanel.setBounds(0, 191, width, routingPanel.preferredHeight());
+    modulationPanel.setBounds(0, 0, width, modulationPanel.preferredHeight());
+    routingPanel.setBounds(0, modulationPanel.getBottom() + 3, width, routingPanel.preferredHeight());
     graphSide.setSize(width, routingPanel.getBottom());
 }
 
@@ -2509,6 +2534,13 @@ void MotionEditor::detectTempo() {
 }
 
 void MotionEditor::refreshOutputChoices() {
+    // Say so when "Soundtrack" would play silence.
+    const juce::String soundtrackChoice = soundtrackClip() != 0 ? "Soundtrack" : "Soundtrack (none yet)";
+    if (monitorOutput.getItemText(0) != soundtrackChoice) {
+        const auto chosen = monitorOutput.getSelectedId();
+        monitorOutput.changeItemText(1, soundtrackChoice);
+        monitorOutput.setSelectedId(chosen, juce::dontSendNotification);
+    }
     auto* holder = juce::StandalonePluginHolder::getInstance();
     auto* device = holder != nullptr ? holder->deviceManager.getCurrentAudioDevice() : nullptr;
     monitorOutput.setItemEnabled(3, device != nullptr && device->getOutputChannelNames().size() >= 5);

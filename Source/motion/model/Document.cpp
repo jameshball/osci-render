@@ -756,10 +756,23 @@ static void carryViewOptions(Project& next, const Project& current, const Projec
         const auto* from = find(current, definition->id);
         const auto* opposite = find(other, definition->id);
         if (from == nullptr || opposite == nullptr) { continue; }
+        // Work out the carried options first; copy the definition only if one differs.
+        Composition options;
+        options.timeDisplay = definition->timeDisplay;
+        options.snapBeats = definition->snapBeats;
+        options.gridSnap = definition->gridSnap;
+        options.looping = definition->looping;
+        options.loopStart = definition->loopStart;
+        options.loopEnd = definition->loopEnd;
+        carry(options, *from, *opposite);
+        const auto same = options.timeDisplay == definition->timeDisplay && options.snapBeats == definition->snapBeats && options.gridSnap == definition->gridSnap && options.looping == definition->looping;
+        if (same) { continue; }
         auto updated = std::make_shared<CompositionDefinition>(*definition);
-        carry(*updated, *from, *opposite);
-        const auto same = updated->timeDisplay == definition->timeDisplay && updated->snapBeats == definition->snapBeats && updated->gridSnap == definition->gridSnap && updated->looping == definition->looping;
-        if (!same) { definition = std::move(updated); }
+        updated->timeDisplay = options.timeDisplay;
+        updated->snapBeats = options.snapBeats;
+        updated->gridSnap = options.gridSnap;
+        updated->looping = options.looping;
+        definition = std::move(updated);
     }
 }
 

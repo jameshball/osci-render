@@ -7,6 +7,7 @@
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
 #include <optional>
+#include <set>
 #include <limits>
 
 // Keys retain content-local times; the ruler and snapping use project time.
@@ -20,6 +21,12 @@ public:
     explicit MotionCurveEditor(MotionProcessor& processor) : processor(processor) {
         setName("Animation curve editor");
         setWantsKeyboardFocus(true);
+    }
+    // Sibling axes the channel list hid: not drawn and not selectable.
+    void setHiddenCurves(std::set<std::string> curves) {
+        if (curves == hiddenCurves) { return; }
+        hiddenCurves = std::move(curves);
+        repaint();
     }
     // Curves shown faintly behind the edited group (from the channel list).
     void setContextCurves(std::map<std::string, juce::Colour> curves) {
@@ -782,7 +789,7 @@ private:
         const auto* current = motion::findPropertySpec(specs, propertyName);
         if (current == nullptr || target.isEffect) { return result; }
         for (const auto& spec : specs) {
-            if (spec.group != current->group || spec.id == current->id || target.curve(std::string(spec.id)) == nullptr) { continue; }
+            if (spec.group != current->group || spec.id == current->id || target.curve(std::string(spec.id)) == nullptr || hiddenCurves.contains(std::string(spec.id))) { continue; }
             const auto axis = spec.axis.empty() ? ' ' : spec.axis[0];
             result.emplace_back(std::string(spec.id), axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : motion::style::axisZ());
         }
@@ -1283,6 +1290,7 @@ private:
     std::optional<Drag> drag;
     std::optional<double> snapGuide;     // Project time of the magnet a drag is snapped to.
     std::map<std::string, juce::Colour> contextCurves;
+    std::set<std::string> hiddenCurves;
     bool following = false, followPaused = false, scrubbing = false;
     double viewStart = 0.0, viewEnd = 1.0;
     double low = -1.0, high = 1.0;

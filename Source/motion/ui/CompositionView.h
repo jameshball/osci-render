@@ -22,6 +22,8 @@ public:
     motion::Id selected = 0;
     std::function<void(bool)> onNavigationChanged;
     std::function<void()> onContextMenu;
+    std::function<void(motion::Id, const std::string&)> onPropertyEdited;
+    std::function<bool(motion::Id)> isSelected;
     std::function<void(MotionTransformTool)> onToolChanged;
     void setTool(MotionTransformTool value) {
         cancelGesture();
@@ -131,7 +133,8 @@ public:
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
             g.setFont(14);
-            g.drawText(prepared == nullptr ? juce::String("Preparing...") : emptyMessage(), getLocalBounds(), juce::Justification::centred);
+            // Clear of the tool strip on the left; wraps in a narrow Scene.
+            g.drawFittedText(prepared == nullptr ? juce::String("Preparing...") : emptyMessage(), getLocalBounds().withTrimmedLeft(48).reduced(12, 0), juce::Justification::centred, 3);
             return;
         }
         juce::Graphics::ScopedSaveState sceneState(g);
@@ -173,7 +176,6 @@ public:
     }
 
     void mouseDown(const juce::MouseEvent& event) override {
-        const auto liveFrames = processor.liveSourcePreview();
         if (navigating) { setNavigating(false); return; }
         grabKeyboardFocus();
         cancelGesture();
@@ -187,7 +189,9 @@ public:
             // Like a left click, the menu acts on what is under the pointer.
             if (prepared != nullptr) {
                 const auto hit = pickAt(event.position, nullptr);
-                if (hit != 0 && hit != selected) {
+                // Right-clicking one of several selected clips keeps the set.
+                const auto inSelection = isSelected && isSelected(hit);
+                if (hit != 0 && hit != selected && !inSelection) {
                     selected = hit;
                     if (onSelection) { onSelection(hit); }
                 }
@@ -306,6 +310,7 @@ public:
             if (std::abs(value - base) <= 1e-10) { continue; }
             if (curve->animated()) { curve->setKeyValue(localTime, value); }
             else { curve->base = value; }
+            if (!anyChange) { editedProperty = property; }
             anyChange = true;
         }
         // Position, rotation and scale key as one property, as in After
@@ -335,6 +340,8 @@ public:
         if (validGesture()) {
             if (changed) {
                 processor.document.commit(tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object", std::move(*before));
+                // The Graph shows the channel the drag changed.
+                if (onPropertyEdited && !editedProperty.empty()) { onPropertyEdited(editSelection, editedProperty); }
             } else if (dragStarted) {
                 processor.document.preview(std::move(*before));
             }
@@ -688,6 +695,7 @@ private:
     juce::Point<float> down;
     motion::editor::Camera camera, cameraAtDown;
     motion::editor::Vec3 dragAnchor;
+    std::string editedProperty;
     mutable std::optional<motion::editor::EulerGizmoFrame> gizmoFrame;
     std::optional<motion::editor::EulerGizmoFrame> gizmoAtDown;
     MotionTransformTool tool = MotionTransformTool::move;

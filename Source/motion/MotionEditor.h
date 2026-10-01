@@ -175,7 +175,7 @@ private:
     osci::TabBar inspectorTabs;
     osci::TabBar timelineTabs;
     MotionCurveList curveList;
-    std::set<std::string> shownCurves;
+    std::set<std::string> shownCurves, hiddenCurves;
     void refreshCurveList();
     osci::PanelDivider timelineDivider { false }, previewDivider { true };
     double timelineFraction = 0.34, previewFraction = 0.5;

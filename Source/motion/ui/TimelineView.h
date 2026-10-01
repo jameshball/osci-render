@@ -1537,7 +1537,8 @@ private:
         for (const auto time : clipKeyTimes(clip)) {
             const auto x = static_cast<float>(timeX(time));
             if (x - lastX < 3 || x < bounds.getX() - 2 || x > bounds.getRight() + 2) { continue; }
-            motion::style::drawDiamond(g, {x, bounds.getBottom() - 4.0f}, 2.5f, true);
+            // Keys on a clip edge are inset so they are never cut in half.
+            motion::style::drawDiamond(g, {std::clamp(x, bounds.getX() + 3.0f, std::max(bounds.getX() + 3.0f, bounds.getRight() - 3.0f)), bounds.getBottom() - 4.0f}, 2.5f, true);
             lastX = x;
         }
     }
@@ -1586,7 +1587,8 @@ private:
             // diamond linear, circle auto/Bezier.
             for (std::size_t k = 0; k < keys.size(); ++k) {
                 const auto time = timing.projectTime(keys[k].time);
-                const auto x = static_cast<float>(timeX(time));
+                // A key at the very start stays clear of the name column.
+                const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
                 const bool chosen = isKeySelected(clip.id, row.lane, keys[k].time);
                 g.setColour(chosen ? juce::Colours::white : motion::style::key());
                 const auto shape = keys[k].interpolation;

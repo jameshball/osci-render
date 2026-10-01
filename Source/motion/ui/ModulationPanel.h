@@ -11,6 +11,7 @@ public:
         setName("Property modulation");
         setWantsKeyboardFocus(true);
         enabled.setButtonText("Enabled");
+        enabled.setTooltip("This property's own oscillator (LFO, random or soundtrack). Shared modulators are routed below.");
         enabled.setName("Enable modulation");
         enabled.setTitle("Enable modulation");
         enabled.setColour(juce::TextButton::buttonColourId, osci::Colours::surface());
@@ -74,6 +75,12 @@ public:
         sync.setSelectedId(settings.tempoSync ? 2 : 1, juce::dontSendNotification);
         mode.setSelectedId(static_cast<int>(settings.mode) + 1, juce::dontSendNotification);
         for (auto* component : std::initializer_list<juce::Component*> { &waveform, &sync, &mode, &rate, &amount, &phase, &seed, &newSeed }) { component->setEnabled(curve != nullptr); }
+        // This property's own oscillator: its controls fold away until it is
+        // switched on, leaving room for shared modulator routing below.
+        const auto wasExpanded = expanded;
+        expanded = settings.enabled;
+        for (auto* component : std::initializer_list<juce::Component*> { &waveform, &sync, &mode, &rate, &amount, &phase, &seed, &newSeed, &rateLabel, &amountLabel, &phaseLabel }) { component->setVisible(expanded); }
+        if (expanded != wasExpanded && onLayoutChanged) { onLayoutChanged(); }
         if (!gesture.has_value()) {
             rate.setRange(settings.tempoSync ? 0.0625 : 0.001, settings.tempoSync ? 64 : 1000, settings.tempoSync ? 0.0625 : 0.001);
             rate.setSkewFactorFromMidPoint(settings.tempoSync ? 4 : 1);
@@ -99,6 +106,8 @@ public:
         updating = false;
         repaint();
     }
+    std::function<void()> onLayoutChanged;
+    int preferredHeight() const { return expanded ? 188 : 32; }
     void resized() override {
         auto bounds = getLocalBounds().reduced(7, 3);
         auto header = bounds.removeFromTop(27);
@@ -134,7 +143,7 @@ public:
         osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(30).toFloat(), osci::Colours::veryDark());
         g.setColour(osci::Colours::text());
         g.setFont(14);
-        g.drawText("Modulation", 10, 0, getWidth() - 107, 30, juce::Justification::centredLeft);
+        g.drawText("Oscillator", 10, 0, getWidth() - 107, 30, juce::Justification::centredLeft);
     }
     bool keyPressed(const juce::KeyPress& key) override {
         if (key == juce::KeyPress::escapeKey && gesture.has_value()) { cancelGesture(); cancelled = true; refresh(); return true; }
@@ -202,7 +211,7 @@ private:
     motion::Id targetId = 0;
     std::string propertyName;
     std::optional<Gesture> gesture;
-    bool updating = false, cancelled = false;
+    bool updating = false, cancelled = false, expanded = true;
     juce::ToggleButton enabled;
     juce::ComboBox waveform, sync, mode;
     juce::Slider rate, amount, phase;
