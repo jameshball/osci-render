@@ -208,7 +208,7 @@ def library_tab(name):
 
 
 def add_effect(effect, parameters=None, scope=None):
-    tab("Effects")
+    tab("FX")
     if scope is not None:
         step("scope " + scope, "select-option", "--name", "Effect scope", "--text", scope)
     library_tab("Effects")
@@ -511,7 +511,7 @@ def cameras():
 
 def finale_colour():
     # Once everything is back, the whole picture drifts through hue.
-    tab("Effects")
+    tab("FX")
     step("scope composition", "select-option", "--name", "Effect scope", "--text", "Composition")
     library_tab("Effects")
     step("add colour", "click", "--name", "Colour", "--role", "listItem", "--click-count", 2)

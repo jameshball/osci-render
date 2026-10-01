@@ -16,25 +16,23 @@ public:
         scope.addItem("Group", 4);
         scope.setSelectedId(1, juce::dontSendNotification);
         scope.onChange = [this] { cancelGesture(); selected = 0; refresh(); notifySelection(); };
-        stack.setRowHeight(30);
+        stack.setRowHeight(28);
         stack.setColour(juce::ListBox::backgroundColourId, osci::Colours::veryDark());
         stack.setOutlineThickness(0);
-        addButton.setButtonText("Add effect");
+        stack.setTooltip("Click the box to switch an effect on or off; drag to reorder; right-click for more");
+        addButton.setButtonText("Add effect...");
         addButton.onClick = [this] { showAddMenu(); };
-        removeButton.setButtonText("Remove");
-        removeButton.onClick = [this] { removeSelected(); };
-        enabled.setButtonText("Enabled");
-        enabled.onClick = [this] {
-            const auto id = selected;
-            const auto value = enabled.getToggleState();
-            processor.document.edit(value ? "Enable effect" : "Bypass effect", [id, value](motion::Project& project) {
-                auto* effect = motion::findEffect(project, id);
-                if (effect != nullptr) { effect->enabled = value; }
-            });
-        };
-        for (auto* component : std::initializer_list<juce::Component*> { &scope, &stack, &addButton, &removeButton, &enabled, &title, &viewport }) {
+        scopeLabel.setText("Apply to", juce::dontSendNotification);
+        scopeLabel.setFont(motion::style::small());
+        scopeLabel.setColour(juce::Label::textColourId, motion::style::muted());
+        hint.setFont(motion::style::small());
+        hint.setColour(juce::Label::textColourId, motion::style::muted());
+        hint.setJustificationType(juce::Justification::centredTop);
+        for (auto* component : std::initializer_list<juce::Component*> { &scopeLabel, &scope, &stack, &addButton, &title, &viewport }) {
             addAndMakeVisible(component);
         }
+        addChildComponent(hint);
+        title.setFont(motion::style::strong());
         title.setJustificationType(juce::Justification::centredLeft);
         viewport.setViewedComponent(&controls, false);
         viewport.setScrollBarsShown(true, false);
@@ -145,11 +143,13 @@ public:
         if (found == ids.end()) { stack.deselectAllRows(); } else { stack.selectRow(static_cast<int>(found - ids.begin())); }
         updating = false;
         addButton.setEnabled(validOwner() && ids.size() < motion::maximumEffectsPerOwner);
-        removeButton.setEnabled(selected != 0);
         const auto* effect = motion::findEffect(processor.document.project(), selected);
-        enabled.setEnabled(effect != nullptr);
-        enabled.setToggleState(effect != nullptr && effect->enabled, juce::dontSendNotification);
-        title.setText(effect == nullptr ? (validOwner() ? "Drop an effect here" : "Select an object clip") : juce::String(effect->name), juce::dontSendNotification);
+        title.setText(effect == nullptr ? juce::String() : juce::String(effect->name) + (effect->enabled ? "" : "  (off)"), juce::dontSendNotification);
+        // Say what to do when there is nothing to show.
+        hint.setText(!validOwner() ? "Select a clip to give it effects, or apply them to the whole composition."
+            : ids.empty() ? "No effects yet. Add one, or drag one from the Effects library." : juce::String(), juce::dontSendNotification);
+        hint.setVisible(hint.getText().isNotEmpty());
+        stack.setVisible(!ids.empty());
         const auto type = effect == nullptr ? std::string() : effect->type;
         if (builtFor != selected || builtType != type) {
             cancelGesture();
@@ -205,26 +205,29 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds().reduced(6, 3);
-        scope.setBounds(area.removeFromTop(28));
-        area.removeFromTop(3);
-        stack.setBounds(area.removeFromTop(std::min(120, 30 * std::max(2, static_cast<int>(ids.size())))));
-        area.removeFromTop(3);
-        auto buttons = area.removeFromTop(28);
-        removeButton.setBounds(buttons.removeFromRight(68));
-        addButton.setBounds(buttons.withTrimmedRight(3));
-        area.removeFromTop(3);
-        auto header = area.removeFromTop(30);
-        enabled.setBounds(header.removeFromRight(80));
-        title.setBounds(header);
+        // One line: what the effects apply to, and adding one.
+        auto top = area.removeFromTop(28);
+        scopeLabel.setBounds(top.removeFromLeft(54));
+        addButton.setBounds(top.removeFromRight(std::min(100, top.getWidth() / 2)));
+        top.removeFromRight(4);
+        scope.setBounds(top);
+        area.removeFromTop(6);
+        if (hint.isVisible()) { hint.setBounds(area.removeFromTop(48).reduced(4, 6)); }
+        if (stack.isVisible()) {
+            stack.setBounds(area.removeFromTop(std::min(140, 28 * static_cast<int>(ids.size()))));
+            area.removeFromTop(6);
+        }
+        title.setBounds(area.removeFromTop(title.getText().isEmpty() ? 0 : 24));
         viewport.setBounds(area);
-        controls.setSize(std::max(1, viewport.getMaximumVisibleWidth()), static_cast<int>(rows.size()) * 48);
+        // One compact line per parameter: name, slider, key.
+        controls.setSize(std::max(1, viewport.getMaximumVisibleWidth()), static_cast<int>(rows.size()) * 30);
         int y = 0;
         for (const auto& row : rows) {
-            auto line = juce::Rectangle<int>(0, y, controls.getWidth(), 45);
-            row->label.setBounds(line.removeFromTop(18));
+            auto line = juce::Rectangle<int>(0, y, controls.getWidth(), 28);
+            row->label.setBounds(line.removeFromLeft(std::min(96, line.getWidth() / 3)));
             row->key.setBounds(line.removeFromRight(22));
-            row->value.setBounds(line);
-            y += 48;
+            row->value.setBounds(line.reduced(0, 2));
+            y += 30;
         }
     }
     bool keyPressed(const juce::KeyPress& key) override {
@@ -239,7 +242,7 @@ public:
         const auto value = details.description.toString();
         if (value.startsWith("motion-effect:")) { addEffect(value.fromFirstOccurrenceOf(":", false, false).toStdString()); return; }
         const auto id = instanceId(value);
-        const auto target = std::clamp((details.localPosition.y - stack.getY()) / 30, 0, std::max(0, static_cast<int>(ids.size()) - 1));
+        const auto target = std::clamp((details.localPosition.y - stack.getY()) / 28, 0, std::max(0, static_cast<int>(ids.size()) - 1));
         reorder(id, target);
     }
 
@@ -261,9 +264,49 @@ private:
             g.setColour(osci::Colours::accentColor().withAlpha(0.65f));
             g.fillRect(1, 5, 2, height - 10);
         }
+        // The on/off box, then the name (dimmed when bypassed).
+        const auto box = juce::Rectangle<float>(10, height * .5f - 6, 12, 12);
+        g.setColour(osci::Colours::text().withAlpha(.6f));
+        g.drawRoundedRectangle(box, 2, 1.2f);
+        if (effect->enabled) {
+            g.setColour(motion::style::accent());
+            g.fillRoundedRectangle(box.reduced(2.5f), 1.5f);
+        }
         g.setColour(osci::Colours::text().withAlpha(effect->enabled ? 1.0f : 0.4f));
         g.setFont(13);
-        g.drawText(juce::String(row + 1) + "  " + juce::String(effect->name), 8, 0, width - 16, height, juce::Justification::centredLeft);
+        g.drawText(juce::String(effect->name), 30, 0, width - 38, height, juce::Justification::centredLeft);
+    }
+    void listBoxItemClicked(int row, const juce::MouseEvent& event) override {
+        if (row < 0 || row >= getNumRows()) { return; }
+        const auto id = ids[static_cast<std::size_t>(row)];
+        if (event.mods.isPopupMenu()) { showStackMenu(id, row); return; }
+        if (event.x < 28) { setEnabled(id, !isEnabled(id)); }
+    }
+    bool isEnabled(motion::Id id) const {
+        const auto* effect = motion::findEffect(processor.document.project(), id);
+        return effect != nullptr && effect->enabled;
+    }
+    void setEnabled(motion::Id id, bool value) {
+        processor.document.edit(value ? "Enable effect" : "Bypass effect", [id, value](motion::Project& project) {
+            auto* effect = motion::findEffect(project, id);
+            if (effect != nullptr) { effect->enabled = value; }
+        });
+        refresh();
+    }
+    void showStackMenu(motion::Id id, int row) {
+        juce::PopupMenu menu;
+        menu.addItem(1, isEnabled(id) ? "Switch off" : "Switch on");
+        menu.addItem(2, "Move up", row > 0);
+        menu.addItem(3, "Move down", row + 1 < getNumRows());
+        menu.addSeparator();
+        menu.addItem(4, "Remove");
+        const juce::Component::SafePointer<MotionEffectsPanel> owner(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&stack).withMousePosition(), [owner, id, row](int result) {
+            if (owner == nullptr || result == 0) { return; }
+            if (result == 1) { owner->setEnabled(id, !owner->isEnabled(id)); }
+            if (result == 2 || result == 3) { owner->reorder(id, row + (result == 2 ? -1 : 1)); }
+            if (result == 4) { owner->selected = id; owner->removeSelected(); }
+        });
     }
     void selectedRowsChanged(int row) override {
         if (updating || row < 0 || row >= getNumRows()) { return; }
@@ -375,9 +418,8 @@ private:
     std::vector<motion::Id> ids;
     juce::ComboBox scope;
     juce::ListBox stack;
-    juce::TextButton addButton, removeButton;
-    juce::ToggleButton enabled;
-    juce::Label title;
+    juce::TextButton addButton;
+    juce::Label title, scopeLabel, hint;
     juce::Viewport viewport;
     juce::Component controls;
     std::vector<std::unique_ptr<Row>> rows;

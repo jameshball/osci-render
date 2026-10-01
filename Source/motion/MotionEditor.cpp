@@ -340,7 +340,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
     inspectorTabs.addTab("Properties");
-    inspectorTabs.addTab("Effects");
+    inspectorTabs.addTab("FX");
     inspectorTabs.addTab("Camera");
     inspectorTabs.addTab("Timing");
     addChildComponent(clipTimingPanel);
