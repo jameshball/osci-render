@@ -156,7 +156,7 @@ public:
         g.drawText(clip->camera ? "Camera: " + owner : clip->isEffect ? "Effect: " + owner : clip->isGroup ? "Group: " + owner : owner, 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
         g.setFont(13.0f);
         if (modulated) {
-            g.setColour(juce::Colour(0xff70da91));
+            g.setColour(primaryColour(*clip));
             g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
             g.setColour(juce::Colour(0xff80baff));
             g.drawText("Result", getWidth() - 90, 3, 65, 22, juce::Justification::centredLeft);

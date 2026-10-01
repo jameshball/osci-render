@@ -1538,7 +1538,7 @@ private:
             const auto x = static_cast<float>(timeX(time));
             if (x - lastX < 3 || x < bounds.getX() - 2 || x > bounds.getRight() + 2) { continue; }
             // Keys on a clip edge are inset so they are never cut in half.
-            motion::style::drawDiamond(g, {std::clamp(x, bounds.getX() + 3.0f, std::max(bounds.getX() + 3.0f, bounds.getRight() - 3.0f)), bounds.getBottom() - 4.0f}, 2.5f, true);
+            motion::style::drawDiamond(g, {std::clamp(x, bounds.getX() + 3.0f, std::max(bounds.getX() + 3.0f, bounds.getRight() - 3.0f)), bounds.getBottom() - 5.0f}, 3.5f, true);
             lastX = x;
         }
     }

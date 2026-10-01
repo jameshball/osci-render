@@ -106,7 +106,8 @@ public:
         // With several clips selected the header says so; edits apply to the
         // one named.
         const juce::String kindText = !editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object";
-        kind.setText(editable && selectionCount > 1 ? "1 of " + juce::String(selectionCount) + " selected" : kindText, juce::dontSendNotification);
+        kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
+        kind.setTooltip(editable && selectionCount > 1 ? juce::String(selectionCount) + " clips are selected; these fields edit only " + juce::String(found->name.data(), found->name.size()) + "." : juce::String());
         empty = !editable;
         if (!editable) { repaint(); return; }
         const auto time = keyTime(*found);
