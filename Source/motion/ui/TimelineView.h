@@ -1584,21 +1584,17 @@ private:
                 }
             }
             // Key shape encodes its outgoing interpolation: square hold,
-            // diamond linear, circle auto/Bezier.
+            // diamond linear, hourglass eased, circle auto/Bezier.
             for (std::size_t k = 0; k < keys.size(); ++k) {
                 const auto time = timing.projectTime(keys[k].time);
                 // A key at the very start stays clear of the name column.
                 const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
                 const bool chosen = isKeySelected(clip.id, row.lane, keys[k].time);
                 g.setColour(chosen ? juce::Colours::white : motion::style::key());
-                const auto shape = keys[k].interpolation;
-                if (shape == motion::Interpolation::hold) {
-                    g.fillRect(juce::Rectangle<float>(x - 3.5f, centre - 3.5f, 7, 7));
-                } else if (shape == motion::Interpolation::linear) {
-                    motion::style::drawDiamond(g, {x, centre}, 4.5f, true);
-                } else {
-                    g.fillEllipse(x - 4, centre - 4, 8, 8);
-                }
+                const auto shape = keys[k].interpolation == motion::Interpolation::hold ? motion::style::KeyShape::hold
+                    : keys[k].interpolation == motion::Interpolation::linear ? motion::style::KeyShape::linear
+                    : motion::isEased(keys[k]) ? motion::style::KeyShape::eased : motion::style::KeyShape::smooth;
+                motion::style::drawKeyShape(g, {x, centre}, 4.5f, shape);
                 if (chosen) {
                     g.setColour(motion::style::key());
                     g.drawEllipse(x - 6, centre - 6, 12, 12, 1.0f);
@@ -2410,8 +2406,6 @@ private:
         menu.addItem(2, "Slip content inside clip (S)", true, tool == Tool::slip);
         menu.addItem(3, "Stretch duration and speed (R)", true, tool == Tool::stretch);
         menu.addItem(5, "Ripple trim edges on this track (B)", true, tool == Tool::ripple);
-        menu.addSeparator();
-        menu.addItem(4, "Fit project (F)");
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
         const auto options = juce::PopupMenu::Options().withTargetComponent(this);
         const auto placement = atHeader ? options.withTargetScreenArea(localAreaToGlobal(juce::Rectangle<int>(0, 0, namesWidth, rulerHeight))) : options.withMousePosition();
@@ -2707,7 +2701,15 @@ private:
         const auto raw = scrollTime + (x - namesWidth) / pixelsPerSecond;
         const auto& project = processor.document.project();
         auto target = modifiers.isAltDown() ? std::optional<double>() : magnet(raw, project, {}, nullptr, false);
-        processor.seek(std::clamp(target.value_or(snapTime(raw, modifiers)), 0.0, project.duration));
+        auto snapped = snapTime(raw, modifiers);
+        // Like an adaptive grid: in seconds the playhead lands on the ruler's
+        // visible subdivisions (frames stay exact; bars use the beat grid).
+        if (!modifiers.isAltDown() && project.gridSnap && project.timeDisplay == motion::TimeDisplay::seconds) {
+            const auto grid = project.timeGrid();
+            const auto step = grid.tickStep(pixelsPerSecond) / 4;
+            if (std::isfinite(step) && step > 0) { snapped = grid.snap(std::round(raw / step) * step); }
+        }
+        processor.seek(std::clamp(target.value_or(snapped), 0.0, project.duration));
         repaint();
     }
     juce::TextButton addTrack;

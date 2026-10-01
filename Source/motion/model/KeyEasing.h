@@ -9,6 +9,11 @@ namespace motion {
 // linear neighbour still leaves in a straight line, and a hold into the key
 // still holds. Easing out of a hold key makes it a Bezier, as in After Effects.
 // Returns false when the key is missing or already eased that way.
+// Eased (Easy Ease or similar): a Bezier key that stops on its outgoing side.
+inline bool isEased(const Keyframe& key) {
+    return key.interpolation == Interpolation::cubic && key.outgoingSlope == 0;
+}
+
 inline bool easeKey(Curve& curve, double time, bool in, bool out) {
     const auto keys = curve.keyframes();
     const auto found = std::find_if(keys.begin(), keys.end(), [time](const Keyframe& key) { return keyedit::sameTime(key.time, time); });
@@ -38,8 +43,9 @@ inline bool easeKey(Curve& curve, double time, bool in, bool out) {
         key.incomingSlope = 0;
         key.incomingInfluence = Keyframe::defaultInfluence;
     }
-    if (out && index + 1 < keys.size()) {
-        if (key.interpolation != Interpolation::cubic) {
+    // A last key has no segment to ease but is marked eased, as in After Effects.
+    if (out) {
+        if (index + 1 < keys.size() && key.interpolation != Interpolation::cubic) {
             auto next = keys[index + 1];
             next.incomingSlope = endSlope(index, index + 1);
             next.incomingInfluence = Keyframe::defaultInfluence;

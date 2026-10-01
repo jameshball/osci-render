@@ -40,6 +40,7 @@ public:
             expect(curve.keyframes()[1].interpolation == motion::Interpolation::cubic);
             expectEquals(curve.keyframes()[1].outgoingSlope, 0.0);
             expect(!motion::easeKey(curve, 5, true, true), "a missing key is refused");
+            expect(motion::easeKey(curve, 2, true, true) && motion::isEased(curve.keyframes()[2]), "the last key is marked eased too");
         }
     }
 };

@@ -45,7 +45,8 @@ public:
         for (auto& row : rows) {
             row->selected = row->channel.id == selected;
             row->eye.setToggleState(visible.contains(row->channel.id) || row->selected, juce::dontSendNotification);
-            row->eye.setEnabled(!row->selected);
+            // The edited curve is always drawn: its eye shows open but takes no clicks.
+            row->eye.setInterceptsMouseClicks(!row->selected, false);
             row->repaint();
         }
         if (!same) { revealSelected(); }

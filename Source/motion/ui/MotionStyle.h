@@ -200,6 +200,29 @@ inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
     g.setColour(panel());
     g.fillRoundedRectangle(bounds.toFloat(), panelRadius);
 }
+// After Effects' key glyphs: square hold, diamond linear, hourglass eased,
+// circle smooth or Bezier.
+enum class KeyShape { hold, linear, eased, smooth };
+inline void drawKeyShape(juce::Graphics& g, juce::Point<float> centre, float radius, KeyShape shape) {
+    if (shape == KeyShape::hold) {
+        g.fillRect(juce::Rectangle<float>(radius * 1.6f, radius * 1.6f).withCentre(centre));
+    } else if (shape == KeyShape::smooth) {
+        g.fillEllipse(juce::Rectangle<float>(radius * 1.8f, radius * 1.8f).withCentre(centre));
+    } else if (shape == KeyShape::eased) {
+        juce::Path hourglass;
+        hourglass.addTriangle(centre.x - radius, centre.y - radius, centre.x + radius, centre.y - radius, centre.x, centre.y);
+        hourglass.addTriangle(centre.x - radius, centre.y + radius, centre.x + radius, centre.y + radius, centre.x, centre.y);
+        g.fillPath(hourglass);
+    } else {
+        juce::Path diamond;
+        diamond.startNewSubPath(centre.x, centre.y - radius);
+        diamond.lineTo(centre.x + radius, centre.y);
+        diamond.lineTo(centre.x, centre.y + radius);
+        diamond.lineTo(centre.x - radius, centre.y);
+        diamond.closeSubPath();
+        g.fillPath(diamond);
+    }
+}
 inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radius, bool filled, float stroke = 1.2f) {
     juce::Path diamond;
     diamond.startNewSubPath(centre.x, centre.y - radius);

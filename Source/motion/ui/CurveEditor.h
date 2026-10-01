@@ -145,7 +145,10 @@ public:
         g.drawText(propertyLabel(*clip), 12, 3, 160, 22, juce::Justification::centredLeft);
         g.setFont(motion::style::body());
         g.setColour(motion::style::muted());
-        g.drawText(juce::String(clip->name.data(), clip->name.size()), 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
+        // Name the owner's kind when it isn't a clip, so a camera or effect
+        // curve is never mistaken for the selected clip's.
+        const juce::String owner(clip->name.data(), clip->name.size());
+        g.drawText(clip->camera ? "Camera: " + owner : clip->isEffect ? "Effect: " + owner : clip->isGroup ? "Group: " + owner : owner, 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
         g.setFont(13.0f);
         if (curve.modulation.enabled) {
             g.setColour(juce::Colour(0xff70da91));
@@ -216,7 +219,7 @@ public:
                 g.setColour(colour.withAlpha(.5f));
                 g.strokePath(ghost, juce::PathStrokeType(1.2f));
                 for (const auto& key : other->keyframes()) {
-                    drawKey(g, keyPoint(*clip, key), 4.0f, isSelected(name, key.time) ? juce::Colours::white : colour);
+                    drawKey(g, keyPoint(*clip, key), 4.0f, isSelected(name, key.time) ? juce::Colours::white : colour, key);
                 }
             }
         }
@@ -262,7 +265,7 @@ public:
                 }
             }
             for (const auto& key : curve.keyframes()) {
-                drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : colour);
+                drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : colour, key);
             }
             const auto x = timeX(processor.position.load());
             g.setColour(motion::style::playhead());
@@ -885,15 +888,15 @@ private:
         });
     }
 
-    static void drawKey(juce::Graphics& g, juce::Point<float> point, float radius, juce::Colour colour) {
-        juce::Path diamond;
-        diamond.startNewSubPath(point.x, point.y - radius);
-        diamond.lineTo(point.x + radius, point.y);
-        diamond.lineTo(point.x, point.y + radius);
-        diamond.lineTo(point.x - radius, point.y);
-        diamond.closeSubPath();
+    static void drawKey(juce::Graphics& g, juce::Point<float> point, float radius, juce::Colour colour, const motion::Keyframe& key) {
         g.setColour(colour);
-        g.fillPath(diamond);
+        motion::style::drawKeyShape(g, point, radius, keyShape(key));
+    }
+    static motion::style::KeyShape keyShape(const motion::Keyframe& key) {
+        using Shape = motion::style::KeyShape;
+        if (key.interpolation == motion::Interpolation::hold) { return Shape::hold; }
+        if (key.interpolation == motion::Interpolation::linear) { return Shape::linear; }
+        return motion::isEased(key) ? Shape::eased : Shape::smooth;
     }
 
     // The time span of a selection of 2+ keys at different times, with the

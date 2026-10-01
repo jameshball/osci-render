@@ -1548,18 +1548,18 @@ void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, j
 }
 
 void MotionEditor::buildFileMenu(juce::PopupMenu& menu) {
-    menu.addItem(motion::style::menuItem("New Project", 1001, "Cmd+N"));
-    menu.addItem(motion::style::menuItem("Open Project...", 1002, "Cmd+O"));
+    menu.addItem(motion::style::menuItem("New project", 1001, "Cmd+N"));
+    menu.addItem(motion::style::menuItem("Open project...", 1002, "Cmd+O"));
     menus.addRecentProjectsSubmenu(menu, processor, 1100, 1099);
     menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Save Project", 1003, "Cmd+S"));
-    menu.addItem(motion::style::menuItem("Save Project As...", 1004, "Cmd+Shift+S"));
+    menu.addItem(motion::style::menuItem("Save project", 1003, "Cmd+S"));
+    menu.addItem(motion::style::menuItem("Save project as...", 1004, "Cmd+Shift+S"));
     menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Import Source...", 1005, "Cmd+I"));
+    menu.addItem(motion::style::menuItem("Import source...", 1005, "Cmd+I"));
     menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Export XYRGB Signal...", 1006, {}));
+    menu.addItem(motion::style::menuItem("Export XYRGB signal...", 1006, {}));
 #if OSCI_PREMIUM
-    menu.addItem(motion::style::menuItem("Export Video...", 1007, {}));
+    menu.addItem(motion::style::menuItem("Export video...", 1007, {}));
 #endif
 }
 
@@ -1680,8 +1680,8 @@ void MotionEditor::registerCommands() {
    #else
     const juce::String fullScreenKeys = "F11";
    #endif
-    menus.addToggleMenuItem(5, "Full Screen", [this] { toggleFullScreen(); }, [this] { return isFullScreen(); }, motion::style::shortcutText(fullScreenKeys));
-    menus.addMenuItem(5, "Reset Window Size and Position", [this] { resetWindowSizeAndPosition(); });
+    menus.addToggleMenuItem(5, "Full screen", [this] { toggleFullScreen(); }, [this] { return isFullScreen(); }, motion::style::shortcutText(fullScreenKeys));
+    menus.addMenuItem(5, "Reset window size and position", [this] { resetWindowSizeAndPosition(); });
     menus.addMenuSeparator(5);
     addCommand(5, "Keyboard shortcuts...", juce::KeyPress('/', command, 0), "Cmd+/", [this] { showShortcuts(); });
     // File items live in the File menu built by buildFileMenu; these bind keys.
@@ -2355,6 +2355,7 @@ void MotionEditor::refreshCurveList() {
     juce::String primaryGroup;
     for (const auto& channel : channels) { if (channel.id == curvePropertyName) { primaryGroup = channel.group; } }
     auto shown = shownCurves;
+    shown.insert(curvePropertyName);
     for (const auto& channel : channels) {
         const auto sibling = channel.id != curvePropertyName && primaryGroup.isNotEmpty() && channel.group == primaryGroup;
         if (sibling && !hiddenCurves.contains(channel.id)) { shown.insert(channel.id); }
@@ -2387,10 +2388,8 @@ juce::PopupMenu MotionEditor::timingMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
     menu.setLookAndFeel(&getLookAndFeel());
-    menu.addSectionHeader("Tempo");
     menu.addItem(600, detectingTempo ? "Detecting tempo..." : "Detect tempo from soundtrack", !detectingTempo && soundtrackClip() != 0);
     menu.addSeparator();
-    menu.addSectionHeader("Time display");
     menu.addItem(101, "Seconds", true, project.timeDisplay == motion::TimeDisplay::seconds);
     menu.addItem(102, "Frames", true, project.timeDisplay == motion::TimeDisplay::frames);
     menu.addItem(103, "Bars / beats", true, project.timeDisplay == motion::TimeDisplay::beats);
