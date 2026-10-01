@@ -143,7 +143,7 @@ def import_source(name, start, duration=None, bake=None, offset=None):
 def timing(start=None, duration=None, offset=None, back="Properties"):
     if start is None and duration is None and offset is None:
         return
-    tab("Timing")
+    tab("Properties")
     if start is not None:
         edit_label("Clip start", start)
     if duration is not None:

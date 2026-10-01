@@ -1,28 +1,35 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "MotionStyle.h"
 #include <array>
 #include <cstdlib>
+#include <functional>
 
-// Resolved seconds are explicit here even when the timeline ruler shows beats.
-// The document converts musical clips back into their canonical beat domain.
+// A clip's timing, shown as the first section of the Properties inspector.
+// Times use the ruler's format; the document converts musical clips back into
+// their canonical beat domain.
 class MotionClipTimingPanel : public juce::Component {
 public:
     explicit MotionClipTimingPanel(MotionProcessor& owner) : processor(owner) {
         setName("Clip timing inspector");
-        title.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+        title.setText("Timing", juce::dontSendNotification);
+        title.setFont(motion::style::small());
+        title.setColour(juce::Label::textColourId, motion::style::muted());
+        title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
-        const std::array<const char*, 4> labels {"Start", "Duration", "Source offset (s)", "Speed"};
+        const std::array<const char*, 4> labels {"Start", "Duration", "Offset", "Speed"};
         const std::array<const char*, 4> names {"Clip start", "Clip duration", "Clip source offset", "Clip speed"};
         const std::array<const char*, 4> hints {
             "Move the clip without changing its source offset or animation. Uses the ruler's units; add s for seconds.",
             "Change the right edge without stretching the source or animation. Musical lengths read bars.beats (1.2 is a bar and two beats); add s for seconds.",
-            "Slip the source and its animation inside the existing clip.",
+            "Source offset in seconds: slip the source and its animation inside the existing clip.",
             "Playback multiplier. 1 is normal speed; 2 is twice as fast. Clip duration stays unchanged."
         };
         for (std::size_t i = 0; i < values.size(); ++i) {
             captions[i].setText(labels[i], juce::dontSendNotification);
-            captions[i].setFont(12.0f);
+            captions[i].setFont(motion::style::small());
+            captions[i].setColour(juce::Label::textColourId, motion::style::muted());
             addAndMakeVisible(captions[i]);
             auto& value = values[i];
             value.setName(names[i]); value.setTitle(names[i]);
@@ -35,10 +42,11 @@ public:
             value.onTextChange = [this, i] { if (!updating) { apply(i); } };
             addAndMakeVisible(value);
         }
-        details.setFont(12.0f);
+        details.setFont(motion::style::small());
+        details.setColour(juce::Label::textColourId, motion::style::muted());
         details.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(details);
-        status.setFont(12.0f);
+        status.setFont(motion::style::small());
         status.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(status);
         refresh();
@@ -47,42 +55,47 @@ public:
         if (id != selected) { discardEditors(); selected = id; error.clear(); }
         refresh();
     }
+    std::function<void()> onHeightChanged;
+    bool hasClip() const { return findClip() != nullptr; }
+    int preferredHeight() const { return hasClip() ? 16 + 2 * rowHeight + 18 + (status.isVisible() ? 30 : 0) + 6 : 0; }
     void refresh() {
         if (editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { discardEditors(); }
         const auto* clip = findClip();
         const bool locked = isLocked();
-        title.setText(clip != nullptr ? juce::String(clip->name) : "Clip timing", juce::dontSendNotification);
+        const auto previousHeight = preferredHeight();
         updating = true;
         const auto timing = clip != nullptr ? clip->timing(processor.document.project().tempo()) : motion::ClipTiming();
         const auto grid = processor.document.project().timeGrid();
         const std::array<juce::String, 4> current {juce::String(grid.positionLabel(timing.start)), juce::String(grid.durationLabel(timing.start, timing.end())), format(timing.offset), format(timing.rate)};
         for (std::size_t i = 0; i < values.size(); ++i) {
-            captions[i].setVisible(clip != nullptr);
-            values[i].setVisible(clip != nullptr);
             values[i].setEnabled(clip != nullptr && !locked);
             if (!values[i].isBeingEdited()) { values[i].setText(current[i], juce::dontSendNotification); }
         }
         updating = false;
-        details.setText(clip != nullptr ? "Ends at " + juce::String(grid.positionLabel(timing.end())) + "\n"
-            + (clip->timeBase == motion::ClipTimeBase::beats ? "Beat anchored - follows project tempo." : "Time anchored - keeps its position in seconds.")
-            : "Select a clip in the timeline to edit its timing.", juce::dontSendNotification);
-        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : osci::Colours::text().withAlpha(.6f));
-        status.setText(error.isNotEmpty() ? error : locked ? "Track locked. Timing is read-only." : "Edits preserve existing keyframes and notes.", juce::dontSendNotification);
-        status.setVisible(clip != nullptr || error.isNotEmpty());
+        details.setText(clip == nullptr ? juce::String() : (clip->timeBase == motion::ClipTimeBase::beats ? "Beat anchored (follows tempo)" : "Time anchored (keeps its seconds)")
+            + juce::String::fromUTF8("  \u00b7  ends ") + juce::String(grid.positionLabel(timing.end())), juce::dontSendNotification);
+        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : motion::style::muted());
+        status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
+        status.setVisible(clip != nullptr && status.getText().isNotEmpty());
+        setVisible(clip != nullptr);
         resized();
+        if (preferredHeight() != previousHeight && onHeightChanged) { onHeightChanged(); }
     }
     void resized() override {
-        auto area = getLocalBounds().reduced(10, 0);
-        title.setBounds(area.removeFromTop(36));
-        for (std::size_t i = 0; i < values.size(); ++i) {
-            auto row = area.removeFromTop(38);
-            captions[i].setBounds(row.removeFromLeft(108));
-            values[i].setBounds(row.reduced(2, 6));
+        auto area = getLocalBounds();
+        title.setBounds(area.removeFromTop(16));
+        for (std::size_t line = 0; line < 2; ++line) {
+            auto row = area.removeFromTop(rowHeight);
+            const auto half = row.getWidth() / 2;
+            for (std::size_t column = 0; column < 2; ++column) {
+                auto cell = row.removeFromLeft(half).withTrimmedRight(column == 0 ? 6 : 0);
+                const auto i = line * 2 + column;
+                captions[i].setBounds(cell.removeFromLeft(56));
+                values[i].setBounds(cell.reduced(0, 3));
+            }
         }
-        area.removeFromTop(12);
-        details.setBounds(area.removeFromTop(55));
-        area.removeFromTop(8);
-        status.setBounds(area.removeFromTop(70));
+        details.setBounds(area.removeFromTop(18));
+        status.setBounds(area.removeFromTop(30));
     }
     // Three decimals, more only when the value needs them (no trailing zeros).
     static juce::String format(double value) {
@@ -136,6 +149,7 @@ private:
         error = result.failed() ? result.getErrorMessage() : juce::String();
         refresh();
     }
+    static constexpr int rowHeight = 28;
     MotionProcessor& processor;
     motion::Id selected = 0;
     std::uint64_t editRevision = 0, editGeneration = 0;

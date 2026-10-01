@@ -126,11 +126,10 @@ try:
     # Moved later so the 0.3 s downbeat lands on the next bar line.
     assert abs(float(clip.get("start")) + 0.3 - bar) < 0.03, clip.attrib
     step("detected", "screenshot", "--file", session.artifact_dir / "detected.png")
-    # Ruler-format timing: bars.beats in the Timing tab once the ruler shows bars.
-    step("timing menu again", "click", "--name", "Time and grid", "--exact")
-    step("bars", "click", "--name", "Bars / beats", "--role", "menuItem", "--exact")
-    wait_undo("Change timeline grid")
-    step("timing tab", "click", "--name", "Timing", "--class", "osci::TabBar::Tab", "--exact")
+    # Detection switches the ruler to bars in the same step, and the clip's
+    # timing (in Properties) then shows bars.beats.
+    assert tree.get("timeDisplay") == "2", tree.attrib
+    step("properties tab", "click", "--name", "Properties", "--class", "osci::TabBar::Tab", "--exact")
     step("select soundtrack", "click", "--class", "MotionTimelineView", "--position", "400,42")
     command("wait", "--ms", 300)
     tree = json.loads(command("snapshot", "--json", "--full"))

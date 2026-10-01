@@ -139,7 +139,7 @@ def import_source(name, start, duration, properties, animation=None):
         command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
         step("trace animated raster", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", name, "--class", "juce::Label", "--exact")
-    tab("Timing")
+    tab("Properties")
     edit("Clip duration", duration)
     if properties or animation:
         tab("Properties")
@@ -157,7 +157,7 @@ def import_source(name, start, duration, properties, animation=None):
 
 def repeat_selected(start, duration):
     step("repeat selected motif", "press", "command + d", "--class", "MotionTimelineView")
-    tab("Timing")
+    tab("Properties")
     edit("Clip start", start)
     edit("Clip duration", duration)
 
@@ -165,7 +165,7 @@ def repeat_selected(start, duration):
 
 def extend(name,at,end):
     select_clip(name,at)
-    tab("Timing")
+    tab("Properties")
     edit("Clip duration",end)
     tab("Properties")
 
@@ -188,8 +188,8 @@ try:
     extend("Relay corridor.obj",34,44.8)
     keys("weight",[(32,.15),(44.8,.6),(57.6,.9),(70.4,1),(76.7,0)])
     keys("rotation.y",[(51.2,20),(64,-15),(70.4,10),(76.7,80)])
-    select_clip("Relay packet.json",27);tab("Timing");edit("Clip duration",51.2);tab("Properties")
-    select_clip("Reply.lua",24);tab("Timing");edit("Clip duration",54.4);tab("Properties")
+    select_clip("Relay packet.json",27);tab("Properties");edit("Clip duration",51.2);tab("Properties")
+    select_clip("Reply.lua",24);tab("Properties");edit("Clip duration",54.4);tab("Properties")
     keys("weight",[(51.2,.65),(64,.25),(76.7,0)])
     import_source("Interference.lua",51.2,25.6,{"red":1,"green":.2,"blue":.12,"scale.x":.7,"scale.y":.7,"scale.z":.7}, {
         "weight":[(51.2,0),(57.6,.35),(64,.7),(73.6,1),(76.7,0)],

@@ -121,7 +121,7 @@ public:
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     // Replace the initial tempo and every change in one undo step.
-    juce::Result setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
+    juce::Result setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label, bool showBars = false);
     // A steady tempo from audio analysis, and the soundtrack clip moved so its
     // first downbeat (content seconds) lands on a bar line. One undo step.
     juce::Result setTempoFromAudio(Id soundtrackClip, double bpm, double downbeat, double& moved);
@@ -164,6 +164,17 @@ public:
     // A track's row height (0: default). View state: no undo step, and undo
     // or redo keep the current heights.
     bool setTrackHeight(Id trackId, int height);
+    // Edits made inside a ViewChange (loop range, snapping, time display)
+    // stay undoable but tell listeners nothing that playback depends on
+    // changed, so the composition is not prepared again.
+    struct ViewChange {
+        explicit ViewChange(Document& owner) : document(owner), previous(owner.viewChange) { owner.viewChange = true; }
+        ~ViewChange() { document.viewChange = previous; }
+        Document& document;
+        bool previous;
+    };
+    bool viewOnlyChange() const { return viewChange; }
+    void setTrackHeights(const std::vector<std::pair<Id, int>>& heights);
     // Removes the listed sources (or every unused source when empty) that no
     // clip, composition or MIDI assignment references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);
@@ -220,6 +231,20 @@ public:
     }
     static Clip makeCompositionClip(Id id, const CompositionDefinition& definition, double time);
     static Clip makeClip(Id id, const Asset& asset, double time);
+    // "Fern.lsystem" becomes "Fern 2.lsystem" when another source has the name.
+    static juce::String uniqueAssetName(const Project& project, const juce::String& name) {
+        const auto taken = [&project](const juce::String& candidate) {
+            return std::any_of(project.assets.begin(), project.assets.end(), [&candidate](const auto& asset) { return asset != nullptr && asset->name == candidate; });
+        };
+        if (!taken(name)) { return name; }
+        const auto dot = name.lastIndexOfChar('.');
+        const auto stem = dot > 0 ? name.substring(0, dot) : name;
+        const auto extension = dot > 0 ? name.substring(dot) : juce::String();
+        for (int number = 2;; ++number) {
+            const auto candidate = stem + " " + juce::String(number) + extension;
+            if (!taken(candidate)) { return candidate; }
+        }
+    }
 
 private:
     Id highestId() const;
@@ -235,6 +260,7 @@ private:
     std::uint64_t projectGeneration = 0;
     std::uint64_t stateRevision = 0;
     bool carryView = true;
+    bool viewChange = false;
     juce::UndoManager& undo;
 };
 }

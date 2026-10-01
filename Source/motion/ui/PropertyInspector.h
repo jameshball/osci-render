@@ -37,6 +37,16 @@ public:
     // Embedded inspectors (e.g. in the camera panel) supply their own title.
     // Distinguishes controls of several inspectors for automation and access.
     void setNamePrefix(juce::String prefix) { namePrefix = std::move(prefix); layoutSignature = "none"; refresh(); }
+    // A section above the property rows (the clip's timing), sized by
+    // `height`; 0 hides it.
+    void setLead(juce::Component* component, std::function<int()> height) {
+        if (lead != nullptr && lead != component) { content.removeChildComponent(lead); }
+        lead = component;
+        leadHeight = std::move(height);
+        if (lead != nullptr) { content.addChildComponent(lead); }
+        layoutContent();
+    }
+    void relayout() { layoutContent(); }
     void setShowsHeader(bool shows) { showsHeader = shows; title.setVisible(shows); kind.setVisible(shows); resized(); }
     void setTarget(motion::Id id) {
         if (id != target) { target = id; cancelGesture(); }
@@ -188,6 +198,7 @@ private:
     void build(std::span<const motion::PropertySpec> specs) {
         rows.clear();
         content.removeAllChildren();
+        if (lead != nullptr) { content.addChildComponent(lead); }
         for (const auto& spec : specs) {
             if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size())) {
                 auto row = std::make_unique<Row>();
@@ -261,6 +272,11 @@ private:
     void layoutContent() {
         const auto width = viewport.getWidth() - (viewport.isVerticalScrollBarShown() ? 8 : 0);
         int y = 0;
+        const auto leading = lead != nullptr && leadHeight ? leadHeight() : 0;
+        if (lead != nullptr) {
+            lead->setBounds(motion::style::padding, y, width - motion::style::padding * 2, leading);
+            y += leading > 0 ? leading + motion::style::padding : 0;
+        }
         for (auto& row : rows) {
             row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, 17 + motion::style::controlHeight);
             y += 17 + motion::style::controlHeight + motion::style::padding;
@@ -328,6 +344,18 @@ private:
         if (onPropertySelected) { onPropertySelected(target, property); }
         if (onKeyTimeEdited) { onKeyTimeEdited(); }
     }
+public:
+    // Alt+Shift+P/R/S/T, as in After Effects: key a group at the playhead.
+    bool toggleGroupKeys(const juce::String& group) {
+        for (auto& row : rows) {
+            if (row->group == group && row->isVisible()) {
+                toggleKeys(*row);
+                return true;
+            }
+        }
+        return false;
+    }
+private:
     void toggleKeys(Row& row) {
         const auto found = motion::findPropertyTarget(processor.document.project(), target);
         if (!found.has_value()) { return; }
@@ -442,6 +470,8 @@ private:
     juce::Component content;
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
+    juce::Component* lead = nullptr;
+    std::function<int()> leadHeight;
     std::vector<motion::PropertySpec> specList;
     motion::Id target = 0;
     juce::String layoutSignature = "none", namePrefix;

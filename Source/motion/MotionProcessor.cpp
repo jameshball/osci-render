@@ -23,6 +23,7 @@ MotionProcessor::MotionProcessor()
         loopStart.store(project.loopStart);
         loopEnd.store(project.loopEnd);
         looping.store(project.looping && project.hasLoop());
+        if (document.viewOnlyChange()) { return; }
         requestComposition(project);
     };
     document.onChanged();

@@ -8,6 +8,7 @@
 #include <set>
 #include "../model/CompositionGraph.h"
 #include "../model/PropertySchema.h"
+#include "../model/KeyEasing.h"
 #include "MotionStyle.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
@@ -39,6 +40,7 @@ public:
         snapButton.setTitle("Snapping");
         snapButton.setTooltip("Snapping to the grid, clip edges, markers and the playhead. Hold Alt while dragging to bypass it.");
         snapButton.onClick = [this] {
+            const motion::Document::ViewChange view(processor.document);
             processor.document.edit("Change timeline grid", [](motion::Project& project) { project.gridSnap = !project.gridSnap; });
         };
         addAndMakeVisible(snapButton);
@@ -142,8 +144,11 @@ public:
         if (found == rows.end()) { return; }
         const auto row = static_cast<std::size_t>(found - rows.begin());
         const auto top = rowTops[row], bottom = top + heightOf(row), view = viewHeight();
-        if (top < scrollY) { scrollY = top; }
-        else if (bottom > scrollY + view) { scrollY = std::min(top, bottom - view); }
+        if (top < scrollY) {
+            scrollY = top;
+        } else if (bottom > scrollY + view) {
+            scrollY = std::min(top, bottom - view);
+        }
         if (expanded) { refreshTracks(); } else { resized(); repaint(); }
     }
 
@@ -192,12 +197,6 @@ public:
         const auto row = trackAtY(point.y);
         const auto& tracks = processor.document.project().tracks;
         return std::make_pair(time, row >= 0 && row < static_cast<int>(tracks.size()) ? tracks[static_cast<std::size_t>(row)].id : motion::Id(0));
-    }
-    // Selects the marker at a time (after a J/K jump).
-    void selectMarkerAt(double time) {
-        for (const auto& marker : processor.document.project().markers) {
-            if (std::abs(marker.time - time) < 1.0e-6) { selectMarker(marker.id); repaint(); return; }
-        }
     }
     void selectClips(const std::vector<motion::Id>& ids) {
         selectedKeys.clear();
@@ -995,6 +994,7 @@ public:
         if (bounds.isEmpty() || event.y < loopTop - 4 || event.y >= loopTop + loopHeight || event.x < bounds.getX() - 5 || event.x > bounds.getRight() + 5) { return false; }
         const auto& project = processor.document.project();
         if (event.getNumberOfClicks() > 1) {
+            const motion::Document::ViewChange view(processor.document);
             processor.document.tryEdit(project.looping ? "Stop looping" : "Loop playback", [](motion::Project& state) { state.looping = !state.looping; return true; });
             return true;
         }
@@ -1018,6 +1018,7 @@ public:
             updated.loopEnd = std::clamp(snapEdge(drag.end + delta, event.mods, drag.before, {}), std::min(drag.start + frame, updated.duration), updated.duration);
         }
         drag.changed = updated.loopStart != drag.before.loopStart || updated.loopEnd != drag.before.loopEnd;
+        const motion::Document::ViewChange view(processor.document);
         processor.document.preview(std::move(updated));
         drag.revision = processor.document.revision();
         repaint();
@@ -1233,7 +1234,10 @@ public:
         if (heightDrag.has_value()) { heightDrag.reset(); return; }
         if (barDrag.has_value()) { barDrag.reset(); repaint(); return; }
         if (loopDrag.has_value()) {
-            if (loopDrag->changed && processor.document.revision() == loopDrag->revision) { processor.document.commit("Move loop", std::move(loopDrag->before)); }
+            if (loopDrag->changed && processor.document.revision() == loopDrag->revision) {
+                const motion::Document::ViewChange view(processor.document);
+                processor.document.commit("Move loop", std::move(loopDrag->before));
+            }
             loopDrag.reset();
             return;
         }
@@ -1333,11 +1337,14 @@ public:
         const auto offset = row >= 0 && row < static_cast<int>(rows.size()) ? rowY(row) : 0;
         const auto next = std::clamp(juce::roundToInt(defaultTrackHeight * factor), motion::Track::minimumHeight, 120);
         if (next == defaultTrackHeight) { return; }
-        // Tracks with their own height scale with the rest.
+        // Tracks with their own height scale with the rest (collected first:
+        // setting heights replaces the project being read).
         const auto ratio = static_cast<double>(next) / defaultTrackHeight;
+        std::vector<std::pair<motion::Id, int>> heights;
         for (const auto& track : processor.document.project().tracks) {
-            if (track.height > 0) { processor.document.setTrackHeight(track.id, juce::roundToInt(track.height * ratio)); }
+            if (track.height > 0) { heights.emplace_back(track.id, juce::roundToInt(track.height * ratio)); }
         }
+        processor.document.setTrackHeights(heights);
         setDefaultTrackHeight(next);
         if (row >= 0 && row < static_cast<int>(rows.size())) { scrollY = std::clamp(scrollY + rowY(row) - offset, 0, maximumScrollY()); }
     }
@@ -1411,7 +1418,7 @@ public:
             cancelGesture();
             return true;
         }
-        if (!key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown()) {
+        if (!key.getModifiers().isCommandDown() && !key.getModifiers().isCtrlDown() && !key.getModifiers().isAltDown() && !key.getModifiers().isShiftDown()) {
             const auto character = juce::CharacterFunctions::toLowerCase(key.getTextCharacter());
             if (character == 'm' && onEditMarker) {
                 cancelGesture();
@@ -1723,6 +1730,28 @@ private:
         marquee.reset();
         repaint();
     }
+public:
+    bool easeSelectedKeys(bool in, bool out) {
+        if (selectedKeys.empty()) { return false; }
+        const auto keys = selectedKeys;
+        const auto eased = processor.document.tryEdit(in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out"), [&keys, in, out](motion::Project& project) {
+            bool any = false;
+            for (auto& track : project.tracks) {
+                for (auto& clip : track.clips) {
+                    for (const auto& key : keys) {
+                        if (key.clip != clip.id) { continue; }
+                        if (track.locked) { return false; }
+                        const auto found = clip.properties.find(key.property);
+                        any = (found != clip.properties.end() && motion::easeKey(found->second, key.time, in, out)) || any;
+                    }
+                }
+            }
+            return any;
+        });
+        repaint();
+        return eased;
+    }
+private:
     void deleteSelectedKeys() {
         const auto keys = selectedKeys;
         const auto removed = processor.document.tryEdit(keys.size() > 1 ? "Delete keyframes" : "Delete keyframe", [&keys](motion::Project& project) {

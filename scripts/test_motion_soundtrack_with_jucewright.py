@@ -95,14 +95,14 @@ try:
         raise RuntimeError("Audio gain undo failed")
     step("show gain graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("gain graph screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-gain.png")
-    step("select XY output", "select-option", "--name", "Audio output mode", "--text", "Outputs: XY signal")
+    step("select XY output", "select-option", "--name", "Audio output mode", "--text", "Beam X/Y")
     if os.environ.get("MOTION_TEST_XYRGB") == "1":
-        step("enable five channel output", "select-option", "--name", "Audio output mode", "--text", "Outputs: XYRGB signal (5 ch)")
+        step("enable five channel output", "select-option", "--name", "Audio output mode", "--text", "Beam XYRGB (5 ch)")
         output = find(snapshot(), lambda node: node.get("componentName") == "Audio output mode")
         if output is None or "XYRGB" not in str(output.get("value", "")):
             raise RuntimeError("Five-channel device configuration failed")
         step("five channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyrgb-output.png")
-    step("restore music monitor", "select-option", "--name", "Audio output mode", "--text", "Speakers: soundtrack")
+    step("restore music monitor", "select-option", "--name", "Audio output mode", "--text", "Soundtrack")
     step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("split soundtrack", "press", "command + k", "--class", "MotionTimelineView")
     wait_undo("Split clip")

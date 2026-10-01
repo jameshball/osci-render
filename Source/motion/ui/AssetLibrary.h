@@ -77,6 +77,9 @@ public:
         for (const auto& definition : document.mainProject().definitions) {
             if (definition != nullptr && (filter.isEmpty() || juce::String(definition->name).containsIgnoreCase(filter))) { definitions.push_back(definition); }
         }
+        std::erase_if(thumbnails, [&](const Thumbnail& thumbnail) {
+            return std::none_of(document.project().assets.begin(), document.project().assets.end(), [&](const auto& asset) { return asset != nullptr && asset->source == thumbnail.source && asset->drawing == thumbnail.drawing; });
+        });
         list.updateContent();
         list.deselectAllRows();
         selectAsset(selectedId);
@@ -203,6 +206,53 @@ private:
         graphics.drawText(detail, bounds, juce::Justification::centredLeft);
     }
 
+    // A source's middle frame as a path inside the unit square, broken at the
+    // jumps between strokes (dark travel in baked points, long steps in
+    // vector shapes, which carry no colour).
+    static juce::Path traceThumbnail(const motion::Asset& asset) {
+        juce::Path path;
+        const auto source = asset.source;
+        const auto drawing = asset.drawing;
+        const auto frames = source != nullptr ? source->frameCount() : 0;
+        if (frames == 0 && (drawing == nullptr || drawing->empty())) { return path; }
+        const auto frame = frames / 2;
+        const auto pointFrames = frames > 0 && source->drawingAt(frame) == nullptr;
+        constexpr int steps = 400;
+        std::vector<juce::Point<float>> points;
+        std::vector<bool> lit;
+        float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
+        for (int index = 0; index <= steps; ++index) {
+            const auto phase = static_cast<double>(index) / steps;
+            const auto point = frames > 0 ? source->sampleFrame(frame, phase, 0) : drawing->sample(phase, 0);
+            if (!std::isfinite(point.x) || !std::isfinite(point.y)) { continue; }
+            points.emplace_back(point.x, point.y);
+            lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
+            left = std::min(left, point.x); right = std::max(right, point.x);
+            top = std::min(top, point.y); bottom = std::max(bottom, point.y);
+        }
+        if (points.empty()) { return path; }
+        const auto size = std::max({right - left, bottom - top, 1e-6f});
+        const auto jump = size * .2f;
+        const auto map = [&](juce::Point<float> point) {
+            return juce::Point<float>(.5f + (point.x - (left + right) * .5f) / size, .5f - (point.y - (top + bottom) * .5f) / size);
+        };
+        bool open = false;
+        for (std::size_t index = 0; index < points.size(); ++index) {
+            const auto dark = pointFrames && !lit[index];
+            const auto far = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
+            if (dark) { open = false; continue; }
+            if (open && !far) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }
+        }
+        return path;
+    }
+    // Keyed by the prepared data itself, so a replaced source re-traces.
+    struct Thumbnail {
+        std::shared_ptr<const motion::PreparedSource> source;
+        std::shared_ptr<const osci::PreparedDrawing> drawing;
+        juce::Path path;
+    };
+    mutable std::vector<Thumbnail> thumbnails;
+
     void paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const {
         graphics.setColour(juce::Colours::black.withAlpha(.35f));
         graphics.fillRoundedRectangle(box.toFloat(), 3.0f);
@@ -234,6 +284,7 @@ private:
             int low = 127, high = 0;
             double end = 0;
             for (const auto& note : notes) { low = std::min(low, note.pitch); high = std::max(high, note.pitch); end = std::max(end, note.start + note.duration); }
+            if (!(end > 0)) { return; }
             const auto rows = static_cast<float>(std::max(1, high - low + 1));
             for (const auto& note : notes) {
                 const auto x = area.getX() + static_cast<float>(note.start / end) * area.getWidth();
@@ -242,40 +293,14 @@ private:
             }
             return;
         }
-        // Animated sources show a frame from their middle (vector or baked points).
-        const auto source = asset.source;
-        const auto drawing = asset.drawing;
-        if ((source == nullptr || source->frameCount() == 0) && (drawing == nullptr || drawing->empty())) { return; }
-        const auto frame = source != nullptr ? source->frameCount() / 2 : 0;
-        const auto sampleAt = [&](double phase, double span) { return source != nullptr && source->frameCount() > 0 ? source->sampleFrame(frame, phase, span) : drawing->sample(phase, span); };
-        // Trace the first frame, breaking the path at jumps between strokes.
-        constexpr int steps = 400;
-        std::vector<juce::Point<float>> points;
-        float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
-        std::vector<bool> lit;
-        for (int index = 0; index <= steps; ++index) {
-            const auto point = sampleAt(static_cast<double>(index) / steps, 0);
-            points.emplace_back(point.x, point.y);
-            lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
-            left = std::min(left, point.x); right = std::max(right, point.x);
-            top = std::min(top, point.y); bottom = std::max(bottom, point.y);
+        // Traced once per source (a unit-square path), then scaled to the row.
+        auto found = std::find_if(thumbnails.begin(), thumbnails.end(), [&](const Thumbnail& thumbnail) { return thumbnail.source == asset.source && thumbnail.drawing == asset.drawing; });
+        if (found == thumbnails.end()) {
+            thumbnails.push_back({asset.source, asset.drawing, traceThumbnail(asset)});
+            found = std::prev(thumbnails.end());
         }
-        const auto scale = std::min(area.getWidth() / std::max(1e-6f, right - left), area.getHeight() / std::max(1e-6f, bottom - top));
-        const auto map = [&](juce::Point<float> point) {
-            return juce::Point<float>(area.getCentreX() + (point.x - (left + right) * .5f) * scale, area.getCentreY() - (point.y - (top + bottom) * .5f) * scale);
-        };
-        // Baked point frames mark travel dark; vector shapes carry no colour,
-        // so a long step between samples marks the jump between strokes.
-        const auto pointFrames = source != nullptr && source->frameCount() > 0 && source->drawingAt(frame) == nullptr;
-        const auto jump = std::max(right - left, bottom - top) * .2f;
-        juce::Path path;
-        bool open = false;
-        for (std::size_t index = 0; index < points.size(); ++index) {
-            const auto dark = pointFrames && !lit[index];
-            const auto far = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
-            if (dark) { open = false; continue; }
-            if (open && !far) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }
-        }
+        auto path = found->path;
+        path.applyTransform(juce::AffineTransform::scale(area.getWidth(), area.getHeight()).translated(area.getX(), area.getY()));
         graphics.strokePath(path, juce::PathStrokeType(1.0f));
     }
 
@@ -341,8 +366,9 @@ private:
     void adoptMidiTempo(motion::Id id) {
         const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& item) { return item != nullptr && item->id == id; });
         if (found == assets.end() || (*found)->midi == nullptr) { return; }
-        const auto result = document.setTempoMap((*found)->midiSuggestedBpm, (*found)->midiTempoChanges, "Use MIDI tempo");
-        if (onMessage) { onMessage(result.failed() ? result.getErrorMessage() : "Tempo now follows " + (*found)->name + "."); }
+        const auto bars = document.project().timeDisplay == motion::TimeDisplay::beats;
+        const auto result = document.setTempoMap((*found)->midiSuggestedBpm, (*found)->midiTempoChanges, "Use MIDI tempo", true);
+        if (onMessage) { onMessage(result.failed() ? result.getErrorMessage() : "Tempo now follows " + (*found)->name + (bars ? "." : "; the ruler shows bars and beats.")); }
     }
     // Rename by identity: the list may have changed while the menu was open.
     void beginRename(motion::Id id) {

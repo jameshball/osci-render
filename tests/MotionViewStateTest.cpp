@@ -87,6 +87,18 @@ public:
             expect(motion::Document::prepareLoad(document.save(), loaded).wasOk());
             expect(!loaded.hasLoop() && !loaded.looping, "an inverted loop is dropped");
         }
+        beginTest("Imported sources with a taken name are numbered");
+        {
+            motion::Project project;
+            for (const auto* name : {"Fern.lsystem", "Fern 2.lsystem", "README"}) {
+                auto asset = std::make_shared<motion::Asset>();
+                asset->name = name;
+                project.assets.push_back(asset);
+            }
+            expectEquals(motion::Document::uniqueAssetName(project, "Dot.svg"), juce::String("Dot.svg"));
+            expectEquals(motion::Document::uniqueAssetName(project, "Fern.lsystem"), juce::String("Fern 3.lsystem"));
+            expectEquals(motion::Document::uniqueAssetName(project, "README"), juce::String("README 2"));
+        }
     }
 };
 

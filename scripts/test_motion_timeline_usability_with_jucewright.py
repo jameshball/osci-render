@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Timeline usability through the real workspace: loop range and button, snapping toggle,
 track resizing, dropping a file onto a track, box selection, edit-point and marker
-navigation, and the Graph's channel list."""
+navigation, the Graph's channel list, Easy Ease and After Effects keying shortcuts."""
 import json
 import struct
 import subprocess
@@ -187,6 +187,20 @@ try:
     hidden = find(lambda n: n.get("name") == "Curve Position X")
     assert hidden is None or not hidden.get("visible"), "unanimated channels stay listed"
     step("graph list", "screenshot", "--file", session.artifact_dir / "graph-list.png")
+
+    # Cmd+A in the Graph selects the curve's keys; F9 eases them.
+    def keys(name):
+        clip = next(c for c in saved().iter("clip") if c.get("id") == "11")
+        return [k for p in clip.iter("property") if p.get("name") == name for k in p.findall("key")]
+
+    step("select all keys", "press", "command + a", "--class", "MotionCurveEditor")
+    step("easy ease", "press", "F9", "--class", "MotionCurveEditor")
+    eased = keys("weight")
+    assert eased[0].get("interpolation") == "3" and float(eased[0].get("out")) == 0 and float(eased[1].get("in")) == 0, [k.attrib for k in eased]
+    # Alt+Shift+P keys position at the playhead, as in After Effects.
+    step("key position", "press", "alt + shift + p", "--class", "MotionCurveEditor")
+    keyed = keys("position.x")
+    assert len(keyed) == 1 and abs(float(keyed[0].get("time")) - 1) < 1e-6, [k.attrib for k in keyed]
     print("Timeline usability passed.", flush=True)
 finally:
     session.stop_app()

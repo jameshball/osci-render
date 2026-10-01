@@ -216,12 +216,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
-    monitorOutput.addItem("Speakers: soundtrack", 1);
-    monitorOutput.addItem("Outputs: XY signal", 2);
-    monitorOutput.addItem("Outputs: XYRGB signal (5 ch)", 3);
+    monitorOutput.addSectionHeading("Your audio interface plays");
+    monitorOutput.addItem("Soundtrack", 1);
+    monitorOutput.addItem("Beam X/Y", 2);
+    monitorOutput.addItem("Beam XYRGB (5 ch)", 3);
     refreshOutputChoices();
     monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
-    monitorOutput.setTooltip("Physical audio output. The visualiser always receives the beam signal. XYRGB requires five enabled output channels.");
+    monitorOutput.setTooltip("What your audio interface plays: the soundtrack, or the beam itself to drive a real oscilloscope (XYRGB needs five output channels). The Scope always shows the beam.");
     monitorOutput.onChange = [this] {
         const auto mode = static_cast<MotionProcessor::OutputMode>(monitorOutput.getSelectedId() - 1);
         if (mode == MotionProcessor::OutputMode::xyrgb) {
@@ -342,11 +343,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     inspectorTabs.addTab("Properties");
     inspectorTabs.addTab("FX");
     inspectorTabs.addTab("Camera");
-    inspectorTabs.addTab("Timing");
-    addChildComponent(clipTimingPanel);
+    // A clip's timing leads its Properties, as layer timing does in other editors.
+    propertyInspector.setLead(&clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
+    clipTimingPanel.onHeightChanged = [this] { propertyInspector.relayout(); };
     inspectorTabs.onSelectionChanged = [this](int index) {
         cameraPanel.setVisible(index == 2);
-        clipTimingPanel.setVisible(index == 3);
         effectsPanel.setVisible(index == 1);
         propertyInspector.setVisible(index == 0);
         refreshInspector();
@@ -563,7 +564,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             }
         }
     };
-    timeline.onTimingRequested = [this](motion::Id id) { select(id); inspectorTabs.setSelectedIndex(3); };
+    timeline.onTimingRequested = [this](motion::Id id) { select(id); inspectorTabs.setSelectedIndex(0); };
     timeline.onLoopSelection = [this] { loopSelection(); };
     timeline.onRevealSource = [this](motion::Id asset) {
         libraryTabs.setSelectedIndex(0);
@@ -715,7 +716,6 @@ void MotionEditor::resized() {
     inspectorHeader.setBounds(inspector.removeFromTop(30));
     inspectorTabs.setBounds(inspectorHeader.getBounds());
     cameraPanel.setBounds(inspector);
-    clipTimingPanel.setBounds(inspector);
     effectsPanel.setBounds(inspector);
     propertyInspector.setBounds(inspector);
     area.removeFromRight(3);
@@ -726,14 +726,16 @@ void MotionEditor::resized() {
     outputHeader.setBounds(output.removeFromTop(30));
     auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(68).reduced(4, 3);
     if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
-        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 140));
+        // The scope's buttons keep their size; the output menu gives way first
+        // (down to 90 px), then the buttons.
+        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 64 - 6 - 90 - 4));
         visualiserControls->setBounds(monitorBounds.removeFromRight(width).withSizeKeepingCentre(width, 24));
         monitorBounds.removeFromRight(4);
         visualiserControls->toFront(false);
     }
     canvasButton.setBounds(monitorBounds.removeFromRight(64));
     monitorBounds.removeFromRight(6);
-    monitorOutput.setBounds(monitorBounds.withWidth(std::min(190, monitorBounds.getWidth())));
+    monitorOutput.setBounds(monitorBounds.withWidth(std::min(150, monitorBounds.getWidth())));
     output.removeFromTop(3);
     visualiser.setBounds(output);
     viewportBounds = editing;
@@ -1218,6 +1220,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 return;
             }
             asset->id = document.newId();
+            asset->name = motion::Document::uniqueAssetName(document.mainProject(), asset->name);
             if (asset->midi != nullptr) {
                 document.edit("Import MIDI file", [&](motion::Project& project) { project.assets.push_back(asset); });
                 owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
@@ -1316,17 +1319,26 @@ void MotionEditor::timerCallback() {
     const auto position = processor.position.load();
     // A slow refresh (about 3 Hz) still catches anything that changes
     // without an edit or a playhead move.
+    // Live inputs (armed MIDI tracks, Blender capture) draw while stopped too.
+    const auto liveFrames = processor.liveSourcePreview();
+    const auto isArmed = [](const auto& track) { return track.midiInput != 0; };
+    const auto& mainTracks = processor.document.mainProject().tracks;
+    const auto& scopeTracks = processor.document.project().tracks;
+    const auto armed = std::any_of(mainTracks.begin(), mainTracks.end(), isArmed) || std::any_of(scopeTracks.begin(), scopeTracks.end(), isArmed);
+    // The snapshot is held, so a new one can never reuse the old address.
+    const auto live = armed || liveFrames != lastLiveFrames;
+    lastLiveFrames = liveFrames;
     const auto moved = position != lastPaintedPosition || playing || ++idleTicks % 10 == 0;
     lastPaintedPosition = position;
     timeline.followPlayhead(position, playing);
     if (curveEditor.isVisible() && timeline.followEnabled) { curveEditor.followPlayhead(position, playing); }
-    if (moved) {
+    if (moved || live) {
         timeline.repaint();
         if (notesEditor.isVisible()) { notesEditor.repaint(); }
         if (curveEditor.isVisible()) { curveEditor.repaint(); }
         composition.repaint();
-        refreshInspector();
     }
+    if (moved) { refreshInspector(); }
     if (effectsPanel.isVisible()) { effectsPanel.updateValues(); }
 }
 
@@ -1410,7 +1422,7 @@ void MotionEditor::leaveComposition() {
     select(previous.selection);
     cameraPanel.restoreSelection(previous.cameraSelection);
     timelineTabs.setSelectedIndex(previous.timelineTab);
-    inspectorTabs.setSelectedIndex(previous.inspectorTab);
+    inspectorTabs.setSelectedIndex(std::min(previous.inspectorTab, inspectorTabs.getNumTabs() - 1));
     effectsPanel.restoreView(previous.effects);
     selectCurveTarget(previous.curveTarget, previous.property, previous.cameraCurve);
     timelineFraction = previous.timelineFraction;
@@ -1483,7 +1495,23 @@ void MotionEditor::registerCommands() {
     addCommand(1, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
     addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] { timeline.deleteSelection(); });
     menus.addMenuSeparator(1);
-    addCommand(1, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] { timeline.selectAll(); });
+    addCommand(1, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
+        if (timelineTabs.getCurrentTabIndex() == 1) { curveEditor.selectAllKeys(); } else { timeline.selectAll(); }
+    });
+    // After Effects' Easy Ease, on the selected keys of the visible editor.
+    const auto ease = [this](bool in, bool out) {
+        const auto graph = timelineTabs.getCurrentTabIndex() == 1;
+        const auto selected = graph ? curveEditor.hasSelectedKeys() : timeline.hasSelectedKeys();
+        if (!selected) {
+            statusBar.show("Select keyframes to ease.");
+            return;
+        }
+        if (graph) { curveEditor.easeSelected(in, out); } else { timeline.easeSelectedKeys(in, out); }
+    };
+    menus.addMenuSeparator(1);
+    addCommand(1, "Easy ease", juce::KeyPress(juce::KeyPress::F9Key), "F9", [ease] { ease(true, true); });
+    addCommand(1, "Easy ease in", juce::KeyPress(juce::KeyPress::F9Key, shift, 0), "Shift+F9", [ease] { ease(true, false); });
+    addCommand(1, "Easy ease out", juce::KeyPress(juce::KeyPress::F9Key, command | shift, 0), "Cmd+Shift+F9", [ease] { ease(false, true); });
     addCommand(2, "Split at playhead", juce::KeyPress('k', command, 0), "Cmd+K", [this] { splitAtPlayhead(); });
     addCommand(2, "Duplicate", juce::KeyPress('d', command, 0), "Cmd+D", [this] {
         std::vector<motion::Id> duplicates;
@@ -1503,6 +1531,15 @@ void MotionEditor::registerCommands() {
     addCommand(2, "Trim clip start to playhead", juce::KeyPress('[', juce::ModifierKeys::altModifier, 0), "Alt+[", [this] { placeClipAtPlayhead(true, true); });
     addCommand(2, "Trim clip end to playhead", juce::KeyPress(']', juce::ModifierKeys::altModifier, 0), "Alt+]", [this] { placeClipAtPlayhead(false, true); });
     addCommand(2, "Show keyframe lanes", juce::KeyPress('u', 0, 0), "U", [this] { timeline.toggleLanesForSelection(); });
+    menus.addMenuSeparator(2);
+    const auto alt = juce::ModifierKeys::altModifier;
+    for (const auto& [letter, group, name] : std::initializer_list<std::tuple<char, const char*, const char*>> {
+             {'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'t', "Drawing", "Key drawing weight"}}) {
+        const juce::String groupName(group);
+        addCommand(2, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
+            if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it."); }
+        });
+    }
 
     addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { processor.playing.store(!processor.playing.load()); });
     addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { processor.seek(0); timeline.revealTime(0); });
@@ -1530,8 +1567,14 @@ void MotionEditor::registerCommands() {
     addCommand(5, "Show graph", juce::KeyPress('2', juce::ModifierKeys::altModifier, 0), "Alt+2", [this] { timelineTabs.setSelectedIndex(1); });
     addCommand(5, "Show notes", juce::KeyPress('3', juce::ModifierKeys::altModifier, 0), "Alt+3", [this] { timelineTabs.setSelectedIndex(2); });
     menus.addMenuSeparator(5);
-    addCommand(5, "Zoom timeline in", juce::KeyPress('=', command, 0), "Cmd+=", [this] { timeline.zoomBy(1.5); });
-    addCommand(5, "Zoom timeline out", juce::KeyPress('-', command, 0), "Cmd+-", [this] { timeline.zoomBy(1 / 1.5); });
+    // Zoom acts on whichever lower panel is showing.
+    const auto zoom = [this](double factor) {
+        if (curveEditor.isVisible()) { curveEditor.zoomTime(curveEditor.getWidth() * .5f, factor); curveEditor.repaint(); return; }
+        if (notesEditor.isVisible()) { notesEditor.zoomAround(notesEditor.getWidth() / 2, factor); notesEditor.repaint(); return; }
+        timeline.zoomBy(factor);
+    };
+    addCommand(5, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
+    addCommand(5, "Zoom out", juce::KeyPress('-', command, 0), "Cmd+-", [zoom] { zoom(1 / 1.5); });
     addCommand(5, "Fit timeline to project", juce::KeyPress(), "F", [this] { timeline.fitToProject(); });
     addCommand(5, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight + 8); });
     addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight - 8); });
@@ -1580,15 +1623,12 @@ void MotionEditor::stepFrames(int frames) {
 void MotionEditor::showSceneViewMenu() {
     juce::PopupMenu menu;
     menu.setLookAndFeel(&getLookAndFeel());
-    menu.addItem(1, "Front", true, false);
-    menu.addItem(2, "Right");
-    menu.addItem(3, "Top");
-    menu.addItem(4, "Back");
-    menu.addItem(5, "Left");
-    menu.addItem(6, "Bottom");
-    menu.addSeparator();
-    menu.addItem(7, "Frame selection (F)");
-    menu.addItem(8, "Reset view (0)");
+    const std::array<std::pair<const char*, const char*>, 8> items {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"},
+        {"Bottom", "Ctrl+7"}, {"Frame selection", "F"}, {"Reset view", "0"}}};
+    for (int index = 0; index < static_cast<int>(items.size()); ++index) {
+        if (index == 6) { menu.addSeparator(); }
+        menu.addItem(motion::style::menuItem(items[static_cast<std::size_t>(index)].first, index + 1, items[static_cast<std::size_t>(index)].second));
+    }
     const juce::Component::SafePointer<MotionEditor> owner(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(sceneView), [owner](int result) {
         if (owner == nullptr || result == 0) { return; }
@@ -1608,8 +1648,12 @@ void MotionEditor::toggleLoop() {
         if (timeline.hasSelectedClips()) { loopSelection(); return; }
         const auto tempo = project.tempo();
         const auto bar = std::max(1, project.beatsPerBar);
-        const auto first = std::floor(tempo.beats(processor.position.load()) / bar) * bar;
-        setLoop(tempo.seconds(first), std::min(project.duration, tempo.seconds(first + 4 * bar)), true, "Set loop");
+        // Near the end, the four bars end at the end instead.
+        const auto last = std::max(0.0, tempo.beats(project.duration) - 4 * bar);
+        const auto first = std::min(std::floor(tempo.beats(processor.position.load()) / bar) * bar, last);
+        if (!setLoop(tempo.seconds(first), std::min(project.duration, tempo.seconds(first + 4 * bar)), true, "Set loop")) {
+            statusBar.show("The composition is too short to loop.");
+        }
         return;
     }
     setLoop(project.loopStart, project.loopEnd, !project.looping, project.looping ? "Stop looping" : "Loop playback");
@@ -1639,13 +1683,17 @@ void MotionEditor::loopSelection() {
     setLoop(first, last, true, "Loop selection");
 }
 
-void MotionEditor::setLoop(double start, double end, bool enabled, juce::String label) {
-    processor.document.tryEdit(label, [start, end, enabled](motion::Project& state) {
-        const auto frame = state.frameRate > 0 ? 1 / state.frameRate : 1.0 / 30;
-        if (!(end - start >= frame) || start < 0 || (state.loopStart == start && state.loopEnd == end && state.looping == enabled)) { return false; }
+// False when the range is shorter than a frame; an unchanged loop is fine.
+bool MotionEditor::setLoop(double start, double end, bool enabled, juce::String label) {
+    const auto& current = processor.document.project();
+    const auto frame = current.frameRate > 0 ? 1 / current.frameRate : 1.0 / 30;
+    if (!(end - start >= frame) || start < 0) { return false; }
+    if (current.loopStart == start && current.loopEnd == end && current.looping == enabled) { return true; }
+    const motion::Document::ViewChange view(processor.document);
+    processor.document.edit(label, [start, end, enabled](motion::Project& state) {
         state.loopStart = start; state.loopEnd = end; state.looping = enabled;
-        return true;
     });
+    return true;
 }
 
 // Up/Down, like Premiere: the previous or next clip start or end.
@@ -1687,7 +1735,6 @@ void MotionEditor::jumpToKey(bool forward) {
     const auto time = std::clamp(*best, 0.0, processor.document.project().duration);
     processor.seek(time);
     timeline.revealTime(time);
-    timeline.selectMarkerAt(time);
 }
 
 // Records into the first armed track's clip under the playhead (or the next
@@ -1816,7 +1863,8 @@ void MotionEditor::showShortcuts() {
          << "F / Shift+F     Frame all / this curve   Drag the time axis to scrub\n"
          << "\nScene\n"
          << "G / R / S       Move, rotate, scale    F  frame    0  reset view\n"
-         << "1 / 3 / 7       Front, right, top (Ctrl: opposite)  N  fly    P  motion path\n";
+         << "1 / 3 / 7       Front, right, top (Ctrl: opposite)  N  fly    P  motion path\n"
+         << "Two fingers     Orbit (Shift: pan; Cmd or pinch: zoom)   Wheel  zoom\n";
     osci::showOverlayMessage(*this, "Keyboard shortcuts", text, osci::ErrorOverlay::Icon::None, {620, 560}, juce::Justification::centredLeft);
 }
 
@@ -2070,11 +2118,15 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     cameraCurve = camera;
     curveProperties.clear();
     const auto* effect = motion::findEffect(processor.document.project(), id);
-    if (effect != nullptr && motion::effectDefinition(effect->type) != nullptr && motion::effectDefinition(effect->type)->parameters.empty()) {
-        // An effect without parameters has nothing to graph.
+    const auto parameterless = effect != nullptr && motion::effectDefinition(effect->type) != nullptr && motion::effectDefinition(effect->type)->parameters.empty();
+    if (parameterless || !motion::findPropertyTarget(processor.document.project(), id).has_value()) {
+        // Nothing selected, or an effect without parameters: nothing to graph.
         curveTarget = 0;
         curveEditor.setSelection(0, {});
+        modulationPanel.setTarget(0, {});
+        routingPanel.setTarget(0, {});
         refreshCurveList();
+        layoutGraphSide();
         return;
     }
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
@@ -2218,6 +2270,9 @@ void MotionEditor::showTimingMenu() {
         if (result >= 300 && result < 307 && current.gridSnap && std::abs(current.snapBeats - subdivision) < 1.0e-9) { return; }
         if (result >= 402 && result <= 407 && current.beatsPerBar == result - 400) { return; }
         if (result >= 500 && result < 508 && std::abs(current.frameRate - rates[static_cast<std::size_t>(result - 500)]) < 1.0e-9) { return; }
+        // Display and snapping are view state; meter and frame rate are not.
+        std::optional<motion::Document::ViewChange> view;
+        if (result < 400) { view.emplace(owner->processor.document); }
         owner->processor.document.edit("Change timeline grid", [result, subdivision, rates](motion::Project& state) {
             if (result >= 101 && result <= 103) {
                 state.timeDisplay = static_cast<motion::TimeDisplay>(result - 101);
@@ -2304,13 +2359,15 @@ void MotionEditor::detectTempo() {
                 return;
             }
             double moved = 0;
+            const auto bars = owner->processor.document.project().timeDisplay == motion::TimeDisplay::beats;
             const auto result = owner->processor.document.setTempoFromAudio(id, estimate->bpm, estimate->firstDownbeat, moved);
             if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); return; }
             const auto bpm = juce::String(estimate->bpm, estimate->bpm == std::round(estimate->bpm) ? 0 : 2);
             const auto other = estimate->bpm * 2 <= 200 ? estimate->bpm * 2 : estimate->bpm / 2;
             owner->statusBar.show("Tempo " + bpm + " BPM from the soundtrack" + (estimate->confidence < 0.4 ? " (low confidence - check it)" : "")
                 + ". If it feels " + (other > estimate->bpm ? "twice as fast" : "half as fast") + ", type " + juce::String(other, other == std::round(other) ? 0 : 2) + " in BPM"
-                + (moved > 0 ? ". Moved it " + juce::String(moved, 3) + " s so its first downbeat is on a bar." : "; its downbeats are already on the bars."), MotionStatusBar::Kind::notice);
+                + (moved > 0 ? ". Moved it " + juce::String(moved, 3) + " s so its first downbeat is on a bar." : "; its downbeats are already on the bars.")
+                + (bars ? "" : " The ruler now shows bars and beats."), MotionStatusBar::Kind::notice);
         });
     });
 }

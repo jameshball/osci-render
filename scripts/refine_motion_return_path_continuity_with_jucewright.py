@@ -107,7 +107,7 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", name, "--timeout-ms", 60000)
     step("size workspace", "resize-window", "--w", 1600, "--h", 1000)
     select_track(22,60)
-    tab("Timing"); edit("Clip duration",67.2)
+    tab("Properties"); edit("Clip duration",67.2)
     tab("Properties")
     for moment,value in [(76.7,.05),(80,.06),(89.5,.03)]:
         seek(moment); edit("weight",value)

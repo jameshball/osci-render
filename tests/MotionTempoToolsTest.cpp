@@ -100,6 +100,7 @@ public:
             expectWithinAbsoluteError(moved, 1.7, 1e-9, "the downbeat moves to bar 2, never cutting audio");
             expectWithinAbsoluteError(document.project().tracks[0].clips[0].timing(document.project().tempo()).start, 1.7, 1e-9);
             expect(undo.getUndoDescription() == "Set tempo from soundtrack");
+            expect(document.project().timeDisplay == motion::TimeDisplay::beats, "the ruler switches to bars in the same step");
             expect(undo.undo());
             expectEquals(document.project().bpm, 100.0);
             expectEquals(document.project().tracks[0].clips[0].start, 0.0);
@@ -114,8 +115,9 @@ public:
             project.duration = 20;
             document.reset(project);
             const auto changes = std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{16, 90}, {32, 140, true}});
-            expect(document.setTempoMap(100, changes, "Use MIDI tempo").wasOk());
+            expect(document.setTempoMap(100, changes, "Use MIDI tempo", true).wasOk());
             expectEquals(document.project().bpm, 100.0);
+            expect(document.project().timeDisplay == motion::TimeDisplay::beats);
             expect(document.project().tempoChanges != nullptr && *document.project().tempoChanges == *changes);
             expect(undo.undo());
             expect(document.project().tempoChanges == nullptr);

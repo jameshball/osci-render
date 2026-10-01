@@ -2,6 +2,7 @@
 
 #include "../MotionProcessor.h"
 #include "../model/KeyEdit.h"
+#include "../model/KeyEasing.h"
 #include "../model/PropertyTarget.h"
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
@@ -571,6 +572,10 @@ public:
     // Shift+F frames only the primary curve. Escape or Cmd+Z during a drag
     // restores the keys and selection; Delete removes the selection on every curve.
     bool keyPressed(const juce::KeyPress& key) override {
+        if (!drag.has_value() && key.getModifiers().isCommandDown() && !key.getModifiers().isShiftDown() && (key.getKeyCode() == 'A' || key.getKeyCode() == 'a')) {
+            selectAllKeys();
+            return true;
+        }
         if (!drag.has_value() && (key.getKeyCode() == 'F' || key.getKeyCode() == 'f')) {
             const auto primaryOnly = key.getModifiers().isShiftDown();
             // Framing the group is the automatic view, so later edits keep it framed.
@@ -808,8 +813,20 @@ private:
         }
         return target.curve(property);
     }
+    // The name the inspector and channel list use, never the internal id.
     juce::String propertyLabel(const motion::PropertyTarget& target) const {
-        const auto* spec = target.isEffect ? nullptr : motion::findPropertySpec(motion::propertySpecs(target), propertyName);
+        if (target.isEffect) {
+            const auto* effect = motion::findEffect(processor.document.project(), targetId);
+            const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
+            if (definition != nullptr) {
+                for (const auto& parameter : definition->parameters) {
+                    if (parameter.id == propertyName) { return juce::String(parameter.name); }
+                }
+            }
+            return juce::String(propertyName);
+        }
+        const auto* spec = motion::findPropertySpec(motion::propertySpecs(target), propertyName);
+        if (spec == nullptr && propertyName.starts_with("slider.")) { spec = motion::findPropertySpec(motion::luaSliderSpecs(), propertyName); }
         return spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(propertyName);
     }
     static const motion::Curve* findCurve(const std::optional<motion::PropertyTarget>& target, const std::string& property) {
@@ -1103,6 +1120,43 @@ private:
         normalizeValueRange();
     }
 
+public:
+    // Every key on the group's curves; the primary curve's first key leads.
+    void selectAllKeys() {
+        const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+        selectedTime.reset();
+        companions.clear();
+        if (clip.has_value()) {
+            for (const auto& name : groupNames(*clip)) {
+                for (const auto& key : clip->curve(name)->keyframes()) {
+                    if (name == propertyName && !selectedTime.has_value()) { selectedTime = key.time; } else { companions.push_back({name, key.time}); }
+                }
+            }
+        }
+        repaint();
+    }
+    bool hasSelectedKeys() const { return selectedTime.has_value() || !companions.empty(); }
+    // Easy Ease (F9; Shift+F9 in, Cmd+Shift+F9 out) on every selected key, in
+    // one undo step.
+    bool easeSelected(bool in, bool out) {
+        const auto keys = selection();
+        if (keys.empty()) {
+            return false;
+        }
+        const auto id = targetId;
+        const auto eased = processor.document.tryEdit(in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out"), [id, keys, in, out](motion::Project& project) {
+            bool any = false;
+            for (const auto& key : keys) {
+                auto* target = mutableCurve(project, id, key.property);
+                any = (target != nullptr && motion::easeKey(*target, key.time, in, out)) || any;
+            }
+            return any;
+        });
+        refresh();
+        return eased;
+    }
+
+private:
     bool deleteSelected() {
         const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
         auto keys = selection();
@@ -1144,9 +1198,17 @@ private:
         for (int i = 0; i < 4; ++i) {
             menu.addItem(i + 1, labels[i], true, static_cast<int>(key->interpolation) == i);
         }
+        menu.addSeparator();
+        menu.addItem(motion::style::menuItem("Easy ease", 11, "F9"));
+        menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9"));
+        menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9"));
         const auto id = targetId;
         juce::Component::SafePointer<MotionCurveEditor> safe(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe, id, keys](int result) {
+            if (safe != nullptr && result >= 11 && result <= 13) {
+                safe->easeSelected(result != 13, result != 12);
+                return;
+            }
             if (safe == nullptr || result < 1 || result > 4) {
                 return;
             }

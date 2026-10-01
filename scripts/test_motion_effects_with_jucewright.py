@@ -92,6 +92,12 @@ try:
     wait_undo("Remove effect")
     step("undo removal", "click", "--name", "Undo", "--exact")
     command("wait-for-locator", "--name", "Effect ripplePhase", "--role", "slider", "--exact")
+    # The cross at a row's end removes that effect.
+    stack = find(snapshot(), lambda node: node.get("class") == "juce::ListBox" and node.get("name") == "Effect stack")["bounds"]
+    step("remove with cross", "click-xy", stack["x"] + stack["w"] - 13, stack["y"] + 14)
+    wait_undo("Remove effect")
+    step("undo cross removal", "click", "--name", "Undo", "--exact")
+    command("wait-for-locator", "--name", "Effect ripplePhase", "--role", "slider", "--exact")
     step("effects final screenshot", "screenshot", "--file", session.artifact_dir / "effects-final.png")
     print("Motion scoped effects smoke passed", flush=True)
 finally:

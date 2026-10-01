@@ -17,9 +17,10 @@ public:
         scope.setSelectedId(1, juce::dontSendNotification);
         scope.onChange = [this] { cancelGesture(); selected = 0; refresh(); notifySelection(); };
         stack.setRowHeight(28);
+        stack.addMouseListener(this, true);
         stack.setColour(juce::ListBox::backgroundColourId, osci::Colours::veryDark());
         stack.setOutlineThickness(0);
-        stack.setTooltip("Click the box to switch an effect on or off; drag to reorder; right-click for more");
+        stack.setTooltip("Click the box to switch an effect on or off, the cross to remove it; drag to reorder; right-click for more");
         addButton.setButtonText("Add effect...");
         addButton.onClick = [this] { showAddMenu(); };
         scopeLabel.setText("Apply to", juce::dontSendNotification);
@@ -38,7 +39,7 @@ public:
         viewport.setScrollBarsShown(true, false);
         refresh();
     }
-    ~MotionEffectsPanel() override { cancelGesture(); }
+    ~MotionEffectsPanel() override { stack.removeMouseListener(this); cancelGesture(); }
     std::function<void(motion::Id, std::string)> onPropertySelected;
 
     void setSelectedClip(motion::Id id) {
@@ -242,8 +243,12 @@ public:
         const auto value = details.description.toString();
         if (value.startsWith("motion-effect:")) { addEffect(value.fromFirstOccurrenceOf(":", false, false).toStdString()); return; }
         const auto id = instanceId(value);
-        const auto target = std::clamp((details.localPosition.y - stack.getY()) / 28, 0, std::max(0, static_cast<int>(ids.size()) - 1));
-        reorder(id, target);
+        const auto position = stack.getLocalPoint(this, details.localPosition);
+        // An insertion point below the effect's own row counts the row itself.
+        const auto source = static_cast<int>(std::find(ids.begin(), ids.end(), id) - ids.begin());
+        auto insertion = stack.getInsertionIndexForPosition(position.x, position.y);
+        if (insertion > source) { --insertion; }
+        reorder(id, std::clamp(insertion, 0, std::max(0, static_cast<int>(ids.size()) - 1)));
     }
 
 private:
@@ -274,14 +279,31 @@ private:
         }
         g.setColour(osci::Colours::text().withAlpha(effect->enabled ? 1.0f : 0.4f));
         g.setFont(13);
-        g.drawText(juce::String(effect->name), 30, 0, width - 38, height, juce::Justification::centredLeft);
+        g.drawText(juce::String(effect->name), 30, 0, width - 30 - removeWidth, height, juce::Justification::centredLeft);
+        // Remove: a cross at the row's end.
+        const auto cross = juce::Rectangle<float>(width - removeWidth * .5f - 4, height * .5f - 4, 8, 8);
+        g.setColour(osci::Colours::text().withAlpha(active ? .75f : .3f));
+        g.drawLine({cross.getTopLeft(), cross.getBottomRight()}, 1.3f);
+        g.drawLine({cross.getTopRight(), cross.getBottomLeft()}, 1.3f);
     }
+    static constexpr int removeWidth = 26;
     void listBoxItemClicked(int row, const juce::MouseEvent& event) override {
         if (row < 0 || row >= getNumRows()) { return; }
         const auto id = ids[static_cast<std::size_t>(row)];
         if (event.mods.isPopupMenu()) { showStackMenu(id, row); return; }
         if (event.x < 28) { setEnabled(id, !isEnabled(id)); }
+        // The cross removes on release, so a drag that starts on it reorders.
+        const auto* rowComponent = event.eventComponent;
+        pendingRemove = rowComponent != nullptr && event.x >= rowComponent->getWidth() - removeWidth ? id : 0;
     }
+    void mouseUp(const juce::MouseEvent& event) override {
+        const auto id = std::exchange(pendingRemove, motion::Id(0));
+        const auto* row = event.eventComponent;
+        if (id == 0 || row == nullptr || event.mouseWasDraggedSinceMouseDown() || !stack.isParentOf(row) || event.x < row->getWidth() - removeWidth) { return; }
+        selected = id;
+        removeSelected();
+    }
+    motion::Id pendingRemove = 0;
     bool isEnabled(motion::Id id) const {
         const auto* effect = motion::findEffect(processor.document.project(), id);
         return effect != nullptr && effect->enabled;

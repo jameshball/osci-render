@@ -92,7 +92,7 @@ try:
     command("wait-for-locator", "--name", "Timing verification", "--class", "juce::Label", "--exact")
     step("size timing workspace", "resize-window", "--w", "1440", "--h", "900")
     step("select first clip", "click", "--class", "MotionTimelineView", "--position", "250,46")
-    step("open clip inspector", "click", "--name", "Timing", "--class", "osci::TabBar::Tab", "--exact")
+    step("open clip inspector", "click", "--name", "Properties", "--class", "osci::TabBar::Tab", "--exact")
     edit("Clip duration", 8)
     _, clips = saved()
     assert float(clips['3'].get('duration')) == 8
@@ -117,7 +117,7 @@ try:
     _, clips = saved()
     assert float(clips['3'].get('offset')) == 1.25
     step("select second clip", "click", "--class", "MotionTimelineView", "--position", "920,46")
-    # The Timing tab must remain open while changing the selected timeline clip.
+    # Timing stays in the inspector while changing the selected timeline clip.
     command("wait-for-locator", "--name", "Clip timing inspector", "--exact")
     edit("Clip duration", 180)
     result, clips = saved()

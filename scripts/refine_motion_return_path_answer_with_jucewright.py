@@ -114,7 +114,7 @@ try:
     source = session.root_dir / "research/osci-motion/benchmark-sources/Answer pulse.svg"
     step("import answer pulse", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Answer pulse.svg", "--class", "juce::Label", "--exact")
-    tab("Timing"); edit("Clip duration",25.6)
+    tab("Properties"); edit("Clip duration",25.6)
     tab("Properties")
     for prop,value in {"red":.2,"green":.8,"blue":1,"position.y":0,"position.z":0}.items():
         edit(prop,value)

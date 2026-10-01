@@ -127,19 +127,6 @@ public:
             drawWorldLine(g, { static_cast<double>(line), -5, 0 }, { static_cast<double>(line), 5, 0 });
             drawWorldLine(g, { -5, static_cast<double>(line), 0 }, { 5, static_cast<double>(line), 0 });
         }
-        // Context hints only while flying or dragging (the tool strip's tooltips
-        // cover the rest), like Blender's status hints.
-        const juce::String help = navigating ? "WASD / arrows move | Q E down / up | Shift faster | Esc finishes"
-            : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
-        if (help.isNotEmpty()) {
-            auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
-            strip = strip.withSizeKeepingCentre(std::min(strip.getWidth(), juce::GlyphArrangement::getStringWidthInt(juce::Font(juce::FontOptions(12.0f)), help) + 24), strip.getHeight());
-            g.setColour(osci::Colours::veryDark().withAlpha(.85f));
-            g.fillRoundedRectangle(strip.toFloat(), 4);
-            g.setColour(osci::Colours::textMuted());
-            g.setFont(12.0f);
-            g.drawFittedText(help, strip.reduced(8, 0), juce::Justification::centred, 1);
-        }
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
             g.setFont(14);
@@ -147,7 +134,6 @@ public:
             return;
         }
         juce::Graphics::ScopedSaveState sceneState(g);
-        g.reduceClipRegion(getLocalBounds().withTrimmedBottom(30));
         const auto time = editingTime();
         for (const auto& clip : prepared->clips) {
             const auto sampleTime = clip.editorId() == selected && atSelectedPathEnd(time) ? std::nextafter(time, 0.0) : time;
@@ -191,7 +177,6 @@ public:
         grabKeyboardFocus();
         cancelGesture();
         dragHint.clear();
-        if (event.position.y >= getHeight() - 30) { repaint(); return; }
         navigationDrag = event.mods.isAltDown() || event.mods.isMiddleButtonDown();
         panDrag = event.mods.isShiftDown();
         cameraAtDown = camera;
@@ -347,9 +332,42 @@ public:
         }
     }
 
-    void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel) override {
+    // Context hints only while flying or dragging (the tool strip's tooltips
+    // cover the rest), like Blender's status hints, drawn over the scene.
+    void paintOverChildren(juce::Graphics& g) override {
+        const juce::String help = navigating ? "WASD / arrows move | Q E down / up | Shift faster | Esc finishes"
+            : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
+        if (help.isNotEmpty()) {
+            auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
+            strip = strip.withSizeKeepingCentre(std::min(strip.getWidth(), juce::GlyphArrangement::getStringWidthInt(juce::Font(juce::FontOptions(12.0f)), help) + 24), strip.getHeight());
+            g.setColour(osci::Colours::veryDark().withAlpha(.85f));
+            g.fillRoundedRectangle(strip.toFloat(), 4);
+            g.setColour(osci::Colours::textMuted());
+            g.setFont(12.0f);
+            g.drawFittedText(help, strip.reduced(8, 0), juce::Justification::centred, 1);
+        }
+    }
+    // Blender's conventions: a mouse wheel zooms; on a trackpad two fingers
+    // orbit, Shift pans and Cmd/Ctrl zooms; a pinch zooms.
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override {
         if (navigating || before.has_value()) { return; }
-        camera.dolly(-wheel.deltaY * 2.0);
+        const auto pixels = juce::Point<double>(wheel.deltaX, wheel.deltaY) * 256.0;
+        if (!wheel.isSmooth || event.mods.isCommandDown() || event.mods.isCtrlDown()) {
+            if (wheel.isInertial) { return; }
+            camera.dolly(-(std::abs(wheel.deltaY) >= std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.0);
+        } else if (wheel.isInertial) {
+            // Momentum after the fingers lift would keep the view drifting.
+            return;
+        } else if (event.mods.isShiftDown()) {
+            camera.pan(pixels.x, pixels.y, outputFrame().getHeight());
+        } else {
+            camera.orbit(-pixels.x * 0.006, pixels.y * 0.006);
+        }
+        repaint();
+    }
+    void mouseMagnify(const juce::MouseEvent&, float scale) override {
+        if (navigating || before.has_value() || !(scale > 0)) { return; }
+        camera.dolly(-std::log(static_cast<double>(scale)));
         repaint();
     }
     void mouseExit(const juce::MouseEvent&) override {
@@ -357,7 +375,7 @@ public:
     }
     void mouseMove(const juce::MouseEvent& event) override {
         if (!navigating) {
-            const auto hit = event.position.y < getHeight() - 30 ? currentGizmo().hitTest(event.position) : -1;
+            const auto hit = currentGizmo().hitTest(event.position);
             if (hit != hoverHandle) { hoverHandle = hit; repaint(); }
             return;
         }
@@ -390,6 +408,9 @@ public:
         }
         if (navigating) { return true; }
         if (key.getModifiers().isAltDown()) { return false; }
+        // Single-letter tools take plain keys only, so Shift+R and friends
+        // reach the editor's commands.
+        if (key.getModifiers().isShiftDown()) { return false; }
         if (key.getKeyCode() == 'P') { setMotionPathVisible(!showMotionPath); return true; }
         if (key.getKeyCode() == 'G') { setTool(MotionTransformTool::move); return true; }
         if (key.getKeyCode() == 'R') { setTool(MotionTransformTool::rotate); return true; }

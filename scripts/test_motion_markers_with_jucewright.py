@@ -78,6 +78,7 @@ try:
     command("wait-for-value", "--component-name", "Timeline position", "--value", "6.000s", "--timeout-ms", 5000)
     step("previous marker shortcut", "press", "j", "--class", "MotionTimelineView")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "3.000s", "--timeout-ms", 5000)
+    step("select verse marker", "click", "--class", "MotionTimelineView", "--position", "400,36")
     step("delete selected marker", "press", "backspace", "--class", "MotionTimelineView")
     assert markers() == {"Chorus": 6}
     assert len(save().findall("track/clip")) == 1

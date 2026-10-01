@@ -935,10 +935,11 @@ static juce::Result retimed(const Project& state, double initialBpm, std::shared
     return juce::Result::ok();
 }
 
-juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label) {
+juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label, bool showBars) {
     Project next;
     const auto result = retimed(project(), initialBpm, std::move(changes), next);
     if (result.failed()) { return result; }
+    if (showBars) { next.timeDisplay = TimeDisplay::beats; }
     edit(label, [next = std::move(next)](Project& project) { project = next; });
     return juce::Result::ok();
 }
@@ -968,6 +969,8 @@ juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat,
                 clip = placed;
                 next.duration = std::max(next.duration, timing.end());
             }
+            // A tempo taken from the music is for working in bars.
+            next.timeDisplay = TimeDisplay::beats;
             edit("Set tempo from soundtrack", [next = std::move(next)](Project& project) { project = next; });
             return juce::Result::ok();
         }
@@ -1055,6 +1058,33 @@ bool Document::setTrackHeight(Id trackId, int height) {
     state = std::move(next);
     refreshScope();
     return true;
+}
+
+// Several heights with one copy of the project.
+void Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
+    if (heights.empty()) { return; }
+    std::map<Id, int> wanted;
+    for (const auto& [id, height] : heights) { wanted[id] = height == 0 ? 0 : std::clamp(height, Track::minimumHeight, Track::maximumHeight); }
+    const auto update = [&](Composition& composition) {
+        bool changed = false;
+        for (auto& track : composition.tracks) {
+            const auto found = wanted.find(track.id);
+            if (found != wanted.end() && track.height != found->second) { track.height = found->second; changed = true; }
+        }
+        return changed;
+    };
+    auto next = state;
+    bool changed = update(next);
+    for (auto& definition : next.definitions) {
+        if (definition == nullptr) { continue; }
+        const auto owns = std::any_of(definition->tracks.begin(), definition->tracks.end(), [&](const auto& track) { return wanted.contains(track.id); });
+        if (!owns) { continue; }
+        auto copy = std::make_shared<CompositionDefinition>(*definition);
+        if (update(*copy)) { definition = std::move(copy); changed = true; }
+    }
+    if (!changed) { return; }
+    state = std::move(next);
+    refreshScope();
 }
 
 bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {

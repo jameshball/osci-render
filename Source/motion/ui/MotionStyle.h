@@ -15,6 +15,13 @@ inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
 
 inline juce::Font small() { return juce::Font(juce::FontOptions(11.0f)); }
+// A menu item showing its shortcut on the right.
+inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const juce::String& shortcut) {
+    juce::PopupMenu::Item item(text);
+    item.itemID = id;
+    item.shortcutKeyDescription = shortcut;
+    return item;
+}
 inline juce::Font body() { return juce::Font(juce::FontOptions(12.0f)); }
 inline juce::Font strong() { return juce::Font(juce::FontOptions(12.0f, juce::Font::bold)); }
 inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }

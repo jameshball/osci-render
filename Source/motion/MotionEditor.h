@@ -131,7 +131,7 @@ private:
     void toggleLoop();
     void setLoopEdge(bool start);
     void loopSelection();
-    void setLoop(double start, double end, bool enabled, juce::String label);
+    bool setLoop(double start, double end, bool enabled, juce::String label);
     void loadLayout();
     void saveLayout();
     // The panel holding keyboard focus is outlined, so it is clear where
@@ -198,6 +198,7 @@ private:
     bool detectingTempo = false;
     double lastPaintedPosition = -1;
     int idleTicks = 0;
+    std::shared_ptr<const motion::LiveSourceFrames> lastLiveFrames;
     juce::Component* visualiserControls = nullptr;
     motion::Id soundtrackClip() const;
     void detectTempo();
