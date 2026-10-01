@@ -148,7 +148,7 @@ public:
         if (assets.empty() && definitions.empty()) {
             graphics.setColour(osci::Colours::text().withAlpha(0.6f));
             graphics.setFont(13.0f);
-            graphics.drawFittedText("Import a source to add it to your asset library.", list.getBounds().reduced(12), juce::Justification::centred, 3);
+            graphics.drawFittedText("Drop files here, or click Add source (" + motion::style::shortcutText("Cmd+I") + "). Shapes, text, Lua, images, video, audio and MIDI all work.", list.getBounds().reduced(12), juce::Justification::centred, 3);
         }
     }
 

@@ -60,6 +60,8 @@ try:
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("select child", "click", "--class", "MotionTimelineView", "--position", "250,46")
     step("open notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    # Give the piano roll the room it used to take for itself.
+    step("taller notes", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
     step("create child pattern", "click", "--name", "Create notes", "--exact")
     step("draw child note", "click", "--class", "MotionNotesEditor", "--position", "222,170", "--click-count", 2)
     command("wait-for-locator", "--name", "Undo Add MIDI note", "--role", "label", "--exact")

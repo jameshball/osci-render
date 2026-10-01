@@ -111,7 +111,6 @@ private:
     void failCommandLineRender(const juce::String& message);
     juce::File commandLineRender;
     bool commandLineRenderStarted = false, commandLineProjectRequested = false, projectLoadFailed = false;
-    void showTimingMenu();
     juce::PopupMenu timingMenu();
     bool applyTiming(int result);
     double snapDivision(int index) const;
@@ -197,7 +196,6 @@ private:
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;
     juce::Label tempoValue, tempoLabel;
-    juce::TextButton timingButton;
     // Tap tempo: taps preview the tempo; it commits once tapping pauses.
     juce::TextButton tapButton {"Tap"};
     motion::TapTempo tapTempo;
@@ -212,6 +210,7 @@ private:
     void detectTempo();
     void tap();
     bool compactTransport = false;
+    juce::Label outputLabel;
     juce::ComboBox monitorOutput;
     juce::TextButton canvasButton { "Canvas" };
     MotionPropertyInspector propertyInspector;

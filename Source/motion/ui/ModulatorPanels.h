@@ -99,7 +99,7 @@ public:
         addEnvelope.setTooltip("Add an envelope that fires on the notes of a MIDI clip");
         addOscillator.onClick = [this] { add(motion::ModulatorKind::oscillator); };
         addEnvelope.onClick = [this] { add(motion::ModulatorKind::envelope); };
-        addController.setButtonText("+ MIDI CC");
+        addController.setButtonText("+ CC");
         addController.setName("Add MIDI controller");
         addController.setTitle("Add MIDI controller");
         addController.setTooltip("Add a modulator that follows a MIDI clip's controller or pitch bend");
@@ -195,7 +195,7 @@ public:
         routesTitle.setText("Drives", juce::dontSendNotification);
         routesTitle.setFont(motion::style::strong());
         addAndMakeVisible(routesTitle);
-        hint.setText("No modulators. Add an LFO, random, envelope or controller, then route it from the Graph.", juce::dontSendNotification);
+        hint.setText("No modulators yet. Add an LFO (also random or soundtrack), an envelope (Env) or a MIDI controller (CC), then route it from the Graph.", juce::dontSendNotification);
         hint.setTooltip("One modulator drives many properties from a single clock: an LFO, a random walk, the soundtrack's loudness, or a MIDI clip's notes (envelope) and controllers.");
         hint.setFont(motion::style::small());
         hint.setColour(juce::Label::textColourId, motion::style::muted());

@@ -76,6 +76,30 @@ public:
         }
         return 0;
     }
+    // The scope choices name what they apply to ("Clip: Trace.lua").
+    void nameScopes() {
+        const auto& project = processor.document.project();
+        juce::String clipName, trackName, groupName;
+        const auto target = motion::findPropertyTarget(project, clipId);
+        if (target.has_value() && !target->isGroup) { clipName = juce::String(target->name.data(), target->name.size()); }
+        for (const auto& track : project.tracks) {
+            const auto owns = explicitTrack ? track.id == trackId : std::any_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return clip.id == clipId; });
+            if (!owns) { continue; }
+            trackName = juce::String(track.name);
+            const auto* group = motion::findGroup(project, track.group);
+            if (group != nullptr) { groupName = juce::String(group->name); }
+        }
+        const auto* selectedGroup = motion::findGroup(project, clipId);
+        if (selectedGroup != nullptr) { groupName = juce::String(selectedGroup->name); }
+        const auto label = [](const char* kind, const juce::String& name) { return name.isEmpty() ? juce::String(kind) : juce::String(kind) + ": " + name; };
+        const auto chosen = scope.getSelectedId();
+        scope.changeItemText(1, label("Clip", clipName));
+        scope.changeItemText(2, label("Track", trackName));
+        scope.changeItemText(4, label("Group", groupName));
+        // Renaming the shown item blanks the box; choose it again.
+        scope.setSelectedId(0, juce::dontSendNotification);
+        scope.setSelectedId(chosen, juce::dontSendNotification);
+    }
     bool validOwner() const { return scope.getSelectedId() == 3 || (ownerId() != 0 && motion::findEffectOwner(processor.document.project(), ownerId()) != nullptr); }
     void showOwner(motion::Id id, motion::Id effectId) {
         cancelGesture();
@@ -151,6 +175,7 @@ public:
             : ids.empty() ? "No effects yet. Add one, or drag one from the Effects library." : juce::String(), juce::dontSendNotification);
         hint.setVisible(hint.getText().isNotEmpty());
         stack.setVisible(!ids.empty());
+        nameScopes();
         const auto type = effect == nullptr ? std::string() : effect->type;
         if (builtFor != selected || builtType != type) {
             cancelGesture();
@@ -169,6 +194,7 @@ public:
                     row->value.setSliderStyle(juce::Slider::LinearHorizontal);
                     row->value.setTextBoxStyle(juce::Slider::TextBoxRight, false, 62, 22);
                     row->value.setRange(parameter.min, parameter.max, 0.0001);
+                    row->value.setNumDecimalPlacesToDisplay(2);
                     row->key.setButtonText("Key effect " + juce::String(parameter.id));
                     row->value.onDragStart = [this, name = row->id] { beginGesture(name); };
                     row->value.onValueChange = [this, pointer = row.get()] { setValue(pointer->id, pointer->value.getValue(), false); };

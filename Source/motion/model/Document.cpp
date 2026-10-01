@@ -591,13 +591,13 @@ struct Document::Change : juce::UndoableAction {
     Change(Document& owner, Project before, Project after) : owner(owner), before(std::move(before)), after(std::move(after)) {}
     // Redo and undo keep the current view options; the first perform sets them.
     bool perform() override {
-        const juce::ScopedValueSetter<bool> carry(owner.carryOptions, performed);
+        const juce::ScopedValueSetter<const Project*> carry(owner.carryOptionsFrom, performed ? &before : nullptr);
         owner.apply(after);
         performed = true;
         return true;
     }
     bool undo() override {
-        const juce::ScopedValueSetter<bool> carry(owner.carryOptions, true);
+        const juce::ScopedValueSetter<const Project*> carry(owner.carryOptionsFrom, &after);
         owner.apply(before);
         return true;
     }
@@ -737,25 +737,29 @@ static void clampLoop(Project& project) {
 }
 
 // Time display, snapping and the loop switch are view options: undo and redo
-// keep the current ones (like track heights).
-static void carryViewOptions(Project& next, const Project& current) {
-    const auto copy = [](Composition& to, const Composition& from) {
-        to.timeDisplay = from.timeDisplay;
-        to.snapBeats = from.snapBeats;
-        to.gridSnap = from.gridSnap;
-        to.looping = from.looping;
+// keep the current ones (like track heights), except those the step itself
+// changed (`other` is the step's opposite snapshot).
+static void carryViewOptions(Project& next, const Project& current, const Project& other) {
+    const auto carry = [](Composition& to, const Composition& from, const Composition& opposite) {
+        if (to.timeDisplay == opposite.timeDisplay) { to.timeDisplay = from.timeDisplay; }
+        if (to.snapBeats == opposite.snapBeats) { to.snapBeats = from.snapBeats; }
+        if (to.gridSnap == opposite.gridSnap) { to.gridSnap = from.gridSnap; }
+        if (to.looping == opposite.looping) { to.looping = from.looping && to.hasLoop(); }
     };
-    const auto same = [](const Composition& a, const Composition& b) {
-        return a.timeDisplay == b.timeDisplay && a.snapBeats == b.snapBeats && a.gridSnap == b.gridSnap && a.looping == b.looping;
+    const auto find = [](const Project& project, Id id) -> const Composition* {
+        const auto found = std::find_if(project.definitions.begin(), project.definitions.end(), [id](const auto& item) { return item != nullptr && item->id == id; });
+        return found == project.definitions.end() ? nullptr : found->get();
     };
-    copy(next, current);
+    carry(next, current, other);
     for (auto& definition : next.definitions) {
         if (definition == nullptr) { continue; }
-        const auto found = std::find_if(current.definitions.begin(), current.definitions.end(), [&](const auto& item) { return item != nullptr && item->id == definition->id; });
-        if (found == current.definitions.end() || same(*definition, **found)) { continue; }
+        const auto* from = find(current, definition->id);
+        const auto* opposite = find(other, definition->id);
+        if (from == nullptr || opposite == nullptr) { continue; }
         auto updated = std::make_shared<CompositionDefinition>(*definition);
-        copy(*updated, **found);
-        definition = std::move(updated);
+        carry(*updated, *from, *opposite);
+        const auto same = updated->timeDisplay == definition->timeDisplay && updated->snapBeats == definition->snapBeats && updated->gridSnap == definition->gridSnap && updated->looping == definition->looping;
+        if (!same) { definition = std::move(updated); }
     }
 }
 
@@ -793,7 +797,7 @@ void Document::apply(Project value) {
     if (carryView) {
         carryTrackHeights(value, state);
         carryLuaBakes(value, state);
-        if (carryOptions) { carryViewOptions(value, state); }
+        if (carryOptionsFrom != nullptr) { carryViewOptions(value, state, *carryOptionsFrom); }
     }
     state = std::move(value);
     refreshScope();

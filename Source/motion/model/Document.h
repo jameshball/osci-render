@@ -262,7 +262,9 @@ private:
     Id lastId = 0;
     std::uint64_t projectGeneration = 0;
     std::uint64_t stateRevision = 0;
-    bool carryView = true, carryOptions = false;
+    bool carryView = true;
+    // During undo and redo: the step's opposite snapshot, for carrying view options.
+    const Project* carryOptionsFrom = nullptr;
     bool viewChange = false;
     juce::UndoManager& undo;
 };

@@ -184,6 +184,14 @@ public:
         down = event.position;
         if (navigationDrag) { return; }
         if (event.mods.isPopupMenu()) {
+            // Like a left click, the menu acts on what is under the pointer.
+            if (prepared != nullptr) {
+                const auto hit = pickAt(event.position, nullptr);
+                if (hit != 0 && hit != selected) {
+                    selected = hit;
+                    if (onSelection) { onSelection(hit); }
+                }
+            }
             if (onContextMenu) { onContextMenu(); }
             return;
         }
@@ -210,26 +218,8 @@ public:
             repaint();
             return;
         }
-        float nearest = 18;
-        motion::Id hit = 0;
         const auto time = editingTime();
-        for (const auto& clip : prepared->clips) {
-            if (!clip.active(time)) {
-                continue;
-            }
-            for (int i = 0; i < 256; ++i) {
-                const auto sample = clip.sample(time, i / 256.0, 0, 0, liveFrames.get());
-                if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
-                const auto point = projected(sample, time);
-                if (!point.has_value()) { continue; }
-                const auto distance = point->getDistanceFrom(event.position);
-                if (distance < nearest) {
-                    nearest = distance;
-                    hit = clip.editorId();
-                    dragAnchor = worldPoint(sample, time);
-                }
-            }
-        }
+        const auto hit = pickAt(event.position, &dragAnchor);
         selected = hit;
         if (onSelection) {
             onSelection(hit);
@@ -353,6 +343,33 @@ public:
         }
     }
 
+    // The visible clip drawn nearest the point (within 18 px), and the world
+    // point there.
+    motion::Id pickAt(juce::Point<float> position, motion::editor::Vec3* anchor) const {
+        const auto liveFrames = processor.liveSourcePreview();
+        float nearest = 18;
+        motion::Id hit = 0;
+        const auto time = editingTime();
+        for (const auto& clip : prepared->clips) {
+            if (!clip.active(time)) {
+                continue;
+            }
+            for (int i = 0; i < 256; ++i) {
+                const auto sample = clip.sample(time, i / 256.0, 0, 0, liveFrames.get());
+                if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
+                const auto point = projected(sample, time);
+                if (!point.has_value()) { continue; }
+                const auto distance = point->getDistanceFrom(position);
+                if (distance < nearest) {
+                    nearest = distance;
+                    hit = clip.editorId();
+                    if (anchor != nullptr) { *anchor = worldPoint(sample, time); }
+                }
+            }
+        }
+        return hit;
+    }
+
     // Context hints only while flying or dragging (the tool strip's tooltips
     // cover the rest), like Blender's status hints, drawn over the scene.
     void paintOverChildren(juce::Graphics& g) override {
@@ -461,7 +478,7 @@ private:
                 if (!silenced && timing.start > now && (!next.has_value() || timing.start < *next)) { next = timing.start; }
             }
         }
-        if (!any) { return "Drop an object here"; }
+        if (!any) { return "Drop files here to start, or Add source (" + motion::style::shortcutText("Cmd+I") + ")"; }
         if (hidden) { return "Clips here are on muted or un-soloed tracks"; }
         const auto grid = project.timeGrid();
         const auto at = "Nothing on screen at " + juce::String(grid.positionLabel(now));

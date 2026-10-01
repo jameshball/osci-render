@@ -53,6 +53,12 @@ public:
         refresh();
     }
     motion::Id getTarget() const { return target; }
+    void setSelectionCount(std::size_t count) {
+        if (count == selectionCount) { return; }
+        selectionCount = count;
+        resized();
+        refresh();
+    }
 
     // Rebuilds rows only when the target's property set changes; otherwise
     // updates values and key states in place (cheap enough for 30 Hz).
@@ -97,7 +103,10 @@ public:
             row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
         }
         title.setText(editable ? juce::String(found->name.data(), found->name.size()) : "Nothing selected", juce::dontSendNotification);
-        kind.setText(!editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object", juce::dontSendNotification);
+        // With several clips selected the header says so; edits apply to the
+        // one named.
+        const juce::String kindText = !editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object";
+        kind.setText(editable && selectionCount > 1 ? "1 of " + juce::String(selectionCount) + " selected" : kindText, juce::dontSendNotification);
         empty = !editable;
         if (!editable) { repaint(); return; }
         const auto time = keyTime(*found);
@@ -132,7 +141,7 @@ public:
         auto area = getLocalBounds();
         if (showsHeader) {
             auto header = area.removeFromTop(34).reduced(motion::style::padding + 2, 0);
-            kind.setBounds(header.removeFromRight(60));
+            kind.setBounds(header.removeFromRight(selectionCount > 1 ? 110 : 60));
             title.setBounds(header);
         }
         viewport.setBounds(area);
@@ -174,7 +183,8 @@ private:
             previous.setBounds(line.removeFromRight(12));
             line.removeFromRight(motion::style::gap);
             const auto count = static_cast<int>(fields.size());
-            const auto width = (line.getWidth() - motion::style::gap * (count - 1)) / std::max(1, count);
+            // Capped, so an axis label stays beside its value in a wide inspector.
+            const auto width = std::min(110, (line.getWidth() - motion::style::gap * (count - 1)) / std::max(1, count));
             for (int index = 0; index < count; ++index) {
                 fields[static_cast<std::size_t>(index)]->editor.setBounds(line.removeFromLeft(width));
                 line.removeFromLeft(motion::style::gap);
@@ -471,6 +481,7 @@ private:
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
     juce::Component* lead = nullptr;
+    std::size_t selectionCount = 1;
     std::function<int()> leadHeight;
     std::vector<motion::PropertySpec> specList;
     motion::Id target = 0;

@@ -113,7 +113,10 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             menu.addSubMenu("Audio interface plays", output);
             menu.addSeparator();
         }
-        if (index == timingMenuIndex) { menu = timingMenu(); }
+        if (index == timingMenuIndex) {
+            menu = timingMenu();
+            menu.setLookAndFeel(&menuLookAndFeel);
+        }
     };
     menus.customMenuSelectedLogic = [this](int id, int index) {
         if (index == 4 && id > 2000 && id <= 2003) {
@@ -212,7 +215,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
-    addAndMakeVisible(timingButton);
     addAndMakeVisible(canvasButton);
     canvasButton.setName("Output canvas");
     canvasButton.setTooltip("Set the output framing and default video dimensions.");
@@ -232,6 +234,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         showOverlay(std::move(overlay));
     };
     addAndMakeVisible(monitorOutput);
+    outputLabel.setText("Output", juce::dontSendNotification);
+    outputLabel.setFont(motion::style::small());
+    outputLabel.setColour(juce::Label::textColourId, motion::style::muted());
+    outputLabel.setJustificationType(juce::Justification::centredRight);
+    addAndMakeVisible(outputLabel);
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
@@ -255,7 +262,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         }
         processor.setOutputMode(mode);
     };
-    timingButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     playButton.setTooltip("Play / pause (Space)");
     startButton.setTooltip("Go to start (Home)");
     endButton.setTooltip("Go to end (End)");
@@ -273,10 +279,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     tempoValue.setFont(motion::style::body());
     tempoLabel.setFont(motion::style::small());
     tempoLabel.setColour(juce::Label::textColourId, motion::style::muted());
-    timingButton.setName("Timing");
-    timingButton.setTitle("Timing");
-    timingButton.setTooltip("Time display, snapping, meter and frame rate. Alt temporarily bypasses snapping.");
-    timingButton.onClick = [this] { showTimingMenu(); };
     refreshTiming();
     tempoLabel.setText("BPM", juce::dontSendNotification);
     timeLabel.setName("Timeline position");
@@ -378,7 +380,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timelineTabs.addTab("Graph");
     timelineTabs.addTab("Notes");
     timelineTabs.onSelectionChanged = [this](int index) {
-        if (index == 2) { timelineFraction = std::max(timelineFraction, .42); }
+        // All three share the panel height the user chose: switching never
+        // moves the Scene or Scope.
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
         notesEditor.setVisible(index == 2);
@@ -673,7 +676,20 @@ void MotionEditor::resized() {
     int menuWidth = 0;
     const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
     for (int index = 0; index < names.size(); ++index) { menuWidth += menuBar.getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
-    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 512), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 256));
+    auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, 390), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - 195));
+    // What the audio interface plays sits with the other audio state (the
+    // DSP meter), not in the Scope; without room it lives in the Audio menu.
+    {
+        auto output = top.withLeft(transport.getRight() + 12);
+        const auto fits = output.getWidth() >= 46 + 130;
+        outputLabel.setVisible(fits);
+        monitorOutput.setVisible(fits);
+        if (fits) {
+            output = output.removeFromRight(46 + 130);
+            outputLabel.setBounds(output.removeFromLeft(46));
+            monitorOutput.setBounds(output.reduced(0, 4));
+        }
+    }
     menuBar.setBounds(top.withRight(transport.getX()));
     startButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     playButton.setBounds(transport.removeFromLeft(32).reduced(1, 3));
@@ -681,7 +697,7 @@ void MotionEditor::resized() {
     loopButton.setBounds(transport.removeFromLeft(28).reduced(1, 3));
     // Narrow windows drop the BPM caption and tighten the readouts so the
     // timing menu never collapses to nothing.
-    const auto compact = transport.getWidth() < 360;
+    const auto compact = transport.getWidth() < 258;
     if (compact != compactTransport) {
         compactTransport = compact;
         refreshTiming();
@@ -693,10 +709,6 @@ void MotionEditor::resized() {
     tempoLabel.setVisible(!compact);
     tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34));
     tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
-    transport.removeFromLeft(4);
-    // Too narrow to read, the button gives way to the menu bar's Timing menu.
-    timingButton.setVisible(transport.getWidth() >= 80);
-    timingButton.setBounds(transport.removeFromLeft(std::min(transport.getWidth(), 120)).reduced(0, 3));
     area.removeFromTop(3);
     statusBar.setBounds(area.removeFromBottom(20));
     area.removeFromBottom(2);
@@ -724,7 +736,7 @@ void MotionEditor::resized() {
     // Modulation and routing need a target; without one the graph takes the room.
     graphSideViewport.setVisible(timelineTabs.getCurrentTabIndex() == 1 && curveTarget != 0);
     if (curveTarget != 0) {
-        graphSideViewport.setBounds(graph.removeFromRight(285));
+        graphSideViewport.setBounds(graph.removeFromRight(std::clamp(graph.getWidth() / 4, 230, 285)));
         layoutGraphSide();
         graph.removeFromRight(3);
     }
@@ -757,23 +769,18 @@ void MotionEditor::resized() {
     // A tight header drops its title before any control: the picture says
     // what the panel is.
     const auto controlsWidth = visualiserControls != nullptr && visualiserControls->getParentComponent() == this ? visualiser.controlsPreferredWidth() + 4 : 0;
-    const auto titled = outputHeader.getWidth() - 8 >= 68 + controlsWidth + 64 + 6 + 120;
+    const auto titled = outputHeader.getWidth() - 8 >= 68 + controlsWidth + 64 + 6;
     outputTitle.setVisible(titled);
     outputTitle.setBounds(outputHeader.getBounds().reduced(8, 3).withWidth(60));
     auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(titled ? 68 : 0).reduced(4, 3);
-    // The scope's buttons keep their size; the output menu gives way first
-    // (it is also in the Audio menu), then the buttons.
-    const auto pickerFits = monitorBounds.getWidth() - controlsWidth - 64 - 6 >= 90;
-    monitorOutput.setVisible(pickerFits);
     if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
-        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 64 - 6 - (pickerFits ? 90 + 4 : 0)));
+        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 64 - 6));
         visualiserControls->setBounds(monitorBounds.removeFromRight(width).withSizeKeepingCentre(width, 24));
         monitorBounds.removeFromRight(4);
         visualiserControls->toFront(false);
     }
     canvasButton.setBounds(monitorBounds.removeFromRight(64));
-    monitorBounds.removeFromRight(6);
-    monitorOutput.setBounds(monitorBounds.withWidth(std::min(150, monitorBounds.getWidth())));
+
     output.removeFromTop(3);
     visualiser.setBounds(output);
     viewportBounds = editing;
@@ -1494,6 +1501,7 @@ bool MotionEditor::audioSelected() const {
 }
 
 void MotionEditor::refreshInspector() {
+    propertyInspector.setSelectionCount(std::max<std::size_t>(1, timeline.selectedClipIds().size()));
     cameraPanel.refresh();
     clipTimingPanel.refresh();
     const motion::Clip* selected = nullptr;
@@ -1575,7 +1583,10 @@ void MotionEditor::registerCommands() {
             statusBar.show("Select keyframes to ease.");
             return;
         }
-        if (graph) { curveEditor.easeSelected(in, out); } else { timeline.easeSelectedKeys(in, out); }
+        // Smooth keys already ease at their ends, so say what happened.
+        const auto eased = graph ? curveEditor.easeSelected(in, out) : timeline.easeSelectedKeys(in, out);
+        const juce::String what = in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out");
+        statusBar.show(eased ? what + " applied: the keys stop with a third of each segment as influence." : "The selected keys already ease that way.", MotionStatusBar::Kind::notice);
     };
     menus.addMenuSeparator(1);
     addCommand(1, "Easy ease", juce::KeyPress(juce::KeyPress::F9Key), "F9", [ease] { ease(true, true); });
@@ -2292,6 +2303,12 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
 void MotionEditor::refreshCurveList() {
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, curveTarget);
+    if (!target.has_value()) {
+        // Nothing selected: an empty list, like the graph beside it.
+        curveList.setChannels({}, {}, shownCurves);
+        curveEditor.setContextCurves({});
+        return;
+    }
     const auto* effect = motion::findEffect(project, curveTarget);
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
     std::vector<MotionCurveList::Channel> channels;
@@ -2334,27 +2351,11 @@ void MotionEditor::layoutGraphSide() {
 
 
 void MotionEditor::refreshTiming() {
-    const auto& project = processor.document.project();
-    const auto display = project.timeDisplay == motion::TimeDisplay::beats ? "Beats" : (project.timeDisplay == motion::TimeDisplay::frames ? "Frames" : "Seconds");
-    juce::String grid = "Free";
-    if (project.gridSnap) {
-        if (project.timeDisplay != motion::TimeDisplay::beats) { grid = "Frame"; }
-        else if (std::abs(project.snapBeats - project.beatsPerBar) < 1.0e-9) { grid = "Bar"; }
-        else if (std::abs(project.snapBeats - 1) < 1.0e-9) { grid = "Beat"; }
-        else if (std::abs(project.snapBeats - 1.0 / 3) < 1.0e-9) { grid = "1/8 T"; }
-        else if (std::abs(project.snapBeats - 1.0 / 6) < 1.0e-9) { grid = "1/16 T"; }
-        else { grid = "1/" + juce::String(4.0 / project.snapBeats, 0); }
-    }
-    // Named for what it holds; the ruler and readout show the units, the
-    // magnet the snapping, and the tooltip both.
-    timingButton.setButtonText("Timing " + juce::String::charToString(0x25be));
-    timingButton.setTooltip("Showing " + juce::String(display).toLowerCase() + ", snapping " + (project.gridSnap ? "to " + grid.toLowerCase() : juce::String("off"))
-        + ". Detect tempo, time display, snapping, meter and frame rate. Alt bypasses snapping while dragging.");
     timeline.repaint();
     curveEditor.repaint();
 }
 
-// The Timing menu, shared by the transport button and the menu bar.
+// The menu bar's Timing menu.
 static const std::array<double, 8> timingRates { 24000.0 / 1001, 24, 25, 30000.0 / 1001, 30, 50, 60, 120 };
 
 juce::PopupMenu MotionEditor::timingMenu() {
@@ -2387,14 +2388,6 @@ juce::PopupMenu MotionEditor::timingMenu() {
 double MotionEditor::snapDivision(int index) const {
     const std::array<double, 7> divisions { static_cast<double>(processor.document.project().beatsPerBar), 1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6 };
     return divisions[static_cast<std::size_t>(std::clamp(index, 0, 6))];
-}
-
-void MotionEditor::showTimingMenu() {
-    const juce::Component::SafePointer<MotionEditor> owner(this);
-    const auto generation = processor.document.generation();
-    timingMenu().showMenuAsync(juce::PopupMenu::Options().withTargetComponent(timingButton), [owner, generation](int result) {
-        if (owner != nullptr && owner->processor.document.generation() == generation) { owner->applyTiming(result); }
-    });
 }
 
 // Display and snapping are view options (no undo step); meter and frame

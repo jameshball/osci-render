@@ -95,13 +95,26 @@ public:
             document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::beats; state.gridSnap = false; });
             expect(!undo.canUndo(), "a view option is not an edit");
             document.edit("Rename", [](motion::Project& project) { project.tracks[0].name = "Renamed"; });
-            document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::frames; state.looping = true; });
+            document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::frames; });
             expect(undo.undo());
-            expect(document.project().timeDisplay == motion::TimeDisplay::frames && !document.project().gridSnap && document.project().looping, "undo keeps the current view options");
+            expect(document.project().timeDisplay == motion::TimeDisplay::frames && !document.project().gridSnap, "undo keeps the current view options");
             expect(undo.redo());
             expect(document.project().timeDisplay == motion::TimeDisplay::frames, "redo keeps them too");
             document.edit("Show bars", [](motion::Project& project) { project.timeDisplay = motion::TimeDisplay::beats; });
             expect(document.project().timeDisplay == motion::TimeDisplay::beats, "an edit can still set them");
+            expect(undo.undo());
+            expect(document.project().timeDisplay == motion::TimeDisplay::frames, "undoing that edit reverts what it changed");
+            expect(undo.redo());
+            expect(document.project().timeDisplay == motion::TimeDisplay::beats);
+        }
+        beginTest("Undoing a loop never leaves looping on without a range");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            document.reset(twoTracks(document));
+            document.edit("Set loop", [](motion::Project& project) { project.loopStart = 2; project.loopEnd = 4; project.looping = true; });
+            expect(undo.undo());
+            expect(!document.project().hasLoop() && !document.project().looping);
         }
         beginTest("Imported sources with a taken name are numbered");
         {

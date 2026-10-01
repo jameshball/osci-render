@@ -77,11 +77,11 @@ try:
     stack = find(tree, lambda node: node.get("class") == "juce::ListBox" and node.get("name") == "Effect stack")["bounds"]
     step("reorder effect stack", "drag-xy", stack["x"] + 60, stack["y"] + 15, stack["x"] + 60, stack["y"] + 47, "--steps", 16)
     wait_undo("Reorder effects")
-    step("choose track scope", "select-option", "--name", "Effect scope", "--text", "Track")
+    step("choose track scope", "select-option", "--name", "Effect scope", "--id", 2)
     step("add track rotate", "click", "--name", "Rotate", "--role", "listItem", "--click-count", 2)
     wait_undo("Add Rotate")
     step("rotate track", "set-value", "--name", "Effect rotateZ", "--role", "slider", 0.2)
-    step("choose composition scope", "select-option", "--name", "Effect scope", "--text", "Composition")
+    step("choose composition scope", "select-option", "--name", "Effect scope", "--id", 3)
     step("add composition ripple", "click", "--name", "Ripple", "--role", "listItem", "--click-count", 2)
     wait_undo("Add Ripple")
     step("key composition ripple", "click", "--name", "Key effect ripplePhase", "--exact")

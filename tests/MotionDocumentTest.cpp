@@ -591,7 +591,7 @@ private:
         expect(!loaded.project().gridSnap);
         expect(undo.undo());
         expectEquals(document.project().beatsPerBar, source.beatsPerBar);
-        expect(document.project().timeDisplay == motion::TimeDisplay::beats, "the display is a view option undo keeps");
+        expect(document.project().timeDisplay == source.timeDisplay, "undoing the step that changed the display reverts it");
         expect(undo.redo());
         expectEquals(document.project().beatsPerBar, 3);
         beginTest("Invalid timing settings reject atomically");

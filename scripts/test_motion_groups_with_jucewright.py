@@ -116,7 +116,7 @@ try:
     step("effect on empty grouped track", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
     wait_undo("Add Translate")
-    step("group scope from empty track", "select-option", "--name", "Effect scope", "--text", "Group")
+    step("group scope from empty track", "select-option", "--name", "Effect scope", "--id", 4)
     step("add effect to empty track parent", "click", "--name", "Swirl", "--role", "listItem", "--click-count", 2)
     wait_undo("Add Swirl")
     step("delete parent menu", "click", "--name", "Reorder track " + group, "--exact")

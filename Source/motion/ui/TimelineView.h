@@ -673,7 +673,7 @@ public:
         }
         if (tracks.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.55f));
-            g.drawText("Import media to start your composition", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
+            g.drawText("Drop files here to put them on the timeline, or Add source (" + motion::style::shortcutText("Cmd+I") + ")", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
         }
     }
 

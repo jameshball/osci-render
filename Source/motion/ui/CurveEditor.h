@@ -150,7 +150,10 @@ public:
         {
             const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
             const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
-            for (auto value = std::ceil(low / valueTick) * valueTick; value <= high + valueTick * 1e-6; value += valueTick) {
+            // An integer index (capped) so extreme values can never stall the loop.
+            const auto first = std::ceil(low / valueTick);
+            for (int index = 0; index < 200 && (first + index) * valueTick <= high + valueTick * 1e-6; ++index) {
+                const auto value = (first + index) * valueTick;
                 const auto y = valueY(value);
                 g.setColour(juce::Colours::white.withAlpha(std::abs(value) < valueTick * 1e-6 ? 0.14f : 0.07f));
                 g.drawLine(area.getX(), y, area.getRight(), y);
