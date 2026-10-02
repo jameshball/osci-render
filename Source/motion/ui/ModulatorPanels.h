@@ -65,7 +65,7 @@ struct LabelledScrub {
     MotionScrubField field;
     void setup(juce::Component& owner, const juce::String& text, const juce::String& name, const PropertySpec& spec) {
         label.setText(text, juce::dontSendNotification);
-        label.setFont(style::small());
+        label.setFont(style::smallText());
         label.setColour(juce::Label::textColourId, style::muted());
         field.setName(name);
         field.setTitle(name);
@@ -197,7 +197,7 @@ public:
         addAndMakeVisible(routesTitle);
         hint.setText("No modulators yet. Add an LFO (also random or soundtrack), an envelope (Env) or a MIDI controller (CC), then route it from the Graph.", juce::dontSendNotification);
         hint.setTooltip("One modulator drives many properties from a single clock: an LFO, a random walk, the soundtrack's loudness, or a MIDI clip's notes (envelope) and controllers.");
-        hint.setFont(motion::style::small());
+        hint.setFont(motion::style::smallText());
         hint.setColour(juce::Label::textColourId, motion::style::muted());
         hint.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(hint);
@@ -325,7 +325,7 @@ private:
     struct RouteRow final : juce::Component {
         RouteRow(MotionModulatorLibrary& owner, const motion::ModulationRoute& route, const juce::String& text) : owner(owner), route(route) {
             target.setText(text, juce::dontSendNotification);
-            target.setFont(motion::style::small());
+            target.setFont(motion::style::smallText());
             target.setColour(juce::Label::textColourId, motion::style::text());
             amount.setName("Route amount " + text);
             amount.setTitle("Route amount " + text);
@@ -444,7 +444,7 @@ public:
         unlink.setName("Unlink property");
         unlink.setTitle("Unlink property");
         unlink.onClick = [this] { report(processor.document.setLink(targetId, propertyName, std::nullopt)); };
-        linkSource.setFont(motion::style::small());
+        linkSource.setFont(motion::style::smallText());
         linkSource.setName("Link source");
         scale.setup(*this, "Scale", "Link scale", motion::ui::amountSpec);
         offset.setup(*this, "Offset", "Link offset", motion::ui::amountSpec);
@@ -546,7 +546,7 @@ private:
     struct Row final : juce::Component {
         Row(MotionRoutingPanel& owner, const motion::ModulationRoute& route, const juce::String& text) : owner(owner), route(route) {
             name.setText(text, juce::dontSendNotification);
-            name.setFont(motion::style::small());
+            name.setFont(motion::style::smallText());
             amount.setName("Routed amount " + text);
             amount.setTitle("Routed amount " + text);
             amount.setSpec(motion::ui::amountSpec);

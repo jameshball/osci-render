@@ -239,9 +239,9 @@ private:
         bool open = false;
         for (std::size_t index = 0; index < points.size(); ++index) {
             const auto dark = pointFrames && !lit[index];
-            const auto far = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
+            const auto jumped = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
             if (dark) { open = false; continue; }
-            if (open && !far) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }
+            if (open && !jumped) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }
         }
         return path;
     }

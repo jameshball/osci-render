@@ -16,10 +16,10 @@ public:
         dismiss.onClick = [this] { clear(); };
         addChildComponent(dismiss);
         message.setName("Status message");
-        message.setFont(motion::style::small());
+        message.setFont(motion::style::smallText());
         message.setMinimumHorizontalScale(1.0f);
         addAndMakeVisible(message);
-        stats.setFont(motion::style::small());
+        stats.setFont(motion::style::smallText());
         stats.setJustificationType(juce::Justification::centredRight);
         stats.setColour(juce::Label::textColourId, motion::style::subtle());
         addAndMakeVisible(stats);

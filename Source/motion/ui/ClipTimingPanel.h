@@ -14,7 +14,7 @@ public:
     explicit MotionClipTimingPanel(MotionProcessor& owner) : processor(owner) {
         setName("Clip timing inspector");
         title.setText("Timing", juce::dontSendNotification);
-        title.setFont(motion::style::small());
+        title.setFont(motion::style::smallText());
         title.setColour(juce::Label::textColourId, motion::style::muted());
         title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
@@ -28,7 +28,7 @@ public:
         };
         for (std::size_t i = 0; i < values.size(); ++i) {
             captions[i].setText(labels[i], juce::dontSendNotification);
-            captions[i].setFont(motion::style::small());
+            captions[i].setFont(motion::style::smallText());
             captions[i].setColour(juce::Label::textColourId, motion::style::muted());
             addAndMakeVisible(captions[i]);
             auto& value = values[i];
@@ -42,11 +42,11 @@ public:
             value.onTextChange = [this, i] { if (!updating) { apply(i); } };
             addAndMakeVisible(value);
         }
-        details.setFont(motion::style::small());
+        details.setFont(motion::style::smallText());
         details.setColour(juce::Label::textColourId, motion::style::muted());
         details.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(details);
-        status.setFont(motion::style::small());
+        status.setFont(motion::style::smallText());
         status.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(status);
         refresh();

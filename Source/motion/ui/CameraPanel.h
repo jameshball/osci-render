@@ -60,7 +60,7 @@ public:
         lookAt.onChange = [this] { applyRig(); };
         parent.onChange = [this] { applyRig(); };
         for (auto* label : {&lookAtLabel, &parentLabel}) {
-            label->setFont(motion::style::small());
+            label->setFont(motion::style::smallText());
             label->setColour(juce::Label::textColourId, motion::style::muted());
             addAndMakeVisible(label);
         }
@@ -70,7 +70,7 @@ public:
         cutButton.setTooltip("Use this camera from the current frame until the next cut. Cuts appear in the timeline's Cameras band, where they move, trim and switch camera.");
         cutButton.onClick = [this] { cutHere(); };
         addAndMakeVisible(cutButton);
-        status.setFont(motion::style::small());
+        status.setFont(motion::style::smallText());
         status.setTooltip("Which camera the output uses at the playhead. Cuts are moved, trimmed and switched in the timeline's Cameras band.");
         status.setColour(juce::Label::textColourId, motion::style::muted());
         addAndMakeVisible(status);

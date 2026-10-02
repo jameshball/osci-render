@@ -20,7 +20,7 @@ public:
         title.setFont(motion::style::title());
         title.setColour(juce::Label::textColourId, motion::style::text());
         title.setName("Inspector title");
-        kind.setFont(motion::style::small());
+        kind.setFont(motion::style::smallText());
         kind.setColour(juce::Label::textColourId, motion::style::muted());
         kind.setJustificationType(juce::Justification::centredRight);
         addAndMakeVisible(title);
@@ -165,7 +165,7 @@ private:
         std::unique_ptr<motion::style::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
         void paint(juce::Graphics& g) override {
-            g.setFont(motion::style::small());
+            g.setFont(motion::style::smallText());
             g.setColour(motion::style::muted());
             g.drawText(group, getLocalBounds().removeFromTop(16).withTrimmedLeft(2), juce::Justification::centredLeft);
         }

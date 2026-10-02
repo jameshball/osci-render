@@ -107,7 +107,7 @@ private:
             if (channel.keyed) { motion::style::drawDiamond(g, {static_cast<float>(marks.getX() + 6), static_cast<float>(marks.getCentreY())}, 3.5f, true); }
             if (channel.driven) {
                 g.setColour(motion::style::accent());
-                g.setFont(motion::style::small());
+                g.setFont(motion::style::smallText());
                 g.drawText("~", marks.withTrimmedLeft(12), juce::Justification::centred);
             }
             g.setColour(selected ? juce::Colours::white : osci::Colours::text().withAlpha(channel.keyed || channel.driven ? .95f : .6f));

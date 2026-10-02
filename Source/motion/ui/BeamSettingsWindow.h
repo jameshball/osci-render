@@ -24,7 +24,7 @@ public:
         addAndMakeVisible(presets);
         note.setText("Dwell holds the beam dark at both ends of every jump. Travel is the dark move time per unit of screen distance. "
             "Settle waits after each jump before drawing, for slow scopes and galvos.", juce::dontSendNotification);
-        note.setFont(motion::style::small());
+        note.setFont(motion::style::smallText());
         note.setColour(juce::Label::textColourId, motion::style::muted());
         note.setJustificationType(juce::Justification::topLeft);
         note.setBorderSize({});

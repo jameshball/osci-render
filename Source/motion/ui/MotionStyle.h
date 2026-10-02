@@ -14,7 +14,7 @@ inline constexpr int transportHeight = 36;
 inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
 
-inline juce::Font small() { return juce::Font(juce::FontOptions(11.0f)); }
+inline juce::Font smallText() { return juce::Font(juce::FontOptions(11.0f)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
 // Ctrl+Shift+F9 elsewhere. Mouse gestures ("Alt+wheel") keep their words.
 inline juce::String shortcutText(const juce::String& raw) {

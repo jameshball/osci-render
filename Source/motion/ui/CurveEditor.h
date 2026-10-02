@@ -308,7 +308,7 @@ public:
             g.setColour(osci::Colours::warning().withAlpha(.18f));
             g.fillRoundedRectangle(banner.toFloat(), 3.0f);
             g.setColour(osci::Colours::warning());
-            g.setFont(motion::style::small());
+            g.setFont(motion::style::smallText());
             g.drawText("Linked to " + name + " (" + juce::String(storedCurve->link->property) + "): keys here are ignored. Unlink in Routing.", banner.reduced(8, 0), juce::Justification::centred, true);
         }
     }

@@ -24,9 +24,9 @@ public:
         addButton.setButtonText("Add effect...");
         addButton.onClick = [this] { showAddMenu(); };
         scopeLabel.setText("Apply to", juce::dontSendNotification);
-        scopeLabel.setFont(motion::style::small());
+        scopeLabel.setFont(motion::style::smallText());
         scopeLabel.setColour(juce::Label::textColourId, motion::style::muted());
-        hint.setFont(motion::style::small());
+        hint.setFont(motion::style::smallText());
         hint.setColour(juce::Label::textColourId, motion::style::muted());
         hint.setJustificationType(juce::Justification::centredTop);
         for (auto* component : std::initializer_list<juce::Component*> { &scopeLabel, &scope, &stack, &addButton, &title, &viewport }) {

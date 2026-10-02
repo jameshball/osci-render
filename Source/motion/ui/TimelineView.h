@@ -1493,7 +1493,7 @@ private:
         g.setFont(motion::style::body());
         if (!clip.effects.empty() && bounds.getWidth() > 90) {
             g.setColour(juce::Colours::white.withAlpha(0.6f * opacity));
-            g.setFont(motion::style::small());
+            g.setFont(motion::style::smallText());
             g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38).withTrimmedBottom(8), juce::Justification::centred);
             g.setFont(motion::style::body());
         }
@@ -1549,7 +1549,7 @@ private:
         g.fillRect(0, y, getWidth(), height);
         const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
         const auto* spec = motion::findPropertySpec(specs, row.lane);
-        g.setFont(motion::style::small());
+        g.setFont(motion::style::smallText());
         g.setColour(motion::style::muted());
         const auto indent = std::min(48, row.depth * 8) + 30;
         g.drawText(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(row.lane), indent, y, namesWidth - indent - 6, height, juce::Justification::centredLeft);

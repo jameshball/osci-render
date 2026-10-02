@@ -237,7 +237,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     addAndMakeVisible(monitorOutput);
     outputLabel.setText("Output", juce::dontSendNotification);
-    outputLabel.setFont(motion::style::small());
+    outputLabel.setFont(motion::style::smallText());
     outputLabel.setColour(juce::Label::textColourId, motion::style::muted());
     outputLabel.setJustificationType(juce::Justification::centredRight);
     addAndMakeVisible(outputLabel);
@@ -279,7 +279,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timeLabel.setFont(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 14.0f, juce::Font::plain));
     timeLabel.setJustificationType(juce::Justification::centred);
     tempoValue.setFont(motion::style::body());
-    tempoLabel.setFont(motion::style::small());
+    tempoLabel.setFont(motion::style::smallText());
     tempoLabel.setColour(juce::Label::textColourId, motion::style::muted());
     refreshTiming();
     tempoLabel.setText("BPM", juce::dontSendNotification);
