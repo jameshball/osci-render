@@ -136,9 +136,9 @@ public:
             const motion::PreparedComposition composition(project({{square(1, .2f), -.5}, {square(2, .1f), .5}}), 48000);
             motion::BeamRenderer beam;
             const auto points = cycle(composition, 48000, 5, beam);
-            const auto big = litNear(points, -.5f, .3f), small = litNear(points, .5f, .2f);
-            expect(small > 0);
-            expectWithinAbsoluteError(static_cast<double>(big) / small, 2.0, 0.15);
+            const auto big = litNear(points, -.5f, .3f), little = litNear(points, .5f, .2f);
+            expect(little > 0);
+            expectWithinAbsoluteError(static_cast<double>(big) / little, 2.0, 0.15);
         }
 
         beginTest("Stroke-heavy drawings are budgeted by their true length, not their probe continuity");

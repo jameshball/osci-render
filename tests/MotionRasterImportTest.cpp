@@ -7,9 +7,12 @@ public:
     void runTest() override {
         beginTest("Transparent PNG prepares colored outlines without tinting pure blue away");
         juce::Image image(juce::Image::ARGB, 16, 8, true);
-        juce::Graphics graphics(image);
-        graphics.setColour(juce::Colours::blue);
-        graphics.fillRect(2, 2, 10, 4);
+        {
+            // Direct2D (Windows) commits drawing when the context ends.
+            juce::Graphics graphics(image);
+            graphics.setColour(juce::Colours::blue);
+            graphics.fillRect(2, 2, 10, 4);
+        }
         juce::MemoryOutputStream encoded;
         expect(juce::PNGImageFormat().writeImageToStream(image, encoded));
         auto png = std::make_shared<motion::Asset>();
