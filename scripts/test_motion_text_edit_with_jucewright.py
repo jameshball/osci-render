@@ -4,11 +4,15 @@
 This is a usability stress pass, not the finished music-video benchmark.
 """
 import json
+import sys
 import struct
 import subprocess
 import xml.etree.ElementTree as ET
 from jucewright_osci_browser.cli import parse_args
 from jucewright_osci_browser.session import BrowserSession
+
+# A monospace family installed by default on each platform.
+FONT = {"darwin": "Menlo", "win32": "Consolas"}.get(sys.platform, "DejaVu Sans Mono")
 
 session = BrowserSession(parse_args())
 if session.build_app_requested:
@@ -63,7 +67,7 @@ try:
     step("open shared text", "click", "--name", "Edit text...", "--exact")
     command("wait-for-locator", "--name", "Source text", "--class", "juce::TextEditor", "--exact")
     step("edit multiline text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RETURN\nTOGETHER")
-    step("choose font", "select-option", "--name", "Text font family", "--class", "juce::ComboBox", "--exact", "--text", "Menlo")
+    step("choose font", "select-option", "--name", "Text font family", "--class", "juce::ComboBox", "--exact", "--text", FONT)
     step("choose bold", "select-option", "--name", "Text font style", "--class", "juce::ComboBox", "--exact", "--text", "Bold")
     step("centre title", "select-option", "--name", "Text alignment", "--class", "juce::ComboBox", "--exact", "--text", "Centre")
     step("set line spacing", "set-value", "--name", "Text line spacing", "--role", "slider", "1.8")
@@ -74,7 +78,7 @@ try:
     after = saved_asset()
     assert after != before and len(saved_clips()) == 2
     typography = ET.fromstring(after).find("typography")
-    assert typography.get("family") == "Menlo" and typography.get("style") == "1" and typography.get("alignment") == "1"
+    assert typography.get("family") == FONT and typography.get("style") == "1" and typography.get("alignment") == "1"
     assert float(typography.get("lineSpacing")) == 1.8 and float(typography.get("tracking")) == 0.15
     step("open text for preparation failure", "click", "--name", "Edit text...", "--exact")
     oversized_geometry = "MW" * 8000
@@ -92,7 +96,7 @@ try:
                 yield from nodes(child)
     fields = list(nodes(state))
     assert any(node.get("componentName") == "Source text" and node.get("value") == oversized_geometry for node in fields)
-    assert any(node.get("componentName") == "Text font family" and node.get("value") == "Menlo" for node in fields)
+    assert any(node.get("componentName") == "Text font family" and node.get("value") == FONT for node in fields)
     assert any(node.get("componentName") == "Text preparation error" and "too detailed" in str(node.get("value")) for node in fields)
     step("recover shorter title", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RECOVERED\nTITLE")
     step("retained formatting and error", "screenshot", "--file", session.artifact_dir / "text-recovery.png")

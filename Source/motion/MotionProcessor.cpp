@@ -114,6 +114,7 @@ void MotionProcessor::releaseRecordingTransport() {
 }
 
 void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    lastCallbackMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
     buffer.clear();
     releaseRecordingTransport();
     const auto* prepared = composition.acquire();

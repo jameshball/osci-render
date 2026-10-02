@@ -1321,6 +1321,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
 
 void MotionEditor::timerCallback() {
     continueCommandLineRender();
+    processor.showIdleSeek(processor.document.mainProject().duration);
     refreshOutputChoices();
     auto& previewRate = processor.recordingParameters.frameRate;
     // Keep playback and export cadence aligned within the live renderer's supported range.

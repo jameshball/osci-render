@@ -2,6 +2,7 @@
 
 #include "../CommonPluginProcessor.h"
 #include "model/Document.h"
+#include "render/SampleClock.h"
 #include "render/CompositionRenderer.h"
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
@@ -42,8 +43,28 @@ public:
     // Loop playback (seconds); the editor mirrors the project's loop range.
     std::atomic<double> loopStart { 0.0 }, loopEnd { 0.0 };
     std::atomic<bool> looping { false };
-    void seek(double seconds) { seekSerial.fetch_add(1); requestedPosition.store(std::max(0.0, seconds)); }
+    void seek(double seconds) {
+        seekSerial.fetch_add(1);
+        requestedPosition.store(std::max(0.0, seconds));
+        // Without audio callbacks the playhead moves at once (see showIdleSeek).
+        if (audioIdle()) { position.store(onSampleGrid(std::max(0.0, seconds))); }
+    }
+    // The audio thread reports positions on its sample grid; idle seeks match it.
+    double onSampleGrid(double seconds) {
+        const auto rate = getSampleRate() > 0 ? getSampleRate() : 48000.0;
+        const auto index = motion::sampleIndex(seconds, rate);
+        return index.has_value() ? static_cast<double>(*index) / rate : seconds;
+    }
+    bool audioIdle() const { return juce::Time::getMillisecondCounterHiRes() - lastCallbackMs.load(std::memory_order_relaxed) >= 250; }
     std::uint64_t seekRevision() const { return seekSerial.load(); }
+    // Without audio callbacks (no output device, or one that failed) a seek
+    // still moves the playhead. The request stays queued, so the audio thread
+    // applies it too if callbacks resume. Message thread only.
+    void showIdleSeek(double duration) {
+        if (!audioIdle()) { return; }
+        const auto requested = requestedPosition.load();
+        if (requested >= 0 && std::isfinite(requested)) { position.store(onSampleGrid(std::clamp(requested, 0.0, std::max(0.0, duration)))); }
+    }
     void collectPreparedState() { composition.collect(); liveSources.collect(); }
     // Message-thread publication/preview; source geometry was prepared off audio.
     void publishLiveSources(std::shared_ptr<const motion::LiveSourceFrames> frames) { liveSources.publish(std::move(frames)); }
@@ -97,6 +118,7 @@ private:
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };
     std::atomic<std::uint64_t> seekSerial {0};
+    std::atomic<double> lastCallbackMs {0.0};
     double audioTime = 0.0;
     juce::int64 audioSample = 0;
 public:

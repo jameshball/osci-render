@@ -4,6 +4,9 @@
 Generate inputs first with generate_motion_video_fixtures.py.
 """
 import os
+import shutil
+import sys
+import tempfile
 import struct
 import subprocess
 from pathlib import Path
@@ -20,7 +23,23 @@ keep = session.keep_app
 session.keep_app = False
 session.launch_app("motion-video")
 session.keep_app = keep
-fixtures = Path(os.environ.get("MOTION_VIDEO_FIXTURES", "/private/tmp/motion-video-fixtures"))
+fixtures = Path(os.environ.get("MOTION_VIDEO_FIXTURES", Path(tempfile.gettempdir()) / "motion-video-fixtures"))
+
+
+def ensure_fixtures():
+    """Generates the MP4/MOV inputs when they are missing (temp folders get cleaned)."""
+    if all((fixtures / name).is_file() for name in ("motion.mp4", "motion.mov")):
+        return
+    home = Path.home()
+    candidates = [shutil.which("ffmpeg"), home / "Library/Application Support/osci-render/ffmpeg",
+                  home / ".config/osci-render/ffmpeg", home / "AppData/Roaming/osci-render/ffmpeg.exe"]
+    ffmpeg = next((str(candidate) for candidate in candidates if candidate and Path(candidate).is_file()), None)
+    if ffmpeg is None:
+        raise SystemExit("Video fixtures are missing and no FFmpeg was found to generate them.")
+    subprocess.run([sys.executable, str(session.root_dir / "scripts" / "generate_motion_video_fixtures.py"), "--output-dir", str(fixtures), "--ffmpeg", ffmpeg], check=True)
+
+
+ensure_fixtures()
 
 
 def command(*args):
@@ -62,7 +81,8 @@ try:
         step("choose sample count", "select-option", "--name", "Image samples per frame", "--class", "juce::ComboBox", "--exact", "--text", "1024")
         step("video settings", "screenshot", "--file", session.artifact_dir / (name + "-settings.png"))
         step("prepare " + name, "click", "--name", "Prepare video", "--class", "juce::TextButton", "--exact")
-        command("wait-for-locator", "--name", name, "--role", "label", "--exact", "--timeout-ms", "30000")
+        # Generous: a Debug build preparing video in a VM takes far longer than on a Mac.
+        command("wait-for-locator", "--name", name, "--role", "label", "--exact", "--timeout-ms", "120000")
     state = save()
     assert len(state.findall("asset")) == 2
     assert all(float(clip.get("duration")) == 2 for clip in state.findall("track/clip"))
