@@ -80,6 +80,13 @@ class BrowserSession:
         return [str(self.jucewright), *[str(arg) for arg in args]]
 
     def cli(self, *args: object) -> list[str]:
+        # On Linux, Jucewright's OpenGL framebuffer capture deadlocks with the
+        # GL render thread (a blocking OpenGLContext::execute from the message
+        # thread while renderFrame waits for the message lock). Screenshots are
+        # artifacts, not assertions, so they are skipped there.
+        if is_linux() and args and str(args[0]) == "screenshot":
+            print("[browse-osci-render] screenshot skipped on Linux (OpenGL capture deadlock)", flush=True)
+            return self.jw("-s", self.session, "wait", "--ms", "1")
         return self.jw("-s", self.session, *args)
 
     def call(self, command: list[str], stdin: str | None = None) -> str:
@@ -203,6 +210,14 @@ class BrowserSession:
             "--parallel",
             jobs,
         ], cwd=self.root_dir)
+
+    def open_project(self, path, editor_class: str = "MotionEditor") -> None:
+        """Opens a project in the running app: as Finder does on macOS, by dropping
+        the file on the editor elsewhere (the editor opens dropped projects)."""
+        if is_macos():
+            subprocess.run(["open", "-a", str(self.app_path), str(path)], check=True)
+        else:
+            subprocess.run(self.cli("drop-files", "--file", str(path), "--class", editor_class, "--exact"), check=True)
 
     def projucer_path(self) -> Path:
         if os.environ.get("PROJUCER"):

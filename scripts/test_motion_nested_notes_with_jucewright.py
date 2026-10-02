@@ -42,7 +42,7 @@ try:
     ET.SubElement(root, "composition", name="Nested rendering study", duration="20", bpm="120", fps="30")
     seed = session.artifact_dir / "seed.osci-motion"
     write_project(root, seed)
-    subprocess.run(["open", "-a", str(session.app_path), str(seed)], check=True)
+    session.open_project(seed)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     source = session.artifact_dir / "Motif.txt"
     source.write_text("RETURN")
@@ -86,7 +86,7 @@ try:
     session.launch_app("nested-notes-reopen")
     session.keep_app = keep
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(seed)], check=True)
+    session.open_project(seed)
     command("wait-for-locator", "--name", "Composition 1", "--class", "juce::Label", "--exact")
     step("reopen musical composition", "click", "--class", "MotionTimelineView", "--position", "250,46", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Main", "--exact")

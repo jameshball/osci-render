@@ -79,7 +79,7 @@ project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 source = None
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "MIDI envelope study", "--timeout-ms", "10000")
     step("resize workspace", "resize-window", "--w", "1440", "--h", "900")
     shape = session.artifact_dir / "MIDI diamond.svg"
@@ -153,7 +153,7 @@ try:
     session.keep_app = False
     session.launch_app("envelope-reopened")
     session.keep_app = keep
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "MIDI envelope study", "--timeout-ms", "10000")
     step("compact workspace", "resize-window", "--w", "1100", "--h", "740")
     step("select reopened clip", "click", "--class", "MotionTimelineView", "--position", "190,55")

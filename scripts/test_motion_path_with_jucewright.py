@@ -103,7 +103,7 @@ def saved_keys(axis):
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Motion path study", "--timeout-ms", 10000)
     step("mute isolated test output", "press", "command + shift + m", "--class", "MotionEditor")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)

@@ -93,7 +93,7 @@ def drag(label, start, finish):
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(fixture)], check=True)
+    session.open_project(fixture)
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("select visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
@@ -161,7 +161,7 @@ try:
     assert len(restored) == 1 and restored[0].get("pitch") == "60"
     step("compact notes workspace", "resize-window", "--w", 1100, "--h", 700)
     step("compact layout", "screenshot", "--file", session.artifact_dir / "compact.png")
-    subprocess.run(["open", "-a", str(session.app_path), str(fixture)], check=True)
+    session.open_project(fixture)
     step("show reopened timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     # A locked track retains readable notes without accepting edits.
@@ -170,7 +170,7 @@ try:
     locked_xml = ET.tostring(saved, encoding="utf-8")
     locked_fixture = session.artifact_dir / "locked-notes.osci-motion"
     locked_fixture.write_bytes(struct.pack("<II", 0x21324356, len(locked_xml)) + locked_xml + b"\0")
-    subprocess.run(["open", "-a", str(session.app_path), str(locked_fixture)], check=True)
+    session.open_project(locked_fixture)
     command("wait-for-locator", "--name", "Locked musical beam", "--class", "juce::Label", "--exact")
     step("select locked visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
     step("inspect locked notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")

@@ -46,7 +46,7 @@ def check_saved():
 
 
 try:
-    subprocess.run(['open', '-a', str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     raw = source.read_bytes()
     root = ET.fromstring(raw[8:8 + struct.unpack('<I', raw[4:8])[0]])
     command('wait-for-value', '--component-name', 'Composition name', '--hidden', '--value', root.find('composition').get('name'), '--timeout-ms', 120000)

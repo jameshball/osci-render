@@ -64,7 +64,7 @@ def saved():
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Input study", "--timeout-ms", 60000)
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     step("arm", "click", "--name", "MIDI input track 2", "--exact")

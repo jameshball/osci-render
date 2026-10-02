@@ -71,7 +71,7 @@ def edit(name, value):
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     source = session.artifact_dir / "Colour triangle.obj"
     source.write_text("v -0.5 -0.5 0\nv 0.5 -0.5 0\nv 0 0.5 0\nf 1 2 3\n")

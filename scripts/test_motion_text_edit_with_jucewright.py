@@ -50,7 +50,7 @@ def saved_asset():
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     source = session.artifact_dir / "Title.txt"
     source.write_text("ORIGINAL")
@@ -116,7 +116,7 @@ try:
     session.launch_app("text-reopen")
     session.keep_app = keep
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait", "--ms", 500)
     step("select text asset", "click", "--name", "Title.txt", "--role", "listItem", "--exact", "--position", "6,12")
     step("reopen saved text", "click", "--name", "Edit text...", "--exact")

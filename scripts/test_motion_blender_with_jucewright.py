@@ -85,7 +85,7 @@ port = ports[0]
 sender = None
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Live Blender test", "--timeout-ms", "10000")
     step("resize workspace", "resize-window", "--w", "1440", "--h", "900")
     step("open source menu", "click", "--name", "Add source", "--exact")
@@ -156,7 +156,7 @@ try:
     session.keep_app = False
     session.stop_app()
     session.launch_app("motion-blender-reopen")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Live Blender test", "--timeout-ms", "10000")
     command("wait", "--ms", "600")
     step("reopened portable beam", "screenshot", "--file", session.artifact_dir / "blender-capture-reopened.png")

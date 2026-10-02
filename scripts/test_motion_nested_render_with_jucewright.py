@@ -47,7 +47,7 @@ try:
     ET.SubElement(root, "composition", name="Nested rendering study", duration="20", bpm="120", fps="30")
     seed = session.artifact_dir / "seed.osci-motion"
     write_project(root, seed)
-    subprocess.run(["open", "-a", str(session.app_path), str(seed)], check=True)
+    session.open_project(seed)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     source = session.artifact_dir / "Motif.txt"
     source.write_text("RETURN")
@@ -83,7 +83,7 @@ try:
         instance_track.append(instance)
     nested = session.artifact_dir / "nested.osci-motion"
     write_project(root, nested)
-    subprocess.run(["open", "-a", str(session.app_path), str(nested)], check=True)
+    session.open_project(nested)
     command("wait", "--ms", 1000)
     snapshot = command("snapshot", "--json", "--full")
     assert "Reusable composition rendering is not connected" not in snapshot
@@ -96,7 +96,7 @@ try:
     session.launch_app("nested-reopen")
     session.keep_app = keep
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(nested)], check=True)
+    session.open_project(nested)
     command("wait", "--ms", 1000)
     step("reopened nested output", "screenshot", "--file", session.artifact_dir / "nested-reopened.png")
     print("Nested rendering fixture saved and reopened; inspect both output screenshots", flush=True)

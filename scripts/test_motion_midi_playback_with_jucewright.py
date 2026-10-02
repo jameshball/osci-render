@@ -77,7 +77,7 @@ fixture = session.artifact_dir / "midi-beam.osci-motion"
 fixture.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(fixture)], check=True)
+    session.open_project(fixture)
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("select MIDI clip", "click", "--class", "MotionTimelineView", "--position", "190,55")

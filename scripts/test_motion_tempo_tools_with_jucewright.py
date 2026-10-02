@@ -110,7 +110,7 @@ def saved():
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Tempo tools", "--timeout-ms", 60000)
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     # Detect tempo and downbeat from a 128 BPM loop whose first downbeat is 0.3 s in.

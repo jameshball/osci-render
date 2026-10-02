@@ -64,7 +64,7 @@ try:
     ET.SubElement(composition, "camera", id="9", name="Camera")
     xml = ET.tostring(root, encoding="utf-8")
     project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Slider study", "--timeout-ms", 60000)
     # Text: rise in, character by character.
     step("import text", "drop-files", "--file", title, "--class", "MotionEditor", "--exact")

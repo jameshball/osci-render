@@ -97,7 +97,7 @@ def saved_scope():
 
 
 def open_project():
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-locator", "--name", "Hero diamond.obj", "--class", "juce::Label", "--exact")
 
 

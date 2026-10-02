@@ -60,7 +60,7 @@ def saved_asset():
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     source = session.artifact_dir / "Orbit.lua"
     original = "return {0.7*math.cos(phase),0.7*math.sin(phase),0,1,0.3,0.1}"
@@ -101,7 +101,7 @@ try:
     session.launch_app("lua-reopen")
     session.keep_app = keep
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait", "--ms", 500)
     step("select saved source", "click", "--name", "Orbit.lua", "--role", "listItem", "--exact", "--position", "6,12")
     step("reopen saved code", "click", "--name", "Edit Lua...", "--exact")

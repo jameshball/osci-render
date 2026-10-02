@@ -847,6 +847,11 @@ void MotionEditor::filesDropped(const juce::StringArray& files, int x, int y) {
     std::optional<std::pair<double, motion::Id>> placement;
     if (timeline.isShowing()) { placement = timeline.dropTarget(timeline.getLocalPoint(this, juce::Point<int>(x, y))); }
     for (const auto& file : files) {
+        // A dropped project opens, as it would from Finder or Explorer.
+        if (juce::File(file).hasFileExtension(".osci-motion")) {
+            openProject(juce::File(file));
+            return;
+        }
         importSourceFile(juce::File(file), 0, placement);
     }
 }

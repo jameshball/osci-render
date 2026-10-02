@@ -40,7 +40,7 @@ def saved_clips():
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Ripple study", "--timeout-ms", "10000")
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     for index in range(2):
@@ -77,7 +77,7 @@ try:
     session.keep_app = False
     session.launch_app("ripple-reopened")
     session.keep_app = keep
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Ripple study", "--timeout-ms", "10000")
     assert sorted(float(c.get("start")) for c in saved_clips()) == [0, 0, 5]
     step("reopened ripple", "screenshot", "--file", session.artifact_dir / "ripple-reopened.png")

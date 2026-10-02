@@ -88,7 +88,7 @@ def edit(name, value):
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-locator", "--name", "Timing verification", "--class", "juce::Label", "--exact")
     step("size timing workspace", "resize-window", "--w", "1440", "--h", "900")
     step("select first clip", "click", "--class", "MotionTimelineView", "--position", "250,46")

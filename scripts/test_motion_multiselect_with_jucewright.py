@@ -43,7 +43,7 @@ def saved_clips():
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     for index in range(2):
         source = session.artifact_dir / f"Selection {index}.svg"

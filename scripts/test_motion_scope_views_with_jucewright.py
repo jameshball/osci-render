@@ -44,7 +44,7 @@ try:
     ET.SubElement(root, "composition", name="Nested rendering study", duration="20", bpm="120", fps="30")
     seed = session.artifact_dir / "seed.osci-motion"
     write_project(root, seed)
-    subprocess.run(["open", "-a", str(session.app_path), str(seed)], check=True)
+    session.open_project(seed)
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     source = session.artifact_dir / "Motif.txt"
     source.write_text("RETURN")

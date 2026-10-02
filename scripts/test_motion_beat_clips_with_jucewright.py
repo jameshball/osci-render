@@ -75,7 +75,7 @@ fixture = session.artifact_dir / "beat-clips.osci-motion"
 fixture.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(fixture)], check=True)
+    session.open_project(fixture)
     command("wait-for-locator", "--name", "Mixed timing", "--class", "juce::Label", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("original musical placement", "screenshot", "--file", session.artifact_dir / "120-bpm.png")

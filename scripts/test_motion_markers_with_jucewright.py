@@ -47,7 +47,7 @@ project = session.artifact_dir / "markers.osci-motion"
 project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Marker study", "--timeout-ms", 10000)
     step("size workspace", "resize-window", "--w", 1440, "--h", 900)
     source = session.artifact_dir / "Title.txt"
@@ -109,7 +109,7 @@ try:
     session.launch_app("markers-reopen")
     session.keep_app = keep
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
-    subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
+    session.open_project(project)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Marker study", "--timeout-ms", 10000)
     assert markers() == {"Verse": 3, "Final chorus": 5}
     step("reopened markers", "screenshot", "--file", session.artifact_dir / "markers-reopened.png")

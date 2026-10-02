@@ -49,7 +49,7 @@ def fixture(name, slow=False):
 
 
 def open_file(path):
-    subprocess.run(["open", "-a", str(session.app_path), str(path)], check=True)
+    session.open_project(path)
 
 
 def current_name():
