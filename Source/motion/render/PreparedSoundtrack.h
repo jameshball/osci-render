@@ -10,11 +10,19 @@ class PreparedSoundtrack {
 public:
     template <typename ProjectType>
     explicit PreparedSoundtrack(const ProjectType& project, const std::atomic<bool>* cancel = nullptr) {
-        const auto expanded = expandComposition(project, [&](const auto&, const auto& stages) {
+        // A concrete stages type and a plain loop: clang 18 (Ubuntu 24.04's
+        // default compiler) crashes instantiating this generic visitor when it
+        // takes generic stages or nests a lambda.
+        const auto expanded = expandComposition(project, [&](const auto&, const std::vector<CompositionStage>& stages) {
             const auto& leaf = stages.back();
             if (leaf.track->kind != TrackKind::audio) { return; }
-            const auto asset = std::find_if(project.assets.begin(), project.assets.end(),
-                [&](const auto& value) { return value != nullptr && value->id == leaf.clip->asset; });
+            auto asset = project.assets.end();
+            for (auto candidate = project.assets.begin(); candidate != project.assets.end(); ++candidate) {
+                if (*candidate != nullptr && (*candidate)->id == leaf.clip->asset) {
+                    asset = candidate;
+                    break;
+                }
+            }
             if (asset == project.assets.end() || (*asset)->audio == nullptr) { return; }
             ClipSource source {leaf.clipClock, (*asset)->audio, {}};
             for (const auto& stage : stages) {
