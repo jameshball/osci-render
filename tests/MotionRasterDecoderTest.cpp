@@ -70,6 +70,21 @@ static juce::Colour pixel(const osci::RasterImage& image, std::size_t frame, uns
 class MotionRasterDecoderTest : public juce::UnitTest {
 public:
     MotionRasterDecoderTest() : juce::UnitTest("Motion bounded raster decoder", "MotionRaster") {}
+    // __FILE__ is absolute from Xcode but relative to the Makefile directory on
+    // Linux, so also search upwards from the working directory and the binary.
+    static juce::File fixtures() {
+        const auto source = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__)).getParentDirectory().getChildFile("fixtures/motion");
+        if (source.isDirectory()) { return source; }
+        for (auto start : {juce::File::getCurrentWorkingDirectory(), juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory()}) {
+            for (int depth = 0; depth < 8 && start.exists(); ++depth) {
+                const auto candidate = start.getChildFile("tests/fixtures/motion");
+                if (candidate.isDirectory()) { return candidate; }
+                start = start.getParentDirectory();
+            }
+        }
+        return source;
+    }
+
     void runTest() override {
         using namespace motion_raster_test;
         beginTest("PNG preserves straight RGBA and JPEG decodes opaque colour");
@@ -182,8 +197,7 @@ public:
         // string dictionary and records code coverage in raster_lzw_manifest.json.
         // Saturation: width12, four full dictionaries and four subsequent clears.
         // Repetitive: 62 code==available (KwKwK) codes.
-        const auto fixtureDirectory = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(__FILE__))
-            .getParentDirectory().getChildFile("fixtures/motion");
+        const auto fixtureDirectory = fixtures();
         for (const auto* name : { "lzw_saturation.gif", "lzw_kwkwk.gif" }) {
             const auto file = fixtureDirectory.getChildFile(name);
             juce::MemoryBlock encodedFixture;
