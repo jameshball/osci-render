@@ -479,7 +479,7 @@
       </MODULEPATHS>
     </LINUX_MAKE>
     <VS2022 targetFolder="Builds/osci-motion/VisualStudio2022" smallIcon="MotionIcon"
-            bigIcon="MotionIcon" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX"
+            bigIcon="MotionIcon" extraCompilerFlags="/wd4005 /wd4244 /wd4305 /wd4584 /arch:AVX /bigobj"
             externalLibraries="luajit51.lib" extraLinkerFlags="/IGNORE:4006">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="osci-motion" headerPath="..\..\..\modules\osci_scripting\third_party\LuaJIT\src&#10;..\..\..\Source\thorvg-config&#10;..\..\..\modules\thorvg\inc&#10;..\..\..\modules\thorvg\src&#10;..\..\..\modules\thorvg\src\common&#10;..\..\..\modules\thorvg\src\renderer&#10;..\..\..\modules\thorvg\src\loaders&#10;..\..\..\modules\thorvg\src\loaders\lottie&#10;..\..\..\modules\thorvg\src\loaders\lottie\rapidjson&#10;..\..\..\modules\thorvg\src\loaders\raw&#10;..\..\..\modules\Clipper2\CPP\Clipper2Lib\include"
