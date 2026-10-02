@@ -317,6 +317,7 @@ private:
         menu.addSeparator();
         menu.addItem(3, references != 0 ? "Remove composition (in use)" : open ? "Remove composition (open)" : "Remove unused composition", references == 0 && !open);
         const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
             if (owner == nullptr || owner->document.generation() != generation) { return; }
             if (result == 1 && owner->onOpenComposition) { owner->onOpenComposition(id); }
@@ -346,6 +347,7 @@ private:
         menu.addItem(4, uses == 0 ? "Remove source" : "Remove source (in use)", uses == 0);
         menu.addItem(5, "Remove all unused sources");
         const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
             if (owner == nullptr || result == 0 || owner->document.generation() != generation) { return; }
             if (result == 1 && owner->onInsert) { owner->onInsert(id); }

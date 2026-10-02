@@ -151,6 +151,7 @@ private:
             menu.addItem(static_cast<int>(index + 1), juce::String(preset.name.data(), preset.name.size()), true, preset.profile == current);
         }
         juce::Component::SafePointer<MotionScopeProfilePanel> safe(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presets), [safe](int result) {
             if (safe == nullptr || result <= 0 || result > static_cast<int>(motion::scopeProfilePresets.size())) { return; }
             safe->applyPreset(motion::scopeProfilePresets[static_cast<std::size_t>(result - 1)]);

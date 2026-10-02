@@ -454,7 +454,21 @@ public:
 
     void scrubTo(float x, juce::ModifierKeys modifiers) {
         auto time = std::clamp(projectTime(x), 0.0, processor.document.project().duration);
-        if (!modifiers.isAltDown()) { time = processor.document.project().timeGrid().snap(time); }
+        // Free scrubbing that snaps only to the keys on screen (Alt: never).
+        const auto target = motion::findPropertyTarget(processor.document.project(), targetId);
+        if (!modifiers.isAltDown() && target.has_value()) {
+            auto nearest = 8.0f;
+            for (const auto& name : groupNames(*target)) {
+                for (const auto& key : target->curve(name)->keyframes()) {
+                    const auto keyTime = target->projectTime(key.time);
+                    const auto distance = std::abs(timeX(keyTime) - x);
+                    if (distance < nearest) {
+                        nearest = distance;
+                        time = keyTime;
+                    }
+                }
+            }
+        }
         processor.seek(time);
         repaint();
     }

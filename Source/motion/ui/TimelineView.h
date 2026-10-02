@@ -1803,6 +1803,7 @@ private:
         menu.addItem(10, "Delete");
         const auto revision = processor.document.revision();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, revision](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.revision() != revision) { return; }
             if (result == 10) { owner->deleteSelectedKeys(); return; }
@@ -2084,6 +2085,7 @@ private:
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, time, generation, revision](int result) {
             if (owner == nullptr || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
             if ((result == 1 || result == 3) && owner->onEditMarker) { owner->onEditMarker(result == 1 ? id : 0, time); }
@@ -2154,6 +2156,7 @@ private:
         const auto generation = processor.document.generation();
         const auto revision = processor.document.revision();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, revision](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
             if (result >= 20 && result < 24 && owner->onCommand) {
@@ -2218,6 +2221,7 @@ private:
         menu.addItem(4, "Delete group and its tracks");
         const auto generation = processor.document.generation();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || motion::findGroup(owner->processor.document.project(), id) == nullptr) { return; }
             owner->cancelGesture();
@@ -2276,6 +2280,7 @@ private:
         menu.addItem(3, "Delete track");
         const auto generation = processor.document.generation();
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, groups](int result) {
             if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
             owner->cancelGesture();
@@ -2415,6 +2420,7 @@ private:
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
         const auto options = juce::PopupMenu::Options().withTargetComponent(this);
         const auto placement = atHeader ? options.withTargetScreenArea(localAreaToGlobal(juce::Rectangle<int>(0, 0, namesWidth, rulerHeight))) : options.withMousePosition();
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(placement, [owner](int result) {
             if (owner == nullptr || result == 0) {
                 return;
@@ -2673,13 +2679,18 @@ private:
                 consider(marker.time);
             }
         }
+        if (project.hasLoop()) {
+            consider(project.loopStart);
+            consider(project.loopEnd);
+        }
         for (const auto& track : project.tracks) {
             for (const auto& clip : track.clips) {
                 if (excludedClips.contains(clip.id)) { continue; }
                 const auto timing = clip.timing(project.tempo());
                 consider(timing.start);
                 consider(timing.end());
-                if (!expandedTracks.contains(track.id) || timing.rate == 0) { continue; }
+                // Keys count whether or not lanes are open: clips show them as ticks.
+                if (timing.rate == 0) { continue; }
                 for (const auto& [name, curve] : clip.properties) {
                     for (const auto& key : curve.keyframes()) {
                         const bool moving = movingKeys != nullptr && std::any_of(movingKeys->begin(), movingKeys->end(), [&](const auto& item) {
@@ -2708,16 +2719,10 @@ private:
         // The playhead itself is excluded as a magnet while scrubbing it.
         const auto raw = scrollTime + (x - namesWidth) / pixelsPerSecond;
         const auto& project = processor.document.project();
-        auto target = modifiers.isAltDown() ? std::optional<double>() : magnet(raw, project, {}, nullptr, false);
-        auto snapped = snapTime(raw, modifiers);
-        // Like an adaptive grid: in seconds the playhead lands on the ruler's
-        // visible subdivisions (frames stay exact; bars use the beat grid).
-        if (!modifiers.isAltDown() && project.gridSnap && project.timeDisplay == motion::TimeDisplay::seconds) {
-            const auto grid = project.timeGrid();
-            const auto step = grid.tickStep(pixelsPerSecond) / 4;
-            if (std::isfinite(step) && step > 0) { snapped = grid.snap(std::round(raw / step) * step); }
-        }
-        processor.seek(std::clamp(target.value_or(snapped), 0.0, project.duration));
+        // The playhead moves freely and snaps only to things that matter
+        // (clip edges, keys, markers, the loop); Alt bypasses even those.
+        const auto target = modifiers.isAltDown() ? std::optional<double>() : magnet(raw, project, {}, nullptr, false);
+        processor.seek(std::clamp(target.value_or(raw), 0.0, project.duration));
         repaint();
     }
     juce::TextButton addTrack;

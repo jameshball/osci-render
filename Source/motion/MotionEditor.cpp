@@ -441,6 +441,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         menu.addItem(1, "Import file...");
         menu.addItem(2, "Blender live source...");
         const juce::Component::SafePointer<MotionEditor> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner](int choice) {
             if (owner == nullptr) { return; }
             if (choice == 1) { owner->chooseSourceFile(); }

@@ -347,6 +347,7 @@ private:
         menu.addSeparator();
         menu.addItem(4, "Remove");
         const juce::Component::SafePointer<MotionEffectsPanel> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&stack).withMousePosition(), [owner, id, row](int result) {
             if (owner == nullptr || result == 0) { return; }
             if (result == 1) { owner->setEnabled(id, !owner->isEnabled(id)); }
@@ -370,6 +371,7 @@ private:
         int id = 1;
         for (const auto& definition : motion::effectCatalog()) { menu.addItem(id++, juce::String(definition.name)); }
         const juce::Component::SafePointer<MotionEffectsPanel> owner(this);
+        menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton), [owner](int result) {
             if (owner != nullptr && result > 0 && result <= static_cast<int>(motion::effectCatalog().size())) { owner->addEffect(motion::effectCatalog()[static_cast<std::size_t>(result - 1)].id); }
         });
