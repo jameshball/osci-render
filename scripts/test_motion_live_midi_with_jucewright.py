@@ -71,7 +71,7 @@ try:
                      '<path fill="none" stroke="white" d="M50 10 L90 50 L50 90 L10 50 Z"/></svg>')
     step("import audition source", "drop-files", "--file", shape, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
-    step("select audition clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
+    step("select audition clip", "click", "--class", "MotionTimelineView", "--position", "190,77")
     step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     step("enable MIDI audition", "click", "--name", "MIDI audition", "--class", "juce::TextButton", "--exact")
     command("wait", "--ms", "4000")

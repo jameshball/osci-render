@@ -50,12 +50,12 @@ try:
         source.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 10 L90 10 L50 90 Z"/></svg>')
         step("import selection source", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
         command("wait-for-locator", "--name", source.name, "--class", "juce::Label", "--exact")
-    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "230,46")
-    step("extend selection", "click", "--class", "MotionTimelineView", "--position", "230,86", "--modifiers", "shift")
-    step("move selected clips", "drag", "--class", "MotionTimelineView", "--position", "230,46", "--dx", "140", "--dy", "0", "--steps", "12")
+    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "230,68")
+    step("extend selection", "click", "--class", "MotionTimelineView", "--position", "230,108", "--modifiers", "shift")
+    step("move selected clips", "drag", "--class", "MotionTimelineView", "--position", "230,68", "--dx", "140", "--dy", "0", "--steps", "12")
     clips = saved_clips()
     assert len(clips) == 2 and all(float(c.get("start")) == 2 for c in clips), [c.attrib for c in clips]
-    step("reject move above first track", "drag", "--class", "MotionTimelineView", "--position", "370,86", "--dx", "0", "--dy", "-40", "--steps", "8")
+    step("reject move above first track", "drag", "--class", "MotionTimelineView", "--position", "370,108", "--dx", "0", "--dy", "-40", "--steps", "8")
     assert all(float(c.get("start")) == 2 for c in saved_clips())
     step("selection moved", "screenshot", "--file", session.artifact_dir / "selection-moved.png")
     step("undo both moves", "click", "--name", "Undo", "--exact")
@@ -64,8 +64,8 @@ try:
     assert not saved_clips()
     step("undo both deletions", "click", "--name", "Undo", "--exact")
     assert len(saved_clips()) == 2
-    step("select originals for duplication", "click", "--class", "MotionTimelineView", "--position", "230,46")
-    step("extend duplicate selection", "click", "--class", "MotionTimelineView", "--position", "230,86", "--modifiers", "shift")
+    step("select originals for duplication", "click", "--class", "MotionTimelineView", "--position", "230,68")
+    step("extend duplicate selection", "click", "--class", "MotionTimelineView", "--position", "230,108", "--modifiers", "shift")
     original_ids = {c.get("id") for c in saved_clips()}
     step("duplicate selection", "press", "command + d", "--class", "MotionTimelineView")
     duplicated = saved_clips()

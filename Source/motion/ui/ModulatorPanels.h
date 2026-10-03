@@ -431,7 +431,7 @@ private:
     class ShapeButton final : public juce::Button {
     public:
         ShapeButton(const juce::String& text, motion::ModulationWaveform waveform) : juce::Button("Shape " + text) {
-            setTitle(text);
+            setTitle(getName());
             setTooltip(text);
             setWantsKeyboardFocus(false);
             shape.shape.waveform = waveform;

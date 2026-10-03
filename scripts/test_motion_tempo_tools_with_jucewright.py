@@ -130,7 +130,7 @@ try:
     # timing (in Properties) then shows bars.beats.
     assert tree.get("timeDisplay") == "2", tree.attrib
     step("properties tab", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
-    step("select soundtrack", "click", "--class", "MotionTimelineView", "--position", "400,42")
+    step("select soundtrack", "click", "--class", "MotionTimelineView", "--position", "400,64")
     command("wait", "--ms", 300)
     tree = json.loads(command("snapshot", "--json", "--full"))
     start = next((node for node in nodes(tree) if node.get("componentName") == "Clip start" and node.get("visible")), None)

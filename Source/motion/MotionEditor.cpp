@@ -425,6 +425,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
         juce::PopupMenu menu;
+        menu.addItem(3, "Draw a shape...");
         menu.addItem(1, "Import file...");
         menu.addItem(2, "Blender live source...");
         // The examples that ship with osci-render, by kind.
@@ -447,11 +448,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             if (owner == nullptr) { return; }
             if (choice == 1) { owner->chooseSourceFile(); }
             if (choice == 2) { owner->showBlenderSettings(); }
+            if (choice == 3) { owner->showDrawingEditor(0); }
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };
     playButton.onClick = [this] { processor.playing.store(!processor.playing.load()); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
+    assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
         const auto& definitions = processor.document.mainProject().definitions;
         const auto found = std::find_if(definitions.begin(), definitions.end(), [id](const auto& value) { return value->id == id; });
@@ -578,7 +581,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     timeline.onEnterComposition = [this](motion::Id id) { enterComposition(id); };
     timeline.onSelection = [this](motion::Id id) { select(id); };
-    timeline.onAddCamera = [this] { addCamera(); };
+    timeline.onAddCamera = [this](double time) { addCamera(time); };
     timeline.onMidiAssigned = [this](motion::Id id) { select(id); timelineTabs.setSelectedIndex(2); notesEditor.fitContents(); };
     timeline.onMakeUnique = [this](motion::Id id) {
         libraryTabs.setSelectedIndex(0);
@@ -1527,6 +1530,48 @@ void MotionEditor::select(motion::Id id) {
     repaint();
 }
 
+// Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
+// SVG in a temporary folder and imported like any file, relinking an edit.
+void MotionEditor::showDrawingEditor(motion::Id asset) {
+    motion::drawing::Drawing initial;
+    juce::String name;
+    if (asset != 0) {
+        for (const auto& item : processor.document.mainProject().assets) {
+            if (item->id != asset) { continue; }
+            const auto parsed = motion::drawing::fromSvg(juce::String::fromUTF8(static_cast<const char*>(item->data.getData()), static_cast<int>(item->data.getSize())));
+            if (!parsed.has_value()) { return; }
+            initial = *parsed;
+            name = item->name.upToLastOccurrenceOf(".", false, false);
+        }
+    } else {
+        int count = 1;
+        for (const auto& item : processor.document.mainProject().assets) { count += item->name.startsWith("Drawing") ? 1 : 0; }
+        name = "Drawing " + juce::String(count);
+    }
+    auto panel = std::make_unique<MotionDrawingEditor>(initial, name, asset != 0);
+    auto* editor = panel.get();
+    const auto size = juce::Point<int>(std::min(860, getWidth() - 120), std::min(680, getHeight() - 190));
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), asset != 0 ? "Edit drawing" : "Draw a shape", size, true);
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
+    editor->onCancel = [owner, dialog] {
+        juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent()); } });
+    };
+    editor->onDone = [owner, dialog, asset](const motion::drawing::Drawing& drawing, const juce::String& text) {
+        if (owner == nullptr) { return; }
+        const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion drawings");
+        const auto file = folder.getChildFile(juce::File::createLegalFileName(text) + ".svg");
+        if (!folder.createDirectory().wasOk() || !file.replaceWithText(motion::drawing::toSvg(drawing))) {
+            owner->statusBar.show("Could not save the drawing.");
+            return;
+        }
+        owner->importSourceFile(file, asset);
+        juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent()); } });
+    };
+    showOverlay(std::move(overlay));
+    editor->grabKeyboardFocus();
+}
+
 // Examples are written to a temporary folder and imported like any file;
 // the project keeps its own copy of the data.
 void MotionEditor::importExample(const juce::String& resource) {
@@ -1543,9 +1588,9 @@ void MotionEditor::importExample(const juce::String& resource) {
     importSourceFile(file, 0);
 }
 
-void MotionEditor::addCamera() {
+void MotionEditor::addCamera(double at) {
     const auto& project = processor.document.project();
-    const auto time = std::clamp(processor.position.load(), 0.0, project.duration);
+    const auto time = std::clamp(at, 0.0, project.duration);
     const auto frame = project.frameRate > 0.0 ? std::clamp(std::round(time * project.frameRate) / project.frameRate, 0.0, project.duration) : time;
     motion::Id id = 0;
     const auto result = processor.document.addCamera(frame, id);

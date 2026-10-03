@@ -62,17 +62,17 @@ try:
     source = asset["bounds"]
     target = timeline["bounds"]
     step("drag reusable asset", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
-         target["x"] + 170 + 6 * 70, target["y"] + 46, "--steps", 20)
+         target["x"] + 170 + 6 * 70, target["y"] + 68, "--steps", 20)
     command("wait-for-locator", "--name", "Undo Add object clip", "--role", "label", "--exact")
     step("asset placement screenshot", "screenshot", "--file", session.artifact_dir / "motion-asset-placement.png")
     step("undo asset placement", "click", "--name", "Undo", "--exact")
-    step("select original clip", "click", "--class", "MotionTimelineView", "--position", "250,46")
+    step("select original clip", "click", "--class", "MotionTimelineView", "--position", "250,68")
     step("choose slip tool", "press", "S", "--class", "MotionTimelineView")
-    step("slip clip", "drag", "--class", "MotionTimelineView", "--position", "250,46", "--dx", 70, "--dy", 0)
+    step("slip clip", "drag", "--class", "MotionTimelineView", "--position", "250,68", "--dx", 70, "--dy", 0)
     command("wait-for-locator", "--name", "Undo Slip clip", "--role", "label", "--exact")
     step("undo slip", "click", "--name", "Undo", "--exact")
     step("choose stretch tool", "press", "R", "--class", "MotionTimelineView")
-    step("stretch clip", "drag", "--class", "MotionTimelineView", "--position", "250,46", "--dx", 70, "--dy", 0)
+    step("stretch clip", "drag", "--class", "MotionTimelineView", "--position", "250,68", "--dx", 70, "--dy", 0)
     command("wait-for-locator", "--name", "Undo Stretch clip", "--role", "label", "--exact")
     step("undo stretch", "click", "--name", "Undo", "--exact")
     step("choose move tool", "press", "V", "--class", "MotionTimelineView")
@@ -96,12 +96,13 @@ try:
     graph_after = find_node(after_resize, lambda node: node.get("class") == "MotionCurveEditor")["bounds"]
     if graph_after["h"] <= graph_before["h"] + 20:
         raise RuntimeError("Timeline divider did not resize the animation panel")
-    step("open camera inspector", "click", "--name", "Camera", "--class", "MotionTabs::Tab", "--exact")
-    step("add camera", "click", "--name", "Add", "--class", "juce::TextButton", "--exact")
-    command("wait-for-locator", "--name", "Key camera position", "--exact")
-    step("key camera", "click", "--name", "Key camera position", "--exact")
-    step("cut camera", "click", "--name", "Cut here", "--exact")
-    command("wait-for-locator", "--name", "Undo Cut to camera", "--role", "label", "--exact")
+    # The Cameras band's plus adds a camera at the playhead and edits it in Properties.
+    step("show timeline for cameras", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    step("add camera", "click", "--class", "MotionTimelineView", "--position", "154,37")
+    command("wait-for-locator", "--name", "Undo Add camera", "--role", "label", "--exact")
+    step("key camera", "click", "--name", "Key position", "--exact")
+    command("wait-for-locator", "--name", "Undo Set keyframe", "--role", "label", "--exact")
+    step("show graph again", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("camera graph screenshot", "screenshot", "--file", session.artifact_dir / "motion-camera-graph.png")
     step("compact workspace", "resize-window", "--w", "1100", "--h", "700")
     step("compact screenshot", "screenshot", "--file", session.artifact_dir / "motion-compact.png")

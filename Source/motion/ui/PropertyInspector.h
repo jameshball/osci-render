@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MotionStyle.h"
+#include "MotionIcons.h"
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
@@ -58,7 +58,11 @@ public:
     void relayout() { layoutContent(); }
     void setShowsHeader(bool shows) { showsHeader = shows; title.setVisible(shows); kind.setVisible(shows); resized(); }
     void setTarget(motion::Id id) {
-        if (id != target) { target = id; cancelGesture(); }
+        if (id != target) {
+            title.hideEditor(true);
+            target = id;
+            cancelGesture();
+        }
         refresh();
     }
     motion::Id getTarget() const { return target; }
@@ -170,10 +174,10 @@ private:
         juce::String group;
         std::vector<std::unique_ptr<Field>> fields;
         osci::KeyframeButton key;
-        motion::style::Chip modulate {"~"};
+        motion::icons::Chip modulate {"Modulate", motion::icons::Icon::wave};
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         // Position: one spatial path; Rotation: quaternion orientation.
-        std::unique_ptr<motion::style::Chip> mode;
+        std::unique_ptr<motion::icons::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
         void paint(juce::Graphics& g) override {
             g.setFont(motion::style::caption());
@@ -186,7 +190,7 @@ private:
             modulate.setBounds(heading.removeFromRight(20).reduced(0, 1));
             if (mode != nullptr) {
                 heading.removeFromRight(motion::style::gap);
-                mode->setBounds(heading.removeFromRight(44).reduced(0, 1));
+                mode->setBounds(heading.removeFromRight(20).reduced(0, 1));
             }
             area.removeFromTop(1);
             auto line = area.removeFromTop(motion::style::controlHeight);
@@ -253,7 +257,7 @@ private:
                 row->key.onClick = [this, raw] { toggleKeys(*raw); };
                 if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                     const bool path = row->group == "Position";
-                    row->mode = std::make_unique<motion::style::Chip>(path ? "Path" : "Quat");
+                    row->mode = std::make_unique<motion::icons::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
                     row->mode->setName(namePrefix + (path ? "Spatial path" : "Quaternion rotation"));
                     row->mode->setTitle(row->mode->getName());
                     row->mode->setTooltip(path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out). Keys all three axes together."

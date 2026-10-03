@@ -89,7 +89,17 @@ try:
                 found = effect_tab(value)
                 if found: return found
     step("open effects library", "click", effect_tab(library)["ref"])
-    step("add colour effect", "click", "--name", "Colour", "--role", "listItem", "--click-count", 2, "--exact")
+    def tiles(value):
+        if isinstance(value, dict):
+            if str(value.get("class", "")).endswith("Tile") and value.get("componentName") == "Colour":
+                yield value
+            for child in value.values():
+                yield from tiles(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from tiles(child)
+    tile = next(tiles(json.loads(command("snapshot", "--json", "--full"))))
+    step("add colour effect", "click", tile["ref"], "--click-count", 2)
     command("wait-for-locator", "--name", "Effect hue", "--role", "slider", "--exact")
     step("key initial hue", "click", "--name", "Key effect hue", "--exact")
     command("wait", "--ms", 1000)

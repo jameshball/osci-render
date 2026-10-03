@@ -50,18 +50,18 @@ try:
     step("import motif", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Motif.txt", "--class", "juce::Label", "--exact")
     step("save source", "press", "command + s", "--class", "MotionEditor")
-    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "250,46", "--button", "right")
+    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "250,68", "--button", "right")
     step("create composition", "click", "--name", "Create composition from selection", "--role", "menuItem", "--exact")
     step("save created composition", "press", "command + s", "--class", "MotionEditor")
     created = read_project(seed)
     assert len(created.findall("./composition/definition")) == 1
     assert len(created.findall("./composition/track/clip[@composition]")) == 1
     assert len(created.findall("./composition/track")) == 1
-    step("open composition", "click", "--class", "MotionTimelineView", "--position", "250,46", "--click-count", 2)
+    step("open composition", "click", "--class", "MotionTimelineView", "--position", "250,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("inside composition", "screenshot", "--file", session.artifact_dir / "inside-composition.png")
     # Scope entry intentionally clears selection; select the child before duplicating.
-    step("select child", "click", "--class", "MotionTimelineView", "--position", "250,46")
+    step("select child", "click", "--class", "MotionTimelineView", "--position", "250,68")
     step("duplicate selected child", "press", "command + d", "--class", "MotionTimelineView")
     step("save inside composition", "press", "command + s", "--class", "MotionEditor")
     saved = read_project(seed)
@@ -76,18 +76,18 @@ try:
     saved = read_project(seed)
     assert saved.find("./composition/definition/composition").get("name") == "Shared motif"
     assert saved.find("composition").get("name") == "Nested rendering study"
-    step("open child menu for nesting", "click", "--class", "MotionTimelineView", "--position", "250,46", "--button", "right")
+    step("open child menu for nesting", "click", "--class", "MotionTimelineView", "--position", "250,68", "--button", "right")
     step("create inner composition", "click", "--name", "Create composition from selection", "--role", "menuItem", "--exact")
     step("save inner composition", "press", "command + s", "--class", "MotionEditor")
     assert len(read_project(seed).findall("./composition/definition")) == 2
-    step("enter inner composition", "click", "--class", "MotionTimelineView", "--position", "250,46", "--click-count", 2)
+    step("enter inner composition", "click", "--class", "MotionTimelineView", "--position", "250,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Shared motif", "--exact")
     step("nested editor", "screenshot", "--file", session.artifact_dir / "nested-editor.png")
     step("return to shared parent", "click", "--name", "Back to Shared motif", "--exact")
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("return to main", "click", "--name", "Back to Main", "--exact")
     step("duplicate main instance", "press", "command + d", "--class", "MotionTimelineView")
-    step("open duplicate menu", "click", "--class", "MotionTimelineView", "--position", "600,46", "--button", "right")
+    step("open duplicate menu", "click", "--class", "MotionTimelineView", "--position", "600,68", "--button", "right")
     step("make duplicate independent", "click", "--name", "Make composition unique", "--role", "menuItem", "--exact")
     step("save independent instance", "press", "command + s", "--class", "MotionEditor")
     saved = read_project(seed)
@@ -98,7 +98,7 @@ try:
     independent = saved.find(f"./composition/definition[@id='{copy_id}']/composition")
     assert original.get("name") == "Shared motif" and independent.get("name") == "Shared motif copy"
     assert original.find("track/clip[@composition]").get("composition") == independent.find("track/clip[@composition]").get("composition")
-    step("open independent instance", "click", "--class", "MotionTimelineView", "--position", "600,46", "--click-count", 2)
+    step("open independent instance", "click", "--class", "MotionTimelineView", "--position", "600,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Shared motif copy", "--class", "juce::Label", "--exact")
     step("open independent name", "click", "--name", "Shared motif copy", "--class", "juce::Label", "--exact", "--click-count", 2)
     step("rename independent definition", "fill", "--name", "Composition name", "--class", "juce::TextEditor", "--exact", "Independent motif")

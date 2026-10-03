@@ -48,17 +48,17 @@ try:
         source.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 10 L90 10 L50 90 Z"/></svg>')
         step("import selection source", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
         command("wait-for-locator", "--name", source.name, "--class", "juce::Label", "--exact")
-    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "230,46")
+    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "230,68")
     step("duplicate at five seconds", "press", "command + d", "--class", "MotionTimelineView")
     step("duplicate at ten seconds", "press", "command + d", "--class", "MotionTimelineView")
     original = {c.get("id"): float(c.get("start")) for c in saved_clips()}
     assert sorted(original.values()) == [0, 0, 5, 10], original
-    step("select middle clip", "click", "--class", "MotionTimelineView", "--position", "600,46")
+    step("select middle clip", "click", "--class", "MotionTimelineView", "--position", "600,68")
     step("delete leaving gap", "press", "Backspace", "--class", "MotionTimelineView")
     assert sorted(float(c.get("start")) for c in saved_clips()) == [0, 0, 10]
     step("undo gap deletion", "click", "--name", "Undo", "--exact")
-    step("reselect middle clip", "click", "--class", "MotionTimelineView", "--position", "600,46")
-    step("open ripple menu", "click", "--class", "MotionTimelineView", "--position", "600,46", "--button", "right")
+    step("reselect middle clip", "click", "--class", "MotionTimelineView", "--position", "600,68")
+    step("open ripple menu", "click", "--class", "MotionTimelineView", "--position", "600,68", "--button", "right")
     step("ripple command screenshot", "screenshot", "--file", session.artifact_dir / "ripple-menu.png")
     step("ripple delete middle", "click", "--name", "Ripple delete clip", "--role", "menuItem", "--exact")
     assert sorted(float(c.get("start")) for c in saved_clips()) == [0, 0, 5]
@@ -66,8 +66,8 @@ try:
     step("undo ripple", "click", "--name", "Undo", "--exact")
     assert {c.get("id"): float(c.get("start")) for c in saved_clips()} == original
     step("redo ripple", "click", "--name", "Redo", "--exact")
-    step("select first track head", "click", "--class", "MotionTimelineView", "--position", "230,46")
-    step("select second track head", "click", "--class", "MotionTimelineView", "--position", "230,86", "--modifiers", "shift")
+    step("select first track head", "click", "--class", "MotionTimelineView", "--position", "230,68")
+    step("select second track head", "click", "--class", "MotionTimelineView", "--position", "230,108", "--modifiers", "shift")
     step("ripple shortcut across tracks", "press", "shift + Backspace", "--class", "MotionTimelineView")
     clips = saved_clips()
     assert len(clips) == 1 and float(clips[0].get("start")) == 0

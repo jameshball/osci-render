@@ -24,6 +24,7 @@
 #include "ui/ShortcutsOverlay.h"
 #include "ui/MotionTabs.h"
 #include "ui/MotionIcons.h"
+#include "ui/DrawingEditor.h"
 #include <deque>
 #include <variant>
 
@@ -95,8 +96,9 @@ private:
     void refreshInspector();
     bool audioSelected() const;
     bool selectionIsCamera() const;
-    void addCamera();
+    void addCamera(double time);
     void importExample(const juce::String& resource);
+    void showDrawingEditor(motion::Id asset);
     // `chosen`: the user picked this property; otherwise a new target opens
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);

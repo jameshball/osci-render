@@ -88,7 +88,7 @@ try:
     step("dismiss conflict", "press", "Escape")
     command("wait", "--ms", 600)
     command("wait-for-locator", "--name", "240.0", "--class", "juce::Label", "--exact")
-    step("select musical clip", "click", "--class", "MotionTimelineView", "--position", "310,55")
+    step("select musical clip", "click", "--class", "MotionTimelineView", "--position", "310,77")
     step("seek musical midpoint", "click", "--class", "MotionTimelineView", "--position", "310,12")
     step("split musical clip", "press", "command + k", "--class", "MotionTimelineView")
     command("wait-for-locator", "--name", "Undo Split clip", "--role", "label", "--exact")

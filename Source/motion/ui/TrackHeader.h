@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../model/Timeline.h"
-#include "MotionStyle.h"
+#include "MotionIcons.h"
 
 class MotionTrackHeader : public juce::Component {
 public:
@@ -92,10 +92,10 @@ public:
         // Compact 15 px switches leave the name as much room as possible.
         constexpr int chip = 15;
         int count = 0;
-        for (auto* button : { &arm, &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
+        for (auto* button : std::initializer_list<juce::Button*> { &arm, &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
         const auto chips = count * (chip + 1);
         auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, 16);
-        for (auto* button : { &arm, &mute, &solo, &lock }) {
+        for (auto* button : std::initializer_list<juce::Button*> { &arm, &mute, &solo, &lock }) {
             if (!button->isVisible()) { continue; }
             button->setBounds(buttons.removeFromLeft(chip));
             buttons.removeFromLeft(1);
@@ -147,5 +147,6 @@ private:
             }
         }
     } grip;
-    motion::style::Chip mute {"M"}, solo {"S"}, lock {"L"}, arm {juce::String(juce::CharPointer_UTF8("\xe2\x97\x8f"))};
+    motion::icons::Chip lock {"Lock", motion::icons::Icon::lock};
+    motion::style::Chip mute {"M"}, solo {"S"}, arm {juce::String(juce::CharPointer_UTF8("\xe2\x97\x8f"))};
 };

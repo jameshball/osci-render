@@ -96,7 +96,7 @@ try:
     session.open_project(fixture)
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
-    step("select visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
+    step("select visual clip", "click", "--class", "MotionTimelineView", "--position", "190,77")
     step("open notes workspace", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     # Give the piano roll the room it used to take for itself.
     step("taller notes", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
@@ -172,7 +172,7 @@ try:
     locked_fixture.write_bytes(struct.pack("<II", 0x21324356, len(locked_xml)) + locked_xml + b"\0")
     session.open_project(locked_fixture)
     command("wait-for-locator", "--name", "Locked musical beam", "--class", "juce::Label", "--exact")
-    step("select locked visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
+    step("select locked visual clip", "click", "--class", "MotionTimelineView", "--position", "190,77")
     step("inspect locked notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     command("wait-for-locator", "--name", "Remove MIDI", "--exact")
     step("select locked notes", "press", "command + a", "--class", "MotionNotesEditor")

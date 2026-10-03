@@ -77,9 +77,9 @@ try:
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     if gain is None or float(gain["value"]) != 1:
         raise RuntimeError("Audio gain inspector missing or incorrect")
-    step("reject audio onto visual lane", "drag", "--class", "MotionTimelineView", "--position", "250,86", "--dx", 0, "--dy", -40)
+    step("reject audio onto visual lane", "drag", "--class", "MotionTimelineView", "--position", "250,108", "--dx", 0, "--dy", -40)
     wait_undo("Import soundtrack")
-    step("move soundtrack", "drag", "--class", "MotionTimelineView", "--position", "250,86", "--dx", 70, "--dy", 0)
+    step("move soundtrack", "drag", "--class", "MotionTimelineView", "--position", "250,108", "--dx", 70, "--dy", 0)
     wait_undo("Move clip")
     step("undo soundtrack move", "click", "--name", "Undo", "--exact")
     step("waveform workspace screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-workspace.png")

@@ -3,6 +3,7 @@
 #include "MotionStyle.h"
 
 #include "../model/Document.h"
+#include "../model/Drawing.h"
 #include <osci_gui/osci_gui.h>
 
 class MotionAssetLibrary : public juce::Component, private juce::ListBoxModel {
@@ -53,7 +54,7 @@ public:
     std::function<void(motion::Id)> onSelectUses;
     std::function<void(const juce::String&)> onMessage;
 
-    std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace;
+    std::function<void(motion::Id)> onInsert, onOpenComposition, onRemoveComposition, onReplace, onEditDrawing;
     std::function<void()> onCancelImport;
     std::function<void(motion::Id)> onBake;
     std::function<juce::String(motion::Id)> liveStatus;
@@ -336,6 +337,10 @@ private:
         juce::PopupMenu menu;
         menu.addItem(1, "Insert at playhead");
         menu.addItem(2, "Rename...");
+        const auto& drawn = *assets[static_cast<std::size_t>(row)];
+        if (drawn.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(drawn.data.getData()), static_cast<int>(drawn.data.getSize())))) {
+            menu.addItem(8, "Edit drawing...");
+        }
         menu.addItem(6, "Replace with file...");
         menu.addItem(3, uses == 0 ? "Not used by any clip" : "Select " + juce::String(static_cast<int>(uses)) + (uses == 1 ? " clip using it" : " clips using it"), uses != 0);
         const auto& source = *assets[static_cast<std::size_t>(row)];
@@ -354,6 +359,7 @@ private:
             if (result == 1 && owner->onInsert) { owner->onInsert(id); }
             if (result == 2) { owner->beginRename(id); }
             if (result == 6 && owner->onReplace) { owner->onReplace(id); }
+            if (result == 8 && owner->onEditDrawing) { owner->onEditDrawing(id); }
             if (result == 3 && owner->onSelectUses) { owner->onSelectUses(id); }
             if (result == 7) { owner->adoptMidiTempo(id); }
             if (result == 4 || result == 5) {

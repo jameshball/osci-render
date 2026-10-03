@@ -80,7 +80,7 @@ try:
     session.open_project(fixture)
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
-    step("select MIDI clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
+    step("select MIDI clip", "click", "--class", "MotionTimelineView", "--position", "190,77")
     step("seek held note", "click", "--class", "MotionTimelineView", "--position", "190,12")
     command("wait", "--ms", 1000)
     step("frozen note audition", "screenshot", "--file", session.artifact_dir / "held-note.png")

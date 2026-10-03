@@ -100,7 +100,7 @@ try:
     library = find(snapshot(), lambda node: node.get("class") == "MotionTabs" and node.get("name") == "Library tabs")
     tab = find(library, lambda node: node.get("class") == "MotionTabs::Tab" and node.get("name") == "Effects")
     step("effects library", "click", tab["ref"])
-    source = find(snapshot(), lambda node: node.get("role") == "listItem" and node.get("name") == "Scale")["bounds"]
+    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Scale"))["bounds"]
     target = header_bounds(group)
     step("effect on group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
@@ -111,13 +111,13 @@ try:
     step("add empty grouped track", "click", "--name", "Add track to group", "--role", "menuItem", "--exact")
     wait_undo("Add track")
     empty = header_id("New track")
-    source = find(snapshot(), lambda node: node.get("role") == "listItem" and node.get("name") == "Translate")["bounds"]
+    source = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Translate"))["bounds"]
     target = header_bounds(empty)
     step("effect on empty grouped track", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
     wait_undo("Add Translate")
-    step("group scope from empty track", "select-option", "--name", "Effect scope", "--id", 4)
-    step("add effect to empty track parent", "click", "--name", "Swirl", "--role", "listItem", "--click-count", 2)
+    step("add effect to empty track's group", "click", "--name", "Add effect to group", "--exact")
+    step("add group swirl", "click", "--name", "Swirl", "--role", "menuItem", "--exact")
     wait_undo("Add Swirl")
     step("delete parent menu", "click", "--name", "Reorder track " + group, "--exact")
     step("delete group", "click", "--name", "Delete group and its tracks", "--role", "menuItem", "--exact")

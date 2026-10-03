@@ -49,16 +49,16 @@ try:
     step("import motif", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Motif.txt", "--class", "juce::Label", "--exact")
     step("save source", "press", "command + s", "--class", "MotionEditor")
-    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "250,46", "--button", "right")
+    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "250,68", "--button", "right")
     step("create composition", "click", "--name", "Create composition from selection", "--role", "menuItem", "--exact")
     step("save created composition", "press", "command + s", "--class", "MotionEditor")
     created = read_project(seed)
     assert len(created.findall("./composition/definition")) == 1
     assert len(created.findall("./composition/track/clip[@composition]")) == 1
     assert len(created.findall("./composition/track")) == 1
-    step("open composition", "click", "--class", "MotionTimelineView", "--position", "250,46", "--click-count", 2)
+    step("open composition", "click", "--class", "MotionTimelineView", "--position", "250,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Main", "--exact")
-    step("select child", "click", "--class", "MotionTimelineView", "--position", "250,46")
+    step("select child", "click", "--class", "MotionTimelineView", "--position", "250,68")
     step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     # Give the piano roll the room it used to take for itself.
     step("taller notes", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
@@ -88,9 +88,9 @@ try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     session.open_project(seed)
     command("wait-for-locator", "--name", "Composition 1", "--class", "juce::Label", "--exact")
-    step("reopen musical composition", "click", "--class", "MotionTimelineView", "--position", "250,46", "--click-count", 2)
+    step("reopen musical composition", "click", "--class", "MotionTimelineView", "--position", "250,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Main", "--exact")
-    step("select reopened child", "click", "--class", "MotionTimelineView", "--position", "250,46")
+    step("select reopened child", "click", "--class", "MotionTimelineView", "--position", "250,68")
     step("show reopened notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     command("wait-for-locator", "--name", "Remove MIDI", "--exact")
     step("select child notes", "press", "command + a", "--class", "MotionNotesEditor")

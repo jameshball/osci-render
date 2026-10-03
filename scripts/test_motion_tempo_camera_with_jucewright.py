@@ -97,8 +97,9 @@ try:
     musical = tree.find("track/clip")
     assert musical.get("start") == "8" and musical.get("duration") == "4", "musical clips keep their beats"
     step("tempo", "screenshot", "--file", session.artifact_dir / "tempo.png")
-    # Aim the front camera at the clip from the camera inspector.
-    step("camera tab", "click", "--name", "Camera", "--class", "MotionTabs::Tab", "--exact")
+    # Aim the front camera at the clip: select it in the Cameras band (under
+    # the markers and tempo band), then edit it in Properties.
+    step("select camera", "click", "--class", "MotionTimelineView", "--position", "300,59")
     step("look at", "select-option", "--name", "Camera look at", "--text", "On the beat")
     wait_undo("Change camera rig")
     camera = next(c for c in saved().iter("camera") if c.get("id") == "9")

@@ -64,7 +64,7 @@ public:
     // Runs one of the editor's commands by name (Cut, Copy, Paste...).
     std::function<void(const juce::String&)> onCommand;
     // Add a camera that takes over the output at the playhead.
-    std::function<void()> onAddCamera;
+    std::function<void(double)> onAddCamera;
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
     std::function<void(const juce::String&)> onError;
@@ -384,8 +384,9 @@ public:
     // it is dropped.
     std::function<void(const motion::Project*)> onPreview;
     void previewEffect(motion::Id owner) {
-        if (owner == previewedOwner) { return; }
+        if (owner == previewedOwner && processor.document.revision() == previewedRevision) { return; }
         previewedOwner = owner;
+        previewedRevision = processor.document.revision();
         if (!onPreview) { return; }
         const auto* definition = motion::effectDefinition(dropEffect);
         if (owner == 0 || definition == nullptr) {
@@ -399,6 +400,7 @@ public:
         onPreview(&project);
     }
     motion::Id previewedOwner = 0;
+    std::uint64_t previewedRevision = 0;
 
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
@@ -2014,7 +2016,7 @@ private:
     }
     void cameraBandDown(const juce::MouseEvent& event) {
         if (addCameraBounds().contains(event.getPosition())) {
-            if (onAddCamera) { onAddCamera(); }
+            if (onAddCamera) { onAddCamera(processor.position.load()); }
             return;
         }
         if (event.x < namesWidth) { return; }
@@ -2096,8 +2098,7 @@ private:
             auto& document = safe->processor.document;
             const auto& cameras = document.project().cameras;
             if (result == 3) {
-                safe->processor.seek(time);
-                if (safe->onAddCamera) { safe->onAddCamera(); }
+                if (safe->onAddCamera) { safe->onAddCamera(time); }
             } else if (result == 2) {
                 safe->report(document.removeCamera(camera));
                 safe->selectedCut = 0;
@@ -2524,8 +2525,7 @@ private:
             if (result == 1 && owner->onCommand) { owner->onCommand("Paste"); }
             if (result == 2) { owner->addTrack.triggerClick(); }
             if (result == 3 && owner->onAddCamera) {
-                owner->processor.seek(time);
-                owner->onAddCamera();
+                owner->onAddCamera(time);
             }
         });
     }

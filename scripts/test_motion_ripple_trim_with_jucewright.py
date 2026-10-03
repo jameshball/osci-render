@@ -85,7 +85,7 @@ def area():
 
 def drag(label, x, dx, row=0):
     bounds = area()
-    y = bounds['y'] + 64 + row * 32
+    y = bounds['y'] + 86 + row * 32
     step(label, 'drag-xy', bounds['x'] + x, y, bounds['x'] + x + dx, y, '--steps', 8)
 
 
@@ -97,8 +97,7 @@ try:
     independent = ET.tostring(state.find("./composition/track[@id='20']"))
     locked = ET.tostring(state.find("./composition/track[@id='30']"))
     baseline = {key: values(value) for key, value in clips.items()}
-    step('editing tool menu', 'click', '--class', 'MotionTimelineView', '--position', '60,12')
-    step('choose ripple trim', 'click', '--name', 'Ripple trim edges on this track (B)', '--role', 'menuItem', '--exact')
+    step('choose ripple trim', 'click', '--name', 'Ripple trim tool', '--exact')
     drag('extend trailing edge two seconds', 517, 140)
     assert_timing({'3': [0, 7, .5, 1.25], '4': [7, 5, .5, 1.25], '6': [14, 5, .25, 1.25]})
     step('undo whole ripple gesture', 'click', '--name', 'Undo', '--exact')

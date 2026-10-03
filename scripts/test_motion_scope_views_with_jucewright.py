@@ -51,7 +51,7 @@ try:
     step("import motif", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Motif.txt", "--class", "juce::Label", "--exact")
     step("save source", "press", "command + s", "--class", "MotionEditor")
-    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "250,46", "--button", "right")
+    step("open clip menu", "click", "--class", "MotionTimelineView", "--position", "250,68", "--button", "right")
     step("create composition", "click", "--name", "Create composition from selection", "--role", "menuItem", "--exact")
     step("save created composition", "press", "command + s", "--class", "MotionEditor")
     created = read_project(seed)

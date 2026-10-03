@@ -7,7 +7,7 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, trash, undo, redo, close, check };
+enum class Icon { bezier, wave, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, lock, trash, undo, redo, close, check };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
@@ -38,11 +38,36 @@ inline const juce::Path& path(Icon icon) {
         add(Icon::rectangle, "M3 5h18v14H3V5zm2 2v10h14V7H5z");
         add(Icon::ellipse, "M12 4C6.48 4 2 7.58 2 12s4.48 8 10 8 10-3.58 10-8-4.48-8-10-8zm0 14c-4.41 0-8-2.69-8-6s3.59-6 8-6 8 2.69 8 6-3.59 6-8 6z");
         add(Icon::erase, "M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.77-.78 2.04 0 2.83L5.03 20h7.66l8.72-8.73c.79-.77.79-2.04 0-2.83l-4.85-4.85c-.39-.39-.91-.59-1.42-.59zM6.44 18.03l-2.44-2.44 6.2-6.2 4.85 4.85-3.77 3.79H6.44z");
+        add(Icon::lock, "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z");
         add(Icon::trash, "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z");
         add(Icon::undo, "M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z");
         add(Icon::redo, "M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z");
         add(Icon::close, "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z");
         add(Icon::check, "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z");
+        // The pen: a curve between two points with their handles.
+        juce::Path curve, bezier;
+        curve.startNewSubPath(4, 19);
+        curve.cubicTo(8, 7, 16, 7, 20, 19);
+        curve.startNewSubPath(4, 19);
+        curve.lineTo(8, 7);
+        curve.startNewSubPath(20, 19);
+        curve.lineTo(16, 7);
+        juce::PathStrokeType(1.6f).createStrokedPath(bezier, curve);
+        bezier.addRectangle(2, 17, 4, 4);
+        bezier.addRectangle(18, 17, 4, 4);
+        bezier.addEllipse(6.5f, 5.5f, 3, 3);
+        bezier.addEllipse(14.5f, 5.5f, 3, 3);
+        bezier.setUsingNonZeroWinding(true);
+        result[Icon::bezier] = bezier;
+        // Modulation: one cycle of a sine.
+        juce::Path sine, wave;
+        for (int step = 0; step <= 32; ++step) {
+            const auto x = 3.0f + 18.0f * static_cast<float>(step) / 32;
+            const auto y = 12.0f - 6.0f * std::sin(static_cast<float>(step) / 32 * juce::MathConstants<float>::twoPi);
+            if (step == 0) { sine.startNewSubPath(x, y); } else { sine.lineTo(x, y); }
+        }
+        juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded).createStrokedPath(wave, sine);
+        result[Icon::wave] = wave;
         return result;
     }();
     return paths.at(icon);
@@ -89,5 +114,29 @@ public:
 private:
     Icon icon;
     motion::style::Fade fade {*this};
+};
+
+// A small toggle chip showing an icon (row options in Properties).
+class Chip final : public juce::Button {
+public:
+    Chip(const juce::String& name, Icon glyph) : juce::Button(name), icon(glyph) {
+        setClickingTogglesState(true);
+        setWantsKeyboardFocus(false);
+    }
+    void setOnColour(juce::Colour colour) { on = colour; repaint(); }
+    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
+        const auto bounds = getLocalBounds().toFloat().reduced(.5f);
+        const auto active = getToggleState();
+        g.setColour(active ? on.withAlpha(.85f) : (highlighted || down ? motion::style::raised().brighter(.15f) : motion::style::field()));
+        g.fillRoundedRectangle(bounds, motion::style::radius);
+        if (!active) {
+            g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
+            g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
+        }
+        draw(g, icon, bounds, active ? juce::Colours::white : motion::style::muted().withAlpha(highlighted ? 1.0f : .85f), 13.0f);
+    }
+private:
+    Icon icon;
+    juce::Colour on = motion::style::accent();
 };
 }

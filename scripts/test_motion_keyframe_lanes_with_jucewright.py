@@ -89,9 +89,9 @@ try:
     step("fit", "press", "F", "--class", "MotionTimelineView")
     pps = (timeline["w"] - 170 - 20) / 8.0
     x_of = lambda t: 170 + round(t * pps)
-    step("select keyed clip", "click", "--class", "MotionTimelineView", "--position", f"{x_of(0.5)},42")
+    step("select keyed clip", "click", "--class", "MotionTimelineView", "--position", f"{x_of(0.5)},64")
     step("show lanes", "press", "U", "--class", "MotionTimelineView")
-    lane_y = 26 + 32 + 11
+    lane_y = 48 + 32 + 11
     step("lanes", "screenshot", "--file", session.artifact_dir / "lanes.png")
     # Drag the key at 1 s to 1.5 s (Alt: no snapping, then check exact grid-free time).
     step("select middle key", "click", "--class", "MotionTimelineView", "--position", f"{x_of(1)},{lane_y}")
@@ -104,7 +104,7 @@ try:
     step("select key 1", "click", "--class", "MotionTimelineView", "--position", f"{x_of(1)},{lane_y}")
     step("add key 2", "click", "--class", "MotionTimelineView", "--position", f"{x_of(2)},{lane_y}", "--modifiers", "shift")
     step("copy keys", "press", "command + c", "--class", "MotionTimelineView")
-    step("select second clip", "click", "--class", "MotionTimelineView", "--position", f"{x_of(5)},{26 + 32 + 22 + 16}")
+    step("select second clip", "click", "--class", "MotionTimelineView", "--position", f"{x_of(5)},{48 + 32 + 22 + 16}")
     step("seek 5 s", "click", "--class", "MotionTimelineView", "--position", f"{x_of(5)},12")
     step("paste keys", "press", "command + v", "--class", "MotionTimelineView")
     pasted = keys(saved(), 5)

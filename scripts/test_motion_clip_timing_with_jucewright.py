@@ -91,7 +91,7 @@ try:
     session.open_project(project)
     command("wait-for-locator", "--name", "Timing verification", "--class", "juce::Label", "--exact")
     step("size timing workspace", "resize-window", "--w", "1440", "--h", "900")
-    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "250,46")
+    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "250,68")
     step("open clip inspector", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     edit("Clip duration", 8)
     _, clips = saved()
@@ -116,7 +116,7 @@ try:
     command("wait-for-locator", "--name", "Enter a finite number.", "--exact")
     _, clips = saved()
     assert float(clips['3'].get('offset')) == 1.25
-    step("select second clip", "click", "--class", "MotionTimelineView", "--position", "920,46")
+    step("select second clip", "click", "--class", "MotionTimelineView", "--position", "920,68")
     # Timing stays in the inspector while changing the selected timeline clip.
     command("wait-for-locator", "--name", "Clip timing inspector", "--exact")
     edit("Clip duration", 180)
@@ -153,19 +153,19 @@ try:
     area = find(tree, "MotionTimelineView")["bounds"]
     pps = (area["w"] - 170 - 20) / 180
     at_duplicate = 170 + round(17.5 * pps)
-    step("open duplicate clip menu", "click", "--class", "MotionTimelineView", "--position", f"{at_duplicate},46", "--button", "right")
+    step("open duplicate clip menu", "click", "--class", "MotionTimelineView", "--position", f"{at_duplicate},68", "--button", "right")
     step("duplicate from menu", "click", "--name", "Duplicate clip", "--role", "menuItem", "--exact")
     _, clips = saved()
     assert len(clips) == 4 and sorted(float(c.get('start')) for c in clips.values()) == [2, 10, 15, 20]
     first_x = 170 + round(6 * pps)
-    step("select occupied repeat target", "click", "--class", "MotionTimelineView", "--position", f"{first_x},46")
+    step("select occupied repeat target", "click", "--class", "MotionTimelineView", "--position", f"{first_x},68")
     step("reject overlapping duplicate", "press", "command + d", "--class", "MotionTimelineView")
     command("wait-for-locator", "--name", "Cannot edit timeline", "--exact")
     step("dismiss duplicate collision", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
     _, unchanged = saved()
     assert [c.attrib for c in clips.values()] == [c.attrib for c in unchanged.values()]
     step("show object inspector", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
-    step("open timing shortcut menu", "click", "--class", "MotionTimelineView", "--position", f"{first_x},46", "--button", "right")
+    step("open timing shortcut menu", "click", "--class", "MotionTimelineView", "--position", f"{first_x},68", "--button", "right")
     step("edit timing from menu", "click", "--name", "Edit clip timing", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Clip timing inspector", "--exact")
     step("repeated arrangement", "screenshot", "--file", session.artifact_dir / "repeated.png")

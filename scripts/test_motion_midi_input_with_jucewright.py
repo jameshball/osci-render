@@ -79,7 +79,8 @@ try:
     step("armed", "screenshot", "--file", session.artifact_dir / "armed.png")
     # A controller modulator following the clip's mod wheel.
     step("modulators", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
-    step("add cc", "click", "--name", "Add MIDI controller", "--exact")
+    step("add modulator", "click", "--name", "Add modulator", "--exact")
+    step("add cc", "click", "--name", "MIDI controller", "--role", "menuItem", "--exact")
     wait_undo("Add modulator")
     step("source", "select-option", "--name", "Envelope source", "--text", "Lead")
     step("pitch bend", "select-option", "--name", "Modulator controller", "--text", "Pitch bend")

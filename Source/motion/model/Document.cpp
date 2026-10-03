@@ -4,6 +4,7 @@
 #include "PropertySchema.h"
 #include "../../parser/fractal/FractalPreparation.h"
 #include "CompositionGraph.h"
+#include "Drawing.h"
 #include "ModulationGraph.h"
 #include "LuaClipBake.h"
 #include "../import/LuaBaker.h"
@@ -2514,6 +2515,12 @@ juce::Result Document::decodeAsset(Asset& asset, const std::atomic<bool>* cancel
     } else if (extension == ".obj") {
         WorldObject object(content.toStdString());
         shapes = object.draw();
+    } else if (extension == ".svg" && drawing::isDrawing(content)) {
+        // Drawings keep the place and size they were drawn at.
+        for (auto [path, smooth] : drawing::paths(content)) {
+            path.applyTransform(juce::AffineTransform::scale(1.0f, -1.0f));
+            SvgParser::pathToShapes(path, shapes, false);
+        }
     } else if (extension == ".svg") {
         SvgParser svg(content);
         shapes = svg.draw();

@@ -131,7 +131,7 @@ try:
     assert float(state.get("loopStart")) == 2 and float(state.get("loopEnd")) == 6 and state.get("looping") in ("0", "false"), state.attrib
     step("loop on", "press", "l", "--class", "MotionTimelineView")
     assert saved().get("looping") in ("1", "true")
-    step("loop button", "click", "--name", "Loop playback", "--class", "motion::style::IconButton", "--exact")
+    step("loop button", "click", "--name", "Loop playback", "--class", "motion::icons::Button", "--exact")
     assert saved().get("looping") in ("0", "false")
     step("loop again", "press", "l", "--class", "MotionTimelineView")
     assert saved().get("looping") in ("1", "true")

@@ -77,14 +77,15 @@ try:
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     # A shared LFO, edited in the library.
     step("modulator tab", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
-    step("add lfo", "click", "--name", "Add LFO", "--exact")
+    step("add modulator", "click", "--name", "Add modulator", "--exact")
+    step("add lfo", "click", "--name", "LFO", "--role", "menuItem", "--exact")
     wait_undo("Add modulator")
-    step("saw", "select-option", "--name", "Modulator waveform", "--text", "Saw")
+    step("saw", "click", "--name", "Shape Saw", "--exact")
     step("rate", "set-value", "--name", "Modulator rate", "2")
     wait_undo("Change modulator")
     step("library", "screenshot", "--file", session.artifact_dir / "library.png")
     # Route it into the leader's position y from the graph column.
-    step("select leader", "click", "--class", "MotionTimelineView", "--position", "300,42")
+    step("select leader", "click", "--class", "MotionTimelineView", "--position", "300,64")
     step("graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("taller graph", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
     step("all channels", "click", "--name", "Animated channels only", "--exact")
@@ -96,7 +97,7 @@ try:
     wait_undo("Change route")
     # Link the follower's position x to the leader's, delayed by half a second.
     step("timeline for follower", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("select follower", "click", "--class", "MotionTimelineView", "--position", "300,74")
+    step("select follower", "click", "--class", "MotionTimelineView", "--position", "300,96")
     step("graph for follower", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("choose position x", "click", "--name", "Curve Position X", "--exact")
     step("link menu", "click", "--name", "Link property", "--exact")
@@ -115,7 +116,7 @@ try:
     assert link is not None and link.get("source") == "3" and link.get("property") == "position.x" and float(link.get("delay")) == 0.5, ET.tostring(linked)
     # A spatial path for the leader, from the inspector's Position row.
     step("timeline for leader", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("select leader again", "click", "--class", "MotionTimelineView", "--position", "300,42")
+    step("select leader again", "click", "--class", "MotionTimelineView", "--position", "300,64")
     step("object inspector", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     step("spatial path", "click", "--name", "Spatial path", "--exact")
     wait_undo("Use spatial path")
