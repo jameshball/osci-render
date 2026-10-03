@@ -2,6 +2,7 @@
 
 #include "EditorTransformFrame.h"
 #include <JuceHeader.h>
+#include "MotionStyle.h"
 
 enum class MotionTransformTool { move, rotate, scale };
 
@@ -90,7 +91,7 @@ struct MotionCompositionGizmo {
                 for (std::size_t index = 1; index < points.size(); ++index) { ring.lineTo(points[index]); }
                 g.strokePath(ring, juce::PathStrokeType(hover == axis ? 2.8f : 1.8f));
                 const auto offset = points.front() - origin;
-                g.setFont(12.0f);
+                g.setFont(motion::style::body());
                 g.drawText(juce::String::charToString("XYZ"[axis]), juce::Rectangle<float>(20, 18).withCentre(points.front() + offset * (14 / std::max(1.0f, offset.getDistanceFromOrigin()))), juce::Justification::centred);
             } else {
                 const juce::Line<float> line(origin, points.back());
@@ -99,7 +100,7 @@ struct MotionCompositionGizmo {
                     g.drawLine(line, 2.0f);
                     g.fillRect(juce::Rectangle<float>(8, 8).withCentre(points.back()));
                 }
-                g.setFont(12.0f);
+                g.setFont(motion::style::body());
                 g.drawText(juce::String::charToString("XYZ"[axis]), juce::Rectangle<float>(20, 18).withCentre(points.back() + (points.back() - origin) * (14 / points.back().getDistanceFrom(origin))), juce::Justification::centred);
             }
         }

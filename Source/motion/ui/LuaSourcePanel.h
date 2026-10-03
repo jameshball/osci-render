@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "BakeSettingsPanel.h"
 #include <osci_scripting/osci_scripting.h>
 
@@ -8,14 +10,14 @@ public:
     MotionLuaSourcePanel(const juce::String& initial, motion::BakeSettings settings, std::size_t instances, const juce::String& error)
         : model("motion-source-draft", "Lua source", initial), editor(model, editorOptions()), baking(settings) {
         setName("Lua source editor");
-        editor.getEditor().setFont(juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 14.0f, juce::Font::plain)));
+        editor.getEditor().setFont(motion::style::mono());
         help.setText("Shared source: " + juce::String(static_cast<juce::uint64>(instances)) + (instances == 1 ? " clip" : " clips")
             + " will update after a successful bake. Clip animation stays unchanged.", juce::dontSendNotification);
-        help.setFont(juce::FontOptions(13));
+        help.setFont(motion::style::body());
         help.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         help.setJustificationType(juce::Justification::centredLeft);
         failure.setName("Source preparation error");
-        failure.setFont(juce::FontOptions(13));
+        failure.setFont(motion::style::body());
         failure.setColour(juce::Label::textColourId, osci::Colours::danger());
         failure.setText(error, juce::dontSendNotification);
         failure.setTooltip(error);

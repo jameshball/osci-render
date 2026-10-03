@@ -19,17 +19,13 @@
 #include "render/LuaSliderBakes.h"
 #include "model/TapTempo.h"
 #include "model/TempoDetection.h"
-#include "ui/PlaybackHealth.h"
 #include "ui/PropertyInspector.h"
 #include "ui/StatusBar.h"
 #include "ui/ShortcutsOverlay.h"
+#include "ui/MotionTabs.h"
+#include "ui/MotionIcons.h"
 #include <deque>
 #include <variant>
-
-// The menu bar at the same type size as the rest of the workspace.
-struct MotionMenuLookAndFeel final : osci::LookAndFeel {
-    juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return juce::Font(juce::FontOptions(14.0f)); }
-};
 
 class MotionEditor : public CommonPluginEditor, public juce::FileDragAndDropTarget, public juce::DragAndDropContainer, private juce::Timer, private juce::ChangeListener, private juce::FocusChangeListener {
 public:
@@ -81,7 +77,7 @@ private:
     void enterComposition(motion::Id clip, bool fromLibrary = false);
     void leaveComposition();
     struct ScopeView {
-        motion::Id scope = 0, selection = 0, curveTarget = 0, cameraSelection = 0;
+        motion::Id scope = 0, selection = 0, curveTarget = 0;
         double position = 0, timelineFraction = 0.34;
         int timelineTab = 0, inspectorTab = 0;
         bool cameraCurve = false;
@@ -98,6 +94,9 @@ private:
     std::uint64_t scopeNameGeneration = 0;
     void refreshInspector();
     bool audioSelected() const;
+    bool selectionIsCamera() const;
+    void addCamera();
+    void importExample(const juce::String& resource);
     // `chosen`: the user picked this property; otherwise a new target opens
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);
@@ -151,7 +150,7 @@ private:
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
-    MotionMenuLookAndFeel menuLookAndFeel;
+    motion::style::LookAndFeel motionLookAndFeel;
     motion::LuaSliderBakes sliderBakes { processor.document };
     MotionScopeProfilePanel scopeProfilePanel { processor };
     MotionBeamSettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, scopeProfilePanel, 550, 500, 1500 };
@@ -160,7 +159,7 @@ private:
     MotionAssetLibrary assetLibrary;
     MotionCurveEditor curveEditor;
     MotionNotesEditor notesEditor;
-    MotionCameraPanel cameraPanel;
+    MotionCameraRig cameraRig;
     MotionClipTimingPanel clipTimingPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectsPanel effectsPanel;
@@ -171,9 +170,9 @@ private:
     juce::Component graphSide;
     void layoutGraphSide();
     MotionModulatorLibrary modulatorLibrary;
-    osci::TabBar libraryTabs;
-    osci::TabBar inspectorTabs;
-    osci::TabBar timelineTabs;
+    MotionTabs libraryTabs;
+    MotionTabs inspectorTabs;
+    MotionTabs timelineTabs;
     MotionCurveList curveList;
     std::set<std::string> shownCurves, hiddenCurves;
     void refreshCurveList();
@@ -185,13 +184,12 @@ private:
     MotionSceneToolbar sceneTools;
     juce::TextButton sceneView { "Views" };
     void showSceneViewMenu(bool atMouse);
-    MotionPlaybackHealth playbackHealth;
 
     juce::TextButton importButton { "Add source" };
-    motion::style::IconButton playButton { "Play", motion::style::IconButton::Icon::play };
-    motion::style::IconButton startButton { "Go to start", motion::style::IconButton::Icon::start };
-    motion::style::IconButton endButton { "Go to end", motion::style::IconButton::Icon::end };
-    motion::style::IconButton loopButton { "Loop playback", motion::style::IconButton::Icon::loop };
+    motion::icons::Button playButton { "Play", motion::icons::Icon::play };
+    motion::icons::Button startButton { "Go to start", motion::icons::Icon::start };
+    motion::icons::Button endButton { "Go to end", motion::icons::Icon::end };
+    motion::icons::Button loopButton { "Loop playback", motion::icons::Icon::loop };
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;

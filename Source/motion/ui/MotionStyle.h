@@ -1,9 +1,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../../LookAndFeel.h"
 
 // One place for osci-motion's visual language: a restrained dark palette built
-// on the shared osci theme, a three-step type scale and a 4 px spacing grid.
+// on the shared osci theme, four type styles and a 4 px spacing grid.
 namespace motion::style {
 inline constexpr int gap = 4;
 inline constexpr int padding = 8;
@@ -14,7 +15,16 @@ inline constexpr int transportHeight = 36;
 inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
 
-inline juce::Font smallText() { return juce::Font(juce::FontOptions(11.0f)); }
+// The only type styles in osci-motion. All UI text uses one of these;
+// MotionTypographyTest fails if code anywhere else asks for a font.
+// title: panel and tab names, the inspector heading, group names.
+// body: values, names, menus, buttons, pickers and editors.
+// caption: field labels, hints, secondary details and the ruler.
+// mono: the position readout and code.
+inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
+inline juce::Font body() { return juce::Font(juce::FontOptions(13.0f)); }
+inline juce::Font caption() { return juce::Font(juce::FontOptions(11.0f)); }
+inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
 // Ctrl+Shift+F9 elsewhere. Mouse gestures ("Alt+wheel") keep their words.
 inline juce::String shortcutText(const juce::String& raw) {
@@ -41,10 +51,6 @@ inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const ju
     item.shortcutKeyDescription = shortcutText(shortcut);
     return item;
 }
-inline juce::Font body() { return juce::Font(juce::FontOptions(12.0f)); }
-inline juce::Font strong() { return juce::Font(juce::FontOptions(12.0f, juce::Font::bold)); }
-inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
-inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::plain)); }
 
 inline juce::Colour background() { return osci::Colours::veryDark(); }
 inline juce::Colour panel() { return osci::Colours::surface(); }
@@ -84,6 +90,31 @@ inline const std::array<TrackLabel, 9>& trackLabels() {
     return labels;
 }
 
+// A short eased fade for hover feedback. It runs only while changing.
+class Fade final : private juce::Timer {
+public:
+    explicit Fade(juce::Component& owner) : component(owner) {}
+    void setTarget(bool on) {
+        const auto target = on ? 1.0f : 0.0f;
+        if (target != goal) {
+            goal = target;
+            startTimerHz(60);
+        }
+    }
+    float value() const { return current; }
+private:
+    void timerCallback() override {
+        current += (goal - current) * .3f;
+        if (std::abs(goal - current) < .02f) {
+            current = goal;
+            stopTimer();
+        }
+        component.repaint();
+    }
+    juce::Component& component;
+    float current = 0.0f, goal = 0.0f;
+};
+
 // A borderless chevron for compact previous/next navigation.
 class ChevronButton final : public juce::Button {
 public:
@@ -104,75 +135,6 @@ private:
     bool right;
 };
 
-// Painted transport glyphs; no image assets, crisp at any scale.
-class IconButton final : public juce::Button {
-public:
-    enum class Icon { play, pause, start, end, loop };
-    IconButton(const juce::String& name, Icon glyph) : juce::Button(name), icon(glyph) {}
-    void setIcon(Icon glyph) { if (icon != glyph) { icon = glyph; repaint(); } }
-    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
-        const auto bounds = getLocalBounds().toFloat();
-        if (highlighted || down || getToggleState()) {
-            g.setColour(osci::Colours::surfaceRaised().brighter(down ? .25f : .12f));
-            g.fillRoundedRectangle(bounds.reduced(1), 3.0f);
-        }
-        const auto c = bounds.getCentre();
-        const auto s = std::min(bounds.getWidth(), bounds.getHeight()) * .22f;
-        g.setColour((getToggleState() ? osci::Colours::accentColor() : osci::Colours::text()).withAlpha(isEnabled() ? .92f : .3f));
-        juce::Path path;
-        switch (icon) {
-            case Icon::play: path.addTriangle(c.x - s * .8f, c.y - s, c.x - s * .8f, c.y + s, c.x + s, c.y); break;
-            case Icon::pause:
-                path.addRoundedRectangle(c.x - s * .85f, c.y - s, s * .6f, s * 2, 1.0f);
-                path.addRoundedRectangle(c.x + s * .25f, c.y - s, s * .6f, s * 2, 1.0f);
-                break;
-            case Icon::start:
-                path.addRectangle(c.x - s, c.y - s, s * .35f, s * 2);
-                path.addTriangle(c.x + s, c.y - s, c.x + s, c.y + s, c.x - s * .55f, c.y);
-                break;
-            case Icon::end:
-                path.addRectangle(c.x + s * .65f, c.y - s, s * .35f, s * 2);
-                path.addTriangle(c.x - s, c.y - s, c.x - s, c.y + s, c.x + s * .55f, c.y);
-                break;
-            case Icon::loop: {
-                juce::Path arc;
-                arc.addCentredArc(c.x, c.y, s, s * .8f, 0, .5f, juce::MathConstants<float>::twoPi - .3f, true);
-                g.strokePath(arc, juce::PathStrokeType(1.5f));
-                path.addTriangle(c.x + s * .15f, c.y - s * 1.25f, c.x + s * .15f, c.y - s * .35f, c.x + s * .8f, c.y - s * .8f);
-                break;
-            }
-        }
-        g.fillPath(path);
-    }
-private:
-    Icon icon;
-};
-
-// A small toggle chip whose label never ellipsises (track M / S / L).
-// A magnet: snapping on (lit) or off.
-class MagnetButton final : public juce::Button {
-public:
-    MagnetButton() : juce::Button("Snapping") { setWantsKeyboardFocus(false); }
-    void paintButton(juce::Graphics& g, bool over, bool down) override {
-        const auto bounds = getLocalBounds().toFloat().reduced(2);
-        if (getToggleState()) {
-            g.setColour(motion::style::accent().withAlpha(.3f));
-            g.fillRoundedRectangle(bounds, 3);
-        } else if (over || down) {
-            g.setColour(juce::Colours::white.withAlpha(.08f));
-            g.fillRoundedRectangle(bounds, 3);
-        }
-        const auto c = bounds.getCentre();
-        juce::Path magnet;
-        magnet.startNewSubPath(c.x - 5, c.y - 5);
-        magnet.lineTo(c.x - 5, c.y + 1);
-        magnet.addCentredArc(c.x, c.y + 1, 5, 5, 0, juce::MathConstants<float>::pi * 1.5f, juce::MathConstants<float>::halfPi);
-        magnet.lineTo(c.x + 5, c.y - 5);
-        g.setColour(getToggleState() ? juce::Colours::white : osci::Colours::text().withAlpha(.6f));
-        g.strokePath(magnet, juce::PathStrokeType(2.0f));
-    }
-};
-
 class Chip final : public juce::Button {
 public:
     explicit Chip(const juce::String& text) : juce::Button(text), label(text) { setClickingTogglesState(true); }
@@ -188,7 +150,7 @@ public:
             g.drawRoundedRectangle(bounds.reduced(.5f), 3.0f, 1.0f);
         }
         g.setColour(active ? juce::Colours::white : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .8f));
-        g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+        g.setFont(caption());
         g.drawText(label, getLocalBounds(), juce::Justification::centred, false);
     }
 private:
@@ -232,4 +194,12 @@ inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radi
     diamond.closeSubPath();
     if (filled) { g.fillPath(diamond); } else { g.strokePath(diamond, juce::PathStrokeType(stroke)); }
 }
+// Routes the editor's menus, buttons and pickers through the type styles.
+class LookAndFeel final : public PluginLookAndFeel {
+public:
+    juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return body(); }
+    juce::Font getPopupMenuFont() override { return body(); }
+    juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
+    juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
+};
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "MotionStyle.h"
 #include <osci_gui/osci_gui.h>
 #include "../live/BlenderSourceSettings.h"
 
@@ -14,17 +15,17 @@ public:
         policy.addItem("Freeze last frame", 1); policy.addItem("Blank output", 2);
         policy.setSelectedId(settings.freezeOnDisconnect ? 1 : 2, juce::dontSendNotification);
         for (auto* editor : {&name, &port}) {
-            editor->setFont(juce::FontOptions(13));
+            editor->setFont(motion::style::body());
             editor->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
             editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
             editor->setColour(juce::TextEditor::textColourId, osci::Colours::text());
         }
         for (auto* label : {&nameLabel, &portLabel, &policyLabel, &status, &note}) {
-            label->setFont(juce::FontOptions(13)); label->setBorderSize({});
+            label->setFont(motion::style::body()); label->setBorderSize({});
             label->setColour(juce::Label::textColourId, osci::Colours::textMuted());
         }
         status.setName("Blender connection status"); status.setJustificationType(juce::Justification::centredLeft);
-        note.setFont(juce::FontOptions(12)); note.setJustificationType(juce::Justification::topLeft);
+        note.setFont(motion::style::body()); note.setJustificationType(juce::Justification::topLeft);
         note.setText("Use the same port in Blender's osci-render add-on.\nReceives camera-framed Grease Pencil line art.\nCapture creates a portable source for editing and export.", juce::dontSendNotification);
         save.setButtonText(existing ? "Apply settings" : "Add source");
         save.onClick = [this] { submit(false); };

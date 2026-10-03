@@ -9,7 +9,7 @@
 #include "../model/CompositionGraph.h"
 #include "../model/PropertySchema.h"
 #include "../model/KeyEasing.h"
-#include "MotionStyle.h"
+#include "MotionIcons.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
     struct Row : motion::TrackRow {
@@ -25,7 +25,6 @@ class MotionTimelineView : public juce::Component, public juce::DragAndDropTarge
 public:
     explicit MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
         setName("Composition timeline");
-        addTrack.setButtonText("+");
         addTrack.setName("Add track");
         addTrack.setTitle("Add track");
         addTrack.setTooltip("Add an empty track");
@@ -42,7 +41,21 @@ public:
         snapButton.onClick = [this] {
             processor.document.changeView([](motion::Composition& state) { state.gridSnap = !state.gridSnap; });
         };
+        snapButton.setClickingTogglesState(false);
         addAndMakeVisible(snapButton);
+        // The editing tools, as in Premiere's tool strip.
+        for (auto [button, value, tip] : {std::tuple {&selectTool, Tool::move, "Select, move and trim (V)"}, std::tuple {&slipTool, Tool::slip, "Slip: move the content inside a clip (S)"},
+                                          std::tuple {&stretchTool, Tool::stretch, "Stretch: change a clip's length and speed together (R)"}, std::tuple {&rippleTool, Tool::ripple, "Ripple trim: trimming moves the clips after it (B)"}}) {
+            button->setTooltip(tip);
+            button->iconSize = 16.0f;
+            button->onClick = [this, value] {
+                cancelGesture();
+                tool = value;
+                repaint();
+            };
+            addAndMakeVisible(button);
+        }
+        for (auto* button : {&snapButton, &addTrack}) { button->iconSize = 16.0f; }
         headerArea.setInterceptsMouseClicks(false, true);
         addAndMakeVisible(headerArea);
         setWantsKeyboardFocus(true);
@@ -50,6 +63,8 @@ public:
     }
     // Runs one of the editor's commands by name (Cut, Copy, Paste...).
     std::function<void(const juce::String&)> onCommand;
+    // Add a camera that takes over the output at the playhead.
+    std::function<void()> onAddCamera;
     std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
     std::function<void(const juce::String&)> onError;
@@ -326,8 +341,10 @@ public:
     }
     void resized() override {
         ensureTrackRows();
-        addTrack.setBounds(namesWidth - 27, 2, 24, 22);
-        snapButton.setBounds(namesWidth - 53, 2, 24, 22);
+        addTrack.setBounds(namesWidth - 26, 2, 22, 22);
+        snapButton.setBounds(namesWidth - 50, 2, 22, 22);
+        auto tools = juce::Rectangle<int>(4, 2, 4 * 22, 22);
+        for (auto* button : {&selectTool, &slipTool, &stretchTool, &rippleTool}) { button->setBounds(tools.removeFromLeft(22)); }
         scrollY = std::clamp(scrollY, 0, maximumScrollY());
         // Headers live in a container clipped below the ruler, so rows scroll
         // smoothly under it.
@@ -355,15 +372,37 @@ public:
         if (dropTrack && details.localPosition.y < rulerHeight) { dropPosition.reset(); repaint(); return; }
         dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
         dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
+        previewEffect(dropEffect.empty() ? 0 : effectOwnerAt(details.localPosition));
         repaint();
     }
     void itemDragExit(const SourceDetails&) override {
         dropPosition.reset();
+        previewEffect(0);
         repaint();
     }
+    // An effect dragged over a clip, track or group is heard and seen before
+    // it is dropped.
+    std::function<void(const motion::Project*)> onPreview;
+    void previewEffect(motion::Id owner) {
+        if (owner == previewedOwner) { return; }
+        previewedOwner = owner;
+        if (!onPreview) { return; }
+        const auto* definition = motion::effectDefinition(dropEffect);
+        if (owner == 0 || definition == nullptr) {
+            onPreview(nullptr);
+            return;
+        }
+        auto project = processor.document.project();
+        auto* effects = motion::findEffectOwner(project, owner);
+        if (effects == nullptr) { onPreview(nullptr); return; }
+        effects->push_back(motion::makeEffect(std::numeric_limits<motion::Id>::max(), *definition));
+        onPreview(&project);
+    }
+    motion::Id previewedOwner = 0;
 
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
+        previewEffect(0);
         if (details.description.toString().startsWith("motion-track:")) {
             if (details.localPosition.y < rulerHeight) { repaint(); return; }
             const auto revision = static_cast<std::uint64_t>(details.description.toString().fromLastOccurrenceOf(":", false, false).getLargeIntValue());
@@ -436,7 +475,7 @@ public:
         auto area = getLocalBounds();
         g.setColour(osci::Colours::surfaceRaised());
         g.fillRect(area.removeFromTop(rulerHeight));
-        g.setFont(12.0f);
+        g.setFont(motion::style::body());
         pixelsPerSecond = std::isfinite(pixelsPerSecond) ? std::clamp(pixelsPerSecond, 0.000001, 500.0) : 70.0;
         scrollTime = std::isfinite(scrollTime) ? std::max(0.0, scrollTime) : 0.0;
         const auto visibleSeconds = std::max(0, getWidth() - namesWidth) / pixelsPerSecond;
@@ -481,12 +520,11 @@ public:
         paintLoop(g);
         g.setColour(osci::Colours::surfaceRaised());
         g.fillRect(0, 0, namesWidth, rulerHeight);
-        g.setColour(osci::Colours::text());
-        g.drawText(toolName(), 12, 0, namesWidth - 80, 26, juce::Justification::centredLeft);
         snapButton.setToggleState(processor.document.project().gridSnap, juce::dontSendNotification);
-        juce::Path toolArrow;
-        toolArrow.addTriangle(namesWidth - 73.0f, 11.0f, namesWidth - 65.0f, 11.0f, namesWidth - 69.0f, 15.0f);
-        g.fillPath(toolArrow);
+        selectTool.setToggleState(tool == Tool::move, juce::dontSendNotification);
+        slipTool.setToggleState(tool == Tool::slip, juce::dontSendNotification);
+        stretchTool.setToggleState(tool == Tool::stretch, juce::dontSendNotification);
+        rippleTool.setToggleState(tool == Tool::ripple, juce::dontSendNotification);
         const auto& tracks = processor.document.project().tracks;
         const auto& project = processor.document.project();
         scrollY = std::clamp(scrollY, 0, maximumScrollY());
@@ -585,7 +623,22 @@ public:
             const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
             const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
             const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().tempo()));
-            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), rowY(std::max(0, visualRowAt(dropPosition->y))), std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), defaultTrackHeight)).toFloat().reduced(1, 4);
+            // Below the tracks, the new track always lands in the first free slot.
+            const auto group = groupAtY(dropPosition->y);
+            const auto slotY = row < 0 && group == 0 ? rowY(static_cast<int>(rows.size())) : rowY(std::max(0, visualRowAt(dropPosition->y)));
+            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), slotY, std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), defaultTrackHeight)).toFloat().reduced(1, 4);
+            if (row < 0 && allowed) {
+                // The header column shows that a track will be created.
+                auto header = juce::Rectangle<float>(4.0f, static_cast<float>(slotY) + 3.0f, static_cast<float>(namesWidth) - 9.0f, static_cast<float>(defaultTrackHeight) - 6.0f);
+                g.setColour(motion::style::accent().withAlpha(.12f));
+                g.fillRoundedRectangle(header, motion::style::radius);
+                g.setColour(motion::style::accent().withAlpha(.7f));
+                g.drawRoundedRectangle(header.reduced(.5f), motion::style::radius, 1.0f);
+                motion::icons::draw(g, motion::icons::Icon::add, header.removeFromLeft(26.0f), motion::style::accent().brighter(.3f), 14.0f);
+                g.setFont(motion::style::body());
+                g.setColour(motion::style::text());
+                g.drawText(audio ? "New audio track" : "New track", header, juce::Justification::centredLeft, true);
+            }
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
             g.setColour((allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080)).withAlpha(0.2f));
@@ -596,7 +649,7 @@ public:
         }
         if (showsMarkerBand()) {
             g.setColour(osci::Colours::textMuted());
-            g.setFont(11.0f);
+            g.setFont(motion::style::caption());
             g.drawText(processor.document.project().tempoChanges != nullptr ? "Markers / tempo" : "Markers", 12, 26, namesWidth - 24, 22, juce::Justification::centredLeft);
             const auto& project = processor.document.project();
             if (project.tempoChanges != nullptr) {
@@ -720,10 +773,7 @@ public:
         }
         selectedMarker = 0;
         if (event.y >= 26 && event.y < cameraBandTop() && event.x < namesWidth && onEditMarker) { onEditMarker(0, processor.position.load()); return; }
-        if (event.y < rulerHeight && event.x < namesWidth) {
-            showToolMenu(true);
-            return;
-        }
+        if (event.y < rulerHeight && event.x < namesWidth) { return; }
         if (event.y >= rulerHeight && laneAtY(event.y) != nullptr) {
             if (event.x < namesWidth) { return; }
             const auto key = keyAt(event.getPosition());
@@ -763,7 +813,7 @@ public:
                     notifySelection(id);
                 }
                 showClipMenu(id);
-            } else { showToolMenu(); }
+            } else { showSpaceMenu(); }
             return;
         }
         if (!event.mods.isLeftButtonDown()) {
@@ -813,6 +863,13 @@ public:
     void mouseMove(const juce::MouseEvent& event) override {
         if (onNamesEdge(event)) {
             setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+            return;
+        }
+        const auto overAdd = addCameraBounds().contains(event.getPosition());
+        if (overAdd != addHover) { addHover = overAdd; repaint(addCameraBounds()); }
+        if (overAdd) {
+            setMouseCursor(juce::MouseCursor::PointingHandCursor);
+            setTooltip("Add a camera at the playhead");
             return;
         }
         const auto bar = barAt(event.getPosition());
@@ -983,10 +1040,14 @@ public:
             g.setColour(colour.withAlpha(.05f));
             g.fillRect(bounds.getX(), rulerHeight, bounds.getWidth(), getHeight() - rulerHeight);
         }
-        g.setColour(colour.withAlpha(on ? .75f : .6f));
-        g.fillRoundedRectangle(bounds.toFloat(), 2.0f);
-        g.fillRect(bounds.getX(), loopTop - 4, 2, loopHeight + 4);
-        g.fillRect(bounds.getRight() - 2, loopTop - 4, 2, loopHeight + 4);
+        // One opaque shape (bar and end brackets), so nothing overlaps.
+        juce::Path brace;
+        brace.addRoundedRectangle(bounds.toFloat(), 2.0f);
+        brace.addRectangle(static_cast<float>(bounds.getX()), static_cast<float>(loopTop - 4), 2.0f, static_cast<float>(loopHeight + 4));
+        brace.addRectangle(static_cast<float>(bounds.getRight() - 2), static_cast<float>(loopTop - 4), 2.0f, static_cast<float>(loopHeight + 4));
+        brace.setUsingNonZeroWinding(true);
+        g.setColour(osci::Colours::surfaceRaised().interpolatedWith(colour, on ? .8f : .55f));
+        g.fillPath(brace);
     }
     struct LoopDrag { enum class Mode { move, left, right } mode; double start, end; int downX; motion::Project before; std::uint64_t revision; bool changed; };
     std::optional<LoopDrag> loopDrag;
@@ -1027,6 +1088,7 @@ public:
         if (hoveredBar != 0) { hoveredBar = 0; repaint(); }
         if (hoveredEdge >= 0) { hoveredEdge = -1; repaint(); }
         if (hoveredClip != 0) { hoveredClip = 0; repaint(); }
+        if (addHover) { addHover = false; repaint(); }
     }
     // Project times of every clip start and end (edit points), sorted.
     std::vector<double> editPoints() const {
@@ -1051,7 +1113,7 @@ public:
             return;
         }
         if (resizingNames) {
-            namesWidth = std::clamp(event.x, 140, std::max(140, std::min(420, getWidth() / 2)));
+            namesWidth = std::clamp(event.x, 150, std::max(150, std::min(420, getWidth() / 2)));
             refreshTracks();
             repaint();
             return;
@@ -1493,7 +1555,7 @@ private:
         g.setFont(motion::style::body());
         if (!clip.effects.empty() && bounds.getWidth() > 90) {
             g.setColour(juce::Colours::white.withAlpha(0.6f * opacity));
-            g.setFont(motion::style::smallText());
+            g.setFont(motion::style::caption());
             g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38).withTrimmedBottom(8), juce::Justification::centred);
             g.setFont(motion::style::body());
         }
@@ -1549,7 +1611,7 @@ private:
         g.fillRect(0, y, getWidth(), height);
         const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
         const auto* spec = motion::findPropertySpec(specs, row.lane);
-        g.setFont(motion::style::smallText());
+        g.setFont(motion::style::caption());
         g.setColour(motion::style::muted());
         const auto indent = std::min(48, row.depth * 8) + 30;
         g.drawText(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(row.lane), indent, y, namesWidth - indent - 6, height, juce::Justification::centredLeft);
@@ -1794,7 +1856,6 @@ private:
     void showKeyMenu() {
         if (selectedKeys.empty()) { return; }
         juce::PopupMenu menu;
-        menu.addSectionHeader(selectedKeys.size() > 1 ? juce::String(static_cast<int>(selectedKeys.size())) + " keyframes" : juce::String("Keyframe"));
         menu.addItem(1, "Hold");
         menu.addItem(2, "Linear");
         menu.addItem(3, "Auto");
@@ -1864,15 +1925,14 @@ private:
         }
     }
     // The camera track: a band under the ruler (and markers) whose clips are
-    // the camera cuts. Shown once a project has cuts or a second camera.
+    // the camera cuts. Between cuts the first camera (or the default view)
+    // shows.
     static constexpr int cameraBandHeight = 22;
     // The marker band also carries tempo changes.
     bool showsMarkerBand() const { return !processor.document.project().markers.empty() || processor.document.project().tempoChanges != nullptr; }
     int cameraBandTop() const { return showsMarkerBand() ? 48 : 26; }
-    bool showsCameraBand() const {
-        const auto& project = processor.document.project();
-        return !project.cameraCuts.empty() || project.cameras.size() > 1;
-    }
+    bool showsCameraBand() const { return true; }
+    juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop() + 2, 20, cameraBandHeight - 4}; }
     bool inCameraBand(int y) const { return showsCameraBand() && y >= cameraBandTop() && y < cameraBandTop() + cameraBandHeight; }
     juce::Rectangle<int> cutBounds(const motion::CameraCut& cut) const {
         const auto left = std::max(namesWidth, timeX(cut.start));
@@ -1896,36 +1956,55 @@ private:
         const auto top = cameraBandTop();
         g.setColour(osci::Colours::surfaceRaised().darker(.15f));
         g.fillRect(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
-        g.setColour(osci::Colours::text().withAlpha(.8f));
-        g.setFont(11.0f);
-        g.drawText("Cameras", 12, top, namesWidth - 24, cameraBandHeight, juce::Justification::centredLeft);
-        if (!project.cameras.empty()) {
-            // Between cuts the first camera shows; label each visible gap.
-            g.setColour(osci::Colours::textMuted().withAlpha(.5f));
-            const auto label = juce::String(project.cameras.front().name) + " (default)";
-            double from = 0;
-            const auto gap = [&](double end) {
-                const auto left = std::max(namesWidth, timeX(from)) + 6, right = std::min(getWidth(), timeX(end)) - 4;
-                if (right - left > 60) { g.drawText(label, left, top, right - left, cameraBandHeight, juce::Justification::centredLeft, true); }
-            };
-            for (const auto& cut : project.cameraCuts) {
-                if (cut.start > from) { gap(cut.start); }
-                from = std::max(from, cut.end());
+        g.setColour(motion::style::muted());
+        g.setFont(motion::style::caption());
+        g.drawText("Cameras", 12, top, namesWidth - 40, cameraBandHeight, juce::Justification::centredLeft);
+        // The green plus adds a camera at the playhead.
+        const auto add = addCameraBounds().toFloat();
+        g.setColour(motion::style::accent().withAlpha(addHover ? .32f : .2f));
+        g.fillRoundedRectangle(add, motion::style::radius);
+        g.setColour(motion::style::accent().brighter(.3f));
+        const auto c = add.getCentre();
+        g.fillRect(juce::Rectangle<float>(9.0f, 1.5f).withCentre(c));
+        g.fillRect(juce::Rectangle<float>(1.5f, 9.0f).withCentre(c));
+        // Between cuts the first camera shows; label each visible gap.
+        const bool defaultSelected = !project.cameras.empty() && selected == project.cameras.front().id;
+        const auto label = project.cameras.empty() ? juce::String("Default view") : juce::String(project.cameras.front().name);
+        double from = 0;
+        const auto gap = [&](double end) {
+            const auto left = std::max(namesWidth, timeX(from)), right = std::min(getWidth(), timeX(end));
+            if (right <= left) { return; }
+            if (defaultSelected) {
+                g.setColour(motion::style::accent().withAlpha(.12f));
+                g.fillRect(left, top + 2, right - left, cameraBandHeight - 4);
             }
-            if (from < project.duration) { gap(project.duration); }
+            g.setColour(motion::style::muted().withAlpha(defaultSelected ? .9f : .55f));
+            if (right - left > 60) { g.drawText(label, left + 6, top, right - left - 10, cameraBandHeight, juce::Justification::centredLeft, true); }
+        };
+        for (const auto& cut : project.cameraCuts) {
+            if (cut.start > from) { gap(cut.start); }
+            from = std::max(from, cut.end());
         }
+        if (from < project.duration) { gap(project.duration); }
         for (const auto& cut : project.cameraCuts) {
             const auto bounds = cutBounds(cut);
             if (bounds.isEmpty()) { continue; }
             g.setColour(cameraColour(project, cut.camera).withAlpha(cut.id == selectedCut ? 1.0f : .85f));
             g.fillRoundedRectangle(bounds.toFloat(), 3.0f);
-            if (cut.id == selectedCut) {
+            if (cut.id == selectedCut || cut.camera == selected) {
                 g.setColour(motion::style::accent());
                 g.drawRoundedRectangle(bounds.toFloat().reduced(.5f), 3.0f, 1.2f);
             }
             g.setColour(osci::Colours::text());
             g.drawText(cameraName(cut.camera), bounds.reduced(6, 0), juce::Justification::centredLeft, true);
         }
+    }
+    bool addHover = false;
+    const motion::CameraCut* findCut(motion::Id id) const {
+        for (const auto& cut : processor.document.project().cameraCuts) {
+            if (cut.id == id) { return &cut; }
+        }
+        return nullptr;
     }
     const motion::CameraCut* cutAt(juce::Point<int> point) const {
         for (const auto& cut : processor.document.project().cameraCuts) {
@@ -1934,16 +2013,25 @@ private:
         return nullptr;
     }
     void cameraBandDown(const juce::MouseEvent& event) {
+        if (addCameraBounds().contains(event.getPosition())) {
+            if (onAddCamera) { onAddCamera(); }
+            return;
+        }
+        if (event.x < namesWidth) { return; }
         const auto time = std::clamp(snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods), 0.0, processor.document.project().duration);
-        const auto* cut = event.x >= namesWidth ? cutAt(event.getPosition()) : nullptr;
+        const auto* cut = cutAt(event.getPosition());
         selectedCut = cut != nullptr ? cut->id : 0;
-        if (event.mods.isPopupMenu() || (cut == nullptr && event.x >= namesWidth && event.getNumberOfClicks() > 1)) {
+        // A cut, or the gap where the first camera shows, selects that camera.
+        const auto& cameras = processor.document.project().cameras;
+        const auto camera = cut != nullptr ? cut->camera : cameras.empty() ? motion::Id(0) : cameras.front().id;
+        if (camera != 0 && onSelection) { onSelection(camera); }
+        if (event.mods.isPopupMenu()) {
             showCutMenu(selectedCut, time);
             repaint();
             return;
         }
         if (cut == nullptr) {
-            processor.seek(time);
+            if (camera == 0) { processor.seek(time); }
             repaint();
             return;
         }
@@ -1990,17 +2078,31 @@ private:
             cutTo.addItem(100 + static_cast<int>(index), juce::String(project.cameras[index].name));
             show.addItem(200 + static_cast<int>(index), juce::String(project.cameras[index].name));
         }
+        menu.addItem(3, "Add camera here");
         menu.addSubMenu("Cut to camera here", cutTo, !project.cameras.empty());
         if (cut != 0) {
             menu.addSubMenu("Show camera", show);
             menu.addItem(1, "Delete cut");
         }
+        const auto* cutValue = findCut(cut);
+        const auto camera = cutValue != nullptr ? cutValue->camera : project.cameras.empty() ? motion::Id(0) : project.cameras.front().id;
+        if (camera != 0) {
+            menu.addSeparator();
+            menu.addItem(2, "Delete " + cameraName(camera));
+        }
         juce::Component::SafePointer<MotionTimelineView> safe(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [safe, cut, time](int result) {
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [safe, cut, time, camera](int result) {
             if (safe == nullptr || result == 0) { return; }
             auto& document = safe->processor.document;
             const auto& cameras = document.project().cameras;
-            if (result == 1) {
+            if (result == 3) {
+                safe->processor.seek(time);
+                if (safe->onAddCamera) { safe->onAddCamera(); }
+            } else if (result == 2) {
+                safe->report(document.removeCamera(camera));
+                safe->selectedCut = 0;
+                if (safe->onSelection) { safe->onSelection(0); }
+            } else if (result == 1) {
                 safe->report(document.removeCut(cut));
                 safe->selectedCut = 0;
             } else if (result >= 200 && result - 200 < static_cast<int>(cameras.size())) {
@@ -2213,7 +2315,6 @@ private:
         const auto* group = motion::findGroup(processor.document.project(), id);
         if (group == nullptr) { return; }
         juce::PopupMenu menu;
-        menu.addSectionHeader(juce::String(group->name));
         menu.addItem(1, "Edit group");
         menu.addItem(2, "Add track to group");
         menu.addItem(3, "Add nested group");
@@ -2250,7 +2351,6 @@ private:
         const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
         if (found == tracks.end()) { return; }
         juce::PopupMenu menu;
-        menu.addSectionHeader(juce::String(found->name));
         menu.addItem(1, "Move track up", std::any_of(tracks.begin(), found, [&](const auto& track) { return track.group == found->group; }));
         menu.addItem(2, "Move track down", std::any_of(found + 1, tracks.end(), [&](const auto& track) { return track.group == found->group; }));
         menu.addItem(4, "Group track");
@@ -2377,18 +2477,27 @@ private:
         const auto boundary = row >= 0 ? row + (y - trackY(row) >= trackHeight(row) / 2 ? 1 : 0) : static_cast<int>(tracks.size());
         placeTrack(id, boundary, group != 0 ? group : (row >= 0 ? tracks[row].group : 0));
     }
-    void insertEffect(const std::string& type, juce::Point<int> position) {
-        const auto* definition = motion::effectDefinition(type);
-        if (definition == nullptr || position.y < rulerHeight) { return; }
+    // What an effect dropped here applies to: the clip under the pointer, a
+    // track by its header, or a group; 0 for nothing.
+    motion::Id effectOwnerAt(juce::Point<int> position) const {
+        if (position.y < rulerHeight) { return 0; }
         int row = 0;
         const auto* clip = clipAt(position, row);
         const auto& tracks = processor.document.project().tracks;
         if (position.x < namesWidth) { row = trackAtY(position.y); }
         const auto group = groupAtY(position.y);
-        if (group == 0 && (row < 0 || row >= static_cast<int>(tracks.size()) || (clip == nullptr && position.x >= namesWidth))) { return; }
-        const auto owner = group != 0 ? group : (clip != nullptr ? clip->id : tracks[row].id);
+        if (group != 0) { return group; }
+        if (row < 0 || row >= static_cast<int>(tracks.size()) || tracks[static_cast<std::size_t>(row)].kind != motion::TrackKind::visual || (clip == nullptr && position.x >= namesWidth)) { return 0; }
+        const auto owner = clip != nullptr ? clip->id : tracks[static_cast<std::size_t>(row)].id;
         const auto* effects = motion::findEffectOwner(processor.document.project(), owner);
-        if (effects == nullptr || effects->size() >= motion::maximumEffectsPerOwner) { return; }
+        return effects != nullptr && effects->size() < motion::maximumEffectsPerOwner ? owner : 0;
+    }
+    void insertEffect(const std::string& type, juce::Point<int> position) {
+        const auto* definition = motion::effectDefinition(type);
+        const auto owner = effectOwnerAt(position);
+        if (definition == nullptr || owner == 0) { return; }
+        int row = 0;
+        const auto* clip = position.x >= namesWidth ? clipAt(position, row) : nullptr;
         if (clip != nullptr) { selectClip(clip->id); }
         const auto effect = motion::makeEffect(processor.document.newId(), *definition);
         processor.document.edit("Add " + juce::String(definition->name), [owner, effect](motion::Project& project) {
@@ -2400,39 +2509,23 @@ private:
     enum class Tool { move, slip, stretch, ripple };
     enum class Mode { move, left, right, slip, stretch, rippleLeft, rippleRight };
 
-    juce::String toolName() const {
-        return tool == Tool::ripple ? "Ripple Trim (B)" : tool == Tool::move ? "Move / Trim (V)" : (tool == Tool::slip ? "Slip (S)" : "Stretch (R)");
-    }
-
-    void showToolMenu(bool atHeader = false) {
+    // Right-clicking empty track space offers what people look for first.
+    void showSpaceMenu() {
         juce::PopupMenu menu;
-        // On empty space, the edits people look for first.
-        if (!atHeader) {
-            menu.addItem(motion::style::menuItem("Paste", 10, "Cmd+V"));
-            menu.addItem(11, "Add track");
-            menu.addSeparator();
-        }
-        menu.addSectionHeader("Clip editing tool");
-        menu.addItem(1, "Move / trim edges (V)", true, tool == Tool::move);
-        menu.addItem(2, "Slip content inside clip (S)", true, tool == Tool::slip);
-        menu.addItem(3, "Stretch duration and speed (R)", true, tool == Tool::stretch);
-        menu.addItem(5, "Ripple trim edges on this track (B)", true, tool == Tool::ripple);
+        menu.addItem(motion::style::menuItem("Paste", 1, "Cmd+V"));
+        menu.addItem(2, "Add track");
+        menu.addItem(3, "Add camera here");
         const juce::Component::SafePointer<MotionTimelineView> owner(this);
-        const auto options = juce::PopupMenu::Options().withTargetComponent(this);
-        const auto placement = atHeader ? options.withTargetScreenArea(localAreaToGlobal(juce::Rectangle<int>(0, 0, namesWidth, rulerHeight))) : options.withMousePosition();
+        const auto time = std::clamp(scrollTime + (getMouseXYRelative().x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration);
         menu.setLookAndFeel(&getLookAndFeel());
-        menu.showMenuAsync(placement, [owner](int result) {
-            if (owner == nullptr || result == 0) {
-                return;
-            }
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, time](int result) {
+            if (owner == nullptr || result == 0) { return; }
             owner->cancelGesture();
-            if (result == 10 && owner->onCommand) {
-                owner->onCommand("Paste");
-            } else if (result == 11) {
-                owner->addTrack.triggerClick();
-            } else {
-                owner->tool = result == 5 ? Tool::ripple : result == 1 ? Tool::move : (result == 2 ? Tool::slip : Tool::stretch);
-                owner->repaint();
+            if (result == 1 && owner->onCommand) { owner->onCommand("Paste"); }
+            if (result == 2) { owner->addTrack.triggerClick(); }
+            if (result == 3 && owner->onAddCamera) {
+                owner->processor.seek(time);
+                owner->onAddCamera();
             }
         });
     }
@@ -2725,8 +2818,9 @@ private:
         processor.seek(std::clamp(target.value_or(raw), 0.0, project.duration));
         repaint();
     }
-    juce::TextButton addTrack;
-    motion::style::MagnetButton snapButton;
+    motion::icons::Button addTrack {"Add track", motion::icons::Icon::add}, snapButton {"Snapping", motion::icons::Icon::magnet};
+    motion::icons::Button selectTool {"Select tool", motion::icons::Icon::select}, slipTool {"Slip tool", motion::icons::Icon::slip};
+    motion::icons::Button stretchTool {"Stretch tool", motion::icons::Icon::stretch}, rippleTool {"Ripple trim tool", motion::icons::Icon::ripple};
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
     bool dropTrack = false;
     mutable std::vector<Row> rows;

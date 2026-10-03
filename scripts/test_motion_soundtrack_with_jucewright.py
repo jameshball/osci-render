@@ -73,7 +73,7 @@ try:
     wait_undo("Import object")
     step("import soundtrack", "drop-files", "--file", fixture, "--class", "MotionEditor", "--exact")
     wait_undo("Import soundtrack")
-    command("wait-for-locator", "--name", "Properties", "--class", "osci::TabBar::Tab", "--exact")
+    command("wait-for-locator", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     if gain is None or float(gain["value"]) != 1:
         raise RuntimeError("Audio gain inspector missing or incorrect")
@@ -93,7 +93,7 @@ try:
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     if float(gain["value"]) != 1:
         raise RuntimeError("Audio gain undo failed")
-    step("show gain graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
+    step("show gain graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("gain graph screenshot", "screenshot", "--file", session.artifact_dir / "soundtrack-gain.png")
     # The output picker shows in the Scope header when there is room (it is
     # also in the Audio menu).
@@ -106,7 +106,7 @@ try:
             raise RuntimeError("Five-channel device configuration failed")
         step("five channel output screenshot", "screenshot", "--file", session.artifact_dir / "xyrgb-output.png")
     step("restore music monitor", "select-option", "--name", "Audio output mode", "--text", "Soundtrack")
-    step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
+    step("return to timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
     step("split soundtrack", "press", "command + k", "--class", "MotionTimelineView")
     wait_undo("Split clip")
     step("undo audio split", "click", "--name", "Undo", "--exact")

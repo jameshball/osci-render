@@ -32,6 +32,8 @@
             resource="0" file="tests/MotionViewStateTest.cpp"/>
       <FILE id="MotionKeyEasing" name="MotionKeyEasingTest.cpp" compile="1"
             resource="0" file="tests/MotionKeyEasingTest.cpp"/>
+      <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"
+            resource="0" file="tests/MotionTypographyTest.cpp"/>
       <FILE id="MotionMidiExprT" name="MotionMidiExpressionTest.cpp" compile="1"
             resource="0" file="tests/MotionMidiExpressionTest.cpp"/>
       <FILE id="MotionLuaSlidersT" name="MotionLuaSlidersTest.cpp" compile="1"

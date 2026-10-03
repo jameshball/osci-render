@@ -54,7 +54,7 @@ try:
     step("resize workspace", "resize-window", "--w", 1100, "--h", 800)
     step("import object", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "cube.obj", "--role", "label", "--exact")
-    step("open graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
+    step("open graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("enable modulation", "click", "--name", "Enable modulation", "--exact")
     wait_undo("Change modulation")
     step("set amount", "set-value", "--name", "Modulation amount", "--role", "slider", "0.5")

@@ -22,7 +22,7 @@ public:
             refresh();
         };
         cancelRecording.onClick = [this] { processor.midiRecordingSession().cancel(); refresh(); };
-        recordingStatus.setName("MIDI recording status"); recordingStatus.setFont(juce::FontOptions(11));
+        recordingStatus.setName("MIDI recording status"); recordingStatus.setFont(motion::style::caption());
         recordingStatus.setBorderSize({}); addAndMakeVisible(recordingStatus);
         startTimerHz(15);
         audition.setClickingTogglesState(true);
@@ -141,7 +141,7 @@ public:
         g.setColour(osci::Colours::surfaceRaised()); g.fillRect(0, 0, getWidth(), 30);
         const auto* clip = currentClip();
         const auto pattern = preview != nullptr ? preview : (clip != nullptr ? clip->midi : nullptr);
-        g.setFont(13.0f); g.setColour(osci::Colours::text());
+        g.setFont(motion::style::body()); g.setColour(osci::Colours::text());
         const auto titleEnd = pattern != nullptr ? velocity.getX() - 73 : envelopeButton.getX();
         g.drawText(clip == nullptr ? "Notes" : juce::String(clip->name), 12, 0, std::max(0, titleEnd - 12), 30, juce::Justification::centredLeft);
         if (pattern == nullptr) {
@@ -164,7 +164,7 @@ public:
             g.fillRect(grid.getX(), y, grid.getWidth(), rowHeight);
             g.setColour(osci::Colours::text().withAlpha(.065f)); g.drawHorizontalLine(y + rowHeight, 0, static_cast<float>(getWidth()));
             if (pc == 0 || rowHeight >= 16) {
-                g.setColour(osci::Colours::text().withAlpha(.7f)); g.setFont(11.0f);
+                g.setColour(osci::Colours::text().withAlpha(.7f)); g.setFont(motion::style::caption());
                 g.drawText(juce::MidiMessage::getMidiNoteName(pitch, true, true, 4), 5, y, keyboardWidth - 10, rowHeight, juce::Justification::centredRight);
             }
         }
@@ -180,7 +180,7 @@ public:
             g.setColour(osci::Colours::text().withAlpha(bar ? .16f : .055f));
             g.drawVerticalLine(x, 30, static_cast<float>(lane.getBottom()));
             if (bar) {
-                g.setColour(osci::Colours::text().withAlpha(.7f)); g.setFont(11.0f);
+                g.setColour(osci::Colours::text().withAlpha(.7f)); g.setFont(motion::style::caption());
                 g.drawText(juce::String(1 + static_cast<int>(std::round(beat / processor.document.project().beatsPerBar))), x + 4, 30, 40, rulerHeight, juce::Justification::centredLeft);
             }
         }
@@ -193,7 +193,7 @@ public:
                 const auto fill = osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), .18f + .16f * note.velocity / 127.0f);
                 g.setColour(active ? fill.brighter(.25f) : fill); g.fillRoundedRectangle(bounds.toFloat(), 2);
                 g.setColour(active ? osci::Colours::text().withAlpha(.8f) : osci::Colours::accentColor().withAlpha(.45f)); g.drawRoundedRectangle(bounds.toFloat().reduced(.5f), 2, 1);
-                if (bounds.getWidth() > 32 && rowHeight >= 11) { g.setColour(osci::Colours::text().withAlpha(.9f)); g.setFont(10.0f); g.drawText(juce::MidiMessage::getMidiNoteName(note.pitch, true, true, 4), bounds.reduced(4, 0), juce::Justification::centredLeft); }
+                if (bounds.getWidth() > 32 && rowHeight >= 11) { g.setColour(osci::Colours::text().withAlpha(.9f)); g.setFont(motion::style::caption()); g.drawText(juce::MidiMessage::getMidiNoteName(note.pitch, true, true, 4), bounds.reduced(4, 0), juce::Justification::centredLeft); }
             }
             if (clip != nullptr) {
                 const auto timing = clip->timing(processor.document.project().tempo());
@@ -216,14 +216,14 @@ public:
             g.setColour(selected.contains(note.id) ? osci::Colours::text() : osci::Colours::accentColor().withAlpha(.7f));
             g.fillRect(x, y, 2, lane.getBottom() - y - 4); g.fillEllipse(static_cast<float>(x - 2), static_cast<float>(y - 2), 6, 6);
         }
-        g.setColour(osci::Colours::text().withAlpha(.55f)); g.setFont(10.0f);
+        g.setColour(osci::Colours::text().withAlpha(.55f)); g.setFont(motion::style::caption());
         g.drawText("Velocity", 5, lane.getY() + 4, keyboardWidth - 8, 15, juce::Justification::centredLeft);
         if (clip != nullptr && clip->contains(processor.position.load(), processor.document.project().tempo())) {
             const auto beat = clip->localTime(processor.position.load(), processor.document.project().tempo()) * clip->curveBpm(processor.document.project().tempo()) / 60;
             const auto x = beatX(beat);
             if (x >= keyboardWidth && x < getWidth()) { g.setColour(osci::Colours::accentColor().withAlpha(.65f)); g.drawVerticalLine(x, 30, static_cast<float>(lane.getBottom())); }
         }
-        g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(11.0f);
+        g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(motion::style::caption());
         if (!recordingStatus.isVisible()) {
             g.drawText(error.isEmpty() ? (isLocked() ? "Track locked | Notes are read-only. Selection, Fit and navigation remain available." : "Double-click: add | Drag: move/resize | Delete: remove | Alt: bypass snap | Cmd/Ctrl-wheel: zoom") : error,
             8, getHeight() - 20, getWidth() - 16, 20, juce::Justification::centredLeft);

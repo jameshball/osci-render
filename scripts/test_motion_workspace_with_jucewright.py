@@ -76,7 +76,7 @@ try:
     command("wait-for-locator", "--name", "Undo Stretch clip", "--role", "label", "--exact")
     step("undo stretch", "click", "--name", "Undo", "--exact")
     step("choose move tool", "press", "V", "--class", "MotionTimelineView")
-    step("open graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
+    step("open graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("add graph key", "click", "--class", "MotionCurveEditor", "--position", "560,60", "--click-count", 2)
     command("wait-for-locator", "--name", "Undo Add animation key", "--role", "label", "--exact")
     step("graph screenshot", "screenshot", "--file", session.artifact_dir / "motion-graph.png")
@@ -96,7 +96,7 @@ try:
     graph_after = find_node(after_resize, lambda node: node.get("class") == "MotionCurveEditor")["bounds"]
     if graph_after["h"] <= graph_before["h"] + 20:
         raise RuntimeError("Timeline divider did not resize the animation panel")
-    step("open camera inspector", "click", "--name", "Camera", "--class", "osci::TabBar::Tab", "--exact")
+    step("open camera inspector", "click", "--name", "Camera", "--class", "MotionTabs::Tab", "--exact")
     step("add camera", "click", "--name", "Add", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", "Key camera position", "--exact")
     step("key camera", "click", "--name", "Key camera position", "--exact")
@@ -108,7 +108,7 @@ try:
     step("import animated source", "drop-files", "--file", session.root_dir / "Resources/lottie/spinning_squares.lottie", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "spinning_squares.lottie", "--role", "listItem", "--exact", "--timeout-ms", 120000)
     command("wait-for-locator", "--name", "spinning_squares.lottie", "--role", "label", "--exact")
-    step("show animated timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
+    step("show animated timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
     step("scrub animation first pose", "click", "--class", "MotionTimelineView", "--position", "190,12")
     step("animated first pose", "screenshot", "--file", session.artifact_dir / "motion-animation-first.png")
     step("scrub animation second pose", "click", "--class", "MotionTimelineView", "--position", "225,12")

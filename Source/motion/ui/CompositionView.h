@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "../MotionProcessor.h"
 #include "EditorCamera.h"
 #include "EditorTransformFrame.h"
@@ -134,7 +136,7 @@ public:
         }
         if (prepared == nullptr || prepared->clips.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.5f));
-            g.setFont(14);
+            g.setFont(motion::style::body());
             // Clear of the tool strip on the left; wraps in a narrow Scene.
             g.drawFittedText(prepared == nullptr ? juce::String("Preparing...") : emptyMessage(), getLocalBounds().withTrimmedLeft(48).reduced(12, 0), juce::Justification::centred, 3);
             return;
@@ -173,8 +175,63 @@ public:
                 previousLit = lit;
             }
         }
+        paintCameras(g, time);
         paintMotionPath(g);
         currentGizmo().paint(g, before.has_value() ? dragAxis : hoverHandle);
+    }
+    // Output cameras as small pyramids, Blender style. The camera on the
+    // output also outlines its frame where the scene's origin sits, so what
+    // is in shot is clear before looking at the Scope.
+    void paintCameras(juce::Graphics& g, double time) const {
+        const auto* active = prepared->activeCamera(time);
+        for (const auto& camera : prepared->cameras) {
+            const auto frame = camera.frame(time);
+            if (!frame.has_value()) { continue; }
+            const auto vector = [](const std::array<double, 3>& value) { return motion::editor::Vec3 {value[0], value[1], value[2]}; };
+            const auto position = vector(frame->position), right = vector(frame->right), up = vector(frame->up), forward = vector(frame->forward);
+            const auto rectangle = [&](double depth) {
+                const auto half = depth / frame->focalLength;
+                const auto centre = position + forward * depth;
+                return std::array<motion::editor::Vec3, 4> {centre - right * half + up * half, centre + right * half + up * half, centre + right * half - up * half, centre - right * half - up * half};
+            };
+            const bool isActive = &camera == active, isSelected = camera.id == selected;
+            const auto colour = isSelected ? juce::Colour(0xff9affb3) : isActive ? motion::style::text() : motion::style::muted();
+            g.setColour(colour.withAlpha(isSelected || isActive ? .85f : .5f));
+            const auto corners = rectangle(.45);
+            // Seen from (nearly) inside the camera the pyramid would fill
+            // the view, so only its frame in the scene is drawn.
+            juce::Rectangle<float> extent;
+            bool visible = true;
+            for (const auto& corner : corners) {
+                const auto point = screenPoint(corner);
+                visible = visible && point.has_value();
+                if (point.has_value()) { extent = extent.isEmpty() ? juce::Rectangle<float>(*point, *point) : extent.getUnion(juce::Rectangle<float>(*point, *point)); }
+            }
+            const auto apex = screenPoint(position);
+            visible = visible && apex.has_value() && getLocalBounds().toFloat().expanded(100.0f).contains(*apex);
+            if (visible && extent.getWidth() < getWidth() * .4f) {
+                for (std::size_t index = 0; index < corners.size(); ++index) {
+                    drawWorldLine(g, position, corners[index]);
+                    drawWorldLine(g, corners[index], corners[(index + 1) % corners.size()]);
+                }
+                // The triangle above the frame marks which way is up.
+                const auto top = (corners[0] + corners[1]) * .5;
+                const auto width = (corners[1] - corners[0]) * .3;
+                drawWorldLine(g, top - width, top + up * .12);
+                drawWorldLine(g, top + width, top + up * .12);
+            }
+            if (!isActive) { continue; }
+            const auto depth = (motion::editor::Vec3 {} - position).dot(forward);
+            if (depth <= .5) { continue; }
+            const auto shot = rectangle(depth);
+            g.setColour(colour.withAlpha(isSelected ? .5f : .22f));
+            for (std::size_t index = 0; index < shot.size(); ++index) {
+                const auto first = screenPoint(shot[index]), last = screenPoint(shot[(index + 1) % shot.size()]);
+                if (!first.has_value() || !last.has_value()) { continue; }
+                const float dashes[] {5.0f, 4.0f};
+                g.drawDashedLine({*first, *last}, dashes, 2, 1.0f);
+            }
+        }
     }
 
     void mouseDown(const juce::MouseEvent& event) override {
@@ -386,11 +443,11 @@ public:
             : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
         if (help.isNotEmpty()) {
             auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
-            strip = strip.withSizeKeepingCentre(std::min(strip.getWidth(), juce::GlyphArrangement::getStringWidthInt(juce::Font(juce::FontOptions(12.0f)), help) + 24), strip.getHeight());
+            strip = strip.withSizeKeepingCentre(std::min(strip.getWidth(), juce::GlyphArrangement::getStringWidthInt(motion::style::body(), help) + 24), strip.getHeight());
             g.setColour(osci::Colours::veryDark().withAlpha(.85f));
             g.fillRoundedRectangle(strip.toFloat(), 4);
             g.setColour(osci::Colours::textMuted());
-            g.setFont(12.0f);
+            g.setFont(motion::style::body());
             g.drawFittedText(help, strip.reduced(8, 0), juce::Justification::centred, 1);
         }
     }
@@ -545,7 +602,7 @@ private:
             g.setColour(colour);
             g.drawRect(bounds, 1.5f);
         }
-        g.setFont(juce::FontOptions(11));
+        g.setFont(motion::style::caption());
         g.setColour(osci::Colours::textMuted());
         g.drawFittedText(motionPath.tooComplex ? "Path hidden: more than 2,048 transform keys"
             : "Position path (before effects) | Click a key to seek", getLocalBounds().removeFromTop(26).withTrimmedLeft(48).reduced(10, 0), juce::Justification::centredLeft, 2);

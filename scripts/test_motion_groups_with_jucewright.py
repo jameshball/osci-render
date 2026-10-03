@@ -97,8 +97,8 @@ try:
     if header_bounds(track)["x"] <= source["x"]:
         raise RuntimeError("Track did not become a nested child")
     step("nested group screenshot", "screenshot", "--file", session.artifact_dir / "nested-groups.png")
-    library = find(snapshot(), lambda node: node.get("class") == "osci::TabBar" and node.get("name") == "Library tabs")
-    tab = find(library, lambda node: node.get("class") == "osci::TabBar::Tab" and node.get("name") == "Effects")
+    library = find(snapshot(), lambda node: node.get("class") == "MotionTabs" and node.get("name") == "Library tabs")
+    tab = find(library, lambda node: node.get("class") == "MotionTabs::Tab" and node.get("name") == "Effects")
     step("effects library", "click", tab["ref"])
     source = find(snapshot(), lambda node: node.get("role") == "listItem" and node.get("name") == "Scale")["bounds"]
     target = header_bounds(group)

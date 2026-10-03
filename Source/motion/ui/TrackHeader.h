@@ -55,7 +55,7 @@ public:
         grip.setTooltip(group ? "Group actions" : "Drag to reorder; click for track actions");
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
         disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide keyframe lanes");
-        name.setFont(group ? motion::style::strong() : motion::style::body());
+        name.setFont(group ? motion::style::title() : motion::style::body());
         if (!name.isBeingEdited()) { name.setText(juce::String(track.name), juce::dontSendNotification); }
         name.setTooltip(juce::String(track.name) + " - double-click to rename");
         name.setName("Track name " + juce::String(track.id));

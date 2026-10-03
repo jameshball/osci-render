@@ -135,7 +135,7 @@ public:
         const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
         const auto* storedCurve = findCurve(clip, propertyName);
         g.setColour(osci::Colours::text());
-        g.setFont(13.0f);
+        g.setFont(motion::style::body());
         if (storedCurve == nullptr) {
             g.drawText("Select an object or camera property", getLocalBounds(), juce::Justification::centred);
             return;
@@ -146,7 +146,7 @@ public:
         const auto drivers = resultDrivers(curve);
         const auto modulated = curve.modulation.enabled || drivers != nullptr;
         const auto area = plot();
-        g.setFont(motion::style::strong());
+        g.setFont(motion::style::title());
         g.drawText(propertyLabel(*clip), 12, 3, 160, 22, juce::Justification::centredLeft);
         g.setFont(motion::style::body());
         g.setColour(motion::style::muted());
@@ -154,14 +154,14 @@ public:
         // curve is never mistaken for the selected clip's.
         const juce::String owner(clip->name.data(), clip->name.size());
         g.drawText(clip->camera ? "Camera: " + owner : clip->isEffect ? "Effect: " + owner : clip->isGroup ? "Group: " + owner : owner, 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
-        g.setFont(13.0f);
+        g.setFont(motion::style::body());
         if (modulated) {
             g.setColour(primaryColour(*clip));
             g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
             g.setColour(juce::Colour(0xff80baff));
             g.drawText("Result", getWidth() - 90, 3, 65, 22, juce::Justification::centredLeft);
         }
-        g.setFont(11.0f);
+        g.setFont(motion::style::caption());
         {
             const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
             const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
@@ -308,7 +308,7 @@ public:
             g.setColour(osci::Colours::warning().withAlpha(.18f));
             g.fillRoundedRectangle(banner.toFloat(), 3.0f);
             g.setColour(osci::Colours::warning());
-            g.setFont(motion::style::smallText());
+            g.setFont(motion::style::caption());
             g.drawText("Linked to " + name + " (" + juce::String(storedCurve->link->property) + "): keys here are ignored. Unlink in Routing.", banner.reduced(8, 0), juce::Justification::centred, true);
         }
     }
@@ -1264,7 +1264,6 @@ private:
         }
         juce::PopupMenu menu;
         menu.setLookAndFeel(&getLookAndFeel());
-        menu.addSectionHeader("Outgoing segment");
         const char* labels[] = { "Hold", "Linear", "Auto", "Bezier" };
         for (int i = 0; i < 4; ++i) {
             menu.addItem(i + 1, labels[i], true, static_cast<int>(key->interpolation) == i);

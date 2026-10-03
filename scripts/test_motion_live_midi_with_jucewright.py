@@ -72,7 +72,7 @@ try:
     step("import audition source", "drop-files", "--file", shape, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
     step("select audition clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
-    step("open notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     step("enable MIDI audition", "click", "--name", "MIDI audition", "--class", "juce::TextButton", "--exact")
     command("wait", "--ms", "4000")
     silent = beam("waiting-for-input")
@@ -102,8 +102,8 @@ try:
     command("wait", "--ms", "4000")
     released = beam("released-note")
     assert released < 20, released
-    step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
-    step("reopen notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("return to timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    step("reopen notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     toggle = find("juce::TextButton", "MIDI audition")
     assert not toggle.get("checked", False), toggle
     command("wait", "--ms", "1800")

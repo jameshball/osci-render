@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "../model/MidiInstrument.h"
 #include <osci_gui/osci_gui.h>
 
@@ -11,7 +13,7 @@ public:
         const auto values = initial.key();
         for (std::size_t index = 0; index < fields.size(); ++index) {
             labels[index].setText(names[index], juce::dontSendNotification);
-            labels[index].setFont(juce::FontOptions(13));
+            labels[index].setFont(motion::style::body());
             fields[index].setName(accessible[index]);
             fields[index].setSliderStyle(juce::Slider::LinearHorizontal);
             fields[index].setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, 24);
@@ -22,7 +24,7 @@ public:
             addAndMakeVisible(labels[index]); addAndMakeVisible(fields[index]);
         }
         note.setText("Shared by live MIDI and timeline notes.\nRelease tails stop at the clip's end.\nApplying resets held live notes.", juce::dontSendNotification);
-        note.setFont(juce::FontOptions(12));
+        note.setFont(motion::style::body());
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         note.setJustificationType(juce::Justification::topLeft);
         apply.onClick = [this] { if (onApply) { onApply(value()); } };

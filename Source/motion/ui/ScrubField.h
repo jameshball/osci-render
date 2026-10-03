@@ -48,7 +48,7 @@ public:
         }
         auto text = getLocalBounds().reduced(5, 0);
         if (axisColour.has_value() || prefix.isNotEmpty()) {
-            g.setFont(motion::style::smallText());
+            g.setFont(motion::style::caption());
             g.setColour(axisColour.value_or(motion::style::muted()).withAlpha(isEnabled() ? 1.0f : .4f));
             g.drawText(prefix, text.removeFromLeft(9), juce::Justification::centredLeft);
         }

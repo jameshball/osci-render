@@ -74,7 +74,7 @@ try:
     preview = bounds("MotionCompositionView")
     step("choose parent scale tool", "press", "S", "--class", "MotionCompositionView")
     step("zoom parent preview", "wheel", preview["x"] + preview["w"] // 2, preview["y"] + preview["h"] // 2, "--dy", "-0.3")
-    step("open parent graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
+    step("open parent graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     graph = bounds("MotionCurveEditor")
     step("zoom graph values", "wheel", graph["x"] + graph["w"] // 2, graph["y"] + graph["h"] // 2, "--dy", "0.25")
     step("pan graph time", "wheel", graph["x"] + graph["w"] // 2, graph["y"] + graph["h"] // 2, "--dx", "0.3")
@@ -93,7 +93,7 @@ try:
     assert bounds("MotionCompositionView") == preview
     assert ImageChops.difference(crop(baseline, preview), crop(restored, preview)).getbbox() is None, "Preview camera/tool/selection changed on return"
     assert ImageChops.difference(crop(baseline, graph), crop(restored, graph)).getbbox() is None, "Graph view or target changed on return"
-    step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
+    step("return to timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
     step("remove placed instance", "press", "Backspace", "--class", "MotionTimelineView")
     step("save unused definition", "press", "command + s", "--class", "MotionEditor")
     saved = read_project(seed)

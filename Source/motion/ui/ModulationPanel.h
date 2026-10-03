@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "../MotionProcessor.h"
 #include "../model/PropertyTarget.h"
 
@@ -142,7 +144,7 @@ public:
         g.fillRoundedRectangle(getLocalBounds().toFloat(), 5);
         osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(30).toFloat(), osci::Colours::veryDark());
         g.setColour(osci::Colours::text());
-        g.setFont(14);
+        g.setFont(motion::style::body());
         g.drawText("Oscillator", 10, 0, getWidth() - 107, 30, juce::Justification::centredLeft);
     }
     bool keyPressed(const juce::KeyPress& key) override {

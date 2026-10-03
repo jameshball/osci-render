@@ -87,6 +87,48 @@ public:
             expect(f.undo.undo());
             expectEquals(static_cast<int>(f.document.project().cameraCuts.size()), 2);
         }
+        beginTest("Adding a camera frames like the shot it takes over, as one undo step");
+        {
+            Fixture f; f.initialise();
+            f.document.edit("Frame side", [&](motion::Project& project) {
+                project.cameras[1].properties["position.x"].base = .5;
+                project.cameras[1].properties["fov"].base = 40;
+            });
+            motion::Id cut = 0;
+            expect(f.document.cutToCamera(f.second, 2, cut).wasOk());
+            const auto before = f.prepare().projectPoint({.3f, .2f, 0}, 4);
+            motion::Id added = 0;
+            expect(f.document.addCamera(4, added).wasOk());
+            const auto& project = f.document.project();
+            expectEquals(static_cast<int>(project.cameras.size()), 3);
+            expect(project.cameras.back().id == added && project.cameras.back().name == "Camera 3");
+            // The new camera takes over from the playhead to the end of the shot.
+            expect(project.cameraCuts.back().camera == added && project.cameraCuts.back().start == 4 && project.cameraCuts.back().end() == 10);
+            expect(project.cameraCuts.front().end() == 4);
+            const auto after = f.prepare().projectPoint({.3f, .2f, 0}, 4);
+            expectWithinAbsoluteError(after.x, before.x, 1.0e-5f);
+            expectWithinAbsoluteError(after.y, before.y, 1.0e-5f);
+            expect(f.undo.undo());
+            expectEquals(static_cast<int>(f.document.project().cameras.size()), 2);
+            expectEquals(static_cast<int>(f.document.project().cameraCuts.size()), 1);
+        }
+        beginTest("The first camera becomes the default view; deleting one removes its cuts");
+        {
+            juce::UndoManager undo;
+            motion::Document document(undo);
+            motion::Project project;
+            project.duration = 10;
+            document.reset(std::move(project));
+            motion::Id first = 0, second = 0;
+            expect(document.addCamera(3, first).wasOk());
+            expect(document.project().cameraCuts.empty(), "the first camera needs no cut");
+            expect(document.addCamera(5, second).wasOk());
+            expectEquals(static_cast<int>(document.project().cameraCuts.size()), 1);
+            expect(document.removeCamera(second).wasOk());
+            expect(document.project().cameraCuts.empty() && document.project().cameras.size() == 1);
+            expect(document.removeCamera(second).failed());
+            expect(document.addCamera(11, second).failed(), "cameras are added inside the project");
+        }
         beginTest("Targets and parents save, reload, and are cleared with their objects");
         {
             Fixture f; f.initialise();

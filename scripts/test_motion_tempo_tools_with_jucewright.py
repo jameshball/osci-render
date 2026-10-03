@@ -129,7 +129,7 @@ try:
     # Detection switches the ruler to bars in the same step, and the clip's
     # timing (in Properties) then shows bars.beats.
     assert tree.get("timeDisplay") == "2", tree.attrib
-    step("properties tab", "click", "--name", "Properties", "--class", "osci::TabBar::Tab", "--exact")
+    step("properties tab", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     step("select soundtrack", "click", "--class", "MotionTimelineView", "--position", "400,42")
     command("wait", "--ms", 300)
     tree = json.loads(command("snapshot", "--json", "--full"))

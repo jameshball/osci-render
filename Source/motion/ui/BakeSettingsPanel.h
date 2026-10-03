@@ -2,6 +2,7 @@
 
 #include "../model/BakeSettings.h"
 #include <JuceHeader.h>
+#include "MotionStyle.h"
 #include <cstdlib>
 #include <functional>
 #include <sstream>
@@ -18,7 +19,7 @@ public:
         seed.setName("Bake random seed");
         bpm.setName("Bake tempo");
         for (auto* input : { &duration, &seed, &bpm }) {
-            input->setFont(juce::FontOptions(13));
+            input->setFont(motion::style::body());
             input->setJustification(juce::Justification::centredLeft);
             input->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
             input->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
@@ -55,12 +56,12 @@ public:
         bpm.onTextChange = [this] { tempoEdited = true; refresh(); };
         seed.onTextChange = [this] { refresh(); };
         for (auto* caption : { &durationLabel, &rateLabel, &samplesLabel, &seedLabel, &bpmLabel }) {
-            caption->setFont(juce::FontOptions(13));
+            caption->setFont(motion::style::body());
             caption->setColour(juce::Label::textColourId, osci::Colours::textMuted());
             caption->setBorderSize({});
         }
         for (auto* label : { &summary, &note, &error }) {
-            label->setFont(juce::FontOptions(12));
+            label->setFont(motion::style::body());
             label->setJustificationType(juce::Justification::topLeft);
             label->setBorderSize({});
         }

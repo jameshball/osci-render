@@ -184,7 +184,7 @@ try:
     # hides the rest.
     seek(1)
     step("select first clip", "click", "--class", "MotionTimelineView", "--position", f"{170 + round(1 * pixels)},{track_row(10) + 16}")
-    step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
+    step("graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     command("wait-for-locator", "--name", "Curve Drawing weight", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
     # Only animated channels are listed until the filter is switched off.
     hidden = find(lambda n: n.get("name") == "Curve Position X")

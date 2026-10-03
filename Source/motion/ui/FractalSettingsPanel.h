@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "MotionStyle.h"
 #include <osci_gui/osci_gui.h>
 #include <algorithm>
 #include <functional>
@@ -19,11 +20,11 @@ public:
         depth.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
         depth.setColour(juce::Slider::textBoxTextColourId, osci::Colours::text());
 
-        depthLabel.setFont(juce::FontOptions(13));
+        depthLabel.setFont(motion::style::body());
         depthLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         depthLabel.setBorderSize({});
 
-        note.setFont(juce::FontOptions(12));
+        note.setFont(motion::style::body());
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         note.setBorderSize({});
         note.setJustificationType(juce::Justification::topLeft);

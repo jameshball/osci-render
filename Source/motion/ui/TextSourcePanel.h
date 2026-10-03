@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "MotionStyle.h"
 #include <osci_gui/osci_gui.h>
 #include "../model/TextSettings.h"
 
@@ -17,7 +18,7 @@ public:
         text.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         text.setText(initial, false);
         text.onTextChange = [this] { refresh(); };
-        help.setFont(juce::FontOptions(13));
+        help.setFont(motion::style::body());
         help.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         help.setText("Shared source: " + juce::String(static_cast<juce::uint64>(instances)) + (instances == 1 ? " clip" : " clips") + " will update. Clip animation stays unchanged.", juce::dontSendNotification);
         help.setJustificationType(juce::Justification::centredLeft);
@@ -25,10 +26,10 @@ public:
         error.setText(preparationError.contains("geometry budget") ? "This text is too detailed to prepare. Try a simpler font or shorten the text." : preparationError, juce::dontSendNotification);
         error.setMinimumHorizontalScale(1.0f);
         error.setTooltip(preparationError);
-        error.setFont(juce::FontOptions(13));
+        error.setFont(motion::style::body());
         error.setColour(juce::Label::textColourId, osci::Colours::danger());
         error.setJustificationType(juce::Justification::centredLeft);
-        status.setFont(juce::FontOptions(12));
+        status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         families = juce::Font::findAllTypefaceNames();
         families.sort(true);
@@ -91,7 +92,7 @@ public:
         const std::array<juce::String, 10> captions {"Font", "Style", "Alignment", "Line spacing", "Tracking", "Animation", "Stagger", "Per character", "Hold", "Amount"};
         for (std::size_t i = 0; i < labels.size(); ++i) {
             labels[i].setText(captions[i], juce::dontSendNotification);
-            labels[i].setFont(juce::FontOptions(13));
+            labels[i].setFont(motion::style::body());
             labels[i].setColour(juce::Label::textColourId, osci::Colours::textMuted());
             addAndMakeVisible(labels[i]);
         }

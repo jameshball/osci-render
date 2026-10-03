@@ -14,7 +14,7 @@ public:
     explicit MotionClipTimingPanel(MotionProcessor& owner) : processor(owner) {
         setName("Clip timing inspector");
         title.setText("Timing", juce::dontSendNotification);
-        title.setFont(motion::style::smallText());
+        title.setFont(motion::style::caption());
         title.setColour(juce::Label::textColourId, motion::style::muted());
         title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
@@ -28,25 +28,25 @@ public:
         };
         for (std::size_t i = 0; i < values.size(); ++i) {
             captions[i].setText(labels[i], juce::dontSendNotification);
-            captions[i].setFont(motion::style::smallText());
+            captions[i].setFont(motion::style::caption());
             captions[i].setColour(juce::Label::textColourId, motion::style::muted());
             addAndMakeVisible(captions[i]);
             auto& value = values[i];
             value.setName(names[i]); value.setTitle(names[i]);
             value.setEditable(false, true);
             value.setJustificationType(juce::Justification::centredRight);
-            value.setFont(juce::FontOptions(13.0f));
+            value.setFont(motion::style::body());
             value.setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
             value.setTooltip(hints[i]);
             value.onEditorShow = [this] { editRevision = processor.document.revision(); editGeneration = processor.document.generation(); };
             value.onTextChange = [this, i] { if (!updating) { apply(i); } };
             addAndMakeVisible(value);
         }
-        details.setFont(motion::style::smallText());
+        details.setFont(motion::style::caption());
         details.setColour(juce::Label::textColourId, motion::style::muted());
         details.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(details);
-        status.setFont(motion::style::smallText());
+        status.setFont(motion::style::caption());
         status.setJustificationType(juce::Justification::topLeft);
         addAndMakeVisible(status);
         refresh();

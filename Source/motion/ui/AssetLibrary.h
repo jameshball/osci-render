@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "../model/Document.h"
 #include <osci_gui/osci_gui.h>
 
@@ -14,7 +16,7 @@ public:
         list.setOutlineThickness(0);
         addAndMakeVisible(list);
         status.setJustificationType(juce::Justification::topLeft);
-        status.setFont(juce::Font(12.0f));
+        status.setFont(motion::style::body());
         addAndMakeVisible(status);
         cancelImport.setButtonText("Cancel import");
         cancelImport.onClick = [this] { if (onCancelImport) { onCancelImport(); } };
@@ -31,7 +33,7 @@ public:
         addChildComponent(assignMidi);
         search.setName("Search sources");
         search.setTextToShowWhenEmpty("Search sources", osci::Colours::textMuted());
-        search.setFont(juce::Font(juce::FontOptions(12.0f)));
+        search.setFont(motion::style::body());
         search.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
         search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         search.setIndents(8, 5);
@@ -39,7 +41,7 @@ public:
         search.onEscapeKey = [this] { search.clear(); refresh(); };
         addAndMakeVisible(search);
         rename.setName("Rename source");
-        rename.setFont(juce::Font(juce::FontOptions(13.0f)));
+        rename.setFont(motion::style::body());
         rename.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
         rename.onReturnKey = [this] { finishRename(true); };
         rename.onEscapeKey = [this] { finishRename(false); };
@@ -147,7 +149,7 @@ public:
     void paint(juce::Graphics& graphics) override {
         if (assets.empty() && definitions.empty()) {
             graphics.setColour(osci::Colours::text().withAlpha(0.6f));
-            graphics.setFont(13.0f);
+            graphics.setFont(motion::style::body());
             graphics.drawFittedText("Drop files here, or click Add source (" + motion::style::shortcutText("Cmd+I") + "). Shapes, text, Lua, images, video, audio and MIDI all work.", list.getBounds().reduced(12), juce::Justification::centred, 3);
         }
     }
@@ -187,10 +189,10 @@ private:
         paintThumbnail(graphics, row, bounds.removeFromLeft(36).withSizeKeepingCentre(34, 34));
         bounds.removeFromLeft(8);
         graphics.setColour(osci::Colours::text());
-        graphics.setFont(13.0f);
+        graphics.setFont(motion::style::body());
         graphics.drawText(getNameForRow(row), bounds.removeFromTop(20), juce::Justification::centredLeft);
         graphics.setColour(osci::Colours::text().withAlpha(0.55f));
-        graphics.setFont(11.0f);
+        graphics.setFont(motion::style::caption());
         juce::String detail;
         if (definitionRow(row)) {
             const auto& definition = *definitions[static_cast<std::size_t>(row) - assets.size()];
@@ -332,7 +334,6 @@ private:
         const auto uses = document.assetUses(id);
         const auto generation = document.generation();
         juce::PopupMenu menu;
-        menu.addSectionHeader(assets[static_cast<std::size_t>(row)]->name);
         menu.addItem(1, "Insert at playhead");
         menu.addItem(2, "Rename...");
         menu.addItem(6, "Replace with file...");

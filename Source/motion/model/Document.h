@@ -195,6 +195,12 @@ public:
     // project, and keeps at least one frame.
     juce::Result setCutRange(Id cut, double start, double end, juce::String label = "Move camera cut");
     juce::Result removeCut(Id cut);
+    // Adds a camera framed like the one showing at `time`, so the output does
+    // not jump. The first camera is the default view; later ones cut in at
+    // `time`. One undo step.
+    juce::Result addCamera(double time, Id& cameraId);
+    // Removes a camera and its cuts.
+    juce::Result removeCamera(Id camera);
     // Aims a camera at a clip or group origin (0: free) and/or places it in a
     // group's space (0: world).
     juce::Result setCameraRig(Id camera, Id target, Id parent);

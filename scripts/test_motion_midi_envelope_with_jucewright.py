@@ -88,7 +88,7 @@ try:
     step("import audition source", "drop-files", "--file", shape, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
     step("select audition clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
-    step("open notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     step("open envelope", "click", "--name", "Envelope...", "--exact")
     expected = dict(attack=.1, decay=.25, sustain=.6, release=8)
     for name, value in (("attack", .1), ("decay", .25), ("sustain", 60), ("release", 8)):
@@ -137,8 +137,8 @@ try:
     command("wait", "--ms", "6000")
     released = beam("released-note")
     assert released < 20, released
-    step("return to timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
-    step("reopen notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("return to timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    step("reopen notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     toggle = find("juce::TextButton", "MIDI audition")
     assert not toggle.get("checked", False), toggle
     command("wait", "--ms", "1800")
@@ -157,7 +157,7 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "MIDI envelope study", "--timeout-ms", "10000")
     step("compact workspace", "resize-window", "--w", "1100", "--h", "740")
     step("select reopened clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
-    step("reopen persisted notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("reopen persisted notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     step("compact notes header", "screenshot", "--file", session.artifact_dir / "compact-notes.png")
     step("inspect persisted envelope", "click", "--name", "Envelope...", "--exact")
     for name, value in (("attack", .1), ("decay", .25), ("sustain", 60), ("release", 8)):

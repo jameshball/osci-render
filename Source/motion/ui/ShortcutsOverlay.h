@@ -66,13 +66,13 @@ private:
                 if (shown.empty()) { continue; }
                 any = true;
                 g.setColour(motion::style::accent());
-                g.setFont(juce::Font(juce::FontOptions(14.0f, juce::Font::bold)));
+                g.setFont(motion::style::title());
                 g.drawText(section.title, 0, y + 10, getWidth(), 20, juce::Justification::centredLeft);
                 g.setColour(juce::Colours::white.withAlpha(.08f));
                 g.fillRect(0, y + headingHeight - 3, getWidth(), 1);
                 y += headingHeight;
                 for (const auto* entry : shown) {
-                    g.setFont(juce::Font(juce::FontOptions(14.0f)));
+                    g.setFont(motion::style::body());
                     g.setColour(osci::Colours::text());
                     g.drawText(motion::style::shortcutText(entry->keys), 0, y, keyWidth - 16, rowHeight, juce::Justification::centredRight);
                     g.setColour(osci::Colours::text().withAlpha(.78f));

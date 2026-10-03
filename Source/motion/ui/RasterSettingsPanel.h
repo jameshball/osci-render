@@ -2,6 +2,7 @@
 
 #include "../model/RasterSettings.h"
 #include <JuceHeader.h>
+#include "MotionStyle.h"
 #include <osci_gui/osci_gui.h>
 #include <functional>
 
@@ -17,7 +18,7 @@ public:
             frameRate.setTextValueSuffix(" fps");
             frameRate.onValueChange = [this] { settings.videoFrameRate = frameRate.getValue(); refresh(); };
             frameRate.setTooltip("Resample video timing at this rate for deterministic seeking and export.");
-            frameRateLabel.setFont(juce::FontOptions(13));
+            frameRateLabel.setFont(motion::style::body());
             frameRateLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
             frameRateLabel.setBorderSize({});
             addAndMakeVisible(frameRate); addAndMakeVisible(frameRateLabel);
@@ -78,12 +79,12 @@ public:
         threshold.onValueChange = [this] { thresholdEdited = true; refresh(); };
         invert.onClick = [this] { refresh(); };
         for (auto* caption : {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel}) {
-            caption->setFont(juce::FontOptions(13));
+            caption->setFont(motion::style::body());
             caption->setColour(juce::Label::textColourId, osci::Colours::textMuted());
             caption->setBorderSize({});
         }
         for (auto* label : {&note, &error}) {
-            label->setFont(juce::FontOptions(12));
+            label->setFont(motion::style::body());
             label->setJustificationType(juce::Justification::topLeft);
             label->setBorderSize({});
         }

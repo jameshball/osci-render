@@ -102,10 +102,10 @@ def seek(seconds):
 def tab(name, bar_name="Inspector tabs"):
     """Tabs repeat names across bars (Effects), so resolve within one bar."""
     if name in ("Timeline", "Graph", "Notes"):
-        step("tab " + name, "click", "--name", name, "--class", "osci::TabBar::Tab", "--exact")
+        step("tab " + name, "click", "--name", name, "--class", "MotionTabs::Tab", "--exact")
         return
-    owner = find(lambda node: node.get("class") == "osci::TabBar" and node.get("name") == bar_name)
-    target = find(lambda node: node.get("class") == "osci::TabBar::Tab" and node.get("name") == name, owner)
+    owner = find(lambda node: node.get("class") == "MotionTabs" and node.get("name") == bar_name)
+    target = find(lambda node: node.get("class") == "MotionTabs::Tab" and node.get("name") == name, owner)
     assert target is not None, name
     step("tab " + name, "click", target["ref"])
 
@@ -188,8 +188,8 @@ def modulate(label, waveform, amount, beats=None, hertz=None, mode="Add"):
 
 
 def library_tab(name):
-    library = find(lambda node: node.get("class") == "osci::TabBar" and node.get("name") == "Library tabs")
-    target = find(lambda node: node.get("class") == "osci::TabBar::Tab" and node.get("name") == name, library)
+    library = find(lambda node: node.get("class") == "MotionTabs" and node.get("name") == "Library tabs")
+    target = find(lambda node: node.get("class") == "MotionTabs::Tab" and node.get("name") == name, library)
     step("library " + name, "click", target["ref"])
 
 

@@ -2004,6 +2004,20 @@ static bool isVisualClipOrGroup(const Project& project, Id id, bool groupsOnly) 
     return false;
 }
 
+// A cut at `time` ends the cut it falls in and lasts until the next cut.
+static void insertCut(Project& updated, Id id, Id camera, double time) {
+    auto end = updated.duration;
+    for (const auto& cut : updated.cameraCuts) {
+        if (cut.start > time) { end = std::min(end, cut.start); }
+    }
+    std::erase_if(updated.cameraCuts, [time](const auto& cut) { return cut.start == time; });
+    for (auto& cut : updated.cameraCuts) {
+        if (cut.start < time && cut.end() > time) { cut.duration = spanUntil(cut.start, time); }
+    }
+    updated.cameraCuts.push_back({id, camera, time, spanUntil(time, end)});
+    std::sort(updated.cameraCuts.begin(), updated.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+}
+
 juce::Result Document::cutToCamera(Id camera, double time, Id& cutId) {
     const auto& current = project();
     if (!hasCamera(current, camera)) { return juce::Result::fail("Choose a camera to cut to."); }
@@ -2011,16 +2025,7 @@ juce::Result Document::cutToCamera(Id camera, double time, Id& cutId) {
     cutId = newId();
     const auto id = cutId;
     tryEdit("Cut to camera", [time, camera, id](Project& updated) {
-        auto end = updated.duration;
-        for (const auto& cut : updated.cameraCuts) {
-            if (cut.start > time) { end = std::min(end, cut.start); }
-        }
-        std::erase_if(updated.cameraCuts, [time](const auto& cut) { return cut.start == time; });
-        for (auto& cut : updated.cameraCuts) {
-            if (cut.start < time && cut.end() > time) { cut.duration = spanUntil(cut.start, time); }
-        }
-        updated.cameraCuts.push_back({id, camera, time, spanUntil(time, end)});
-        std::sort(updated.cameraCuts.begin(), updated.cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
+        insertCut(updated, id, camera, time);
         return true;
     });
     return juce::Result::ok();
@@ -2071,6 +2076,49 @@ juce::Result Document::removeCut(Id cut) {
         return updated.cameraCuts.size() != before;
     });
     return removed ? juce::Result::ok() : juce::Result::fail("The cut no longer exists.");
+}
+
+juce::Result Document::addCamera(double time, Id& cameraId) {
+    const auto& current = project();
+    if (!std::isfinite(time) || time < 0 || time > current.duration) { return juce::Result::fail("Cameras are added inside the project."); }
+    Camera camera;
+    camera.id = cameraId = newId();
+    // The camera on the output at `time` is the first camera unless a cut shows another.
+    const Camera* showing = current.cameras.empty() ? nullptr : &current.cameras.front();
+    for (const auto& cut : current.cameraCuts) {
+        if (cut.contains(time)) {
+            for (const auto& item : current.cameras) {
+                if (item.id == cut.camera) { showing = &item; }
+            }
+        }
+    }
+    if (showing != nullptr) {
+        for (const auto& [name, curve] : showing->properties) { camera.properties[name] = Curve(curve.evaluateBase(time)); }
+        camera.target = showing->target;
+        camera.parent = showing->parent;
+    }
+    for (int number = static_cast<int>(current.cameras.size()) + 1;; ++number) {
+        camera.name = "Camera " + std::to_string(number);
+        const auto taken = std::any_of(current.cameras.begin(), current.cameras.end(), [&camera](const auto& item) { return item.name == camera.name; });
+        if (!taken) { break; }
+    }
+    const auto cutId = current.cameras.empty() || time >= current.duration ? Id(0) : newId();
+    tryEdit("Add camera", [camera, cutId, time](Project& updated) {
+        updated.cameras.push_back(camera);
+        if (cutId != 0) { insertCut(updated, cutId, camera.id, time); }
+        return true;
+    });
+    return juce::Result::ok();
+}
+
+juce::Result Document::removeCamera(Id camera) {
+    const auto removed = tryEdit("Delete camera", [camera](Project& updated) {
+        const auto before = updated.cameras.size();
+        std::erase_if(updated.cameras, [camera](const auto& item) { return item.id == camera; });
+        std::erase_if(updated.cameraCuts, [camera](const auto& cut) { return cut.camera == camera; });
+        return updated.cameras.size() != before;
+    });
+    return removed ? juce::Result::ok() : juce::Result::fail("The camera no longer exists.");
 }
 
 juce::Result Document::setCameraRig(Id camera, Id target, Id parent) {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
 #include "../model/PropertySchema.h"
@@ -20,7 +22,12 @@ public:
         title.setFont(motion::style::title());
         title.setColour(juce::Label::textColourId, motion::style::text());
         title.setName("Inspector title");
-        kind.setFont(motion::style::smallText());
+        title.onTextChange = [this] {
+            const auto text = title.getText().trim();
+            if (onRename && text.isNotEmpty()) { onRename(target, text); }
+            refresh();
+        };
+        kind.setFont(motion::style::caption());
         kind.setColour(juce::Label::textColourId, motion::style::muted());
         kind.setJustificationType(juce::Justification::centredRight);
         addAndMakeVisible(title);
@@ -33,6 +40,8 @@ public:
     std::function<void()> onKeyTimeEdited;
     // The row's modulation chip: open the graph (oscillator, routes, link) for this property.
     std::function<void(motion::Id, const std::string&)> onModulate;
+    // Double-clicking a camera's name renames it.
+    std::function<void(motion::Id, const juce::String&)> onRename;
 
     // Embedded inspectors (e.g. in the camera panel) supply their own title.
     // Distinguishes controls of several inspectors for automation and access.
@@ -102,7 +111,9 @@ public:
                                            : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock.";
             row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
         }
-        title.setText(editable ? juce::String(found->name.data(), found->name.size()) : "Nothing selected", juce::dontSendNotification);
+        title.setEditable(false, editable && found->camera);
+        title.setTooltip(editable && found->camera ? "Double-click to rename" : juce::String());
+        if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : "Nothing selected", juce::dontSendNotification); }
         // With several clips selected the header says so; edits apply to the
         // one named.
         const juce::String kindText = !editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object";
@@ -165,7 +176,7 @@ private:
         std::unique_ptr<motion::style::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
         void paint(juce::Graphics& g) override {
-            g.setFont(motion::style::smallText());
+            g.setFont(motion::style::caption());
             g.setColour(motion::style::muted());
             g.drawText(group, getLocalBounds().removeFromTop(16).withTrimmedLeft(2), juce::Justification::centredLeft);
         }
@@ -286,6 +297,7 @@ private:
         const auto leading = lead != nullptr && leadHeight ? leadHeight() : 0;
         if (lead != nullptr) {
             lead->setBounds(motion::style::padding, y, width - motion::style::padding * 2, leading);
+            lead->setVisible(leading > 0);
             y += leading > 0 ? leading + motion::style::padding : 0;
         }
         for (auto& row : rows) {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MotionStyle.h"
+
 #include "../model/TimeGrid.h"
 #include <osci_gui/osci_gui.h>
 
@@ -13,7 +15,7 @@ public:
         position.setText(initialPosition, false);
         position.setTooltip("Use the current time display, or append s for seconds or f for frames.");
         for (auto* field : {&name, &position}) {
-            field->setFont(juce::FontOptions(14));
+            field->setFont(motion::style::body());
             field->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
             field->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
             field->setSelectAllWhenFocused(true);
@@ -23,7 +25,7 @@ public:
         }
         nameLabel.setText("Name", juce::dontSendNotification);
         positionLabel.setText("Position", juce::dontSendNotification);
-        status.setFont(juce::FontOptions(12));
+        status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.onClick = [this] { if (time.has_value() && apply.isEnabled() && onApply) { onApply(name.getText().trim(), *time); } };
         for (auto* component : std::initializer_list<juce::Component*>{&nameLabel, &positionLabel, &status, &apply}) { addAndMakeVisible(component); }
@@ -70,7 +72,7 @@ public:
         tempo.setName("Tempo change BPM");
         tempo.setTitle("Tempo change BPM");
         tempo.setText(juce::String(bpm, bpm == std::round(bpm) ? 0 : 2), false);
-        tempo.setFont(juce::FontOptions(14));
+        tempo.setFont(motion::style::body());
         tempo.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
         tempo.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         tempo.setSelectAllWhenFocused(true);
@@ -80,7 +82,7 @@ public:
         tempoLabel.setText("BPM", juce::dontSendNotification);
         where.setText("From bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2) + " onwards", juce::dontSendNotification);
         where.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        status.setFont(juce::FontOptions(12));
+        status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.setTitle("Save tempo");
         apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(tempo.getText().getDoubleValue(), ramp.getToggleState()); } };

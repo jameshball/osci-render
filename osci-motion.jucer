@@ -25,6 +25,69 @@
         <FILE id="SBWt8K" name="FiraSans-SemiBold.ttf" compile="0" resource="1"
               file="Resources/fonts/FiraSans-SemiBold.ttf"/>
       </GROUP>
+      <GROUP id="{6E1A0C2B-4D11-4B7A-9E0D-5A7C3E2F9B10}" name="examples">
+        <FILE id="Ex3793e4" name="cube.obj" compile="0" resource="1" file="Resources/models/cube.obj"/>
+        <FILE id="Exab417e" name="diamond.obj" compile="0" resource="1" file="Resources/models/diamond.obj"/>
+        <FILE id="Ex483617" name="dodecahedron.obj" compile="0" resource="1"
+              file="Resources/models/dodecahedron.obj"/>
+        <FILE id="Ex13edb1" name="humanoid_quad.obj" compile="0" resource="1"
+              file="Resources/models/humanoid_quad.obj"/>
+        <FILE id="Exf5082a" name="icosahedron.obj" compile="0" resource="1"
+              file="Resources/models/icosahedron.obj"/>
+        <FILE id="Exe5ef05" name="lamp.obj" compile="0" resource="1" file="Resources/models/lamp.obj"/>
+        <FILE id="Excb1b3f" name="shuttle.obj" compile="0" resource="1" file="Resources/models/shuttle.obj"/>
+        <FILE id="Ex8b5feb" name="suzanne.obj" compile="0" resource="1" file="Resources/models/suzanne.obj"/>
+        <FILE id="Ex3b1402" name="teapot.obj" compile="0" resource="1" file="Resources/models/teapot.obj"/>
+        <FILE id="Ex40c781" name="tetrahedron.obj" compile="0" resource="1"
+              file="Resources/models/tetrahedron.obj"/>
+        <FILE id="Exbaf056" name="donut.lua" compile="0" resource="1" file="Resources/lua/donut.lua"/>
+        <FILE id="Ex299c3e" name="graph.lua" compile="0" resource="1" file="Resources/lua/graph.lua"/>
+        <FILE id="Ex6440e2" name="gravity.lua" compile="0" resource="1" file="Resources/lua/gravity.lua"/>
+        <FILE id="Ex22dbee" name="helix.lua" compile="0" resource="1" file="Resources/lua/helix.lua"/>
+        <FILE id="Ex6d4f61" name="human.lua" compile="0" resource="1" file="Resources/lua/human.lua"/>
+        <FILE id="Ex2bfb55" name="hypercube.lua" compile="0" resource="1" file="Resources/lua/hypercube.lua"/>
+        <FILE id="Exdeb915" name="mushroom.lua" compile="0" resource="1" file="Resources/lua/mushroom.lua"/>
+        <FILE id="Ex8fc9a1" name="planet.lua" compile="0" resource="1" file="Resources/lua/planet.lua"/>
+        <FILE id="Exdd70c6" name="shape_generator.lua" compile="0" resource="1"
+              file="Resources/lua/shape_generator.lua"/>
+        <FILE id="Ex394871" name="spiral.lua" compile="0" resource="1" file="Resources/lua/spiral.lua"/>
+        <FILE id="Exccd1c8" name="squiggles.lua" compile="0" resource="1" file="Resources/lua/squiggles.lua"/>
+        <FILE id="Ex74ea76" name="android_wave.lottie" compile="0" resource="1"
+              file="Resources/lottie/android_wave.lottie"/>
+        <FILE id="Exff1d85" name="blinking_eye.lottie" compile="0" resource="1"
+              file="Resources/lottie/blinking_eye.lottie"/>
+        <FILE id="Ex277e15" name="cat.lottie" compile="0" resource="1" file="Resources/lottie/cat.lottie"/>
+        <FILE id="Ex19fd32" name="dice.lottie" compile="0" resource="1" file="Resources/lottie/dice.lottie"/>
+        <FILE id="Ex9347db" name="heart.lottie" compile="0" resource="1" file="Resources/lottie/heart.lottie"/>
+        <FILE id="Ex9a7fd9" name="hello.lottie" compile="0" resource="1" file="Resources/lottie/hello.lottie"/>
+        <FILE id="Exfb0026" name="lottie_logo_1.lottie" compile="0" resource="1"
+              file="Resources/lottie/lottie_logo_1.lottie"/>
+        <FILE id="Ex98247b" name="lottie_logo_2.lottie" compile="0" resource="1"
+              file="Resources/lottie/lottie_logo_2.lottie"/>
+        <FILE id="Ex6ff565" name="pin_jump.lottie" compile="0" resource="1"
+              file="Resources/lottie/pin_jump.lottie"/>
+        <FILE id="Ex06d5b3" name="spinning_squares.lottie" compile="0" resource="1"
+              file="Resources/lottie/spinning_squares.lottie"/>
+        <FILE id="Ex284dc0" name="switch.lottie" compile="0" resource="1" file="Resources/lottie/switch.lottie"/>
+        <FILE id="Ex18de5c" name="wave.lottie" compile="0" resource="1" file="Resources/lottie/wave.lottie"/>
+        <FILE id="Excc63e7" name="binary_tree.lsystem" compile="0" resource="1"
+              file="Resources/fractal/binary_tree.lsystem"/>
+        <FILE id="Ex7bc68d" name="dragon_curve.lsystem" compile="0" resource="1"
+              file="Resources/fractal/dragon_curve.lsystem"/>
+        <FILE id="Ex483ac4" name="hilbert_curve.lsystem" compile="0" resource="1"
+              file="Resources/fractal/hilbert_curve.lsystem"/>
+        <FILE id="Ex20eb4c" name="koch_snowflake.lsystem" compile="0" resource="1"
+              file="Resources/fractal/koch_snowflake.lsystem"/>
+        <FILE id="Ex9bb457" name="sierpinski_triangle.lsystem" compile="0"
+              resource="1" file="Resources/fractal/sierpinski_triangle.lsystem"/>
+        <FILE id="Exca5c2f" name="greek.txt" compile="0" resource="1" file="Resources/text/greek.txt"/>
+        <FILE id="Ex23d16c" name="helloworld.txt" compile="0" resource="1"
+              file="Resources/text/helloworld.txt"/>
+        <FILE id="Exc2e744" name="osci-render.txt" compile="0" resource="1"
+              file="Resources/text/osci-render.txt"/>
+        <FILE id="Ex517caf" name="paperclip.txt" compile="0" resource="1" file="Resources/text/paperclip.txt"/>
+        <FILE id="Exa22612" name="sosci.txt" compile="0" resource="1" file="Resources/text/sosci.txt"/>
+      </GROUP>
       <GROUP id="{F3C16D02-63B4-E3DA-7498-901173C37D6C}" name="oscilloscope">
         <FILE id="qpPhpN" name="empty.jpg" compile="0" resource="1" file="Resources/oscilloscope/empty.jpg"/>
         <FILE id="ZgcesA" name="no_reflection.jpg" compile="0" resource="1"

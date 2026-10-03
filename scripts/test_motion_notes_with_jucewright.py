@@ -97,7 +97,7 @@ try:
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("select visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
-    step("open notes workspace", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("open notes workspace", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     # Give the piano roll the room it used to take for itself.
     step("taller notes", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
     step("create note pattern", "click", "--name", "Create notes", "--exact")
@@ -162,7 +162,7 @@ try:
     step("compact notes workspace", "resize-window", "--w", 1100, "--h", 700)
     step("compact layout", "screenshot", "--file", session.artifact_dir / "compact.png")
     session.open_project(fixture)
-    step("show reopened timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
+    step("show reopened timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
     command("wait-for-locator", "--name", "Musical beam", "--class", "juce::Label", "--exact")
     # A locked track retains readable notes without accepting edits.
     saved.find("./composition/track").set("locked", "1")
@@ -173,7 +173,7 @@ try:
     session.open_project(locked_fixture)
     command("wait-for-locator", "--name", "Locked musical beam", "--class", "juce::Label", "--exact")
     step("select locked visual clip", "click", "--class", "MotionTimelineView", "--position", "190,55")
-    step("inspect locked notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
+    step("inspect locked notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
     command("wait-for-locator", "--name", "Remove MIDI", "--exact")
     step("select locked notes", "press", "command + a", "--class", "MotionNotesEditor")
     locked_tree = json.loads(command("snapshot", "--json", "--full"))
