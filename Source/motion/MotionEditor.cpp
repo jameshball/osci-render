@@ -226,7 +226,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     canvasButton.onClick = [this] {
         auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize(), processor.document.mainProject().frameRate);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "Output canvas", juce::Point<int>(420, 216), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "Output canvas", juce::Point<int>(420, 162), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
         controls->onApply = [owner, dialog](VisualiserRenderSize size) {
@@ -511,7 +511,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "MIDI envelope", juce::Point<int>(420, 330), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "MIDI envelope", juce::Point<int>(420, 286), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
         controls->onApply = [owner, dialog, id, generation, revision](motion::MidiInstrument settings) {
@@ -1154,7 +1154,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 620 : 440, editLua ? 550 : text ? 470 : fractal ? 170 : video ? 444 : 400), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 620 : 440, editLua ? 550 : text ? 470 : fractal ? 124 : video ? 380 : raster ? 336 : 356), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;

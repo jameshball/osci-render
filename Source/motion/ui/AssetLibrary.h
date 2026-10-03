@@ -198,12 +198,14 @@ private:
         if (definitionRow(row)) {
             const auto& definition = *definitions[static_cast<std::size_t>(row) - assets.size()];
             const auto clip = motion::Document::makeCompositionClip(0, definition, 0);
-            detail = "COMPOSITION | " + juce::String(clip.duration, 2) + "s";
+            detail = "Composition" + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(clip.duration, 1) + " s";
         } else {
             const auto& asset = *assets[static_cast<std::size_t>(row)];
-            detail = asset.liveIdentity != nullptr ? "LIVE BLENDER" : asset.extension.equalsIgnoreCase(".blender-capture") ? "CAPTURE" : asset.extension.trimCharactersAtStart(".").toUpperCase();
+            const auto drawn = asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())));
+            detail = asset.liveIdentity != nullptr ? "Live Blender" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing" : asset.extension.trimCharactersAtStart(".").toUpperCase();
+            // Animated sources say how long they run.
             if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
-                detail += " | " + juce::String(asset.source->duration(), 2) + "s | " + juce::String(static_cast<int>(asset.source->frameCount())) + (asset.source->frameCount() == 1 ? " frame" : " frames");
+                detail += juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(asset.source->duration(), 1) + " s";
             }
         }
         graphics.drawText(detail, bounds, juce::Justification::centredLeft);
