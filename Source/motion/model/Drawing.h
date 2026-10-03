@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -149,50 +150,154 @@ inline std::optional<Drawing> fromSvg(const juce::String& svg) {
     return drawing;
 }
 
-// Freehand input to a few smooth anchors: drop points within `tolerance` of
-// the line through their neighbours (Ramer-Douglas-Peucker), then give the
-// survivors Catmull-Rom handles.
-inline Stroke simplify(const std::vector<Point>& input, float tolerance, bool closed = false) {
+namespace detail {
+inline Point normalised(Point value) {
+    const auto length = value.getDistanceFromOrigin();
+    return length > 1.0e-9f ? value / length : Point();
+}
+inline Point bezier(const std::array<Point, 4>& c, float t) {
+    const auto u = 1.0f - t;
+    return c[0] * (u * u * u) + c[1] * (3 * u * u * t) + c[2] * (3 * u * t * t) + c[3] * (t * t * t);
+}
+// Least-squares control points for fixed end tangents (Schneider 1990).
+inline std::array<Point, 4> fitCubic(const std::vector<Point>& points, std::size_t first, std::size_t last, const std::vector<float>& u, Point left, Point right) {
+    const auto start = points[first], end = points[last];
+    float c00 = 0, c01 = 0, c11 = 0, x0 = 0, x1 = 0;
+    for (std::size_t i = first; i <= last; ++i) {
+        const auto t = u[i - first], v = 1.0f - t;
+        const auto b0 = v * v * v, b1 = 3 * v * v * t, b2 = 3 * v * t * t, b3 = t * t * t;
+        const auto a1 = left * b1, a2 = right * b2;
+        c00 += a1.getDotProduct(a1);
+        c01 += a1.getDotProduct(a2);
+        c11 += a2.getDotProduct(a2);
+        const auto rest = points[i] - (start * (b0 + b1) + end * (b2 + b3));
+        x0 += a1.getDotProduct(rest);
+        x1 += a2.getDotProduct(rest);
+    }
+    const auto determinant = c00 * c11 - c01 * c01;
+    const auto chord = start.getDistanceFrom(end);
+    auto alphaLeft = std::abs(determinant) > 1.0e-12f ? (x0 * c11 - x1 * c01) / determinant : 0.0f;
+    auto alphaRight = std::abs(determinant) > 1.0e-12f ? (c00 * x1 - c01 * x0) / determinant : 0.0f;
+    // Degenerate solutions fall back to a third of the chord (Wu-Barsky).
+    if (alphaLeft < chord * 1.0e-3f || alphaRight < chord * 1.0e-3f || alphaLeft > chord * 3 || alphaRight > chord * 3) { alphaLeft = alphaRight = chord / 3; }
+    return {start, start + left * alphaLeft, end + right * alphaRight, end};
+}
+// One Newton step towards each point's nearest parameter on the curve.
+inline void reparameterise(const std::vector<Point>& points, std::size_t first, std::vector<float>& u, const std::array<Point, 4>& c) {
+    for (std::size_t i = 0; i < u.size(); ++i) {
+        const auto t = u[i], v = 1.0f - t;
+        const auto q = bezier(c, t) - points[first + i];
+        const auto d1 = (c[1] - c[0]) * (3 * v * v) + (c[2] - c[1]) * (6 * v * t) + (c[3] - c[2]) * (3 * t * t);
+        const auto d2 = (c[2] - c[1] * 2.0f + c[0]) * (6 * v) + (c[3] - c[2] * 2.0f + c[1]) * (6 * t);
+        const auto denominator = d1.getDotProduct(d1) + q.getDotProduct(d2);
+        if (std::abs(denominator) > 1.0e-12f) { u[i] = std::clamp(t - q.getDotProduct(d1) / denominator, 0.0f, 1.0f); }
+    }
+}
+inline void fitRange(const std::vector<Point>& points, std::size_t first, std::size_t last, Point left, Point right, float tolerance, std::vector<std::array<Point, 4>>& out, int depth = 0) {
+    if (last - first == 1 || depth > 24) {
+        const auto chord = points[first].getDistanceFrom(points[last]) / 3;
+        out.push_back({points[first], points[first] + left * chord, points[last] + right * chord, points[last]});
+        return;
+    }
+    std::vector<float> u {0.0f};
+    for (auto i = first + 1; i <= last; ++i) { u.push_back(u.back() + points[i].getDistanceFrom(points[i - 1])); }
+    for (auto& value : u) { value = u.back() > 0 ? value / u.back() : 0.0f; }
+    auto curve = fitCubic(points, first, last, u, left, right);
+    std::size_t split = (first + last) / 2;
+    for (int iteration = 0; iteration < 5; ++iteration) {
+        float worst = 0;
+        for (auto i = first + 1; i < last; ++i) {
+            const auto error = bezier(curve, u[i - first]).getDistanceFrom(points[i]);
+            if (error > worst) {
+                worst = error;
+                split = i;
+            }
+        }
+        if (worst <= tolerance) {
+            out.push_back(curve);
+            return;
+        }
+        if (worst > tolerance * 4) { break; }
+        reparameterise(points, first, u, curve);
+        curve = fitCubic(points, first, last, u, left, right);
+    }
+    // Split at the worst point with a shared tangent, so the join is smooth.
+    const auto centre = normalised(points[split - 1] - points[split + 1]);
+    fitRange(points, first, split, left, centre, tolerance, out, depth + 1);
+    fitRange(points, split, last, -centre, right, tolerance, out, depth + 1);
+}
+// Indices of sharp turns: the direction over a few points either side
+// changes by more than about 55 degrees, keeping the sharpest of a run.
+inline std::vector<std::size_t> corners(const std::vector<Point>& points, float reach) {
+    std::vector<std::size_t> result;
+    std::vector<float> turn(points.size(), 0.0f);
+    for (std::size_t i = 1; i + 1 < points.size(); ++i) {
+        std::size_t back = i, ahead = i;
+        while (back > 0 && points[back].getDistanceFrom(points[i]) < reach) { --back; }
+        while (ahead + 1 < points.size() && points[ahead].getDistanceFrom(points[i]) < reach) { ++ahead; }
+        const auto in = normalised(points[i] - points[back]), out = normalised(points[ahead] - points[i]);
+        turn[i] = std::acos(std::clamp(in.getDotProduct(out), -1.0f, 1.0f));
+    }
+    for (std::size_t i = 1; i + 1 < points.size(); ++i) {
+        if (turn[i] < .95f) { continue; }
+        std::size_t j = i;
+        while (j + 1 < points.size() && turn[j + 1] >= .95f) { ++j; }
+        const auto sharpest = static_cast<std::size_t>(std::max_element(turn.begin() + static_cast<std::ptrdiff_t>(i), turn.begin() + static_cast<std::ptrdiff_t>(j) + 1) - turn.begin());
+        result.push_back(sharpest);
+        i = j;
+    }
+    return result;
+}
+}
+
+// Freehand input to a few Bezier segments: light smoothing removes hand
+// jitter, sharp turns become corners, and each run between corners is fitted
+// with as few cubic curves as stay within `tolerance` (Schneider's method).
+inline Stroke fit(std::vector<Point> input, float tolerance, bool closed = false) {
     Stroke stroke;
     stroke.closed = closed;
-    if (input.size() < 2) {
+    input.erase(std::unique(input.begin(), input.end()), input.end());
+    if (input.size() < 3) {
         for (const auto& point : input) { stroke.anchors.push_back(Anchor::corner(point)); }
         return stroke;
     }
-    std::vector<bool> keep(input.size(), false);
-    keep.front() = keep.back() = true;
-    std::vector<std::pair<std::size_t, std::size_t>> spans {{0, input.size() - 1}};
-    while (!spans.empty()) {
-        const auto [first, last] = spans.back();
-        spans.pop_back();
-        float worst = 0;
-        std::size_t index = first;
-        const juce::Line<float> chord(input[first], input[last]);
-        for (auto candidate = first + 1; candidate < last; ++candidate) {
-            Point nearest;
-            const auto distance = chord.getLength() > 0 ? chord.getDistanceFromPoint(input[candidate], nearest) : input[candidate].getDistanceFrom(input[first]);
-            if (distance > worst) {
-                worst = distance;
-                index = candidate;
-            }
+    const auto turns = detail::corners(input, tolerance * 6);
+    // Three passes of neighbour averaging, holding the ends and corners.
+    for (int pass = 0; pass < 3; ++pass) {
+        auto smoothed = input;
+        for (std::size_t i = 1; i + 1 < input.size(); ++i) {
+            if (std::find(turns.begin(), turns.end(), i) != turns.end()) { continue; }
+            smoothed[i] = input[i - 1] * .25f + input[i] * .5f + input[i + 1] * .25f;
         }
-        if (worst > tolerance) {
-            keep[index] = true;
-            spans.emplace_back(first, index);
-            spans.emplace_back(index, last);
-        }
+        input = std::move(smoothed);
     }
-    std::vector<Point> points;
-    for (std::size_t index = 0; index < input.size(); ++index) {
-        if (keep[index]) { points.push_back(input[index]); }
+    std::vector<std::size_t> breaks {0};
+    breaks.insert(breaks.end(), turns.begin(), turns.end());
+    breaks.push_back(input.size() - 1);
+    std::vector<std::array<Point, 4>> curves;
+    std::vector<bool> sharp;
+    for (std::size_t piece = 0; piece + 1 < breaks.size(); ++piece) {
+        const auto first = breaks[piece], last = breaks[piece + 1];
+        if (last <= first) { continue; }
+        const auto look = std::min<std::size_t>(3, last - first);
+        const auto left = detail::normalised(input[first + look] - input[first]);
+        const auto right = detail::normalised(input[last - look] - input[last]);
+        const auto before = curves.size();
+        detail::fitRange(input, first, last, left, right, tolerance, curves);
+        sharp.resize(curves.size(), false);
+        if (before > 0) { sharp[before] = true; }
     }
-    const auto count = points.size();
-    for (std::size_t index = 0; index < count; ++index) {
-        const auto& point = points[index];
-        const auto previous = index > 0 ? points[index - 1] : (closed ? points[count - 1] : point);
-        const auto next = index + 1 < count ? points[index + 1] : (closed ? points[0] : point);
-        const auto tangent = (next - previous) / 6.0f;
-        stroke.anchors.push_back({point, point - tangent, point + tangent, count > 2});
+    if (curves.empty()) { return stroke; }
+    stroke.anchors.push_back({curves.front()[0], curves.front()[0], curves.front()[1], false});
+    for (std::size_t index = 0; index < curves.size(); ++index) {
+        stroke.anchors.back().out = curves[index][1];
+        const auto& curve = curves[index];
+        const auto smoothJoin = index + 1 < curves.size() && !sharp[index + 1];
+        stroke.anchors.push_back({curve[3], curve[2], curve[3], smoothJoin});
+    }
+    if (closed && stroke.anchors.size() > 2 && stroke.anchors.back().point.getDistanceFrom(stroke.anchors.front().point) < tolerance * 4) {
+        stroke.anchors.front().in = stroke.anchors.back().in;
+        stroke.anchors.pop_back();
     }
     return stroke;
 }

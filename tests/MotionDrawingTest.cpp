@@ -46,24 +46,32 @@ public:
             expect(reopened.has_value() && !reopened->strokes[0].closed && reopened->strokes[0].anchors.size() == 3);
             expect(!fromSvg("<svg viewBox=\"0 0 1 1\"><path d=\"M0 0 L1 1\"/></svg>").has_value(), "ordinary SVG files are not drawings");
         }
-        beginTest("Freehand input becomes a few smooth anchors close to the stroke");
+        beginTest("Freehand input becomes a few Bezier curves close to the stroke, keeping sharp turns");
         {
             std::vector<Point> points;
             for (int index = 0; index <= 400; ++index) {
                 const auto angle = index / 400.0f * juce::MathConstants<float>::twoPi;
                 points.push_back({.5f * std::cos(angle), .5f * std::sin(angle) + .002f * std::sin(angle * 40)});
             }
-            const auto stroke = simplify(points, .01f);
-            expect(stroke.anchors.size() > 6 && stroke.anchors.size() < 60, juce::String(static_cast<int>(stroke.anchors.size())));
+            const auto stroke = fit(points, .01f, true);
+            expect(stroke.closed && stroke.anchors.size() >= 2 && stroke.anchors.size() < 16, juce::String(static_cast<int>(stroke.anchors.size())));
+            expect(std::all_of(stroke.anchors.begin() + 1, stroke.anchors.end(), [](const auto& anchor) { return anchor.smooth; }), "a smooth gesture has smooth joins");
             const auto path = toPath(stroke);
             float worst = 0;
             for (const auto& point : points) {
                 juce::Point<float> nearest;
-                path.getNearestPoint(point, nearest);
+                path.getNearestPoint(point, nearest, {}, .0005f);
                 worst = std::max(worst, nearest.getDistanceFrom(point));
             }
             expect(worst < .03f, "the fitted curve stays within " + juce::String(worst));
-            expectEquals(static_cast<int>(simplify({{0, 0}, {1, 0}}, .01f).anchors.size()), 2);
+            expectEquals(static_cast<int>(fit({{0, 0}, {1, 0}}, .01f).anchors.size()), 2);
+            // A sharp turn stays a corner: a V drawn with many points.
+            std::vector<Point> vee;
+            for (int index = 0; index <= 100; ++index) { vee.push_back({index / 100.0f, std::abs(index - 50) / 50.0f}); }
+            const auto pointed = fit(vee, .005f);
+            const auto corner = std::find_if(pointed.anchors.begin(), pointed.anchors.end(), [](const auto& anchor) { return anchor.point.getDistanceFrom({.5f, 0}) < .02f; });
+            expect(corner != pointed.anchors.end() && !corner->smooth, "the V keeps its point");
+            expect(pointed.anchors.size() <= 6, juce::String(static_cast<int>(pointed.anchors.size())));
         }
         beginTest("A drawing imports where it was drawn, unlike a normalised SVG");
         {

@@ -83,17 +83,12 @@ int main() {
     clip.properties["position.x"].setKeyValue(10, 10);
     Group animated;
     animated.id = 3;
-    animated.properties["position.y"].modulation.enabled = true;
-    animated.properties["position.y"].modulation.tempoSync = true;
-    animated.properties["position.y"].modulation.beatsPerCycle = 4;
-    animated.properties["position.y"].modulation.amount = 2;
+    animated.properties["position.y"].setKey({0, 0, Interpolation::linear});
+    animated.properties["position.y"].setKey({4, 4, Interpolation::linear});
     project.groups.push_back(animated);
     project.tracks[0].group = 3;
     frame = clipTransformFrame(project, 2, 2);
-    check(frame.has_value() && near(frame->worldOrigin, {5, 2, 3}), "clip keys use offset/rate local time and ancestors use project time");
-    project.bpm = 150;
-    frame = clipTransformFrame(project, 2, 2);
-    check(frame.has_value() && near(frame->worldOrigin, {5, 4, 3}), "ancestor modulation receives project tempo");
+    check(frame.has_value() && near(frame->worldOrigin, {5, 4, 3}), "clip keys use offset/rate local time and ancestors use project time");
 
     auto effect = makeEffect(5, effectCatalog().front());
     effect.range = EffectRange {1, 2};

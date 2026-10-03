@@ -637,11 +637,6 @@ private:
             for (const auto& clip : track.clips) {
                 if (clip.id != selected) { continue; }
                 if (track.locked || !motion::trackIsAudible(project, track) || (!clip.contains(time, project.tempo()) && !atSelectedPathEnd(time))) { return false; }
-                const auto prefix = tool == MotionTransformTool::move ? "position." : tool == MotionTransformTool::rotate ? "rotation." : "scale.";
-                for (const auto axis : std::string("xyz")) {
-                    const auto found = clip.properties.find(std::string(prefix) + axis);
-                    if (found != clip.properties.end() && found->second.modulation.enabled) { return false; }
-                }
                 return true;
             }
         }

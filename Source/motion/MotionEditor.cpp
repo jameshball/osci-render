@@ -84,7 +84,7 @@ bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bp
 }
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), modulationPanel(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectsPanel(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
     motionLookAndFeel.setControlCornerRadius(3.0f);
     setLookAndFeel(&motionLookAndFeel);
@@ -199,7 +199,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
-    graphSide.addAndMakeVisible(modulationPanel);
     graphSide.addAndMakeVisible(routingPanel);
     graphSideViewport.setViewedComponent(&graphSide, false);
     graphSideViewport.setScrollBarsShown(true, false);
@@ -391,7 +390,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     notesEditor.setVisible(false);
     addChildComponent(curveList);
     for (const auto& name : motion::propertyNames) { curveProperties.emplace_back(name); }
-    modulationPanel.onLayoutChanged = [this] { layoutGraphSide(); };
     curveList.onChoose = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
     curveList.onShow = [this](const std::string& property, bool show) {
         // Siblings of the edited channel are shown by default, so their eye hides them.
@@ -810,7 +808,7 @@ void MotionEditor::resized() {
     }
     canvasButton.setBounds(monitorBounds.removeFromRight(64));
 
-    output.removeFromTop(3);
+    output.removeFromTop(1);
     visualiser.setBounds(output);
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
@@ -820,14 +818,14 @@ void MotionEditor::resized() {
     if (compositionTitle.isVisible()) { compositionTitle.setBounds(viewControls.removeFromLeft(100)); }
     // The tool strip floats at the Scene's top left.
     const auto room = editing.getHeight() - 20;
-    sceneTools.setCompact(room < sceneTools.preferredHeight());
-    sceneTools.setVisible(room >= sceneTools.preferredHeight(true));
-    sceneTools.setBounds(editing.getX() + 8, editing.getY() + 11, 34, sceneTools.preferredHeight(sceneTools.compact));
-    composition.setBounds(editing.withTrimmedTop(3));
+    sceneTools.setCompact(room < sceneTools.fullHeight());
+    sceneTools.setVisible(room >= sceneTools.preferredHeight());
+    sceneTools.setBounds(editing.getX() + 8, editing.getY() + 9, sceneTools.preferredWidth(), sceneTools.preferredHeight());
+    composition.setBounds(editing.withTrimmedTop(1));
     sceneTools.toFront(false);
     if (drawingEditor != nullptr) {
-        drawingEditor->setBounds(editing.withTrimmedTop(3));
-        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView}) { component->setVisible(false); }
+        drawingEditor->setBounds(viewportBounds);
+        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
     }
 }
 
@@ -1447,7 +1445,6 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     refreshTiming();
     timeline.refreshTracks();
     effectsPanel.refresh();
-    modulationPanel.refresh();
     curveEditor.refresh();
     notesEditor.refresh();
     composition.refresh();
@@ -1573,7 +1570,6 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
             owner->importSourceFile(file, asset);
         });
     };
-    compositionTitle.setText(asset != 0 ? "Edit drawing" : "Draw a shape", juce::dontSendNotification);
     resized();
     previewDrawing();
     drawingEditor->grabKeyboardFocus();
@@ -1583,9 +1579,7 @@ void MotionEditor::closeDrawingEditor() {
     if (drawingEditor == nullptr) { return; }
     removeChildComponent(drawingEditor.get());
     drawingEditor.reset();
-    compositionTitle.setText("Scene", juce::dontSendNotification);
-    composition.setVisible(true);
-    sceneView.setVisible(true);
+    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
     processor.previewComposition(processor.document.project());
     resized();
 }
@@ -2421,7 +2415,6 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
         // Nothing selected, or an effect without parameters: nothing to graph.
         curveTarget = 0;
         curveEditor.setSelection(0, {});
-        modulationPanel.setTarget(0, {});
         routingPanel.setTarget(0, {});
         refreshCurveList();
         layoutGraphSide();
@@ -2451,7 +2444,7 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     const auto animated = [&](const std::string& name) {
         const auto* curve = target.has_value() ? target->curve(name) : nullptr;
         const auto routed = std::any_of(processor.document.project().routes.begin(), processor.document.project().routes.end(), [&](const auto& route) { return route.target == id && route.property == name; });
-        return routed || (curve != nullptr && (!curve->keyframes().empty() || curve->modulation.enabled || curve->link.has_value()));
+        return routed || (curve != nullptr && (!curve->keyframes().empty() || curve->link.has_value()));
     };
     if (!chosen && previousTarget != id && !animated(curveProperties[selectedIndex])) {
         const auto found = std::find_if(curveProperties.begin(), curveProperties.end(), animated);
@@ -2460,7 +2453,6 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     curvePropertyName = curveProperties[selectedIndex];
     if (previousTarget != id) { shownCurves.clear(); hiddenCurves.clear(); }
     curveEditor.setSelection(id, curvePropertyName);
-    modulationPanel.setTarget(id, curvePropertyName);
     routingPanel.setTarget(id, curvePropertyName);
     refreshCurveList();
     layoutGraphSide();
@@ -2500,7 +2492,7 @@ void MotionEditor::refreshCurveList() {
         const auto* curve = target.has_value() ? target->curve(name) : nullptr;
         channel.keyed = curve != nullptr && !curve->keyframes().empty();
         const auto routed = std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == curveTarget && route.property == name; });
-        channel.driven = routed || (curve != nullptr && (curve->modulation.enabled || curve->link.has_value()));
+        channel.driven = routed || (curve != nullptr && curve->link.has_value());
         colours[name] = channel.colour;
         channels.push_back(std::move(channel));
     }
@@ -2524,8 +2516,7 @@ void MotionEditor::refreshCurveList() {
 
 void MotionEditor::layoutGraphSide() {
     const auto width = graphSideViewport.getWidth() - 8;
-    modulationPanel.setBounds(0, 0, width, modulationPanel.preferredHeight());
-    routingPanel.setBounds(0, modulationPanel.getBottom() + 3, width, routingPanel.preferredHeight());
+    routingPanel.setBounds(0, 0, width, routingPanel.preferredHeight());
     graphSide.setSize(width, routingPanel.getBottom());
 }
 

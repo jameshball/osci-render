@@ -144,7 +144,7 @@ public:
         // Routed modulators and links count as modulation too: the Result
         // curve shows what the property actually does.
         const auto drivers = resultDrivers(curve);
-        const auto modulated = curve.modulation.enabled || drivers != nullptr;
+        const auto modulated = drivers != nullptr;
         const auto area = plot();
         g.setFont(motion::style::title());
         g.drawText(propertyLabel(*clip), 12, 3, 160, 22, juce::Justification::centredLeft);

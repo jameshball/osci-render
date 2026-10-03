@@ -412,11 +412,14 @@ public:
             auto layers = project({{square(1, .1f)}}, 3);
             auto& clip = layers.tracks[0].clips[0];
             clip.start = .2; clip.duration = 2.5; clip.offset = 1; clip.rate = 2;
-            auto& curve = clip.properties["position.x"];
-            curve.base = 0;
-            curve.modulation.enabled = true;
-            curve.modulation.waveform = motion::ModulationWaveform::soundtrack;
-            curve.modulation.amount = .5;
+            clip.properties["position.x"].base = 0;
+            motion::Modulator follower;
+            follower.id = 96;
+            follower.shape.waveform = motion::ModulationWaveform::soundtrack;
+            layers.modulators.push_back(follower);
+            motion::ModulationRoute route;
+            route.id = 95; route.modulator = 96; route.target = clip.id; route.property = "position.x"; route.amount = .5;
+            layers.routes.push_back(route);
             // One quiet second, then one loud second.
             std::vector<float> pcm(24000, 0.0f);
             for (std::size_t i = 8000; i < 16000; ++i) { pcm[i] = static_cast<float>(std::sin(i * .3) * .8); }
@@ -437,9 +440,6 @@ public:
                 expectWithinAbsoluteError(quiet, 0.0f, .01f, "Silence leaves the keyed value");
                 expect(loud > .4f, "Loudness pushes the value by up to the amount: " + juce::String(loud));
             }
-            motion::Curve saved = curve;
-            saved.modulation.soundtrack.reset();
-            expect(curve.modulation == saved.modulation, "The runtime clock is not part of authored equality");
         }
 
         beginTest("Twenty-layer renderer throughput diagnostic");

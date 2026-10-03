@@ -412,16 +412,6 @@ void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& 
     auto* property = item.createNewChildElement("property");
     property->setAttribute("name", juce::String(name));
     property->setAttribute("base", exactBakeNumber(curve.base));
-    auto* modulation = property->createNewChildElement("modulation");
-    modulation->setAttribute("enabled", curve.modulation.enabled);
-    modulation->setAttribute("waveform", static_cast<int>(curve.modulation.waveform));
-    modulation->setAttribute("amount", exactBakeNumber(curve.modulation.amount));
-    modulation->setAttribute("rateHz", exactBakeNumber(curve.modulation.rateHz));
-    modulation->setAttribute("phase", exactBakeNumber(curve.modulation.phase));
-    modulation->setAttribute("tempoSync", curve.modulation.tempoSync);
-    modulation->setAttribute("beatsPerCycle", exactBakeNumber(curve.modulation.beatsPerCycle));
-    modulation->setAttribute("seed", juce::String(static_cast<juce::int64>(curve.modulation.seed)));
-    modulation->setAttribute("mode", static_cast<int>(curve.modulation.mode));
     if (curve.link.has_value()) {
         auto* link = property->createNewChildElement("link");
         link->setAttribute("source", juce::String(curve.link->source));
@@ -446,30 +436,6 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
     curve = Curve(property.getDoubleAttribute("base"));
     if (!std::isfinite(curve.base)) {
         return juce::Result::fail("Invalid property value.");
-    }
-    bool hasModulation = false;
-    for (auto* item : property.getChildWithTagNameIterator("modulation")) {
-        const auto enabled = item->getIntAttribute("enabled");
-        const auto tempoSync = item->getIntAttribute("tempoSync");
-        const auto seed = item->getStringAttribute("seed", "0").getLargeIntValue();
-        if (hasModulation || enabled < 0 || enabled > 1 || tempoSync < 0 || tempoSync > 1
-            || seed < 0 || seed > static_cast<juce::int64>(std::numeric_limits<std::uint32_t>::max())) {
-            return juce::Result::fail("Invalid or duplicate curve modulation settings.");
-        }
-        hasModulation = true;
-        auto& modulation = curve.modulation;
-        modulation.enabled = enabled != 0;
-        modulation.waveform = static_cast<ModulationWaveform>(item->getIntAttribute("waveform"));
-        modulation.amount = item->getDoubleAttribute("amount", 0.25);
-        modulation.rateHz = item->getDoubleAttribute("rateHz", 1);
-        modulation.phase = item->getDoubleAttribute("phase", 0);
-        modulation.tempoSync = tempoSync != 0;
-        modulation.beatsPerCycle = item->getDoubleAttribute("beatsPerCycle", 1);
-        modulation.seed = static_cast<std::uint32_t>(seed);
-        modulation.mode = static_cast<ModulationMode>(item->getIntAttribute("mode"));
-        if (!modulation.valid()) {
-            return juce::Result::fail("Modulation requires a known waveform/mode, finite amount, 0.001-1000 Hz, phase 0-1, and 0.0625-64 beats per cycle.");
-        }
     }
     for (auto* item : property.getChildWithTagNameIterator("link")) {
         PropertyLink link;

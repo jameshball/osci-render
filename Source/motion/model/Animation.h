@@ -66,9 +66,6 @@ struct CurveDrivers {
     // clock: composition <-> curve local; projectClock: project <-> composition.
     ClipTiming clock, projectClock;
     std::vector<Route> routes;
-    // Composition tempo map for tempo-synced oscillators on composition-time
-    // curves (groups, cameras, track and composition effects).
-    std::optional<Tempo> tempo;
     std::shared_ptr<const Curve> linkSource;
     ClipTiming linkClock; // composition -> source local
     double linkBpm = 120;
@@ -88,16 +85,11 @@ public:
     }
     bool linked() const { return drivers != nullptr && drivers->linkSource != nullptr; }
 
-    // Applies this property's oscillator and routed modulators to a given
+    // Applies this property's routed modulators to a given
     // authored value (keys, a link, or a spatial path's coordinate).
     double evaluateWith(double authored, double time, double bpm = 120) const {
         const auto baseValue = std::isfinite(authored) ? authored : (std::isfinite(base) ? base : 0.0);
         auto value = baseValue;
-        if (modulation.enabled && modulation.valid()) {
-            const bool mapped = modulation.tempoSync && drivers != nullptr && drivers->tempo.has_value();
-            const auto movement = modulation.amount * (mapped ? modulation.valueAtBeats(drivers->tempo->beats(drivers->compositionTime(time))) : modulation.value(time, bpm));
-            value = modulation.mode == ModulationMode::add ? value + movement : value * (1 + movement);
-        }
         if (drivers != nullptr && !drivers->routes.empty()) {
             const auto composition = drivers->compositionTime(time);
             const auto project = drivers->projectTime(composition);
@@ -183,7 +175,7 @@ public:
     }
 
     bool valid() const {
-        if (!std::isfinite(base) || !modulation.valid() || (link.has_value() && !link->valid())) {
+        if (!std::isfinite(base) || (link.has_value() && !link->valid())) {
             return false;
         }
         return std::all_of(keys.begin(), keys.end(), [](const Keyframe& key) { return key.valid(); });
@@ -191,14 +183,13 @@ public:
     bool animated() const { return !keys.empty(); }
     const std::vector<Keyframe>& keyframes() const { return keys; }
     double base = 0.0;
-    Modulation modulation;
     std::optional<PropertyLink> link;
     std::shared_ptr<const CurveDrivers> drivers; // runtime only
 
-    // Authored content equality: keys, base, oscillator and link; runtime
+    // Authored content equality: keys, base and link; runtime
     // drivers are ignored.
     bool sameAuthoring(const Curve& other) const {
-        if (base != other.base || !(modulation == other.modulation) || link != other.link || keys.size() != other.keys.size()) { return false; }
+        if (base != other.base || link != other.link || keys.size() != other.keys.size()) { return false; }
         for (std::size_t index = 0; index < keys.size(); ++index) {
             const auto& a = keys[index];
             const auto& b = other.keys[index];

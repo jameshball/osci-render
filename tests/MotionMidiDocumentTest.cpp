@@ -81,12 +81,8 @@ public:
         auto& authored = slowProject.tracks[0].clips[0];
         authored.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
         authored.properties["position.x"].setKey({5, 2, motion::Interpolation::linear});
-        auto& red = authored.properties["red"];
-        red.modulation.enabled = true; red.modulation.tempoSync = true;
-        red.modulation.amount = .1; red.modulation.beatsPerCycle = 4;
         auto fastProject = slowProject; fastProject.bpm = 340;
         const motion::PreparedComposition slow(slowProject), fast(fastProject);
-        // Compare content geometry/curves, independently of the musical oscillator.
         const auto slowPoint = slow.clips[0].sample(1.1, .2), fastPoint = fast.clips[0].sample(.55, .2);
         expectWithinAbsoluteError(slowPoint.x, fastPoint.x, 1e-6f);
         expectWithinAbsoluteError(slowPoint.r, fastPoint.r, 1e-6f);

@@ -42,12 +42,6 @@ public:
         bool driven = false;
         const auto writeCurve = [&key](const Curve& curve) {
             key.writeDouble(curve.base);
-            key.writeBool(curve.modulation.enabled);
-            key.writeInt(static_cast<int>(curve.modulation.waveform));
-            for (const auto value : {curve.modulation.amount, curve.modulation.rateHz, curve.modulation.phase, curve.modulation.beatsPerCycle}) { key.writeDouble(value); }
-            key.writeBool(curve.modulation.tempoSync);
-            key.writeInt64(curve.modulation.seed);
-            key.writeInt(static_cast<int>(curve.modulation.mode));
             for (const auto& point : curve.keyframes()) {
                 for (const auto value : {point.time, point.value, point.incomingSlope, point.outgoingSlope, point.incomingInfluence, point.outgoingInfluence}) { key.writeDouble(value); }
                 key.writeInt(static_cast<int>(point.interpolation));

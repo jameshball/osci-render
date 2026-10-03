@@ -213,13 +213,13 @@ private:
         motion::Id target;
     };
 
-    // Driven by its own oscillator, a link or a shared modulator route.
+    // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const {
         const auto& project = processor.document.project();
         const auto routed = std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == target && route.property == property; });
         const auto found = motion::findPropertyTarget(project, target);
         const auto* curve = found.has_value() ? found->curve(property) : nullptr;
-        return routed || (curve != nullptr && (curve->modulation.enabled || curve->link.has_value()));
+        return routed || (curve != nullptr && curve->link.has_value());
     }
     void build(std::span<const motion::PropertySpec> specs) {
         rows.clear();

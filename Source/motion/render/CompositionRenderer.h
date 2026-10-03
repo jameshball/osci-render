@@ -469,7 +469,6 @@ struct PreparedComposition {
         }
         // Editor geometry is rebuilt during drags; loudness modulation only
         // matters to the signal, so the envelope is built there alone.
-        if (purpose == CompositionPurpose::signal) { attachSoundtrack(cancel); }
     }
 
     // Geometry probe: the beam allocation at one phase of a static multiplexed
@@ -586,46 +585,6 @@ struct PreparedComposition {
 private:
     // Loudness at 240 Hz: rectified peak per bin, then a fast-attack /
     // slow-release follower, normalised to the loudest moment of the piece.
-    void attachSoundtrack(const std::atomic<bool>* cancel) {
-        const auto uses = [](const Curve& curve) { return curve.modulation.enabled && curve.modulation.waveform == ModulationWaveform::soundtrack; };
-        bool needed = false;
-        const auto scanEffects = [&](const std::vector<PreparedEffect>& list) { for (const auto& effect : list) { for (const auto& curve : effect.curves) { needed = needed || uses(curve); } } };
-        const auto scanStage = [&](const PreparedClipStage& stage) {
-            for (const auto& curve : stage.curves) { needed = needed || uses(curve); }
-            scanEffects(stage.effects); scanEffects(stage.trackEffects); scanEffects(stage.compositionEffects);
-            for (const auto& group : stage.groups) { for (const auto& curve : group.curves) { needed = needed || uses(curve); } scanEffects(group.effects); }
-        };
-        for (const auto& clip : clips) { scanStage(clip); for (const auto& ancestor : clip.ancestors) { scanStage(ancestor); } }
-        for (const auto& camera : cameras) { for (const auto& curve : camera.curves) { needed = needed || uses(curve); } }
-        scanEffects(effects);
-        if (!needed) { return; }
-        const auto shared = loudnessEnvelope(cancel);
-        if (shared == nullptr) { return; }
-        // Each clock maps main seconds to the curve's own time; the default
-        // clock is the identity.
-        const auto attach = [&](Curve& curve, const ClipTiming& clock) {
-            if (uses(curve)) { curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock{shared, clock, {}}); }
-        };
-        const auto attachEffects = [&](std::vector<PreparedEffect>& list, const ClipTiming& clock) {
-            for (auto& effect : list) { for (auto& curve : effect.curves) { attach(curve, clock); } }
-        };
-        const auto attachStage = [&](PreparedClipStage& stage) {
-            for (auto& curve : stage.curves) { attach(curve, stage.clock); }
-            attachEffects(stage.effects, stage.clock);
-            // Track, group and composition scopes run on the scope clock.
-            const auto scope = stage.scopeClock.value_or(ClipTiming {});
-            attachEffects(stage.trackEffects, scope);
-            attachEffects(stage.compositionEffects, scope);
-            for (auto& group : stage.groups) {
-                for (auto& curve : group.curves) { attach(curve, scope); }
-                attachEffects(group.effects, scope);
-            }
-        };
-        for (auto& clip : clips) { attachStage(clip); for (auto& ancestor : clip.ancestors) { attachStage(ancestor); } }
-        for (auto& camera : cameras) { for (auto& curve : camera.curves) { attach(curve, {}); } }
-        attachEffects(effects, {});
-    }
-    // Computed once, on first use, for curves and modulators that follow it.
     std::shared_ptr<const SoundtrackEnvelope> loudnessEnvelope(const std::atomic<bool>* cancel) {
         if (loudness != nullptr || loudnessBuilt) { return loudness; }
         loudnessBuilt = true;

@@ -86,11 +86,17 @@ public:
             clip.properties["rotation.z"] = keyed({{0, 0}, {2, 350}});
             clip.properties["rotation.x"] = keyed({{0, 0}, {2, 0}});
             clip.properties["rotation.y"] = keyed({{0, 0}, {2, 0}});
-            clip.properties["position.y"].modulation = {true, motion::ModulationWaveform::square, 0.5, 1};
             motion::Track track;
             track.id = document.newId(); track.name = "Path"; track.insert(clip, motion::Tempo(120));
             motion::Project project;
             project.duration = 4; project.assets = {asset}; project.tracks = {track};
+            motion::Modulator square;
+            square.id = document.newId();
+            square.shape.waveform = motion::ModulationWaveform::square;
+            project.modulators.push_back(square);
+            motion::ModulationRoute route;
+            route.id = document.newId(); route.modulator = square.id; route.target = clip.id; route.property = "position.y"; route.amount = .5;
+            project.routes.push_back(route);
             document.reset(project);
             motion::PreparedComposition prepared(document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry);
             expect(prepared.clips.size() == 1 && prepared.clips[0].spatial != nullptr);

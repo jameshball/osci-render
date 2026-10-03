@@ -62,10 +62,7 @@ private:
                 drivers->linkBpm = source->curveBpm(scope.bpm);
             }
         }
-        // Composition-time curves keep tempo-synced oscillators on the map.
-        const bool compositionTime = target->start == 0 && target->offset == 0 && target->rate == 1 && target->contentBpm == 0;
-        if (scope.tempoChanges != nullptr && compositionTime && curve.modulation.enabled && curve.modulation.tempoSync) { drivers->tempo = scope.tempo(); }
-        if (drivers->routes.empty() && drivers->linkSource == nullptr && !drivers->tempo.has_value()) { return; }
+        if (drivers->routes.empty() && drivers->linkSource == nullptr) { return; }
         curve.drivers = std::move(drivers);
     }
 
@@ -79,20 +76,9 @@ private:
         auto copy = std::make_shared<Curve>(*authored);
         copy->drivers.reset();
         drive(*copy, scope, scopeClock, owner, property, depth);
-        attachLoudness(*copy, scope, scopeClock, owner);
         std::shared_ptr<const Curve> result = std::move(copy);
         state(scope, scopeClock).sources[key] = result;
         return result;
-    }
-
-    // A link source is a private copy the soundtrack pass never visits.
-    void attachLoudness(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner) {
-        if (!curve.modulation.enabled || curve.modulation.waveform != ModulationWaveform::soundtrack) { return; }
-        const auto envelope = loudness ? loudness() : nullptr;
-        const auto target = findPropertyTarget(scope, owner);
-        if (envelope == nullptr || !target.has_value() || scopeClock.rate == 0) { return; }
-        // local -> composition -> project.
-        curve.modulation.soundtrack = std::make_shared<const SoundtrackClock>(SoundtrackClock {envelope, target->clock(), scopeClock});
     }
 
     std::shared_ptr<const PreparedModulator> prepare(const Composition& scope, const ClipTiming& scopeClock, ModulatorId id) {

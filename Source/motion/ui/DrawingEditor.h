@@ -14,12 +14,12 @@ public:
     MotionDrawingEditor(motion::drawing::Drawing initial, const juce::String& initialName, bool editing) : drawing(std::move(initial)) {
         setName("Drawing editor");
         setWantsKeyboardFocus(true);
-        for (auto [button, value, tip] : {std::tuple {&selectTool, Tool::select, "Select (V): move shapes, drag points and handles"}, std::tuple {&penTool, Tool::pen, "Pen (P): click for sharp points, drag for curves"},
-                                          std::tuple {&lineTool, Tool::line, "Line (L)"}, std::tuple {&freehandTool, Tool::freehand, "Freehand (F)"},
-                                          std::tuple {&rectangleTool, Tool::rectangle, "Rectangle (R)"}, std::tuple {&ellipseTool, Tool::ellipse, "Ellipse (E)"}}) {
-            button->setTooltip(tip);
+        for (auto [button, value, tip] : {std::tuple {&selectTool, Tool::select, "Select (V): drag shapes, points and handles; double-click a point for smooth or sharp"},
+                                          std::tuple {&penTool, Tool::pen, "Pen (P): click for corners, drag for curves, click the first point to close"},
+                                          std::tuple {&lineTool, Tool::line, "Line (L): Shift for 15\xc2\xb0 steps"}, std::tuple {&freehandTool, Tool::freehand, "Freehand (F)"},
+                                          std::tuple {&rectangleTool, Tool::rectangle, "Rectangle (R): Shift for a square, Alt from the centre"}, std::tuple {&ellipseTool, Tool::ellipse, "Ellipse (E): Shift for a circle, Alt from the centre"}}) {
+            button->setTooltip(juce::String::fromUTF8(tip));
             button->onClick = [this, value] { setTool(value); };
-            addAndMakeVisible(button);
         }
         undoButton.setTooltip("Undo (Cmd+Z)");
         redoButton.setTooltip("Redo (Shift+Cmd+Z)");
@@ -34,22 +34,26 @@ public:
             deselect();
             changed();
         };
-        for (auto* button : {&undoButton, &redoButton, &clearButton}) { addAndMakeVisible(button); }
-        hint.setFont(motion::style::caption());
-        hint.setColour(juce::Label::textColourId, motion::style::muted());
-        addAndMakeVisible(hint);
+        tools.setGroups({{&selectTool, &penTool, &lineTool, &freehandTool, &rectangleTool, &ellipseTool}, {&undoButton, &redoButton, &clearButton}});
+        addAndMakeVisible(tools);
+        // The name sits in the panel's header like a title, editable in place.
         name.setText(initialName, juce::dontSendNotification);
         name.setName("Drawing name");
         name.setTitle("Drawing name");
-        name.setFont(motion::style::body());
+        name.setFont(motion::style::title());
         name.setJustification(juce::Justification::centredLeft);
-        name.setIndents(8, 0);
-        name.setColour(juce::TextEditor::backgroundColourId, motion::style::field());
+        name.setIndents(6, 0);
+        name.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+        name.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        name.setColour(juce::TextEditor::focusedOutlineColourId, motion::style::accent().withAlpha(.6f));
+        name.setTooltip("Name");
         addAndMakeVisible(name);
         cancelButton.setButtonText("Cancel");
+        cancelButton.setColour(juce::TextButton::buttonColourId, motion::style::raised());
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
-        doneButton.setButtonText(editing ? "Save drawing" : "Add to project");
-        doneButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.45f));
+        doneButton.setButtonText(editing ? "Save" : "Add");
+        doneButton.setTooltip(editing ? "Save the drawing" : "Add the drawing to the project");
+        doneButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.5f));
         doneButton.onClick = [this] { finish(); };
         for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
         setTool(drawing.strokes.empty() ? Tool::pen : Tool::select);
@@ -69,64 +73,45 @@ public:
         freehandTool.setToggleState(tool == Tool::freehand, juce::dontSendNotification);
         rectangleTool.setToggleState(tool == Tool::rectangle, juce::dontSendNotification);
         ellipseTool.setToggleState(tool == Tool::ellipse, juce::dontSendNotification);
-        static const std::map<Tool, const char*> hints {
-            {Tool::select, "Click a shape to select it and drag to move it. Drag points and handles to reshape; double-click a point to make it smooth or sharp."},
-            {Tool::pen, "Click for sharp points, drag for curves. Click the first point to close the shape; Enter or a double-click finishes."},
-            {Tool::line, "Drag to draw a line. Hold Shift for 15\xc2\xb0 steps; ends snap to nearby points."},
-            {Tool::freehand, "Drag to draw. The stroke is smoothed when you let go; finish near its start to close it."},
-            {Tool::rectangle, "Drag to draw. Shift for a square, Alt to draw from the centre."},
-            {Tool::ellipse, "Drag to draw. Shift for a circle, Alt to draw from the centre."}};
-        hint.setText(juce::String::fromUTF8(hints.at(tool)), juce::dontSendNotification);
         setMouseCursor(tool == Tool::select ? juce::MouseCursor::NormalCursor : juce::MouseCursor::CrosshairCursor);
         repaint();
     }
 
+    static constexpr int headerHeight = 30;
     void resized() override {
-        auto area = getLocalBounds().reduced(motion::style::padding);
-        auto footer = area.removeFromBottom(motion::style::controlHeight + 4);
-        doneButton.setBounds(footer.removeFromRight(120));
-        footer.removeFromRight(motion::style::gap);
-        cancelButton.setBounds(footer.removeFromRight(80));
-        footer.removeFromRight(motion::style::padding);
-        name.setBounds(footer.removeFromRight(180));
-        area.removeFromBottom(motion::style::padding);
-        auto hintRow = area.removeFromBottom(20);
-        area.removeFromBottom(motion::style::gap);
-        // The tools sit against the canvas; together they are centred.
-        const auto side = std::min(area.getWidth() - 36 - motion::style::padding, area.getHeight());
-        auto group = area.withSizeKeepingCentre(side + 36 + motion::style::padding, side);
-        auto tools = group.removeFromLeft(36);
-        group.removeFromLeft(motion::style::padding);
-        canvas = group;
-        hint.setBounds(hintRow.withLeft(canvas.getX()).withRight(canvas.getRight()));
-        for (auto* button : {&selectTool, &penTool, &lineTool, &freehandTool, &rectangleTool, &ellipseTool}) { button->setBounds(tools.removeFromTop(34).reduced(1)); }
-        tools.removeFromTop(motion::style::padding * 2);
-        for (auto* button : {&undoButton, &redoButton, &clearButton}) { button->setBounds(tools.removeFromTop(34).reduced(1)); }
+        auto header = getLocalBounds().removeFromTop(headerHeight).reduced(5, 3);
+        doneButton.setBounds(header.removeFromRight(64));
+        header.removeFromRight(motion::style::gap);
+        cancelButton.setBounds(header.removeFromRight(64));
+        header.removeFromRight(motion::style::padding);
+        name.setBounds(header.withWidth(std::min(header.getWidth(), 220)));
+        canvas = getLocalBounds().withTrimmedTop(headerHeight + 1);
+        tools.setBounds(canvas.getX() + 8, canvas.getY() + 8, tools.preferredWidth(), tools.preferredHeight());
     }
 
     void paint(juce::Graphics& g) override {
-        g.fillAll(motion::style::panel());
-        g.setColour(juce::Colours::black);
-        g.fillRoundedRectangle(canvas.toFloat(), motion::style::panelRadius);
+        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), motion::style::background());
+        g.setColour(motion::style::panel());
+        g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
+        g.setColour(motion::style::background());
+        g.fillRect(canvas);
         juce::Graphics::ScopedSaveState state(g);
         g.reduceClipRegion(canvas);
-        // A quarter-unit grid, the axes and the output frame.
-        for (int line = -4; line <= 4; ++line) {
-            const auto value = line * .25f;
+        // A quarter-unit grid across the whole canvas, the axes and the output frame.
+        const auto low = toDrawing(canvas.getBottomLeft().toFloat()), high = toDrawing(canvas.getTopRight().toFloat());
+        for (int line = static_cast<int>(std::floor(low.x * 4)); line <= static_cast<int>(std::ceil(high.x * 4)); ++line) {
             g.setColour(juce::Colours::white.withAlpha(line == 0 ? .12f : .04f));
-            g.drawLine(juce::Line<float>(toScreen({value, -1.15f}), toScreen({value, 1.15f})), 1.0f);
-            g.drawLine(juce::Line<float>(toScreen({-1.15f, value}), toScreen({1.15f, value})), 1.0f);
+            g.drawLine(juce::Line<float>(toScreen({line * .25f, low.y}), toScreen({line * .25f, high.y})), 1.0f);
+        }
+        for (int line = static_cast<int>(std::floor(low.y * 4)); line <= static_cast<int>(std::ceil(high.y * 4)); ++line) {
+            g.setColour(juce::Colours::white.withAlpha(line == 0 ? .12f : .04f));
+            g.drawLine(juce::Line<float>(toScreen({low.x, line * .25f}), toScreen({high.x, line * .25f})), 1.0f);
         }
         const auto frame = juce::Rectangle<float>(toScreen({-1, 1}), toScreen({1, -1}));
         const float dashes[] {5.0f, 4.0f};
         g.setColour(juce::Colours::white.withAlpha(.3f));
         for (const auto& edge : {juce::Line<float>(frame.getTopLeft(), frame.getTopRight()), juce::Line<float>(frame.getTopRight(), frame.getBottomRight()), juce::Line<float>(frame.getBottomRight(), frame.getBottomLeft()), juce::Line<float>(frame.getBottomLeft(), frame.getTopLeft())}) {
             g.drawDashedLine(edge, dashes, 2, 1.0f);
-        }
-        if (drawing.strokes.empty() && !drag.has_value()) {
-            g.setColour(motion::style::muted());
-            g.setFont(motion::style::body());
-            g.drawText("Pick a tool on the left and draw. Inside the dashed frame is on screen.", canvas.reduced(40), juce::Justification::centred, true);
         }
         // Strokes glow like the beam.
         const auto transform = screenTransform();
@@ -254,8 +239,8 @@ public:
         } else if (state.kind == Kind::freehand) {
             if (state.trail.size() > 2) {
                 const auto closed = state.trail.size() > 8 && state.trail.front().getDistanceFrom(state.trail.back()) * scale() < 10;
-                if (closed) { state.trail.pop_back(); }
-                addStroke(motion::drawing::simplify(state.trail, 1.2f / scale(), closed));
+                if (closed) { state.trail.push_back(state.trail.front()); }
+                addStroke(motion::drawing::fit(state.trail, 2.0f / scale(), closed));
             } else {
                 dropHistory();
             }
@@ -320,8 +305,8 @@ private:
         bool moved = false;
     };
 
-    // Screen mapping: the canvas shows -1.15..1.15 so the frame has room.
-    float scale() const { return canvas.getWidth() / 2.3f; }
+    // Screen mapping: the output frame fits the canvas with a margin.
+    float scale() const { return std::min(canvas.getWidth(), canvas.getHeight()) / 2.4f; }
     juce::Point<float> toScreen(motion::drawing::Point point) const { return canvas.toFloat().getCentre() + juce::Point<float>(point.x, -point.y) * scale(); }
     motion::drawing::Point toDrawing(juce::Point<float> screen) const {
         const auto offset = (screen - canvas.toFloat().getCentre()) / scale();
@@ -456,7 +441,7 @@ private:
         for (int stroke = static_cast<int>(drawing.strokes.size()) - 1; stroke >= 0; --stroke) {
             const auto path = motion::drawing::toPath(drawing.strokes[static_cast<std::size_t>(stroke)]);
             juce::Point<float> nearest;
-            path.getNearestPoint(drawn, nearest);
+            path.getNearestPoint(drawn, nearest, {}, .5f / scale());
             if (nearest.getDistanceFrom(drawn) * scale() < 6) {
                 selectedStroke = stroke;
                 beginEdit(next, Kind::moveStroke, -1);
@@ -615,7 +600,7 @@ private:
     motion::icons::Button selectTool {"Select tool", Icon::select}, penTool {"Pen tool", Icon::bezier}, lineTool {"Line tool", Icon::line}, freehandTool {"Freehand tool", Icon::pen};
     motion::icons::Button rectangleTool {"Rectangle tool", Icon::rectangle}, ellipseTool {"Ellipse tool", Icon::ellipse};
     motion::icons::Button undoButton {"Undo drawing", Icon::undo}, redoButton {"Redo drawing", Icon::redo}, clearButton {"Clear drawing", Icon::trash};
-    juce::Label hint;
+    motion::icons::ToolStrip tools;
     juce::TextEditor name;
     juce::TextButton cancelButton, doneButton;
 };

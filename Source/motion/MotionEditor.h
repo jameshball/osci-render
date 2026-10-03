@@ -14,7 +14,6 @@
 #include "ui/ClipTimingPanel.h"
 #include "ui/EffectLibrary.h"
 #include "ui/EffectsPanel.h"
-#include "ui/ModulationPanel.h"
 #include "ui/ModulatorPanels.h"
 #include "render/LuaSliderBakes.h"
 #include "model/TapTempo.h"
@@ -169,7 +168,6 @@ private:
     MotionClipTimingPanel clipTimingPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectsPanel effectsPanel;
-    MotionModulationPanel modulationPanel;
     MotionRoutingPanel routingPanel;
     // The graph's side column scrolls: oscillator settings, then routing.
     juce::Viewport graphSideViewport;

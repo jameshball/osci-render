@@ -139,4 +139,57 @@ private:
     Icon icon;
     juce::Colour on = motion::style::accent();
 };
+
+// A floating vertical strip of tool buttons in groups, with the same 4 px
+// margin on every side of each button's highlight. Hidden buttons take no room.
+class ToolStrip : public juce::Component {
+public:
+    static constexpr int cell = 28, inset = 3, groupGap = 9;
+    void setGroups(std::vector<std::vector<juce::Button*>> buttons) {
+        groups = std::move(buttons);
+        for (auto& group : groups) {
+            for (auto* button : group) { addAndMakeVisible(button); }
+        }
+        resized();
+    }
+    int preferredWidth() const { return cell + 2 * inset; }
+    int preferredHeight() const {
+        int height = inset * 2, shown = 0;
+        for (const auto& group : groups) {
+            const auto count = std::count_if(group.begin(), group.end(), [](const auto* button) { return button->isVisible(); });
+            if (count == 0) { continue; }
+            height += static_cast<int>(count) * cell + (shown++ > 0 ? groupGap : 0);
+        }
+        return height;
+    }
+    void paint(juce::Graphics& g) override {
+        const auto bounds = getLocalBounds().toFloat();
+        g.setColour(motion::style::background().withAlpha(.86f));
+        g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
+        g.setColour(juce::Colours::white.withAlpha(.08f));
+        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);
+        g.setColour(juce::Colours::white.withAlpha(.1f));
+        for (const auto y : separators) { g.fillRect(static_cast<float>(inset + 4), static_cast<float>(y), static_cast<float>(cell - 8), 1.0f); }
+    }
+    void resized() override {
+        separators.clear();
+        int y = inset, shown = 0;
+        for (const auto& group : groups) {
+            if (std::none_of(group.begin(), group.end(), [](const auto* button) { return button->isVisible(); })) { continue; }
+            if (shown++ > 0) {
+                separators.push_back(y + groupGap / 2);
+                y += groupGap;
+            }
+            for (auto* button : group) {
+                if (!button->isVisible()) { continue; }
+                button->setBounds(inset, y, cell, cell);
+                y += cell;
+            }
+        }
+        repaint();
+    }
+private:
+    std::vector<std::vector<juce::Button*>> groups;
+    std::vector<int> separators;
+};
 }

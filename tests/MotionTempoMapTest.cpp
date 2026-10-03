@@ -230,8 +230,16 @@ public:
             project.markers.push_back({document.newId(), 6, "Bar four"}); // beat 12 at 120
             motion::Group group;
             group.id = document.newId();
-            group.properties["position.x"].modulation = {true, motion::ModulationWaveform::saw, 1, 1, 0, true, 4};
             project.groups.push_back(group);
+            motion::Modulator lfo;
+            lfo.id = document.newId();
+            lfo.shape.waveform = motion::ModulationWaveform::saw;
+            lfo.shape.tempoSync = true;
+            lfo.shape.beatsPerCycle = 4;
+            project.modulators.push_back(lfo);
+            motion::ModulationRoute route;
+            route.id = document.newId(); route.modulator = lfo.id; route.target = group.id; route.property = "position.x"; route.amount = 1;
+            project.routes.push_back(route);
             document.reset(project);
             expect(document.setTempoChange(8, 60).wasOk());
             const auto tempo = document.project().tempo();
