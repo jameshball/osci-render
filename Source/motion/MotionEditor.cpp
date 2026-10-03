@@ -825,6 +825,10 @@ void MotionEditor::resized() {
     sceneTools.setBounds(editing.getX() + 8, editing.getY() + 11, 34, sceneTools.preferredHeight(sceneTools.compact));
     composition.setBounds(editing.withTrimmedTop(3));
     sceneTools.toFront(false);
+    if (drawingEditor != nullptr) {
+        drawingEditor->setBounds(editing.withTrimmedTop(3));
+        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView}) { component->setVisible(false); }
+    }
 }
 
 void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
@@ -1548,28 +1552,74 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
         for (const auto& item : processor.document.mainProject().assets) { count += item->name.startsWith("Drawing") ? 1 : 0; }
         name = "Drawing " + juce::String(count);
     }
-    auto panel = std::make_unique<MotionDrawingEditor>(initial, name, asset != 0);
-    auto* editor = panel.get();
-    const auto size = juce::Point<int>(std::min(860, getWidth() - 120), std::min(680, getHeight() - 190));
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), asset != 0 ? "Edit drawing" : "Draw a shape", size, true);
-    const juce::Component::SafePointer<MotionEditor> owner(this);
-    const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
-    editor->onCancel = [owner, dialog] {
-        juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent()); } });
-    };
-    editor->onDone = [owner, dialog, asset](const motion::drawing::Drawing& drawing, const juce::String& text) {
-        if (owner == nullptr) { return; }
+    if (drawingEditor != nullptr) { return; }
+    // The drawing takes over the Scene; the Scope shows it live as a beam.
+    drawingAsset = asset;
+    drawingEditor = std::make_unique<MotionDrawingEditor>(initial, name, asset != 0);
+    addAndMakeVisible(*drawingEditor);
+    drawingEditor->onChanged = [this] { previewDrawing(); };
+    drawingEditor->onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeDrawingEditor(); } }); };
+    drawingEditor->onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
         const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion drawings");
         const auto file = folder.getChildFile(juce::File::createLegalFileName(text) + ".svg");
         if (!folder.createDirectory().wasOk() || !file.replaceWithText(motion::drawing::toSvg(drawing))) {
-            owner->statusBar.show("Could not save the drawing.");
+            statusBar.show("Could not save the drawing.");
             return;
         }
-        owner->importSourceFile(file, asset);
-        juce::MessageManager::callAsync([owner, dialog] { if (owner != nullptr && dialog != nullptr) { owner->dismissOverlay(dialog.getComponent()); } });
+        const auto asset = drawingAsset;
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), file, asset] {
+            if (owner == nullptr) { return; }
+            owner->closeDrawingEditor();
+            owner->importSourceFile(file, asset);
+        });
     };
-    showOverlay(std::move(overlay));
-    editor->grabKeyboardFocus();
+    compositionTitle.setText(asset != 0 ? "Edit drawing" : "Draw a shape", juce::dontSendNotification);
+    resized();
+    previewDrawing();
+    drawingEditor->grabKeyboardFocus();
+}
+
+void MotionEditor::closeDrawingEditor() {
+    if (drawingEditor == nullptr) { return; }
+    removeChildComponent(drawingEditor.get());
+    drawingEditor.reset();
+    compositionTitle.setText("Scene", juce::dontSendNotification);
+    composition.setVisible(true);
+    sceneView.setVisible(true);
+    processor.previewComposition(processor.document.project());
+    resized();
+}
+
+// The drawing in progress on the output: an edited source is swapped in place;
+// a new one plays on a track of its own for the whole project.
+void MotionEditor::previewDrawing() {
+    if (drawingEditor == nullptr) { return; }
+    auto project = processor.document.project();
+    auto asset = std::make_shared<motion::Asset>();
+    asset->id = drawingAsset != 0 ? drawingAsset : std::numeric_limits<motion::Id>::max() - 1;
+    asset->name = "Drawing.svg";
+    asset->extension = ".svg";
+    const auto svg = motion::drawing::toSvg(drawingEditor->current());
+    asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
+    if (drawingEditor->current().empty() || motion::Document::decodeAsset(*asset).failed()) {
+        processor.previewComposition(project);
+        return;
+    }
+    if (drawingAsset != 0) {
+        for (auto& item : project.assets) {
+            if (item->id == drawingAsset) { item = asset; }
+        }
+    } else {
+        project.assets.push_back(asset);
+        motion::Track track;
+        track.id = std::numeric_limits<motion::Id>::max() - 2;
+        track.name = "Drawing";
+        auto clip = motion::Document::makeClip(std::numeric_limits<motion::Id>::max() - 3, *asset, 0);
+        clip.duration = project.duration;
+        track.insert(clip, project.tempo());
+        project.tracks.push_back(track);
+    }
+    processor.previewComposition(project);
 }
 
 // Examples are written to a temporary folder and imported like any file;

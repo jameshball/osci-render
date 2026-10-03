@@ -3,9 +3,10 @@
 #include "MotionIcons.h"
 #include "../model/Drawing.h"
 
-// Draw a source by hand: Bezier pen, lines, freehand, rectangles and
-// ellipses, edited with a select tool. The square is the output: what is
-// drawn inside the dashed frame is on screen with the default camera.
+// Draw a source by hand in the Scene: Bezier pen, lines, freehand,
+// rectangles and ellipses, edited with a select tool. The square is the
+// output: what is inside the dashed frame is on screen with the default
+// camera, and the Scope shows the drawing live.
 class MotionDrawingEditor final : public juce::Component {
 public:
     enum class Tool { select, pen, line, freehand, rectangle, ellipse };
@@ -56,7 +57,7 @@ public:
     }
 
     std::function<void(const motion::drawing::Drawing&, const juce::String&)> onDone;
-    std::function<void()> onCancel;
+    std::function<void()> onCancel, onChanged;
     const motion::drawing::Drawing& current() const { return drawing; }
 
     void setTool(Tool value) {
@@ -104,6 +105,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
+        g.fillAll(motion::style::panel());
         g.setColour(juce::Colours::black);
         g.fillRoundedRectangle(canvas.toFloat(), motion::style::panelRadius);
         juce::Graphics::ScopedSaveState state(g);
@@ -598,6 +600,7 @@ private:
         redoButton.setEnabled(!future.empty());
         clearButton.setEnabled(!drawing.strokes.empty());
         doneButton.setEnabled(!drawing.empty());
+        if (onChanged) { onChanged(); }
         repaint();
     }
 
