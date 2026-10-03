@@ -55,7 +55,7 @@ public:
             }
             const auto stroke = fit(points, .01f, true);
             expect(stroke.closed && stroke.anchors.size() >= 2 && stroke.anchors.size() < 16, juce::String(static_cast<int>(stroke.anchors.size())));
-            expect(std::all_of(stroke.anchors.begin() + 1, stroke.anchors.end(), [](const auto& anchor) { return anchor.smooth; }), "a smooth gesture has smooth joins");
+            expect(std::all_of(stroke.anchors.begin(), stroke.anchors.end(), [](const auto& anchor) { return anchor.smooth; }), "a smooth closed gesture has smooth joins, the seam too");
             const auto path = toPath(stroke);
             float worst = 0;
             for (const auto& point : points) {

@@ -189,7 +189,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     composition.onNavigationChanged = [this](bool active) { sceneTools.fly.setToggleState(active, juce::dontSendNotification); };
     sceneTools.frame.onClick = [this] { composition.frameSelection(); };
     sceneTools.lookThrough.onClick = [this] { composition.setDrivenCamera(sceneTools.lookThrough.getToggleState() ? selection : 0); resized(); };
-    composition.onDrivenCameraChanged = [this](motion::Id id) { sceneTools.lookThrough.setToggleState(id != 0, juce::dontSendNotification); };
+    composition.onDrivenCameraChanged = [this](motion::Id id) {
+        sceneTools.lookThrough.setToggleState(id != 0, juce::dontSendNotification);
+        sceneTools.lookThrough.setVisible(id != 0 || (selectionIsCamera() && composition.canDriveCamera(selection)));
+        resized();
+    };
     addAndMakeVisible(sceneView);
     sceneView.setButtonText("Views");
     sceneView.setName("Scene view");
@@ -357,6 +361,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         if (!properties.empty()) { selectCurveTarget(target, properties.front(), selectionIsCamera(), true); }
     };
     effectStack.onHeightChanged = [this] { propertyInspector.relayout(); };
+    effectStack.onReveal = [this](juce::Component& card) { propertyInspector.reveal(card); };
     timeline.onEffectAdded = [this](motion::Id owner, motion::Id) { select(owner); };
     addChildComponent(cancelExport);
     exportBar.setName("Signal export progress");
@@ -1419,11 +1424,15 @@ void MotionEditor::timerCallback() {
         if (curveEditor.isVisible()) { curveEditor.repaint(); }
         composition.repaint();
     }
-    if (moved) { refreshInspector(); }
-    effectStack.updateValues();
+    if (moved) {
+        refreshInspector();
+        effectStack.updateValues();
+    }
 }
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
+    // A drawing belongs to the project it was started in.
+    if (drawingEditor != nullptr && processor.document.generation() != drawingGeneration) { closeDrawingEditor(); }
     sliderBakes.requestUpdate();
     refreshOutputChoices();
     if (curveList.isVisible()) { refreshCurveList(); }
@@ -1480,6 +1489,7 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     previous.graph = curveEditor.viewState(); previous.notes = notesEditor.viewState();
 
     composition.setNavigating(false);
+    composition.setDrivenCamera(0);
     const auto entered = processor.document.enterComposition(definition);
     if (entered.failed()) { statusBar.show(entered.getErrorMessage()); return; }
     scopeHistory.push_back(previous);
@@ -1493,6 +1503,7 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
 }
 
 void MotionEditor::leaveComposition() {
+    composition.setDrivenCamera(0);
     ScopeView previous;
     if (!scopeHistory.empty()) { previous = scopeHistory.back(); scopeHistory.pop_back(); }
     auto entered = processor.document.enterComposition(previous.scope);
@@ -1550,6 +1561,7 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     if (drawingEditor != nullptr) { return; }
     // The drawing takes over the Scene; the Scope shows it live as a beam.
     drawingAsset = asset;
+    drawingGeneration = processor.document.generation();
     drawingEditor = std::make_unique<MotionDrawingEditor>(initial, name, asset != 0);
     addAndMakeVisible(*drawingEditor);
     drawingEditor->onChanged = [this] { previewDrawing(); };

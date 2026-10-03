@@ -105,6 +105,7 @@ private:
     void previewDrawing();
     std::unique_ptr<MotionDrawingEditor> drawingEditor;
     motion::Id drawingAsset = 0;
+    std::uint64_t drawingGeneration = 0;
     // `chosen`: the user picked this property; otherwise a new target opens
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);

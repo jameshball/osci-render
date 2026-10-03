@@ -108,7 +108,8 @@ public:
             if (onMenu) { onMenu(id); }
             return;
         }
-        if (event.eventComponent == &name && onSelect) { onSelect(id); }
+        // Anywhere on the header but its buttons selects the track or group.
+        if ((event.eventComponent == &name || event.eventComponent == this) && onSelect) { onSelect(id); }
     }
     void mouseDrag(const juce::MouseEvent& event) override {
         if (isGroup || event.eventComponent != &grip || event.getDistanceFromDragStart() < 4) { return; }

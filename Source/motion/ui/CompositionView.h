@@ -112,7 +112,7 @@ public:
     bool canDriveCamera(motion::Id id) const { return documentPose(id).has_value(); }
     motion::Id drivenCamera() const { return lockedCamera; }
     void setDrivenCamera(motion::Id id) {
-        if (id == lockedCamera) { return; }
+        if (id == lockedCamera || (id != 0 && !canDriveCamera(id))) { return; }
         if (lockedCamera == 0 && id != 0) { viewBeforeLock = camera; }
         lockedCamera = id;
         lastPose.reset();
@@ -842,7 +842,13 @@ private:
     std::optional<Pose> documentPose(motion::Id id) const {
         for (const auto& item : processor.document.project().cameras) {
             if (item.id != id) { continue; }
+            // Rigged, rolled, linked or modulated cameras keep their own aim.
             if (item.target != 0 || item.parent != 0) { return std::nullopt; }
+            for (const auto& [name, curve] : item.properties) {
+                if (curve.link.has_value() || (name == "rotation.z" && (curve.animated() || curve.base != 0))) { return std::nullopt; }
+            }
+            const auto& routes = processor.document.project().routes;
+            if (std::any_of(routes.begin(), routes.end(), [id](const auto& route) { return route.target == id; })) { return std::nullopt; }
             const auto value = [&](const char* name, double fallback) {
                 const auto found = item.properties.find(name);
                 return found != item.properties.end() ? found->second.evaluateBase(cameraTime()) : fallback;
@@ -859,13 +865,14 @@ private:
     void syncCamera() {
         if (lockedCamera == 0) { return; }
         const auto view = viewPose();
-        if (lastPose.has_value() && !(view == *lastPose)) {
+        // The view drives the camera only while the transport is stopped.
+        if (lastPose.has_value() && !(view == *lastPose) && !processor.playing.load() && documentPose(lockedCamera).has_value()) {
             const auto id = lockedCamera;
             const auto time = cameraTime();
             processor.document.editCoalesced("Move camera", "camera-view:" + juce::String(static_cast<juce::int64>(id)), [id, time, view](motion::Project& project) {
                 for (auto& item : project.cameras) {
                     if (item.id != id) { continue; }
-                    for (const auto& [name, value] : std::initializer_list<std::pair<const char*, double>> {{"position.x", view.x}, {"position.y", view.y}, {"position.z", view.z}, {"rotation.x", view.pitch}, {"rotation.y", -view.yaw}, {"rotation.z", 0}}) {
+                    for (const auto& [name, value] : std::initializer_list<std::pair<const char*, double>> {{"position.x", view.x}, {"position.y", view.y}, {"position.z", view.z}, {"rotation.x", view.pitch}, {"rotation.y", -view.yaw}}) {
                         auto& curve = item.properties[name];
                         if (curve.animated()) { curve.setKeyValue(time, value); } else { curve.base = value; }
                     }

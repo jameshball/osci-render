@@ -80,8 +80,9 @@ try:
     # A controller modulator following the clip's mod wheel.
     step("modulators", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
     step("add modulator", "click", "--name", "Add modulator", "--exact")
-    step("add cc", "click", "--name", "MIDI controller", "--role", "menuItem", "--exact")
     wait_undo("Add modulator")
+    step("add cc", "click", "--name", "Shape MIDI controller", "--exact")
+    wait_undo("Change modulator")
     step("source", "select-option", "--name", "Envelope source", "--text", "Lead")
     step("pitch bend", "select-option", "--name", "Modulator controller", "--text", "Pitch bend")
     modulator = saved().find("modulator")

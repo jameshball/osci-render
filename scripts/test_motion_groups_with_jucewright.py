@@ -105,7 +105,7 @@ try:
     step("effect on group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
     wait_undo("Add Scale")
-    command("wait-for-locator", "--name", "Effect scaleX", "--role", "slider", "--exact")
+    command("wait-for-locator", "--component-name", "Effect scaleX", "--exact")
     step("group effects screenshot", "screenshot", "--file", session.artifact_dir / "group-effects.png")
     step("empty grouped track menu", "click", "--name", "Reorder track " + group, "--exact")
     step("add empty grouped track", "click", "--name", "Add track to group", "--role", "menuItem", "--exact")
@@ -116,8 +116,11 @@ try:
     step("effect on empty grouped track", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
     wait_undo("Add Translate")
-    step("add effect to empty track's group", "click", "--name", "Add effect to group", "--exact")
-    step("add group swirl", "click", "--name", "Swirl", "--role", "menuItem", "--exact")
+    # The empty track's group chip shows the group's effects; a double-click adds there.
+    step("show the group's effects", "click", "--component-name", "Effects of Group 1", "--exact")
+    command("wait-for-value", "--component-name", "Inspector title", "--value", "Group 1")
+    swirl = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and node.get("componentName") == "Swirl")
+    step("add group swirl", "click", swirl["ref"], "--click-count", 2)
     wait_undo("Add Swirl")
     step("delete parent menu", "click", "--name", "Reorder track " + group, "--exact")
     step("delete group", "click", "--name", "Delete group and its tracks", "--role", "menuItem", "--exact")

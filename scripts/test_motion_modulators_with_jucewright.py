@@ -78,7 +78,6 @@ try:
     # A shared LFO, edited in the library.
     step("modulator tab", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
     step("add modulator", "click", "--name", "Add modulator", "--exact")
-    step("add lfo", "click", "--name", "LFO", "--role", "menuItem", "--exact")
     wait_undo("Add modulator")
     step("saw", "click", "--name", "Shape Saw", "--exact")
     step("rate", "set-value", "--name", "Modulator rate", "2")
@@ -90,8 +89,22 @@ try:
     step("taller graph", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
     step("all channels", "click", "--name", "Animated channels only", "--exact")
     step("choose position y", "click", "--name", "Curve Position Y", "--exact")
-    step("route menu", "click", "--name", "Route modulator", "--exact")
-    step("route lfo", "click", "--name", "LFO 1", "--role", "menuItem", "--exact")
+    # Dragging the LFO's card onto the Y field in Properties routes it there.
+    tree = json.loads(command("snapshot", "--json", "--full"))
+    def first(value, predicate):
+        if isinstance(value, dict):
+            if predicate(value):
+                return value
+            value = list(value.values())
+        if isinstance(value, list):
+            for child in value:
+                found = first(child, predicate)
+                if found is not None:
+                    return found
+        return None
+    card = first(tree, lambda node: str(node.get("class", "")).endswith("Card") and node.get("componentName") == "LFO 1")["bounds"]
+    field = first(tree, lambda node: node.get("componentName") == "position.y")["bounds"]
+    step("route lfo by dragging", "drag-xy", card["x"] + 30, card["y"] + card["h"] // 2, field["x"] + field["w"] // 2, field["y"] + field["h"] // 2, "--steps", 20)
     wait_undo("Route modulator")
     step("route amount", "set-value", "--name", "Routed amount LFO 1", "0.4")
     wait_undo("Change route")
@@ -117,7 +130,6 @@ try:
     # A spatial path for the leader, from the inspector's Position row.
     step("timeline for leader", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
     step("select leader again", "click", "--class", "MotionTimelineView", "--position", "300,64")
-    step("object inspector", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     step("spatial path", "click", "--name", "Spatial path", "--exact")
     wait_undo("Use spatial path")
     clip, _ = clip_property(saved(), 3, "position.x")
@@ -127,7 +139,7 @@ try:
     # The Position row's modulation chip opens the axis that is driven: the LFO routes into Y.
     step("modulate position", "click", "--name", "Modulate position", "--exact")
     command("wait-for-locator", "--name", "Curve Position Y", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
-    command("wait-for-locator", "--name", "Route modulator", "--exact", "--timeout-ms", 5000)
+    command("wait-for-locator", "--name", "Routed amount LFO 1", "--exact", "--timeout-ms", 5000)
     step("modulate screenshot", "screenshot", "--file", session.artifact_dir / "modulate.png")
     # Deleting the modulator removes its route; undo restores both.
     step("modulator tab again", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")

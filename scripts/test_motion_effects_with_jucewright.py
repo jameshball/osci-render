@@ -57,13 +57,18 @@ try:
     library = find(snapshot(), lambda node: node.get("class") == "MotionTabs" and node.get("name") == "Library tabs")
     effectTab = find(library, lambda node: node.get("class") == "MotionTabs::Tab" and node.get("name") == "Effects")
     step("open effects library", "click", effectTab["ref"])
+
+    def tile(name):
+        return find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and node.get("componentName") == name)
+
+    # Dragging an effect onto a clip adds it there and shows it in Properties.
     tree = snapshot()
-    source = find(tree, lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Swirl"))["bounds"]
+    source = tile("Swirl")["bounds"]
     target = find(tree, lambda node: node.get("class") == "MotionTimelineView")["bounds"]
     step("drag effect onto clip", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          target["x"] + 280, target["y"] + 68, "--steps", 20)
     wait_undo("Add Swirl")
-    step("set effect amount", "set-value", "--name", "Effect swirl", "--role", "slider", 0.22)
+    step("set effect amount", "set-value", "--component-name", "Effect swirl", "--exact", "0.22")
     wait_undo("Change effect parameter")
     step("key effect amount", "click", "--name", "Key effect swirl", "--exact")
     wait_undo("Key effect parameter")
@@ -71,38 +76,34 @@ try:
     step("effect graph screenshot", "screenshot", "--file", session.artifact_dir / "effect-graph.png")
     step("add graph effect key", "click", "--class", "MotionCurveEditor", "--position", "560,60", "--click-count", 2)
     wait_undo("Add animation key")
-    translate = find(snapshot(), lambda node: str(node.get("class", "")).endswith("Tile") and str(node.get("name", "")).startswith("Translate"))
-    step("append translate", "click", translate["ref"], "--click-count", 2)
+    # Double-clicking an effect adds it to what Properties shows.
+    step("append translate", "click", tile("Translate")["ref"], "--click-count", 2)
     wait_undo("Add Translate")
-    # The chain lists the clip's effects first: Swirl, then Translate.
-    step("reorder clip effects", "drag", "--class", "MotionEffectsPanel::Chain", "--position", "60,39", "--dx", 0, "--dy", 32, "--steps", 16)
-    wait_undo("Reorder effects")
-    step("add to track", "click", "--name", "Add effect to track", "--exact")
-    step("add track rotate", "click", "--name", "Rotate", "--role", "menuItem", "--exact")
+    swirl = find(snapshot(), lambda node: node.get("class") == "MotionEffectStack::Card" and node.get("componentName") == "Swirl effect")["bounds"]
+    translate = find(snapshot(), lambda node: node.get("class") == "MotionEffectStack::Card" and node.get("componentName") == "Translate effect")["bounds"]
+    # The new effect scrolls into view; its header drags it above Swirl.
+    step("reorder effects by their header", "drag-xy", translate["x"] + 60, translate["y"] + 14, translate["x"] + 60, translate["y"] - 60, "--steps", 16)
+    wait_undo("Move effect")
+    # A track's own effects: select it by its name.
+    step("show timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    header = find(snapshot(), lambda node: str(node.get("componentName", "")).startswith("Track name ") and node.get("value") == "cube.obj")
+    step("select track", "click", header["ref"])
+    command("wait-for-value", "--component-name", "Inspector title", "--value", "cube.obj")
+    step("add track rotate", "click", tile("Rotate")["ref"], "--click-count", 2)
     wait_undo("Add Rotate")
-    step("rotate track", "set-value", "--name", "Effect rotateZ", "--role", "slider", 0.2)
-    step("add to composition", "click", "--name", "Add effect to composition", "--exact")
-    step("add composition ripple", "click", "--name", "Ripple", "--role", "menuItem", "--exact")
+    step("rotate track", "set-value", "--component-name", "Effect rotateZ", "--exact", "0.2")
+    # With nothing selected, effects apply to the whole composition.
+    step("select nothing", "click", "--class", "MotionTimelineView", "--position", "700,140")
+    command("wait-for-value", "--component-name", "Inspector title", "--value", "Composition")
+    step("add composition ripple", "click", tile("Ripple")["ref"], "--click-count", 2)
     wait_undo("Add Ripple")
     step("key composition ripple", "click", "--name", "Key effect ripplePhase", "--exact")
     wait_undo("Key effect parameter")
     step("scoped effect screenshot", "screenshot", "--file", session.artifact_dir / "scoped-effects.png")
-    # Clip (2 effects), track (1), then the composition's Ripple.
-    ripple_y = 26 + 2 * 26 + 6 + 26 + 26 + 6 + 26 + 13
-    step("select composition effect", "click", "--class", "MotionEffectsPanel::Chain", "--position", f"80,{ripple_y}")
-    step("remove composition effect", "press", "Delete", "--class", "MotionEffectsPanel::Chain")
+    step("remove with close button", "click", "--name", "Remove effect icon", "--exact")
     wait_undo("Remove effect")
     step("undo removal", "click", "--name", "Undo", "--exact")
-    step("reselect composition effect", "click", "--class", "MotionEffectsPanel::Chain", "--position", f"80,{ripple_y}")
-    command("wait-for-locator", "--name", "Effect ripplePhase", "--role", "slider", "--exact")
-    # The cross at a row's end removes that effect.
-    chain = find(snapshot(), lambda node: node.get("class") == "MotionEffectsPanel::Chain")["bounds"]
-    step("hover composition effect", "mouse-move", chain["x"] + 80, chain["y"] + ripple_y)
-    step("remove with cross", "click-xy", chain["x"] + chain["w"] - 13, chain["y"] + ripple_y)
-    wait_undo("Remove effect")
-    step("undo cross removal", "click", "--name", "Undo", "--exact")
-    step("reselect restored effect", "click", "--class", "MotionEffectsPanel::Chain", "--position", f"80,{ripple_y}")
-    command("wait-for-locator", "--name", "Effect ripplePhase", "--role", "slider", "--exact")
+    command("wait-for-locator", "--component-name", "Effect ripplePhase", "--exact")
     step("effects final screenshot", "screenshot", "--file", session.artifact_dir / "effects-final.png")
     print("Motion scoped effects smoke passed", flush=True)
 finally:

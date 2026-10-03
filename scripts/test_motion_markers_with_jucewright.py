@@ -66,26 +66,26 @@ try:
     edit("Marker position", "6s")
     step("save chorus marker", "click", "--name", "Save marker", "--exact")
     assert markers() == {"Verse": 2, "Chorus": 6}
-    step("drag verse one second", "drag", "--class", "MotionTimelineView", "--position", "320,58", "--dx", 70, "--dy", 0, "--steps", 12)
+    step("drag verse one second", "drag", "--class", "MotionTimelineView", "--position", "320,36", "--dx", 70, "--dy", 0, "--steps", 12)
     assert markers() == {"Verse": 3, "Chorus": 6}
     step("undo marker drag", "click", "--name", "Undo", "--exact")
     assert markers()["Verse"] == 2
     step("redo marker drag", "click", "--name", "Redo", "--exact")
     assert markers()["Verse"] == 3
-    step("jump to verse", "click", "--class", "MotionTimelineView", "--position", "400,58")
+    step("jump to verse", "click", "--class", "MotionTimelineView", "--position", "400,36")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "3.000s", "--timeout-ms", 5000)
     step("next marker shortcut", "press", "k", "--class", "MotionTimelineView")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "6.000s", "--timeout-ms", 5000)
     step("previous marker shortcut", "press", "j", "--class", "MotionTimelineView")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "3.000s", "--timeout-ms", 5000)
-    step("select verse marker", "click", "--class", "MotionTimelineView", "--position", "400,58")
+    step("select verse marker", "click", "--class", "MotionTimelineView", "--position", "400,36")
     step("delete selected marker", "press", "backspace", "--class", "MotionTimelineView")
     assert markers() == {"Chorus": 6}
     assert len(save().findall("track/clip")) == 1
     step("undo marker deletion", "click", "--name", "Undo", "--exact")
     assert len(markers()) == 2
     step("select clip before marker", "click", "--class", "MotionTimelineView", "--position", "250,86")
-    step("select marker exclusively", "click", "--class", "MotionTimelineView", "--position", "400,58")
+    step("select marker exclusively", "click", "--class", "MotionTimelineView", "--position", "400,36")
     step("duplicate shortcut with marker selected", "press", "command + d", "--class", "MotionTimelineView")
     assert len(save().findall("track/clip")) == 1
     step("select clip from preview", "click", "--class", "MotionCompositionView", "--position", "60,235")
@@ -95,7 +95,7 @@ try:
     assert len(state.findall("marker")) == 2
     step("undo clip deletion", "click", "--name", "Undo", "--exact")
     assert len(save().findall("track/clip")) == 1
-    step("chorus menu", "click", "--class", "MotionTimelineView", "--position", "610,58", "--button", "right")
+    step("chorus menu", "click", "--class", "MotionTimelineView", "--position", "610,36", "--button", "right")
     step("edit chorus", "click", "--name", "Edit marker...", "--role", "menuItem", "--exact")
     edit("Marker name", "Final chorus")
     edit("Marker position", "3s")

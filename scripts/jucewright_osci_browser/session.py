@@ -332,6 +332,7 @@ class BrowserSession:
             self.die("Prepared jucewright profile has no audio output device. Configure the standalone output device once, then rerun the browser automation.")
 
         profile["ffmpegFile"] = self.copy_profile_ffmpeg(profile, launch_home)
+        self.reset_profile_layout(profile, launch_home)
         if self.legal_only:
             # Reset acknowledgements, preserving the installer's offline document cache.
             legal_file = Path(profile['supportDirectory']) / 'osci-licensing.settings'
@@ -368,6 +369,20 @@ class BrowserSession:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         return str(destination)
+
+    @staticmethod
+    def reset_profile_layout(profile: dict, launch_home: Path) -> None:
+        """Start from the default workspace layout, whatever the user last arranged."""
+        support = Path(profile.get("supportDirectory", ""))
+        if not support.is_dir() or not support.resolve().is_relative_to(launch_home.resolve()):
+            return
+        for settings in support.glob("*_globals.settings"):
+            tree = ET.parse(settings)
+            root = tree.getroot()
+            for entry in list(root):
+                if entry.get("name", "").startswith("motion.layout."):
+                    root.remove(entry)
+            tree.write(settings)
 
     @staticmethod
     def disable_profile_audio_input(settings_file: Path, audio_output_override: str | None = None) -> str | None:

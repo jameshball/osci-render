@@ -280,8 +280,14 @@ inline Stroke fit(std::vector<Point> input, float tolerance, bool closed = false
         const auto first = breaks[piece], last = breaks[piece + 1];
         if (last <= first) { continue; }
         const auto look = std::min<std::size_t>(3, last - first);
-        const auto left = detail::normalised(input[first + look] - input[first]);
-        const auto right = detail::normalised(input[last - look] - input[last]);
+        auto left = detail::normalised(input[first + look] - input[first]);
+        auto right = detail::normalised(input[last - look] - input[last]);
+        // A closed loop without corners joins smoothly where it started.
+        if (closed && turns.empty() && input.size() > 2 * look + 1) {
+            const auto through = detail::normalised(input[first + look] - input[last - look]);
+            left = through;
+            right = -through;
+        }
         const auto before = curves.size();
         detail::fitRange(input, first, last, left, right, tolerance, curves);
         sharp.resize(curves.size(), false);
@@ -297,6 +303,7 @@ inline Stroke fit(std::vector<Point> input, float tolerance, bool closed = false
     }
     if (closed && stroke.anchors.size() > 2 && stroke.anchors.back().point.getDistanceFrom(stroke.anchors.front().point) < tolerance * 4) {
         stroke.anchors.front().in = stroke.anchors.back().in;
+        stroke.anchors.front().smooth = turns.empty();
         stroke.anchors.pop_back();
     }
     return stroke;

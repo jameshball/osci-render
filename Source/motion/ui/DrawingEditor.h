@@ -274,7 +274,8 @@ public:
             if (key.getModifiers().isShiftDown()) { redo(); } else { undo(); }
             return true;
         }
-        if (command) { return false; }
+        // Other shortcuts would act on the timeline behind the drawing.
+        if (command) { return key.getKeyCode() != 'S'; }
         if (key == juce::KeyPress::returnKey) { finishStroke(); changed(); return true; }
         if (key == juce::KeyPress::escapeKey) {
             if (activeStroke >= 0) { finishStroke(); } else { deselect(); }

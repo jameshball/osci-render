@@ -21,8 +21,8 @@ public:
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through this camera: moving the view moves the camera");
-        lookThrough.setVisible(false);
         setGroups({{&move, &rotate, &scale}, {&path, &fly, &frame}, {&lookThrough}});
+        lookThrough.setVisible(false);
     }
     Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam};

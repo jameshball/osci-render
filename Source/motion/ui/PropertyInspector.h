@@ -70,6 +70,15 @@ public:
         refresh();
     }
     void relayout() { layoutContent(); }
+    // Scrolls so `component` (inside the inspector) is fully in view.
+    void reveal(juce::Component& component) {
+        layoutContent();
+        const auto area = content.getLocalArea(&component, component.getLocalBounds());
+        auto position = viewport.getViewPosition();
+        if (area.getBottom() > position.y + viewport.getMaximumVisibleHeight()) { position.y = area.getBottom() - viewport.getMaximumVisibleHeight() + motion::style::padding; }
+        if (area.getY() < position.y) { position.y = area.getY() - motion::style::padding; }
+        viewport.setViewPosition(position);
+    }
     void setShowsHeader(bool shows) { showsHeader = shows; title.setVisible(shows); kind.setVisible(shows); resized(); }
     void setTarget(motion::Id id) {
         if (id != target) {

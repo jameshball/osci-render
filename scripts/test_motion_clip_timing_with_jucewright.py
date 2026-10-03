@@ -92,7 +92,6 @@ try:
     command("wait-for-locator", "--name", "Timing verification", "--class", "juce::Label", "--exact")
     step("size timing workspace", "resize-window", "--w", "1440", "--h", "900")
     step("select first clip", "click", "--class", "MotionTimelineView", "--position", "250,68")
-    step("open clip inspector", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     edit("Clip duration", 8)
     _, clips = saved()
     assert float(clips['3'].get('duration')) == 8
@@ -164,7 +163,6 @@ try:
     step("dismiss duplicate collision", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
     _, unchanged = saved()
     assert [c.attrib for c in clips.values()] == [c.attrib for c in unchanged.values()]
-    step("show object inspector", "click", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
     step("open timing shortcut menu", "click", "--class", "MotionTimelineView", "--position", f"{first_x},68", "--button", "right")
     step("edit timing from menu", "click", "--name", "Edit clip timing", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Clip timing inspector", "--exact")

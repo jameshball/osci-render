@@ -73,7 +73,7 @@ try:
     wait_undo("Import object")
     step("import soundtrack", "drop-files", "--file", fixture, "--class", "MotionEditor", "--exact")
     wait_undo("Import soundtrack")
-    command("wait-for-locator", "--name", "Properties", "--class", "MotionTabs::Tab", "--exact")
+    command("wait-for-locator", "--name", "Property inspector", "--exact")
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     if gain is None or float(gain["value"]) != 1:
         raise RuntimeError("Audio gain inspector missing or incorrect")

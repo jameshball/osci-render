@@ -22,12 +22,15 @@ public:
     std::function<void(motion::Id, std::string)> onPropertySelected;
     std::function<void(motion::Id)> onShowOwner;
     std::function<void()> onHeightChanged;
+    // A newly added effect asks to be scrolled into view.
+    std::function<void(juce::Component&)> onReveal;
 
     // `value` is a clip, track or group id, or 0 for the composition;
     // `clip` is the selection whose other stages are listed.
     void setOwner(std::optional<motion::Id> value, motion::Id clip) {
         if (value != owner || clip != context) {
             cancelGesture();
+            cancelledGesture = false;
             owner = value;
             context = clip;
         }
@@ -59,8 +62,15 @@ public:
         if (effects != nullptr) {
             for (const auto& effect : *effects) { ids.push_back(effect.id); }
         }
+        std::optional<motion::Id> added;
+        if (ids.size() == listed.size() + 1 && std::find(ids.begin(), ids.end(), ids.back()) != ids.end()) {
+            for (const auto id : ids) {
+                if (std::find(listed.begin(), listed.end(), id) == listed.end()) { added = id; }
+            }
+        }
         if (ids != listed) {
             cancelGesture();
+            cancelledGesture = false;
             listed = ids;
             cards.clear();
             for (const auto id : ids) {
@@ -73,6 +83,11 @@ public:
         refreshStages();
         resized();
         if (onHeightChanged) { onHeightChanged(); }
+        if (added.has_value() && onReveal) {
+            for (auto& card : cards) {
+                if (card->getEffectId() == *added) { onReveal(*card); }
+            }
+        }
         repaint();
     }
     void updateValues() {
@@ -176,7 +191,7 @@ private:
             const auto* effect = motion::findEffect(stack.processor.document.project(), id);
             const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
             name = effect == nullptr ? juce::String() : juce::String(effect->name);
-            setName("Effect " + name);
+            setName(name + " effect");
             close.setPaintsBackground(true);
             close.setIconPadding(6);
             close.onClick = [this] { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Card>(this)] { if (safe != nullptr) { safe->stack.remove(safe->id); } }); };
@@ -206,6 +221,7 @@ private:
             }
         }
         int preferredHeight() const { return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + 2) + motion::style::gap; }
+        motion::Id getEffectId() const { return id; }
         void update() {
             const auto& project = stack.processor.document.project();
             const auto* effect = motion::findEffect(project, id);
@@ -322,7 +338,10 @@ private:
             chip->setName("Effects of " + label.upToFirstOccurrenceOf(juce::String::fromUTF8(" \xc2\xb7"), false, false));
             chip->setTooltip("Also applied");
             chip->setColour(juce::TextButton::buttonColourId, motion::style::field());
-            chip->onClick = [this, id = id] { if (onShowOwner) { onShowOwner(id); } };
+            // Showing another stage rebuilds these chips, so it waits.
+            chip->onClick = [this, id = id] {
+                juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MotionEffectStack>(this), id] { if (safe != nullptr && safe->onShowOwner) { safe->onShowOwner(id); } });
+            };
             addAndMakeVisible(*chip);
             stages.push_back(std::move(chip));
         }
