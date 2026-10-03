@@ -98,6 +98,13 @@ inline void paintModulatorShape(juce::Graphics& g, const Modulator& modulator, j
         x += modulator.decay / total; path.lineTo(point(x, sustain));
         x += .3 / total; path.lineTo(point(x, sustain));
         path.lineTo(point(1, bottom));
+    } else if (modulator.kind == ModulatorKind::controller && modulator.controller == MidiControl::pitchBend) {
+        // A bend: centred, a dip and back.
+        path.startNewSubPath(point(0, 0));
+        for (int step = 1; step <= 40; ++step) {
+            const auto x = step / 40.0;
+            path.lineTo(point(x, -.85 * std::exp(-std::pow((x - .5) * 5, 2))));
+        }
     } else if (modulator.kind == ModulatorKind::controller) {
         path.startNewSubPath(point(0, -.8));
         for (int step = 1; step <= 40; ++step) {
@@ -130,8 +137,8 @@ inline void paintModulatorShape(juce::Graphics& g, const Modulator& modulator, j
 
 inline juce::String modulatorKindName(const Modulator& modulator) {
     if (modulator.kind == ModulatorKind::envelope) { return "Envelope"; }
-    if (modulator.kind == ModulatorKind::controller) { return "MIDI controller"; }
-    if (modulator.shape.waveform == ModulationWaveform::soundtrack) { return "Soundtrack loudness"; }
+    if (modulator.kind == ModulatorKind::controller) { return modulator.controller == MidiControl::pitchBend ? "Pitch bend" : "MIDI CC"; }
+    if (modulator.shape.waveform == ModulationWaveform::soundtrack) { return "Loudness"; }
     if (modulator.shape.waveform == ModulationWaveform::noiseSmooth || modulator.shape.waveform == ModulationWaveform::noiseHold) { return "Random"; }
     return "LFO";
 }
@@ -150,11 +157,10 @@ public:
         addButton.setButtonText("Add modulator");
         addButton.setName("Add modulator");
         addButton.setTitle("Add modulator");
-        addButton.setTooltip("An LFO, random or soundtrack follower, an envelope on MIDI notes, or a MIDI controller");
         addButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.3f));
-        addButton.onClick = [this] { showAddMenu(); };
+        addButton.onClick = [this] { add(); };
         content.addAndMakeVisible(addButton);
-        emptyText.setText("Modulators move many properties from one source: an LFO, a random walk, the soundtrack's loudness, or a MIDI clip's notes and controllers.", juce::dontSendNotification);
+        emptyText.setText("Drag a modulator onto any property to move it.", juce::dontSendNotification);
         emptyText.setFont(motion::style::caption());
         emptyText.setColour(juce::Label::textColourId, motion::style::muted());
         emptyText.setJustificationType(juce::Justification::centredTop);
@@ -180,14 +186,24 @@ public:
             refresh();
         };
         content.addAndMakeVisible(remove);
-        // The oscillator's shapes, as pictures.
-        for (int index = 0; index < static_cast<int>(shapes.size()); ++index) {
-            auto& button = shapes[static_cast<std::size_t>(index)];
-            static const char* names[] {"Sine", "Triangle", "Saw", "Square", "Smooth random", "Random steps", "Soundtrack loudness"};
-            button = std::make_unique<ShapeButton>(names[index], static_cast<motion::ModulationWaveform>(index));
-            button->onClick = [this, index] { change([index](auto& modulator) { modulator.shape.waveform = static_cast<motion::ModulationWaveform>(index); }); };
+        // What kind of modulator, as pictures: wave shapes, random, the
+        // soundtrack's loudness, envelopes on MIDI notes and MIDI controllers.
+        for (std::size_t index = 0; index < kinds().size(); ++index) {
+            const auto& kind = kinds()[index];
+            auto& button = shapes[index];
+            button = std::make_unique<ShapeButton>(kind.name, kind.kind, kind.waveform);
+            button->onClick = [this, index] { setKind(index); };
             content.addAndMakeVisible(*button);
         }
+        more.setButtonText("More");
+        more.setName("More modulator settings");
+        more.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        more.setColour(juce::TextButton::textColourOffId, motion::style::muted());
+        more.onClick = [this] {
+            showMore = !showMore;
+            refresh();
+        };
+        content.addAndMakeVisible(more);
         for (auto [chip, beats] : {std::pair {&hertz, false}, std::pair {&beatsChip, true}}) {
             chip->setClickingTogglesState(false);
             chip->onClick = [this, beats = beats] { change([beats](auto& modulator) { modulator.shape.tempoSync = beats; }); };
@@ -245,7 +261,7 @@ public:
         routesTitle.setColour(juce::Label::textColourId, motion::style::muted());
         routesTitle.setText("Drives", juce::dontSendNotification);
         content.addAndMakeVisible(routesTitle);
-        routesHint.setText("Nothing yet. Select a property, open the Graph and choose Route modulator.", juce::dontSendNotification);
+        routesHint.setText("Drag the card onto a property.", juce::dontSendNotification);
         routesHint.setFont(motion::style::caption());
         routesHint.setColour(juce::Label::textColourId, motion::style::muted());
         routesHint.setJustificationType(juce::Justification::topLeft);
@@ -264,14 +280,24 @@ public:
         const auto& modulators = project.modulators;
         if (selected != 0 && std::none_of(modulators.begin(), modulators.end(), [this](const auto& item) { return item.id == selected; })) { selected = 0; }
         if (selected == 0 && !modulators.empty()) { selected = modulators.front().id; }
-        cards.clear();
+        // Cards are rebuilt only when the list changes, so a card being
+        // clicked or dragged survives selection.
+        std::vector<std::pair<motion::Modulator, int>> listing;
         for (const auto& modulator : modulators) {
             int routeCount = 0;
             for (const auto& route : project.routes) { routeCount += route.modulator == modulator.id ? 1 : 0; }
-            auto card = std::make_unique<Card>(*this, modulator, routeCount);
-            content.addAndMakeVisible(*card);
-            cards.push_back(std::move(card));
+            listing.emplace_back(modulator, routeCount);
         }
+        if (listing != listedCards) {
+            listedCards = listing;
+            cards.clear();
+            for (const auto& [modulator, routeCount] : listing) {
+                auto card = std::make_unique<Card>(*this, modulator, routeCount);
+                content.addAndMakeVisible(*card);
+                cards.push_back(std::move(card));
+            }
+        }
+        for (auto& card : cards) { card->repaint(); }
         emptyText.setVisible(modulators.empty());
         const auto* modulator = current();
         const auto oscillator = modulator != nullptr && modulator->kind == motion::ModulatorKind::oscillator;
@@ -281,19 +307,25 @@ public:
         const auto noise = oscillator && (modulator->shape.waveform == motion::ModulationWaveform::noiseHold || modulator->shape.waveform == motion::ModulationWaveform::noiseSmooth);
         name.setVisible(modulator != nullptr);
         remove.setVisible(modulator != nullptr);
-        for (auto& button : shapes) { button->setVisible(oscillator); }
+        for (auto& button : shapes) { button->setVisible(modulator != nullptr); }
+        // The essentials show; phase, seed, velocity, note range and channel
+        // wait behind More.
+        const auto hasMore = (oscillator && !loudness) || envelope || midiControl;
+        more.setVisible(hasMore);
+        more.setButtonText(showMore ? "Less" : "More");
         hertz.setVisible(oscillator && !loudness);
         beatsChip.setVisible(oscillator && !loudness);
         rate.setVisible(oscillator && !loudness);
-        phase.setVisible(oscillator && !loudness);
-        seed.setVisible(noise);
+        phase.setVisible(oscillator && !loudness && showMore);
+        seed.setVisible(noise && showMore);
         source.setVisible(envelope || midiControl);
         controller.setVisible(midiControl);
-        channel.setVisible(midiControl);
-        for (auto* row : {&attack, &decay, &sustain, &release, &velocity, &lowest, &highest}) { row->setVisible(envelope); }
+        channel.setVisible(midiControl && showMore);
+        for (auto* row : {&attack, &decay, &sustain, &release}) { row->setVisible(envelope); }
+        for (auto* row : {&velocity, &lowest, &highest}) { row->setVisible(envelope && showMore); }
         if (modulator != nullptr) {
             if (!name.isBeingEdited()) { name.setText(juce::String(modulator->name), juce::dontSendNotification); }
-            for (std::size_t index = 0; index < shapes.size(); ++index) { shapes[index]->setToggleState(static_cast<int>(modulator->shape.waveform) == static_cast<int>(index), juce::dontSendNotification); }
+            for (std::size_t index = 0; index < shapes.size(); ++index) { shapes[index]->setToggleState(kindIndex(*modulator) == index, juce::dontSendNotification); }
             hertz.setToggleState(!modulator->shape.tempoSync, juce::dontSendNotification);
             beatsChip.setToggleState(modulator->shape.tempoSync, juce::dontSendNotification);
             controller.setSelectedId(modulator->controller + 1, juce::dontSendNotification);
@@ -347,10 +379,14 @@ public:
             remove.setBounds(header.removeFromRight(motion::style::controlHeight));
             name.setBounds(header);
             area.removeFromTop(motion::style::gap);
-            if (shapes.front()->isVisible()) {
-                auto row = area.removeFromTop(28);
-                const auto each = row.getWidth() / static_cast<int>(shapes.size());
-                for (auto& button : shapes) { button->setBounds(row.removeFromLeft(each).reduced(1, 0)); }
+            {
+                // Two rows of five kinds.
+                const auto each = (area.getWidth() + 2) / 5;
+                for (std::size_t index = 0; index < shapes.size(); ++index) {
+                    const auto column = static_cast<int>(index % 5), line = static_cast<int>(index / 5);
+                    shapes[index]->setBounds(area.getX() + column * each, area.getY() + line * 30, each - 2, 28);
+                }
+                area.removeFromTop(60);
                 area.removeFromTop(motion::style::gap);
             }
             previewArea = area.removeFromTop(44);
@@ -361,15 +397,24 @@ public:
                 area.removeFromTop(motion::style::gap);
             }
             if (rate.field.isVisible()) {
-                auto row = area.removeFromTop(motion::style::controlHeight);
+                // The clock's unit sits on the label line; the value gets the width.
+                auto heading = area.removeFromTop(18);
+                beatsChip.setBounds(heading.removeFromRight(46).reduced(0, 1));
+                heading.removeFromRight(motion::style::gap);
+                hertz.setBounds(heading.removeFromRight(32).reduced(0, 1));
+                rate.label.setBounds(heading);
+                area.removeFromTop(2);
+                rate.field.setBounds(area.removeFromTop(motion::style::controlHeight));
                 area.removeFromTop(motion::style::gap);
-                beatsChip.setBounds(row.removeFromRight(46));
-                hertz.setBounds(row.removeFromRight(36));
-                row.removeFromRight(motion::style::gap);
-                rate.label.setBounds(row.removeFromLeft(62));
-                rate.field.setBounds(row);
             }
-            for (auto* row : {&phase, &seed, &attack, &decay, &sustain, &release, &velocity, &lowest, &highest}) {
+            for (auto* row : {&attack, &decay, &sustain, &release}) {
+                if (row->field.isVisible()) { row->layout(area); }
+            }
+            if (more.isVisible()) {
+                more.setBounds(area.removeFromTop(20).removeFromLeft(56));
+                area.removeFromTop(motion::style::gap);
+            }
+            for (auto* row : {&phase, &seed, &velocity, &lowest, &highest}) {
                 if (row->field.isVisible()) { row->layout(area); }
             }
             area.removeFromTop(motion::style::padding);
@@ -409,11 +454,9 @@ private:
             g.fillRoundedRectangle(picture, motion::style::radius);
             motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 7), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
             area.removeFromLeft(motion::style::padding);
-            const auto count = routes == 0 ? juce::String() : routes == 1 ? juce::String("1 route") : juce::String(routes) + " routes";
             g.setFont(motion::style::caption());
-            g.setColour(motion::style::muted());
-            if (count.isNotEmpty()) { g.drawText(count, area.removeFromRight(56), juce::Justification::centredRight, false); }
-            g.drawText(motion::ui::modulatorKindName(modulator), area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
+            g.setColour(routes == 0 ? motion::style::muted().withAlpha(.7f) : motion::style::accent().brighter(.3f));
+            g.drawText(routes == 0 ? juce::String("Not routed") : routes == 1 ? juce::String("Drives 1") : "Drives " + juce::String(routes), area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
             g.setFont(motion::style::body());
             g.setColour(motion::style::text());
             g.drawText(juce::String(modulator.name), area, juce::Justification::bottomLeft, true);
@@ -421,6 +464,12 @@ private:
         void mouseEnter(const juce::MouseEvent&) override { fade.setTarget(true); }
         void mouseExit(const juce::MouseEvent&) override { fade.setTarget(false); }
         void mouseDown(const juce::MouseEvent&) override { owner.select(modulator.id); }
+        // Dragging the card onto a property in Properties routes it there.
+        void mouseDrag(const juce::MouseEvent& event) override {
+            if (event.getDistanceFromDragStart() < 4) { return; }
+            auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+            if (container != nullptr && !container->isDragAndDropActive()) { container->startDragging("motion-modulator:" + juce::String(static_cast<juce::int64>(modulator.id)), this); }
+        }
     private:
         MotionModulatorLibrary& owner;
         motion::Modulator modulator;
@@ -430,12 +479,15 @@ private:
     // One oscillator shape, drawn.
     class ShapeButton final : public juce::Button {
     public:
-        ShapeButton(const juce::String& text, motion::ModulationWaveform waveform) : juce::Button("Shape " + text) {
+        ShapeButton(const juce::String& text, motion::ModulatorKind kind, motion::ModulationWaveform waveform) : juce::Button("Shape " + text) {
             setTitle(getName());
             setTooltip(text);
             setWantsKeyboardFocus(false);
+            shape.kind = kind;
             shape.shape.waveform = waveform;
             shape.shape.seed = 3;
+            shape.sustain = .5;
+            if (text == "Pitch bend") { shape.controller = motion::MidiControl::pitchBend; }
         }
         void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
             fade.setTarget(highlighted);
@@ -454,24 +506,37 @@ private:
         const auto found = std::find_if(modulators.begin(), modulators.end(), [this](const auto& item) { return item.id == selected; });
         return found == modulators.end() ? nullptr : &*found;
     }
-    void showAddMenu() {
-        juce::PopupMenu menu;
-        menu.addItem(1, "LFO");
-        menu.addItem(2, "Random");
-        menu.addItem(3, "Soundtrack loudness");
-        menu.addSeparator();
-        menu.addItem(4, "Envelope on MIDI notes");
-        menu.addItem(5, "MIDI controller");
-        const juce::Component::SafePointer<MotionModulatorLibrary> safe(this);
-        menu.setLookAndFeel(&getLookAndFeel());
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addButton), [safe](int result) {
-            if (safe == nullptr || result == 0) { return; }
-            const auto kind = result == 4 ? motion::ModulatorKind::envelope : result == 5 ? motion::ModulatorKind::controller : motion::ModulatorKind::oscillator;
-            const auto waveform = result == 2 ? motion::ModulationWaveform::noiseSmooth : result == 3 ? motion::ModulationWaveform::soundtrack : motion::ModulationWaveform::sine;
-            safe->add(kind, waveform);
+    struct Kind { const char* name; motion::ModulatorKind kind; motion::ModulationWaveform waveform; };
+    static const std::array<Kind, 10>& kinds() {
+        using motion::ModulatorKind, motion::ModulationWaveform;
+        static const std::array<Kind, 10> list {{
+            {"Sine", ModulatorKind::oscillator, ModulationWaveform::sine}, {"Triangle", ModulatorKind::oscillator, ModulationWaveform::triangle},
+            {"Saw", ModulatorKind::oscillator, ModulationWaveform::saw}, {"Square", ModulatorKind::oscillator, ModulationWaveform::square},
+            {"Smooth random", ModulatorKind::oscillator, ModulationWaveform::noiseSmooth}, {"Random steps", ModulatorKind::oscillator, ModulationWaveform::noiseHold},
+            {"Soundtrack loudness", ModulatorKind::oscillator, ModulationWaveform::soundtrack}, {"Envelope on MIDI notes", ModulatorKind::envelope, ModulationWaveform::sine},
+            {"MIDI controller", ModulatorKind::controller, ModulationWaveform::sine}, {"Pitch bend", ModulatorKind::controller, ModulationWaveform::sine}}};
+        return list;
+    }
+    static std::size_t kindIndex(const motion::Modulator& modulator) {
+        if (modulator.kind == motion::ModulatorKind::envelope) { return 7; }
+        if (modulator.kind == motion::ModulatorKind::controller) { return modulator.controller == motion::MidiControl::pitchBend ? 9 : 8; }
+        return std::min<std::size_t>(static_cast<std::size_t>(modulator.shape.waveform), 6);
+    }
+    // Changing the kind renames a modulator that still has its default name.
+    void setKind(std::size_t index) {
+        const auto* modulator = current();
+        if (modulator == nullptr) { return; }
+        const auto& kind = kinds()[index];
+        const auto oldBase = motion::ui::modulatorKindName(*modulator).toStdString();
+        change([&](auto& edited) {
+            edited.kind = kind.kind;
+            if (kind.kind == motion::ModulatorKind::oscillator) { edited.shape.waveform = kind.waveform; }
+            if (index == 9) { edited.controller = motion::MidiControl::pitchBend; }
+            if (index == 8 && edited.controller == motion::MidiControl::pitchBend) { edited.controller = 1; }
+            if (edited.name.rfind(oldBase + " ", 0) == 0) { edited.name = motion::ui::modulatorKindName(edited).toStdString() + edited.name.substr(oldBase.size()); }
         });
     }
-    void add(motion::ModulatorKind kind, motion::ModulationWaveform waveform) {
+    void add(motion::ModulatorKind kind = motion::ModulatorKind::oscillator, motion::ModulationWaveform waveform = motion::ModulationWaveform::sine) {
         motion::Modulator modulator;
         modulator.kind = kind;
         modulator.shape.waveform = waveform;
@@ -591,7 +656,10 @@ private:
     Content content {*this};
     juce::TextButton addButton;
     motion::icons::Button remove {"Delete modulator", motion::icons::Icon::trash};
-    std::array<std::unique_ptr<ShapeButton>, 7> shapes;
+    std::array<std::unique_ptr<ShapeButton>, 10> shapes;
+    std::vector<std::pair<motion::Modulator, int>> listedCards;
+    juce::TextButton more;
+    bool showMore = false;
     motion::style::Chip hertz {"Hz"}, beatsChip {"Beats"};
     juce::ComboBox source, controller, channel;
     std::vector<motion::Id> sourceIds;
@@ -608,11 +676,6 @@ class MotionRoutingPanel final : public juce::Component, private juce::ChangeLis
 public:
     explicit MotionRoutingPanel(MotionProcessor& owner) : processor(owner) {
         setName("Property routing");
-        route.setButtonText("Route modulator...");
-        route.setName("Route modulator");
-        route.setTitle("Route modulator");
-        route.setColour(juce::TextButton::buttonColourId, motion::style::raised());
-        route.onClick = [this] { showRouteMenu(); };
         link.setButtonText("Link to...");
         link.setName("Link property");
         link.setTitle("Link property");
@@ -640,7 +703,7 @@ public:
         bindLink(scale, [](auto& value, double number) { value.scale = number; });
         bindLink(offset, [](auto& value, double number) { value.offset = number; });
         bindLink(delay, [](auto& value, double number) { value.delay = number; });
-        for (auto* component : std::initializer_list<juce::Component*> {&route, &link, &unlink, &linkSource}) { addAndMakeVisible(component); }
+        for (auto* component : std::initializer_list<juce::Component*> {&link, &unlink, &linkSource}) { addAndMakeVisible(component); }
         processor.document.addChangeListener(this);
         refresh();
     }
@@ -668,7 +731,6 @@ public:
             rows.push_back(std::move(row));
         }
         const auto drivable = motion::drivableProperty(project, targetId, propertyName);
-        route.setEnabled(drivable);
         link.setEnabled(drivable);
         const auto linked = curve != nullptr && curve->link.has_value();
         unlink.setVisible(linked);
@@ -686,8 +748,8 @@ public:
         repaint();
     }
     int preferredHeight() const {
-        auto height = 30 + motion::style::controlHeight + motion::style::gap + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap);
-        height += motion::style::padding + motion::style::controlHeight + motion::style::gap;
+        auto height = 30 + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap);
+        height += motion::style::controlHeight + motion::style::gap;
         if (linkSource.isVisible()) { height += 20 + 3 * (motion::style::controlHeight + motion::style::gap); }
         return height + motion::style::padding;
     }
@@ -698,8 +760,6 @@ public:
             row->setBounds(area.removeFromTop(motion::style::controlHeight));
             area.removeFromTop(motion::style::gap);
         }
-        route.setBounds(area.removeFromTop(motion::style::controlHeight));
-        area.removeFromTop(motion::style::padding);
         auto header = area.removeFromTop(motion::style::controlHeight);
         area.removeFromTop(motion::style::gap);
         if (unlink.isVisible()) { unlink.setBounds(header.removeFromRight(64)); header.removeFromRight(motion::style::gap); }
@@ -755,42 +815,6 @@ private:
         juce::TextButton remove;
     };
 
-    void showRouteMenu() {
-        const auto& modulators = processor.document.project().modulators;
-        juce::PopupMenu menu;
-        menu.setLookAndFeel(&getLookAndFeel());
-        menu.addItem(1, "New LFO");
-        menu.addItem(2, "New envelope");
-        if (!modulators.empty()) { menu.addSeparator(); }
-        for (std::size_t index = 0; index < modulators.size(); ++index) { menu.addItem(100 + static_cast<int>(index), juce::String(modulators[index].name)); }
-        juce::Component::SafePointer<MotionRoutingPanel> safe(this);
-        const auto id = targetId;
-        const auto property = propertyName;
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&route), [safe, id, property](int result) {
-            if (safe == nullptr || result == 0) { return; }
-            auto& document = safe->processor.document;
-            // A visible but contained default depth: a quarter unit keeps a
-            // moved or scaled object on the canvas; rotations swing 45 degrees.
-            const auto amount = property.starts_with("rotation.") ? 45.0 : (property.starts_with("red") || property.starts_with("green") || property.starts_with("blue") ? 0.5 : 0.25);
-            const motion::ModulationRoute route {0, 0, id, property, amount, motion::ModulationMode::add};
-            if (result == 1 || result == 2) {
-                motion::Modulator created;
-                created.kind = result == 2 ? motion::ModulatorKind::envelope : motion::ModulatorKind::oscillator;
-                created.name = result == 2 ? "Envelope" : "LFO";
-                motion::Id modulator = 0;
-                const auto added = document.addRoutedModulator(created, route, modulator);
-                safe->report(added);
-                if (added.wasOk() && safe->onShowModulator) { safe->onShowModulator(modulator); }
-                return;
-            }
-            const auto index = static_cast<std::size_t>(result - 100);
-            if (index >= document.project().modulators.size()) { return; }
-            auto existing = route;
-            existing.modulator = document.project().modulators[index].id;
-            motion::Id routeId = 0;
-            safe->report(document.addRoute(existing, routeId));
-        });
-    }
     void showLinkMenu() {
         const auto& project = processor.document.project();
         juce::PopupMenu menu;
@@ -836,7 +860,7 @@ private:
     MotionProcessor& processor;
     motion::Id targetId = 0;
     std::string propertyName;
-    juce::TextButton route, link, unlink;
+    juce::TextButton link, unlink;
     juce::Label linkSource;
     motion::ui::LabelledScrub scale, offset, delay;
     std::vector<std::unique_ptr<Row>> rows;

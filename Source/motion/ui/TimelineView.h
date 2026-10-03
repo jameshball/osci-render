@@ -300,7 +300,8 @@ public:
                     });
                 };
                 header->onMenu = [this](motion::Id id) { showTrackMenu(id); };
-                header->onSelect = [this](motion::Id id) { if (motion::findGroup(processor.document.project(), id) != nullptr) { selectClip(id); } };
+                // A track or group name selects it, to show its effects.
+                header->onSelect = [this](motion::Id id) { selectClip(id); };
                 header->onCollapse = [this](motion::Id id) {
                     if (collapsedGroups.contains(id)) { collapsedGroups.erase(id); } else { collapsedGroups.insert(id); }
                     refreshTracks();
@@ -400,6 +401,11 @@ public:
         onPreview(&project);
     }
     motion::Id previewedOwner = 0;
+    bool effectDragActive = false;
+    void setEffectDragActive(bool active) {
+        effectDragActive = active;
+        repaint();
+    }
     std::uint64_t previewedRevision = 0;
 
     void itemDropped(const SourceDetails& details) override {
@@ -543,10 +549,17 @@ public:
                 paintLane(g, row, y, height);
                 continue;
             }
-            g.setColour(motion::style::raised());
+            // Alternate lanes are faintly lighter and every row ends in a
+            // hairline across headers and lanes, so tracks read as rows.
+            const auto selectedRow = row.id == selected;
+            g.setColour(selectedRow ? motion::style::raised().interpolatedWith(motion::style::accent(), .12f) : motion::style::raised());
             g.fillRect(0, y, namesWidth - 1, height - 1);
-            g.setColour(motion::style::outline().withAlpha(.35f));
-            g.drawHorizontalLine(y + height - 1, static_cast<float>(namesWidth), static_cast<float>(getWidth()));
+            if (visible % 2 == 1) {
+                g.setColour(juce::Colours::white.withAlpha(.018f));
+                g.fillRect(namesWidth, y, getWidth() - namesWidth, height - 1);
+            }
+            g.setColour(juce::Colours::black.withAlpha(.45f));
+            g.drawHorizontalLine(y + height - 1, 0.0f, static_cast<float>(getWidth()));
             const auto index = row.track;
             if (index < 0) {
                 g.setColour(motion::style::raised().withAlpha(0.25f));
@@ -578,6 +591,27 @@ public:
             }
         }
         g.restoreState();
+        if (blocked.has_value()) {
+            juce::Graphics::ScopedSaveState ghost(g);
+            g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
+            const auto area = blocked->toFloat().reduced(1, 3);
+            g.setColour(juce::Colour(0xffe98080).withAlpha(.2f));
+            g.fillRoundedRectangle(area, 4);
+            g.setColour(juce::Colour(0xffe98080));
+            g.drawRoundedRectangle(area, 4, 1.2f);
+            g.setFont(motion::style::caption());
+            g.drawText("Overlaps", area.reduced(8, 0), juce::Justification::centredLeft, true);
+        }
+        // While an effect is dragged, every clip that can take it is outlined.
+        if (effectDragActive) {
+            juce::Graphics::ScopedSaveState outlines(g);
+            g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
+            g.setColour(motion::style::accent().withAlpha(.35f));
+            for (int index = 0; index < static_cast<int>(tracks.size()); ++index) {
+                if (tracks[static_cast<std::size_t>(index)].kind != motion::TrackKind::visual) { continue; }
+                for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) { g.drawRoundedRectangle(clipBounds(clip, index).toFloat().reduced(1.5f), 4, 1.0f); }
+            }
+        }
         if (dropPosition.has_value() && dropTrack) {
             g.setColour(osci::Colours::accentColor());
             const auto under = visualRowAt(dropPosition->y);
@@ -728,7 +762,7 @@ public:
         }
         if (tracks.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.55f));
-            g.drawText("Drop files here to put them on the timeline, or Add source (" + motion::style::shortcutText("Cmd+I") + ")", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
+            g.drawText("Drop sources here", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
         }
     }
 
@@ -1287,14 +1321,24 @@ public:
         if (updated.tracks[target].insert(candidate, updated.tempo())) {
             updated.duration = std::max(updated.duration, candidate.timing(updated.tempo()).end());
             changed = true;
+            blocked.reset();
             processor.document.preview(std::move(updated));
             expectedRevision = processor.document.revision();
             repaint();
+        } else {
+            // Where the clip would land shows in red; it stays at the last free spot.
+            blocked = clipBounds(candidate, target);
+            repaint();
         }
     }
+    std::optional<juce::Rectangle<int>> blocked;
 
     void mouseUp(const juce::MouseEvent&) override {
         snapGuide.reset();
+        if (blocked.has_value()) {
+            blocked.reset();
+            repaint();
+        }
         if (heightDrag.has_value()) { heightDrag.reset(); return; }
         if (barDrag.has_value()) { barDrag.reset(); repaint(); return; }
         if (loopDrag.has_value()) {

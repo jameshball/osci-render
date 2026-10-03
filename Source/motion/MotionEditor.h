@@ -13,7 +13,7 @@
 #include "ui/CameraPanel.h"
 #include "ui/ClipTimingPanel.h"
 #include "ui/EffectLibrary.h"
-#include "ui/EffectsPanel.h"
+#include "ui/EffectStack.h"
 #include "ui/ModulatorPanels.h"
 #include "render/LuaSliderBakes.h"
 #include "model/TapTempo.h"
@@ -79,14 +79,13 @@ private:
     struct ScopeView {
         motion::Id scope = 0, selection = 0, curveTarget = 0;
         double position = 0, timelineFraction = 0.34;
-        int timelineTab = 0, inspectorTab = 0;
+        int timelineTab = 0;
         bool cameraCurve = false;
         std::string property = "position.x";
         MotionTimelineView::ViewState timeline;
         MotionCompositionView::ViewState preview;
         MotionCurveEditor::ViewState graph;
         MotionNotesEditor::ViewState notes;
-        MotionEffectsPanel::ViewState effects;
     };
     std::vector<ScopeView> scopeHistory;
     juce::TextButton scopeBack { "Back to Main" };
@@ -96,6 +95,10 @@ private:
     bool audioSelected() const;
     bool selectionIsCamera() const;
     void addCamera(double time);
+    void previewEffect(const std::string& type, std::optional<motion::Id> owner);
+    void addEffectTo(const std::string& type, motion::Id owner);
+    void dragOperationStarted(const juce::DragAndDropTarget::SourceDetails&) override;
+    void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
     void importExample(const juce::String& resource);
     void showDrawingEditor(motion::Id asset);
     void closeDrawingEditor();
@@ -167,7 +170,7 @@ private:
     MotionCameraRig cameraRig;
     MotionClipTimingPanel clipTimingPanel;
     MotionEffectLibrary effectLibrary;
-    MotionEffectsPanel effectsPanel;
+    MotionEffectStack effectStack;
     MotionRoutingPanel routingPanel;
     // The graph's side column scrolls: oscillator settings, then routing.
     juce::Viewport graphSideViewport;
@@ -175,7 +178,7 @@ private:
     void layoutGraphSide();
     MotionModulatorLibrary modulatorLibrary;
     MotionTabs libraryTabs;
-    MotionTabs inspectorTabs;
+    juce::Label inspectorTitle;
     MotionTabs timelineTabs;
     MotionCurveList curveList;
     std::set<std::string> shownCurves, hiddenCurves;
@@ -251,7 +254,7 @@ private:
     // Titled by outputTitle, which gives way when the header is tight.
     osci::PanelHeader outputHeader;
     juce::Label outputTitle;
-    osci::PanelHeader inspectorHeader { "Inspector" };
+    osci::PanelHeader inspectorHeader;
     osci::PanelHeader timelineHeader { "Timeline" };
     juce::Rectangle<int> libraryBounds, viewportBounds, inspectorBounds, timelineBounds;
 };

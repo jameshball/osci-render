@@ -20,16 +20,10 @@ public:
         viewport.setScrollBarsShown(true, false);
         viewport.setScrollBarThickness(6);
         addAndMakeVisible(viewport);
-        hint.setText("Drag an effect onto a clip, track or group to try it. Double-click adds it to the selected clip.", juce::dontSendNotification);
-        hint.setFont(motion::style::caption());
-        hint.setColour(juce::Label::textColourId, motion::style::muted());
-        hint.setJustificationType(juce::Justification::topLeft);
-        addAndMakeVisible(hint);
     }
     std::function<void(const std::string&)> onInsert;
     void resized() override {
         auto area = getLocalBounds();
-        hint.setBounds(area.removeFromBottom(48).reduced(motion::style::padding, motion::style::gap));
         viewport.setBounds(area);
         const auto width = viewport.getMaximumVisibleWidth();
         int y = motion::style::gap;
@@ -47,7 +41,7 @@ private:
         Tile(MotionEffectLibrary& library, const motion::EffectDefinition& effect) : owner(library), definition(effect) {
             setName(juce::String(definition.name));
             setTitle(juce::String(definition.name) + " effect");
-            setDescription("Drag onto a clip, track or group, or double-click to add it to the selected clip");
+            setDescription("Drag onto an object, a track or the Scene. Double-click adds it to what Properties shows.");
             setTooltip(getDescription());
             setMouseCursor(juce::MouseCursor::DraggingHandCursor);
             buildThumbnail();
@@ -86,7 +80,7 @@ private:
         // that are neutral by default turned up so every tile shows a change.
         void buildThumbnail() {
             auto instance = motion::makeEffect(1, definition);
-            for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"rotateZ", .12}, {"rotateY", .08}, {"skewX", .35}, {"hue", 150}, {"rippleDepth", .6}, {"rippleAmount", .4}}) {
+            for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"rotateZ", .12}, {"rotateY", .08}, {"skewX", .35}, {"hue", 150}, {"rippleDepth", .6}, {"rippleAmount", .4}, {"crush", .97}, {"fov", 110}}) {
                 const auto found = instance.properties.find(property);
                 if (found != instance.properties.end()) { found->second = motion::Curve(value); }
             }
@@ -105,7 +99,10 @@ private:
                 for (const bool vertical : {false, true}) {
                     for (int step = 0; step <= steps; ++step) {
                         const auto along = -.6f + 1.2f * static_cast<float>(step) / steps;
-                        auto point = motion::applyEffects(effects, vertical ? osci::Point(across, along, 0) : osci::Point(along, across, 0), .5);
+                        // A grid tilted away at the top shows depth effects.
+                        auto input = vertical ? osci::Point(across, along, 0) : osci::Point(along, across, 0);
+                        if (definition.id == "perspective") { input.z = input.y * 1.4f; }
+                        auto point = motion::applyEffects(effects, input, .5);
                         point.x = std::clamp(point.x, -.95f, .95f);
                         point.y = std::clamp(point.y, -.95f, .95f);
                         if (step == 0) { thumbnail.startNewSubPath(point.x, point.y); } else { thumbnail.lineTo(point.x, point.y); }
@@ -122,5 +119,4 @@ private:
     juce::Viewport viewport;
     juce::Component content;
     std::vector<std::unique_ptr<Tile>> tiles;
-    juce::Label hint;
 };

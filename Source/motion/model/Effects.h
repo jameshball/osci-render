@@ -30,7 +30,13 @@ inline const std::vector<EffectDefinition>& effectCatalog() {
         { "bulge", "Bulge", {{"strength", "Strength", 1, 0, 1}, {"bulge", "Bulge", 0.5, 0, 1}} },
         { "ripple", "Ripple", {{"strength", "Strength", 1, 0, 1}, {"rippleDepth", "Depth", 0.2, 0, 1}, {"ripplePhase", "Phase", 0, -1, 1}, {"rippleAmount", "Amount", 0.1, 0, 1}} },
         { "vortex", "Vortex", {{"strength", "Strength", 1, 0, 1}, {"vortexStrength", "Vortex strength", 0.6, 0, 1}, {"vortexAmount", "Amount", 2, 2, 6}, {"vortexRotation", "Rotation", 0.25, 0, 1}} },
-        { "colour", "Colour", {{"strength", "Strength", 1, 0, 1}, {"hue", "Hue (degrees)", 0, -180, 180}, {"saturation", "Saturation", 1, 0, 2}, {"brightness", "Brightness", 1, 0, 2}} }
+        { "colour", "Colour", {{"strength", "Strength", 1, 0, 1}, {"hue", "Hue (degrees)", 0, -180, 180}, {"saturation", "Saturation", 1, 0, 2}, {"brightness", "Brightness", 1, 0, 2}} },
+        { "bitCrush", "Bit crush", {{"strength", "Strength", 1, 0, 1}, {"crush", "Crush", 0.7, 0, 1}} },
+        { "twist", "Twist", {{"strength", "Strength", 1, 0, 1}, {"twist", "Twist", 0.5, -1, 1}} },
+        { "polygon", "Polygon", {{"strength", "Strength", 1, 0, 1}, {"sides", "Sides", 5, 2, 12}, {"stripes", "Stripe size", 0.5, 0, 1}, {"turn", "Rotation", 0, 0, 1}, {"stripePhase", "Stripe phase", 0, 0, 1}} },
+        { "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        { "perspective", "Perspective", {{"strength", "Strength", 1, 0, 1}, {"fov", "Field of view", 50, 5, 130}} },
+        { "wobble", "Wobble", {{"strength", "Strength", 1, 0, 1}, {"amount", "Amount", 0.3, 0, 1}, {"rate", "Rate (Hz)", 2, 0, 20}, {"phase", "Phase", 0, 0, 1}} }
     };
     return catalog;
 }

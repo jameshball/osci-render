@@ -209,6 +209,10 @@ public:
     juce::Result setModulator(Modulator modulator);
     juce::Result removeModulator(Id id);
     juce::Result addRoute(ModulationRoute route, Id& id);
+    // Routes `modulator` to each of `properties` of `target` that it does not
+    // drive yet, at a visible but contained default depth. One undo step.
+    juce::Result routeModulator(Id modulator, Id target, const std::vector<std::string>& properties);
+    static double defaultRouteAmount(const std::string& property);
     // Creates a modulator already driving one property, as one undo step.
     juce::Result addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId);
     juce::Result setRoute(const ModulationRoute& route);

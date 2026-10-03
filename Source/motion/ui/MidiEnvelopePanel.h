@@ -23,7 +23,7 @@ public:
             fields[index].onValueChange = [this] { repaint(); };
             addAndMakeVisible(labels[index]); addAndMakeVisible(fields[index]);
         }
-        note.setText("Shared by live MIDI and timeline notes.\nRelease tails stop at the clip's end.\nApplying resets held live notes.", juce::dontSendNotification);
+
         note.setFont(motion::style::body());
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         note.setJustificationType(juce::Justification::topLeft);
@@ -41,7 +41,7 @@ public:
             labels[index].setBounds(row.removeFromLeft(100)); fields[index].setBounds(row);
         }
         area.removeFromTop(8);
-        note.setBounds(area.removeFromTop(44));
+
         apply.setBounds(area.removeFromBottom(30).removeFromRight(130));
     }
     void paint(juce::Graphics& g) override {

@@ -24,8 +24,6 @@ public:
         presets.setTooltip("Apply timing suited to a kind of display.");
         presets.onClick = [this] { showPresets(); };
         addAndMakeVisible(presets);
-        note.setText("Dwell holds the beam dark at both ends of every jump. Travel is the dark move time per unit of screen distance. "
-            "Settle waits after each jump before drawing, for slow scopes and galvos.", juce::dontSendNotification);
         note.setFont(motion::style::caption());
         note.setColour(juce::Label::textColourId, motion::style::muted());
         note.setJustificationType(juce::Justification::topLeft);
@@ -43,7 +41,10 @@ public:
             field.editor.setName("Scope " + label.toLowerCase());
             field.editor.setTitle("Scope " + label.toLowerCase());
             field.editor.setComponentID("motion.scope." + juce::String(spec.id.data(), spec.id.size()));
-            field.editor.setTooltip(label + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
+            const auto lower = label.toLowerCase();
+            field.editor.setTooltip(lower.contains("dwell") ? "How long the beam stays dark at both ends of every jump"
+                : lower.contains("travel") ? "Dark move time per unit of screen distance"
+                : lower.contains("settle") ? "Wait after each jump before drawing, for slow scopes and galvos" : label);
             field.editor.onBegin = [this] { beginGesture(); };
             field.editor.onChange = [this, index](double value) { previewValue(index, value); };
             field.editor.onEnd = [this] { endGesture(); };
@@ -90,7 +91,7 @@ public:
     }
 
 private:
-    static constexpr int outerPadding = 10, noteHeight = 44;
+    static constexpr int outerPadding = 10, noteHeight = 0;
     static constexpr std::array<motion::PropertySpec, 3> specs {{
         {"dwell", "Dwell", "Scope", "", 0, motion::ScopeProfile::maximumDwellMicros, 12, 1, 1, " µs"},
         {"travel", "Travel", "Scope", "", 0, motion::ScopeProfile::maximumTravelMicrosPerUnit, 30, 1, 1, " µs/unit"},

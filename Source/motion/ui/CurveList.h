@@ -1,7 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "MotionStyle.h"
+#include "MotionIcons.h"
 
 // The Graph's channel list (like Blender's or After Effects' graph editor):
 // every animatable property of the target, with its axis colour, whether it
@@ -66,17 +66,10 @@ private:
         struct Eye final : juce::Button {
             Eye() : juce::Button("Show curve") { setClickingTogglesState(false); }
             void paintButton(juce::Graphics& g, bool over, bool) override {
-                // An eye: open (pupil drawn) when the curve is shown, closed (a
-                // lid line) when it is not.
-                const auto c = getLocalBounds().toFloat().getCentre();
+                // Material's eye: open when the curve is drawn, struck through when not.
                 const auto shown = getToggleState();
-                g.setColour(osci::Colours::text().withAlpha(isEnabled() ? (over ? 1.0f : shown ? .85f : .45f) : .3f));
-                juce::Path eye;
-                eye.startNewSubPath(c.x - 6, c.y);
-                eye.quadraticTo(c.x, c.y - (shown ? 5.0f : 2.0f), c.x + 6, c.y);
-                eye.quadraticTo(c.x, c.y + (shown ? 5.0f : 2.0f), c.x - 6, c.y);
-                g.strokePath(eye, juce::PathStrokeType(1.2f));
-                if (shown) { g.fillEllipse(c.x - 2, c.y - 2, 4, 4); }
+                const auto alpha = isEnabled() ? (over ? 1.0f : shown ? .8f : .35f) : .3f;
+                motion::icons::draw(g, shown ? motion::icons::Icon::visibility : motion::icons::Icon::visibilityOff, getLocalBounds().toFloat(), osci::Colours::text().withAlpha(alpha), 14.0f);
             }
         } eye;
         std::function<void()> onClick;

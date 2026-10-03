@@ -11,7 +11,7 @@
 // group, audio clip or camera). Rows group related axes; each row keys all of
 // its axes at once and navigates between its keys. Values edit at the key
 // under the playhead (frame-aligned) or, for animated curves, create one.
-class MotionPropertyInspector final : public juce::Component {
+class MotionPropertyInspector final : public juce::Component, public juce::DragAndDropTarget {
 public:
     explicit MotionPropertyInspector(MotionProcessor& owner) : processor(owner) {
         setName("Property inspector");
@@ -54,6 +54,20 @@ public:
         leadHeight = std::move(height);
         if (lead != nullptr) { content.addChildComponent(lead); }
         layoutContent();
+    }
+    // A section below the property rows (the owner's effects).
+    void setTrail(juce::Component* component, std::function<int()> height) {
+        if (trail != nullptr && trail != component) { content.removeChildComponent(trail); }
+        trail = component;
+        trailHeight = std::move(height);
+        if (trail != nullptr) { content.addChildComponent(trail); }
+        layoutContent();
+    }
+    // What the header says when the target has no properties of its own (a
+    // track or the composition, shown for their effects).
+    void setHeading(std::optional<std::pair<juce::String, juce::String>> value) {
+        heading = std::move(value);
+        refresh();
     }
     void relayout() { layoutContent(); }
     void setShowsHeader(bool shows) { showsHeader = shows; title.setVisible(shows); kind.setVisible(shows); resized(); }
@@ -117,13 +131,13 @@ public:
         }
         title.setEditable(false, editable && found->camera);
         title.setTooltip(editable && found->camera ? "Double-click to rename" : juce::String());
-        if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : "Nothing selected", juce::dontSendNotification); }
+        if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : heading.has_value() ? heading->first : juce::String(), juce::dontSendNotification); }
         // With several clips selected the header says so; edits apply to the
         // one named.
-        const juce::String kindText = !editable ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object";
+        const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object";
         kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
         kind.setTooltip(editable && selectionCount > 1 ? juce::String(selectionCount) + " clips are selected; these fields edit only " + juce::String(found->name.data(), found->name.size()) + "." : juce::String());
-        empty = !editable;
+        empty = !editable && !heading.has_value();
         if (!editable) { repaint(); return; }
         const auto time = keyTime(*found);
         for (auto& row : rows) {
@@ -144,6 +158,59 @@ public:
             row->modulate.setToggleState(modulated, juce::dontSendNotification);
         }
         repaint();
+    }
+
+    // Modulators dragged from the library route to the field or row dropped on.
+    std::function<void(motion::Id modulator, motion::Id target, std::vector<std::string> properties)> onRouteModulator;
+    void setModulatorDrag(bool active) {
+        modulatorDrag = active;
+        if (!active) { dropTarget = nullptr; }
+        repaint();
+    }
+    bool isInterestedInDragSource(const SourceDetails& details) override { return details.description.toString().startsWith("motion-modulator:"); }
+    void itemDragMove(const SourceDetails& details) override {
+        auto* found = routeTargetAt(details.localPosition);
+        if (found != dropTarget.getComponent()) {
+            dropTarget = found;
+            repaint();
+        }
+    }
+    void itemDragExit(const SourceDetails&) override {
+        dropTarget = nullptr;
+        repaint();
+    }
+    void itemDropped(const SourceDetails& details) override {
+        auto* found = routeTargetAt(details.localPosition);
+        dropTarget = nullptr;
+        repaint();
+        if (found == nullptr || !onRouteModulator) { return; }
+        const auto modulator = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
+        const auto& properties = found->getProperties();
+        const auto owner = properties.contains("routeTarget") ? static_cast<motion::Id>(properties["routeTarget"].toString().getLargeIntValue()) : target;
+        std::vector<std::string> names;
+        for (const auto& name : juce::StringArray::fromTokens(properties["routeProperties"].toString(), ",", "")) { names.push_back(name.toStdString()); }
+        onRouteModulator(modulator, owner, names);
+    }
+    void paintOverChildren(juce::Graphics& g) override {
+        if (!modulatorDrag) { return; }
+        g.reduceClipRegion(viewport.getBounds());
+        std::function<void(juce::Component&)> outline = [&](juce::Component& parent) {
+            for (auto* child : parent.getChildren()) {
+                if (!child->isVisible()) { continue; }
+                if (child->getProperties().contains("routeProperties") && dynamic_cast<MotionScrubField*>(child) != nullptr) {
+                    const auto area = getLocalArea(child, child->getLocalBounds()).toFloat();
+                    g.setColour(motion::style::accent().withAlpha(child == dropTarget.getComponent() ? .95f : .35f));
+                    g.drawRoundedRectangle(area.reduced(.5f), motion::style::radius, child == dropTarget.getComponent() ? 2.0f : 1.0f);
+                }
+                outline(*child);
+            }
+        };
+        outline(content);
+        auto* row = dropTarget.getComponent();
+        if (row != nullptr && dynamic_cast<MotionScrubField*>(row) == nullptr) {
+            g.setColour(motion::style::accent().withAlpha(.9f));
+            g.drawRoundedRectangle(getLocalArea(row, row->getLocalBounds()).toFloat().expanded(2), motion::style::radius + 1, 2.0f);
+        }
     }
 
     void paint(juce::Graphics& g) override {
@@ -225,6 +292,7 @@ private:
         rows.clear();
         content.removeAllChildren();
         if (lead != nullptr) { content.addChildComponent(lead); }
+        if (trail != nullptr) { content.addChildComponent(trail); }
         for (const auto& spec : specs) {
             if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size())) {
                 auto row = std::make_unique<Row>();
@@ -290,6 +358,10 @@ private:
             editor.onEnd = [this] { endGesture(); };
             editor.onCancel = [this] { cancelGesture(); refresh(); };
             editor.onCommit = [this, property](double value) { commitValue(property, value); };
+            // A modulator dropped here drives this axis; on the row, all of them.
+            editor.getProperties().set("routeProperties", juce::String(property));
+            auto& routes = rows.back()->getProperties();
+            routes.set("routeProperties", routes["routeProperties"].toString() + (routes["routeProperties"].toString().isEmpty() ? "" : ",") + juce::String(property));
             rows.back()->addAndMakeVisible(editor);
             rows.back()->fields.push_back(std::move(field));
         }
@@ -307,6 +379,12 @@ private:
         for (auto& row : rows) {
             row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, 17 + motion::style::controlHeight);
             y += 17 + motion::style::controlHeight + motion::style::padding;
+        }
+        const auto trailing = trail != nullptr && trailHeight ? trailHeight() : 0;
+        if (trail != nullptr) {
+            trail->setBounds(motion::style::padding, y, width - motion::style::padding * 2, trailing);
+            trail->setVisible(trailing > 0);
+            y += trailing > 0 ? trailing + motion::style::padding : 0;
         }
         content.setSize(std::max(0, width), y + motion::style::padding);
     }
@@ -497,7 +575,21 @@ private:
     juce::Component content;
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
+    // The innermost field or row under `point` that a modulator can drive.
+    juce::Component* routeTargetAt(juce::Point<int> point) {
+        auto* component = getComponentAt(point);
+        while (component != nullptr && component != this) {
+            if (component->getProperties().contains("routeProperties")) { return component; }
+            component = component->getParentComponent();
+        }
+        return nullptr;
+    }
+    bool modulatorDrag = false;
+    juce::Component::SafePointer<juce::Component> dropTarget;
     juce::Component* lead = nullptr;
+    juce::Component* trail = nullptr;
+    std::function<int()> trailHeight;
+    std::optional<std::pair<juce::String, juce::String>> heading;
     std::size_t selectionCount = 1;
     std::function<int()> leadHeight;
     std::vector<motion::PropertySpec> specList;

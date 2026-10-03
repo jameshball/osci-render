@@ -89,11 +89,10 @@ public:
             label->setBorderSize({});
         }
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        note.setText("Use outlines for logos and scanlines for filled imagery. More scanline rows share the available beam samples and can dim the image; start with 64 px detail. GIF timing is preserved.", juce::dontSendNotification);
+
         error.setName("Image preparation validation error");
         error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
         if (isVideo) {
-            note.setText("Video frames are sampled at the chosen rate and saved in the project. Outlines suit clear shapes; scanlines suit filled imagery. Video audio is not imported; add your soundtrack separately.", juce::dontSendNotification);
         }
         prepare.setName(isVideo ? "Prepare video" : "Prepare image");
         prepare.setButtonText(isVideo ? "Prepare video" : "Prepare image");
@@ -131,7 +130,7 @@ public:
         if (isVideo) { row(frameRateLabel, frameRate); }
         invert.setBounds(area.removeFromTop(28).withTrimmedLeft(142));
         area.removeFromTop(12);
-        note.setBounds(area.removeFromTop(64));
+
         area.removeFromTop(8);
         prepare.setBounds(area.removeFromBottom(32));
         area.removeFromBottom(8);

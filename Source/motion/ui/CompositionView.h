@@ -10,13 +10,15 @@
 #include "TransformGizmo.h"
 #include "../model/PropertyTarget.h"
 
-class MotionCompositionView : public juce::Component, private juce::Timer {
+class MotionCompositionView : public juce::Component, public juce::DragAndDropTarget, private juce::Timer {
 public:
     explicit MotionCompositionView(MotionProcessor& processor) : processor(processor) {
         setName("Composition preview");
         setWantsKeyboardFocus(true);
+        cameraSync.tick = [this] { syncCamera(); };
     }
     ~MotionCompositionView() override {
+        cameraSync.stopTimer();
         stopTimer();
         cancelGesture();
         if (navigating) { releaseCursor(); }
@@ -103,6 +105,29 @@ public:
         repaint();
     }
     void resetView() { cancelGesture(); camera = {}; repaint(); }
+
+    // Looking through an output camera: the Scene shows exactly its view, and
+    // orbiting, panning, zooming or flying moves the camera itself (keyed at
+    // the playhead when it is animated). Rigged cameras cannot be driven.
+    bool canDriveCamera(motion::Id id) const { return documentPose(id).has_value(); }
+    motion::Id drivenCamera() const { return lockedCamera; }
+    void setDrivenCamera(motion::Id id) {
+        if (id == lockedCamera) { return; }
+        if (lockedCamera == 0 && id != 0) { viewBeforeLock = camera; }
+        lockedCamera = id;
+        lastPose.reset();
+        if (id != 0) {
+            syncCamera();
+            cameraSync.startTimerHz(30);
+        } else {
+            cameraSync.stopTimer();
+            if (viewBeforeLock.has_value()) { camera = *viewBeforeLock; }
+            viewBeforeLock.reset();
+        }
+        if (onDrivenCameraChanged) { onDrivenCameraChanged(lockedCamera); }
+        repaint();
+    }
+    std::function<void(motion::Id)> onDrivenCameraChanged;
     // Blender's numpad views: look along an axis at the current pivot and
     // distance.
     enum class ViewPreset { front, back, right, left, top, bottom };
@@ -168,9 +193,10 @@ public:
                 }
                 const auto distance = previous->getDistanceFrom(*next);
                 const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
-                const auto colour = clip.editorId() == selected ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
+                const auto highlighted = clip.editorId() == selected || (dropHover.has_value() && *dropHover != 0 && clip.editorId() == *dropHover);
+                const auto colour = highlighted ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
                 g.setColour(colour.withAlpha(alpha * 0.8f));
-                g.drawLine({ *previous, *next }, clip.editorId() == selected ? 1.4f : 1.0f);
+                g.drawLine({ *previous, *next }, highlighted ? 1.4f : 1.0f);
                 previous = next;
                 previousLit = lit;
             }
@@ -185,6 +211,7 @@ public:
     void paintCameras(juce::Graphics& g, double time) const {
         const auto* active = prepared->activeCamera(time);
         for (const auto& camera : prepared->cameras) {
+            if (camera.id == lockedCamera) { continue; }
             const auto frame = camera.frame(time);
             if (!frame.has_value()) { continue; }
             const auto vector = [](const std::array<double, 3>& value) { return motion::editor::Vec3 {value[0], value[1], value[2]}; };
@@ -438,7 +465,52 @@ public:
 
     // Context hints only while flying or dragging (the tool strip's tooltips
     // cover the rest), like Blender's status hints, drawn over the scene.
+    // Effects dropped on an object apply to it; anywhere else, to everything.
+    std::function<void(const std::string&, std::optional<motion::Id>)> onEffectPreview;
+    std::function<void(const std::string&, motion::Id)> onEffectDropped;
+    bool isInterestedInDragSource(const SourceDetails& details) override { return details.description.toString().startsWith("motion-effect:"); }
+    void itemDragMove(const SourceDetails& details) override {
+        const auto type = details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString();
+        const auto hit = prepared != nullptr ? pickAt(details.localPosition.toFloat(), nullptr) : motion::Id(0);
+        if (dropHover == hit) { return; }
+        dropHover = hit;
+        if (onEffectPreview) { onEffectPreview(type, hit); }
+        repaint();
+    }
+    void itemDragExit(const SourceDetails& details) override {
+        dropHover.reset();
+        if (onEffectPreview) { onEffectPreview(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), std::nullopt); }
+        repaint();
+    }
+    void itemDropped(const SourceDetails& details) override {
+        const auto hit = dropHover.value_or(0);
+        dropHover.reset();
+        const auto type = details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString();
+        if (onEffectPreview) { onEffectPreview(type, std::nullopt); }
+        if (onEffectDropped) { onEffectDropped(type, hit); }
+        repaint();
+    }
+    void setEffectDragActive(bool active) {
+        effectDrag = active;
+        if (!active) { dropHover.reset(); }
+        repaint();
+    }
+
     void paintOverChildren(juce::Graphics& g) override {
+        if (effectDrag) {
+            // Over empty space the whole Scene is the target.
+            const auto everything = dropHover.has_value() && *dropHover == 0;
+            g.setColour(motion::style::accent().withAlpha(everything ? .9f : .3f));
+            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(2.0f), motion::style::panelRadius, everything ? 2.0f : 1.0f);
+            if (everything) {
+                auto label = getLocalBounds().removeFromBottom(30).withSizeKeepingCentre(110, 22);
+                g.setColour(motion::style::accent().withAlpha(.85f));
+                g.fillRoundedRectangle(label.toFloat(), motion::style::radius + 2);
+                g.setColour(juce::Colours::white);
+                g.setFont(motion::style::body());
+                g.drawText("Everything", label, juce::Justification::centred, false);
+            }
+        }
         const juce::String help = navigating ? "WASD / arrows move | Q E down / up | Shift faster | Esc finishes"
             : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
         if (help.isNotEmpty()) {
@@ -745,9 +817,78 @@ private:
     motion::editor::MotionPath motionPath;
     MotionProcessor& processor;
     std::unique_ptr<motion::PreparedComposition> prepared;
+    std::optional<motion::Id> dropHover;
+    bool effectDrag = false;
     std::optional<motion::Project> before;
     juce::Point<float> down;
     motion::editor::Camera camera, cameraAtDown;
+    struct Pose {
+        double x = 0, y = 0, z = 0, pitch = 0, yaw = 0, fov = 0;
+        bool operator==(const Pose&) const = default;
+    };
+    motion::Id lockedCamera = 0;
+    std::optional<Pose> lastPose;
+    std::optional<motion::editor::Camera> viewBeforeLock;
+    struct Sync final : juce::Timer {
+        std::function<void()> tick;
+        void timerCallback() override { if (tick) { tick(); } }
+    } cameraSync;
+    double cameraTime() const {
+        const auto& project = processor.document.project();
+        const auto time = std::clamp(processor.position.load(), 0.0, project.duration);
+        return project.frameRate > 0 ? std::round(time * project.frameRate) / project.frameRate : time;
+    }
+    // A free camera's pose at the playhead (rotation X as pitch, -Y as yaw).
+    std::optional<Pose> documentPose(motion::Id id) const {
+        for (const auto& item : processor.document.project().cameras) {
+            if (item.id != id) { continue; }
+            if (item.target != 0 || item.parent != 0) { return std::nullopt; }
+            const auto value = [&](const char* name, double fallback) {
+                const auto found = item.properties.find(name);
+                return found != item.properties.end() ? found->second.evaluateBase(cameraTime()) : fallback;
+            };
+            return Pose {value("position.x", 0), value("position.y", 0), value("position.z", 4), value("rotation.x", 0), -value("rotation.y", 0), value("fov", motion::defaultCameraFieldOfView)};
+        }
+        return std::nullopt;
+    }
+    Pose viewPose() const {
+        return {camera.position.x, camera.position.y, camera.position.z, camera.pitch * 180 / std::numbers::pi, camera.yaw * 180 / std::numbers::pi, camera.fovDegrees};
+    }
+    // The view moved: write it to the camera. The document moved (playback,
+    // undo, the inspector): move the view.
+    void syncCamera() {
+        if (lockedCamera == 0) { return; }
+        const auto view = viewPose();
+        if (lastPose.has_value() && !(view == *lastPose)) {
+            const auto id = lockedCamera;
+            const auto time = cameraTime();
+            processor.document.editCoalesced("Move camera", "camera-view:" + juce::String(static_cast<juce::int64>(id)), [id, time, view](motion::Project& project) {
+                for (auto& item : project.cameras) {
+                    if (item.id != id) { continue; }
+                    for (const auto& [name, value] : std::initializer_list<std::pair<const char*, double>> {{"position.x", view.x}, {"position.y", view.y}, {"position.z", view.z}, {"rotation.x", view.pitch}, {"rotation.y", -view.yaw}, {"rotation.z", 0}}) {
+                        auto& curve = item.properties[name];
+                        if (curve.animated()) { curve.setKeyValue(time, value); } else { curve.base = value; }
+                    }
+                }
+            });
+            lastPose = view;
+            return;
+        }
+        const auto pose = documentPose(lockedCamera);
+        if (!pose.has_value()) {
+            setDrivenCamera(0);
+            return;
+        }
+        if (lastPose.has_value() && *pose == *lastPose) { return; }
+        const auto distance = std::clamp(camera.distance() > 0 ? camera.distance() : 4.0, motion::editor::Camera::minimumDistance, motion::editor::Camera::maximumDistance);
+        camera.position = {pose->x, pose->y, pose->z};
+        camera.pitch = std::clamp(pose->pitch * std::numbers::pi / 180, -motion::editor::Camera::pitchLimit, motion::editor::Camera::pitchLimit);
+        camera.yaw = pose->yaw * std::numbers::pi / 180;
+        camera.fovDegrees = std::clamp(pose->fov, 1.0, 150.0);
+        camera.pivot = camera.position + camera.forward() * distance;
+        lastPose = viewPose();
+        repaint();
+    }
     motion::editor::Vec3 dragAnchor;
     std::string editedProperty;
     mutable std::optional<motion::editor::EulerGizmoFrame> gizmoFrame;

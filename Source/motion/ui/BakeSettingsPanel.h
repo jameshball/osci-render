@@ -67,7 +67,7 @@ public:
         }
         summary.setName("Bake prepared payload estimate");
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        note.setText("MIDI and slider inputs stay fixed while baking. Stateful Lua becomes a prepared source for repeatable scrubbing and export.", juce::dontSendNotification);
+        note.setVisible(false);
         error.setName("Bake validation error");
         error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
         bake.setName("Bake source");
@@ -105,7 +105,7 @@ public:
         area.removeFromTop(2);
         summary.setBounds(area.removeFromTop(40));
         area.removeFromTop(8);
-        note.setBounds(area.removeFromTop(44));
+
         area.removeFromTop(6);
         error.setBounds(area.removeFromTop(40));
         bake.setBounds(area.removeFromTop(32));

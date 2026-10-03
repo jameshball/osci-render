@@ -26,7 +26,7 @@ public:
         }
         status.setName("Blender connection status"); status.setJustificationType(juce::Justification::centredLeft);
         note.setFont(motion::style::body()); note.setJustificationType(juce::Justification::topLeft);
-        note.setText("Use the same port in Blender's osci-render add-on.\nReceives camera-framed Grease Pencil line art.\nCapture creates a portable source for editing and export.", juce::dontSendNotification);
+        note.setText("Use the same port in Blender's osci-render add-on.", juce::dontSendNotification);
         save.setButtonText(existing ? "Apply settings" : "Add source");
         save.onClick = [this] { submit(false); };
         listen.setButtonText(existing ? "Start listening" : "Add & listen");

@@ -2160,6 +2160,29 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
     return juce::Result::ok();
 }
 
+double Document::defaultRouteAmount(const std::string& property) {
+    // A quarter unit keeps a moved or scaled object on the canvas; rotations
+    // swing 45 degrees; colours move halfway.
+    if (property.starts_with("rotation.")) { return 45.0; }
+    if (property == "red" || property == "green" || property == "blue") { return 0.5; }
+    return 0.25;
+}
+
+juce::Result Document::routeModulator(Id modulator, Id target, const std::vector<std::string>& properties) {
+    const auto& current = project();
+    const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == modulator; });
+    if (!hasModulator) { return juce::Result::fail("The modulator no longer exists."); }
+    std::vector<ModulationRoute> added;
+    for (const auto& property : properties) {
+        const auto routed = std::any_of(current.routes.begin(), current.routes.end(), [&](const auto& route) { return route.modulator == modulator && route.target == target && route.property == property; });
+        if (routed || !drivableProperty(current, target, property)) { continue; }
+        added.push_back({newId(), modulator, target, property, defaultRouteAmount(property), ModulationMode::add});
+    }
+    if (added.empty()) { return juce::Result::fail("It already drives that, or that cannot be modulated."); }
+    edit("Route modulator", [added](Project& project) { project.routes.insert(project.routes.end(), added.begin(), added.end()); });
+    return juce::Result::ok();
+}
+
 juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId) {
     modulator.id = newId();
     normaliseModulator(modulator);

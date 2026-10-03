@@ -28,7 +28,7 @@ public:
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         note.setBorderSize({});
         note.setJustificationType(juce::Justification::topLeft);
-        note.setText("Prepared once at the chosen depth.\nChange the depth here to rebuild this source.", juce::dontSendNotification);
+
 
         prepare.setName("Prepare fractal");
         prepare.setButtonText("Prepare fractal");
@@ -53,7 +53,7 @@ public:
         depthLabel.setBounds(row.removeFromLeft(112));
         depth.setBounds(row);
         area.removeFromTop(10);
-        note.setBounds(area.removeFromTop(42));
+
         area.removeFromTop(8);
         prepare.setBounds(area.removeFromBottom(30));
     }

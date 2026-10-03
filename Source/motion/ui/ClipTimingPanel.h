@@ -44,7 +44,7 @@ public:
         }
         details.setFont(motion::style::caption());
         details.setColour(juce::Label::textColourId, motion::style::muted());
-        details.setJustificationType(juce::Justification::topLeft);
+        details.setJustificationType(juce::Justification::centredRight);
         addAndMakeVisible(details);
         status.setFont(motion::style::caption());
         status.setJustificationType(juce::Justification::topLeft);
@@ -57,7 +57,7 @@ public:
     }
     std::function<void()> onHeightChanged;
     bool hasClip() const { return findClip() != nullptr; }
-    int preferredHeight() const { return hasClip() ? 16 + 2 * rowHeight + 18 + (status.isVisible() ? 30 : 0) + 6 : 0; }
+    int preferredHeight() const { return hasClip() ? 16 + 2 * rowHeight + (status.isVisible() ? 30 : 0) + 4 : 0; }
     void refresh() {
         if (editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { discardEditors(); }
         const auto* clip = findClip();
@@ -72,8 +72,9 @@ public:
             if (!values[i].isBeingEdited()) { values[i].setText(current[i], juce::dontSendNotification); }
         }
         updating = false;
-        details.setText(clip == nullptr ? juce::String() : (clip->timeBase == motion::ClipTimeBase::beats ? "Follows the tempo" : "Fixed in seconds")
-            + juce::String::fromUTF8("  \u00b7  ends ") + juce::String(grid.positionLabel(timing.end())), juce::dontSendNotification);
+        // Which clock the clip keeps, on the heading line.
+        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "In beats" : "In seconds", juce::dontSendNotification);
+        details.setTooltip(clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo changes" : "Keeps its time when the tempo changes");
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : motion::style::muted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
         status.setVisible(clip != nullptr && status.getText().isNotEmpty());
@@ -83,7 +84,9 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds();
-        title.setBounds(area.removeFromTop(16));
+        auto heading = area.removeFromTop(16);
+        details.setBounds(heading.removeFromRight(80));
+        title.setBounds(heading);
         for (std::size_t line = 0; line < 2; ++line) {
             auto row = area.removeFromTop(rowHeight);
             const auto half = row.getWidth() / 2;
@@ -94,7 +97,6 @@ public:
                 values[i].setBounds(cell.reduced(0, 3));
             }
         }
-        details.setBounds(area.removeFromTop(18));
         status.setBounds(area.removeFromTop(30));
     }
     // Three decimals, more only when the value needs them (no trailing zeros).
