@@ -231,10 +231,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     scopeTools.fullScreen.onClick = [this] { visualiser.clickControl(Control::fullScreen, &scopeTools.fullScreen); };
     visualiser.setFullScreenCallback([this](FullScreenMode mode) {
         const auto next = mode == FullScreenMode::TOGGLE ? !scopeFullScreen : mode == FullScreenMode::FULL_SCREEN;
-        if (next == scopeFullScreen) { return; }
-        scopeFullScreen = next;
-        visualiser.setFullScreen(scopeFullScreen);
-        resized();
+        setScopeFullScreen(next);
     });
     scopeTools.canvas.onClick = [this] {
         auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize(), processor.document.mainProject().frameRate);
@@ -892,15 +889,24 @@ void MotionEditor::resized() {
         sceneEditor->setBounds(viewportBounds);
         for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
     }
-    // Full screen, the Scope covers everything with its own control row.
+    // Full screen, the Scope covers everything; its strip stays at the top
+    // right, with the recording stopwatch beside it.
     if (scopeFullScreen) {
-        scopeTools.setVisible(false);
         visualiser.setBounds(getLocalBounds());
         visualiser.toFront(false);
+        scopeTools.setVisible(true);
+        scopeTools.setBounds(getWidth() - 8 - scopeTools.preferredWidth(), 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
+        scopeTools.toFront(false);
+        if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
+            const auto width = visualiser.controlsPreferredWidth();
+            visualiserControls->setBounds(scopeTools.getX() - 8 - width, 8, width, 24);
+            visualiserControls->toFront(false);
+        }
     }
 }
 
 void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
+    if (scopeFullScreen) { return; }
     // Every panel has the same rounded corners, whatever its content paints.
     const auto scope = outputHeader.getBounds().getUnion(visualiser.getBounds());
     graphics.setColour(motion::style::background());
@@ -1026,6 +1032,17 @@ void MotionEditor::dismissPopover(juce::Component* content) {
     if (content == nullptr) { return; }
     auto* box = content->findParentComponentOfClass<juce::CallOutBox>();
     if (box != nullptr) { box->dismiss(); }
+}
+
+// Full screen, the Scope covers the window and keeps Motion's strip; the
+// visualiser's own full-screen mode would bring back its built-in row.
+void MotionEditor::setScopeFullScreen(bool value) {
+    if (value == scopeFullScreen) { return; }
+    scopeFullScreen = value;
+    scopeTools.fullScreen.setIcon(value ? motion::icons::Icon::fullscreenExit : motion::icons::Icon::fullscreen);
+    scopeTools.fullScreen.setTooltip(value ? "Exit full screen (Esc)" : "Full screen");
+    resized();
+    if (value) { visualiser.grabKeyboardFocus(); }
 }
 
 void MotionEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
@@ -2009,6 +2026,10 @@ void MotionEditor::refreshInspector() {
 }
 
 bool MotionEditor::keyPressed(const juce::KeyPress& key) {
+    if (scopeFullScreen && key == juce::KeyPress::escapeKey) {
+        setScopeFullScreen(false);
+        return true;
+    }
     for (const auto& command : commands) {
         if (command.key.isValid() && command.key == key) {
             command.action();

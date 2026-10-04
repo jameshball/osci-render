@@ -230,6 +230,7 @@ private:
     juce::Component::SafePointer<juce::CallOutBox> popover;
     // The Scope filling the window (its full-screen control or Escape).
     bool scopeFullScreen = false;
+    void setScopeFullScreen(bool value);
     juce::TextButton sceneView { "Views" };
     void showSceneViewMenu(bool atMouse);
 
