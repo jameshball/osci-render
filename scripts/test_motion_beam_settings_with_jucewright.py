@@ -102,7 +102,7 @@ def open_project():
 
 
 def open_settings():
-    step("open beam settings", "click", "--name", "settings", "--class", "osci::SvgButton", "--exact")
+    step("open beam settings", "click", "--name", "Scope settings", "--exact")
 
 
 def close_settings():

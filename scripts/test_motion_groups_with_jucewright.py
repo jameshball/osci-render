@@ -46,7 +46,7 @@ def snapshot():
 
 
 def wait_undo(text):
-    command("wait-for-locator", "--name", "Undo " + text, "--role", "label", "--exact")
+    session.wait_for_undo(text)
 
 
 def header_id(label):

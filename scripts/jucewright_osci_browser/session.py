@@ -142,6 +142,29 @@ class BrowserSession:
         self.log(f"OK  {label} -> {file}")
         return True
 
+    def wait_for_undo(self, description: str, timeout: float = 10.0) -> None:
+        """Waits for the undo button's description, shown or not: osci-motion
+        hides it in narrow windows rather than wrapping it."""
+        wanted = "Undo " + description
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            result = subprocess.run(self.cli("snapshot", "--json", "--full", "--include-hidden"), capture_output=True, text=True)
+            stack = []
+            try:
+                stack = [json.loads(result.stdout)]
+            except ValueError:
+                pass
+            while stack:
+                node = stack.pop()
+                if isinstance(node, dict):
+                    if node.get("name") == wanted and node.get("role") == "label":
+                        return
+                    stack.extend(node.values())
+                elif isinstance(node, list):
+                    stack.extend(node)
+            time.sleep(0.1)
+        raise RuntimeError("Timed out waiting for " + wanted)
+
     def run_step(self, label: str, action) -> bool:
         return self.step_action(label, action, True)
 

@@ -56,6 +56,9 @@ def beam(label):
     # Exclude beam toolbar controls and panel edges. Pixel checks establish
     # signal presence/absence, not frequency or perceptual drawing quality.
     picture = Image.open(path).convert("RGB")
+    # The Scope's floating tool strip sits over the picture's top right.
+    tools = find("MotionScopeToolbar")["bounds"]
+    picture.paste((0, 0, 0), (tools["x"], tools["y"], tools["x"] + tools.get("width", tools.get("w")), tools["y"] + tools.get("height", tools.get("h"))))
     width, height = box.get("width", box.get("w")), box.get("height", box.get("h"))
     region = picture.crop((box["x"] + 20, box["y"] + 20,
                            box["x"] + width - 20, box["y"] + height - 40))

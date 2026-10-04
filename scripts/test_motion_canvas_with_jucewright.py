@@ -51,7 +51,7 @@ try:
     root = ET.fromstring(raw[8:8 + struct.unpack('<I', raw[4:8])[0]])
     command('wait-for-value', '--component-name', 'Composition name', '--hidden', '--value', root.find('composition').get('name'), '--timeout-ms', 120000)
     step('compact workspace', 'resize-window', '--w', 1200, '--h', 800)
-    step('canvas entry', 'click', '--component-name', 'Output canvas', '--class', 'juce::TextButton', '--exact')
+    step('canvas entry', 'click', '--name', 'Output canvas', '--exact')
     step('portrait preset', 'select-option', '--name', 'Canvas preset', '--exact', '--index', 3)
     step('portrait width', 'wait-for-value', '--name', 'Video width', '--class', 'juce::TextEditor', '--exact', '--value', '1080')
     step('portrait height', 'wait-for-value', '--name', 'Video height', '--class', 'juce::TextEditor', '--exact', '--value', '1920')

@@ -68,10 +68,10 @@ try:
     command("wait-for-locator", "--name", "Source text", "--class", "juce::TextEditor", "--exact")
     step("edit multiline text", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RETURN\nTOGETHER")
     step("choose font", "select-option", "--name", "Text font family", "--class", "juce::ComboBox", "--exact", "--text", FONT)
-    step("choose bold", "select-option", "--name", "Text font style", "--class", "juce::ComboBox", "--exact", "--text", "Bold")
-    step("centre title", "select-option", "--name", "Text alignment", "--class", "juce::ComboBox", "--exact", "--text", "Centre")
-    step("set line spacing", "set-value", "--name", "Text line spacing", "--role", "slider", "1.8")
-    step("set tracking", "set-value", "--name", "Text tracking", "--role", "slider", "0.15")
+    step("choose bold", "click", "--name", "Bold", "--exact")
+    step("centre title", "click", "--name", "Align centre", "--exact")
+    step("set line spacing", "set-value", "--component-name", "Text line spacing", "--exact", "1.8")
+    step("set tracking", "set-value", "--component-name", "Text tracking", "--exact", "0.15")
     step("text editor", "screenshot", "--file", session.artifact_dir / "text-editor.png")
     step("apply text", "click", "--name", "Apply text", "--exact")
     command("wait-for-locator", "--name", "Undo Edit text source", "--class", "juce::Label", "--exact")
@@ -84,7 +84,7 @@ try:
     oversized_geometry = "MW" * 8000
     step("draft exceeding geometry budget", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", oversized_geometry)
     step("apply excessive geometry", "click", "--name", "Apply text", "--exact")
-    command("wait-for-locator", "--component-name", "Text preparation error", "--role", "label", "--exact", "--timeout-ms", 15000)
+    command("wait-for-value", "--component-name", "Text status", "--value", "Too detailed to prepare: try a simpler font or shorter text.", "--timeout-ms", 15000)
     state = json.loads(command("snapshot", "--json", "--full"))
     def nodes(value):
         if isinstance(value, dict):
@@ -97,7 +97,7 @@ try:
     fields = list(nodes(state))
     assert any(node.get("componentName") == "Source text" and node.get("value") == oversized_geometry for node in fields)
     assert any(node.get("componentName") == "Text font family" and node.get("value") == FONT for node in fields)
-    assert any(node.get("componentName") == "Text preparation error" and "too detailed" in str(node.get("value")) for node in fields)
+    assert any(node.get("componentName") == "Text status" and "too detailed" in str(node.get("value")).lower() for node in fields)
     step("recover shorter title", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "RECOVERED\nTITLE")
     step("retained formatting and error", "screenshot", "--file", session.artifact_dir / "text-recovery.png")
     step("apply recovered title", "click", "--name", "Apply text", "--exact")
@@ -113,7 +113,7 @@ try:
     assert saved_asset() == after
     step("open text to cancel", "click", "--name", "Edit text...", "--exact")
     step("unapplied edit", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", "DO NOT APPLY")
-    step("dismiss edit", "click", "--name", "Close icon", "--exact")
+    step("dismiss edit", "click", "--name", "Cancel", "--class", "juce::TextButton", "--exact")
     assert saved_asset() == after
     # Launch a fresh process so this verifies persisted source content.
     session.keep_app = False
@@ -126,7 +126,7 @@ try:
     step("reopen saved text", "click", "--name", "Edit text...", "--exact")
     snapshot = command("snapshot", "--json", "--full")
     assert "RETURN" in snapshot and "TOGETHER" in snapshot and "DO NOT APPLY" not in snapshot
-    step("close verified text", "click", "--name", "Close icon", "--exact")
+    step("close verified text", "click", "--name", "Cancel", "--class", "juce::TextButton", "--exact")
     command("wait", "--ms", 600)
     assert len(saved_clips()) == 2
     step("edited text output", "screenshot", "--file", session.artifact_dir / "text-output.png")

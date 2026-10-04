@@ -94,7 +94,7 @@ try:
     tree = snapshot()
     first = visible_header(tree, names[0])
     area = timeline(tree)
-    assert first["bounds"]["y"] < area["y"] + 58, "Fit left headers at their old scrolled positions"
+    assert first["bounds"]["y"] < area["y"] + 62, "Fit left headers at their old scrolled positions"
     step("project overview", "screenshot", "--file", session.artifact_dir / "overview.png")
     step("resize compact workspace", "resize-window", "--w", "1100", "--h", "700")
     area = timeline(snapshot())

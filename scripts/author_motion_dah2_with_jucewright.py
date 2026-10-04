@@ -281,7 +281,7 @@ def setup():
     subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "dah", "--timeout-ms", 30000)
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
-    step("canvas", "click", "--component-name", "Output canvas", "--class", "juce::TextButton", "--exact")
+    step("canvas", "click", "--name", "Output canvas", "--exact")
     step("landscape", "select-option", "--name", "Canvas preset", "--exact", "--index", 2)
     step("apply canvas", "click", "--name", "Apply canvas", "--exact")
     # The track starts 0.15 s before its first downbeat: slip it so bars fall on 1.6 s.

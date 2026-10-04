@@ -69,13 +69,13 @@ try:
     # Text: rise in, character by character.
     step("import text", "drop-files", "--file", title, "--class", "MotionEditor", "--exact")
     wait_undo("Import object")
-    step("edit text", "click", "--name", "Edit text...", "--exact")
-    command("wait-for-locator", "--name", "Text animation", "--class", "juce::ComboBox", "--exact", "--timeout-ms", 10000)
-    step("rise", "select-option", "--name", "Text animation", "--class", "juce::ComboBox", "--exact", "--text", "Rise")
-    step("stagger", "set-value", "--name", "Text animation stagger", "--role", "slider", "0.1")
+    # Per-character animation lives in the text clip's Properties.
+    command("wait-for-locator", "--name", "Text animation Rise", "--exact", "--timeout-ms", 10000)
+    step("rise", "click", "--name", "Text animation Rise", "--exact")
+    wait_undo("Animate text")
+    step("stagger", "set-value", "--component-name", "Text animation Stagger", "--exact", "0.1")
+    command("wait", "--ms", 1500)
     step("text panel", "screenshot", "--file", session.artifact_dir / "text-panel.png")
-    step("apply text", "click", "--name", "Apply text", "--exact")
-    wait_undo("Edit text source")
     typography = saved().find("asset/typography")
     assert typography is not None and typography.get("animation") == "2" and float(typography.get("characterDelay")) == 0.1, typography.attrib if typography is not None else None
     # Lua: bake, then animate slider A from the inspector.

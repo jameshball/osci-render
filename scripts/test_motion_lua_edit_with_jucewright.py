@@ -95,7 +95,7 @@ try:
     assert saved_asset() == after
     step("open source for cancellation", "click", "--name", "Edit Lua...", "--exact")
     step("unapplied edit", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", "return {0,0}")
-    step("discard unapplied draft", "click", "--name", "Close icon", "--exact")
+    step("discard unapplied draft", "click", "--name", "Cancel", "--class", "juce::TextButton", "--exact")
     assert saved_asset() == after
     session.keep_app = False
     session.launch_app("lua-reopen")
@@ -108,7 +108,7 @@ try:
     snapshot = command("snapshot", "--json", "--full")
     assert revised in snapshot and "Keep this draft" not in snapshot
     step("reopened editor", "screenshot", "--file", session.artifact_dir / "lua-reopened.png")
-    step("close editor", "click", "--name", "Close icon", "--exact")
+    step("close editor", "click", "--name", "Cancel", "--class", "juce::TextButton", "--exact")
     step("edited Lua output", "screenshot", "--file", session.artifact_dir / "lua-output.png")
     print("Shared Lua editing, failed draft recovery, undo/redo, cancel and reopen passed", flush=True)
 finally:
