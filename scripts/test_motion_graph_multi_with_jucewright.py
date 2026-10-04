@@ -140,8 +140,8 @@ try:
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     timeline = find(lambda n: n.get("class") == "MotionTimelineView")["bounds"]
     step("fit timeline", "press", "F", "--class", "MotionTimelineView")
-    pps = (timeline["w"] - 170 - 20) / 8.0
-    step("select clip", "click", "--class", "MotionTimelineView", "--position", f"{170 + round(0.5 * pps)},64")
+    pps = (timeline["w"] - 220 - 20) / 8.0
+    step("select clip", "click", "--class", "MotionTimelineView", "--position", f"{220 + round(0.5 * pps)},64")
     step("open graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     graph = find(lambda n: n.get("class") == "MotionCurveEditor")["bounds"]
     model = {name: list(curve) for name, curve in AUTHORED.items()}

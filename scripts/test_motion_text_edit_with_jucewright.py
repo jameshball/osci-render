@@ -131,7 +131,7 @@ try:
     assert len(saved_clips()) == 2
     step("edited text output", "screenshot", "--file", session.artifact_dir / "text-output.png")
     shared = saved_asset()
-    step("open second clip menu", "click", "--class", "MotionTimelineView", "--position", "600,68", "--button", "right")
+    step("open second clip menu", "click", "--class", "MotionTimelineView", "--position", "650,68", "--button", "right")
     step("make second source unique", "click", "--name", "Make this clip's source unique", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Undo Make source unique", "--class", "juce::Label", "--exact")
     isolated_clips = saved_clips()

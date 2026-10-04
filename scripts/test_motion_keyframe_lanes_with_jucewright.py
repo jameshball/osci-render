@@ -87,8 +87,8 @@ try:
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     timeline = find(lambda n: n.get("class") == "MotionTimelineView")["bounds"]
     step("fit", "press", "F", "--class", "MotionTimelineView")
-    pps = (timeline["w"] - 170 - 20) / 8.0
-    x_of = lambda t: 170 + round(t * pps)
+    pps = (timeline["w"] - 220 - 20) / 8.0
+    x_of = lambda t: 220 + round(t * pps)
     step("select keyed clip", "click", "--class", "MotionTimelineView", "--position", f"{x_of(0.5)},64")
     step("show lanes", "press", "U", "--class", "MotionTimelineView")
     lane_y = 48 + 32 + 11

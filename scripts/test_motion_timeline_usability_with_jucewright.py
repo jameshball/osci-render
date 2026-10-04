@@ -152,8 +152,8 @@ try:
 
     # Drop a file onto the second track's empty stretch at about 13 s.
     area = timeline_bounds()
-    pixels = (area["w"] - 170 - 20) / 20
-    x = 170 + round(13 * pixels)
+    pixels = (area["w"] - 220 - 20) / 20
+    x = 220 + round(13 * pixels)
     # Jucewright places a file drop relative to the drop target (the editor).
     step("drop on track", "drop-files", "--file", extra, "--class", "MotionEditor", "--exact", "--position", f"{area['x'] + x},{area['y'] + track_row(20) + 16}")
     command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact", "--timeout-ms", 30000)
@@ -165,7 +165,7 @@ try:
 
     # Box-select from empty space over the third track, then delete and undo.
     row = track_row(30) + 16
-    step("box select", "drag", "--class", "MotionTimelineView", "--position", f"{170 + round(19 * pixels)},{row}", "--dx", -round(18 * pixels), "--dy", 2, "--steps", 8)
+    step("box select", "drag", "--class", "MotionTimelineView", "--position", f"{220 + round(19 * pixels)},{row}", "--dx", -round(18 * pixels), "--dy", 2, "--steps", 8)
     step("delete boxed", "press", "Delete", "--class", "MotionTimelineView")
     assert len(track(saved(), 30).findall("clip")) == 0
     step("undo delete", "click", "--name", "Undo", "--exact")
@@ -183,7 +183,7 @@ try:
     # The Graph's channel list: the first clip's weight is keyed; the filter
     # hides the rest.
     seek(1)
-    step("select first clip", "click", "--class", "MotionTimelineView", "--position", f"{170 + round(1 * pixels)},{track_row(10) + 16}")
+    step("select first clip", "click", "--class", "MotionTimelineView", "--position", f"{220 + round(1 * pixels)},{track_row(10) + 16}")
     step("graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     command("wait-for-locator", "--name", "Curve Drawing weight", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
     # Only animated channels are listed until the filter is switched off.

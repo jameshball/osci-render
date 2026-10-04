@@ -87,10 +87,10 @@ try:
     assert len(state.findall("asset")) == 2
     assert all(float(clip.get("duration")) == 2 for clip in state.findall("track/clip"))
     assert all(asset.find("video-cache") is not None for asset in state.findall("asset"))
-    step("early video frame", "click", "--class", "MotionTimelineView", "--position", "190,12")
+    step("early video frame", "click", "--class", "MotionTimelineView", "--position", "240,12")
     command("wait", "--ms", "500")
     step("early frame screenshot", "screenshot", "--file", session.artifact_dir / "early-video.png")
-    step("late video frame", "click", "--class", "MotionTimelineView", "--position", "290,12")
+    step("late video frame", "click", "--class", "MotionTimelineView", "--position", "340,12")
     command("wait", "--ms", "500")
     step("late frame screenshot", "screenshot", "--file", session.artifact_dir / "late-video.png")
     step("edit video source", "click", "--name", "Video settings...", "--exact")

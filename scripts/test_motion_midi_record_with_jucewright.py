@@ -105,7 +105,7 @@ try:
     step("select virtual MIDI input", "select-option", "--class", device_list, "--exact", "--index", str(source.source_index()))
     step("enable virtual MIDI input", "press", "Return", "--class", device_list, "--exact")
     step("close input settings", "click", "--name", "Close icon", "--exact")
-    step("select clip", "click", "--class", "MotionTimelineView", "--position", "190,77")
+    step("select clip", "click", "--class", "MotionTimelineView", "--position", "240,77")
     step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
 
     # Take 1: two notes, the second held by sustain past its note-off.

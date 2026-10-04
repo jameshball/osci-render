@@ -69,7 +69,7 @@ try:
     step("fit", "press", "F", "--class", "MotionTimelineView")
     # Two cameras show the camera band below the ruler (26-48 px).
     step("band", "screenshot", "--file", session.artifact_dir / "band.png")
-    step("cut menu", "click", "--class", "MotionTimelineView", "--position", "600,37", "--button", "right")
+    step("cut menu", "click", "--class", "MotionTimelineView", "--position", "650,37", "--button", "right")
     step("cut submenu", "click", "--name", "Cut to camera here", "--role", "menuItem", "--exact")
     step("cut to side", "click", "--name", "Side", "--role", "menuItem", "--exact")
     wait_undo("Cut to camera")
@@ -78,14 +78,14 @@ try:
     assert cut is not None and cut.get("camera") == "10", ET.tostring(tree)
     start = float(cut.get("start"))
     # Delete the cut with the keyboard after selecting it.
-    step("select cut", "click", "--class", "MotionTimelineView", "--position", "700,37")
+    step("select cut", "click", "--class", "MotionTimelineView", "--position", "750,37")
     step("delete cut", "press", "Delete", "--class", "MotionTimelineView")
     wait_undo("Remove camera cut")
     assert saved().find("cameraCut") is None
     step("undo cut delete", "click", "--name", "Undo", "--exact")
     assert saved().find("cameraCut") is not None
     # A tempo change at beat 9 (the clip's second beat) from the ruler.
-    step("tempo menu", "click", "--class", "MotionTimelineView", "--position", "400,12", "--button", "right")
+    step("tempo menu", "click", "--class", "MotionTimelineView", "--position", "450,12", "--button", "right")
     step("add tempo", "click", "--name", "Add tempo change here...", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Tempo change BPM", "--timeout-ms", 10000)
     step("bpm", "fill", "--name", "Tempo change BPM", "--class", "juce::TextEditor", "--exact", "60")
@@ -99,7 +99,7 @@ try:
     step("tempo", "screenshot", "--file", session.artifact_dir / "tempo.png")
     # Aim the front camera at the clip: select it in the Cameras band (under
     # the markers and tempo band), then edit it in Properties.
-    step("select camera", "click", "--class", "MotionTimelineView", "--position", "300,59")
+    step("select camera", "click", "--class", "MotionTimelineView", "--position", "350,59")
     step("look at", "select-option", "--name", "Camera look at", "--text", "On the beat")
     wait_undo("Change camera rig")
     camera = next(c for c in saved().iter("camera") if c.get("id") == "9")

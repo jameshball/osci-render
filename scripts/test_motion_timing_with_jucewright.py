@@ -103,7 +103,7 @@ try:
     choose("1 beat", "Beat grid")
     # The playhead moves freely: away from clip edges, keys, markers and the
     # loop, a ruler click is not pulled to the beat grid, even with snapping on.
-    step("seek between beats", "click", "--class", "MotionTimelineView", "--position", "200,12")
+    step("seek between beats", "click", "--class", "MotionTimelineView", "--position", "250,12")
     position("1.1.823")
     step("musical ruler screenshot", "screenshot", "--file", session.artifact_dir / "beat-timeline.png")
     choose("Seconds")
@@ -124,7 +124,7 @@ try:
     choose("24 fps", "Frame rate")
     choose("Frames")
     step("show frame timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("seek frame", "click", "--class", "MotionTimelineView", "--position", "230,12")
+    step("seek frame", "click", "--class", "MotionTimelineView", "--position", "280,12")
     position("21f")
     step("frame ruler screenshot", "screenshot", "--file", session.artifact_dir / "frame-timeline.png")
     # Undo reverts the frame rate but keeps the display, like any view option.

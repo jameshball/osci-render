@@ -107,7 +107,7 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Motion path study", "--timeout-ms", 10000)
     step("mute isolated test output", "press", "command + shift + m", "--class", "MotionEditor")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
-    step("select path object clip", "click", "--class", "MotionTimelineView", "--position", "200,68")
+    step("select path object clip", "click", "--class", "MotionTimelineView", "--position", "250,68")
     step("show selected motion path", "click", "--component-name", "Show motion path", "--exact")
     step("motion path screenshot", "screenshot", "--file", session.artifact_dir / "motion-path.png")
     composition = next(node for node in nodes(snapshot()) if node.get("class") == "MotionCompositionView")

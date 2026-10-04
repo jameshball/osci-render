@@ -91,7 +91,7 @@ try:
     session.open_project(project)
     command("wait-for-locator", "--name", "Timing verification", "--class", "juce::Label", "--exact")
     step("size timing workspace", "resize-window", "--w", "1440", "--h", "900")
-    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "250,68")
+    step("select first clip", "click", "--class", "MotionTimelineView", "--position", "300,68")
     edit("Clip duration", 8)
     _, clips = saved()
     assert float(clips['3'].get('duration')) == 8
@@ -115,7 +115,7 @@ try:
     command("wait-for-locator", "--name", "Enter a finite number.", "--exact")
     _, clips = saved()
     assert float(clips['3'].get('offset')) == 1.25
-    step("select second clip", "click", "--class", "MotionTimelineView", "--position", "920,68")
+    step("select second clip", "click", "--class", "MotionTimelineView", "--position", "970,68")
     # Timing stays in the inspector while changing the selected timeline clip.
     command("wait-for-locator", "--name", "Clip timing inspector", "--exact")
     edit("Clip duration", 180)
@@ -123,7 +123,7 @@ try:
     assert float(clips['4'].get('duration')) == 180
     assert float(result.find('composition').get('duration')) == 190
     assert float(clips['3'].get('duration')) == 8
-    step("preview long clip", "click", "--class", "MotionTimelineView", "--position", "1010,12")
+    step("preview long clip", "click", "--class", "MotionTimelineView", "--position", "1060,12")
     step("timing inspector", "screenshot", "--file", session.artifact_dir / "timing.png")
     step("compact timing workspace", "resize-window", "--w", "1100", "--h", "700")
     step("compact timing inspector", "screenshot", "--file", session.artifact_dir / "compact.png")
@@ -150,13 +150,13 @@ try:
     # The 1100px workspace gives 904px for 180 seconds plus the 20px margin.
     tree = json.loads(command("snapshot", "--json", "--full"))
     area = find(tree, "MotionTimelineView")["bounds"]
-    pps = (area["w"] - 170 - 20) / 180
-    at_duplicate = 170 + round(17.5 * pps)
+    pps = (area["w"] - 220 - 20) / 180
+    at_duplicate = 220 + round(17.5 * pps)
     step("open duplicate clip menu", "click", "--class", "MotionTimelineView", "--position", f"{at_duplicate},68", "--button", "right")
     step("duplicate from menu", "click", "--name", "Duplicate clip", "--role", "menuItem", "--exact")
     _, clips = saved()
     assert len(clips) == 4 and sorted(float(c.get('start')) for c in clips.values()) == [2, 10, 15, 20]
-    first_x = 170 + round(6 * pps)
+    first_x = 220 + round(6 * pps)
     step("select occupied repeat target", "click", "--class", "MotionTimelineView", "--position", f"{first_x},68")
     step("reject overlapping duplicate", "press", "command + d", "--class", "MotionTimelineView")
     command("wait-for-locator", "--name", "Cannot edit timeline", "--exact")

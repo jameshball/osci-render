@@ -62,17 +62,17 @@ try:
     source = asset["bounds"]
     target = timeline["bounds"]
     step("drag reusable asset", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
-         target["x"] + 170 + 6 * 70, target["y"] + 68, "--steps", 20)
+         target["x"] + 220 + 6 * 70, target["y"] + 68, "--steps", 20)
     command("wait-for-locator", "--name", "Undo Add object clip", "--role", "label", "--exact")
     step("asset placement screenshot", "screenshot", "--file", session.artifact_dir / "motion-asset-placement.png")
     step("undo asset placement", "click", "--name", "Undo", "--exact")
-    step("select original clip", "click", "--class", "MotionTimelineView", "--position", "250,68")
+    step("select original clip", "click", "--class", "MotionTimelineView", "--position", "300,68")
     step("choose slip tool", "press", "S", "--class", "MotionTimelineView")
-    step("slip clip", "drag", "--class", "MotionTimelineView", "--position", "250,68", "--dx", 70, "--dy", 0)
+    step("slip clip", "drag", "--class", "MotionTimelineView", "--position", "300,68", "--dx", 70, "--dy", 0)
     command("wait-for-locator", "--name", "Undo Slip clip", "--role", "label", "--exact")
     step("undo slip", "click", "--name", "Undo", "--exact")
     step("choose stretch tool", "press", "R", "--class", "MotionTimelineView")
-    step("stretch clip", "drag", "--class", "MotionTimelineView", "--position", "250,68", "--dx", 70, "--dy", 0)
+    step("stretch clip", "drag", "--class", "MotionTimelineView", "--position", "300,68", "--dx", 70, "--dy", 0)
     command("wait-for-locator", "--name", "Undo Stretch clip", "--role", "label", "--exact")
     step("undo stretch", "click", "--name", "Undo", "--exact")
     step("choose move tool", "press", "V", "--class", "MotionTimelineView")
@@ -85,20 +85,20 @@ try:
     step("undo graph deletion", "click", "--name", "Undo", "--exact")
     before_resize = json.loads(command("snapshot", "--json", "--full"))
     preview_before = find_node(before_resize, lambda node: node.get("class") == "MotionCompositionView")["bounds"]
-    step("resize preview panes", "drag", "--name", "Resize preview panels", "--class", "osci::PanelDivider", "--exact", "--position", "3,20", "--dx", 60, "--dy", 0)
+    step("resize preview panes", "drag", "--name", "Resize preview panels", "--class", "MotionDivider", "--exact", "--position", "3,20", "--dx", 60, "--dy", 0)
     after_resize = json.loads(command("snapshot", "--json", "--full"))
     preview_after = find_node(after_resize, lambda node: node.get("class") == "MotionCompositionView")["bounds"]
     if preview_after["w"] <= preview_before["w"] + 40:
         raise RuntimeError("Preview divider did not resize the composition panel")
     graph_before = find_node(after_resize, lambda node: node.get("class") == "MotionCurveEditor")["bounds"]
-    step("resize timeline pane", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -30)
+    step("resize timeline pane", "drag", "--name", "Resize timeline", "--class", "MotionDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -30)
     after_resize = json.loads(command("snapshot", "--json", "--full"))
     graph_after = find_node(after_resize, lambda node: node.get("class") == "MotionCurveEditor")["bounds"]
     if graph_after["h"] <= graph_before["h"] + 20:
         raise RuntimeError("Timeline divider did not resize the animation panel")
     # The Cameras band's plus adds a camera at the playhead and edits it in Properties.
     step("show timeline for cameras", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("add camera", "click", "--class", "MotionTimelineView", "--position", "154,37")
+    step("add camera", "click", "--class", "MotionTimelineView", "--position", "204,37")
     command("wait-for-locator", "--name", "Undo Add camera", "--role", "label", "--exact")
     step("key camera", "click", "--name", "Key position", "--exact")
     command("wait-for-locator", "--name", "Undo Set keyframe", "--role", "label", "--exact")
@@ -110,9 +110,9 @@ try:
     command("wait-for-locator", "--name", "spinning_squares.lottie", "--role", "listItem", "--exact", "--timeout-ms", 120000)
     command("wait-for-locator", "--name", "spinning_squares.lottie", "--role", "label", "--exact")
     step("show animated timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("scrub animation first pose", "click", "--class", "MotionTimelineView", "--position", "190,12")
+    step("scrub animation first pose", "click", "--class", "MotionTimelineView", "--position", "240,12")
     step("animated first pose", "screenshot", "--file", session.artifact_dir / "motion-animation-first.png")
-    step("scrub animation second pose", "click", "--class", "MotionTimelineView", "--position", "225,12")
+    step("scrub animation second pose", "click", "--class", "MotionTimelineView", "--position", "275,12")
     step("animated second pose", "screenshot", "--file", session.artifact_dir / "motion-animation-second.png")
     step("undo animation import", "click", "--name", "Undo", "--exact")
     tree = json.loads(command("snapshot", "--json", "--full"))

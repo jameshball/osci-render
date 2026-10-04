@@ -84,9 +84,9 @@ try:
     wait_undo("Change modulator")
     step("library", "screenshot", "--file", session.artifact_dir / "library.png")
     # Route it into the leader's position y from the graph column.
-    step("select leader", "click", "--class", "MotionTimelineView", "--position", "300,64")
+    step("select leader", "click", "--class", "MotionTimelineView", "--position", "350,64")
     step("graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
-    step("taller graph", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
+    step("taller graph", "drag", "--name", "Resize timeline", "--class", "MotionDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
     step("all channels", "click", "--name", "Animated channels only", "--exact")
     step("choose position y", "click", "--name", "Curve Position Y", "--exact")
     # Dragging the LFO's card onto the Y field in Properties routes it there.
@@ -110,7 +110,7 @@ try:
     wait_undo("Change route")
     # Link the follower's position x to the leader's, delayed by half a second.
     step("timeline for follower", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("select follower", "click", "--class", "MotionTimelineView", "--position", "300,96")
+    step("select follower", "click", "--class", "MotionTimelineView", "--position", "350,96")
     step("graph for follower", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
     step("choose position x", "click", "--name", "Curve Position X", "--exact")
     step("link menu", "click", "--name", "Link property", "--exact")
@@ -129,7 +129,7 @@ try:
     assert link is not None and link.get("source") == "3" and link.get("property") == "position.x" and float(link.get("delay")) == 0.5, ET.tostring(linked)
     # A spatial path for the leader, from the inspector's Position row.
     step("timeline for leader", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
-    step("select leader again", "click", "--class", "MotionTimelineView", "--position", "300,64")
+    step("select leader again", "click", "--class", "MotionTimelineView", "--position", "350,64")
     step("spatial path", "click", "--name", "Spatial path", "--exact")
     wait_undo("Use spatial path")
     clip, _ = clip_property(saved(), 3, "position.x")

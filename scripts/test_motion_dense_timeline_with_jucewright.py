@@ -113,9 +113,9 @@ try:
     full_rows, partial = divmod(area["h"] - 48 - 12, 32)
     assert partial >= 4, "Fixture needs a partially visible bottom row"
     # Fit uses a 20px right margin and the project's 180-second duration.
-    pps = (area["w"] - 170 - 20) / 180
+    pps = (area["w"] - 220 - 20) / 180
     row_y = 48 + full_rows * 32 + partial // 2
-    middle = 170 + round(2.5 * pps)
+    middle = 220 + round(2.5 * pps)
     step("move partial-row clip horizontally", "drag", "--class", "MotionTimelineView", "--position", f"{middle},{row_y}", "--dx", "100", "--dy", "0", "--steps", "12")
     step("save partial-row edit", "press", "command + s", "--class", "MotionEditor")
     moved_data = project.read_bytes()

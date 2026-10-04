@@ -93,7 +93,7 @@ try:
     wait_undo("Add Rotate")
     step("rotate track", "set-value", "--component-name", "Effect rotateZ", "--exact", "0.2")
     # With nothing selected, effects apply to the whole composition.
-    step("select nothing", "click", "--class", "MotionTimelineView", "--position", "700,140")
+    step("select nothing", "click", "--class", "MotionTimelineView", "--position", "750,140")
     command("wait-for-value", "--component-name", "Inspector title", "--value", "Composition")
     step("add composition ripple", "click", tile("Ripple")["ref"], "--click-count", 2)
     wait_undo("Add Ripple")
