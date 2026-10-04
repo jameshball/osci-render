@@ -21,11 +21,13 @@ public:
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
-        setGroups({{&move, &rotate, &scale}, {&path, &fly, &frame}, {&lookThrough}});
+        keyCamera.setTooltip("Key the camera at the playhead: position, rotation and lens");
+        setGroups({{&move, &rotate, &scale}, {&path, &fly, &frame}, {&lookThrough, &keyCamera}});
         lookThrough.setEnabled(false);
+        keyCamera.setEnabled(false);
     }
     Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale};
-    Tool lookThrough {"Look through camera", motion::icons::Icon::videocam};
+    Tool lookThrough {"Look through camera", motion::icons::Icon::videocam}, keyCamera {"Key camera", motion::icons::Icon::keyframe};
     Tool path {"Show motion path", motion::icons::Icon::path}, fly {"Navigate composition view", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
     // A short Scene keeps only the transform tools.
     void setCompact(bool value) {
@@ -34,7 +36,7 @@ public:
         for (auto* tool : {&path, &fly, &frame}) { tool->setVisible(!compact); }
         resized();
     }
-    int fullHeight() const { return cell * 7 + groupGap * 2 + inset * 2; }
+    int fullHeight() const { return cell * 8 + groupGap * 2 + inset * 2; }
     bool compact = false;
 };
 

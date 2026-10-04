@@ -337,6 +337,8 @@ private:
                     onModulate(target, property);
                 };
                 row->key.onClick = [this, raw] { toggleKeys(*raw); };
+                // Like Motion's other icon buttons: no focus ring after a click.
+                row->key.setWantsKeyboardFocus(false);
                 if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                     const bool path = row->group == "Position";
                     row->mode = std::make_unique<motion::icons::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);

@@ -188,10 +188,19 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     sceneTools.fly.onClick = [this] { composition.setNavigating(!composition.isNavigating()); };
     composition.onNavigationChanged = [this](bool active) { sceneTools.fly.setToggleState(active, juce::dontSendNotification); };
     sceneTools.frame.onClick = [this] { composition.frameSelection(); };
-    sceneTools.lookThrough.onClick = [this] { composition.setDrivenCamera(sceneTools.lookThrough.getToggleState() ? selection : 0); resized(); };
+    sceneTools.lookThrough.onClick = [this] {
+        composition.setDrivenCamera(sceneTools.lookThrough.getToggleState() ? selection : 0);
+        // A camera that cannot be driven leaves the button off.
+        sceneTools.lookThrough.setToggleState(composition.drivenCamera() != 0, juce::dontSendNotification);
+        resized();
+    };
+    sceneTools.keyCamera.onClick = [this] {
+        composition.toggleCameraKey(toolCamera());
+        refreshCameraTools();
+    };
     composition.onDrivenCameraChanged = [this](motion::Id id) {
         sceneTools.lookThrough.setToggleState(id != 0, juce::dontSendNotification);
-        sceneTools.lookThrough.setEnabled(id != 0 || (selectionIsCamera() && composition.canDriveCamera(selection)));
+        refreshCameraTools();
         resized();
     };
     addAndMakeVisible(sceneView);
@@ -1596,6 +1605,7 @@ void MotionEditor::timerCallback() {
     }
     if (moved) {
         refreshInspector();
+        refreshCameraTools();
         effectStack.updateValues();
     }
 }
@@ -1628,8 +1638,31 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     notesEditor.refresh();
     composition.refresh();
     refreshInspector();
+    refreshCameraTools();
     resized();
     repaint();
+}
+
+// The camera the Scene's camera tools act on: the one looked through, or else
+// the selected one.
+motion::Id MotionEditor::toolCamera() const {
+    const auto& cameras = processor.document.project().cameras;
+    const auto driven = composition.drivenCamera();
+    // A deleted camera stays driven until the Scene's next sync.
+    if (driven != 0 && std::any_of(cameras.begin(), cameras.end(), [driven](const auto& camera) { return camera.id == driven; })) { return driven; }
+    return selectionIsCamera() ? selection : 0;
+}
+
+// Look through and Key camera follow the selection, the playhead and edits;
+// a camera that cannot be looked through says why.
+void MotionEditor::refreshCameraTools() {
+    const auto camera = toolCamera();
+    const auto driven = camera != 0 && camera == composition.drivenCamera();
+    const auto blocker = composition.driveBlocker(camera);
+    sceneTools.lookThrough.setEnabled(driven || blocker.isEmpty());
+    sceneTools.lookThrough.setTooltip(driven || blocker.isEmpty() ? "Look through the selected camera: moving the view moves the camera" : blocker);
+    sceneTools.keyCamera.setEnabled(camera != 0);
+    sceneTools.keyCamera.setToggleState(camera != 0 && composition.cameraKeyed(camera), juce::dontSendNotification);
 }
 
 void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
@@ -1706,8 +1739,8 @@ void MotionEditor::select(motion::Id id) {
     // A free camera can be driven from the Scene until its button is released
     // or another camera is chosen.
     if (camera && composition.drivenCamera() != 0 && composition.drivenCamera() != id) { composition.setDrivenCamera(0); }
-    // Always in the strip, so it keeps its size; usable with a free camera selected.
-    sceneTools.lookThrough.setEnabled(composition.drivenCamera() != 0 || (camera && composition.canDriveCamera(id)));
+    // Always in the strip, so they keep its size; usable with a camera selected.
+    refreshCameraTools();
     selectCurveTarget(id, curvePropertyName, camera);
     refreshInspector();
     resized();

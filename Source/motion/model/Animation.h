@@ -181,6 +181,8 @@ public:
         return std::all_of(keys.begin(), keys.end(), [](const Keyframe& key) { return key.valid(); });
     }
     bool animated() const { return !keys.empty(); }
+    // A key at this time, matched as removeKey and setKeyValue match it.
+    bool hasKeyAt(double time) const { return matchingIndex(time) >= 0; }
     const std::vector<Keyframe>& keyframes() const { return keys; }
     double base = 0.0;
     std::optional<PropertyLink> link;
@@ -251,7 +253,11 @@ private:
         }
     }
     std::vector<Keyframe>::iterator matchingKey(double time) {
-        if (!std::isfinite(time)) { return keys.end(); }
+        const auto index = matchingIndex(time);
+        return index < 0 ? keys.end() : keys.begin() + index;
+    }
+    std::ptrdiff_t matchingIndex(double time) const {
+        if (!std::isfinite(time)) { return -1; }
         const auto sameTime = [time](const Keyframe& key) {
             // Decimal persistence and project-to-source subtraction can differ
             // by a few ULPs. Preserve the authored time, not a frame-sized snap.
@@ -261,9 +267,9 @@ private:
         };
         const auto next = std::lower_bound(keys.begin(), keys.end(), time,
             [](const Keyframe& key, double value) { return key.time < value; });
-        if (next != keys.end() && sameTime(*next)) { return next; }
-        if (next != keys.begin() && sameTime(*(next - 1))) { return next - 1; }
-        return keys.end();
+        if (next != keys.end() && sameTime(*next)) { return next - keys.begin(); }
+        if (next != keys.begin() && sameTime(*(next - 1))) { return next - 1 - keys.begin(); }
+        return -1;
     }
     std::vector<Keyframe> keys;
     std::vector<double> autoSlopes;

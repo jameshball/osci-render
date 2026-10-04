@@ -25,16 +25,12 @@ class MotionTimelineView : public juce::Component, public juce::DragAndDropTarge
 public:
     explicit MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
         setName("Composition timeline");
-        addTrack.setName("Add track");
-        addTrack.setTitle("Add track");
-        addTrack.setTooltip("Add an empty track");
         addTrack.onClick = [this] {
             motion::Track track;
             track.id = processor.document.newId();
             track.name = "Track " + std::to_string(processor.document.project().tracks.size() + 1);
             processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
         };
-        addAndMakeVisible(addTrack);
         snapButton.setName("Snapping");
         snapButton.setTitle("Snapping");
         snapButton.setTooltip("Snapping to the grid, clip edges, markers and the playhead. Hold Alt while dragging to bypass it.");
@@ -55,9 +51,14 @@ public:
             };
             addAndMakeVisible(button);
         }
-        for (auto* button : {&snapButton, &addTrack}) { button->iconSize = 16.0f; }
+        snapButton.iconSize = 16.0f;
         headerArea.setInterceptsMouseClicks(false, true);
         addAndMakeVisible(headerArea);
+        // Add track sits under the last track and scrolls with the list. Its
+        // plus lines up with the grips above, its text with the track names.
+        addTrack.leading = 18;
+        addTrack.gap = 3;
+        headerArea.addAndMakeVisible(addTrack);
         setWantsKeyboardFocus(true);
         // Shortcuts are listed in Help > Keyboard shortcuts rather than a hover wall.
     }
@@ -294,6 +295,12 @@ public:
         const auto& project = processor.document.project();
         ensureTrackRows();
         validateTrackDrag();
+        // A drag whose source went away never says it left.
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+        if (dropPosition.has_value() && (container == nullptr || !container->isDragAndDropActive())) {
+            dropPosition.reset();
+            addTrack.setVisible(true);
+        }
         std::erase_if(headers, [&](const auto& header) {
             return motion::findGroup(project, header->id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) { return track.id == header->id; });
         });
@@ -353,8 +360,7 @@ public:
     void resized() override {
         ensureTrackRows();
         validateTrackDrag();
-        addTrack.setBounds(namesWidth - 26, 2, 22, 22);
-        snapButton.setBounds(namesWidth - 50, 2, 22, 22);
+        snapButton.setBounds(namesWidth - 26, 2, 22, 22);
         // The tool highlights line up with the cards below.
         auto tools = juce::Rectangle<int>(cardInset - 1, 2, 4 * 22, 22);
         for (auto* button : {&selectTool, &slipTool, &stretchTool, &rippleTool}) { button->setBounds(tools.removeFromLeft(22)); }
@@ -379,6 +385,63 @@ public:
             header->setLifted(lifted);
             if (lifted) { header->setVisible(true); header->toFront(false); }
         }
+        // While an asset is dragged below the tracks, the new track's preview
+        // takes this place.
+        addTrack.setVisible(!dropPosition.has_value());
+        addTrack.setBounds(cardInset, rowY(static_cast<int>(rows.size())) - rulerHeight + addTrackGap, addTrack.idealWidth(), addTrackHeight);
+    }
+    // The lifted block floats over every row and header: an opaque card with
+    // a shadow all round, its own rows, and its header drawn in place.
+    void paintOverChildren(juce::Graphics& g) override {
+        // JUCE can skip paint() under opaque children; rows must still be current.
+        ensureTrackRows();
+        validateTrackDrag();
+        if (!trackDrag.has_value()) { return; }
+        juce::Graphics::ScopedSaveState view(g);
+        g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
+        const auto top = liftedTop();
+        const auto block = juce::Rectangle<int>(cardInset, top, getWidth() - cardInset, trackDrag->height - bandGap);
+        const auto shape = [&block](float inset) {
+            const auto area = block.toFloat().reduced(inset);
+            juce::Path path;
+            path.addRoundedRectangle(area.getX(), area.getY(), area.getWidth(), area.getHeight(), cardRadius, cardRadius, true, false, true, false);
+            return path;
+        };
+        // A wide soft shadow and a tight one, so the block reads as lifted
+        // above and below even over the dark rows.
+        juce::DropShadow(juce::Colours::black.withAlpha(.9f), 22, {0, 3}).drawForPath(g, shape(0.0f));
+        juce::DropShadow(juce::Colours::black.withAlpha(.6f), 6, {0, 1}).drawForPath(g, shape(0.0f));
+        g.setColour(osci::Colours::veryDark());
+        g.fillPath(shape(0.0f));
+        {
+            juce::Graphics::ScopedSaveState lifted(g);
+            g.reduceClipRegion(shape(0.0f));
+            g.addTransform(juce::AffineTransform::translation(0.0f, static_cast<float>(top - rowY(trackDrag->first))));
+            for (int visible = trackDrag->first; visible < trackDrag->last; ++visible) { paintRow(g, visible); }
+            // Lifted blocks are a shade lighter, nearer the light.
+            g.setColour(juce::Colours::white.withAlpha(.035f));
+            g.fillAll();
+        }
+        for (auto& header : headers) {
+            if (header->id != trackDrag->id) { continue; }
+            juce::Graphics::ScopedSaveState placed(g);
+            g.setOrigin(headerArea.getPosition() + header->getPosition());
+            header->paintEntireComponent(g, true);
+        }
+        g.setColour(motion::style::accent().withAlpha(.55f));
+        g.strokePath(shape(.75f), juce::PathStrokeType(1.5f));
+        // The scroll bars and playhead stay on top, as over any other row.
+        paintScrollBars(g);
+        paintPlayhead(g);
+    }
+    void paintPlayhead(juce::Graphics& g) const {
+        const auto playhead = timeX(processor.position.load());
+        if (playhead < namesWidth || playhead > getWidth()) { return; }
+        g.setColour(juce::Colour(0xff7de5a0));
+        g.drawVerticalLine(playhead, 0, static_cast<float>(getHeight()));
+        juce::Path head;
+        head.addTriangle(playhead - 5, 0, playhead + 5, 0, playhead, 8);
+        g.fillPath(head);
     }
     bool isInterestedInDragSource(const SourceDetails& details) override {
         const auto description = details.description.toString();
@@ -388,6 +451,7 @@ public:
     void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
     void itemDragMove(const SourceDetails& details) override {
         dropPosition = details.localPosition;
+        addTrack.setVisible(false);
         dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
         dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
         previewEffect(dropEffect.empty() ? 0 : effectOwnerAt(details.localPosition));
@@ -395,6 +459,7 @@ public:
     }
     void itemDragExit(const SourceDetails&) override {
         dropPosition.reset();
+        addTrack.setVisible(true);
         previewEffect(0);
         repaint();
     }
@@ -427,6 +492,7 @@ public:
 
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
+        addTrack.setVisible(true);
         previewEffect(0);
         if (details.description.toString().startsWith("motion-effect:")) {
             insertEffect(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), details.localPosition);
@@ -546,56 +612,11 @@ public:
         stretchTool.setToggleState(tool == Tool::stretch, juce::dontSendNotification);
         rippleTool.setToggleState(tool == Tool::ripple, juce::dontSendNotification);
         const auto& tracks = processor.document.project().tracks;
-        const auto& project = processor.document.project();
         scrollY = std::clamp(scrollY, 0, maximumScrollY());
         g.saveState();
         g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
-        const auto paintRow = [&](int visible) {
-            const auto y = rowY(visible);
-            const auto& row = rows[static_cast<std::size_t>(visible)];
-            const auto height = heightOf(static_cast<std::size_t>(visible));
-            if (row.isLane()) {
-                paintLane(g, row, y, height);
-                return;
-            }
-            // Alternate lanes are faintly lighter; the gap under each card
-            // separates the rows.
-            const auto selectedRow = row.id == selected;
-            const auto cardHeight = height - bandGap;
-            fillCard(g, y, cardHeight, selectedRow ? motion::style::raised().interpolatedWith(motion::style::accent(), .12f) : motion::style::raised(),
-                     visible % 2 == 1 ? std::optional<juce::Colour>(juce::Colours::white.withAlpha(.018f)) : std::nullopt);
-            const auto index = row.track;
-            if (index < 0) {
-                g.setColour(motion::style::raised().withAlpha(0.25f));
-                g.fillRect(namesWidth, y, getWidth() - namesWidth, cardHeight);
-                juce::Graphics::ScopedSaveState summaryScope(g);
-                g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
-                for (const auto& track : tracks) {
-                    auto parent = track.group;
-                    for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
-                        if (parent == row.id) {
-                            g.setColour(motion::style::accent().withAlpha(motion::trackIsAudible(project, track) ? 0.35f : 0.1f));
-                            for (const auto& clip : track.clips) {
-                                const auto timing = clip.timing(project.tempo());
-                                g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + height * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
-                            }
-                            break;
-                        }
-                        const auto* group = motion::findGroup(project, parent);
-                        parent = group != nullptr ? group->parent : 0;
-                    }
-                }
-                return;
-            }
-            juce::Graphics::ScopedSaveState scope(g);
-            g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
-            const auto opacity = !motion::trackIsAudible(project, tracks[static_cast<std::size_t>(index)]) ? 0.38f : 1.0f;
-            for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) {
-                paintClip(g, clip, tracks[static_cast<std::size_t>(index)], index, opacity);
-            }
-        };
-        // A dragged track lifts out of the list; the other rows slide by
-        // their eased offsets, and the lifted block is drawn last.
+        // A dragged track lifts out of the list and the other rows slide by
+        // their eased offsets; paintOverChildren draws the lifted block.
         const auto dragging = trackDrag.has_value();
         // While rows slide (dragging or settling) some come from off screen.
         const auto sliding = dragging || !rowShift.empty();
@@ -605,27 +626,12 @@ public:
             if (dragging && visible >= trackDrag->first && visible < trackDrag->last) { continue; }
             juce::Graphics::ScopedSaveState shifted(g);
             g.addTransform(juce::AffineTransform::translation(0.0f, static_cast<float>(shiftOf(visible))));
-            paintRow(visible);
+            paintRow(g, visible);
             if (dragging && trackDrag->group != 0 && rows[static_cast<std::size_t>(visible)].group() && rows[static_cast<std::size_t>(visible)].id == trackDrag->group) {
                 // The group it will join.
                 g.setColour(motion::style::accent().withAlpha(.7f));
                 g.drawRoundedRectangle(juce::Rectangle<float>(static_cast<float>(cardInset), static_cast<float>(rowY(visible)), static_cast<float>(getWidth() - cardInset), static_cast<float>(heightOf(static_cast<std::size_t>(visible)) - bandGap)).reduced(.75f), cardRadius, 1.5f);
             }
-        }
-        if (dragging) {
-            const auto top = liftedTop();
-            const auto offset = static_cast<float>(top - rowY(trackDrag->first));
-            const auto block = juce::Rectangle<int>(cardInset, top, getWidth() - cardInset, trackDrag->height - bandGap);
-            juce::DropShadow(juce::Colours::black.withAlpha(.6f), 16, {0, 5}).drawForRectangle(g, block);
-            {
-                juce::Graphics::ScopedSaveState lifted(g);
-                g.addTransform(juce::AffineTransform::translation(0.0f, offset));
-                for (int visible = trackDrag->first; visible < trackDrag->last; ++visible) { paintRow(visible); }
-            }
-            juce::Path outline;
-            outline.addRoundedRectangle(block.toFloat().reduced(.75f).getX(), block.toFloat().reduced(.75f).getY(), block.toFloat().reduced(.75f).getWidth(), block.toFloat().reduced(.75f).getHeight(), cardRadius, cardRadius, true, false, true, false);
-            g.setColour(motion::style::accent().withAlpha(.55f));
-            g.strokePath(outline, juce::PathStrokeType(1.5f));
         }
         g.restoreState();
         if (blocked.has_value()) {
@@ -785,14 +791,7 @@ public:
             g.setColour(motion::style::accent().withAlpha(.6f));
             g.drawRect(*clipMarquee);
         }
-        const auto playhead = timeX(processor.position.load());
-        if (playhead >= namesWidth && playhead <= getWidth()) {
-            g.setColour(juce::Colour(0xff7de5a0));
-            g.drawVerticalLine(playhead, 0, static_cast<float>(getHeight()));
-            juce::Path head;
-            head.addTriangle(playhead - 5, 0, playhead + 5, 0, playhead, 8);
-            g.fillPath(head);
-        }
+        paintPlayhead(g);
         if (tracks.empty()) {
             g.setColour(osci::Colours::text().withAlpha(0.55f));
             g.drawText("Drop sources here", getLocalBounds().withTrimmedTop(rulerHeight), juce::Justification::centred);
@@ -1601,8 +1600,13 @@ public:
     }
 
 private:
+    static std::optional<juce::Colour> labelColour(const motion::Track& track) {
+        if (track.label <= 0 || track.label >= static_cast<int>(motion::style::trackLabels().size())) { return std::nullopt; }
+        return juce::Colour(motion::style::trackLabels()[static_cast<std::size_t>(track.label)].argb);
+    }
     juce::Colour clipColour(const motion::Clip& clip, const motion::Track& track) const {
-        if (track.label > 0 && track.label < static_cast<int>(motion::style::trackLabels().size())) { return juce::Colour(motion::style::trackLabels()[static_cast<std::size_t>(track.label)].argb); }
+        const auto label = labelColour(track);
+        if (label.has_value()) { return *label; }
         if (track.kind == motion::TrackKind::audio) { return motion::style::audioClip(); }
         if (clip.composition != 0) { return motion::style::compositionClip(); }
         if (clip.midi != nullptr) { return motion::style::midiClip(); }
@@ -2017,6 +2021,57 @@ private:
     static constexpr float cardRadius = 5.0f;
     int markerBandTop() const { return toolsHeight + bandGap; }
     int cameraBandTop() const { return (showsMarkerBand() ? markerBandTop() + markerBandHeight : toolsHeight) + bandGap; }
+    // One row: a track's or group's card and clips, or a keyframe lane.
+    void paintRow(juce::Graphics& g, int visible) {
+        const auto& project = processor.document.project();
+        const auto& tracks = project.tracks;
+        const auto y = rowY(visible);
+        const auto& row = rows[static_cast<std::size_t>(visible)];
+        const auto height = heightOf(static_cast<std::size_t>(visible));
+        if (row.isLane()) {
+            paintLane(g, row, y, height);
+            return;
+        }
+        // Alternate lanes are faintly lighter; the gap under each card
+        // separates the rows. A label colour tints the whole track.
+        const auto selectedRow = row.id == selected;
+        const auto cardHeight = height - bandGap;
+        const auto index = row.track;
+        const auto label = index >= 0 ? labelColour(tracks[static_cast<std::size_t>(index)]) : std::nullopt;
+        auto card = label.has_value() ? motion::style::raised().interpolatedWith(*label, .45f) : motion::style::raised();
+        if (selectedRow) { card = card.interpolatedWith(motion::style::accent(), .12f); }
+        auto lane = visible % 2 == 1 ? std::optional<juce::Colour>(juce::Colours::white.withAlpha(.018f)) : std::nullopt;
+        if (label.has_value()) { lane = label->withAlpha(.12f); }
+        fillCard(g, y, cardHeight, card, lane);
+        if (index < 0) {
+            g.setColour(motion::style::raised().withAlpha(0.25f));
+            g.fillRect(namesWidth, y, getWidth() - namesWidth, cardHeight);
+            juce::Graphics::ScopedSaveState summaryScope(g);
+            g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
+            for (const auto& track : tracks) {
+                auto parent = track.group;
+                for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
+                    if (parent == row.id) {
+                        g.setColour(motion::style::accent().withAlpha(motion::trackIsAudible(project, track) ? 0.35f : 0.1f));
+                        for (const auto& clip : track.clips) {
+                            const auto timing = clip.timing(project.tempo());
+                            g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + height * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
+                        }
+                        break;
+                    }
+                    const auto* group = motion::findGroup(project, parent);
+                    parent = group != nullptr ? group->parent : 0;
+                }
+            }
+            return;
+        }
+        juce::Graphics::ScopedSaveState scope(g);
+        g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
+        const auto opacity = !motion::trackIsAudible(project, tracks[static_cast<std::size_t>(index)]) ? 0.38f : 1.0f;
+        for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) {
+            paintClip(g, clip, tracks[static_cast<std::size_t>(index)], index, opacity);
+        }
+    }
     void fillCard(juce::Graphics& g, int y, int height, juce::Colour header, std::optional<juce::Colour> lane) const {
         juce::Path card;
         card.addRoundedRectangle(static_cast<float>(cardInset), static_cast<float>(y), static_cast<float>(namesWidth - 1 - cardInset), static_cast<float>(height), cardRadius, cardRadius, true, false, true, false);
@@ -2055,7 +2110,7 @@ private:
         g.setColour(motion::style::muted());
         g.setFont(motion::style::caption());
         g.drawText("Cameras", cardInset + 8, top, namesWidth - 40, cameraBandHeight, juce::Justification::centredLeft);
-        // The plus adds a camera at the playhead, drawn like the add-track button.
+        // The plus adds a camera at the playhead, drawn like an icon button.
         const auto add = addCameraBounds().toFloat();
         if (addHover) {
             g.setColour(juce::Colours::white.withAlpha(.08f));
@@ -2092,6 +2147,22 @@ private:
             }
             g.setColour(osci::Colours::text());
             g.drawText(cameraName(cut.camera), bounds.reduced(6, 0), juce::Justification::centredLeft, true);
+        }
+        // The selected camera's keys, so its moves read on the timeline.
+        const auto camera = std::find_if(project.cameras.begin(), project.cameras.end(), [this](const auto& item) { return item.id == selected; });
+        if (camera == project.cameras.end()) { return; }
+        std::set<double> times;
+        for (const auto& [name, curve] : camera->properties) {
+            for (const auto& key : curve.keyframes()) { times.insert(key.time); }
+        }
+        juce::Graphics::ScopedSaveState band(g);
+        g.reduceClipRegion(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
+        for (const auto time : times) {
+            const auto centre = juce::Point<float>(static_cast<float>(timeX(time)) + .5f, static_cast<float>(top) + cameraBandHeight * .5f);
+            g.setColour(osci::Colours::veryDark());
+            motion::style::drawDiamond(g, centre, 5.0f, true);
+            g.setColour(motion::style::text());
+            motion::style::drawDiamond(g, centre, 3.5f, true);
         }
     }
     bool addHover = false;
@@ -2946,9 +3017,9 @@ private:
     }
     // Rows end above the horizontal scroll strip.
     int viewHeight() const { return std::max(0, getHeight() - rulerHeight - scrollStrip); }
-    // A little room below the last track to drop new ones into, without
-    // pushing whole rows off the last page.
-    static constexpr int bottomRoom = 12;
+    // Room below the last track for the Add track button and for dropping
+    // new tracks, without pushing whole rows off the last page.
+    static constexpr int addTrackGap = 4, addTrackHeight = 24, bottomRoom = addTrackGap + addTrackHeight + 12;
     int maximumScrollY() const { return std::max(0, contentHeight + bottomRoom - viewHeight()); }
     int firstVisibleRow() const { return std::max(0, visualRowAt(rulerHeight)); }
     int visualRowAt(int y) const {
@@ -3060,7 +3131,8 @@ private:
         processor.seek(std::clamp(target.value_or(raw), 0.0, project.duration));
         repaint();
     }
-    motion::icons::Button addTrack {"Add track", motion::icons::Icon::add}, snapButton {"Snapping", motion::icons::Icon::magnet};
+    motion::icons::LabelButton addTrack {"Add track", motion::icons::Icon::add};
+    motion::icons::Button snapButton {"Snapping", motion::icons::Icon::magnet};
     motion::icons::Button selectTool {"Select tool", motion::icons::Icon::select}, slipTool {"Slip tool", motion::icons::Icon::slip};
     motion::icons::Button stretchTool {"Stretch tool", motion::icons::Icon::stretch}, rippleTool {"Ripple trim tool", motion::icons::Icon::ripple};
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;

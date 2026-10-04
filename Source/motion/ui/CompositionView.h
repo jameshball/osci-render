@@ -107,9 +107,61 @@ public:
     void resetView() { cancelGesture(); camera = {}; repaint(); }
 
     // Looking through an output camera: the Scene shows exactly its view, and
-    // orbiting, panning, zooming or flying moves the camera itself (keyed at
-    // the playhead when it is animated). Rigged cameras cannot be driven.
+    // orbiting, panning, zooming or flying moves the camera itself (keying the
+    // whole camera at the playhead once it has keys). Rigged cameras cannot be
+    // driven; driveBlocker says why.
     bool canDriveCamera(motion::Id id) const { return documentPose(id).has_value(); }
+    juce::String driveBlocker(motion::Id id) const {
+        const auto& project = processor.document.project();
+        const auto found = std::find_if(project.cameras.begin(), project.cameras.end(), [id](const auto& item) { return item.id == id; });
+        if (found == project.cameras.end()) { return "Select a camera to look through it"; }
+        if (found->target != 0) { return "This camera is aimed by Look at"; }
+        if (found->parent != 0) { return "This camera is carried by a group"; }
+        for (const auto& [name, curve] : found->properties) {
+            if (curve.link.has_value()) { return "This camera has a linked property"; }
+            if (name == "rotation.z" && !level(curve)) { return "This camera is rolled (Z rotation)"; }
+        }
+        const auto& routes = project.routes;
+        if (std::any_of(routes.begin(), routes.end(), [id](const auto& route) { return route.target == id; })) { return "This camera is modulated"; }
+        return {};
+    }
+    // A key on every camera property at the playhead (linked ones follow
+    // their source and are left alone).
+    bool cameraKeyed(motion::Id id) const {
+        const auto& cameras = processor.document.project().cameras;
+        const auto found = std::find_if(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; });
+        if (found == cameras.end()) { return false; }
+        const auto time = cameraTime();
+        return std::all_of(motion::cameraPropertyNames.begin(), motion::cameraPropertyNames.end(), [&](const auto& name) {
+            const auto curve = found->properties.find(std::string(name));
+            return curve != found->properties.end() && (curve->second.link.has_value() || curve->second.hasKeyAt(time));
+        });
+    }
+    // Keys the whole camera (position, rotation and lens) at the playhead, or
+    // removes that key when it is already there.
+    void toggleCameraKey(motion::Id id) {
+        const auto& cameras = processor.document.project().cameras;
+        if (std::none_of(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; })) { return; }
+        const auto time = cameraTime();
+        const auto keyed = cameraKeyed(id);
+        processor.document.edit(keyed ? "Remove camera key" : "Key camera", [id, time, keyed](motion::Project& project) {
+            for (auto& item : project.cameras) {
+                if (item.id != id) { continue; }
+                for (const auto& name : motion::cameraPropertyNames) {
+                    auto& curve = item.properties[std::string(name)];
+                    if (curve.link.has_value()) { continue; }
+                    const auto value = curve.evaluateBase(time);
+                    if (!keyed) {
+                        curve.setKeyValue(time, value);
+                        continue;
+                    }
+                    curve.removeKey(time);
+                    // Without keys the camera keeps the pose it had here.
+                    if (!curve.animated()) { curve.base = value; }
+                }
+            }
+        });
+    }
     motion::Id drivenCamera() const { return lockedCamera; }
     void setDrivenCamera(motion::Id id) {
         if (id == lockedCamera || (id != 0 && !canDriveCamera(id))) { return; }
@@ -843,6 +895,14 @@ private:
         std::function<void()> tick;
         void timerCallback() override { if (tick) { tick(); } }
     } cameraSync;
+    // Zero throughout: no roll at any key or between them.
+    static bool level(const motion::Curve& curve) {
+        const auto& keys = curve.keyframes();
+        return std::abs(curve.base) < 1.0e-9 && std::all_of(keys.begin(), keys.end(), [](const auto& key) {
+            const auto flat = key.interpolation != motion::Interpolation::cubic || (std::abs(key.incomingSlope) < 1.0e-9 && std::abs(key.outgoingSlope) < 1.0e-9);
+            return std::abs(key.value) < 1.0e-9 && flat;
+        });
+    }
     double cameraTime() const {
         const auto& project = processor.document.project();
         const auto time = std::clamp(processor.position.load(), 0.0, project.duration);
@@ -853,12 +913,8 @@ private:
         for (const auto& item : processor.document.project().cameras) {
             if (item.id != id) { continue; }
             // Rigged, rolled, linked or modulated cameras keep their own aim.
-            if (item.target != 0 || item.parent != 0) { return std::nullopt; }
-            for (const auto& [name, curve] : item.properties) {
-                if (curve.link.has_value() || (name == "rotation.z" && (curve.animated() || curve.base != 0))) { return std::nullopt; }
-            }
-            const auto& routes = processor.document.project().routes;
-            if (std::any_of(routes.begin(), routes.end(), [id](const auto& route) { return route.target == id; })) { return std::nullopt; }
+            // Keys on a level Z rotation (keying the whole camera) are fine.
+            if (driveBlocker(id).isNotEmpty()) { return std::nullopt; }
             const auto value = [&](const char* name, double fallback) {
                 const auto found = item.properties.find(name);
                 return found != item.properties.end() ? found->second.evaluateBase(cameraTime()) : fallback;
@@ -882,10 +938,22 @@ private:
             processor.document.editCoalesced("Move camera", "camera-view:" + juce::String(static_cast<juce::int64>(id)), [id, time, view](motion::Project& project) {
                 for (auto& item : project.cameras) {
                     if (item.id != id) { continue; }
-                    for (const auto& [name, value] : std::initializer_list<std::pair<const char*, double>> {{"position.x", view.x}, {"position.y", view.y}, {"position.z", view.z}, {"rotation.x", view.pitch}, {"rotation.y", -view.yaw}}) {
+                    // A camera with keys is keyed as a whole at the playhead, so
+                    // its position, rotation and lens keys stay together. One
+                    // without keys just takes the new pose.
+                    const auto keyed = std::any_of(item.properties.begin(), item.properties.end(), [](const auto& entry) { return entry.second.animated(); });
+                    // The view wraps its yaw; keep the camera's turn continuous.
+                    const auto turn = item.properties["rotation.y"].evaluateBase(time);
+                    const auto yaw = turn + std::remainder(-view.yaw - turn, 360.0);
+                    for (const auto& [name, value] : std::initializer_list<std::pair<const char*, double>> {{"position.x", view.x}, {"position.y", view.y}, {"position.z", view.z}, {"rotation.x", view.pitch}, {"rotation.y", yaw}}) {
                         auto& curve = item.properties[name];
-                        if (curve.animated()) { curve.setKeyValue(time, value); } else { curve.base = value; }
+                        if (keyed) { curve.setKeyValue(time, value); } else { curve.base = value; }
                     }
+                    if (!keyed) { continue; }
+                    // The view has no roll; the lens stays as it is.
+                    item.properties["rotation.z"].setKeyValue(time, 0.0);
+                    auto& lens = item.properties["fov"];
+                    lens.setKeyValue(time, lens.evaluateBase(time));
                 }
             });
             lastPose = view;

@@ -101,6 +101,8 @@ private:
     void refreshInspector();
     bool audioSelected() const;
     bool selectionIsCamera() const;
+    motion::Id toolCamera() const;
+    void refreshCameraTools();
     void addCamera(double time);
     void previewEffect(const std::string& type, std::optional<motion::Id> owner);
     void addEffectTo(const std::string& type, motion::Id owner);

@@ -8,12 +8,14 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, lock, trash, undo, redo, close, check, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, lineSpacing };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, lock, trash, undo, redo, close, check, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, lineSpacing, keyframe };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
         std::map<Icon, juce::Path> result;
         const auto add = [&result](Icon key, const char* data) { result[key] = juce::Drawable::parseSVGPath(data); };
+        // A keyframe: an outlined diamond.
+        add(Icon::keyframe, "M12 3l9 9-9 9-9-9 9-9zm0 3.1L6.1 12 12 17.9 17.9 12 12 6.1z");
         add(Icon::move, "M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z");
         add(Icon::rotate, "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z");
         add(Icon::scale, "M21 11V3h-8l3.29 3.29-10 10L3 13v8h8l-3.29-3.29 10-10z");
@@ -134,6 +136,41 @@ public:
     // behind a button that is on.
     std::optional<juce::Colour> tint;
     juce::Colour onColour = motion::style::accent().withAlpha(.35f);
+private:
+    Icon icon;
+    motion::style::Fade fade {*this};
+};
+
+// An accent text action with a leading icon (Add track), hover fades in.
+class LabelButton final : public juce::Button {
+public:
+    LabelButton(const juce::String& name, Icon glyph) : juce::Button(name), icon(glyph) {
+        setTitle(name);
+        setButtonText(name);
+        setWantsKeyboardFocus(false);
+        setMouseClickGrabsKeyboardFocus(false);
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    }
+    // The natural width: icon, gap, text and side padding.
+    int idealWidth() const { return juce::roundToInt(leading + iconSize + gap + juce::TextLayout::getStringWidth(motion::style::body(), getButtonText()) + trailing); }
+    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
+        fade.setTarget(highlighted && isEnabled());
+        const auto bounds = getLocalBounds().toFloat();
+        if (fade.value() > 0.0f || down) {
+            g.setColour(motion::style::accent().withAlpha(down ? .22f : .12f * fade.value()));
+            g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+        }
+        const auto colour = motion::style::accent().brighter(.35f).withMultipliedAlpha(isEnabled() ? 1.0f : .35f);
+        auto area = getLocalBounds().withTrimmedLeft(leading);
+        draw(g, icon, area.removeFromLeft(static_cast<int>(iconSize)).toFloat(), colour, iconSize);
+        area.removeFromLeft(gap);
+        g.setColour(colour);
+        g.setFont(motion::style::body());
+        g.drawText(getButtonText(), area, juce::Justification::centredLeft, false);
+    }
+    float iconSize = 16.0f;
+    // Space before the icon, between it and the text, and after the text.
+    int leading = 6, gap = 5, trailing = 8;
 private:
     Icon icon;
     motion::style::Fade fade {*this};

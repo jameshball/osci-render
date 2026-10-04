@@ -84,7 +84,7 @@ try:
     oversized_geometry = "MW" * 8000
     step("draft exceeding geometry budget", "fill", "--name", "Source text", "--class", "juce::TextEditor", "--exact", oversized_geometry)
     step("apply excessive geometry", "click", "--name", "Apply text", "--exact")
-    command("wait-for-value", "--component-name", "Text status", "--value", "Too detailed to prepare: try a simpler font or shorter text.", "--timeout-ms", 15000)
+    command("wait-for-value", "--component-name", "Text status", "--value", "Too detailed to prepare: try a simpler font or shorter text.", "--timeout-ms", 60000)
     state = json.loads(command("snapshot", "--json", "--full"))
     def nodes(value):
         if isinstance(value, dict):

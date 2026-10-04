@@ -32,8 +32,8 @@ public:
         lock.setOnColour(juce::Colour(0xff5c5f6b));
         // The glyph matches the M and S letters' height.
         lock.iconSize = 10.0f;
-        grip.setTooltip("Drag to reorder; click for track actions");
-        // A click opens the menu; a drag moves the track instead.
+        // A click opens the menu; a drag moves the track instead. The open
+        // hand says so; a tooltip window would reset the cursor on macOS.
         grip.onClick = [this] { if (gripTravel < 4 && onMenu) { onMenu(id); } };
         grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
         grip.addMouseListener(this, false);
@@ -43,9 +43,6 @@ public:
     }
     void update(const motion::Track& track, bool group = false, bool collapsed = false, bool lanes = false, bool expanded = false) {
         isGroup = group;
-        const auto& labels = motion::style::trackLabels();
-        const auto colour = !group && track.label > 0 && track.label < static_cast<int>(labels.size()) ? juce::Colour(labels[static_cast<std::size_t>(track.label)].argb).brighter(.5f) : juce::Colours::transparentBlack;
-        if (colour != labelColour) { labelColour = colour; repaint(); }
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
@@ -55,7 +52,7 @@ public:
             resized();
         }
         grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor);
-        grip.setTooltip(group ? "Group actions" : "Drag to reorder; click for track actions");
+        grip.setTooltip(group ? "Group actions" : juce::String());
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
         disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide keyframe lanes");
         name.setFont(group ? motion::style::title() : motion::style::body());
@@ -80,29 +77,10 @@ public:
         arm.setTooltip(track.midiInput == 0 ? "Play and record live MIDI on this track (choose a channel in the track menu)"
             : "Live MIDI input: " + (track.midiInput == motion::Track::anyMidiChannel ? juce::String("any channel") : "channel " + juce::String(track.midiInput)));
     }
-    // While dragged, the header covers the rows it passes over with its own
-    // card and the left of the lifted block's outline.
-    void setLifted(bool value) {
-        if (lifted != value) {
-            lifted = value;
-            repaint();
-        }
-    }
-    void paint(juce::Graphics& g) override {
-        if (lifted) {
-            const auto card = getLocalBounds().toFloat().withTrimmedTop(-1.0f).withTrimmedBottom(-1.0f).withWidth(static_cast<float>(getWidth() + 8)).reduced(.75f);
-            juce::Path shape;
-            shape.addRoundedRectangle(card.getX(), card.getY(), card.getWidth(), card.getHeight(), 5.0f, 5.0f, true, false, true, false);
-            g.setColour(motion::style::raised());
-            g.fillPath(shape);
-            g.setColour(motion::style::accent().withAlpha(.55f));
-            g.strokePath(shape, juce::PathStrokeType(1.5f));
-        }
-        if (!labelColour.isTransparent()) {
-            g.setColour(labelColour);
-            g.fillRect(0, 2, 3, std::min(getHeight(), 28) - 4);
-        }
-    }
+    // While dragged, the timeline draws the header in its lifted block above
+    // the other rows; the header itself stays in place, unseen, to keep
+    // receiving the drag.
+    void setLifted(bool value) { setAlpha(value ? 0.0f : 1.0f); }
     // One compact line: [fold/lanes] [grip] name ... [M][S][L]
     void resized() override {
         // Controls stay on one top line however tall the row is.
@@ -154,9 +132,8 @@ public:
     // The grip's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
-    bool isGroup = false, lifted = false;
+    bool isGroup = false;
     int gripTravel = 0;
-    juce::Colour labelColour = juce::Colours::transparentBlack;
     class Disclosure : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {
             g.setColour(osci::Colours::text().withAlpha(over ? 1.0f : 0.65f));
