@@ -4,6 +4,7 @@
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
+#include "ColourPicker.h"
 #include "../model/PropertySchema.h"
 #include "../model/SpatialMotion.h"
 #include "../model/Drawing.h"
@@ -43,6 +44,8 @@ public:
     std::function<void()> onKeyTimeEdited;
     // The row's modulation chip: open the graph (oscillator, routes, link) for this property.
     std::function<void(motion::Id, const std::string&)> onModulate;
+    // Opens a popover pointing at `anchor` (the colour picker).
+    std::function<void(std::unique_ptr<juce::Component>, juce::Component& anchor)> onShowPopover;
     // Double-clicking a camera's name renames it.
     std::function<void(motion::Id, const juce::String&)> onRename;
 
@@ -168,6 +171,10 @@ public:
             row->previous.setEnabled(anyAnimated);
             row->next.setEnabled(anyAnimated);
             row->modulate.setToggleState(modulated, juce::dontSendNotification);
+            if (row->swatch != nullptr) {
+                const auto rgb = colourOf(*row);
+                row->swatch->setColour(juce::Colour::fromFloatRGBA(static_cast<float>(rgb[0]), static_cast<float>(rgb[1]), static_cast<float>(rgb[2]), 1.0f));
+            }
         }
         repaint();
     }
@@ -249,9 +256,33 @@ private:
         motion::PropertySpec spec;
         MotionScrubField editor;
     };
+    // The Colour row's swatch: the colour at the playhead; a click opens the picker.
+    struct Swatch : juce::Button {
+        Swatch() : juce::Button("Colour swatch") {
+            setTitle("Colour swatch");
+            setTooltip("Pick a colour");
+            setWantsKeyboardFocus(false);
+            setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        }
+        void paintButton(juce::Graphics& g, bool highlighted, bool) override {
+            const auto bounds = getLocalBounds().toFloat().reduced(.5f);
+            g.setColour(colour);
+            g.fillRoundedRectangle(bounds, motion::style::radius);
+            g.setColour(juce::Colours::white.withAlpha(highlighted ? .5f : .22f));
+            g.drawRoundedRectangle(bounds, motion::style::radius, 1.0f);
+        }
+        void setColour(juce::Colour value) {
+            if (value != colour) {
+                colour = value;
+                repaint();
+            }
+        }
+        juce::Colour colour = juce::Colours::white;
+    };
     struct Row : juce::Component {
         juce::String group;
         std::vector<std::unique_ptr<Field>> fields;
+        std::unique_ptr<Swatch> swatch;
         osci::KeyframeButton key;
         motion::icons::Chip modulate {"Modulate", motion::icons::Icon::wave};
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
@@ -266,6 +297,11 @@ private:
         void resized() override {
             auto area = getLocalBounds();
             auto heading = area.removeFromTop(16);
+            if (swatch != nullptr) {
+                // Beside the heading, as After Effects places a colour's swatch.
+                const auto label = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), group));
+                swatch->setBounds(heading.getX() + label + 6, heading.getY() + 2, 24, 12);
+            }
             modulate.setBounds(heading.removeFromRight(20).reduced(0, 1));
             if (mode != nullptr) {
                 heading.removeFromRight(motion::style::gap);
@@ -349,6 +385,11 @@ private:
                     // A misaligned mode stays on and realigns its keys.
                     row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState() || raw->misaligned); };
                     row->addAndMakeVisible(*row->mode);
+                }
+                if (row->group == "Colour") {
+                    row->swatch = std::make_unique<Swatch>();
+                    row->swatch->onClick = [this, raw] { openColourPicker(*raw); };
+                    row->addAndMakeVisible(*row->swatch);
                 }
                 row->previous.onClick = [this, raw] { jumpToKey(*raw, false); };
                 row->next.onClick = [this, raw] { jumpToKey(*raw, true); };
@@ -441,9 +482,9 @@ private:
         gesture->revision = processor.document.revision();
         changed = true;
     }
-    void endGesture() {
+    void endGesture(const juce::String& name = "Change property") {
         if (gesture.has_value() && changed && processor.document.revision() == gesture->revision) {
-            processor.document.commit("Change property", std::move(gesture->before));
+            processor.document.commit(name.toStdString(), std::move(gesture->before));
             if (onKeyTimeEdited) { onKeyTimeEdited(); }
         }
         gesture.reset();
@@ -456,6 +497,34 @@ private:
         }
         gesture.reset();
         changed = false;
+    }
+    // The row's red, green and blue as shown (0..1).
+    static MotionColourPicker::Rgb colourOf(const Row& row) {
+        MotionColourPicker::Rgb rgb {1.0, 1.0, 1.0};
+        for (const auto& field : row.fields) {
+            const auto id = std::string(field->spec.id);
+            const auto index = id == "red" ? 0 : id == "green" ? 1 : id == "blue" ? 2 : -1;
+            if (index >= 0) { rgb[static_cast<std::size_t>(index)] = std::clamp(field->editor.getValue(), 0.0, 1.0); }
+        }
+        return rgb;
+    }
+    // The picker edits all three channels as one gesture and one undo step.
+    void openColourPicker(Row& row) {
+        if (row.swatch == nullptr || !onShowPopover) { return; }
+        auto picker = std::make_unique<MotionColourPicker>(colourOf(row));
+        picker->onBegin = [this] { beginGesture("red"); };
+        picker->onChange = [this](MotionColourPicker::Rgb rgb) {
+            if (!gesture.has_value() || gesture->target != target) { return; }
+            auto updated = gesture->before;
+            for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"red", rgb[0]}, {"green", rgb[1]}, {"blue", rgb[2]}}) {
+                apply(updated, property, value, gestureTime);
+            }
+            processor.document.preview(std::move(updated));
+            gesture->revision = processor.document.revision();
+            changed = true;
+        };
+        picker->onEnd = [this] { endGesture("Change colour"); };
+        onShowPopover(std::move(picker), *row.swatch);
     }
     void commitValue(const std::string& property, double value) {
         const auto found = motion::findPropertyTarget(processor.document.project(), target);
