@@ -2,6 +2,7 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/ScopeBeam.h"
+#include "../Source/visualiser/OfflineVisualiserParameters.h"
 
 class MotionScopeBeamTest : public juce::UnitTest {
 public:
@@ -31,7 +32,9 @@ public:
             const auto target = motion::findPropertyTarget(f.document.project(), f.beam());
             expect(target.has_value() && target->beam && !target->camera);
             expect(motion::propertySpecs(*target).size() == motion::beamPropertyNames.size());
-            VisualiserParameters parameters;
+            // Owns the parameters, which a processor normally does.
+            OfflineVisualiserParameters offline;
+            auto& parameters = offline.params;
             const auto specs = motion::beamPropertySpecs();
             for (std::size_t index = 0; index < motion::beamPropertyNames.size(); ++index) {
                 const juce::String id(motion::beamPropertyNames[index]);
@@ -130,7 +133,9 @@ public:
 
         beginTest("The visualiser's beam effects take the document's values without touching their parameters");
         {
-            VisualiserParameters parameters;
+            // Owns the parameters, which a processor normally does.
+            OfflineVisualiserParameters offline;
+            auto& parameters = offline.params;
             const motion::ScopeBeamSlots slots(parameters);
             const auto before = parameters.intensityEffect->parameters[0]->getValueUnnormalised();
             parameters.intensityEffect->animateValues(16, nullptr);

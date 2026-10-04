@@ -3,8 +3,11 @@
 #include "CompositionRenderer.h"
 
 namespace motion {
-// One coalesced pending request, one running job, one completed result. All
-// project copies and prepared-state destruction stay off the audio thread.
+// One coalesced pending request, one running job, one completed result. A
+// running job finishes and its result stays available even when newer work
+// is waiting, so a stream of edits (a drag) still updates playback; the
+// newest request runs next. All project copies and prepared-state
+// destruction stay off the audio thread.
 class CompositionPreparationWorker : private juce::Thread {
 public:
     struct Result {
@@ -27,13 +30,10 @@ public:
     std::uint64_t request(const Project& project, double sampleRate) {
         auto next = std::make_shared<Request>(project, sampleRate, ++revision);
         std::shared_ptr<Request> replaced;
-        std::unique_ptr<Result> obsolete;
         {
             const juce::SpinLock::ScopedLockType lock(mutex);
-            if (running) { running->cancel.store(true); }
             replaced = std::move(pending);
             pending = std::move(next);
-            obsolete = std::move(completed);
         }
         wake.signal();
         return revision;

@@ -670,6 +670,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
     propertyInspector.onShowPopover = [this](std::unique_ptr<juce::Component> content, juce::Component& anchor) { showPopover(std::move(content), getLocalArea(&anchor, anchor.getLocalBounds())); };
     processor.document.addChangeListener(this);
+    auto* holder = juce::StandalonePluginHolder::getInstance();
+    if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
     sliderBakes.onStatus = [this](const juce::String& text, bool error) { statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice); };
     sliderBakes.update();
     composition.refresh();
@@ -724,6 +726,8 @@ MotionEditor::~MotionEditor() {
     curveEditor.onPreview = {};
     processor.previewComposition(processor.document.project());
     processor.document.removeChangeListener(this);
+    auto* holder = juce::StandalonePluginHolder::getInstance();
+    if (holder != nullptr) { holder->deviceManager.removeChangeListener(this); }
     for (const auto& task : pendingImports) { task->cancelled.store(true); }
     if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
     imports.removeAllJobs(true, -1);
@@ -1500,7 +1504,6 @@ void MotionEditor::timerCallback() {
     continueCommandLineRender();
     if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
     processor.showIdleSeek(processor.document.mainProject().duration);
-    refreshOutputChoices();
     auto& previewRate = processor.recordingParameters.frameRate;
     // Keep playback and export cadence aligned within the live renderer's supported range.
     const auto projectFrameRate = static_cast<float>(std::clamp<double>(processor.document.mainProject().frameRate, previewRate.min, previewRate.max));
@@ -1600,7 +1603,12 @@ void MotionEditor::timerCallback() {
     }
 }
 
-void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
+void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
+    // The audio device decides whether the 5-channel output can be chosen.
+    if (source != &processor.document) {
+        refreshOutputChoices();
+        return;
+    }
     // A drawing belongs to the project it was started in.
     if (drawingEditor != nullptr && processor.document.generation() != drawingGeneration) { closeDrawingEditor(); }
     if (textEditor != nullptr && processor.document.generation() != textGeneration) { closeTextEditor(); }

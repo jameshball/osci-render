@@ -63,8 +63,11 @@ void MotionProcessor::handleAsyncUpdate() {
         requestComposition(document.project());
         return;
     }
+    // A result older than the latest request still plays until the newest
+    // one is ready, so a drag updates playback as it goes.
     auto result = preparationWorker->take();
-    if (result == nullptr || result->revision != preparationRevision) { return; }
+    if (result == nullptr || result->revision <= acceptedPreparationRevision) { return; }
+    if (result->composition != nullptr && result->composition->sampleRate != preparationSampleRate) { return; }
     acceptedPreparationRevision = result->revision;
     preparationError = result->error;
     preparationFailed.store(preparationError.isNotEmpty());
