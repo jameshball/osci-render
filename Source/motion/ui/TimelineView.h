@@ -86,6 +86,7 @@ public:
     void setSelection(motion::Id id) {
         ensureTrackRows();
         selectedMarker = 0;
+        if (selectedCameraKey.has_value() && selectedCameraKey->first != id) { selectedCameraKey.reset(); }
         selected = id;
         if (!notifyingSelection) {
             selectedClips.clear();
@@ -975,6 +976,9 @@ public:
         if (hovered != hoveredClip) { hoveredClip = hovered; repaint(); }
         if (event.y < rulerHeight && event.x < namesWidth) {
             setMouseCursor(juce::MouseCursor::PointingHandCursor);
+        } else if (inCameraBand(event.y) && event.x >= namesWidth && cameraKeyAt(event.x).has_value()) {
+            setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+            setTooltip("Camera key: drag to move, Delete to remove");
         } else if (markerAt(event.getPosition()) != nullptr) {
             setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         } else if (clip != nullptr) {
@@ -1186,6 +1190,10 @@ public:
             repaint();
             return;
         }
+        if (cameraKeyDrag.has_value()) {
+            dragCameraKey(event);
+            return;
+        }
         if (cutDrag.has_value()) {
             cameraBandDrag(event);
             return;
@@ -1385,6 +1393,14 @@ public:
             resizingNames = false;
             return;
         }
+        if (cameraKeyDrag.has_value()) {
+            if (cameraKeyDrag->moved && processor.document.revision() == cameraKeyDrag->revision) {
+                processor.document.commit("Move camera key", std::move(cameraKeyDrag->before));
+            }
+            cameraKeyDrag.reset();
+            repaint();
+            return;
+        }
         if (cutDrag.has_value()) {
             cutDrag.reset();
             repaint();
@@ -1545,6 +1561,12 @@ public:
             clipMarquee.reset();
             selectedClips = clipMarqueeBase;
             notifySelection(selectedClips.empty() ? 0 : *selectedClips.begin());
+            return true;
+        }
+        if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey) && selectedCameraKey.has_value()) {
+            deleteCameraKey(selectedCameraKey->first, selectedCameraKey->second);
+            selectedCameraKey.reset();
+            repaint();
             return true;
         }
         if ((key.getKeyCode() == juce::KeyPress::deleteKey || key.getKeyCode() == juce::KeyPress::backspaceKey) && selectedCut != 0) {
@@ -2159,10 +2181,11 @@ private:
         g.reduceClipRegion(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
         for (const auto time : times) {
             const auto centre = juce::Point<float>(static_cast<float>(timeX(time)) + .5f, static_cast<float>(top) + cameraBandHeight * .5f);
+            const auto chosen = selectedCameraKey.has_value() && selectedCameraKey->first == camera->id && std::abs(selectedCameraKey->second - time) < 1.0e-6;
             g.setColour(osci::Colours::veryDark());
-            motion::style::drawDiamond(g, centre, 5.0f, true);
-            g.setColour(motion::style::text());
-            motion::style::drawDiamond(g, centre, 3.5f, true);
+            motion::style::drawDiamond(g, centre, chosen ? 6.0f : 5.0f, true);
+            g.setColour(chosen ? motion::style::accent().brighter(.4f) : motion::style::text());
+            motion::style::drawDiamond(g, centre, chosen ? 4.5f : 3.5f, true);
         }
     }
     bool addHover = false;
@@ -2184,6 +2207,16 @@ private:
             return;
         }
         if (event.x < namesWidth) { return; }
+        // The selected camera's keys come first: select one, or drag it.
+        const auto key = event.mods.isPopupMenu() ? std::nullopt : cameraKeyAt(event.x);
+        if (key.has_value()) {
+            selectedCut = 0;
+            selectedCameraKey = std::make_pair(selected, *key);
+            cameraKeyDrag = CameraKeyDrag {selected, *key, *key, event.x, processor.document.project(), processor.document.revision(), false};
+            repaint();
+            return;
+        }
+        selectedCameraKey.reset();
         const auto time = std::clamp(snapTime(scrollTime + (event.x - namesWidth) / pixelsPerSecond, event.mods), 0.0, processor.document.project().duration);
         const auto* cut = cutAt(event.getPosition());
         selectedCut = cut != nullptr ? cut->id : 0;
@@ -2291,6 +2324,93 @@ private:
         Mode mode = Mode::move;
     };
     std::optional<CutDrag> cutDrag;
+    // A camera key in the Cameras band stands for every property's key at
+    // that time; dragging moves them together as one undo step.
+    struct CameraKeyDrag {
+        motion::Id camera = 0;
+        double from = 0, to = 0;
+        int downX = 0;
+        motion::Project before;
+        std::uint64_t revision = 0;
+        bool moved = false;
+    };
+    std::optional<CameraKeyDrag> cameraKeyDrag;
+    std::optional<std::pair<motion::Id, double>> selectedCameraKey;
+    const motion::Camera* selectedCamera() const {
+        const auto& cameras = processor.document.project().cameras;
+        const auto found = std::find_if(cameras.begin(), cameras.end(), [this](const auto& item) { return item.id == selected; });
+        return found == cameras.end() ? nullptr : &*found;
+    }
+    // The selected camera's key nearest x, within 5 px.
+    std::optional<double> cameraKeyAt(int x) const {
+        const auto* camera = selectedCamera();
+        if (camera == nullptr) { return std::nullopt; }
+        std::optional<double> nearest;
+        int distance = 6;
+        for (const auto& [name, curve] : camera->properties) {
+            for (const auto& key : curve.keyframes()) {
+                const auto offset = std::abs(timeX(key.time) - x);
+                if (offset < distance) {
+                    distance = offset;
+                    nearest = key.time;
+                }
+            }
+        }
+        return nearest;
+    }
+    static void moveCameraKeys(motion::Camera& camera, double from, double to) {
+        for (auto& [name, curve] : camera.properties) {
+            const auto& keys = curve.keyframes();
+            const auto found = std::find_if(keys.begin(), keys.end(), [from](const auto& key) { return std::abs(key.time - from) < 1.0e-6; });
+            if (found == keys.end()) { continue; }
+            auto moved = *found;
+            curve.removeKey(moved.time);
+            moved.time = to;
+            curve.setKey(moved);
+        }
+    }
+    void dragCameraKey(const juce::MouseEvent& event) {
+        auto& drag = *cameraKeyDrag;
+        // An undo or load under the drag ends it where it is.
+        if (processor.document.revision() != drag.revision) {
+            cameraKeyDrag.reset();
+            return;
+        }
+        const auto& project = processor.document.project();
+        auto time = snapTime(drag.from + (event.x - drag.downX) / pixelsPerSecond, event.mods);
+        if (project.frameRate > 0) { time = std::round(time * project.frameRate) / project.frameRate; }
+        time = std::clamp(time, 0.0, project.duration);
+        if (std::abs(time - drag.to) < 1.0e-9) { return; }
+        auto updated = drag.before;
+        const auto camera = std::find_if(updated.cameras.begin(), updated.cameras.end(), [&drag](const auto& item) { return item.id == drag.camera; });
+        if (camera == updated.cameras.end()) { return; }
+        // A key never lands on another key of the same camera.
+        const auto occupied = std::abs(time - drag.from) > 1.0e-6 && std::any_of(camera->properties.begin(), camera->properties.end(), [time](const auto& entry) { return entry.second.hasKeyAt(time); });
+        if (occupied) { return; }
+        moveCameraKeys(*camera, drag.from, time);
+        processor.document.preview(std::move(updated));
+        drag.revision = processor.document.revision();
+        drag.to = time;
+        drag.moved = true;
+        selectedCameraKey = std::make_pair(drag.camera, time);
+        repaint();
+    }
+    void deleteCameraKey(motion::Id id, double time) {
+        processor.document.tryEdit("Delete camera key", [id, time](motion::Project& project) {
+            bool removed = false;
+            for (auto& camera : project.cameras) {
+                if (camera.id != id) { continue; }
+                for (auto& [name, curve] : camera.properties) {
+                    const auto value = curve.evaluateBase(time);
+                    if (!curve.removeKey(time)) { continue; }
+                    removed = true;
+                    // Without keys the camera keeps the pose it had here.
+                    if (!curve.animated()) { curve.base = value; }
+                }
+            }
+            return removed;
+        });
+    }
     motion::Id selectedCut = 0;
 
     juce::Rectangle<int> markerBounds(const motion::Marker& marker) const {

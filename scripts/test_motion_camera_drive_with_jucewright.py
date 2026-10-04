@@ -133,12 +133,33 @@ try:
     first = lambda name: float(camera.find(f"property[@name='{name}']").findall("key")[0].get("value"))
     second = lambda name: float(camera.find(f"property[@name='{name}']").findall("key")[1].get("value"))
     assert abs(first("rotation.x") - second("rotation.x")) > 0.5, "Orbiting did not change the keyed pitch"
-    # Removing the key at the playhead.
+    # The Cameras band shows the keys: drag the 2 s key to 3 s, as one step.
+    band_y = timeline["y"] + 39
+    step("drag camera key", "drag-xy", timeline["x"] + x_of(2), band_y, timeline["x"] + x_of(3), band_y, "--steps", 10)
+    session.wait_for_undo("Move camera key")
+    camera = saved_camera()
+    for name in camera_properties:
+        assert key_times(camera, name) == [0.0, 3.0], (name, key_times(camera, name))
+    step("undo key move", "click", "--name", "Undo", "--exact")
+    session.wait_for_undo("Move camera")
+    camera = saved_camera()
+    for name in camera_properties:
+        assert key_times(camera, name) == [0.0, 2.0], (name, key_times(camera, name))
+    # Select the key on the band and delete it.
+    step("select camera key", "click", "--class", "MotionTimelineView", "--position", f"{x_of(2)},39")
+    step("delete camera key", "press", "Delete", "--class", "MotionTimelineView")
+    session.wait_for_undo("Delete camera key")
+    camera = saved_camera()
+    for name in camera_properties:
+        assert key_times(camera, name) == [0.0], (name, key_times(camera, name))
+    # Removing the key at the playhead with Key camera.
+    step("playhead to 0 s", "click", "--class", "MotionTimelineView", "--position", f"{x_of(0)},12")
+    assert state("Key camera", "checked", True), "Key camera does not show the key at 0 s"
     step("remove camera key", "click", "--name", "Key camera", "--exact")
     session.wait_for_undo("Remove camera key")
     camera = saved_camera()
     for name in camera_properties:
-        assert key_times(camera, name) == [0.0], (name, key_times(camera, name))
+        assert key_times(camera, name) == [], (name, key_times(camera, name))
     print("Motion camera drive passed", flush=True)
 finally:
     session.stop_app()
