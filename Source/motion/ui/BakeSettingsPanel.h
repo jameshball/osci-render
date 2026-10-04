@@ -84,8 +84,26 @@ public:
     }
 
     std::function<void(motion::BakeSettings)> onBake;
+    // Inside the Scene's Lua editor: captions above fields in a narrow
+    // column, and the bake button lives in the editor's header.
+    juce::TextButton& bakeButton() { return bake; }
+    // The last valid settings shown.
+    const motion::BakeSettings& currentSettings() const { return settings; }
+    void setEmbedded(bool value) { embedded = value; resized(); }
+    static constexpr int embeddedHeight = 5 * (18 + 28 + 8) + 24;
 
     void resized() override {
+        if (embedded) {
+            auto area = getLocalBounds();
+            for (auto [label, field] : { std::pair<juce::Label*, juce::Component*> { &durationLabel, &duration }, { &rateLabel, &frameRate }, { &samplesLabel, &samples }, { &seedLabel, &seed }, { &bpmLabel, &bpm } }) {
+                label->setBounds(area.removeFromTop(18));
+                field->setBounds(area.removeFromTop(28));
+                area.removeFromTop(8);
+            }
+            summary.setBounds(area);
+            error.setBounds(area);
+            return;
+        }
         auto area = getLocalBounds().reduced(motion::style::dialog::margin);
         motion::style::dialog::footer(area, { &bake });
         const auto row = [&](juce::Label& label, juce::Component& field) { motion::style::dialog::formRow(area, label, field, 142); };
@@ -149,7 +167,7 @@ private:
         }
     }
     motion::BakeSettings settings;
-    bool valid = false;
+    bool valid = false, embedded = false;
     bool durationEdited = false, tempoEdited = false;
     std::vector<double> rates;
     std::vector<std::size_t> strides;

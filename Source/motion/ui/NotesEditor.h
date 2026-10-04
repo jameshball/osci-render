@@ -55,6 +55,8 @@ public:
         refresh();
     }
     std::function<void(motion::Id)> onEditInstrument;
+    // Where the envelope popover points.
+    juce::Component& envelopeAnchor() { return envelopeButton; }
     struct ViewState {
         motion::Id target = 0;
         std::set<motion::Id> selected;

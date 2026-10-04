@@ -24,6 +24,9 @@
 #include "ui/MotionTabs.h"
 #include "ui/MotionIcons.h"
 #include "ui/DrawingEditor.h"
+#include "ui/TextSourceEditor.h"
+#include "ui/LuaSourceEditor.h"
+#include "ui/TextAnimationPanel.h"
 #include <deque>
 #include <variant>
 
@@ -39,6 +42,8 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
     void openProject(const juce::File& file) override;
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
+    void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor);
+    static void dismissPopover(juce::Component* content);
 
 
 private:
@@ -102,6 +107,21 @@ private:
     void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
     void importExample(const juce::String& resource);
     void showDrawingEditor(motion::Id asset);
+    // Text sources are written in the Scene, with the Scope previewing them.
+    void showTextEditor(SourceRequest request);
+    void closeTextEditor();
+    void previewText();
+    std::unique_ptr<MotionTextSourceEditor> textEditor;
+    void showLuaEditor(SourceRequest request);
+    void closeLuaEditor();
+    std::unique_ptr<MotionLuaSourceEditor> luaEditor;
+    SourceRequest luaRequest;
+    std::uint64_t luaGeneration = 0;
+    bool luaSubmitted = false;
+    SourceRequest textRequest;
+    std::uint64_t textGeneration = 0;
+    // Typing previews after a short pause rather than on every key.
+    double textPreviewDue = 0;
     void closeDrawingEditor();
     void previewDrawing();
     std::unique_ptr<MotionDrawingEditor> drawingEditor;
@@ -197,6 +217,19 @@ private:
     int previewWidth = 1, workspaceHeight = 1;
     juce::Label compositionTitle;
     MotionSceneToolbar sceneTools;
+    MotionScopeToolbar scopeTools;
+    // Properties lead: a clip's timing, then a text clip's character animation.
+    MotionSectionStack inspectorLead;
+    MotionTextAnimationPanel textAnimation { processor };
+    struct QueuedTextAnimation {
+        motion::Id asset;
+        motion::TextSettings settings;
+        std::uint64_t generation;
+    };
+    std::optional<QueuedTextAnimation> queuedTextAnimation;
+    juce::Component::SafePointer<juce::CallOutBox> popover;
+    // The Scope filling the window (its full-screen control or Escape).
+    bool scopeFullScreen = false;
     juce::TextButton sceneView { "Views" };
     void showSceneViewMenu(bool atMouse);
 
@@ -225,7 +258,6 @@ private:
     bool compactTransport = false;
     juce::Label outputLabel;
     juce::ComboBox monitorOutput;
-    juce::TextButton canvasButton { "Canvas" };
     MotionPropertyInspector propertyInspector;
     MotionStatusBar statusBar;
     motion::Id selection = 0;

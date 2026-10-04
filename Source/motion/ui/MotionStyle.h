@@ -228,11 +228,31 @@ inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radi
 class LookAndFeel final : public PluginLookAndFeel {
 public:
     // One button fill everywhere unless a button says otherwise.
-    LookAndFeel() { setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised()); }
+    LookAndFeel() {
+        setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
+        // Selected text: a muted accent behind white, not bright green.
+        setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(.35f));
+        setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
+    }
     juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return body(); }
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
+    // Popovers look like the panels they sit over, with a soft shadow.
+    void drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g, const juce::Path& path, juce::Image& cachedImage) override {
+        if (cachedImage.isNull()) {
+            cachedImage = juce::Image(juce::Image::ARGB, box.getWidth(), box.getHeight(), true);
+            juce::Graphics shadow(cachedImage);
+            juce::DropShadow(juce::Colours::black.withAlpha(.55f), 14, {0, 4}).drawForPath(shadow, path);
+        }
+        g.drawImageAt(cachedImage, 0, 0);
+        g.setColour(panel());
+        g.fillPath(path);
+        g.setColour(juce::Colours::white.withAlpha(.1f));
+        g.strokePath(path, juce::PathStrokeType(1.0f));
+    }
+    int getCallOutBoxBorderSize(const juce::CallOutBox&) override { return 16; }
+    float getCallOutBoxCornerSize(const juce::CallOutBox&) override { return panelRadius + 1.0f; }
     // Combo text keeps the field inset and clears the arrow.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
         PluginLookAndFeel::positionComboBoxText(box, label);
@@ -261,6 +281,10 @@ namespace motion::style {
 // Dialogs keep the overlay's look but use the editor's type sizes.
 class DialogLookAndFeel final : public osci::OverlayLookAndFeel {
 public:
+    DialogLookAndFeel() {
+        setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(.35f));
+        setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
+    }
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
@@ -305,24 +329,34 @@ inline void formRow(juce::Rectangle<int>& area, juce::Label& label, juce::Compon
 }
 }
 
+// One field look for dialogs and popovers: dark, borderless, text 8 px in.
+inline void styleField(juce::Component& component) {
+    auto* editor = dynamic_cast<juce::TextEditor*>(&component);
+    auto* combo = dynamic_cast<juce::ComboBox*>(&component);
+    if (editor != nullptr) {
+        // A centred field centres its text below the top indent, so the
+        // indent would push single lines low.
+        const auto centred = (editor->getJustificationType().getFlags() & juce::Justification::verticallyCentred) != 0;
+        editor->setIndents(DialogLookAndFeel::fieldIndent - editor->getBorder().getLeft(), centred ? 0 : editor->getTopIndent());
+        editor->setColour(juce::TextEditor::backgroundColourId, field());
+        editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+    }
+    if (combo != nullptr) {
+        combo->setColour(juce::ComboBox::backgroundColourId, field());
+        combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+    }
+}
+inline void styleFields(juce::Component& root) {
+    styleField(root);
+    for (auto* child : root.getChildren()) { styleFields(*child); }
+}
 // Gives a dialog's controls the editor's type sizes and field look. The
 // overlay hands its controls its own look whenever it lays out, so the
 // editor calls this after every overlay layout.
 inline void restyleDialog(juce::Component& component, DialogLookAndFeel& look) {
     auto* current = &component.getLookAndFeel();
     if (current != &look && dynamic_cast<osci::OverlayLookAndFeel*>(current) != nullptr) {
-        if (auto* editor = dynamic_cast<juce::TextEditor*>(&component)) {
-            // A centred field centres its text below the top indent, so the
-            // indent would push single lines low.
-            const auto centred = (editor->getJustificationType().getFlags() & juce::Justification::verticallyCentred) != 0;
-            editor->setIndents(DialogLookAndFeel::fieldIndent - editor->getBorder().getLeft(), centred ? 0 : editor->getTopIndent());
-            editor->setColour(juce::TextEditor::backgroundColourId, field());
-            editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
-        }
-        if (auto* combo = dynamic_cast<juce::ComboBox*>(&component)) {
-            combo->setColour(juce::ComboBox::backgroundColourId, field());
-            combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
-        }
+        styleField(component);
         component.setLookAndFeel(&look);
     }
     for (auto* child : component.getChildren()) { restyleDialog(*child, look); }

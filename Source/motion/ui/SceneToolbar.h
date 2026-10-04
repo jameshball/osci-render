@@ -37,3 +37,27 @@ public:
     int fullHeight() const { return cell * (lookThrough.isVisible() ? 7 : 6) + groupGap * (lookThrough.isVisible() ? 2 : 1) + inset * 2; }
     bool compact = false;
 };
+
+// The Scope's controls in the same floating strip, at its top right:
+// recording and texture output, framing and beam settings, then the
+// popout and full screen.
+class MotionScopeToolbar final : public motion::icons::ToolStrip {
+public:
+    using Tool = motion::icons::Button;
+
+    MotionScopeToolbar() {
+        setName("Scope tools");
+        record.setTooltip("Record the Scope's picture and sound");
+        record.tint = juce::Colour(0xffe5484d);
+        record.onColour = juce::Colour(0xffe5484d).withAlpha(.25f);
+        textureOutput.setTooltip("Share the Scope's picture with other apps (Syphon/Spout)");
+        canvas.setTooltip("Output canvas size");
+        settings.setTooltip("Beam and display settings");
+        popout.setTooltip("Open the Scope in its own window");
+        fullScreen.setTooltip("Full screen");
+        setGroups({{&record, &textureOutput}, {&canvas, &settings}, {&popout, &fullScreen}});
+    }
+    Tool record {"Record scope", motion::icons::Icon::record}, textureOutput {"Texture output", motion::icons::Icon::cast};
+    Tool canvas {"Output canvas", motion::icons::Icon::aspectRatio}, settings {"Scope settings", motion::icons::Icon::settings};
+    Tool popout {"Pop out scope", motion::icons::Icon::openInNew}, fullScreen {"Full screen scope", motion::icons::Icon::fullscreen};
+};

@@ -71,6 +71,13 @@ public:
     std::function<void(motion::Id, double)> onEditMarker;
     // (beat, current bpm, beat of the change being edited, if any)
     std::function<void(double, double, std::optional<double>)> onEditTempo;
+    // A point on the ruler at `seconds` for a popover to aim at, kept within
+    // the visible lanes.
+    juce::Rectangle<int> rulerAnchor(double seconds) const {
+        const auto x = std::clamp(timeX(seconds), namesWidth + 4, std::max(namesWidth + 4, getWidth() - 4));
+        const auto top = showsMarkerBand() ? markerBandTop() : 0;
+        return {x - 1, top, 2, showsMarkerBand() ? markerBandHeight : toolsHeight};
+    }
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
     mutable motion::Id selected = 0;
     void setSelection(motion::Id id) {
@@ -344,7 +351,8 @@ public:
         ensureTrackRows();
         addTrack.setBounds(namesWidth - 26, 2, 22, 22);
         snapButton.setBounds(namesWidth - 50, 2, 22, 22);
-        auto tools = juce::Rectangle<int>(4, 2, 4 * 22, 22);
+        // The tool highlights line up with the cards below.
+        auto tools = juce::Rectangle<int>(cardInset - 1, 2, 4 * 22, 22);
         for (auto* button : {&selectTool, &slipTool, &stretchTool, &rippleTool}) { button->setBounds(tools.removeFromLeft(22)); }
         scrollY = std::clamp(scrollY, 0, maximumScrollY());
         // Headers live in a container clipped below the ruler, so rows scroll
@@ -357,8 +365,9 @@ public:
             const auto y = rowY(static_cast<int>(row)) - rulerHeight;
             const auto height = heightOf(row);
             header->setVisible(y + height > 0 && y < headerArea.getHeight());
-            const auto indent = std::min(48, found->depth * 8);
-            header->setBounds(indent, y, namesWidth - 5 - indent, height - resizeStrip);
+            // Centred on the card; the rest of the row's foot still resizes it.
+            const auto indent = cardInset + std::min(48, found->depth * 8);
+            header->setBounds(indent, y + (resizeStrip - bandGap) / 2, namesWidth - 5 - indent, height - resizeStrip);
         }
     }
     bool isInterestedInDragSource(const SourceDetails& details) override {
@@ -482,7 +491,8 @@ public:
         g.fillAll(osci::Colours::veryDark());
         auto area = getLocalBounds();
         g.setColour(osci::Colours::surfaceRaised());
-        g.fillRect(area.removeFromTop(rulerHeight));
+        g.fillRect(area.removeFromTop(toolsHeight));
+        if (showsMarkerBand()) { fillCard(g, markerBandTop(), markerBandHeight, motion::style::raised(), motion::style::raised().darker(.15f)); }
         g.setFont(motion::style::body());
         pixelsPerSecond = std::isfinite(pixelsPerSecond) ? std::clamp(pixelsPerSecond, 0.000001, 500.0) : 70.0;
         scrollTime = std::isfinite(scrollTime) ? std::max(0.0, scrollTime) : 0.0;
@@ -527,7 +537,7 @@ public:
         }
         paintLoop(g);
         g.setColour(osci::Colours::surfaceRaised());
-        g.fillRect(0, 0, namesWidth, rulerHeight);
+        g.fillRect(0, 0, namesWidth, toolsHeight);
         snapButton.setToggleState(processor.document.project().gridSnap, juce::dontSendNotification);
         selectTool.setToggleState(tool == Tool::move, juce::dontSendNotification);
         slipTool.setToggleState(tool == Tool::slip, juce::dontSendNotification);
@@ -549,21 +559,16 @@ public:
                 paintLane(g, row, y, height);
                 continue;
             }
-            // Alternate lanes are faintly lighter and every row ends in a
-            // hairline across headers and lanes, so tracks read as rows.
+            // Alternate lanes are faintly lighter; the gap under each card
+            // separates the rows.
             const auto selectedRow = row.id == selected;
-            g.setColour(selectedRow ? motion::style::raised().interpolatedWith(motion::style::accent(), .12f) : motion::style::raised());
-            g.fillRect(0, y, namesWidth - 1, height - 1);
-            if (visible % 2 == 1) {
-                g.setColour(juce::Colours::white.withAlpha(.018f));
-                g.fillRect(namesWidth, y, getWidth() - namesWidth, height - 1);
-            }
-            g.setColour(juce::Colours::black.withAlpha(.45f));
-            g.drawHorizontalLine(y + height - 1, 0.0f, static_cast<float>(getWidth()));
+            const auto cardHeight = height - bandGap;
+            fillCard(g, y, cardHeight, selectedRow ? motion::style::raised().interpolatedWith(motion::style::accent(), .12f) : motion::style::raised(),
+                     visible % 2 == 1 ? std::optional<juce::Colour>(juce::Colours::white.withAlpha(.018f)) : std::nullopt);
             const auto index = row.track;
             if (index < 0) {
                 g.setColour(motion::style::raised().withAlpha(0.25f));
-                g.fillRect(namesWidth, y, getWidth() - namesWidth, height - 1);
+                g.fillRect(namesWidth, y, getWidth() - namesWidth, cardHeight);
                 juce::Graphics::ScopedSaveState summaryScope(g);
                 g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
                 for (const auto& track : tracks) {
@@ -686,7 +691,7 @@ public:
         if (showsMarkerBand()) {
             g.setColour(osci::Colours::textMuted());
             g.setFont(motion::style::caption());
-            g.drawText(processor.document.project().tempoChanges != nullptr ? "Markers / tempo" : "Markers", 12, 26, namesWidth - 24, 22, juce::Justification::centredLeft);
+            g.drawText(processor.document.project().tempoChanges != nullptr ? "Markers / tempo" : "Markers", cardInset + 8, markerBandTop(), namesWidth - 24, markerBandHeight, juce::Justification::centredLeft);
             const auto& project = processor.document.project();
             if (project.tempoChanges != nullptr) {
                 const auto tempo = project.tempo();
@@ -699,7 +704,8 @@ public:
                         const auto from = static_cast<float>(std::max(namesWidth, timeX(tempo.seconds(previousBeat))));
                         const auto rising = change.bpm >= previousBpm;
                         g.setColour(colour.withAlpha(0.55f));
-                        g.drawLine(from, rising ? 45.0f : 29.0f, static_cast<float>(std::min(x, getWidth())), rising ? 29.0f : 45.0f, 1.5f);
+                        const auto high = static_cast<float>(markerBandTop() + 3), low = static_cast<float>(markerBandTop() + markerBandHeight - 3);
+                        g.drawLine(from, rising ? low : high, static_cast<float>(std::min(x, getWidth())), rising ? high : low, 1.5f);
                     }
                     previousBeat = change.beat;
                     previousBpm = change.bpm;
@@ -707,8 +713,8 @@ public:
                     g.setColour(colour.withAlpha(0.14f));
                     g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
                     g.setColour(colour);
-                    g.fillRect(x, 27, 2, 20);
-                    g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x99\xa9 ")) + juce::String(change.bpm, change.bpm == std::round(change.bpm) ? 0 : 2), x + 4, 27, 70, 20, juce::Justification::centredLeft, true);
+                    g.fillRect(x, markerBandTop() + 1, 2, markerBandHeight - 2);
+                    g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x99\xa9 ")) + juce::String(change.bpm, change.bpm == std::round(change.bpm) ? 0 : 2), x + 4, markerBandTop() + 1, 70, markerBandHeight - 2, juce::Justification::centredLeft, true);
                 }
             }
             for (const auto& marker : processor.document.project().markers) {
@@ -808,7 +814,7 @@ public:
             return;
         }
         selectedMarker = 0;
-        if (event.y >= 26 && event.y < cameraBandTop() && event.x < namesWidth && onEditMarker) { onEditMarker(0, processor.position.load()); return; }
+        if (showsMarkerBand() && event.y >= markerBandTop() && event.y < markerBandTop() + markerBandHeight && event.x < namesWidth && onEditMarker) { onEditMarker(0, processor.position.load()); return; }
         if (event.y < rulerHeight && event.x < namesWidth) { return; }
         if (event.y >= rulerHeight && laneAtY(event.y) != nullptr) {
             if (event.x < namesWidth) { return; }
@@ -1653,8 +1659,7 @@ private:
     void paintLane(juce::Graphics& g, const Row& row, int y, int height) const {
         const auto& project = processor.document.project();
         const auto& track = project.tracks[static_cast<std::size_t>(row.track)];
-        g.setColour(motion::style::sunken());
-        g.fillRect(0, y, getWidth(), height);
+        fillCard(g, y, height - bandGap, motion::style::sunken(), motion::style::sunken());
         const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
         const auto* spec = motion::findPropertySpec(specs, row.lane);
         g.setFont(motion::style::caption());
@@ -1976,7 +1981,22 @@ private:
     static constexpr int cameraBandHeight = 22;
     // The marker band also carries tempo changes.
     bool showsMarkerBand() const { return !processor.document.project().markers.empty() || processor.document.project().tempoChanges != nullptr; }
-    int cameraBandTop() const { return showsMarkerBand() ? 48 : 26; }
+    // Bands and rows are cards with rounded left ends, inset from the panel
+    // edge and separated by one small gap.
+    static constexpr int toolsHeight = 26, bandGap = 2, markerBandHeight = 22, cardInset = 4;
+    static constexpr float cardRadius = 5.0f;
+    int markerBandTop() const { return toolsHeight + bandGap; }
+    int cameraBandTop() const { return (showsMarkerBand() ? markerBandTop() + markerBandHeight : toolsHeight) + bandGap; }
+    void fillCard(juce::Graphics& g, int y, int height, juce::Colour header, std::optional<juce::Colour> lane) const {
+        juce::Path card;
+        card.addRoundedRectangle(static_cast<float>(cardInset), static_cast<float>(y), static_cast<float>(namesWidth - 1 - cardInset), static_cast<float>(height), cardRadius, cardRadius, true, false, true, false);
+        g.setColour(header);
+        g.fillPath(card);
+        if (lane.has_value()) {
+            g.setColour(*lane);
+            g.fillRect(namesWidth, y, getWidth() - namesWidth, height);
+        }
+    }
     bool showsCameraBand() const { return true; }
     // Matches the add-track button above it.
     juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop(), 22, cameraBandHeight}; }
@@ -2001,11 +2021,10 @@ private:
     void paintCameraBand(juce::Graphics& g) const {
         const auto& project = processor.document.project();
         const auto top = cameraBandTop();
-        g.setColour(osci::Colours::surfaceRaised().darker(.15f));
-        g.fillRect(namesWidth, top, getWidth() - namesWidth, cameraBandHeight);
+        fillCard(g, top, cameraBandHeight, motion::style::raised(), motion::style::raised().darker(.15f));
         g.setColour(motion::style::muted());
         g.setFont(motion::style::caption());
-        g.drawText("Cameras", 12, top, namesWidth - 40, cameraBandHeight, juce::Justification::centredLeft);
+        g.drawText("Cameras", cardInset + 8, top, namesWidth - 40, cameraBandHeight, juce::Justification::centredLeft);
         // The plus adds a camera at the playhead, drawn like the add-track button.
         const auto add = addCameraBounds().toFloat();
         if (addHover) {
@@ -2180,10 +2199,10 @@ private:
         for (const auto& next : processor.document.project().markers) {
             if (next.time > marker.time) { right = std::min(right, timeX(next.time) - 2); break; }
         }
-        return {x, 27, std::max(3, right - x), 20};
+        return {x, markerBandTop() + 1, std::max(3, right - x), markerBandHeight - 2};
     }
     const motion::Marker* markerAt(juce::Point<int> point) const {
-        if (point.y < 26 || point.y >= cameraBandTop()) { return nullptr; }
+        if (point.y < markerBandTop() || point.y >= markerBandTop() + markerBandHeight) { return nullptr; }
         for (const auto& marker : processor.document.project().markers) {
             if (markerBounds(marker).contains(point)) { return &marker; }
         }
@@ -2677,7 +2696,7 @@ private:
             layoutRevision.reset();
         }
         if (!layoutRevision.has_value() || *layoutRevision != revision) {
-            rulerHeight = cameraBandTop() + (showsCameraBand() ? cameraBandHeight : 0);
+            rulerHeight = cameraBandTop() + (showsCameraBand() ? cameraBandHeight + bandGap : 0);
             if (std::none_of(processor.document.project().markers.begin(), processor.document.project().markers.end(), [this](const auto& marker) { return marker.id == selectedMarker; })) { selectedMarker = 0; }
             rebuildRows();
             std::erase_if(selectedClips, [this](auto id) { return !isClip(id); });

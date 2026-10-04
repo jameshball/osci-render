@@ -7,6 +7,8 @@
 namespace motion {
 struct TextSettings {
     juce::String family;
+    // Style bits: bold and italic combine.
+    static constexpr int bold = juce::Font::bold, italic = juce::Font::italic;
     int style = juce::Font::plain;
     int alignment = 0; // Left, centre, right; explicit line breaks are preserved.
     double lineSpacing = 1.2;

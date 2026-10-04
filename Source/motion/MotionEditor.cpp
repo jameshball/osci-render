@@ -7,8 +7,7 @@
 #include "ui/BakeSettingsPanel.h"
 #include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
-#include "ui/TextSourcePanel.h"
-#include "ui/LuaSourcePanel.h"
+
 #include "ui/MarkerPanel.h"
 #include "ui/MidiEnvelopePanel.h"
 #include "../components/OverlayDialogHelpers.h"
@@ -221,24 +220,36 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     addAndMakeVisible(tempoValue);
     addAndMakeVisible(tempoLabel);
-    addAndMakeVisible(canvasButton);
-    canvasButton.setName("Output canvas");
-    canvasButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
-    canvasButton.setTooltip("Set the output framing and default video dimensions.");
-    canvasButton.onClick = [this] {
+    // The Scope's controls float over its top right, like the Scene's tools.
+    addAndMakeVisible(scopeTools);
+    visualiser.setControlButtonsHidden(true);
+    using Control = VisualiserComponent::Control;
+    scopeTools.record.onClick = [this] { visualiser.clickControl(Control::record, &scopeTools.record); };
+    scopeTools.textureOutput.onClick = [this] { visualiser.clickControl(Control::textureOutput, &scopeTools.textureOutput); };
+    scopeTools.settings.onClick = [this] { visualiser.clickControl(Control::settings, &scopeTools.settings); };
+    scopeTools.popout.onClick = [this] { visualiser.clickControl(Control::popout, &scopeTools.popout); };
+    scopeTools.fullScreen.onClick = [this] { visualiser.clickControl(Control::fullScreen, &scopeTools.fullScreen); };
+    visualiser.setFullScreenCallback([this](FullScreenMode mode) {
+        const auto next = mode == FullScreenMode::TOGGLE ? !scopeFullScreen : mode == FullScreenMode::FULL_SCREEN;
+        if (next == scopeFullScreen) { return; }
+        scopeFullScreen = next;
+        visualiser.setFullScreen(scopeFullScreen);
+        resized();
+    });
+    scopeTools.canvas.onClick = [this] {
         auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize(), processor.document.mainProject().frameRate);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "Output canvas", juce::Point<int>(420, 150), true);
+        panel->setSize(360, 150);
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
-        controls->onApply = [owner, dialog](VisualiserRenderSize size) {
-            juce::MessageManager::callAsync([owner, dialog, size] {
-                if (owner == nullptr || dialog == nullptr) { return; }
+        const juce::Component::SafePointer<juce::Component> popover(controls);
+        controls->onApply = [owner, popover](VisualiserRenderSize size) {
+            juce::MessageManager::callAsync([owner, popover, size] {
+                if (owner == nullptr || popover == nullptr) { return; }
                 owner->processor.recordingParameters.setCanvasSize(size);
-                owner->dismissOverlay(dialog.getComponent());
+                dismissPopover(popover.getComponent());
             });
         };
-        showOverlay(std::move(overlay));
+        showPopover(std::move(panel), getLocalArea(&scopeTools, scopeTools.canvas.getBounds()));
     };
     addAndMakeVisible(monitorOutput);
     outputLabel.setText("Output", juce::dontSendNotification);
@@ -370,8 +381,33 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
     // A clip's timing leads its Properties, as layer timing does in other editors.
-    propertyInspector.setLead(&clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
-    clipTimingPanel.onHeightChanged = [this] { propertyInspector.relayout(); };
+    inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
+    inspectorLead.add(textAnimation, [this] { return textAnimation.preferredHeight(); });
+    propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
+    clipTimingPanel.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    textAnimation.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    // A change to the characters prepares the text source again in place.
+    textAnimation.onApply = [this](motion::Id id, motion::TextSettings settings) {
+        const auto& assets = processor.document.project().assets;
+        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+        if (found == assets.end()) { return; }
+        // One preparation at a time: a later change waits for the current one.
+        if (!pendingImports.empty()) {
+            queuedTextAnimation = QueuedTextAnimation {id, settings, processor.document.generation()};
+            return;
+        }
+        // Only the animation is this section's; the text and its type stay
+        // as the source has them now.
+        auto merged = (*found)->textSettings;
+        merged.animation = settings.animation;
+        merged.characterDelay = settings.characterDelay;
+        merged.characterDuration = settings.characterDuration;
+        merged.hold = settings.hold;
+        merged.amount = settings.amount;
+        SourceRequest request {{}, processor.position.load(), processor.document.generation(), *found};
+        request.textSettings = merged;
+        beginSourceImport(request);
+    };
     // The owner's effects follow its properties.
     propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); });
     addAndMakeVisible(inspectorTitle);
@@ -515,20 +551,20 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "MIDI envelope", juce::Point<int>(420, 294), true);
+        panel->setSize(380, 294);
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
-        controls->onApply = [owner, dialog, id, generation, revision](motion::MidiInstrument settings) {
-            juce::MessageManager::callAsync([owner, dialog, id, generation, revision, settings] {
-                if (owner == nullptr || dialog == nullptr) { return; }
+        const juce::Component::SafePointer<juce::Component> popover(controls);
+        controls->onApply = [owner, popover, id, generation, revision](motion::MidiInstrument settings) {
+            juce::MessageManager::callAsync([owner, popover, id, generation, revision, settings] {
+                if (owner == nullptr || popover == nullptr) { return; }
                 if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
                     const auto result = owner->processor.document.setMidiInstrument(id, settings);
                     if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
                 }
-                owner->dismissOverlay(dialog.getComponent());
+                dismissPopover(popover.getComponent());
             });
         };
-        showOverlay(std::move(overlay));
+        showPopover(std::move(panel), getLocalArea(&notesEditor, notesEditor.envelopeAnchor().getBounds()));
     };
     timeline.onEditTempo = [this](double beat, double bpm, std::optional<double> replacing) {
         const auto& changes = processor.document.project().tempoChanges;
@@ -536,22 +572,21 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto ramped = changes != nullptr && replacing.has_value() && existing != changes->end() && existing->ramp;
         auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, ramped);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), replacing.has_value() ? "Edit tempo change" : "Add tempo change", juce::Point<int>(360, 160), true);
+        panel->setSize(300, 160);
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
         const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(controls);
-        controls->onApply = [owner, overlayPointer, tempoPanel, beat, replacing](double value, bool glide) {
-            juce::MessageManager::callAsync([owner, overlayPointer, tempoPanel, beat, replacing, value, glide] {
-                if (owner == nullptr || overlayPointer == nullptr) { return; }
+        controls->onApply = [owner, tempoPanel, beat, replacing](double value, bool glide) {
+            juce::MessageManager::callAsync([owner, tempoPanel, beat, replacing, value, glide] {
+                if (owner == nullptr || tempoPanel == nullptr) { return; }
                 const auto result = owner->processor.document.setTempoChange(beat, value, replacing, glide);
                 if (result.failed()) {
-                    if (tempoPanel != nullptr) { tempoPanel->setError(result.getErrorMessage()); }
+                    tempoPanel->setError(result.getErrorMessage());
                     return;
                 }
-                owner->dismissOverlay(overlayPointer.getComponent());
+                dismissPopover(tempoPanel.getComponent());
             });
         };
-        showOverlay(std::move(overlay));
+        showPopover(std::move(panel), getLocalArea(&timeline, timeline.rulerAnchor(processor.document.project().tempo().seconds(beat))));
     };
     timeline.onEditMarker = [this](motion::Id id, double time) {
         const auto& project = processor.document.project();
@@ -569,21 +604,20 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add marker" : "Edit marker", juce::Point<int>(420, 140), true);
+        panel->setSize(300, 140);
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
         const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(controls);
-        controls->onApply = [owner, overlayPointer, markerPanel, id, generation, revision](juce::String name, double time) {
-            juce::MessageManager::callAsync([owner, overlayPointer, markerPanel, id, generation, revision, name, time] {
-                if (owner == nullptr || overlayPointer == nullptr) { return; }
+        controls->onApply = [owner, markerPanel, id, generation, revision](juce::String name, double time) {
+            juce::MessageManager::callAsync([owner, markerPanel, id, generation, revision, name, time] {
+                if (owner == nullptr || markerPanel == nullptr) { return; }
                 if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
                     const auto result = owner->processor.document.setMarker(id, time, name);
-                    if (result.failed()) { if (markerPanel != nullptr) { markerPanel->setError(result.getErrorMessage()); } return; }
+                    if (result.failed()) { markerPanel->setError(result.getErrorMessage()); return; }
                 }
-                owner->dismissOverlay(overlayPointer.getComponent());
+                dismissPopover(markerPanel.getComponent());
             });
         };
-        showOverlay(std::move(overlay));
+        showPopover(std::move(panel), getLocalArea(&timeline, timeline.rulerAnchor(time)));
     };
     timeline.onEnterComposition = [this](motion::Id id) { enterComposition(id); };
     timeline.onSelection = [this](motion::Id id) { select(id); };
@@ -676,6 +710,12 @@ void MotionEditor::saveLayout() {
 
 MotionEditor::~MotionEditor() {
     juce::Desktop::getInstance().removeFocusChangeListener(this);
+    // A popover is parented here and deletes itself only when dismissed.
+    if (popover != nullptr) {
+        popover->exitModalState(0);
+        delete popover.getComponent();
+    }
+    visualiser.setFullScreenCallback(nullptr);
     for (auto* child : getChildren()) { child->removeComponentListener(&dialogStyle); }
     motion::style::unstyleDialogs(*this, dialogStyle.look);
     saveLayout();
@@ -811,23 +851,28 @@ void MotionEditor::resized() {
     previewDivider.setBounds(area.removeFromLeft(7));
     auto output = area;
     outputHeader.setBounds(output.removeFromTop(30));
-    // A tight header drops its title before any control: the picture says
-    // what the panel is.
+    // The header keeps the title; what remains of the visualiser's own bar
+    // (the recording stopwatch, an ffmpeg download) sits at its right.
     const auto controlsWidth = visualiserControls != nullptr && visualiserControls->getParentComponent() == this ? visualiser.controlsPreferredWidth() + 4 : 0;
-    const auto titled = outputHeader.getWidth() - 8 >= 68 + controlsWidth + 64 + 6;
+    const auto titled = outputHeader.getWidth() - 8 >= 68 + controlsWidth;
     outputTitle.setVisible(titled);
     outputTitle.setBounds(outputHeader.getBounds().reduced(8, 3).withWidth(60));
     auto monitorBounds = outputHeader.getBounds().withTrimmedLeft(titled ? 68 : 0).reduced(4, 3);
     if (visualiserControls != nullptr && visualiserControls->getParentComponent() == this) {
-        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth() - 64 - 6));
+        const auto width = std::min(visualiser.controlsPreferredWidth(), std::max(0, monitorBounds.getWidth()));
         visualiserControls->setBounds(monitorBounds.removeFromRight(width).withSizeKeepingCentre(width, 24));
-        monitorBounds.removeFromRight(4);
         visualiserControls->toFront(false);
     }
-    canvasButton.setBounds(monitorBounds.removeFromRight(64));
 
     output.removeFromTop(1);
     visualiser.setBounds(output);
+    // Mirrors the Scene's strip: 8 px in from the Scope's top right.
+    {
+        const auto room = output.getHeight() - 16;
+        scopeTools.setVisible(room >= scopeTools.preferredHeight() && output.getWidth() >= scopeTools.preferredWidth() + 16);
+        scopeTools.setBounds(output.getRight() - 8 - scopeTools.preferredWidth(), output.getY() + 8, scopeTools.preferredWidth(), scopeTools.preferredHeight());
+        scopeTools.toFront(false);
+    }
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
     auto viewControls = viewportHeader.getBounds().reduced(8, 3);
@@ -841,9 +886,17 @@ void MotionEditor::resized() {
     sceneTools.setBounds(editing.getX() + 8, editing.getY() + 9, sceneTools.preferredWidth(), sceneTools.preferredHeight());
     composition.setBounds(editing.withTrimmedTop(1));
     sceneTools.toFront(false);
-    if (drawingEditor != nullptr) {
-        drawingEditor->setBounds(viewportBounds);
+    // A drawing or text being edited takes over the Scene.
+    juce::Component* sceneEditor = drawingEditor != nullptr ? static_cast<juce::Component*>(drawingEditor.get()) : textEditor != nullptr ? static_cast<juce::Component*>(textEditor.get()) : luaEditor.get();
+    if (sceneEditor != nullptr) {
+        sceneEditor->setBounds(viewportBounds);
         for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
+    }
+    // Full screen, the Scope covers everything with its own control row.
+    if (scopeFullScreen) {
+        scopeTools.setVisible(false);
+        visualiser.setBounds(getLocalBounds());
+        visualiser.toFront(false);
     }
 }
 
@@ -938,6 +991,41 @@ bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, s
         beginSourceImport(std::move(request));
     }
     return true;
+}
+
+// Small edits (a marker, a tempo change, the canvas) open in a panel that
+// points at what was clicked instead of covering the window.
+void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor) {
+    auto* panel = content.get();
+    motion::style::styleFields(*panel);
+    auto& box = juce::CallOutBox::launchAsynchronously(std::move(content), anchor, this);
+    box.setArrowSize(9.0f);
+    popover = &box;
+    // Escape in a field closes the popover, as it does anywhere else in it.
+    std::vector<juce::TextEditor*> fields;
+    for (auto* child : panel->getChildren()) {
+        auto* field = dynamic_cast<juce::TextEditor*>(child);
+        if (field == nullptr) { continue; }
+        fields.push_back(field);
+        if (!field->onEscapeKey) { field->onEscapeKey = [panel] { dismissPopover(panel); }; }
+    }
+    // The first field takes the keyboard, its text selected; without one the
+    // popover itself does, so Escape still closes it.
+    juce::MessageManager::callAsync([first = juce::Component::SafePointer<juce::TextEditor>(fields.empty() ? nullptr : fields.front()), popover = juce::Component::SafePointer<juce::CallOutBox>(&box)] {
+        if (first != nullptr && first->isShowing()) {
+            first->grabKeyboardFocus();
+            first->selectAll();
+        } else if (popover != nullptr) {
+            popover->setWantsKeyboardFocus(true);
+            popover->grabKeyboardFocus();
+        }
+    });
+}
+
+void MotionEditor::dismissPopover(juce::Component* content) {
+    if (content == nullptr) { return; }
+    auto* box = content->findParentComponentOfClass<juce::CallOutBox>();
+    if (box != nullptr) { box->dismiss(); }
 }
 
 void MotionEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
@@ -1137,7 +1225,8 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
 }
 
 void MotionEditor::showNextPreparationSettings() {
-    if (preparationSettingsOpen) { return; }
+    // Queued sources wait while a dialog or a Scene editor is open.
+    if (preparationSettingsOpen || drawingEditor != nullptr) { return; }
     while (!preparationRequests.empty() && preparationRequests.front().generation != processor.document.generation()) { preparationRequests.pop_front(); }
     if (preparationRequests.empty()) { return; }
     auto request = std::move(preparationRequests.front());
@@ -1148,26 +1237,20 @@ void MotionEditor::showNextPreparationSettings() {
     const bool video = motion::Document::isVideoSource(extension);
     const bool text = extension.equalsIgnoreCase(".txt");
     const bool fractal = extension.equalsIgnoreCase(".lsystem");
-    const bool editLua = extension.equalsIgnoreCase(".lua") && request.replacement != nullptr;
     std::unique_ptr<juce::Component> content;
-    MotionBakeSettingsPanel* luaPanel = nullptr;
     MotionRasterSettingsPanel* imagePanel = nullptr;
     MotionFractalSettingsPanel* fractalPanel = nullptr;
-    MotionTextSourcePanel* textPanel = nullptr;
-    MotionLuaSourcePanel* sourcePanel = nullptr;
+    // Text and Lua are written in the Scene; images and fractals keep a
+    // short settings dialog.
     if (text) {
-        const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
-        const auto draft = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())));
-        auto panel = std::make_unique<MotionTextSourcePanel>(draft, instances, request.textSettings.value_or(request.replacement->textSettings), request.preparationError);
-        textPanel = panel.get();
-        content = std::move(panel);
-    } else if (editLua) {
-        const auto instances = motion::sourceReferenceCount(processor.document.mainProject(), request.replacement->id);
-        const auto code = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())));
-        auto panel = std::make_unique<MotionLuaSourcePanel>(code, request.retrySettings.value_or(request.replacement->bakeSettings), instances, request.preparationError);
-        sourcePanel = panel.get();
-        content = std::move(panel);
-    } else if (raster) {
+        showTextEditor(std::move(request));
+        return;
+    }
+    if (!raster && !fractal) {
+        showLuaEditor(std::move(request));
+        return;
+    }
+    if (raster) {
         auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video);
         imagePanel = panel.get();
         content = std::move(panel);
@@ -1176,16 +1259,8 @@ void MotionEditor::showNextPreparationSettings() {
         auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth);
         fractalPanel = panel.get();
         content = std::move(panel);
-    } else {
-        motion::BakeSettings initial;
-        initial.bpm = processor.document.project().bpm;
-        initial.frameRate = processor.document.project().frameRate;
-        if (request.replacement != nullptr) { initial = request.replacement->bakeSettings; }
-        auto panel = std::make_unique<MotionBakeSettingsPanel>(initial);
-        luaPanel = panel.get();
-        content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 620 : 440, editLua ? 550 : text ? 470 : fractal ? 102 : video ? 328 : raster ? 270 : 290), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Prepare " + name, juce::Point<int>(440, fractal ? 102 : video ? 328 : 270), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -1211,16 +1286,8 @@ void MotionEditor::showNextPreparationSettings() {
             });
         });
     };
-    if (luaPanel != nullptr) { luaPanel->onBake = [submit](motion::BakeSettings settings) mutable { submit(settings, {}); }; }
-    if (sourcePanel != nullptr) {
-        sourcePanel->onBake = [submit, original = request.replacement](motion::BakeSettings settings, juce::String code) mutable {
-            const auto unchanged = code == juce::String::fromUTF8(static_cast<const char*>(original->data.getData()), static_cast<int>(original->data.getSize()));
-            submit(settings, {}, unchanged ? std::optional<juce::String>() : std::optional<juce::String>(std::move(code)));
-        };
-    }
     if (imagePanel != nullptr) { imagePanel->onPrepare = [submit](motion::RasterSettings settings) mutable { submit({}, settings); }; }
     if (fractalPanel != nullptr) { fractalPanel->onPrepare = [submit](int depth) mutable { submit({}, {}, {}, {}, depth); }; }
-    if (textPanel != nullptr) { textPanel->onApply = [submit](juce::String text, motion::TextSettings settings) mutable { submit({}, {}, std::move(text), std::move(settings)); }; }
     showOverlay(std::move(overlay));
 }
 
@@ -1283,11 +1350,28 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                 return;
             }
             std::erase(owner->pendingImports, task);
+            juce::MessageManager::callAsync([owner] {
+                if (owner == nullptr || !owner->pendingImports.empty() || !owner->queuedTextAnimation.has_value()) { return; }
+                const auto queued = *owner->queuedTextAnimation;
+                owner->queuedTextAnimation.reset();
+                if (queued.generation != owner->processor.document.generation()) { owner->textAnimation.clearPending(); return; }
+                if (owner->textAnimation.onApply) { owner->textAnimation.onApply(queued.asset, queued.settings); }
+            });
             if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
             if (result.failed()) {
                 owner->importError = result.getErrorMessage();
                 owner->statusBar.show(owner->importError);
+                owner->textAnimation.clearPending();
                 owner->repaint();
+                // A new script that fails reopens with its code, as an edit does.
+                if (request.replacement == nullptr && request.relink == 0 && request.file.hasFileExtension("lua")) {
+                    auto retry = request;
+                    retry.retrySettings = asset->bakeSettings;
+                    retry.preparationError = result.getErrorMessage();
+                    owner->preparationRequests.push_front(std::move(retry));
+                    owner->showNextPreparationSettings();
+                    return;
+                }
                 if (request.uniqueClip == 0 && request.replacement != nullptr && (request.replacement->extension.equalsIgnoreCase(".lua") || request.replacement->extension.equalsIgnoreCase(".txt"))) {
                     const auto& assets = owner->processor.document.project().assets;
                     if (std::find(assets.begin(), assets.end(), request.replacement) != assets.end()) {
@@ -1317,7 +1401,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     return;
                 }
                 asset->id = request.replacement->id;
-                document.edit(request.editedText.has_value() ? (asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source") : "Rebuild source cache", [&](motion::Project& project) {
+                document.edit(request.editedText.has_value() ? (asset->extension.equalsIgnoreCase(".lua") ? "Edit Lua source" : "Edit text source") : request.textSettings.has_value() ? "Animate text" : "Rebuild source cache", [&](motion::Project& project) {
                     for (auto& item : project.assets) {
                         if (item == request.replacement) { item = asset; }
                     }
@@ -1374,6 +1458,7 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
 
 void MotionEditor::timerCallback() {
     continueCommandLineRender();
+    if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
     processor.showIdleSeek(processor.document.mainProject().duration);
     refreshOutputChoices();
     auto& previewRate = processor.recordingParameters.frameRate;
@@ -1382,7 +1467,20 @@ void MotionEditor::timerCallback() {
     if (!visualiser.isRecording() && std::abs(previewRate.getValueUnnormalised() - projectFrameRate) > 0.005f) {
         previewRate.setUnnormalisedValueNotifyingHost(projectFrameRate);
     }
-    canvasButton.setEnabled(!visualiser.isRecording() && exportState == nullptr);
+    scopeTools.canvas.setEnabled(!visualiser.isRecording() && exportState == nullptr);
+    {
+        using Control = VisualiserComponent::Control;
+        // The strip shows what the visualiser is doing, however it started.
+        scopeTools.record.setToggleState(visualiser.isControlOn(Control::record), juce::dontSendNotification);
+        scopeTools.textureOutput.setToggleState(visualiser.isControlOn(Control::textureOutput), juce::dontSendNotification);
+        scopeTools.popout.setToggleState(visualiser.isControlOn(Control::popout), juce::dontSendNotification);
+        const auto settingsShown = visualiser.hasControl(Control::settings), popoutShown = visualiser.hasControl(Control::popout);
+        if (scopeTools.settings.isVisible() != settingsShown || scopeTools.popout.isVisible() != popoutShown) {
+            scopeTools.settings.setVisible(settingsShown);
+            scopeTools.popout.setVisible(popoutShown);
+            resized();
+        }
+    }
     {
         const auto rate = processor.exportSampleRate();
         const auto beamRate = motion::beamCycleRate(processor.document.mainProject().frameRate);
@@ -1464,6 +1562,8 @@ void MotionEditor::timerCallback() {
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     // A drawing belongs to the project it was started in.
     if (drawingEditor != nullptr && processor.document.generation() != drawingGeneration) { closeDrawingEditor(); }
+    if (textEditor != nullptr && processor.document.generation() != textGeneration) { closeTextEditor(); }
+    if (luaEditor != nullptr && processor.document.generation() != luaGeneration) { closeLuaEditor(); }
     sliderBakes.requestUpdate();
     refreshOutputChoices();
     if (curveList.isVisible()) { refreshCurveList(); }
@@ -1556,6 +1656,7 @@ void MotionEditor::select(motion::Id id) {
     selection = id;
     notesEditor.setSelection(id);
     clipTimingPanel.setSelection(id);
+    textAnimation.setSelection(id);
     // Cameras have no effects, so selecting one shows its Properties.
     const auto camera = selectionIsCamera();
     timeline.setSelection(id);
@@ -1589,7 +1690,7 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
         for (const auto& item : processor.document.mainProject().assets) { count += item->name.startsWith("Drawing") ? 1 : 0; }
         name = "Drawing " + juce::String(count);
     }
-    if (drawingEditor != nullptr) { return; }
+    if (drawingEditor != nullptr || textEditor != nullptr || luaEditor != nullptr) { return; }
     // The drawing takes over the Scene; the Scope shows it live as a beam.
     drawingAsset = asset;
     drawingGeneration = processor.document.generation();
@@ -1616,6 +1717,139 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     drawingEditor->grabKeyboardFocus();
 }
 
+void MotionEditor::showTextEditor(SourceRequest request) {
+    if (request.replacement == nullptr || textEditor != nullptr || drawingEditor != nullptr || luaEditor != nullptr) { return; }
+    const auto& asset = *request.replacement;
+    const auto draft = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())));
+    const auto settings = request.textSettings.value_or(asset.textSettings);
+    textRequest = request;
+    textGeneration = processor.document.generation();
+    // Other queued sources wait until the text is saved or cancelled.
+    preparationSettingsOpen = true;
+    textEditor = std::make_unique<MotionTextSourceEditor>(draft, asset.name.upToLastOccurrenceOf(".", false, false), settings, request.preparationError);
+    addAndMakeVisible(*textEditor);
+    textEditor->onChanged = [this] { textPreviewDue = juce::Time::getMillisecondCounterHiRes() + 120; };
+    textEditor->onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeTextEditor(); } }); };
+    textEditor->onDone = [this](const juce::String& text, const motion::TextSettings& chosen) {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), editor = textEditor.get(), text, chosen] {
+            // A second Save before this runs finds the editor already gone.
+            if (owner == nullptr || owner->textEditor.get() != editor) { return; }
+            auto next = owner->textRequest;
+            owner->closeTextEditor();
+            if (owner->processor.document.generation() != next.generation) { return; }
+            // The source may have changed while the editor was open (its
+            // animation, an undo): build on what it is now.
+            const auto& assets = owner->processor.document.project().assets;
+            const auto id = next.replacement->id;
+            const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+            if (found == assets.end()) { owner->statusBar.show("The text source was removed while it was being edited."); return; }
+            auto settings = (*found)->textSettings;
+            settings.family = chosen.family;
+            settings.style = chosen.style;
+            settings.alignment = chosen.alignment;
+            settings.lineSpacing = chosen.lineSpacing;
+            settings.tracking = chosen.tracking;
+            next.replacement = *found;
+            next.editedText = text;
+            next.textSettings = settings;
+            next.preparationError.clear();
+            owner->beginSourceImport(next);
+        });
+    };
+    resized();
+    previewText();
+    textEditor->focusText();
+}
+
+void MotionEditor::showLuaEditor(SourceRequest request) {
+    if (luaEditor != nullptr || textEditor != nullptr || drawingEditor != nullptr) { return; }
+    const auto editing = request.replacement != nullptr;
+    const auto code = editing ? request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())))
+                              : request.file.loadFileAsString();
+    motion::BakeSettings initial;
+    initial.bpm = processor.document.project().bpm;
+    initial.frameRate = processor.document.project().frameRate;
+    if (editing) { initial = request.replacement->bakeSettings; }
+    initial = request.retrySettings.value_or(initial);
+    const auto title = (editing ? request.replacement->name : request.file.getFileName()).upToLastOccurrenceOf(".", false, false);
+    luaRequest = request;
+    luaGeneration = processor.document.generation();
+    luaSubmitted = false;
+    preparationSettingsOpen = true;
+    luaEditor = std::make_unique<MotionLuaSourceEditor>(code, title, initial, editing, request.preparationError);
+    addAndMakeVisible(*luaEditor);
+    luaEditor->onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeLuaEditor(); } }); };
+    luaEditor->onDone = [this, original = code](motion::BakeSettings settings, const juce::String& written) {
+        if (luaSubmitted) { return; }
+        auto next = luaRequest;
+        next.preparationError.clear();
+        if (next.replacement != nullptr) {
+            next.editedText = written == original ? std::optional<juce::String>() : std::optional<juce::String>(written);
+        } else if (written != original) {
+            // A new file edited before it is added imports from a copy.
+            const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion lua").getChildFile(juce::Uuid().toString());
+            const auto copy = folder.getChildFile(next.file.getFileName());
+            if (!folder.createDirectory().wasOk() || !copy.replaceWithText(written)) {
+                statusBar.show("Could not save the edited script.");
+                return;
+            }
+            next.file = copy;
+        }
+        luaSubmitted = true;
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), next, settings] {
+            if (owner == nullptr) { return; }
+            owner->closeLuaEditor();
+            if (owner->processor.document.generation() == next.generation) { owner->beginSourceImport(next, settings); }
+        });
+    };
+    resized();
+    luaEditor->focusCode();
+}
+
+void MotionEditor::closeLuaEditor() {
+    if (luaEditor == nullptr) { return; }
+    removeChildComponent(luaEditor.get());
+    luaEditor.reset();
+    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
+    preparationSettingsOpen = false;
+    resized();
+    showNextPreparationSettings();
+}
+
+void MotionEditor::closeTextEditor() {
+    if (textEditor == nullptr) { return; }
+    removeChildComponent(textEditor.get());
+    textEditor.reset();
+    textPreviewDue = 0;
+    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
+    processor.previewComposition(processor.document.project());
+    preparationSettingsOpen = false;
+    resized();
+    showNextPreparationSettings();
+}
+
+// The words being written, on the output: the source is swapped in place,
+// still, so typing stays quick; its animation plays once saved.
+void MotionEditor::previewText() {
+    textPreviewDue = 0;
+    if (textEditor == nullptr || textRequest.replacement == nullptr) { return; }
+    auto project = processor.document.project();
+    auto asset = std::make_shared<motion::Asset>(*textRequest.replacement);
+    const auto text = textEditor->currentText();
+    asset->data.reset();
+    asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
+    asset->textSettings = textEditor->currentSettings();
+    asset->textSettings.animation = motion::TextSettings::Animation::none;
+    if (text.trim().isEmpty() || text.length() > 16384 || motion::Document::decodeAsset(*asset).failed()) {
+        processor.previewComposition(project);
+        return;
+    }
+    for (auto& item : project.assets) {
+        if (item->id == asset->id) { item = asset; }
+    }
+    processor.previewComposition(project);
+}
+
 void MotionEditor::closeDrawingEditor() {
     if (drawingEditor == nullptr) { return; }
     removeChildComponent(drawingEditor.get());
@@ -1623,6 +1857,7 @@ void MotionEditor::closeDrawingEditor() {
     for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
     processor.previewComposition(processor.document.project());
     resized();
+    showNextPreparationSettings();
 }
 
 // The drawing in progress on the output: an edited source is swapped in place;
@@ -1741,13 +1976,15 @@ bool MotionEditor::audioSelected() const {
 void MotionEditor::refreshInspector() {
     propertyInspector.setSelectionCount(std::max<std::size_t>(1, timeline.selectedClipIds().size()));
     clipTimingPanel.refresh();
+    textAnimation.refresh();
+    inspectorLead.resized();
     // A camera's rig leads its Properties where a clip's timing would.
     const auto camera = selectionIsCamera();
     cameraRig.setCamera(camera ? selection : 0);
     if (camera) {
         propertyInspector.setLead(&cameraRig, [this] { return cameraRig.preferredHeight(); });
     } else {
-        propertyInspector.setLead(&clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
+        propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
     }
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, selection);
