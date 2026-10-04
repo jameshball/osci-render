@@ -20,9 +20,9 @@ public:
         fly.setTooltip("Fly (N): mouse to look, WASD to move, Esc to finish");
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
-        lookThrough.setTooltip("Look through this camera: moving the view moves the camera");
+        lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
         setGroups({{&move, &rotate, &scale}, {&path, &fly, &frame}, {&lookThrough}});
-        lookThrough.setVisible(false);
+        lookThrough.setEnabled(false);
     }
     Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam};
@@ -34,7 +34,7 @@ public:
         for (auto* tool : {&path, &fly, &frame}) { tool->setVisible(!compact); }
         resized();
     }
-    int fullHeight() const { return cell * (lookThrough.isVisible() ? 7 : 6) + groupGap * (lookThrough.isVisible() ? 2 : 1) + inset * 2; }
+    int fullHeight() const { return cell * 7 + groupGap * 2 + inset * 2; }
     bool compact = false;
 };
 
@@ -57,7 +57,7 @@ public:
         fullScreen.setTooltip("Full screen");
         setGroups({{&record, &textureOutput}, {&canvas, &settings}, {&popout, &fullScreen}});
     }
-    Tool record {"Record scope", motion::icons::Icon::record}, textureOutput {"Texture output", motion::icons::Icon::cast};
+    Tool record {"Record scope", motion::icons::Icon::record}, textureOutput {"Share picture", motion::icons::Icon::cast};
     Tool canvas {"Output canvas", motion::icons::Icon::aspectRatio}, settings {"Scope settings", motion::icons::Icon::settings};
     Tool popout {"Pop out scope", motion::icons::Icon::openInNew}, fullScreen {"Full screen scope", motion::icons::Icon::fullscreen};
 };

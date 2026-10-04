@@ -12,6 +12,8 @@ public:
         setName("MIDI notes editor");
         setWantsKeyboardFocus(true);
         for (auto* button : {&create, &fitButton, &remove, &audition, &envelopeButton, &record, &cancelRecording}) { addAndMakeVisible(button); }
+        // On the raised header the buttons take the dark field fill, so they read as buttons.
+        for (auto* button : {&fitButton, &remove, &audition, &envelopeButton, &record, &cancelRecording}) { button->setColour(juce::TextButton::buttonColourId, motion::style::field()); }
         record.setName("Record MIDI notes"); cancelRecording.setName("Cancel MIDI recording");
         record.setTooltip("Record unquantized notes, velocity and sustain into this clip. Existing notes are kept. Other controllers are not applied yet.");
         record.onClick = [this] {
@@ -109,7 +111,7 @@ public:
         updating = false;
         record.setButtonText(recording ? (processor.midiRecordingSession().stopping() ? "Finishing..." : "Stop recording") : "Record notes");
         record.setEnabled(recording ? !processor.midiRecordingSession().stopping() : available && !isLocked() && clip->composition == 0);
-        if (recording) { record.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff8b3039)); } else { record.removeColour(juce::TextButton::buttonColourId); }
+        record.setColour(juce::TextButton::buttonColourId, recording ? juce::Colour(0xff8b3039) : motion::style::field());
         cancelRecording.setVisible(recording);
         // Clip-bound actions appear once a visual clip is chosen.
         record.setVisible(clip != nullptr || recording);

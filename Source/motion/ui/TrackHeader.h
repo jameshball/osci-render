@@ -33,7 +33,8 @@ public:
         // The glyph matches the M and S letters' height.
         lock.iconSize = 10.0f;
         grip.setTooltip("Drag to reorder; click for track actions");
-        grip.onClick = [this] { if (onMenu) { onMenu(id); } };
+        // A click opens the menu; a drag moves the track instead.
+        grip.onClick = [this] { if (gripTravel < 4 && onMenu) { onMenu(id); } };
         grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
         grip.addMouseListener(this, false);
         for (auto* child : std::initializer_list<juce::Component*> { &name, &mute, &solo, &grip }) { addAndMakeVisible(child); }
@@ -79,7 +80,24 @@ public:
         arm.setTooltip(track.midiInput == 0 ? "Play and record live MIDI on this track (choose a channel in the track menu)"
             : "Live MIDI input: " + (track.midiInput == motion::Track::anyMidiChannel ? juce::String("any channel") : "channel " + juce::String(track.midiInput)));
     }
+    // While dragged, the header covers the rows it passes over with its own
+    // card and the left of the lifted block's outline.
+    void setLifted(bool value) {
+        if (lifted != value) {
+            lifted = value;
+            repaint();
+        }
+    }
     void paint(juce::Graphics& g) override {
+        if (lifted) {
+            const auto card = getLocalBounds().toFloat().withTrimmedTop(-1.0f).withTrimmedBottom(-1.0f).withWidth(static_cast<float>(getWidth() + 8)).reduced(.75f);
+            juce::Path shape;
+            shape.addRoundedRectangle(card.getX(), card.getY(), card.getWidth(), card.getHeight(), 5.0f, 5.0f, true, false, true, false);
+            g.setColour(motion::style::raised());
+            g.fillPath(shape);
+            g.setColour(motion::style::accent().withAlpha(.55f));
+            g.strokePath(shape, juce::PathStrokeType(1.5f));
+        }
         if (!labelColour.isTransparent()) {
             g.setColour(labelColour);
             g.fillRect(0, 2, 3, std::min(getHeight(), 28) - 4);
@@ -110,24 +128,34 @@ public:
             if (onMenu) { onMenu(id); }
             return;
         }
+        if (event.eventComponent == &grip) { gripTravel = 0; }
         // Anywhere on the header but its buttons selects the track or group.
         if ((event.eventComponent == &name || event.eventComponent == this) && onSelect) { onSelect(id); }
     }
+    // Dragging the grip moves the track itself: the timeline lifts it and
+    // slides the other rows aside.
     void mouseDrag(const juce::MouseEvent& event) override {
-        if (isGroup || event.eventComponent != &grip || event.getDistanceFromDragStart() < 4) { return; }
-        auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
-        if (container != nullptr && !container->isDragAndDropActive()) {
-            container->startDragging("motion-track:" + juce::String(id) + ":" + juce::String(onDragRevision ? onDragRevision() : 0), &grip);
-        }
+        if (isGroup || event.eventComponent != &grip) { return; }
+        gripTravel = std::max(gripTravel, event.getDistanceFromDragStart());
+        if (gripTravel >= 4 && onReorder) { onReorder(id, event.getScreenPosition(), false); }
+    }
+    void mouseUp(const juce::MouseEvent& event) override {
+        if (isGroup || event.eventComponent != &grip || gripTravel < 4) { return; }
+        // The button has already ignored this release as a click; later
+        // clicks (or an accessibility press) open the menu again.
+        gripTravel = 0;
+        if (onReorder) { onReorder(id, event.getScreenPosition(), true); }
     }
     const motion::Id id;
     std::function<void(motion::Id, std::string)> onRename;
     std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock, onArm;
     // Live input reaches main-timeline tracks only.
     bool armingAvailable = true;
-    std::function<std::uint64_t()> onDragRevision;
+    // The grip's drag, in screen coordinates; `finished` on release.
+    std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
-    bool isGroup = false;
+    bool isGroup = false, lifted = false;
+    int gripTravel = 0;
     juce::Colour labelColour = juce::Colours::transparentBlack;
     class Disclosure : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {

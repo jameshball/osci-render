@@ -12,9 +12,9 @@ public:
         for (auto* component : std::initializer_list<juce::Component*> { &preset, &widthLabel, &heightLabel, &width, &height }) { addAndMakeVisible(component); }
         preset.setName("Canvas preset");
         preset.addItem("Custom canvas", 1);
-        preset.addItem("Square / 1024 x 1024", 2);
-        preset.addItem("Landscape / 1920 x 1080", 3);
-        preset.addItem("Portrait / 1080 x 1920", 4);
+        preset.addItem("Square" + motion::style::dot() + "1024 " + juce::String::fromUTF8("\xc3\x97") + " 1024", 2);
+        preset.addItem("Landscape" + motion::style::dot() + "1920 " + juce::String::fromUTF8("\xc3\x97") + " 1080", 3);
+        preset.addItem("Portrait" + motion::style::dot() + "1080 " + juce::String::fromUTF8("\xc3\x97") + " 1920", 4);
         width.setName("Video width");
         height.setName("Video height");
         motion::style::dialog::caption(widthLabel);

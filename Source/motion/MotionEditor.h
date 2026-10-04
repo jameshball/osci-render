@@ -27,6 +27,7 @@
 #include "ui/TextSourceEditor.h"
 #include "ui/LuaSourceEditor.h"
 #include "ui/TextAnimationPanel.h"
+#include "ui/CompositionPanel.h"
 #include <deque>
 #include <variant>
 
@@ -221,6 +222,7 @@ private:
     // Properties lead: a clip's timing, then a text clip's character animation.
     MotionSectionStack inspectorLead;
     MotionTextAnimationPanel textAnimation { processor };
+    MotionCompositionPanel compositionSettings { processor };
     struct QueuedTextAnimation {
         motion::Id asset;
         motion::TextSettings settings;

@@ -123,7 +123,7 @@ public:
         if (midi != nullptr) {
             const auto& asset = *assets[static_cast<std::size_t>(row)];
             help += "\n" + juce::String(static_cast<int>(midi->notes().size())) + (midi->notes().size() == 1 ? " note" : " notes");
-            if (asset.midiSuggestedBpm > 0) { help += " | " + juce::String(asset.midiSuggestedBpm, 1) + " BPM suggested"; }
+            if (asset.midiSuggestedBpm > 0) { help += motion::style::dot() + juce::String(asset.midiSuggestedBpm, 1) + " BPM suggested"; }
             if (asset.midiIgnoredEvents > 0) { help += "\n" + juce::String(asset.midiIgnoredEvents) + " unsupported events were not imported."; }
         }
         status.setText(importStatus.isNotEmpty() ? importStatus : (hasError ? errorMessage : help), juce::dontSendNotification);
@@ -224,7 +224,8 @@ private:
         if (frames == 0 && (drawing == nullptr || drawing->empty())) { return path; }
         const auto frame = frames / 2;
         const auto pointFrames = frames > 0 && source->drawingAt(frame) == nullptr;
-        constexpr int steps = 400;
+        // Enough samples for text's many small outlines; traced once per source.
+        constexpr int steps = 2000;
         std::vector<juce::Point<float>> points;
         std::vector<bool> lit;
         float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
@@ -238,6 +239,8 @@ private:
             top = std::min(top, point.y); bottom = std::max(bottom, point.y);
         }
         if (points.empty()) { return path; }
+        // A script that never sets a colour leaves every point unlit; draw it all.
+        const auto anyLit = std::find(lit.begin(), lit.end(), true) != lit.end();
         const auto size = std::max({right - left, bottom - top, 1e-6f});
         const auto jump = size * .2f;
         const auto map = [&](juce::Point<float> point) {
@@ -245,7 +248,7 @@ private:
         };
         bool open = false;
         for (std::size_t index = 0; index < points.size(); ++index) {
-            const auto dark = pointFrames && !lit[index];
+            const auto dark = pointFrames && anyLit && !lit[index];
             const auto jumped = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
             if (dark) { open = false; continue; }
             if (open && !jumped) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }

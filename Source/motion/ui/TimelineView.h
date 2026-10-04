@@ -71,6 +71,8 @@ public:
     std::function<void(motion::Id, double)> onEditMarker;
     // (beat, current bpm, beat of the change being edited, if any)
     std::function<void(double, double, std::optional<double>)> onEditTempo;
+    // The tempo change at (or nearest a beat to) `seconds`, as the ruler's menu edits it.
+    void editTempoAt(double seconds) { editTempoChange(seconds); }
     // A point on the ruler at `seconds` for a popover to aim at, kept within
     // the visible lanes.
     juce::Rectangle<int> rulerAnchor(double seconds) const {
@@ -291,6 +293,7 @@ public:
     void refreshTracks() {
         const auto& project = processor.document.project();
         ensureTrackRows();
+        validateTrackDrag();
         std::erase_if(headers, [&](const auto& header) {
             return motion::findGroup(project, header->id) == nullptr && std::none_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) { return track.id == header->id; });
         });
@@ -314,7 +317,7 @@ public:
                     refreshTracks();
                     selectClip(id);
                 };
-                header->onDragRevision = [this] { return processor.document.revision(); };
+                header->onReorder = [this](motion::Id id, juce::Point<int> screen, bool finished) { dragTrack(id, getLocalPoint(nullptr, screen).y, finished); };
                 header->onLanes = [this](motion::Id id) {
                     if (expandedTracks.contains(id)) { expandedTracks.erase(id); } else { expandedTracks.insert(id); }
                     layoutRevision.reset();
@@ -349,6 +352,7 @@ public:
     }
     void resized() override {
         ensureTrackRows();
+        validateTrackDrag();
         addTrack.setBounds(namesWidth - 26, 2, 22, 22);
         snapButton.setBounds(namesWidth - 50, 2, 22, 22);
         // The tool highlights line up with the cards below.
@@ -364,22 +368,26 @@ public:
             const auto row = static_cast<std::size_t>(found - rows.begin());
             const auto y = rowY(static_cast<int>(row)) - rulerHeight;
             const auto height = heightOf(row);
-            header->setVisible(y + height > 0 && y < headerArea.getHeight());
+            const auto shown = y + shiftOf(static_cast<int>(row));
+            header->setVisible(shown + height > 0 && shown < headerArea.getHeight());
             // Centred on the card; the rest of the row's foot still resizes it.
+            // A dragged track's header rides with it; the others slide.
             const auto indent = cardInset + std::min(48, found->depth * 8);
-            header->setBounds(indent, y + (resizeStrip - bandGap) / 2, namesWidth - 5 - indent, height - resizeStrip);
+            const auto lifted = trackDrag.has_value() && trackDrag->id == header->id;
+            const auto top = lifted ? liftedTop() - rulerHeight : y + shiftOf(static_cast<int>(row));
+            header->setBounds(indent, top + (resizeStrip - bandGap) / 2, namesWidth - 5 - indent, height - resizeStrip);
+            header->setLifted(lifted);
+            if (lifted) { header->setVisible(true); header->toFront(false); }
         }
     }
     bool isInterestedInDragSource(const SourceDetails& details) override {
         const auto description = details.description.toString();
-        return description.startsWith("motion-asset:") || description.startsWith("motion-effect:") || description.startsWith("motion-track:");
+        return description.startsWith("motion-asset:") || description.startsWith("motion-effect:");
     }
 
     void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
     void itemDragMove(const SourceDetails& details) override {
         dropPosition = details.localPosition;
-        dropTrack = details.description.toString().startsWith("motion-track:");
-        if (dropTrack && details.localPosition.y < rulerHeight) { dropPosition.reset(); repaint(); return; }
         dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
         dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
         previewEffect(dropEffect.empty() ? 0 : effectOwnerAt(details.localPosition));
@@ -420,13 +428,6 @@ public:
     void itemDropped(const SourceDetails& details) override {
         dropPosition.reset();
         previewEffect(0);
-        if (details.description.toString().startsWith("motion-track:")) {
-            if (details.localPosition.y < rulerHeight) { repaint(); return; }
-            const auto revision = static_cast<std::uint64_t>(details.description.toString().fromLastOccurrenceOf(":", false, false).getLargeIntValue());
-            if (revision != processor.document.revision()) { repaint(); return; }
-            reorderTrack(static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), details.localPosition.y);
-            return;
-        }
         if (details.description.toString().startsWith("motion-effect:")) {
             insertEffect(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), details.localPosition);
             repaint();
@@ -488,6 +489,7 @@ public:
 
     void paint(juce::Graphics& g) override {
         ensureTrackRows();
+        validateTrackDrag();
         g.fillAll(osci::Colours::veryDark());
         auto area = getLocalBounds();
         g.setColour(osci::Colours::surfaceRaised());
@@ -548,16 +550,13 @@ public:
         scrollY = std::clamp(scrollY, 0, maximumScrollY());
         g.saveState();
         g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
-        for (int visible = firstVisibleRow(); visible < static_cast<int>(rows.size()); ++visible) {
+        const auto paintRow = [&](int visible) {
             const auto y = rowY(visible);
-            if (y >= getHeight()) {
-                break;
-            }
             const auto& row = rows[static_cast<std::size_t>(visible)];
             const auto height = heightOf(static_cast<std::size_t>(visible));
             if (row.isLane()) {
                 paintLane(g, row, y, height);
-                continue;
+                return;
             }
             // Alternate lanes are faintly lighter; the gap under each card
             // separates the rows.
@@ -586,7 +585,7 @@ public:
                         parent = group != nullptr ? group->parent : 0;
                     }
                 }
-                continue;
+                return;
             }
             juce::Graphics::ScopedSaveState scope(g);
             g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
@@ -594,6 +593,39 @@ public:
             for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) {
                 paintClip(g, clip, tracks[static_cast<std::size_t>(index)], index, opacity);
             }
+        };
+        // A dragged track lifts out of the list; the other rows slide by
+        // their eased offsets, and the lifted block is drawn last.
+        const auto dragging = trackDrag.has_value();
+        // While rows slide (dragging or settling) some come from off screen.
+        const auto sliding = dragging || !rowShift.empty();
+        const auto reach = sliding ? (dragging ? trackDrag->height : getHeight()) : 0;
+        for (int visible = sliding ? 0 : firstVisibleRow(); visible < static_cast<int>(rows.size()); ++visible) {
+            if (rowY(visible) - reach >= getHeight()) { break; }
+            if (dragging && visible >= trackDrag->first && visible < trackDrag->last) { continue; }
+            juce::Graphics::ScopedSaveState shifted(g);
+            g.addTransform(juce::AffineTransform::translation(0.0f, static_cast<float>(shiftOf(visible))));
+            paintRow(visible);
+            if (dragging && trackDrag->group != 0 && rows[static_cast<std::size_t>(visible)].group() && rows[static_cast<std::size_t>(visible)].id == trackDrag->group) {
+                // The group it will join.
+                g.setColour(motion::style::accent().withAlpha(.7f));
+                g.drawRoundedRectangle(juce::Rectangle<float>(static_cast<float>(cardInset), static_cast<float>(rowY(visible)), static_cast<float>(getWidth() - cardInset), static_cast<float>(heightOf(static_cast<std::size_t>(visible)) - bandGap)).reduced(.75f), cardRadius, 1.5f);
+            }
+        }
+        if (dragging) {
+            const auto top = liftedTop();
+            const auto offset = static_cast<float>(top - rowY(trackDrag->first));
+            const auto block = juce::Rectangle<int>(cardInset, top, getWidth() - cardInset, trackDrag->height - bandGap);
+            juce::DropShadow(juce::Colours::black.withAlpha(.6f), 16, {0, 5}).drawForRectangle(g, block);
+            {
+                juce::Graphics::ScopedSaveState lifted(g);
+                g.addTransform(juce::AffineTransform::translation(0.0f, offset));
+                for (int visible = trackDrag->first; visible < trackDrag->last; ++visible) { paintRow(visible); }
+            }
+            juce::Path outline;
+            outline.addRoundedRectangle(block.toFloat().reduced(.75f).getX(), block.toFloat().reduced(.75f).getY(), block.toFloat().reduced(.75f).getWidth(), block.toFloat().reduced(.75f).getHeight(), cardRadius, cardRadius, true, false, true, false);
+            g.setColour(motion::style::accent().withAlpha(.55f));
+            g.strokePath(outline, juce::PathStrokeType(1.5f));
         }
         g.restoreState();
         if (blocked.has_value()) {
@@ -617,12 +649,7 @@ public:
                 for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) { g.drawRoundedRectangle(clipBounds(clip, index).toFloat().reduced(1.5f), 4, 1.0f); }
             }
         }
-        if (dropPosition.has_value() && dropTrack) {
-            g.setColour(osci::Colours::accentColor());
-            const auto under = visualRowAt(dropPosition->y);
-            const auto boundary = std::clamp(under >= 0 && under < static_cast<int>(rows.size()) && dropPosition->y >= rowY(under) + heightAt(under) / 2 ? under + 1 : under, 0, static_cast<int>(rows.size()));
-            if (groupAtY(dropPosition->y) != 0) { g.drawRect(0, rowY(under), getWidth(), heightAt(under), 2); } else { g.fillRect(0, rowY(boundary) - 1, getWidth(), 2); }
-        } else if (dropPosition.has_value() && !dropEffect.empty()) {
+        if (dropPosition.has_value() && !dropEffect.empty()) {
             int row = 0;
             const auto* clip = clipAt(*dropPosition, row);
             if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = trackAtY(dropPosition->y); }
@@ -1400,8 +1427,11 @@ public:
         if (marker != nullptr && onEditMarker) { onEditMarker(marker->id, marker->time); return; }
         int row = 0;
         const auto* clip = clipAt(event.getPosition(), row);
-        if (clip != nullptr && clip->composition != 0 && onEnterComposition) { onEnterComposition(clip->id); }
+        if (clip != nullptr && clip->composition != 0 && onEnterComposition) { onEnterComposition(clip->id); return; }
+        // Other clips open their source's editor (text, Lua or a drawing).
+        if (clip != nullptr && onOpenSource) { onOpenSource(clip->id); }
     }
+    std::function<void(motion::Id)> onOpenSource;
 
     // One convention across the timeline, graph and notes: the wheel and
     // trackpad pan (Shift makes the wheel horizontal), Cmd/Ctrl+wheel or a
@@ -2534,12 +2564,161 @@ private:
         collapsedGroups.erase(group);
         refreshTracks();
     }
-    void reorderTrack(motion::Id id, int y) {
-        const auto& tracks = processor.document.project().tracks;
-        const auto row = trackAtY(y);
-        const auto group = groupAtY(y);
-        const auto boundary = row >= 0 ? row + (y - trackY(row) >= trackHeight(row) / 2 ? 1 : 0) : static_cast<int>(tracks.size());
-        placeTrack(id, boundary, group != 0 ? group : (row >= 0 ? tracks[row].group : 0));
+    // Dragging a track by its grip: the track lifts and follows the pointer,
+    // the rows around it ease aside to open the place it will land, and on
+    // release it settles there.
+    struct TrackDrag {
+        motion::Id id;
+        int first, last, height, grab, pointer;
+        std::uint64_t revision;
+        int boundary;
+        motion::Id group = 0;
+    };
+    std::optional<TrackDrag> trackDrag;
+    std::vector<float> rowShift;
+    juce::TimedCallback rowAnimation {[this] { stepRows(); }};
+    // A drag ends where it began if the document changes under it (an undo,
+    // a load) or its track goes away.
+    void validateTrackDrag() {
+        if (!trackDrag.has_value()) { return; }
+        const auto stale = processor.document.revision() != trackDrag->revision || trackDrag->last > static_cast<int>(rows.size())
+            || rows[static_cast<std::size_t>(trackDrag->first)].id != trackDrag->id;
+        if (stale) {
+            trackDrag.reset();
+            rowShift.clear();
+        }
+    }
+    int liftedTop() const {
+        return std::clamp(trackDrag->pointer - trackDrag->grab, rulerHeight - trackDrag->height / 2, rulerHeight + viewHeight() - trackDrag->height / 2);
+    }
+    int shiftOf(int row) const {
+        return rowShift.size() == rows.size() && row >= 0 && row < static_cast<int>(rows.size()) ? juce::roundToInt(rowShift[static_cast<std::size_t>(row)]) : 0;
+    }
+    void dragTrack(motion::Id id, int y, bool finished) {
+        ensureTrackRows();
+        if (!trackDrag.has_value()) {
+            if (finished) { return; }
+            const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane() && !row.group(); });
+            if (found == rows.end()) { return; }
+            cancelGesture();
+            const auto first = static_cast<int>(found - rows.begin());
+            auto last = first + 1;
+            while (last < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(last)].isLane()) { ++last; }
+            trackDrag = TrackDrag {id, first, last, rowY(last) - rowY(first), y - rowY(first), y, processor.document.revision(), first};
+            rowShift.assign(rows.size(), 0.0f);
+            rowAnimation.startTimerHz(60);
+        }
+        // Another edit while dragging ends the drag where it began.
+        if (processor.document.revision() != trackDrag->revision) {
+            trackDrag.reset();
+            return;
+        }
+        trackDrag->pointer = y;
+        trackDrag->boundary = dropBoundary(trackDrag->group);
+        if (!finished) { stepRows(); return; }
+        const auto drag = *trackDrag;
+        const auto top = liftedTop();
+        trackDrag.reset();
+        const auto [boundary, group] = dropTarget(drag);
+        placeTrack(drag.id, boundary, group);
+        // The block glides from where it was let go into its new place.
+        ensureTrackRows();
+        rowShift.assign(rows.size(), 0.0f);
+        const auto landed = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == drag.id && !row.isLane(); });
+        if (landed != rows.end()) {
+            const auto index = static_cast<int>(landed - rows.begin());
+            for (auto row = index; row < static_cast<int>(rows.size()) && (row == index || rows[static_cast<std::size_t>(row)].isLane()); ++row) {
+                rowShift[static_cast<std::size_t>(row)] = static_cast<float>(top - rowY(index));
+            }
+        }
+        rowAnimation.startTimerHz(60);
+    }
+    // Where the dragged block would land, as a row boundary in the current
+    // layout: the block's centre is compared with the midpoints of the other
+    // rows as they sit with it taken out, so the gap follows the block. Over
+    // the middle of a group's row it joins the group, at its end.
+    int dropBoundary(motion::Id& group) const {
+        group = 0;
+        const auto count = static_cast<int>(rows.size());
+        const auto centre = liftedTop() + trackDrag->height / 2;
+        for (int start = 0; start < count;) {
+            if (start == trackDrag->first) {
+                start = trackDrag->last;
+                continue;
+            }
+            const auto& row = rows[static_cast<std::size_t>(start)];
+            auto end = start + 1;
+            if (!row.group()) {
+                while (end < count && rows[static_cast<std::size_t>(end)].isLane()) { ++end; }
+            }
+            const auto top = rowY(start) - (start >= trackDrag->last ? trackDrag->height : 0);
+            const auto height = rowY(end) - rowY(start);
+            if (row.group() && centre >= top + height / 4 && centre < top + height * 3 / 4) {
+                group = row.id;
+                auto subtree = start + 1;
+                while (subtree < count && rows[static_cast<std::size_t>(subtree)].depth > row.depth) { ++subtree; }
+                return subtree;
+            }
+            if (centre < top + height / 2) { return start; }
+            start = end;
+        }
+        return count;
+    }
+    // The track array position and parent group that a row boundary means:
+    // before the track at the boundary, inside a group it was dropped on, or
+    // ahead of a group's first track (among that group's siblings).
+    std::pair<int, motion::Id> dropTarget(const TrackDrag& drag) const {
+        const auto& project = processor.document.project();
+        const auto& tracks = project.tracks;
+        const auto count = static_cast<int>(rows.size());
+        const auto own = trackIndex(drag.id);
+        if (drag.group != 0) { return {static_cast<int>(tracks.size()), drag.group}; }
+        if (drag.boundary >= drag.first && drag.boundary <= drag.last) { return {own, own >= 0 ? tracks[static_cast<std::size_t>(own)].group : 0}; }
+        if (drag.boundary >= count) { return {static_cast<int>(tracks.size()), 0}; }
+        const auto& row = rows[static_cast<std::size_t>(drag.boundary)];
+        if (!row.group()) { return {row.track, tracks[static_cast<std::size_t>(row.track)].group}; }
+        // Before a group: its parent, ahead of the first track under it.
+        const auto* folder = motion::findGroup(project, row.id);
+        auto index = static_cast<int>(tracks.size());
+        for (auto next = drag.boundary + 1; next < count; ++next) {
+            const auto& below = rows[static_cast<std::size_t>(next)];
+            if (!below.group() && !below.isLane() && below.track != own) { index = below.track; break; }
+        }
+        return {index, folder != nullptr ? folder->parent : 0};
+    }
+    float targetShift(int row) const {
+        if (!trackDrag.has_value()) { return 0.0f; }
+        auto boundary = trackDrag->boundary;
+        if (boundary > trackDrag->first && boundary <= trackDrag->last) { boundary = trackDrag->first; }
+        return static_cast<float>((row >= trackDrag->last ? -trackDrag->height : 0) + (row >= boundary ? trackDrag->height : 0));
+    }
+    void stepRows() {
+        ensureTrackRows();
+        validateTrackDrag();
+        if (trackDrag.has_value()) { trackDrag->boundary = dropBoundary(trackDrag->group); }
+        if (rowShift.size() != rows.size()) { rowShift.assign(rows.size(), 0.0f); }
+        bool moving = false;
+        for (std::size_t row = 0; row < rowShift.size(); ++row) {
+            const auto target = targetShift(static_cast<int>(row));
+            auto& shift = rowShift[row];
+            shift += (target - shift) * .3f;
+            if (std::abs(target - shift) < .5f) { shift = target; } else { moving = true; }
+        }
+        // Near the top or bottom edge the list scrolls to reach further rows.
+        if (trackDrag.has_value()) {
+            const auto edge = trackDrag->pointer < rulerHeight + 16 ? -8 : trackDrag->pointer > rulerHeight + viewHeight() - 16 ? 8 : 0;
+            if (edge != 0) {
+                const auto before = scrollY;
+                scrollY = std::clamp(scrollY + edge, 0, maximumScrollY());
+                if (scrollY != before) { trackDrag->boundary = dropBoundary(trackDrag->group); }
+            }
+        }
+        if (!trackDrag.has_value() && !moving) {
+            rowShift.clear();
+            rowAnimation.stopTimer();
+        }
+        resized();
+        repaint();
     }
     // What an effect dropped here applies to: the clip under the pointer, a
     // track by its header, or a group; 0 for nothing.
@@ -2885,7 +3064,6 @@ private:
     motion::icons::Button selectTool {"Select tool", motion::icons::Icon::select}, slipTool {"Slip tool", motion::icons::Icon::slip};
     motion::icons::Button stretchTool {"Stretch tool", motion::icons::Icon::stretch}, rippleTool {"Ripple trim tool", motion::icons::Icon::ripple};
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
-    bool dropTrack = false;
     mutable std::vector<Row> rows;
     mutable std::vector<int> rowTops;
     mutable int contentHeight = 0;

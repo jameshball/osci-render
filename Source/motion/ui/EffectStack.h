@@ -73,6 +73,9 @@ public:
             cancelledGesture = false;
             listed = ids;
             cards.clear();
+            cardShift.clear();
+            // A hover over the old cards no longer names a card here.
+            dragged = gapIndex = -1;
             for (const auto id : ids) {
                 auto card = std::make_unique<Card>(*this, id);
                 addAndMakeVisible(*card);
@@ -129,31 +132,36 @@ public:
             g.fillPath(dashed);
         }
     }
-    void paintOverChildren(juce::Graphics& g) override {
-        if (insertionY.has_value()) {
-            g.setColour(motion::style::accent());
-            g.fillRect(0, *insertionY - 1, getWidth(), 2);
-        }
-    }
 
     // Effects from the library are added here; cards are moved within.
     bool isInterestedInDragSource(const SourceDetails& details) override {
         const auto value = details.description.toString();
         return owner.has_value() && (value.startsWith("motion-effect:") || value.startsWith("motion-effect-instance:"));
     }
+    // While something is dragged over the cards they part to open its place;
+    // a card being moved leaves its own slot empty.
     void itemDragMove(const SourceDetails& details) override {
         dropHover = true;
-        insertionY = cards.empty() ? std::optional<int>() : std::optional<int>(insertionTop(insertionIndex(details.localPosition.y)));
+        const auto value = details.description.toString();
+        const auto moving = value.startsWith("motion-effect-instance:") ? static_cast<motion::Id>(value.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id();
+        const auto found = std::find(listed.begin(), listed.end(), moving);
+        dragged = found != listed.end() ? static_cast<int>(found - listed.begin()) : -1;
+        gapIndex = cards.empty() ? -1 : insertionIndex(details.localPosition.y);
+        gapHeight = dragged >= 0 ? cards[static_cast<std::size_t>(dragged)]->getHeight() + motion::style::gap : 40;
+        // Restarting a running timer on every move would postpone its ticks.
+        if (!cardAnimation.isTimerRunning()) { cardAnimation.startTimerHz(60); }
         repaint();
     }
     void itemDragExit(const SourceDetails&) override {
         dropHover = false;
-        insertionY.reset();
+        dragged = gapIndex = -1;
+        if (!cardAnimation.isTimerRunning()) { cardAnimation.startTimerHz(60); }
         repaint();
     }
     void itemDropped(const SourceDetails& details) override {
         dropHover = false;
-        insertionY.reset();
+        dragged = gapIndex = -1;
+        settleCards();
         const auto index = insertionIndex(details.localPosition.y);
         const auto value = details.description.toString();
         if (value.startsWith("motion-effect:")) {
@@ -346,6 +354,34 @@ private:
             stages.push_back(std::move(chip));
         }
     }
+    float cardTarget(int index) const {
+        if (gapIndex < 0) { return 0.0f; }
+        auto boundary = gapIndex;
+        if (dragged >= 0 && (boundary == dragged || boundary == dragged + 1)) { boundary = dragged; }
+        const auto removed = dragged >= 0 && index > dragged ? -gapHeight : 0;
+        return static_cast<float>(removed + (index >= boundary && index != dragged ? gapHeight : 0));
+    }
+    void stepCards() {
+        cardShift.resize(cards.size(), 0.0f);
+        bool moving = false;
+        for (std::size_t index = 0; index < cards.size(); ++index) {
+            const auto target = cardTarget(static_cast<int>(index));
+            auto& shift = cardShift[index];
+            shift += (target - shift) * .3f;
+            if (std::abs(target - shift) < .5f) { shift = target; } else { moving = true; }
+            cards[index]->setTransform(juce::AffineTransform::translation(0.0f, static_cast<float>(juce::roundToInt(shift))));
+            cards[index]->setAlpha(static_cast<int>(index) == dragged ? 0.0f : 1.0f);
+        }
+        if (!moving && gapIndex < 0) { cardAnimation.stopTimer(); }
+    }
+    void settleCards() {
+        cardAnimation.stopTimer();
+        cardShift.clear();
+        for (auto& card : cards) {
+            card->setTransform({});
+            card->setAlpha(1.0f);
+        }
+    }
     int insertionIndex(int y) const {
         int index = 0;
         for (const auto& card : cards) {
@@ -353,10 +389,6 @@ private:
             ++index;
         }
         return index;
-    }
-    int insertionTop(int index) const {
-        if (index < static_cast<int>(cards.size())) { return cards[static_cast<std::size_t>(index)]->getY() - motion::style::gap / 2; }
-        return cards.back()->getBottom() + motion::style::gap / 2;
     }
     double frameTime() const {
         const auto& project = processor.document.project();
@@ -509,7 +541,9 @@ private:
     std::vector<std::pair<juce::String, motion::Id>> listedStages;
     std::vector<std::unique_ptr<juce::TextButton>> stages;
     std::optional<Gesture> gesture;
-    std::optional<int> insertionY;
+    std::vector<float> cardShift;
+    int dragged = -1, gapIndex = -1, gapHeight = 0;
+    juce::TimedCallback cardAnimation {[this] { stepCards(); }};
     juce::Rectangle<int> dropZone;
     bool cancelledGesture = false, dragActive = false, dropHover = false;
 };

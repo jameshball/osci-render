@@ -191,7 +191,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     sceneTools.lookThrough.onClick = [this] { composition.setDrivenCamera(sceneTools.lookThrough.getToggleState() ? selection : 0); resized(); };
     composition.onDrivenCameraChanged = [this](motion::Id id) {
         sceneTools.lookThrough.setToggleState(id != 0, juce::dontSendNotification);
-        sceneTools.lookThrough.setVisible(id != 0 || (selectionIsCamera() && composition.canDriveCamera(selection)));
+        sceneTools.lookThrough.setEnabled(id != 0 || (selectionIsCamera() && composition.canDriveCamera(selection)));
         resized();
     };
     addAndMakeVisible(sceneView);
@@ -378,7 +378,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
     // A clip's timing leads its Properties, as layer timing does in other editors.
+    inspectorLead.add(compositionSettings, [this] { return compositionSettings.preferredHeight(); });
     inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
+    compositionSettings.onTiming = [this](int command) { applyTiming(command); };
+    compositionSettings.onError = [this](const juce::String& message) { statusBar.show(message); };
+    compositionSettings.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
     inspectorLead.add(textAnimation, [this] { return textAnimation.preferredHeight(); });
     propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
     clipTimingPanel.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
@@ -535,6 +539,25 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
         showNextPreparationSettings();
     };
+    composition.onOpenSource = [this](motion::Id id) {
+        const auto& project = processor.document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != id) { continue; }
+                if (clip.composition != 0) { enterComposition(clip.id); return; }
+                const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
+                if (found == project.assets.end()) { return; }
+                const auto& asset = **found;
+                if (asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())))) {
+                    showDrawingEditor(asset.id);
+                } else if (asset.extension.equalsIgnoreCase(".txt") || asset.extension.equalsIgnoreCase(".lua")) {
+                    assetLibrary.onBake(asset.id);
+                }
+                return;
+            }
+        }
+    };
+    timeline.onOpenSource = [this](motion::Id id) { composition.onOpenSource(id); };
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
     };
@@ -747,9 +770,10 @@ void MotionEditor::resized() {
     // Narrow windows keep the Output picker: the undo description shortens first.
     // Without room for the whole description only the buttons stay; a clipped
     // description would wrap onto two lines.
-    const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - (46 + 160);
+    const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - (46 + 160) - 8;
     const auto wide = spare >= undoRedoControls.getPreferredWidth();
     undoRedoControls.setBounds(top.removeFromRight(wide ? undoRedoControls.getPreferredWidth() : 54));
+    top.removeFromRight(8);
     // Transport sits centred in the menu row, leaving the full height below
     // for the workspace.
     // The transport goes compact (no BPM caption, tighter readout) before the
@@ -1682,7 +1706,8 @@ void MotionEditor::select(motion::Id id) {
     // A free camera can be driven from the Scene until its button is released
     // or another camera is chosen.
     if (camera && composition.drivenCamera() != 0 && composition.drivenCamera() != id) { composition.setDrivenCamera(0); }
-    sceneTools.lookThrough.setVisible(composition.drivenCamera() != 0 || (camera && composition.canDriveCamera(id)));
+    // Always in the strip, so it keeps its size; usable with a free camera selected.
+    sceneTools.lookThrough.setEnabled(composition.drivenCamera() != 0 || (camera && composition.canDriveCamera(id)));
     selectCurveTarget(id, curvePropertyName, camera);
     refreshInspector();
     resized();
@@ -1994,6 +2019,8 @@ void MotionEditor::refreshInspector() {
     propertyInspector.setSelectionCount(std::max<std::size_t>(1, timeline.selectedClipIds().size()));
     clipTimingPanel.refresh();
     textAnimation.refresh();
+    compositionSettings.setShown(selection == 0);
+    compositionSettings.refresh();
     inspectorLead.resized();
     // A camera's rig leads its Properties where a clip's timing would.
     const auto camera = selectionIsCamera();
@@ -2126,7 +2153,7 @@ void MotionEditor::registerCommands() {
     menus.addMenuSeparator(2);
     const auto alt = juce::ModifierKeys::altModifier;
     for (const auto& [letter, group, name] : std::initializer_list<std::tuple<char, const char*, const char*>> {
-             {'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'t', "Drawing", "Key drawing weight"}}) {
+             {'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'c', "Colour", "Key colour"}, {'t', "Drawing", "Key drawing weight"}}) {
         const juce::String groupName(group);
         addCommand(2, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
             if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it."); }
@@ -2238,8 +2265,8 @@ void MotionEditor::showSceneViewMenu(bool atMouse) {
         menu.addSubMenu("View from", views);
         if (selection != 0) {
             menu.addSeparator();
-            const std::array<std::pair<const char*, const char*>, 4> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key drawing weight", "Alt+Shift+T"}}};
-            for (int index = 0; index < 4; ++index) { menu.addItem(motion::style::menuItem(keys[static_cast<std::size_t>(index)].first, 20 + index, keys[static_cast<std::size_t>(index)].second)); }
+            const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key drawing weight", "Alt+Shift+T"}}};
+            for (int index = 0; index < 5; ++index) { menu.addItem(motion::style::menuItem(keys[static_cast<std::size_t>(index)].first, 20 + index, keys[static_cast<std::size_t>(index)].second)); }
             menu.addSeparator();
             menu.addItem(motion::style::menuItem("Show in timeline", 30, {}));
         }
@@ -2258,8 +2285,8 @@ void MotionEditor::showSceneViewMenu(bool atMouse) {
         if (result >= 1 && result <= 6) { owner->composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
         if (result == 7) { owner->composition.frameSelection(); }
         if (result == 8) { owner->composition.resetView(); }
-        const std::array<const char*, 4> groups {"Position", "Rotation", "Scale", "Drawing"};
-        if (result >= 20 && result < 24 && !owner->propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
+        const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Drawing"};
+        if (result >= 20 && result < 25 && !owner->propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
             owner->statusBar.show("The selection has no such property to key.");
         }
         if (result == 30) { owner->timelineTabs.setSelectedIndex(0); owner->timeline.revealSelection(); }
@@ -2883,6 +2910,10 @@ juce::PopupMenu MotionEditor::timingMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
     menu.setLookAndFeel(&getLookAndFeel());
+    // What the ruler's right-click offers, at the playhead.
+    menu.addItem(motion::style::menuItem("Add marker...", 700, "M"));
+    menu.addItem(701, "Add tempo change...");
+    menu.addSeparator();
     menu.addItem(600, detectingTempo ? "Detecting tempo..." : "Detect tempo from soundtrack", !detectingTempo && soundtrackClip() != 0);
     menu.addSeparator();
     menu.addItem(101, "Seconds", true, project.timeDisplay == motion::TimeDisplay::seconds);
@@ -2913,6 +2944,14 @@ double MotionEditor::snapDivision(int index) const {
 // rate are edits.
 bool MotionEditor::applyTiming(int result) {
     if (result == 600) { detectTempo(); return true; }
+    if (result == 700 && timeline.onEditMarker) {
+        timeline.onEditMarker(0, std::clamp(processor.position.load(), 0.0, processor.document.project().duration));
+        return true;
+    }
+    if (result == 701) {
+        timeline.editTempoAt(processor.position.load());
+        return true;
+    }
     const auto& current = processor.document.project();
     if (result >= 101 && result <= 103) {
         const auto display = static_cast<motion::TimeDisplay>(result - 101);

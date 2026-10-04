@@ -3,6 +3,7 @@
 #include "../model/BakeSettings.h"
 #include <JuceHeader.h>
 #include "MotionStyle.h"
+#include <array>
 #include <cstdlib>
 #include <functional>
 #include <sstream>
@@ -84,24 +85,41 @@ public:
     }
 
     std::function<void(motion::BakeSettings)> onBake;
-    // Inside the Scene's Lua editor: captions above fields in a narrow
-    // column, and the bake button lives in the editor's header.
+    // Inside the Scene's Lua editor: a footer of two columns, captions beside
+    // fields like a clip's timing, and the bake button in the editor's header.
     juce::TextButton& bakeButton() { return bake; }
     // The last valid settings shown.
     const motion::BakeSettings& currentSettings() const { return settings; }
-    void setEmbedded(bool value) { embedded = value; resized(); }
-    static constexpr int embeddedHeight = 5 * (18 + 28 + 8) + 24;
+    void setEmbedded(bool value) {
+        embedded = value;
+        // One line in the grid's last cell, centred like the fields.
+        for (auto* label : { &summary, &note, &error }) { label->setJustificationType(embedded ? juce::Justification::centredLeft : juce::Justification::topLeft); }
+        resized();
+    }
+    static constexpr int embeddedRow = 28, embeddedHeight = 3 * embeddedRow;
 
     void resized() override {
         if (embedded) {
             auto area = getLocalBounds();
-            for (auto [label, field] : { std::pair<juce::Label*, juce::Component*> { &durationLabel, &duration }, { &rateLabel, &frameRate }, { &samplesLabel, &samples }, { &seedLabel, &seed }, { &bpmLabel, &bpm } }) {
-                label->setBounds(area.removeFromTop(18));
-                field->setBounds(area.removeFromTop(28));
-                area.removeFromTop(8);
+            const std::array<std::pair<juce::Label*, juce::Component*>, 5> cells { { { &durationLabel, &duration }, { &rateLabel, &frameRate }, { &samplesLabel, &samples }, { &seedLabel, &seed }, { &bpmLabel, &bpm } } };
+            juce::Rectangle<int> last;
+            for (std::size_t line = 0; line < 3; ++line) {
+                auto row = area.removeFromTop(embeddedRow);
+                const auto half = row.getWidth() / 2;
+                for (std::size_t column = 0; column < 2; ++column) {
+                    auto cell = row.removeFromLeft(half).withTrimmedRight(column == 0 ? 8 : 0);
+                    const auto index = line * 2 + column;
+                    if (index >= cells.size()) {
+                        last = cell;
+                        continue;
+                    }
+                    cells[index].first->setBounds(cell.removeFromLeft(112));
+                    cells[index].second->setBounds(cell.reduced(0, 2));
+                }
             }
-            summary.setBounds(area);
-            error.setBounds(area);
+            // The estimate, or what is wrong, fills the last cell.
+            summary.setBounds(last);
+            error.setBounds(last);
             return;
         }
         auto area = getLocalBounds().reduced(motion::style::dialog::margin);

@@ -54,7 +54,9 @@ public:
     void paint(juce::Graphics& g) override { g.fillAll(motion::style::sunken()); }
     void resized() override {
         auto area = getLocalBounds();
-        animatedOnly.setBounds(area.removeFromTop(26).reduced(6, 4));
+        // A filter chip sized to its words, not a full-width button.
+        const auto chipWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), animatedOnly.getButtonText()) + 20;
+        animatedOnly.setBounds(area.removeFromTop(26).reduced(6, 4).withWidth(chipWidth));
         viewport.setBounds(area);
         layout();
     }

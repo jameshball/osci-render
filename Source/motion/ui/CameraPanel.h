@@ -52,7 +52,7 @@ public:
         const auto* found = findCamera(project, camera);
         refreshRig(project, found);
         const auto showing = activeCamera() == camera;
-        cutButton.setButtonText(showing ? "On the output at the playhead" : "Cut to it at the playhead");
+        cutButton.setButtonText(showing ? "Showing at the playhead" : "Cut to this camera at the playhead");
         cutButton.setEnabled(found != nullptr && frameTime() < project.duration && !showing);
     }
     void resized() override {

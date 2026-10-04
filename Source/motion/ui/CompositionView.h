@@ -261,6 +261,16 @@ public:
         }
     }
 
+    // Double-clicking an object opens what made it: the text, Lua or drawing
+    // editor, or a nested composition.
+    std::function<void(motion::Id)> onOpenSource;
+    void mouseDoubleClick(const juce::MouseEvent& event) override {
+        if (navigating || prepared == nullptr || !event.mods.isLeftButtonDown() || event.mods.isAltDown()) { return; }
+        const auto hit = pickAt(event.position, nullptr);
+        if (hit == 0 || !onOpenSource) { return; }
+        cancelGesture();
+        onOpenSource(hit);
+    }
     void mouseDown(const juce::MouseEvent& event) override {
         if (navigating) { setNavigating(false); return; }
         grabKeyboardFocus();
@@ -511,7 +521,7 @@ public:
                 g.drawText("Everything", label, juce::Justification::centred, false);
             }
         }
-        const juce::String help = navigating ? "WASD / arrows move | Q E down / up | Shift faster | Esc finishes"
+        const juce::String help = navigating ? "WASD / arrows move" + motion::style::dot() + "Q E down / up" + motion::style::dot() + "Shift faster" + motion::style::dot() + "Esc finishes"
             : (validGesture() || navigationDrag) && dragHint.isNotEmpty() ? dragHint : juce::String();
         if (help.isNotEmpty()) {
             auto strip = getLocalBounds().removeFromBottom(26).reduced(8, 3);
@@ -677,7 +687,7 @@ private:
         g.setFont(motion::style::caption());
         g.setColour(osci::Colours::textMuted());
         g.drawFittedText(motionPath.tooComplex ? "Path hidden: more than 2,048 transform keys"
-            : "Position path (before effects) | Click a key to seek", getLocalBounds().removeFromTop(26).withTrimmedLeft(48).reduced(10, 0), juce::Justification::centredLeft, 2);
+            : "Position path (before effects)" + motion::style::dot() + "Click a key to seek", getLocalBounds().removeFromTop(26).withTrimmedLeft(48).reduced(10, 0), juce::Justification::centredLeft, 2);
     }
     bool seekMotionKey(juce::Point<float> position) {
         updateMotionPath();

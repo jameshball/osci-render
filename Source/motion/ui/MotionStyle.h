@@ -21,6 +21,8 @@ inline constexpr float panelRadius = 5.0f;
 // body: values, names, menus, buttons, pickers and editors.
 // caption: field labels, hints, secondary details and the ruler.
 // mono: the position readout and code.
+// The separator between short facts, as in the status bar.
+inline juce::String dot() { return juce::String::fromUTF8(" \xc2\xb7 "); }
 inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
 inline juce::Font body() { return juce::Font(juce::FontOptions(13.0f)); }
 inline juce::Font caption() { return juce::Font(juce::FontOptions(11.0f)); }

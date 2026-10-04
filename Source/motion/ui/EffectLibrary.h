@@ -15,7 +15,18 @@ public:
             auto tile = std::make_unique<Tile>(*this, definition);
             content.addAndMakeVisible(*tile);
             tiles.push_back(std::move(tile));
+            names.add(juce::String(definition.name.data(), definition.name.size()));
         }
+        // The same search field as Assets.
+        search.setName("Search effects");
+        search.setTextToShowWhenEmpty("Search effects", osci::Colours::textMuted());
+        search.setFont(motion::style::body());
+        search.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+        search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        search.setIndents(8, 5);
+        search.onTextChange = [this] { resized(); };
+        search.onEscapeKey = [this] { search.clear(); resized(); };
+        addAndMakeVisible(search);
         viewport.setViewedComponent(&content, false);
         viewport.setScrollBarsShown(true, false);
         viewport.setScrollBarThickness(6);
@@ -24,10 +35,18 @@ public:
     std::function<void(const std::string&)> onInsert;
     void resized() override {
         auto area = getLocalBounds();
+        area.removeFromTop(6);
+        search.setBounds(area.removeFromTop(26).reduced(4, 1));
+        area.removeFromTop(2);
         viewport.setBounds(area);
         const auto width = viewport.getMaximumVisibleWidth();
+        const auto query = search.getText().trim();
         int y = motion::style::gap;
-        for (auto& tile : tiles) {
+        for (std::size_t index = 0; index < tiles.size(); ++index) {
+            auto& tile = tiles[index];
+            const auto shown = query.isEmpty() || names[static_cast<int>(index)].containsIgnoreCase(query);
+            tile->setVisible(shown);
+            if (!shown) { continue; }
             tile->setBounds(motion::style::gap, y, width - 2 * motion::style::gap, tileHeight);
             y += tileHeight + motion::style::gap;
         }
@@ -119,4 +138,6 @@ private:
     juce::Viewport viewport;
     juce::Component content;
     std::vector<std::unique_ptr<Tile>> tiles;
+    juce::StringArray names;
+    juce::TextEditor search;
 };

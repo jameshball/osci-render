@@ -28,10 +28,19 @@ public:
         bake.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.5f));
         addAndMakeVisible(bake);
         baking.setEmbedded(true);
+        motion::style::styleFields(baking);
         baking.onBake = [this](motion::BakeSettings values) { if (onDone) { onDone(values, model.getCode()); } };
         addAndMakeVisible(baking);
-        editor.getEditor().setFont(motion::style::mono());
-        addAndMakeVisible(editor);
+        // The code sits on Motion's dark field, without the shared editor's
+        // button row (its frame clips it away).
+        auto& codeView = editor.getEditor();
+        codeView.setFont(motion::style::mono());
+        codeView.setColour(juce::CodeEditorComponent::backgroundColourId, motion::style::field());
+        codeView.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, motion::style::field());
+        codeView.setColour(juce::CodeEditorComponent::lineNumberTextId, motion::style::muted().withAlpha(.6f));
+        codeView.setColour(juce::CodeEditorComponent::highlightColourId, motion::style::accent().withAlpha(.3f));
+        codeFrame.addAndMakeVisible(editor);
+        addAndMakeVisible(codeFrame);
         failure.setName("Source preparation error");
         failure.setFont(motion::style::caption());
         failure.setColour(juce::Label::textColourId, motion::style::danger());
@@ -39,6 +48,10 @@ public:
         failure.setText(preparationError, juce::dontSendNotification);
         failure.setTooltip(preparationError);
         addAndMakeVisible(failure);
+        // A runtime error names its line ("...:12: attempt to..."); mark it in
+        // the code as a syntax error would be.
+        const auto line = errorLine(preparationError);
+        if (line > 0) { static_cast<ErrorListener&>(model).onError(line, preparationError.fromFirstOccurrenceOf(juce::String(line) + ":", false, false).trim()); }
     }
 
     std::function<void(motion::BakeSettings, const juce::String&)> onDone;
@@ -55,13 +68,15 @@ public:
         header.removeFromRight(motion::style::padding);
         name.setBounds(header);
         auto page = getLocalBounds().withTrimmedTop(headerHeight + 1).reduced(8);
-        // The settings card floats at the right, 8 px in, as tall as it needs.
-        card = page.removeFromRight(std::min(196, page.getWidth() / 3)).withHeight(std::min(page.getHeight(), MotionBakeSettingsPanel::embeddedHeight + 2 * 12));
-        baking.setBounds(card.reduced(12));
-        page.removeFromRight(8);
+        // The code takes the full width; the bake settings are a card below.
+        card = page.removeFromBottom(MotionBakeSettingsPanel::embeddedHeight + 2 * 10);
+        baking.setBounds(card.reduced(12, 10));
+        page.removeFromBottom(8);
         const auto failed = failure.getText().isNotEmpty();
         failure.setBounds(failed ? page.removeFromBottom(40).withTrimmedTop(6) : juce::Rectangle<int>());
-        editor.setBounds(page);
+        codeFrame.setBounds(page);
+        constexpr int buttonRow = 24;
+        editor.setBounds(0, -buttonRow, page.getWidth(), page.getHeight() + buttonRow);
     }
 
     void paint(juce::Graphics& g) override {
@@ -96,6 +111,11 @@ public:
     }
 
 private:
+    static int errorLine(const juce::String& message) {
+        const auto at = message.indexOf("]:");
+        if (at < 0) { return 0; }
+        return message.substring(at + 2).getIntValue();
+    }
     static osci::LuaScriptEditorComponent::Options editorOptions() {
         osci::LuaScriptEditorComponent::Options options;
         options.showTitle = false;
@@ -108,6 +128,7 @@ private:
     const juce::String original;
     const motion::BakeSettings originalSettings;
     juce::Rectangle<int> card;
+    juce::Component codeFrame;
     juce::Label name, failure;
     juce::TextButton cancelButton;
 };

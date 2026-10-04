@@ -6,6 +6,7 @@
 #include "ScrubField.h"
 #include "../model/PropertySchema.h"
 #include "../model/SpatialMotion.h"
+#include "../model/Drawing.h"
 
 // Scrolling transform/appearance inspector for one property target (object,
 // group, audio clip or camera). Rows group related axes; each row keys all of
@@ -145,7 +146,7 @@ public:
         if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : heading.has_value() ? heading->first : juce::String(), juce::dontSendNotification); }
         // With several clips selected the header says so; edits apply to the
         // one named.
-        const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : "Object";
+        const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
         kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
         kind.setTooltip(editable && selectionCount > 1 ? juce::String(selectionCount) + " clips are selected; these fields edit only " + juce::String(found->name.data(), found->name.size()) + "." : juce::String());
         empty = !editable && !heading.has_value();
@@ -512,6 +513,31 @@ private:
         processor.seek(std::clamp(projectTime, 0.0, processor.document.project().duration));
     }
 
+    // What a clip shows, named by its source rather than "Object".
+    juce::String sourceKind(motion::Id clip) const {
+        const auto& project = processor.document.project();
+        for (const auto& track : project.tracks) {
+            for (const auto& item : track.clips) {
+                if (item.id != clip) { continue; }
+                if (item.composition != 0) { return "Composition"; }
+                const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == item.asset; });
+                if (found == project.assets.end()) { return "Object"; }
+                const auto& asset = **found;
+                const auto extension = asset.extension.toLowerCase();
+                if (asset.liveIdentity != nullptr) { return "Blender"; }
+                if (extension == ".txt") { return "Text"; }
+                if (extension == ".lua") { return "Lua"; }
+                if (extension == ".lsystem") { return "Fractal"; }
+                if (motion::Document::isVideoSource(extension)) { return "Video"; }
+                if (motion::Document::isRasterSource(extension)) { return "Image"; }
+                if (extension == ".svg") { return motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()))) ? "Drawing" : "Vector"; }
+                if (extension == ".json" || extension == ".lottie") { return "Lottie"; }
+                if (extension == ".obj") { return "3D object"; }
+                return "Object";
+            }
+        }
+        return "Object";
+    }
     // Sliders a Lua clip's script reads (slider_a ...), plus any it already
     // animates. Their curves are created on first edit.
     std::vector<motion::PropertySpec> luaSliders() const {
