@@ -2,13 +2,13 @@
 
 <JUCERPROJECT id="OsciMotion01" name="osci-motion" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
-              pluginManufacturer="jameshball" aaxIdentifier="sh.ball.oscimotion"
-              cppLanguageStandard="20" projectLineFeed="&#10;" headerPath="./include"
-              version="0.1.0.0" companyName="James H Ball" companyWebsite="https://osci-render.com"
-              companyEmail="james@ball.sh" defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;&#10;OSCI_MOTION=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1"
-              pluginManufacturerCode="Jhba" pluginCode="Osmo" pluginAUMainType="'aufx'"
-              bundleIdentifier="sh.ball.oscimotion" pluginFormats="buildStandalone"
-              pluginCharacteristicsValue="pluginWantsMidiIn" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
+              pluginManufacturer="jameshball" cppLanguageStandard="20" projectLineFeed="&#10;"
+              headerPath="./include" version="0.1.0.0" companyName="James H Ball"
+              companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
+              defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;&#10;OSCI_MOTION=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1"
+              pluginManufacturerCode="Jhba" pluginCode="Osmo" bundleIdentifier="sh.ball.oscimotion"
+              pluginFormats="buildStandalone" pluginCharacteristicsValue="pluginWantsMidiIn"
+              postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-motion">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{42A9EAA7-6D00-065D-0F8B-755E9B552173}" name="audio">
@@ -490,9 +490,8 @@
             file="Source/motion/ui/TrackLayout.h"/>
     </GROUP>
   </MAINGROUP>
-  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"
-               JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1" JUCE_ASIO="1"
-               JUCE_USE_XRENDER="1"/>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1"
+               JUCE_ASIO="1" JUCE_USE_XRENDER="1"/>
   <EXPORTFORMATS>
     <LINUX_MAKE targetFolder="Builds/osci-motion/LinuxMakefile" smallIcon="MotionIcon"
                 bigIcon="MotionIcon" externalLibraries="luajit&#10;X11&#10;Xext&#10;Xrender"
