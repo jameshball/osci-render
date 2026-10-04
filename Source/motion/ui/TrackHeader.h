@@ -2,6 +2,7 @@
 
 #include "../model/Timeline.h"
 #include "MotionIcons.h"
+#include "GrabCursor.h"
 
 class MotionTrackHeader : public juce::Component {
 public:
@@ -51,7 +52,7 @@ public:
             arm.setVisible(armable);
             resized();
         }
-        grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor);
+        if (!grabbing) { grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor); }
         grip.setTooltip(group ? "Group actions" : juce::String());
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
         disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide keyframe lanes");
@@ -115,9 +116,22 @@ public:
     void mouseDrag(const juce::MouseEvent& event) override {
         if (isGroup || event.eventComponent != &grip) { return; }
         gripTravel = std::max(gripTravel, event.getDistanceFromDragStart());
-        if (gripTravel >= 4 && onReorder) { onReorder(id, event.getScreenPosition(), false); }
+        if (gripTravel >= 4 && onReorder) {
+            // The hand closes on the track while it is carried.
+            if (!grabbing) {
+                grabbing = true;
+                grip.setMouseCursor(motion::grabbingCursor());
+                grip.updateMouseCursor();
+            }
+            onReorder(id, event.getScreenPosition(), false);
+        }
     }
     void mouseUp(const juce::MouseEvent& event) override {
+        if (grabbing) {
+            grabbing = false;
+            grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+            grip.updateMouseCursor();
+        }
         if (isGroup || event.eventComponent != &grip || gripTravel < 4) { return; }
         // The button has already ignored this release as a click; later
         // clicks (or an accessibility press) open the menu again.
@@ -132,7 +146,7 @@ public:
     // The grip's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
-    bool isGroup = false;
+    bool isGroup = false, grabbing = false;
     int gripTravel = 0;
     class Disclosure : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {

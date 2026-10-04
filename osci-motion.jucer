@@ -474,6 +474,12 @@
             file="Source/motion/ui/CanvasSizeEditor.h"/>
       <FILE id="MotColourPicker" name="ColourPicker.h" compile="0" resource="0"
             file="Source/motion/ui/ColourPicker.h"/>
+      <FILE id="MotGrabCursorH" name="GrabCursor.h" compile="0" resource="0"
+            file="Source/motion/ui/GrabCursor.h"/>
+      <FILE id="MotGrabCursorC" name="GrabCursor.cpp" compile="1" resource="0"
+            file="Source/motion/ui/GrabCursor.cpp"/>
+      <FILE id="MotGrabCursorM" name="GrabCursor_mac.mm" compile="1" resource="0"
+            file="Source/motion/ui/GrabCursor_mac.mm"/>
       <FILE id="MotVideoSettings" name="VideoExportSettings.h" compile="0"
             resource="0" file="Source/motion/ui/VideoExportSettings.h"/>
       <FILE id="OfflineBeamSnap" name="OfflineVisualiserParameters.h" compile="0"
