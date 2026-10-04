@@ -79,6 +79,16 @@ public:
     // (osci-motion). osci-render and sosci keep the defaults.
     void setControlStyle(juce::Colour iconColour, int edgeIndent);
     int controlsPreferredWidth();
+    // For a host that draws its own control buttons (osci-motion): while the
+    // bar is detached its buttons hide (the recording stopwatch, ffmpeg
+    // download and media timeline stay) and the host's buttons act through
+    // clickControl. Full screen brings the built-in buttons back.
+    // osci-render and sosci keep the built-in buttons.
+    enum class Control { record, textureOutput, settings, popout, fullScreen };
+    void setControlButtonsHidden(bool hidden);
+    void clickControl(Control control, juce::Component* anchor);
+    bool isControlOn(Control control) const;
+    bool hasControl(Control control) const;
     // Called when the detached bar's preferred width changes (a recording
     // stopwatch or ffmpeg download) or it returns from full screen.
     std::function<void()> onControlsChanged;
@@ -183,6 +193,7 @@ private:
     };
     ControlBar controls { *this };
     bool controlsDetached = false;
+    bool controlButtonsHidden = false;
     juce::Component::SafePointer<juce::Component> controlsHost;
     int lastControlsWidth = 0;
     int placeControls(juce::Rectangle<int> area, bool apply);

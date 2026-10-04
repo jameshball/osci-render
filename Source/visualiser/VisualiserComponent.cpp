@@ -585,6 +585,57 @@ void VisualiserComponent::setControlStyle(juce::Colour iconColour, int edgeInden
     for (auto* button : std::initializer_list<juce::DrawableButton*> {&fullScreenButton, &popOutButton, &settingsButton, &audioInputButton, &textureOutputButton, &record}) { button->setEdgeIndent(edgeIndent); }
 }
 
+void VisualiserComponent::setControlButtonsHidden(bool hidden) {
+    controlButtonsHidden = hidden;
+    resized();
+}
+
+void VisualiserComponent::clickControl(Control control, juce::Component* anchor) {
+    switch (control) {
+        case Control::record: record.triggerClick(); break;
+        case Control::textureOutput: textureOutputButton.triggerClick(); break;
+        case Control::settings: settingsButton.triggerClick(); break;
+        case Control::fullScreen: enableFullScreen(); break;
+        case Control::popout:
+#if OSCI_PREMIUM
+            if (popoutVisible && popout != nullptr) {
+                popout->showControlsMenu(anchor != nullptr ? anchor : &popOutButton);
+            } else {
+                popoutWindow();
+            }
+#else
+            juce::ignoreUnused(anchor);
+#endif
+            break;
+    }
+}
+
+bool VisualiserComponent::isControlOn(Control control) const {
+    switch (control) {
+        case Control::record: return record.getToggleState();
+        case Control::textureOutput: return textureOutputButton.getToggleState();
+        case Control::popout: return popoutVisible;
+        case Control::settings:
+        case Control::fullScreen: return false;
+    }
+    return false;
+}
+
+bool VisualiserComponent::hasControl(Control control) const {
+    switch (control) {
+        case Control::settings: return openSettings != nullptr;
+#if OSCI_PREMIUM
+        case Control::popout: return true;
+#else
+        case Control::popout: return false;
+#endif
+        case Control::record:
+        case Control::textureOutput:
+        case Control::fullScreen: return true;
+    }
+    return false;
+}
+
 void VisualiserComponent::ControlBar::paint(juce::Graphics& g) {
     if (owner.controlsDetached) { return; }
     auto colour = osci::Colours::veryDark();
@@ -604,14 +655,15 @@ int VisualiserComponent::placeControls(juce::Rectangle<int> buttons, bool apply)
             if (shown) { component.setBounds(bounds); }
         }
     };
-    place(fullScreenButton, 30, true);
+    const auto showButtons = !(controlButtonsHidden && controlsDetached);
+    place(fullScreenButton, 30, showButtons);
 #if OSCI_PREMIUM
-    place(popOutButton, 30, true);
+    place(popOutButton, 30, showButtons);
 #endif
-    place(settingsButton, 30, openSettings != nullptr);
-    place(audioInputButton, 30, visualiserOnly && juce::JUCEApplication::isStandaloneApp());
-    place(textureOutputButton, 30, true);
-    place(record, 25, true);
+    place(settingsButton, 30, showButtons && openSettings != nullptr);
+    place(audioInputButton, 30, showButtons && visualiserOnly && juce::JUCEApplication::isStandaloneApp());
+    place(textureOutputButton, 30, showButtons);
+    place(record, 25, showButtons);
     place(stopwatch, 100, record.getToggleState());
 
 #if OSCI_PREMIUM
