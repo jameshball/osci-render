@@ -287,11 +287,6 @@ void CommonAudioProcessor::addAllParameters() {
     // Bind all parameters to the ValueTree for undo/redo support
     stateTree.addListener(this);
 
-    // Parameters that should NOT participate in undo/redo
-    auto isUndoExcluded = [](const juce::String& paramID) {
-        return paramID == "visualiserFullScreen";
-    };
-
     for (auto* param : getParameters()) {
         if (auto* bp = dynamic_cast<osci::BooleanParameter*>(param)) {
             auto* um = isUndoExcluded(bp->paramID) ? nullptr : &undoManager;

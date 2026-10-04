@@ -17,6 +17,10 @@
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater {
 public:
     enum class OutputMode { soundtrack, xy, xyrgb };
+    // Pausing the Scope or sharing its picture are view settings, not edits.
+    bool isUndoExcluded(const juce::String& paramID) const override {
+        return CommonAudioProcessor::isUndoExcluded(paramID) || paramID == "visualiserPaused" || paramID == "textureOutputEnabled";
+    }
     OutputMode getOutputMode() const { return outputMode.load(); }
     void setOutputMode(OutputMode value) { outputMode.store(value); }
     // Transient input monitoring: neither note events nor this choice are part

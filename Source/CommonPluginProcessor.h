@@ -33,6 +33,9 @@ public:
     ~CommonAudioProcessor() override;
 
     void addAllParameters();
+    // Parameters left out of undo/redo; a product may leave out more (view
+    // toggles that are not edits). Called while parameters are bound.
+    virtual bool isUndoExcluded(const juce::String& paramID) const { return paramID == "visualiserFullScreen"; }
 
     juce::UndoManager& getUndoManager() { return undoManager; }
     juce::String getProductSlug() const;
