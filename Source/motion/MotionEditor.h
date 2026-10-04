@@ -38,6 +38,7 @@ public:
     void filesDropped(const juce::StringArray& files, int, int) override;
     bool keyPressed(const juce::KeyPress& key) override;
     void openProject(const juce::File& file) override;
+    void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
 
 
 private:
@@ -160,6 +161,12 @@ private:
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
     motion::style::LookAndFeel motionLookAndFeel;
+    // Restyles each dialog after the overlay lays it out.
+    struct DialogStyle final : juce::ComponentListener {
+        motion::style::DialogLookAndFeel look;
+        void componentMovedOrResized(juce::Component& overlay, bool, bool) override { motion::style::restyleDialog(overlay, look); }
+        void componentBeingDeleted(juce::Component& overlay) override { overlay.removeComponentListener(this); }
+    } dialogStyle;
     motion::LuaSliderBakes sliderBakes { processor.document };
     MotionScopeProfilePanel scopeProfilePanel { processor };
     MotionBeamSettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, scopeProfilePanel, 550, 500, 1500 };
@@ -184,7 +191,7 @@ private:
     MotionCurveList curveList;
     std::set<std::string> shownCurves, hiddenCurves;
     void refreshCurveList();
-    osci::PanelDivider timelineDivider { false }, previewDivider { true };
+    MotionDivider timelineDivider { false }, previewDivider { true };
     double timelineFraction = 0.34, previewFraction = 0.5;
     double dividerStart = 0;
     int previewWidth = 1, workspaceHeight = 1;

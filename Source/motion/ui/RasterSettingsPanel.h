@@ -116,24 +116,17 @@ public:
     std::function<void(motion::RasterSettings)> onPrepare;
 
     void resized() override {
-        auto area = getLocalBounds().reduced(14);
-        const auto row = [&](juce::Label& label, juce::Component& field) {
-            auto bounds = area.removeFromTop(28);
-            label.setBounds(bounds.removeFromLeft(142));
-            field.setBounds(bounds);
-            area.removeFromTop(10);
-        };
+        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
+        motion::style::dialog::footer(area, {&prepare});
+        const auto row = [&](juce::Label& label, juce::Component& field) { motion::style::dialog::formRow(area, label, field, 142); };
         row(modeLabel, mode);
         row(thresholdLabel, threshold);
         row(detailLabel, detail);
         row(samplesLabel, samples);
         if (isVideo) { row(frameRateLabel, frameRate); }
-        invert.setBounds(area.removeFromTop(28).withTrimmedLeft(142));
-        area.removeFromTop(12);
-
-        area.removeFromTop(8);
-        prepare.setBounds(area.removeFromBottom(32));
-        area.removeFromBottom(8);
+        // The tick box lines up with the fields' left edge.
+        invert.setBounds(area.removeFromTop(motion::style::dialog::row).withTrimmedLeft(142 - 4));
+        area.removeFromTop(motion::style::dialog::rowGap);
         error.setBounds(area);
     }
 

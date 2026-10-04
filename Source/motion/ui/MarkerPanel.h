@@ -11,7 +11,7 @@ public:
         name.setName("Marker name");
         position.setName("Marker position");
         name.setText(initialName, false);
-        initialPosition = juce::String(seconds, 9) + "s";
+        initialPosition = juce::String(grid.positionLabel(seconds));
         position.setText(initialPosition, false);
         position.setTooltip("Use the current time display, or append s for seconds or f for frames.");
         for (auto* field : {&name, &position}) {
@@ -25,6 +25,8 @@ public:
         }
         nameLabel.setText("Name", juce::dontSendNotification);
         positionLabel.setText("Position", juce::dontSendNotification);
+        motion::style::dialog::caption(nameLabel);
+        motion::style::dialog::caption(positionLabel);
         status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.onClick = [this] { if (time.has_value() && apply.isEnabled() && onApply) { onApply(name.getText().trim(), *time); } };
@@ -34,13 +36,10 @@ public:
     std::function<void(juce::String, double)> onApply;
     void setError(const juce::String& message) { status.setText(message, juce::dontSendNotification); }
     void resized() override {
-        auto bounds = getLocalBounds().reduced(12);
-        auto row = bounds.removeFromTop(32);
-        nameLabel.setBounds(row.removeFromLeft(72)); name.setBounds(row.reduced(0, 3));
-        row = bounds.removeFromTop(32);
-        positionLabel.setBounds(row.removeFromLeft(72)); position.setBounds(row.reduced(0, 3));
-        apply.setBounds(bounds.removeFromBottom(30).removeFromRight(110));
-        status.setBounds(bounds);
+        auto bounds = getLocalBounds().reduced(motion::style::dialog::margin);
+        status.setBounds(motion::style::dialog::footer(bounds, {&apply}));
+        motion::style::dialog::formRow(bounds, nameLabel, name, 72);
+        motion::style::dialog::formRow(bounds, positionLabel, position, 72);
     }
 private:
     void refresh() {
@@ -81,7 +80,9 @@ public:
         tempo.onReturnKey = [this] { apply.triggerClick(); };
         tempoLabel.setText("BPM", juce::dontSendNotification);
         where.setText("From bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2) + " onwards", juce::dontSendNotification);
-        where.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        motion::style::dialog::caption(where);
+        motion::style::dialog::caption(tempoLabel);
+        ramp.setColour(juce::ToggleButton::textColourId, motion::style::text());
         status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.setTitle("Save tempo");
@@ -92,13 +93,13 @@ public:
     std::function<void(double, bool)> onApply;
     void setError(const juce::String& message) { status.setText(message, juce::dontSendNotification); }
     void resized() override {
-        auto bounds = getLocalBounds().reduced(12);
-        where.setBounds(bounds.removeFromTop(24));
-        auto row = bounds.removeFromTop(32);
-        tempoLabel.setBounds(row.removeFromLeft(72)); tempo.setBounds(row.reduced(0, 3));
-        ramp.setBounds(bounds.removeFromTop(28));
-        apply.setBounds(bounds.removeFromBottom(30).removeFromRight(110));
-        status.setBounds(bounds);
+        auto bounds = getLocalBounds().reduced(motion::style::dialog::margin);
+        status.setBounds(motion::style::dialog::footer(bounds, {&apply}));
+        where.setBounds(bounds.removeFromTop(20));
+        bounds.removeFromTop(motion::style::dialog::rowGap);
+        motion::style::dialog::formRow(bounds, tempoLabel, tempo, 72);
+        // The tick box lines up with the field's left edge.
+        ramp.setBounds(bounds.removeFromTop(motion::style::dialog::row).withTrimmedLeft(72 - 4));
     }
 private:
     void refresh() {

@@ -8,7 +8,7 @@ public:
         for (auto* component : std::initializer_list<juce::Component*> { &frameRate, &canvas, &codecLabel, &qualityLabel, &codec, &quality, &soundtrack, &note, &error, &exportButton }) {
             addAndMakeVisible(component);
         }
-        frameRate.setText(juce::String(config.frameRate, 3) + " fps  /  Project frame rate", juce::dontSendNotification);
+        frameRate.setText(juce::String(config.frameRate, 3) + " fps, the composition's frame rate", juce::dontSendNotification);
         frameRate.setName("Video project frame rate");
         codec.setName("Video codec");
         for (const auto& item : VideoEncodingConstants::videoCodecs) {
@@ -26,9 +26,13 @@ public:
         soundtrack.setButtonText("Include stereo soundtrack");
         soundtrack.setToggleState(config.includeAudio, juce::dontSendNotification);
         note.setText(config.preserveAlpha ? "Transparent background: ProRes 4444 with alpha."
-                                         : "Renders the complete composition.\nThese dimensions also update the output preview.", juce::dontSendNotification);
+                                         : juce::String(), juce::dontSendNotification);
+        for (auto* label : { &frameRate, &codecLabel, &qualityLabel, &note }) { motion::style::dialog::caption(*label); }
         note.setJustificationType(juce::Justification::topLeft);
-        error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
+        error.setFont(motion::style::body());
+        error.setBorderSize({});
+        error.setColour(juce::Label::textColourId, motion::style::danger());
+        soundtrack.setColour(juce::ToggleButton::textColourId, motion::style::text());
         canvas.onChange = [this] { error.setText({}, juce::dontSendNotification); };
         exportButton.setButtonText("Choose file and export...");
         exportButton.onClick = [this] {
@@ -51,19 +55,19 @@ public:
     }
     std::function<void(VideoEncodingConfiguration)> onExport;
     void resized() override {
-        auto area = getLocalBounds().reduced(12);
-        frameRate.setBounds(area.removeFromTop(30));
-        area.removeFromTop(12);
-        canvas.setBounds(area.removeFromTop(84));
-        codecLabel.setBounds(area.removeFromTop(26));
-        codec.setBounds(area.removeFromTop(28));
-        qualityLabel.setBounds(area.removeFromTop(26));
-        quality.setBounds(area.removeFromTop(28));
-        area.removeFromTop(10);
-        soundtrack.setBounds(area.removeFromTop(28));
-        note.setBounds(area.removeFromTop(36));
-        error.setBounds(area.removeFromTop(24));
-        exportButton.setBounds(area.removeFromTop(32));
+        using namespace motion::style::dialog;
+        auto area = getLocalBounds().reduced(margin);
+        error.setBounds(footer(area, { &exportButton }, 180));
+        frameRate.setBounds(area.removeFromTop(20));
+        area.removeFromTop(rowGap);
+        canvas.setBounds(area.removeFromTop(MotionCanvasSizeEditor::preferredHeight));
+        area.removeFromTop(rowGap);
+        formRow(area, codecLabel, codec, 72);
+        formRow(area, qualityLabel, quality, 72);
+        // The tick box lines up with the fields' left edge.
+        soundtrack.setBounds(area.removeFromTop(row).withTrimmedLeft(72 - 4));
+        area.removeFromTop(rowGap);
+        note.setBounds(area);
     }
 private:
     void updateQuality() {

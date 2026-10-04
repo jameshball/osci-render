@@ -13,7 +13,7 @@ public:
         const auto values = initial.key();
         for (std::size_t index = 0; index < fields.size(); ++index) {
             labels[index].setText(names[index], juce::dontSendNotification);
-            labels[index].setFont(motion::style::body());
+            motion::style::dialog::caption(labels[index]);
             fields[index].setName(accessible[index]);
             fields[index].setSliderStyle(juce::Slider::LinearHorizontal);
             fields[index].setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, 24);
@@ -33,16 +33,11 @@ public:
     std::function<void(motion::MidiInstrument)> onApply;
     motion::MidiInstrument value() const { return {fields[0].getValue(), fields[1].getValue(), fields[2].getValue() / 100, fields[3].getValue()}; }
     void resized() override {
-        auto area = getLocalBounds().reduced(12);
-        preview = area.removeFromTop(76).toFloat().reduced(8);
-        area.removeFromTop(8);
-        for (std::size_t index = 0; index < fields.size(); ++index) {
-            auto row = area.removeFromTop(32);
-            labels[index].setBounds(row.removeFromLeft(100)); fields[index].setBounds(row);
-        }
-        area.removeFromTop(8);
-
-        apply.setBounds(area.removeFromBottom(30).removeFromRight(130));
+        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
+        motion::style::dialog::footer(area, {&apply});
+        preview = area.removeFromTop(68).toFloat();
+        area.removeFromTop(motion::style::dialog::rowGap);
+        for (std::size_t index = 0; index < fields.size(); ++index) { motion::style::dialog::formRow(area, labels[index], fields[index], 100); }
     }
     void paint(juce::Graphics& g) override {
         const auto settings = value();

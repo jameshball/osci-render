@@ -30,6 +30,8 @@ public:
         mute.setOnColour(juce::Colour(0xff8b6434));
         solo.setOnColour(juce::Colour(0xff347b52));
         lock.setOnColour(juce::Colour(0xff5c5f6b));
+        // The glyph matches the M and S letters' height.
+        lock.iconSize = 10.0f;
         grip.setTooltip("Drag to reorder; click for track actions");
         grip.onClick = [this] { if (onMenu) { onMenu(id); } };
         grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
@@ -89,18 +91,18 @@ public:
         auto bounds = getLocalBounds().removeFromTop(std::min(getHeight(), 28)).reduced(3, 0);
         disclosure.setBounds(bounds.removeFromLeft(16));
         grip.setBounds(bounds.removeFromLeft(14));
-        // Compact 15 px switches leave the name as much room as possible.
-        constexpr int chip = 15;
+        // Square 16 px switches, 2 px apart.
+        constexpr int chip = 16, spacing = 2;
         int count = 0;
         for (auto* button : std::initializer_list<juce::Button*> { &arm, &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
-        const auto chips = count * (chip + 1);
-        auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, 16);
+        const auto chips = count * (chip + spacing);
+        auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, chip);
         for (auto* button : std::initializer_list<juce::Button*> { &arm, &mute, &solo, &lock }) {
             if (!button->isVisible()) { continue; }
             button->setBounds(buttons.removeFromLeft(chip));
-            buttons.removeFromLeft(1);
+            buttons.removeFromLeft(spacing);
         }
-        name.setBounds(bounds.reduced(2, 0).withSizeKeepingCentre(bounds.getWidth() - 4, 18));
+        name.setBounds(bounds.reduced(4, 0).withSizeKeepingCentre(bounds.getWidth() - 8, 18));
     }
     void mouseDown(const juce::MouseEvent& event) override {
         // Right-click anywhere on the header opens the track's menu.

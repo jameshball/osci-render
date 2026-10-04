@@ -111,7 +111,7 @@ public:
     int defaultTrackHeight = 32;
     std::function<void(int)> onDefaultTrackHeight;
     // Track names column; drag its edge to resize (140-420 px).
-    int namesWidth = 170;
+    int namesWidth = 220;
     bool resizingNames = false;
     // The resize handle is the strip just inside the names column, so clicks
     // on keys and clips at the start of the timeline are never taken.
@@ -1978,7 +1978,8 @@ private:
     bool showsMarkerBand() const { return !processor.document.project().markers.empty() || processor.document.project().tempoChanges != nullptr; }
     int cameraBandTop() const { return showsMarkerBand() ? 48 : 26; }
     bool showsCameraBand() const { return true; }
-    juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop() + 2, 20, cameraBandHeight - 4}; }
+    // Matches the add-track button above it.
+    juce::Rectangle<int> addCameraBounds() const { return {namesWidth - 26, cameraBandTop(), 22, cameraBandHeight}; }
     bool inCameraBand(int y) const { return showsCameraBand() && y >= cameraBandTop() && y < cameraBandTop() + cameraBandHeight; }
     juce::Rectangle<int> cutBounds(const motion::CameraCut& cut) const {
         const auto left = std::max(namesWidth, timeX(cut.start));
@@ -2005,14 +2006,13 @@ private:
         g.setColour(motion::style::muted());
         g.setFont(motion::style::caption());
         g.drawText("Cameras", 12, top, namesWidth - 40, cameraBandHeight, juce::Justification::centredLeft);
-        // The green plus adds a camera at the playhead.
+        // The plus adds a camera at the playhead, drawn like the add-track button.
         const auto add = addCameraBounds().toFloat();
-        g.setColour(motion::style::accent().withAlpha(addHover ? .32f : .2f));
-        g.fillRoundedRectangle(add, motion::style::radius);
-        g.setColour(motion::style::accent().brighter(.3f));
-        const auto c = add.getCentre();
-        g.fillRect(juce::Rectangle<float>(9.0f, 1.5f).withCentre(c));
-        g.fillRect(juce::Rectangle<float>(1.5f, 9.0f).withCentre(c));
+        if (addHover) {
+            g.setColour(juce::Colours::white.withAlpha(.08f));
+            g.fillRoundedRectangle(add, motion::style::radius + 1);
+        }
+        motion::icons::draw(g, motion::icons::Icon::add, add, addHover ? motion::style::text() : motion::style::text().withAlpha(.72f), 16.0f);
         // Between cuts the first camera shows; label each visible gap.
         const bool defaultSelected = !project.cameras.empty() && selected == project.cameras.front().id;
         const auto label = project.cameras.empty() ? juce::String("Default view") : juce::String(project.cameras.front().name);

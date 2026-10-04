@@ -1,11 +1,13 @@
 #pragma once
 
 #include "../../visualiser/RecordingSettings.h"
+#include "MotionStyle.h"
 #include <optional>
 
 // Shared framing controls for the output canvas and video export.
 class MotionCanvasSizeEditor final : public juce::Component {
 public:
+    static constexpr int preferredHeight = 2 * motion::style::dialog::row + motion::style::dialog::rowGap + 20;
     explicit MotionCanvasSizeEditor(VisualiserRenderSize size) {
         for (auto* component : std::initializer_list<juce::Component*> { &preset, &widthLabel, &heightLabel, &width, &height }) { addAndMakeVisible(component); }
         preset.setName("Canvas preset");
@@ -15,7 +17,11 @@ public:
         preset.addItem("Portrait / 1080 x 1920", 4);
         width.setName("Video width");
         height.setName("Video height");
+        motion::style::dialog::caption(widthLabel);
+        motion::style::dialog::caption(heightLabel);
         for (auto* field : { &width, &height }) {
+            field->setFont(motion::style::body());
+            field->setJustification(juce::Justification::centredLeft);
             field->setInputRestrictions(4, "0123456789");
             field->onTextChange = [this] { refreshPreset(); };
         }
@@ -37,16 +43,16 @@ public:
     }
     void resized() override {
         auto bounds = getLocalBounds();
-        preset.setBounds(bounds.removeFromTop(28));
-        bounds.removeFromTop(8);
+        preset.setBounds(bounds.removeFromTop(motion::style::dialog::row));
+        bounds.removeFromTop(motion::style::dialog::rowGap);
         auto labels = bounds.removeFromTop(20);
-        const auto half = (bounds.getWidth() - 12) / 2;
+        const auto half = (bounds.getWidth() - 8) / 2;
         widthLabel.setBounds(labels.removeFromLeft(half));
-        labels.removeFromLeft(12);
+        labels.removeFromLeft(8);
         heightLabel.setBounds(labels);
-        auto row = bounds.removeFromTop(28);
+        auto row = bounds.removeFromTop(motion::style::dialog::row);
         width.setBounds(row.removeFromLeft(half));
-        row.removeFromLeft(12);
+        row.removeFromLeft(8);
         height.setBounds(row);
     }
 private:
@@ -71,7 +77,9 @@ public:
     MotionCanvasSettings(VisualiserRenderSize size, double fps) : canvas(size) {
         for (auto* component : std::initializer_list<juce::Component*> { &canvas, &note, &error, &apply }) { addAndMakeVisible(component); }
         juce::ignoreUnused(fps);
-        error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
+        error.setFont(motion::style::body());
+        error.setBorderSize({});
+        error.setColour(juce::Label::textColourId, motion::style::danger());
         canvas.onChange = [this] { error.setText({}, juce::dontSendNotification); };
         apply.onClick = [this] {
             const auto size = canvas.value();
@@ -81,11 +89,9 @@ public:
     }
     std::function<void(VisualiserRenderSize)> onApply;
     void resized() override {
-        auto bounds = getLocalBounds().reduced(12);
-        canvas.setBounds(bounds.removeFromTop(84));
-
-        error.setBounds(bounds.removeFromTop(24));
-        apply.setBounds(bounds.removeFromTop(30));
+        auto bounds = getLocalBounds().reduced(motion::style::dialog::margin);
+        error.setBounds(motion::style::dialog::footer(bounds, { &apply }));
+        canvas.setBounds(bounds.removeFromTop(MotionCanvasSizeEditor::preferredHeight));
     }
 private:
     MotionCanvasSizeEditor canvas;

@@ -130,17 +130,18 @@ public:
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
         const auto bounds = getLocalBounds().toFloat().reduced(.5f);
         const auto active = getToggleState();
-        g.setColour(active ? on.withAlpha(.85f) : (highlighted || down ? motion::style::raised().brighter(.15f) : motion::style::field()));
+        g.setColour(active ? on : (highlighted || down ? motion::style::raised().brighter(.15f) : motion::style::field()));
         g.fillRoundedRectangle(bounds, motion::style::radius);
         if (!active) {
             g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
             g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
         }
-        draw(g, icon, bounds, active ? juce::Colours::white : motion::style::muted().withAlpha(highlighted ? 1.0f : .85f), 13.0f);
+        draw(g, icon, bounds, active ? juce::Colours::white : motion::style::muted().withAlpha(highlighted ? 1.0f : .85f), iconSize);
     }
+    float iconSize = 13.0f;
 private:
     Icon icon;
-    juce::Colour on = motion::style::accent();
+    juce::Colour on = motion::style::accent().withAlpha(.45f);
 };
 
 // A floating vertical strip of tool buttons in groups, with the same 4 px

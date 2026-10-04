@@ -4,6 +4,7 @@
 #include "MotionStyle.h"
 #include <osci_gui/osci_gui.h>
 #include "../model/TextSettings.h"
+#include <numeric>
 
 class MotionTextSourcePanel final : public juce::Component {
 public:
@@ -20,7 +21,7 @@ public:
         text.onTextChange = [this] { refresh(); };
         help.setFont(motion::style::body());
         help.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        help.setText("Shared source: " + juce::String(static_cast<juce::uint64>(instances)) + (instances == 1 ? " clip" : " clips") + " will update. Clip animation stays unchanged.", juce::dontSendNotification);
+        help.setText(instances > 1 ? "Updates " + juce::String(static_cast<juce::uint64>(instances)) + " clips" : juce::String(), juce::dontSendNotification);
         help.setJustificationType(juce::Justification::centredLeft);
         error.setName("Text preparation error");
         error.setText(preparationError.contains("geometry budget") ? "This text is too detailed to prepare. Try a simpler font or shorten the text." : preparationError, juce::dontSendNotification);
@@ -60,6 +61,7 @@ public:
             slider->setTextValueSuffix(" em");
             slider->textFromValueFunction = [](double value) { return juce::String(std::abs(value) < 0.00001 ? 0.0 : value, 2); };
             slider->onValueChange = [this] { settingsChanged(); };
+            slider->updateText();
         }
         for (auto* combo : {&family, &style, &alignment}) {
             combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
@@ -104,37 +106,38 @@ public:
     std::function<void(juce::String, motion::TextSettings)> onApply;
     void resized() override {
         auto area = getLocalBounds().reduced(12);
-        help.setBounds(area.removeFromTop(42));
+        help.setBounds(area.removeFromTop(help.getText().isEmpty() ? 0 : 24));
         error.setBounds(area.removeFromTop(error.getText().isEmpty() ? 0 : 48));
         auto footer = area.removeFromBottom(36);
         apply.setBounds(footer.removeFromRight(108).reduced(0, 4));
         status.setBounds(footer);
-        auto fontRow = area.removeFromTop(32);
-        const auto columnWidth = fontRow.getWidth() / 2;
-        auto left = fontRow.removeFromLeft(columnWidth);
-        labels[0].setBounds(left.removeFromLeft(48));
-        family.setBounds(left.reduced(2, 3));
-        labels[1].setBounds(fontRow.removeFromLeft(48));
-        style.setBounds(fontRow.reduced(2, 3));
-        auto layoutRow = area.removeFromTop(52);
-        const auto third = layoutRow.getWidth() / 3;
-        const std::array<juce::Component*, 3> controls {&alignment, &lineSpacing, &tracking};
-        for (std::size_t i = 0; i < controls.size(); ++i) {
-            auto cell = layoutRow.removeFromLeft(third).reduced(2, 0);
-            labels[i + 2].setBounds(cell.removeFromTop(20));
-            controls[i]->setBounds(cell.reduced(0, 3));
-        }
+        // Each control sits under its caption; cells share one gap and the
+        // outer cells sit flush with the panel's edges.
+        constexpr int gap = 8;
+        const auto row = [&](std::initializer_list<std::pair<std::size_t, juce::Component*>> cells, std::initializer_list<int> weights) {
+            auto bounds = area.removeFromTop(48);
+            area.removeFromTop(4);
+            const auto total = std::accumulate(weights.begin(), weights.end(), 0);
+            const auto available = bounds.getWidth() - gap * static_cast<int>(cells.size() - 1);
+            auto weight = weights.begin();
+            auto index = 0;
+            for (const auto& [label, control] : cells) {
+                const auto last = ++index == static_cast<int>(cells.size());
+                auto cell = last ? bounds : bounds.removeFromLeft(available * *weight++ / total);
+                bounds.removeFromLeft(gap);
+                labels[label].setBounds(cell.removeFromTop(20));
+                control->setBounds(cell.withHeight(26));
+                if (auto* slider = dynamic_cast<juce::Slider*>(control)) {
+                    slider->setTextBoxStyle(juce::Slider::TextBoxLeft, false, cell.getWidth() - 48, 26);
+                }
+            }
+        };
+        row({{0, &family}, {1, &style}}, {1, 1});
+        row({{2, &alignment}, {3, &lineSpacing}, {4, &tracking}}, {1, 1, 1});
         // Per-character animation, baked at 30 fps into the source's frames.
-        auto animationRow = area.removeFromTop(52);
-        const auto fifth = animationRow.getWidth() / 5;
-        const std::array<juce::Component*, 5> animated {&animation, &stagger, &duration, &hold, &amount};
-        for (std::size_t i = 0; i < animated.size(); ++i) {
-            auto cell = animationRow.removeFromLeft(fifth).reduced(2, 0);
-            labels[i + 5].setBounds(cell.removeFromTop(20));
-            animated[i]->setBounds(cell.reduced(0, 3));
-            animated[i]->setEnabled(i == 0 || settings.animated());
-        }
-        text.setBounds(area.reduced(0, 6));
+        row({{5, &animation}, {6, &stagger}, {7, &duration}, {8, &hold}, {9, &amount}}, {4, 3, 3, 3, 3});
+        for (auto* slider : {&stagger, &duration, &hold, &amount}) { slider->setEnabled(settings.animated()); }
+        text.setBounds(area.withTrimmedTop(6).withTrimmedBottom(6));
     }
 private:
     void updateTextLayout() {

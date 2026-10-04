@@ -42,7 +42,7 @@ public:
         cancel.onClick = [this] { if (onCancelCapture) { onCancelCapture(); } error.clear(); timerCallback(); };
         addAndMakeVisible(record); addAndMakeVisible(cancel);
         record.setVisible(existing); cancel.setVisible(false);
-        setSize(460, existing ? 340 : 292);
+        setSize(460, existing ? 254 : 222);
         startTimerHz(5);
     }
     std::function<juce::Result(juce::String, motion::BlenderSourceSettings, bool)> onApply;
@@ -53,19 +53,20 @@ public:
     std::function<bool()> isListening;
     std::function<juce::String()> connectionStatus;
     void resized() override {
-        auto area = getLocalBounds().reduced(16);
-        for (auto pair : {std::pair<juce::Component*, juce::Component*>{&nameLabel, &name}, {&portLabel, &port}, {&policyLabel, &policy}}) {
-            auto row = area.removeFromTop(28); pair.first->setBounds(row.removeFromLeft(116)); pair.second->setBounds(row); area.removeFromTop(8);
+        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
+        for (auto pair : {std::pair<juce::Label*, juce::Component*>{&nameLabel, &name}, {&portLabel, &port}, {&policyLabel, &policy}}) {
+            motion::style::dialog::formRow(area, *pair.first, *pair.second, 116);
         }
-        status.setBounds(area.removeFromTop(32)); area.removeFromTop(6);
-        note.setBounds(area.removeFromTop(58)); area.removeFromTop(10);
+        motion::style::dialog::footer(area, {&listen, &save}, 128);
         if (existing) {
-            auto captureRow = area.removeFromBottom(30);
-            cancel.setBounds(captureRow.removeFromRight(150)); captureRow.removeFromRight(8);
-            record.setBounds(captureRow.removeFromRight(150)); area.removeFromBottom(8);
+            // Capturing sits on its own line, apart from the connection buttons.
+            auto capture = area.removeFromBottom(motion::style::dialog::buttonHeight);
+            area.removeFromBottom(motion::style::dialog::rowGap);
+            record.setBounds(capture.removeFromLeft(150)); capture.removeFromLeft(8);
+            cancel.setBounds(capture.removeFromLeft(128));
         }
-        auto buttons = area.removeFromBottom(30);
-        listen.setBounds(buttons.removeFromRight(150)); buttons.removeFromRight(8); save.setBounds(buttons.removeFromRight(150));
+        status.setBounds(area.removeFromTop(20)); area.removeFromTop(4);
+        note.setBounds(area);
     }
 private:
     void submit(bool start) {
@@ -85,8 +86,7 @@ private:
             cancel.setVisible(recording);
             for (auto* control : std::initializer_list<juce::Component*>{&name, &port, &policy, &save, &listen}) { control->setEnabled(!recording); }
             note.setColour(juce::Label::textColourId, recording ? osci::Colours::text() : osci::Colours::textMuted());
-            note.setText(recording ? "Closing this panel cancels the capture.\nRecording source geometry before effects.\nUp to 10 minutes, 20,000 updates and 1 million segments."
-                : "Use the same port in Blender's osci-render add-on.\nReceives camera-framed Grease Pencil line art.\nCapture creates a portable source for editing and export.", juce::dontSendNotification);
+            note.setText(recording ? "Closing this panel cancels the capture." : "Use the same port in Blender's osci-render add-on.", juce::dontSendNotification);
         }
     }
     bool existing;

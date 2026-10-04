@@ -48,14 +48,9 @@ public:
     std::function<void(int)> onPrepare;
 
     void resized() override {
-        auto area = getLocalBounds().reduced(14);
-        auto row = area.removeFromTop(28);
-        depthLabel.setBounds(row.removeFromLeft(112));
-        depth.setBounds(row);
-        area.removeFromTop(10);
-
-        area.removeFromTop(8);
-        prepare.setBounds(area.removeFromBottom(30));
+        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
+        motion::style::dialog::footer(area, {&prepare});
+        motion::style::dialog::formRow(area, depthLabel, depth, 112);
     }
 
 private:

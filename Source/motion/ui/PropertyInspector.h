@@ -22,6 +22,8 @@ public:
         title.setFont(motion::style::title());
         title.setColour(juce::Label::textColourId, motion::style::text());
         title.setName("Inspector title");
+        title.setBorderSize({});
+        kind.setBorderSize({});
         title.onTextChange = [this] {
             const auto text = title.getText().trim();
             if (onRename && text.isNotEmpty()) { onRename(target, text); }
@@ -133,7 +135,7 @@ public:
             };
             row->misaligned = on && keyed && (times(*x) != times(*y) || times(*x) != times(*z));
             row->mode->setToggleState(on, juce::dontSendNotification);
-            row->mode->setOnColour(row->misaligned ? motion::style::warning() : motion::style::accent());
+            row->mode->setOnColour(row->misaligned ? motion::style::warning().withAlpha(.6f) : motion::style::accent().withAlpha(.45f));
             const juce::String base = path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out)."
                                            : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock.";
             row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
@@ -232,7 +234,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         if (showsHeader) {
-            auto header = area.removeFromTop(34).reduced(motion::style::padding + 2, 0);
+            auto header = area.removeFromTop(34).reduced(motion::style::padding, 0);
             kind.setBounds(header.removeFromRight(selectionCount > 1 ? 110 : 60));
             title.setBounds(header);
         }
@@ -258,7 +260,7 @@ private:
         void paint(juce::Graphics& g) override {
             g.setFont(motion::style::caption());
             g.setColour(motion::style::muted());
-            g.drawText(group, getLocalBounds().removeFromTop(16).withTrimmedLeft(2), juce::Justification::centredLeft);
+            g.drawText(group, getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
         }
         void resized() override {
             auto area = getLocalBounds();
@@ -276,7 +278,9 @@ private:
             line.removeFromRight(motion::style::gap);
             const auto count = static_cast<int>(fields.size());
             // Capped, so an axis label stays beside its value in a wide inspector.
-            const auto width = std::min(110, (line.getWidth() - motion::style::gap * (count - 1)) / std::max(1, count));
+            // Single values take one column of the three-axis grid so every row lines up.
+            const auto columns = std::max(3, count);
+            const auto width = std::min(110, (line.getWidth() - motion::style::gap * (columns - 1)) / columns);
             for (int index = 0; index < count; ++index) {
                 fields[static_cast<std::size_t>(index)]->editor.setBounds(line.removeFromLeft(width));
                 line.removeFromLeft(motion::style::gap);

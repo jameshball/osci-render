@@ -116,7 +116,7 @@ public:
         if (!cards.empty() || dragActive) {
             g.setColour(motion::style::muted());
             g.setFont(motion::style::caption());
-            g.drawText("Effects", getLocalBounds().removeFromTop(headingHeight).withTrimmedLeft(2), juce::Justification::centredLeft, false);
+            g.drawText("Effects", getLocalBounds().removeFromTop(headingHeight), juce::Justification::centredLeft, false);
         }
         if (!dropZone.isEmpty()) {
             g.setColour(motion::style::accent().withAlpha(dropHover ? .18f : .07f));

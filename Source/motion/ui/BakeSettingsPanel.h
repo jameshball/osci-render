@@ -55,11 +55,7 @@ public:
         duration.onTextChange = [this] { durationEdited = true; refresh(); };
         bpm.onTextChange = [this] { tempoEdited = true; refresh(); };
         seed.onTextChange = [this] { refresh(); };
-        for (auto* caption : { &durationLabel, &rateLabel, &samplesLabel, &seedLabel, &bpmLabel }) {
-            caption->setFont(motion::style::body());
-            caption->setColour(juce::Label::textColourId, osci::Colours::textMuted());
-            caption->setBorderSize({});
-        }
+        for (auto* caption : { &durationLabel, &rateLabel, &samplesLabel, &seedLabel, &bpmLabel }) { motion::style::dialog::caption(*caption); }
         for (auto* label : { &summary, &note, &error }) {
             label->setFont(motion::style::body());
             label->setJustificationType(juce::Justification::topLeft);
@@ -83,32 +79,24 @@ public:
                  &duration, &frameRate, &samples, &seed, &bpm, &summary, &note, &error, &bake }) {
             addAndMakeVisible(component);
         }
-        setSize(440, 400);
+        setSize(440, 290);
         refresh();
     }
 
     std::function<void(motion::BakeSettings)> onBake;
 
     void resized() override {
-        auto area = getLocalBounds().reduced(14);
-        const auto row = [&](juce::Label& label, juce::Component& field) {
-            auto bounds = area.removeFromTop(28);
-            label.setBounds(bounds.removeFromLeft(142));
-            field.setBounds(bounds);
-            area.removeFromTop(10);
-        };
+        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
+        motion::style::dialog::footer(area, { &bake });
+        const auto row = [&](juce::Label& label, juce::Component& field) { motion::style::dialog::formRow(area, label, field, 142); };
         row(durationLabel, duration);
         row(rateLabel, frameRate);
         row(samplesLabel, samples);
         row(seedLabel, seed);
         row(bpmLabel, bpm);
-        area.removeFromTop(2);
-        summary.setBounds(area.removeFromTop(40));
-        area.removeFromTop(8);
-
-        area.removeFromTop(6);
-        error.setBounds(area.removeFromTop(40));
-        bake.setBounds(area.removeFromTop(32));
+        // The estimate and any problem share one slot above the button.
+        summary.setBounds(area);
+        error.setBounds(area);
     }
 
 private:
@@ -148,15 +136,16 @@ private:
         }
         valid = message.isEmpty();
         error.setText(message, juce::dontSendNotification);
+        summary.setVisible(valid);
         bake.setEnabled(valid);
         if (valid) {
             settings = next;
             const auto frames = next.frameCount();
             const auto mib = static_cast<double>(frames) * next.pointsPerFrame * sizeof(motion::PointSample) / (1024 * 1024);
-            summary.setText(juce::String(mib, 2) + " MiB prepared payload  /  " + juce::String(static_cast<juce::int64>(frames)) + " frames\n"
-                + displayNumber(static_cast<double>(frames) / next.frameRate) + " seconds after frame rounding", juce::dontSendNotification);
-        } else {
-            summary.setText("Prepared payload estimate requires valid settings.\nMaximum prepared payload: 256 MiB.", juce::dontSendNotification);
+            const auto seconds = static_cast<double>(frames) / next.frameRate;
+            const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
+            summary.setText(juce::String(static_cast<juce::int64>(frames)) + " frames" + dot + juce::String(mib, 2) + " MiB"
+                + (std::abs(seconds - next.duration) > 1.0e-9 ? dot + "rounded to " + displayNumber(seconds) + " s" : juce::String()), juce::dontSendNotification);
         }
     }
     motion::BakeSettings settings;

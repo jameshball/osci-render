@@ -75,6 +75,9 @@ public:
     // The host adds the bar as its own child. While full screen, the bar comes
     // back under the picture so the controls stay on screen.
     juce::Component& detachControls(juce::Component& host);
+    // Restyles the control icons for a host with its own visual language
+    // (osci-motion). osci-render and sosci keep the defaults.
+    void setControlStyle(juce::Colour iconColour, int edgeIndent);
     int controlsPreferredWidth();
     // Called when the detached bar's preferred width changes (a recording
     // stopwatch or ffmpeg download) or it returns from full screen.

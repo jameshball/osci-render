@@ -576,6 +576,15 @@ juce::Component& VisualiserComponent::detachControls(juce::Component& host) {
     return controls;
 }
 
+void VisualiserComponent::setControlStyle(juce::Colour iconColour, int edgeIndent) {
+    fullScreenButton.setColours(iconColour, iconColour);
+    popOutButton.setColours(iconColour, juce::Colours::red);
+    settingsButton.setColours(iconColour, iconColour);
+    audioInputButton.setColours(iconColour, juce::Colours::red);
+    textureOutputButton.setColours(iconColour, juce::Colours::red);
+    for (auto* button : std::initializer_list<juce::DrawableButton*> {&fullScreenButton, &popOutButton, &settingsButton, &audioInputButton, &textureOutputButton, &record}) { button->setEdgeIndent(edgeIndent); }
+}
+
 void VisualiserComponent::ControlBar::paint(juce::Graphics& g) {
     if (owner.controlsDetached) { return; }
     auto colour = osci::Colours::veryDark();

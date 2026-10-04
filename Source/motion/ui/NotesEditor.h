@@ -138,15 +138,22 @@ public:
     }
     void paint(juce::Graphics& g) override {
         g.fillAll(osci::Colours::veryDark());
-        g.setColour(osci::Colours::surfaceRaised()); g.fillRect(0, 0, getWidth(), 30);
         const auto* clip = currentClip();
+        // Without a clip the tab name already says what this is; no header bar.
+        if (clip == nullptr && preview == nullptr) {
+            g.setColour(motion::style::muted());
+            g.setFont(motion::style::body());
+            g.drawText("Select a clip", getLocalBounds(), juce::Justification::centred);
+            return;
+        }
+        g.setColour(osci::Colours::surfaceRaised()); g.fillRect(0, 0, getWidth(), 30);
         const auto pattern = preview != nullptr ? preview : (clip != nullptr ? clip->midi : nullptr);
         g.setFont(motion::style::body()); g.setColour(osci::Colours::text());
         const auto titleEnd = pattern != nullptr ? velocity.getX() - 73 : envelopeButton.getX();
         g.drawText(clip == nullptr ? "Notes" : juce::String(clip->name), 12, 0, std::max(0, titleEnd - 12), 30, juce::Justification::centredLeft);
         if (pattern == nullptr) {
-            g.setColour(osci::Colours::text().withAlpha(.65f));
-            g.drawText(clip == nullptr ? "Select a visual clip to edit its notes." : isLocked() ? "This track is locked. Notes cannot be created." : processor.midiRecordingSession().busy() ? "Play your MIDI keyboard. Stop to keep the notes, or Cancel to discard." : "Create notes, record a performance, or assign a MIDI file from Assets.", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
+            g.setColour(motion::style::muted());
+            g.drawText(isLocked() ? "The track is locked" : processor.midiRecordingSession().busy() ? "Recording: play your MIDI keyboard" : "No notes yet", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
             return;
         }
         g.setColour(osci::Colours::text().withAlpha(.7f));
@@ -225,7 +232,7 @@ public:
         }
         g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(motion::style::caption());
         if (!recordingStatus.isVisible()) {
-            g.drawText(error.isEmpty() ? (isLocked() ? "Track locked | Notes are read-only. Selection, Fit and navigation remain available." : "Double-click: add | Drag: move/resize | Delete: remove | Alt: bypass snap | Cmd/Ctrl-wheel: zoom") : error,
+            g.drawText(error.isEmpty() ? (isLocked() ? "Track locked" : juce::String()) : error,
             8, getHeight() - 20, getWidth() - 16, 20, juce::Justification::centredLeft);
         }
     }

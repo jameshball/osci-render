@@ -191,7 +191,9 @@ private:
         bounds.removeFromLeft(8);
         graphics.setColour(osci::Colours::text());
         graphics.setFont(motion::style::body());
-        graphics.drawText(getNameForRow(row), bounds.removeFromTop(20), juce::Justification::centredLeft);
+        // The detail line names the kind, so the file extension is left off.
+        const auto name = getNameForRow(row);
+        graphics.drawText(definitionRow(row) || !name.containsChar('.') ? name : name.upToLastOccurrenceOf(".", false, false), bounds.removeFromTop(20), juce::Justification::centredLeft);
         graphics.setColour(osci::Colours::text().withAlpha(0.55f));
         graphics.setFont(motion::style::caption());
         juce::String detail;

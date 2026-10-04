@@ -100,6 +100,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // the Scope panel header rather than on top of the picture.
     visualiserControls = &visualiser.detachControls(*this);
     visualiser.onControlsChanged = [this] { resized(); };
+    visualiser.setControlStyle(motion::style::text().withAlpha(.78f), 5);
     beamSettingsWindow.addKeyListener(this);
 #if JUCE_MAC || JUCE_WINDOWS
     beamSettingsWindow.setUsingNativeTitleBar(true);
@@ -222,11 +223,12 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(tempoLabel);
     addAndMakeVisible(canvasButton);
     canvasButton.setName("Output canvas");
+    canvasButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     canvasButton.setTooltip("Set the output framing and default video dimensions.");
     canvasButton.onClick = [this] {
         auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize(), processor.document.mainProject().frameRate);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "Output canvas", juce::Point<int>(420, 162), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "Output canvas", juce::Point<int>(420, 150), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
         controls->onApply = [owner, dialog](VisualiserRenderSize size) {
@@ -338,7 +340,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addChildComponent(effectLibrary);
     libraryHeader.setVisible(false);
     libraryTabs.setName("Library tabs");
-    libraryTabs.setTabPadding(7);
+    libraryTabs.setTabPadding(8);
+    timelineTabs.setTabPadding(8);
     libraryTabs.addTab("Assets");
     libraryTabs.addTab("Effects");
     libraryTabs.addTab("Modulators");
@@ -374,7 +377,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(inspectorTitle);
     inspectorTitle.setText("Properties", juce::dontSendNotification);
     inspectorTitle.setFont(motion::style::title());
-    inspectorTitle.setBorderSize(juce::BorderSize<int>(0, 5, 0, 0));
+    inspectorTitle.setBorderSize(juce::BorderSize<int>(0));
+    timelineTabs.setName("Timeline tabs");
     timelineTabs.addTab("Timeline");
     timelineTabs.addTab("Graph");
     timelineTabs.addTab("Notes");
@@ -385,7 +389,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         curveEditor.setVisible(index == 1);
         notesEditor.setVisible(index == 2);
         graphSideViewport.setVisible(index == 1 && curveTarget != 0);
-        curveList.setVisible(index == 1);
+        curveList.setVisible(index == 1 && curveTarget != 0);
         if (index == 1) { refreshCurveList(); }
         resized();
         if (index == 2) { notesEditor.fitContents(); }
@@ -511,7 +515,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "MIDI envelope", juce::Point<int>(420, 286), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), "MIDI envelope", juce::Point<int>(420, 294), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
         controls->onApply = [owner, dialog, id, generation, revision](motion::MidiInstrument settings) {
@@ -532,7 +536,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto ramped = changes != nullptr && replacing.has_value() && existing != changes->end() && existing->ramp;
         auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, ramped);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), replacing.has_value() ? "Edit tempo change" : "Add tempo change", juce::Point<int>(360, 180), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), replacing.has_value() ? "Edit tempo change" : "Add tempo change", juce::Point<int>(360, 160), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
         const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(controls);
@@ -565,7 +569,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
         auto* controls = panel.get();
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add marker" : "Edit marker", juce::Point<int>(420, 170), true);
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add marker" : "Edit marker", juce::Point<int>(420, 140), true);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
         const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(controls);
@@ -672,6 +676,8 @@ void MotionEditor::saveLayout() {
 
 MotionEditor::~MotionEditor() {
     juce::Desktop::getInstance().removeFocusChangeListener(this);
+    for (auto* child : getChildren()) { child->removeComponentListener(&dialogStyle); }
+    motion::style::unstyleDialogs(*this, dialogStyle.look);
     saveLayout();
     menuBar.setLookAndFeel(nullptr);
     processor.blenderInputs().cancelAllCaptures();
@@ -702,26 +708,28 @@ void MotionEditor::resized() {
     const auto names = static_cast<juce::MenuBarModel&>(menus).getMenuBarNames();
     for (int index = 0; index < names.size(); ++index) { menuWidth += menuBar.getLookAndFeel().getMenuBarItemWidth(menuBar, index, names[index]); }
     // Narrow windows keep the Output picker: the undo description shortens first.
-    const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - (46 + 130);
+    // Without room for the whole description only the buttons stay; a clipped
+    // description would wrap onto two lines.
+    const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - (46 + 160);
     const auto wide = spare >= undoRedoControls.getPreferredWidth();
-    undoRedoControls.setBounds(top.removeFromRight(wide ? undoRedoControls.getPreferredWidth() : 110));
+    undoRedoControls.setBounds(top.removeFromRight(wide ? undoRedoControls.getPreferredWidth() : 54));
     // Transport sits centred in the menu row, leaving the full height below
     // for the workspace.
     // The transport goes compact (no BPM caption, tighter readout) before the
     // Output picker would have to hide.
-    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 130 >= 390 ? 390 : 310;
+    const auto transportWidth = top.getWidth() - menuWidth - 16 - 12 - 160 >= 390 ? 390 : 310;
     auto transport = top.withSizeKeepingCentre(std::min(top.getWidth() - menuWidth - 16, transportWidth), 30).withX(std::max(top.getX() + menuWidth + 16, top.getCentreX() - transportWidth / 2));
     // What the audio interface plays sits with the other audio state (the
     // DSP meter), not in the Scope; without room it lives in the Audio menu.
     {
         // Narrower windows drop the label, then shrink the picker.
         auto output = top.withLeft(transport.getRight() + 12);
-        const auto labelled = output.getWidth() >= 46 + 130;
-        const auto pickerWidth = labelled ? 130 : std::min(130, output.getWidth());
+        const auto labelled = output.getWidth() >= 46 + 160;
+        const auto pickerWidth = labelled ? 160 : std::min(160, output.getWidth());
         outputLabel.setVisible(labelled);
         monitorOutput.setVisible(pickerWidth >= 100);
         output = output.removeFromRight(pickerWidth + (labelled ? 46 : 0));
-        if (labelled) { outputLabel.setBounds(output.removeFromLeft(46)); }
+        if (labelled) { outputLabel.setBounds(output.removeFromLeft(46).withTrimmedRight(6)); }
         monitorOutput.setBounds(output.reduced(0, 4));
     }
     menuBar.setBounds(top.withRight(transport.getX()));
@@ -741,7 +749,7 @@ void MotionEditor::resized() {
     transport.removeFromLeft(compact ? 4 : 8);
     tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
     tempoLabel.setVisible(!compact);
-    tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34));
+    tempoLabel.setBounds(transport.removeFromLeft(compact ? 4 : 34).withTrimmedLeft(compact ? 0 : 4));
     tapButton.setBounds(transport.removeFromLeft(38).reduced(1, 4));
     area.removeFromTop(3);
     statusBar.setBounds(area.removeFromBottom(20));
@@ -751,23 +759,28 @@ void MotionEditor::resized() {
     auto timeline = timelineBounds;
     auto header = timeline.removeFromTop(30);
     timelineHeader.setBounds(header);
-    timelineTabs.setBounds(header.removeFromLeft(270));
+    timelineTabs.setBounds(header.removeFromLeft(timelineTabs.preferredWidth()));
     cancelExport.setBounds(header.removeFromRight(62).reduced(2));
     exportBar.setBounds(header.removeFromRight(180).reduced(2));
     const bool nested = processor.document.editingComposition() != 0;
     scopeBack.setVisible(nested); scopeLabel.setVisible(nested); scopeShared.setVisible(nested);
     if (nested) {
-        auto breadcrumb = timeline.removeFromTop(28);
-        scopeBack.setBounds(breadcrumb.removeFromLeft(160).reduced(2));
-        scopeShared.setBounds(breadcrumb.removeFromRight(170).reduced(6, 1));
-        scopeLabel.setBounds(breadcrumb.reduced(5, 1));
+        // Inset like the tool row below it.
+        auto breadcrumb = timeline.removeFromTop(28).reduced(motion::style::padding, 2);
+        scopeBack.setBounds(breadcrumb.removeFromLeft(scopeBack.getBestWidthForHeight(24) + 16));
+        breadcrumb.removeFromLeft(motion::style::padding);
+        scopeShared.setBounds(breadcrumb.removeFromRight(140));
+        scopeLabel.setBounds(breadcrumb);
     }
     this->timeline.setBounds(timeline.withTrimmedTop(3));
     notesEditor.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
-    curveList.setBounds(graph.removeFromLeft(std::clamp(graph.getWidth() / 7, 150, 210)));
-    graph.removeFromLeft(2);
-    // Modulation and routing need a target; without one the graph takes the room.
+    // The channel list and routing need a target; without one the graph takes the room.
+    curveList.setVisible(timelineTabs.getCurrentTabIndex() == 1 && curveTarget != 0);
+    if (curveTarget != 0) {
+        curveList.setBounds(graph.removeFromLeft(std::clamp(graph.getWidth() / 7, 150, 210)));
+        graph.removeFromLeft(2);
+    }
     graphSideViewport.setVisible(timelineTabs.getCurrentTabIndex() == 1 && curveTarget != 0);
     if (curveTarget != 0) {
         graphSideViewport.setBounds(graph.removeFromRight(std::clamp(graph.getWidth() / 4, 230, 285)));
@@ -790,7 +803,7 @@ void MotionEditor::resized() {
     inspectorBounds = area.removeFromRight(std::clamp(300 + extra * 3 / 20, 300, 420));
     auto inspector = inspectorBounds;
     inspectorHeader.setBounds(inspector.removeFromTop(30));
-    inspectorTitle.setBounds(inspectorHeader.getBounds().reduced(5, 3));
+    inspectorTitle.setBounds(inspectorHeader.getBounds().reduced(8, 3));
     propertyInspector.setBounds(inspector);
     area.removeFromRight(3);
     previewWidth = area.getWidth();
@@ -817,7 +830,7 @@ void MotionEditor::resized() {
     visualiser.setBounds(output);
     viewportBounds = editing;
     viewportHeader.setBounds(editing.removeFromTop(30));
-    auto viewControls = viewportHeader.getBounds().reduced(5, 3);
+    auto viewControls = viewportHeader.getBounds().reduced(8, 3);
     compositionTitle.setVisible(viewControls.getWidth() >= 160);
     sceneView.setBounds(viewControls.removeFromRight(std::min(64, viewControls.getWidth())));
     if (compositionTitle.isVisible()) { compositionTitle.setBounds(viewControls.removeFromLeft(100)); }
@@ -835,6 +848,17 @@ void MotionEditor::resized() {
 }
 
 void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
+    // Every panel has the same rounded corners, whatever its content paints.
+    const auto scope = outputHeader.getBounds().getUnion(visualiser.getBounds());
+    graphics.setColour(motion::style::background());
+    for (const auto& panel : {libraryBounds, viewportBounds, scope, inspectorBounds, timelineBounds}) {
+        if (panel.isEmpty()) { continue; }
+        juce::Path corners;
+        corners.addRectangle(panel.toFloat());
+        corners.addRoundedRectangle(panel.toFloat(), motion::style::panelRadius);
+        corners.setUsingNonZeroWinding(false);
+        graphics.fillPath(corners);
+    }
     if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
     graphics.setColour(osci::Colours::outlineSubtle());
     const auto panel = focusedPanel();
@@ -914,6 +938,13 @@ bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, s
         beginSourceImport(std::move(request));
     }
     return true;
+}
+
+void MotionEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) {
+    auto& shown = *overlay;
+    CommonPluginEditor::showOverlay(std::move(overlay));
+    shown.addComponentListener(&dialogStyle);
+    motion::style::restyleDialog(shown, dialogStyle.look);
 }
 
 void MotionEditor::openProject(const juce::File& file) {
@@ -1010,7 +1041,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     const auto original = found != assets.end() ? *found : std::shared_ptr<const motion::Asset>();
     auto panel = std::make_unique<MotionBlenderSourcePanel>(original != nullptr ? original->name : "Blender", original != nullptr ? original->blenderSettings : motion::BlenderSourceSettings{}, id != 0);
     auto* controls = panel.get();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, id != 0 ? 358 : 310), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, id != 0 ? 254 : 222), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
     const auto generation = document.generation();
@@ -1154,7 +1185,7 @@ void MotionEditor::showNextPreparationSettings() {
         luaPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 620 : 440, editLua ? 550 : text ? 470 : fractal ? 124 : video ? 380 : raster ? 336 : 356), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), (text || editLua ? "Edit " : (raster || fractal ? "Prepare " : "Bake ")) + name, juce::Point<int>(editLua ? 920 : text ? 620 : 440, editLua ? 550 : text ? 470 : fractal ? 102 : video ? 328 : raster ? 270 : 290), true);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;
@@ -1728,7 +1759,7 @@ void MotionEditor::refreshInspector() {
     const auto track = std::find_if(project.tracks.begin(), project.tracks.end(), [this](const auto& item) { return item.id == selection; });
     if (selection == 0) {
         owner = 0;
-        heading = std::pair<juce::String, juce::String>("Composition", "Everything");
+        heading = std::pair<juce::String, juce::String>("Composition", juce::String());
     } else if (track != project.tracks.end()) {
         if (track->kind == motion::TrackKind::visual) { owner = selection; }
         heading = std::pair<juce::String, juce::String>(juce::String(track->name), "Track");
@@ -2240,7 +2271,7 @@ void MotionEditor::exportVideo() {
     const juce::Component::SafePointer<MotionEditor> owner(this);
     auto settings = std::make_unique<MotionVideoExportSettings>(config);
     auto* settingsPointer = settings.get();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), "Export video", juce::Point<int>(440, 388), true);
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), "Export video", juce::Point<int>(440, 330), true);
     const juce::Component::SafePointer<osci::ComponentOverlay> settingsOverlay(overlay.get());
     auto accepted = std::make_shared<bool>(false);
     overlay->onDismissRequested = [owner, state, accepted] {

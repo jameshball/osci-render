@@ -135,6 +135,35 @@ private:
     bool right;
 };
 
+// "More" / "Less": a caption with a chevron that folds a section open.
+class Disclosure final : public juce::Button {
+public:
+    explicit Disclosure(const juce::String& name) : juce::Button(name) {
+        setClickingTogglesState(true);
+        setWantsKeyboardFocus(false);
+    }
+    void paintButton(juce::Graphics& g, bool highlighted, bool) override {
+        auto area = getLocalBounds().toFloat();
+        const auto open = getToggleState();
+        const auto colour = highlighted ? motion::style::text() : motion::style::muted();
+        const auto arrow = area.removeFromLeft(12).withSizeKeepingCentre(8, 8);
+        juce::Path chevron;
+        if (open) {
+            chevron.startNewSubPath(arrow.getX(), arrow.getY() + 2);
+            chevron.lineTo(arrow.getCentreX(), arrow.getBottom() - 2);
+            chevron.lineTo(arrow.getRight(), arrow.getY() + 2);
+        } else {
+            chevron.startNewSubPath(arrow.getX() + 2, arrow.getY());
+            chevron.lineTo(arrow.getRight() - 2, arrow.getCentreY());
+            chevron.lineTo(arrow.getX() + 2, arrow.getBottom());
+        }
+        g.setColour(colour);
+        g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setFont(caption());
+        g.drawText(open ? "Less" : "More", area.withTrimmedLeft(2), juce::Justification::centredLeft, false);
+    }
+};
+
 class Chip final : public juce::Button {
 public:
     explicit Chip(const juce::String& text) : juce::Button(text), label(text) { setClickingTogglesState(true); }
@@ -155,7 +184,8 @@ public:
     }
 private:
     juce::String label;
-    juce::Colour on = osci::Colours::accentColor();
+    // Toggles light up in the same muted green as the tool strips.
+    juce::Colour on = osci::Colours::accentColor().withAlpha(.45f);
 };
 
 inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
@@ -197,9 +227,118 @@ inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radi
 // Routes the editor's menus, buttons and pickers through the type styles.
 class LookAndFeel final : public PluginLookAndFeel {
 public:
+    // One button fill everywhere unless a button says otherwise.
+    LookAndFeel() { setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised()); }
     juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return body(); }
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
+    // Combo text keeps the field inset and clears the arrow.
+    void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
+        PluginLookAndFeel::positionComboBoxText(box, label);
+        const auto left = 8 - getLabelBorderSize(label).getLeft();
+        label.setBounds(left, 1, juce::jmax(1, box.getWidth() - 22 - left), box.getHeight() - 2);
+    }
+    // Tick boxes keep body text and one tick size at any height.
+    void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button, bool highlighted, bool down) override {
+        constexpr float tick = 14.0f;
+        drawTickBox(g, button, 4.0f, (static_cast<float>(button.getHeight()) - tick) * 0.5f, tick, tick, button.getToggleState(), button.isEnabled(), highlighted, down);
+        g.setColour(button.findColour(juce::ToggleButton::textColourId).withMultipliedAlpha(button.isEnabled() ? 1.0f : 0.5f));
+        g.setFont(body());
+        g.drawFittedText(button.getButtonText(), button.getLocalBounds().withTrimmedLeft(4 + static_cast<int>(tick) + 8).withTrimmedRight(2), juce::Justification::centredLeft, 2);
+    }
+    // Plain labels align with the controls around them; labels drawn as
+    // fields keep their inner margin.
+    juce::BorderSize<int> getLabelBorderSize(juce::Label& label) override {
+        const auto border = label.getBorderSize();
+        if (label.findColour(juce::Label::backgroundColourId).isTransparent() && !label.isBeingEdited()) { return {border.getTop(), 0, border.getBottom(), 0}; }
+        return border;
+    }
 };
 }
+
+namespace motion::style {
+// Dialogs keep the overlay's look but use the editor's type sizes.
+class DialogLookAndFeel final : public osci::OverlayLookAndFeel {
+public:
+    juce::Font getPopupMenuFont() override { return body(); }
+    juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
+    juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
+    // Combo text starts where a dialog field's text does.
+    void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
+        osci::OverlayLookAndFeel::positionComboBoxText(box, label);
+        label.setBounds(fieldIndent - label.getBorderSize().getLeft(), 1, juce::jmax(1, box.getWidth() - 24 - fieldIndent + label.getBorderSize().getLeft()), box.getHeight() - 2);
+    }
+    static constexpr int fieldIndent = 8;
+};
+
+// One form layout for every dialog: captions beside or above fields, and
+// the action buttons right-aligned on the last line.
+namespace dialog {
+inline constexpr int margin = 12;
+inline constexpr int row = 28;
+inline constexpr int rowGap = 10;
+inline constexpr int buttonHeight = 30;
+inline constexpr int buttonWidth = 120;
+inline void caption(juce::Label& label) {
+    label.setFont(body());
+    label.setColour(juce::Label::textColourId, muted());
+    label.setBorderSize({});
+    label.setJustificationType(juce::Justification::centredLeft);
+}
+// Lays the buttons out right to left and returns the rest of the line.
+inline juce::Rectangle<int> footer(juce::Rectangle<int>& area, std::initializer_list<juce::Component*> buttons, int width = buttonWidth) {
+    auto line = area.removeFromBottom(buttonHeight);
+    for (auto* button : buttons) {
+        button->setBounds(line.removeFromRight(width));
+        line.removeFromRight(8);
+    }
+    area.removeFromBottom(rowGap);
+    return line;
+}
+// A caption beside its field.
+inline void formRow(juce::Rectangle<int>& area, juce::Label& label, juce::Component& field, int captionWidth) {
+    auto bounds = area.removeFromTop(row);
+    label.setBounds(bounds.removeFromLeft(captionWidth));
+    field.setBounds(bounds);
+    area.removeFromTop(rowGap);
+}
+}
+
+// Gives a dialog's controls the editor's type sizes and field look. The
+// overlay hands its controls its own look whenever it lays out, so the
+// editor calls this after every overlay layout.
+inline void restyleDialog(juce::Component& component, DialogLookAndFeel& look) {
+    auto* current = &component.getLookAndFeel();
+    if (current != &look && dynamic_cast<osci::OverlayLookAndFeel*>(current) != nullptr) {
+        if (auto* editor = dynamic_cast<juce::TextEditor*>(&component)) {
+            // A centred field centres its text below the top indent, so the
+            // indent would push single lines low.
+            const auto centred = (editor->getJustificationType().getFlags() & juce::Justification::verticallyCentred) != 0;
+            editor->setIndents(DialogLookAndFeel::fieldIndent - editor->getBorder().getLeft(), centred ? 0 : editor->getTopIndent());
+            editor->setColour(juce::TextEditor::backgroundColourId, field());
+            editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        }
+        if (auto* combo = dynamic_cast<juce::ComboBox*>(&component)) {
+            combo->setColour(juce::ComboBox::backgroundColourId, field());
+            combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+        }
+        component.setLookAndFeel(&look);
+    }
+    for (auto* child : component.getChildren()) { restyleDialog(*child, look); }
+}
+// Releases the look before it is destroyed.
+inline void unstyleDialogs(juce::Component& component, DialogLookAndFeel& look) {
+    if (&component.getLookAndFeel() == &look) { component.setLookAndFeel(nullptr); }
+    for (auto* child : component.getChildren()) { unstyleDialogs(*child, look); }
+}
+}
+
+// A resize handle that shows its grip only on hover, focus or drag.
+class MotionDivider final : public osci::PanelDivider {
+public:
+    using osci::PanelDivider::PanelDivider;
+    void paint(juce::Graphics& g) override {
+        if (isMouseOverOrDragging() || hasKeyboardFocus(false)) { osci::PanelDivider::paint(g); }
+    }
+};

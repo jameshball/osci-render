@@ -137,7 +137,8 @@ public:
         g.setColour(osci::Colours::text());
         g.setFont(motion::style::body());
         if (storedCurve == nullptr) {
-            g.drawText("Select an object or camera property", getLocalBounds(), juce::Justification::centred);
+            g.setColour(motion::style::muted());
+            g.drawText("Select a property", getLocalBounds(), juce::Justification::centred);
             return;
         }
         const auto& curve = *displayed(*clip, propertyName);

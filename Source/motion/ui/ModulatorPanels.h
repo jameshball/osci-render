@@ -157,14 +157,8 @@ public:
         addButton.setButtonText("Add modulator");
         addButton.setName("Add modulator");
         addButton.setTitle("Add modulator");
-        addButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.3f));
         addButton.onClick = [this] { add(); };
         content.addAndMakeVisible(addButton);
-        emptyText.setText("Drag a modulator onto any property to move it.", juce::dontSendNotification);
-        emptyText.setFont(motion::style::caption());
-        emptyText.setColour(juce::Label::textColourId, motion::style::muted());
-        emptyText.setJustificationType(juce::Justification::centredTop);
-        content.addAndMakeVisible(emptyText);
         name.setName("Modulator name");
         name.setTitle("Modulator name");
         name.setFont(motion::style::title());
@@ -195,12 +189,8 @@ public:
             button->onClick = [this, index] { setKind(index); };
             content.addAndMakeVisible(*button);
         }
-        more.setButtonText("More");
-        more.setName("More modulator settings");
-        more.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
-        more.setColour(juce::TextButton::textColourOffId, motion::style::muted());
         more.onClick = [this] {
-            showMore = !showMore;
+            showMore = more.getToggleState();
             refresh();
         };
         content.addAndMakeVisible(more);
@@ -298,7 +288,6 @@ public:
             }
         }
         for (auto& card : cards) { card->repaint(); }
-        emptyText.setVisible(modulators.empty());
         const auto* modulator = current();
         const auto oscillator = modulator != nullptr && modulator->kind == motion::ModulatorKind::oscillator;
         const auto envelope = modulator != nullptr && modulator->kind == motion::ModulatorKind::envelope;
@@ -312,7 +301,7 @@ public:
         // wait behind More.
         const auto hasMore = (oscillator && !loudness) || envelope || midiControl;
         more.setVisible(hasMore);
-        more.setButtonText(showMore ? "Less" : "More");
+        more.setToggleState(showMore, juce::dontSendNotification);
         hertz.setVisible(oscillator && !loudness);
         beatsChip.setVisible(oscillator && !loudness);
         rate.setVisible(oscillator && !loudness);
@@ -361,16 +350,14 @@ public:
     void resized() override {
         viewport.setBounds(getLocalBounds());
         const auto width = viewport.getMaximumVisibleWidth();
-        auto area = juce::Rectangle<int>(0, 0, width, 100000).reduced(motion::style::padding, motion::style::padding);
+        // The add button sits exactly where Assets' Add source does.
+        auto area = juce::Rectangle<int>(0, 0, width, 100000).reduced(motion::style::padding, 0).withTrimmedTop(6);
+        addButton.setBounds(area.removeFromTop(30));
+        area.removeFromTop(cards.empty() ? 0 : 6);
         for (auto& card : cards) {
             card->setBounds(area.removeFromTop(cardHeight));
             area.removeFromTop(motion::style::gap);
         }
-        if (cards.empty()) {
-            area.removeFromTop(motion::style::padding * 2);
-            emptyText.setBounds(area.removeFromTop(60));
-        }
-        addButton.setBounds(area.removeFromTop(motion::style::controlHeight + 4));
         const auto* modulator = current();
         if (modulator != nullptr) {
             area.removeFromTop(motion::style::padding * 2);
@@ -593,7 +580,7 @@ private:
         void paint(juce::Graphics& g) override {
             const auto* modulator = owner.current();
             if (modulator == nullptr) { return; }
-            g.setColour(motion::style::outline().withAlpha(.6f));
+            g.setColour(juce::Colours::black.withAlpha(.45f));
             g.drawHorizontalLine(owner.separatorY, static_cast<float>(motion::style::padding), static_cast<float>(getWidth() - motion::style::padding));
             const auto area = owner.previewArea.toFloat();
             g.setColour(juce::Colours::black.withAlpha(.35f));
@@ -658,12 +645,12 @@ private:
     motion::icons::Button remove {"Delete modulator", motion::icons::Icon::trash};
     std::array<std::unique_ptr<ShapeButton>, 10> shapes;
     std::vector<std::pair<motion::Modulator, int>> listedCards;
-    juce::TextButton more;
+    motion::style::Disclosure more {"More modulator settings"};
     bool showMore = false;
     motion::style::Chip hertz {"Hz"}, beatsChip {"Beats"};
     juce::ComboBox source, controller, channel;
     std::vector<motion::Id> sourceIds;
-    juce::Label name, emptyText, routesTitle, routesHint;
+    juce::Label name, routesTitle, routesHint;
     motion::ui::LabelledScrub rate, phase, seed, attack, decay, sustain, release, velocity, lowest, highest;
     std::vector<std::unique_ptr<Card>> cards;
     std::vector<std::unique_ptr<RouteRow>> routes;

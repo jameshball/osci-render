@@ -57,7 +57,7 @@ private:
             const auto text = selected ? motion::style::text() : motion::style::muted().interpolatedWith(motion::style::text(), hover * .6f);
             g.setColour(text.withMultipliedAlpha(isEnabled() ? 1.0f : .4f));
             g.setFont(motion::style::title());
-            g.drawText(getButtonText(), getLocalBounds().withTrimmedBottom(2), juce::Justification::centred, false);
+            g.drawText(getButtonText(), getLocalBounds(), juce::Justification::centred, false);
             if (selected) {
                 g.setColour(motion::style::accent());
                 g.fillRoundedRectangle(bounds.reduced(static_cast<float>(tabs.tabPadding), 0).withTop(bounds.getBottom() - 3.0f), 1.5f);
