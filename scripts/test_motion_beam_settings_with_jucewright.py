@@ -9,6 +9,7 @@ import os
 import shutil
 import struct
 import subprocess
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from jucewright_osci_browser.cli import parse_args
@@ -77,7 +78,7 @@ def snapshot():
 
 
 def intensity():
-    return next(node for node in nodes(snapshot()) if node.get("name") == "Line Intensity" and node.get("class") == "juce::Slider")
+    return next(node for node in nodes(snapshot()) if node.get("name") == "Scope intensity" and node.get("class") == "MotionScrubField")
 
 
 def scope_field(label):
@@ -103,17 +104,30 @@ def open_project():
 
 def open_settings():
     step("open beam settings", "click", "--name", "Scope settings", "--exact")
+    command("wait-for-locator", "--name", "Scope settings", "--class", "MotionScopeSettings", "--exact")
 
 
 def close_settings():
-    step("close beam settings", "press", "Escape", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
+    step("close beam settings", "press", "Escape", "--class", "juce::CallOutBox")
+    deadline = time.monotonic() + 5
+    while any(node.get("class") == "MotionScopeSettings" for node in nodes(snapshot())):
+        if time.monotonic() > deadline:
+            raise RuntimeError("Scope settings did not close")
+        time.sleep(0.1)
+
+
+def save(label):
+    # The popover is modal: close it to save from the editor, then reopen it.
+    close_settings()
+    step(label, "press", "command + s", "--class", "MotionEditor")
+    open_settings()
 
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     open_project()
     open_settings()
-    step("save baseline", "press", "Command+s", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
+    save("save baseline")
     if saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") != "1":
         step("enable upsampling", "click", "--name", "Upsample Audio", "--exact")
     step("set beam intensity", "set-value", intensity()["ref"], "6")
@@ -121,7 +135,7 @@ try:
     step("choose laser timing", "click", "--name", "Laser (slow galvo)", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Undo Apply Laser (slow galvo) scope timing", "--role", "label", "--exact")
     step("set scope dwell", "set-value", scope_field("dwell")["ref"], "80")
-    step("save beam settings", "press", "Command+s", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
+    save("save beam settings")
     state = saved()
     assert state.find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") == "1"
     assert float(state.find("beam/effects/parameter[@id='intensity']/parameter").get("value")) == 6
@@ -136,10 +150,10 @@ try:
     assert abs(float(intensity()["value"]) - 6) < .001
     assert abs(float(scope_field("dwell")["value"]) - 80) < .001
     assert abs(float(scope_field("settle")["value"]) - 150) < .001
-    step("reopened beam settings", "screenshot", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact", "--file", session.artifact_dir / "beam-settings.png")
+    step("reopened beam settings", "screenshot", "--file", session.artifact_dir / "beam-settings.png", "--scale", "2")
     # Resave restored runtime state, so this checks restoration rather than merely
     # inspecting the bytes written before changing the controls.
-    step("resave restored beam", "press", "Command+s", "--name", "Beam settings", "--class", "MotionBeamSettingsWindow", "--exact")
+    save("resave restored beam")
     assert saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") == "1"
     assert saved_scope() == [80, 400, 150], saved_scope()
     close_settings()

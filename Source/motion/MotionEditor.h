@@ -5,7 +5,7 @@
 #include "ui/TimelineView.h"
 #include "ui/CompositionView.h"
 #include "ui/AssetLibrary.h"
-#include "ui/BeamSettingsWindow.h"
+#include "ui/ScopeSettings.h"
 #include "ui/CurveEditor.h"
 #include "ui/CurveList.h"
 #include "ui/SceneToolbar.h"
@@ -45,6 +45,7 @@ public:
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor);
     static void dismissPopover(juce::Component* content);
+    void showScopeSettings();
 
 
 private:
@@ -191,8 +192,6 @@ private:
         void componentBeingDeleted(juce::Component& overlay) override { overlay.removeComponentListener(this); }
     } dialogStyle;
     motion::LuaSliderBakes sliderBakes { processor.document };
-    MotionScopeProfilePanel scopeProfilePanel { processor };
-    MotionBeamSettingsWindow beamSettingsWindow { "Beam settings", visualiserSettings, scopeProfilePanel, 550, 500, 1500 };
     MotionTimelineView timeline;
     MotionCompositionView composition;
     MotionAssetLibrary assetLibrary;

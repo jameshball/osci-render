@@ -88,22 +88,17 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     motionLookAndFeel.setControlCornerRadius(3.0f);
     setLookAndFeel(&motionLookAndFeel);
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
-    beamSettingsWindow.setLookAndFeel(&motionLookAndFeel);
-    beamSettingsWindow.setBackgroundColour(osci::Colours::veryDark());
-    visualiser.openSettings = [this] {
-        beamSettingsWindow.setVisible(true);
-        beamSettingsWindow.toFront(true);
+    // The Scope's settings open as a popover from its cog; keeping
+    // openSettings set also keeps the cog in the strip.
+    visualiser.openSettings = [this] { showScopeSettings(); };
+    visualiser.closeSettings = [this] {
+        if (popover != nullptr) { popover->dismiss(); }
     };
-    visualiser.closeSettings = [this] { beamSettingsWindow.setVisible(false); };
     // The scope's record, settings, popout and full-screen controls live in
     // the Scope panel header rather than on top of the picture.
     visualiserControls = &visualiser.detachControls(*this);
     visualiser.onControlsChanged = [this] { resized(); };
     visualiser.setControlStyle(motion::style::text().withAlpha(.78f), 5);
-    beamSettingsWindow.addKeyListener(this);
-#if JUCE_MAC || JUCE_WINDOWS
-    beamSettingsWindow.setUsingNativeTitleBar(true);
-#endif
     // File is built when opened (it lists recent projects); the rest are
     // command lists.
     menus.addTopLevelMenu("File");
@@ -755,8 +750,6 @@ MotionEditor::~MotionEditor() {
     visualiser.openSettings = {};
     visualiser.closeSettings = {};
     visualiser.onControlsChanged = {};
-    beamSettingsWindow.removeKeyListener(this);
-    beamSettingsWindow.setLookAndFeel(nullptr);
     curveEditor.onPreview = {};
     processor.previewComposition(processor.document.project());
     processor.document.removeChangeListener(this);
@@ -1060,6 +1053,10 @@ void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::R
             popover->grabKeyboardFocus();
         }
     });
+}
+
+void MotionEditor::showScopeSettings() {
+    showPopover(std::make_unique<MotionScopeSettings>(processor), getLocalArea(&scopeTools, scopeTools.settings.getBounds()));
 }
 
 void MotionEditor::dismissPopover(juce::Component* content) {
