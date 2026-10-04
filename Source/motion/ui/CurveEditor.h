@@ -437,6 +437,7 @@ public:
             repaint();
             return;
         }
+        if (clip->locked) { return; }
         motion::Keyframe key;
         key.time = clip->localTime(snappedTime(*clip, projectTime(event.position.x), event.mods));
         key.value = constrainedValue(*clip, valueAt(event.position.y), propertyName);
@@ -711,6 +712,8 @@ private:
     };
 
     void beginDrag(const motion::PropertyTarget& clip, DragMode mode, juce::Point<float> down) {
+        // A locked track's keys can be selected but not moved.
+        if (clip.locked) { return; }
         drag = Drag {};
         drag->originals = groupCurves(clip);
         drag->previews = drag->originals;
@@ -905,6 +908,10 @@ private:
         return target.has_value() ? target->curve(property) : nullptr;
     }
 
+    bool targetLocked() const {
+        const auto target = motion::findPropertyTarget(processor.document.project(), targetId);
+        return target.has_value() && target->locked;
+    }
     static motion::Curve* mutableCurve(motion::Project& project, motion::Id id, const std::string& property) {
         return motion::findPropertyCurve(project, id, property);
     }
@@ -1216,7 +1223,7 @@ public:
     // one undo step.
     bool easeSelected(bool in, bool out) {
         const auto keys = selection();
-        if (keys.empty()) {
+        if (keys.empty() || targetLocked()) {
             return false;
         }
         const auto id = targetId;
@@ -1235,6 +1242,7 @@ public:
 private:
     bool deleteSelected() {
         const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+        if (!clip.has_value() || clip->locked) { return false; }
         auto keys = selection();
         std::erase_if(keys, [&clip](const KeyRef& key) {
             const auto* curve = findCurve(clip, key.property);
@@ -1267,16 +1275,17 @@ private:
         if (key == nullptr) {
             return;
         }
+        const auto editable = !clip->locked;
         juce::PopupMenu menu;
         menu.setLookAndFeel(&getLookAndFeel());
         const char* labels[] = { "Hold", "Linear", "Auto", "Bezier" };
         for (int i = 0; i < 4; ++i) {
-            menu.addItem(i + 1, labels[i], true, static_cast<int>(key->interpolation) == i);
+            menu.addItem(i + 1, labels[i], editable, static_cast<int>(key->interpolation) == i);
         }
         menu.addSeparator();
-        menu.addItem(motion::style::menuItem("Easy ease", 11, "F9"));
-        menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9"));
-        menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9"));
+        menu.addItem(motion::style::menuItem("Easy ease", 11, "F9").setEnabled(editable));
+        menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9").setEnabled(editable));
+        menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9").setEnabled(editable));
         const auto id = targetId;
         juce::Component::SafePointer<MotionCurveEditor> safe(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe, id, keys](int result) {

@@ -669,31 +669,48 @@ juce::Result Document::enterComposition(Id id) {
 
 // Snapshots taken before a slider bake landed (undo history, gesture
 // previews) carry the installed bake forward; the baker re-checks its key.
+// A clip keeps its installed slider bake across edits while it plays the same
+// source; a replaced source (or a removed clip) leaves the bake behind.
 static void carryLuaBakes(Project& next, const Project& current) {
-    std::map<Id, std::shared_ptr<const LuaClipBake>> installed;
+    const auto sourceOf = [](const Project& project, Id asset) -> const Asset* {
+        const auto found = std::find_if(project.assets.begin(), project.assets.end(), [asset](const auto& item) { return item->id == asset; });
+        return found == project.assets.end() ? nullptr : found->get();
+    };
+    std::map<Id, std::pair<std::shared_ptr<const LuaClipBake>, const Asset*>> installed;
     const auto collect = [&](const Composition& composition) {
         for (const auto& track : composition.tracks) {
-            for (const auto& clip : track.clips) { if (clip.luaBake != nullptr) { installed.emplace(clip.id, clip.luaBake); } }
+            for (const auto& clip : track.clips) {
+                if (clip.luaBake != nullptr) { installed.emplace(clip.id, std::make_pair(clip.luaBake, sourceOf(current, clip.asset))); }
+            }
         }
     };
     collect(current);
-    for (const auto& definition : current.definitions) { if (definition != nullptr) { collect(*definition); } }
+    for (const auto& definition : current.definitions) { collect(*definition); }
     if (installed.empty()) { return; }
+    const auto carried = [&](const Clip& clip) -> std::shared_ptr<const LuaClipBake> {
+        const auto found = installed.find(clip.id);
+        const auto same = clip.luaBake == nullptr && found != installed.end() && found->second.second == sourceOf(next, clip.asset);
+        return same ? found->second.first : nullptr;
+    };
+    const auto needsCarry = [&](const Composition& composition) {
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
+            return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return carried(clip) != nullptr; });
+        });
+    };
     const auto carry = [&](Composition& composition) {
-        bool changed = false;
         for (auto& track : composition.tracks) {
             for (auto& clip : track.clips) {
-                const auto found = installed.find(clip.id);
-                if (clip.luaBake == nullptr && found != installed.end()) { clip.luaBake = found->second; changed = true; }
+                auto bake = carried(clip);
+                if (bake != nullptr) { clip.luaBake = std::move(bake); }
             }
         }
-        return changed;
     };
     carry(next);
     for (auto& definition : next.definitions) {
-        if (definition == nullptr) { continue; }
+        if (!needsCarry(*definition)) { continue; }
         auto copy = std::make_shared<CompositionDefinition>(*definition);
-        if (carry(*copy)) { definition = std::move(copy); }
+        carry(*copy);
+        definition = std::move(copy);
     }
 }
 
@@ -3032,14 +3049,9 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
                 }
                 const auto frames = BakedSourceArchive::decode(bake->archive);
                 if (!frames) { return juce::Result::fail(juce::String(frames.error)); }
-                // Only a bake matching this clip's current sliders is kept; a
-                // stale one is dropped and the editor bakes again.
-                const auto plan = luaSliderPlan(**found, clip, project.tempo());
-                if (plan.has_value() && plan->key == bake->key && frames.source->frameCount() == plan->settings.frameCount()
-                    && frames.source->frameRate() == plan->settings.frameRate) {
-                    bake->source = std::make_shared<const PreparedSource>(frames.source);
-                    clip.luaBake = std::move(bake);
-                }
+                // Checked against the clip's sliders once routes and links load.
+                bake->source = std::make_shared<const PreparedSource>(frames.source);
+                clip.luaBake = std::move(bake);
             }
             const auto clipEffects = loadEffects(*item, clip.effects, identities);
             if (clipEffects.failed()) {
@@ -3183,6 +3195,18 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
     }
     const auto modulation = validateModulation(project);
     if (!modulation.empty()) { return juce::Result::fail(juce::String(modulation)); }
+    // Only a slider bake matching its clip's sliders and what drives them is
+    // kept; a stale one is dropped and the editor bakes again.
+    for (auto& track : project.tracks) {
+        for (auto& clip : track.clips) {
+            if (clip.luaBake == nullptr) { continue; }
+            const auto asset = std::find_if(assets.begin(), assets.end(), [&clip](const auto& item) { return item->id == clip.asset; });
+            const auto plan = asset == assets.end() ? std::nullopt : luaSliderPlan(**asset, clip, project);
+            const auto& source = *clip.luaBake->source;
+            const auto current = plan.has_value() && plan->key == clip.luaBake->key && source.frameCount() == plan->settings.frameCount() && source.frameRate() == plan->settings.frameRate;
+            if (!current) { clip.luaBake.reset(); }
+        }
+    }
     return juce::Result::ok();
 }
 juce::Result Document::load(const juce::XmlElement& xml) {
@@ -3201,7 +3225,8 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     project.scope.travelMicrosPerUnit = xml.getDoubleAttribute("scopeTravel", defaults.travelMicrosPerUnit);
     project.scope.settleMicros = xml.getDoubleAttribute("scopeSettle", defaults.settleMicros);
     if (!project.scope.valid()) { return juce::Result::fail("Invalid scope timing profile."); }
-    std::set<Id> identities, compositionIds;
+    // The Scope's identity is reserved before anything else claims one.
+    std::set<Id> identities {beamIdentity}, compositionIds;
     for (auto* item : xml.getChildWithTagNameIterator("definition")) {
         const auto identity = item->getStringAttribute("id").getLargeIntValue();
         if (identity <= 0 || !identities.insert(static_cast<Id>(identity)).second) { return juce::Result::fail("Invalid reusable composition identity."); }
@@ -3305,8 +3330,6 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         project.assets.push_back(std::move(asset));
     }
     // The Scope's picture; a project saved without it keeps the defaults.
-    // Its identity is reserved, so nothing else may use it.
-    identities.insert(beamIdentity);
     const auto* beam = xml.getChildByName("scopeBeam");
     if (beam != nullptr) {
         if (beam->getNextElementWithTagName("scopeBeam") != nullptr) { return juce::Result::fail("A project has one Scope."); }
@@ -3339,6 +3362,8 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     const auto graph = validateCompositionGraph(project);
     if (!graph) { return juce::Result::fail(graph.error); }
     if (importCancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
+    // New identities count up from the highest, so they never reach the Scope's.
+    if (highestProjectIdentity(project) >= beamIdentity) { return juce::Result::fail("A project identity is out of range."); }
     output = std::move(project);
     return juce::Result::ok();
 } catch (const std::exception& error) {

@@ -391,6 +391,77 @@ public:
         addTrack.setVisible(!dropPosition.has_value());
         addTrack.setBounds(cardInset, rowY(static_cast<int>(rows.size())) - rulerHeight + addTrackGap, addTrack.idealWidth(), addTrackHeight);
     }
+    // What a dragged source or effect would do where it is.
+    void paintDropPreview(juce::Graphics& g) {
+        if (!dropPosition.has_value()) { return; }
+        const auto& tracks = processor.document.project().tracks;
+        if (!dropEffect.empty()) {
+            int row = 0;
+            const auto* clip = clipAt(*dropPosition, row);
+            if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = trackAtY(dropPosition->y); }
+            const auto group = groupAtY(dropPosition->y);
+            if (group != 0) {
+                g.setColour(osci::Colours::accentColor());
+                g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), heightAt(visualRowAt(dropPosition->y)), 2);
+            } else if (row >= 0 && row < static_cast<int>(tracks.size()) && tracks[row].kind == motion::TrackKind::visual && (clip != nullptr || dropPosition->x < namesWidth)) {
+                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, trackHeight(row));
+                g.setColour(osci::Colours::accentColor());
+                g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
+            }
+        } else {
+            const auto row = trackAtY(dropPosition->y);
+            const auto time = dropPosition->x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (dropPosition->x - namesWidth) / pixelsPerSecond);
+            motion::Clip candidate;
+            candidate.id = std::numeric_limits<motion::Id>::max();
+            candidate.start = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
+            const auto& assets = processor.document.project().assets;
+            const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == dropAssetId; });
+            const auto& definitions = processor.document.project().definitions;
+            const auto definition = std::find_if(definitions.begin(), definitions.end(), [&](const auto& item) { return item->id == dropAssetId; });
+            if (asset != assets.end()) {
+                candidate = motion::Document::makeClip(candidate.id, **asset, candidate.start);
+            } else if (definition != definitions.end()) {
+                candidate = motion::Document::makeCompositionClip(candidate.id, **definition, candidate.start);
+            }
+            const bool recursive = definition != definitions.end() && !processor.document.canReferenceComposition(dropAssetId);
+            if (asset != assets.end() && (*asset)->midi != nullptr) {
+                int targetRow = -1;
+                const auto* target = clipAt(*dropPosition, targetRow);
+                if (target != nullptr && tracks[targetRow].kind == motion::TrackKind::visual && !tracks[targetRow].locked) {
+                    g.setColour(osci::Colours::accentColor());
+                    g.drawRoundedRectangle(clipBounds(*target, targetRow).toFloat().reduced(2), 3, 2);
+                }
+                return;
+            }
+            const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
+            const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+            const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
+            const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().tempo()));
+            // Below the tracks, the new track always lands in the first free slot.
+            const auto group = groupAtY(dropPosition->y);
+            const auto slotY = row < 0 && group == 0 ? rowY(static_cast<int>(rows.size())) : rowY(std::max(0, visualRowAt(dropPosition->y)));
+            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), slotY, std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), defaultTrackHeight)).toFloat().reduced(1, 4);
+            if (row < 0 && allowed) {
+                // The header column shows that a track will be created.
+                auto header = juce::Rectangle<float>(4.0f, static_cast<float>(slotY) + 3.0f, static_cast<float>(namesWidth) - 9.0f, static_cast<float>(defaultTrackHeight) - 6.0f);
+                g.setColour(motion::style::accent().withAlpha(.12f));
+                g.fillRoundedRectangle(header, motion::style::radius);
+                g.setColour(motion::style::accent().withAlpha(.7f));
+                g.drawRoundedRectangle(header.reduced(.5f), motion::style::radius, 1.0f);
+                motion::icons::draw(g, motion::icons::Icon::add, header.removeFromLeft(26.0f), motion::style::accent().brighter(.3f), 14.0f);
+                g.setFont(motion::style::body());
+                g.setColour(motion::style::text());
+                g.drawText(audio ? "New audio track" : "New track", header, juce::Justification::centredLeft, true);
+            }
+            juce::Graphics::ScopedSaveState scope(g);
+            g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
+            g.setColour((allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080)).withAlpha(0.2f));
+            g.fillRoundedRectangle(bounds, 4);
+            g.setColour(allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080));
+            g.drawRoundedRectangle(bounds, 4, 1);
+            g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
+        }
+    }
     // The lifted block floats over every row and header: an opaque card with
     // a shadow all round, its own rows, and its header drawn in place.
     void paintOverChildren(juce::Graphics& g) override {
@@ -656,72 +727,7 @@ public:
                 for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) { g.drawRoundedRectangle(clipBounds(clip, index).toFloat().reduced(1.5f), 4, 1.0f); }
             }
         }
-        if (dropPosition.has_value() && !dropEffect.empty()) {
-            int row = 0;
-            const auto* clip = clipAt(*dropPosition, row);
-            if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = trackAtY(dropPosition->y); }
-            const auto group = groupAtY(dropPosition->y);
-            if (group != 0) {
-                g.setColour(osci::Colours::accentColor());
-                g.drawRect(0, rowY(visualRowAt(dropPosition->y)), getWidth(), heightAt(visualRowAt(dropPosition->y)), 2);
-            } else if (row >= 0 && row < static_cast<int>(tracks.size()) && tracks[row].kind == motion::TrackKind::visual && (clip != nullptr || dropPosition->x < namesWidth)) {
-                const auto bounds = clip != nullptr ? clipBounds(*clip, row) : juce::Rectangle<int>(0, trackY(row), namesWidth, trackHeight(row));
-                g.setColour(osci::Colours::accentColor());
-                g.drawRoundedRectangle(bounds.toFloat().reduced(2), 4, 2);
-            }
-        } else if (dropPosition.has_value()) {
-            const auto row = trackAtY(dropPosition->y);
-            const auto time = dropPosition->x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (dropPosition->x - namesWidth) / pixelsPerSecond);
-            motion::Clip candidate;
-            candidate.id = std::numeric_limits<motion::Id>::max();
-            candidate.start = snapTime(time, juce::ModifierKeys::getCurrentModifiers());
-            const auto& assets = processor.document.project().assets;
-            const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == dropAssetId; });
-            const auto& definitions = processor.document.project().definitions;
-            const auto definition = std::find_if(definitions.begin(), definitions.end(), [&](const auto& item) { return item->id == dropAssetId; });
-            if (asset != assets.end()) {
-                candidate = motion::Document::makeClip(candidate.id, **asset, candidate.start);
-            } else if (definition != definitions.end()) {
-                candidate = motion::Document::makeCompositionClip(candidate.id, **definition, candidate.start);
-            }
-            const bool recursive = definition != definitions.end() && !processor.document.canReferenceComposition(dropAssetId);
-            if (asset != assets.end() && (*asset)->midi != nullptr) {
-                int targetRow = -1;
-                const auto* target = clipAt(*dropPosition, targetRow);
-                if (target != nullptr && tracks[targetRow].kind == motion::TrackKind::visual && !tracks[targetRow].locked) {
-                    g.setColour(osci::Colours::accentColor());
-                    g.drawRoundedRectangle(clipBounds(*target, targetRow).toFloat().reduced(2), 3, 2);
-                }
-                return;
-            }
-            const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
-            const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
-            const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
-            const auto allowed = (asset != assets.end() || definition != definitions.end()) && !recursive && correctKind && (row < 0 || row >= static_cast<int>(tracks.size()) || !tracks[row].locked && tracks[row].canPlace(candidate, 0, processor.document.project().tempo()));
-            // Below the tracks, the new track always lands in the first free slot.
-            const auto group = groupAtY(dropPosition->y);
-            const auto slotY = row < 0 && group == 0 ? rowY(static_cast<int>(rows.size())) : rowY(std::max(0, visualRowAt(dropPosition->y)));
-            const auto bounds = (row >= 0 ? clipBounds(candidate, row) : juce::Rectangle<int>(timeX(candidate.start), slotY, std::max(2, boundedPixel(candidate.duration * pixelsPerSecond)), defaultTrackHeight)).toFloat().reduced(1, 4);
-            if (row < 0 && allowed) {
-                // The header column shows that a track will be created.
-                auto header = juce::Rectangle<float>(4.0f, static_cast<float>(slotY) + 3.0f, static_cast<float>(namesWidth) - 9.0f, static_cast<float>(defaultTrackHeight) - 6.0f);
-                g.setColour(motion::style::accent().withAlpha(.12f));
-                g.fillRoundedRectangle(header, motion::style::radius);
-                g.setColour(motion::style::accent().withAlpha(.7f));
-                g.drawRoundedRectangle(header.reduced(.5f), motion::style::radius, 1.0f);
-                motion::icons::draw(g, motion::icons::Icon::add, header.removeFromLeft(26.0f), motion::style::accent().brighter(.3f), 14.0f);
-                g.setFont(motion::style::body());
-                g.setColour(motion::style::text());
-                g.drawText(audio ? "New audio track" : "New track", header, juce::Justification::centredLeft, true);
-            }
-            juce::Graphics::ScopedSaveState scope(g);
-            g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
-            g.setColour((allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080)).withAlpha(0.2f));
-            g.fillRoundedRectangle(bounds, 4);
-            g.setColour(allowed ? juce::Colour(0xff70da91) : juce::Colour(0xffe98080));
-            g.drawRoundedRectangle(bounds, 4, 1);
-            g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
-        }
+        paintDropPreview(g);
         if (showsMarkerBand()) {
             g.setColour(osci::Colours::textMuted());
             g.setFont(motion::style::caption());
@@ -2376,10 +2382,7 @@ private:
             cameraKeyDrag.reset();
             return;
         }
-        const auto& project = processor.document.project();
-        auto time = snapTime(drag.from + (event.x - drag.downX) / pixelsPerSecond, event.mods);
-        if (project.frameRate > 0) { time = std::round(time * project.frameRate) / project.frameRate; }
-        time = std::clamp(time, 0.0, project.duration);
+        const auto time = processor.document.project().frameTime(snapTime(drag.from + (event.x - drag.downX) / pixelsPerSecond, event.mods));
         if (std::abs(time - drag.to) < 1.0e-9) { return; }
         auto updated = drag.before;
         const auto camera = std::find_if(updated.cameras.begin(), updated.cameras.end(), [&drag](const auto& item) { return item.id == drag.camera; });

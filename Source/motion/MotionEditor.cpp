@@ -572,22 +572,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             for (const auto& item : track.clips) { if (item.id == id) { clip = &item; } }
         }
         if (clip == nullptr) { return; }
-        const auto generation = processor.document.generation();
-        const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
-        auto* controls = panel.get();
         panel->setSize(380, 294);
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<juce::Component> popover(controls);
-        controls->onApply = [owner, popover, id, generation, revision](motion::MidiInstrument settings) {
-            juce::MessageManager::callAsync([owner, popover, id, generation, revision, settings] {
-                if (owner == nullptr || popover == nullptr) { return; }
-                if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
-                    const auto result = owner->processor.document.setMidiInstrument(id, settings);
-                    if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
-                }
-                dismissPopover(popover.getComponent());
-            });
+        const auto apply = popoverEdit(panel.get());
+        panel->onApply = [apply, id](motion::MidiInstrument settings) {
+            apply([id, settings](motion::Document& document) { return document.setMidiInstrument(id, settings); });
         };
         showPopover(std::move(panel), getLocalArea(&notesEditor, notesEditor.envelopeAnchor().getBounds()));
     };
@@ -596,20 +585,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto existing = changes != nullptr && replacing.has_value() ? std::find_if(changes->begin(), changes->end(), [&](const auto& change) { return change.beat == *replacing; }) : std::vector<motion::TempoChange>::const_iterator();
         const auto ramped = changes != nullptr && replacing.has_value() && existing != changes->end() && existing->ramp;
         auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, ramped);
-        auto* controls = panel.get();
         panel->setSize(300, 160);
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(controls);
-        controls->onApply = [owner, tempoPanel, beat, replacing](double value, bool glide) {
-            juce::MessageManager::callAsync([owner, tempoPanel, beat, replacing, value, glide] {
-                if (owner == nullptr || tempoPanel == nullptr) { return; }
-                const auto result = owner->processor.document.setTempoChange(beat, value, replacing, glide);
-                if (result.failed()) {
-                    tempoPanel->setError(result.getErrorMessage());
-                    return;
-                }
-                dismissPopover(tempoPanel.getComponent());
-            });
+        const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(panel.get());
+        const auto apply = popoverEdit(panel.get(), [tempoPanel](const juce::String& error) { if (tempoPanel != nullptr) { tempoPanel->setError(error); } });
+        panel->onApply = [apply, beat, replacing](double value, bool glide) {
+            apply([=](motion::Document& document) { return document.setTempoChange(beat, value, replacing, glide); });
         };
         showPopover(std::move(panel), getLocalArea(&timeline, timeline.rulerAnchor(processor.document.project().tempo().seconds(beat))));
     };
@@ -625,22 +605,12 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             if (found == project.markers.end()) { return; }
             name = found->name; time = found->time;
         }
-        const auto generation = processor.document.generation();
-        const auto revision = processor.document.revision();
         auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
-        auto* controls = panel.get();
         panel->setSize(300, 140);
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(controls);
-        controls->onApply = [owner, markerPanel, id, generation, revision](juce::String name, double time) {
-            juce::MessageManager::callAsync([owner, markerPanel, id, generation, revision, name, time] {
-                if (owner == nullptr || markerPanel == nullptr) { return; }
-                if (owner->processor.document.generation() == generation && owner->processor.document.revision() == revision) {
-                    const auto result = owner->processor.document.setMarker(id, time, name);
-                    if (result.failed()) { markerPanel->setError(result.getErrorMessage()); return; }
-                }
-                dismissPopover(markerPanel.getComponent());
-            });
+        const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(panel.get());
+        const auto apply = popoverEdit(panel.get(), [markerPanel](const juce::String& error) { if (markerPanel != nullptr) { markerPanel->setError(error); } });
+        panel->onApply = [apply, id](juce::String name, double time) {
+            apply([=](motion::Document& document) { return document.setMarker(id, time, name); });
         };
         showPopover(std::move(panel), getLocalArea(&timeline, timeline.rulerAnchor(time)));
     };
@@ -1054,6 +1024,31 @@ void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::R
             popover->grabKeyboardFocus();
         }
     });
+}
+
+// A popover's Apply edits after the native event has returned, and only the
+// project state the popover opened on; otherwise it just closes. A failed
+// edit shows its error in the panel (which stays open) or the status bar.
+std::function<void(MotionEditor::PopoverEdit)> MotionEditor::popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError) {
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    const juce::Component::SafePointer<juce::Component> popover(panel);
+    const auto generation = processor.document.generation();
+    const auto revision = processor.document.revision();
+    return [owner, popover, generation, revision, showError](PopoverEdit edit) {
+        juce::MessageManager::callAsync([owner, popover, generation, revision, showError, edit] {
+            if (owner == nullptr || popover == nullptr) { return; }
+            auto& document = owner->processor.document;
+            if (document.generation() == generation && document.revision() == revision) {
+                const auto result = edit(document);
+                if (result.failed() && showError) {
+                    showError(result.getErrorMessage());
+                    return;
+                }
+                if (result.failed()) { owner->statusBar.show(result.getErrorMessage()); }
+            }
+            dismissPopover(popover.getComponent());
+        });
+    };
 }
 
 void MotionEditor::dismissPopover(juce::Component* content) {
@@ -1610,6 +1605,8 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster*) {
     if (drawingEditor != nullptr && processor.document.generation() != drawingGeneration) { closeDrawingEditor(); }
     if (textEditor != nullptr && processor.document.generation() != textGeneration) { closeTextEditor(); }
     if (luaEditor != nullptr && processor.document.generation() != luaGeneration) { closeLuaEditor(); }
+    // An undo or a delete can remove what was selected.
+    if (selection != 0 && !selectionExists()) { select(0); }
     sliderBakes.requestUpdate();
     refreshOutputChoices();
     if (curveList.isVisible()) { refreshCurveList(); }
@@ -1747,22 +1744,22 @@ void MotionEditor::select(motion::Id id) {
 // Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
 // SVG in a temporary folder and imported like any file, relinking an edit.
 void MotionEditor::showDrawingEditor(motion::Id asset) {
+    if (drawingEditor != nullptr || textEditor != nullptr || luaEditor != nullptr) { return; }
     motion::drawing::Drawing initial;
     juce::String name;
+    const auto& assets = processor.document.mainProject().assets;
     if (asset != 0) {
-        for (const auto& item : processor.document.mainProject().assets) {
-            if (item->id != asset) { continue; }
-            const auto parsed = motion::drawing::fromSvg(juce::String::fromUTF8(static_cast<const char*>(item->data.getData()), static_cast<int>(item->data.getSize())));
-            if (!parsed.has_value()) { return; }
-            initial = *parsed;
-            name = item->name.upToLastOccurrenceOf(".", false, false);
-        }
+        // Only an existing drawing opens; anything else would relink to nothing.
+        const auto found = std::find_if(assets.begin(), assets.end(), [asset](const auto& item) { return item->id == asset; });
+        if (found == assets.end()) { return; }
+        const auto parsed = motion::drawing::fromSvg(juce::String::fromUTF8(static_cast<const char*>((*found)->data.getData()), static_cast<int>((*found)->data.getSize())));
+        if (!parsed.has_value()) { return; }
+        initial = *parsed;
+        name = (*found)->name.upToLastOccurrenceOf(".", false, false);
     } else {
-        int count = 1;
-        for (const auto& item : processor.document.mainProject().assets) { count += item->name.startsWith("Drawing") ? 1 : 0; }
-        name = "Drawing " + juce::String(count);
+        const auto drawings = std::count_if(assets.begin(), assets.end(), [](const auto& item) { return item->name.startsWith("Drawing"); });
+        name = "Drawing " + juce::String(static_cast<int>(drawings) + 1);
     }
-    if (drawingEditor != nullptr || textEditor != nullptr || luaEditor != nullptr) { return; }
     // The drawing takes over the Scene; the Scope shows it live as a beam.
     drawingAsset = asset;
     drawingGeneration = processor.document.generation();
@@ -2023,9 +2020,7 @@ void MotionEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetai
 }
 
 void MotionEditor::addCamera(double at) {
-    const auto& project = processor.document.project();
-    const auto time = std::clamp(at, 0.0, project.duration);
-    const auto frame = project.frameRate > 0.0 ? std::clamp(std::round(time * project.frameRate) / project.frameRate, 0.0, project.duration) : time;
+    const auto frame = processor.document.project().frameTime(at);
     motion::Id id = 0;
     const auto result = processor.document.addCamera(frame, id);
     if (result.failed()) {
@@ -2033,6 +2028,12 @@ void MotionEditor::addCamera(double at) {
         return;
     }
     select(id);
+}
+
+bool MotionEditor::selectionExists() const {
+    const auto& project = processor.document.project();
+    const auto isTrack = std::any_of(project.tracks.begin(), project.tracks.end(), [this](const auto& track) { return track.id == selection; });
+    return isTrack || motion::findPropertyTarget(project, selection).has_value();
 }
 
 bool MotionEditor::selectionIsCamera() const {

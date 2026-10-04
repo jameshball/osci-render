@@ -45,10 +45,15 @@ public:
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor);
     static void dismissPopover(juce::Component* content);
+    using PopoverEdit = std::function<juce::Result(motion::Document&)>;
+    std::function<void(PopoverEdit)> popoverEdit(juce::Component* panel, std::function<void(const juce::String&)> showError = {});
 
 
 private:
     bool openSourceFile(const juce::File& file) override;
+#if OSCI_PREMIUM
+    juce::String offlineRenderTitle() const override { return "Export video"; }
+#endif
     struct SourceRequest {
         juce::File file;
         double time = 0;
@@ -100,6 +105,7 @@ private:
     std::uint64_t scopeNameGeneration = 0;
     void refreshInspector();
     bool audioSelected() const;
+    bool selectionExists() const;
     bool selectionIsCamera() const;
     motion::Id toolCamera() const;
     void refreshCameraTools();

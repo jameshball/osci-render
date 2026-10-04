@@ -390,10 +390,7 @@ private:
         }
         return index;
     }
-    double frameTime() const {
-        const auto& project = processor.document.project();
-        return std::clamp(std::round(processor.position.load() * project.frameRate) / project.frameRate, 0.0, project.duration);
-    }
+    double frameTime() const { return processor.document.project().frameTime(processor.position.load()); }
     void setEnabled(motion::Id id, bool value) {
         processor.document.edit(value ? "Enable effect" : "Bypass effect", [id, value](motion::Project& project) {
             auto* effect = motion::findEffect(project, id);

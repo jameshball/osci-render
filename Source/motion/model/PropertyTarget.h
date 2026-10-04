@@ -29,6 +29,8 @@ struct BasicPropertyTarget {
     std::optional<ClipTiming::BeatWarp> warp;
     // The Scope's picture (Project only), in project time like a camera.
     bool beam = false;
+    // On a locked track: shown, but not edited.
+    bool locked = false;
     double curveBpm(double projectBpm) const { return contentBpm > 0 ? contentBpm : projectBpm; }
 
     double end() const { return start + duration; }
@@ -78,19 +80,21 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
     for (auto& track : project.tracks) {
         for (auto& effect : track.effects) {
             if (effect.id == id) {
-                return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+                Target target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+                target.locked = track.locked;
+                return target;
             }
         }
         for (auto& clip : track.clips) {
+            const auto effect = std::find_if(clip.effects.begin(), clip.effects.end(), [id](const auto& item) { return item.id == id; });
+            if (clip.id != id && effect == clip.effects.end()) { continue; }
+            // Only the owner's timing: under a tempo map it is not free.
             const auto timing = clip.timing(project.tempo());
-            for (auto& effect : clip.effects) {
-                if (effect.id == id) {
-                    return Target { effect.id, effect.name, timing.start, timing.duration(), timing.offset, timing.rate, &effect.properties, false, true, false, false, clip.curveBpm(project.tempo()), timing.warp };
-                }
-            }
-            if (clip.id == id) {
-                return Target { clip.id, clip.name, timing.start, timing.duration(), timing.offset, timing.rate, &clip.properties, false, false, false, track.kind == TrackKind::audio, clip.curveBpm(project.tempo()), timing.warp };
-            }
+            const auto owner = effect != clip.effects.end();
+            Target target { owner ? effect->id : clip.id, owner ? std::string_view(effect->name) : std::string_view(clip.name), timing.start, timing.duration(), timing.offset, timing.rate,
+                            owner ? &effect->properties : &clip.properties, false, owner, false, !owner && track.kind == TrackKind::audio, clip.curveBpm(project.tempo()), timing.warp };
+            target.locked = track.locked;
+            return target;
         }
     }
     for (auto& camera : project.cameras) {

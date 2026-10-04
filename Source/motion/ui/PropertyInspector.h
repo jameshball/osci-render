@@ -166,6 +166,10 @@ public:
                 anyAnimated = anyAnimated || curve->animated();
                 allKeyed = allKeyed && hasKey(*curve, time);
             }
+            // A locked track's values show but do not edit.
+            for (auto& field : row->fields) { field->editor.setEnabled(!found->locked); }
+            row->key.setEnabled(!found->locked);
+            if (row->swatch != nullptr) { row->swatch->setEnabled(!found->locked); }
             row->key.setState(allKeyed && anyAnimated ? osci::KeyframeButton::State::keyed
                 : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
             row->previous.setEnabled(anyAnimated);
@@ -474,10 +478,7 @@ private:
             const auto selected = selectedKeyTime(found.id);
             if (selected.has_value()) { return *selected; }
         }
-        const auto frameRate = processor.document.project().frameRate;
-        auto time = processor.position.load();
-        if (std::isfinite(frameRate) && frameRate > 0) { time = std::round(time * frameRate) / frameRate; }
-        return found.localTime(time);
+        return found.localTime(processor.document.project().frameTime(processor.position.load()));
     }
     static bool hasKey(const motion::Curve& curve, double time) {
         const auto& keys = curve.keyframes();
@@ -491,7 +492,7 @@ private:
     }
     void beginGesture(const std::string& property) {
         const auto found = motion::findPropertyTarget(processor.document.project(), target);
-        if (!found.has_value()) { return; }
+        if (!found.has_value() || found->locked) { return; }
         gesture = Gesture{processor.document.project(), processor.document.revision(), target};
         gestureTime = keyTime(*found);
         if (onPropertySelected) { onPropertySelected(target, property); }
@@ -550,7 +551,10 @@ private:
     }
     void commitValue(const std::string& property, double value) {
         const auto found = motion::findPropertyTarget(processor.document.project(), target);
-        if (!found.has_value()) { return; }
+        if (!found.has_value() || found->locked) {
+            refresh();
+            return;
+        }
         const auto time = keyTime(*found);
         processor.document.edit("Change property", [&](motion::Project& project) { apply(project, property, value, time); });
         if (onPropertySelected) { onPropertySelected(target, property); }
@@ -570,7 +574,7 @@ public:
 private:
     void toggleKeys(Row& row) {
         const auto found = motion::findPropertyTarget(processor.document.project(), target);
-        if (!found.has_value()) { return; }
+        if (!found.has_value() || found->locked) { return; }
         const auto time = keyTime(*found);
         bool allKeyed = true;
         for (auto& field : row.fields) {

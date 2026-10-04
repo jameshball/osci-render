@@ -903,11 +903,7 @@ private:
             return std::abs(key.value) < 1.0e-9 && flat;
         });
     }
-    double cameraTime() const {
-        const auto& project = processor.document.project();
-        const auto time = std::clamp(processor.position.load(), 0.0, project.duration);
-        return project.frameRate > 0 ? std::round(time * project.frameRate) / project.frameRate : time;
-    }
+    double cameraTime() const { return processor.document.project().frameTime(processor.position.load()); }
     // A free camera's pose at the playhead (rotation X as pitch, -Y as yaw).
     std::optional<Pose> documentPose(motion::Id id) const {
         for (const auto& item : processor.document.project().cameras) {

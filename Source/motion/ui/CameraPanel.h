@@ -71,11 +71,7 @@ private:
         const auto found = std::find_if(project.cameras.begin(), project.cameras.end(), [id](const auto& item) { return item.id == id; });
         return found == project.cameras.end() ? nullptr : &*found;
     }
-    double frameTime() const {
-        const auto& project = processor.document.project();
-        const auto time = std::clamp(processor.position.load(), 0.0, project.duration);
-        return project.frameRate > 0.0 ? std::clamp(std::round(time * project.frameRate) / project.frameRate, 0.0, project.duration) : time;
-    }
+    double frameTime() const { return processor.document.project().frameTime(processor.position.load()); }
     motion::Id activeCamera() const {
         const auto& project = processor.document.project();
         for (const auto& cut : project.cameraCuts) {

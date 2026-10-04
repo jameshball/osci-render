@@ -27,7 +27,7 @@ public:
         project.duration = 4; project.assets = {asset}; project.tracks = {track};
         document.reset(project);
 
-        expect(!motion::LuaSliderBakes::planFor(*asset, clip, motion::Tempo(120)).has_value());
+        expect(!motion::LuaSliderBakes::planFor(*asset, clip, motion::Composition {}).has_value());
 
         beginTest("Animated sliders bake per clip over its content and install as a cache");
         document.edit("Animate slider", [&](motion::Project& updated) {
@@ -36,7 +36,7 @@ public:
             curve.setKey({2, 1, motion::Interpolation::linear});
         });
         const auto& animated = document.project().tracks[0].clips[0];
-        const auto plan = motion::LuaSliderBakes::planFor(*asset, animated, motion::Tempo(120));
+        const auto plan = motion::LuaSliderBakes::planFor(*asset, animated, motion::Composition {});
         expect(plan.has_value() && plan->settings.duration == 2.0, "the bake covers the clip's two seconds of content");
         motion::LuaSliderBakes bakes(document);
         bakes.update();
@@ -86,7 +86,7 @@ public:
         }
         beginTest("Editing a slider makes the bake stale; removing the sliders clears it");
         document.edit("Change slider", [&](motion::Project& updated) { updated.tracks[0].clips[0].properties["slider.a"].setKeyValue(2, 0.5); });
-        const auto changed = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], motion::Tempo(120));
+        const auto changed = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], motion::Composition {});
         expect(changed.has_value() && changed->key != plan->key);
         document.edit("Remove slider", [&](motion::Project& updated) { updated.tracks[0].clips[0].properties.erase("slider.a"); });
         bakes.update();
@@ -104,7 +104,7 @@ public:
                 updated.routes.push_back(route);
             });
             const auto& routed = document.project().tracks[0].clips[0];
-            const auto plain = motion::LuaSliderBakes::planFor(*asset, routed, motion::Tempo(120));
+            const auto plain = motion::LuaSliderBakes::planFor(*asset, routed, motion::Composition {});
             const auto driven = motion::LuaSliderBakes::planFor(*asset, routed, document.project());
             expect(plain.has_value() && driven.has_value() && plain->key != driven->key, "a route changes what the bake must contain");
             if (driven.has_value()) {
@@ -119,6 +119,16 @@ public:
             expect(motion::Document::prepareLoad(document.save(), reopened).wasOk());
             const auto again = motion::LuaSliderBakes::planFor(*reopened.assets[0], reopened.tracks[0].clips[0], reopened);
             expect(again.has_value() && deeper.has_value() && again->key == deeper->key, "a saved routed bake still matches after loading");
+            // Baked with its route, it saves and loads without baking again.
+            bakes.update();
+            for (int attempt = 0; attempt < 400; ++attempt) {
+                const auto& current = document.project().tracks[0].clips[0].luaBake;
+                if (current != nullptr && deeper.has_value() && current->key == deeper->key) { break; }
+                juce::MessageManager::getInstance()->runDispatchLoopUntil(10);
+            }
+            motion::Project withBake;
+            expect(motion::Document::prepareLoad(document.save(), withBake).wasOk());
+            expect(withBake.tracks[0].clips[0].luaBake != nullptr && deeper.has_value() && withBake.tracks[0].clips[0].luaBake->key == deeper->key, "a routed slider bake survives saving and loading");
             document.edit("Move clip", [](motion::Project& updated) { updated.tracks[0].clips[0].start = 1; });
             const auto moved = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], document.project());
             expect(moved.has_value() && deeper.has_value() && moved->key != deeper->key, "moving a routed clip re-bakes");

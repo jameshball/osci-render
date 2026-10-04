@@ -456,10 +456,6 @@
             resource="0" file="Source/motion/ui/ModulatorPanels.h"/>
       <FILE id="MotEffectLibrary" name="EffectLibrary.h" compile="0" resource="0"
             file="Source/motion/ui/EffectLibrary.h"/>
-      <FILE id="MotEffectsPanel" name="EffectsPanel.h" compile="0" resource="0"
-            file="Source/motion/ui/EffectsPanel.h"/>
-      <FILE id="motmodpanel" name="ModulationPanel.h" compile="0" resource="0"
-            file="Source/motion/ui/ModulationPanel.h"/>
       <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
             file="Source/motion/model/PreparedSource.h"/>
       <FILE id="MotSampleClock" name="SampleClock.h" compile="0" resource="0"

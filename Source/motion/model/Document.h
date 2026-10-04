@@ -67,6 +67,11 @@ struct Composition {
     double loopStart = 0, loopEnd = 0;
     bool looping = false;
     bool hasLoop() const { return std::isfinite(loopStart) && std::isfinite(loopEnd) && loopStart >= 0 && loopEnd > loopStart; }
+    // A time within the composition on its frame grid, where keys are set.
+    double frameTime(double time) const {
+        const auto inside = std::clamp(std::isfinite(time) ? time : 0.0, 0.0, duration);
+        return std::isfinite(frameRate) && frameRate > 0 ? std::clamp(std::round(inside * frameRate) / frameRate, 0.0, duration) : inside;
+    }
     TimeGrid timeGrid() const {
         TimeGrid grid;
         grid.display = timeDisplay;

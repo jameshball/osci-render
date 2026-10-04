@@ -39,8 +39,21 @@ public:
 #else
         auto environment = environ;
 #endif
-        const auto spawned = input == 0 && output == 0 && error == 0
-            ? posix_spawn(&pid, argv.front(), &actions, nullptr, argv.data(), environment) : EINVAL;
+        // On macOS the child keeps only its standard streams, not the app's
+        // other descriptors (such as live-source listening sockets).
+        posix_spawnattr_t attributes;
+        if (posix_spawnattr_init(&attributes) != 0) {
+            posix_spawn_file_actions_destroy(&actions);
+            return false;
+        }
+#if JUCE_MAC
+        const auto flags = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
+#else
+        const auto flags = 0;
+#endif
+        const auto spawned = input == 0 && output == 0 && error == 0 && flags == 0
+            ? posix_spawn(&pid, argv.front(), &actions, &attributes, argv.data(), environment) : EINVAL;
+        posix_spawnattr_destroy(&attributes);
         posix_spawn_file_actions_destroy(&actions);
         if (spawned != 0) { pid = -1; return false; }
         return true;
@@ -50,6 +63,8 @@ public:
     }
     bool waitForProcessToFinish(int milliseconds) {
 #if JUCE_MAC || JUCE_LINUX
+        // Never started: waitpid(-1) would reap some other child instead.
+        if (pid <= 0) { return true; }
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + milliseconds;
         do {
             if (finished) { return true; }
