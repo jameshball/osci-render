@@ -86,6 +86,8 @@ cd /Users/james/osci-render \
              -configuration Debug -arch arm64 build
 ```
 
+Xcode 27+ rejects the default 10.13 deployment target: add `MACOSX_DEPLOYMENT_TARGET=12.0` to `xcodebuild` (for `run_tests.sh`, set it via an `.xcconfig` passed in `XCODE_XCCONFIG_FILE`). Without the Developer ID certificate, build `sosci` with `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=`.
+
 ### Projucer Resave Order
 `JuceLibraryCode/` is generated, ignored, and shared by both `osci-render.jucer` and `sosci.jucer`. Always resave the exact `.jucer` you are about to build immediately before running `xcodebuild`.
 
