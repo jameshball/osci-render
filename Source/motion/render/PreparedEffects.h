@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/Effects.h"
+#include "TimeCache.h"
 #include "../../../modules/osci_render_core/effects/osci_PointEffectKernels.h"
 #include <array>
 #include <cmath>
@@ -101,22 +102,38 @@ struct PreparedEffect {
         }
     }
 
-    osci::Point apply(osci::Point input, double time, double bpm = 120) const {
-        if (!enabled || !std::isfinite(time) || (range.has_value() && (time < range->start || time >= range->end()))) {
-            return input;
-        }
+    // The parameters at a time, or nothing when the effect does not act then
+    // (bypassed, outside its range, at zero strength or not finite).
+    struct Parameters {
+        bool active = false;
         std::array<double, maximumParameters> values {};
+        // Wobble's offset, which depends only on the time.
+        float wobble = 0;
+    };
+    Parameters parametersAt(double time, double bpm) const {
+        Parameters result;
+        if (!enabled || !std::isfinite(time) || (range.has_value() && (time < range->start || time >= range->end()))) {
+            return result;
+        }
         for (std::size_t index = 0; index < count; ++index) {
             const auto value = curves[index].evaluate(time, bpm);
             if (!std::isfinite(value)) {
-                return input;
+                return result;
             }
-            values[index] = std::clamp(value, minimum[index], maximum[index]);
+            result.values[index] = std::clamp(value, minimum[index], maximum[index]);
         }
-        const auto strength = values[0];
-        if (strength <= 0) {
+        result.active = result.values[0] > 0;
+        if (kind == Kind::wobble) { result.wobble = static_cast<float>(.5 * result.values[1] * std::sin((time * result.values[2] + result.values[3]) * 2 * std::numbers::pi)); }
+        return result;
+    }
+
+    osci::Point apply(osci::Point input, double time, double bpm = 120) const {
+        const auto& parameters = cached.at(time, [&] { return parametersAt(time, bpm); });
+        if (!parameters.active) {
             return input;
         }
+        const auto& values = parameters.values;
+        const auto strength = values[0];
         auto output = input;
         using namespace osci::point_effects;
         switch (kind) {
@@ -135,7 +152,7 @@ struct PreparedEffect {
             case Kind::spiralCrush: output = spiralCrush(input, values[1], values[2], values[3], values[4]); break;
             case Kind::perspective: output = perspective(input, values[1]); break;
             case Kind::wobble: {
-                const auto delta = static_cast<float>(.5 * values[1] * std::sin((time * values[2] + values[3]) * 2 * std::numbers::pi));
+                const auto delta = parameters.wobble;
                 output = osci::Point(input.x + delta, input.y + delta, input.z + delta).withColour(input.r, input.g, input.b);
                 break;
             }
@@ -148,6 +165,9 @@ struct PreparedEffect {
         }
         return output;
     }
+
+private:
+    TimeCache<Parameters> cached;
 };
 
 inline std::vector<PreparedEffect> prepareEffects(const std::vector<EffectInstance>& effects) {

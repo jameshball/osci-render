@@ -10,21 +10,12 @@
 #include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"
+#include "TimeCache.h"
 #include <array>
 #include <numbers>
 #include <optional>
 
 namespace motion {
-inline osci::Point applySourceColour(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm) {
-    const auto sourceRed = point.r < 0 ? 1.0f : point.r;
-    const auto sourceGreen = point.r < 0 ? 1.0f : point.g;
-    const auto sourceBlue = point.r < 0 ? 1.0f : point.b;
-    point.r = std::clamp(static_cast<float>(sourceRed * curves[9].evaluate(time, bpm)), 0.0f, 1.0f);
-    point.g = std::clamp(static_cast<float>(sourceGreen * curves[10].evaluate(time, bpm)), 0.0f, 1.0f);
-    point.b = std::clamp(static_cast<float>(sourceBlue * curves[11].evaluate(time, bpm)), 0.0f, 1.0f);
-    return point;
-}
-
 inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool quaternion, const std::array<Curve, 13>& curves) {
     auto spatial = std::make_shared<PreparedSpatial>();
     if (path) { spatial->path = PreparedPath::prepare(curves[0], curves[1], curves[2]); }
@@ -33,42 +24,99 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
     return spatial;
 }
 
-inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
-    point.scale(curves[6].evaluate(time, bpm), curves[7].evaluate(time, bpm), curves[8].evaluate(time, bpm));
-    constexpr auto radians = std::numbers::pi / 180.0;
-    // A linked rotation axis replaces its keys, so orientation interpolation
-    // only applies while every rotation axis is keyed.
-    const bool oriented = spatial != nullptr && spatial->orientation != nullptr && !curves[3].linked() && !curves[4].linked() && !curves[5].linked();
-    if (oriented) {
-        // Keys set the orientation; modulation adds Euler offsets in object
-        // space before it.
-        std::array<double, 3> extra {};
-        for (std::size_t axis = 0; axis < 3; ++axis) {
-            const auto& curve = curves[3 + axis];
-            const auto keyed = curve.evaluateBase(time);
-            extra[axis] = curve.evaluateWith(keyed, time, bpm) - keyed;
+// A transform's curves evaluated at one time: scale, then rotation (Euler X,
+// Y, Z, or a keyed orientation after modulation offsets), then translation
+// (along a spatial path when there is one), and colour gains. Evaluated once,
+// it applies to any number of points.
+struct TransformPose {
+    using Matrix = std::array<std::array<float, 3>, 3>;
+    std::array<float, 3> scale {1, 1, 1}, translation {}, colour {1, 1, 1};
+    Matrix rotation {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
+
+    static TransformPose at(const std::array<Curve, 13>& curves, double time, double bpm, const PreparedSpatial* spatial) {
+        TransformPose pose;
+        constexpr auto radians = std::numbers::pi / 180.0;
+        for (std::size_t axis = 0; axis < 3; ++axis) { pose.scale[axis] = static_cast<float>(curves[6 + axis].evaluate(time, bpm)); }
+        // A linked rotation axis replaces its keys, so orientation interpolation
+        // only applies while every rotation axis is keyed.
+        const bool oriented = spatial != nullptr && spatial->orientation != nullptr && !curves[3].linked() && !curves[4].linked() && !curves[5].linked();
+        if (oriented) {
+            // Keys set the orientation; modulation adds Euler offsets in object
+            // space before it.
+            std::array<double, 3> extra {};
+            for (std::size_t axis = 0; axis < 3; ++axis) {
+                const auto& curve = curves[3 + axis];
+                const auto keyed = curve.evaluateBase(time);
+                extra[axis] = (curve.evaluateWith(keyed, time, bpm) - keyed) * radians;
+            }
+            const auto orientation = spatial->orientation->at(time);
+            Matrix keyed {};
+            for (std::size_t column = 0; column < 3; ++column) {
+                const auto basis = orientation.rotate(column == 0, column == 1, column == 2);
+                for (std::size_t row = 0; row < 3; ++row) { keyed[row][column] = static_cast<float>(basis[row]); }
+            }
+            pose.rotation = multiply(keyed, euler(extra[0], extra[1], extra[2]));
+        } else {
+            pose.rotation = euler(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
         }
-        if (extra[0] != 0 || extra[1] != 0 || extra[2] != 0) { point.rotate(extra[0] * radians, extra[1] * radians, extra[2] * radians); }
-        const auto rotated = spatial->orientation->at(time).rotate(point.x, point.y, point.z);
-        point.x = static_cast<float>(rotated[0]);
-        point.y = static_cast<float>(rotated[1]);
-        point.z = static_cast<float>(rotated[2]);
-    } else {
-        point.rotate(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
+        if (spatial != nullptr && spatial->path != nullptr) {
+            const auto position = spatial->path->at(time);
+            for (std::size_t axis = 0; axis < 3; ++axis) {
+                const auto& curve = curves[axis];
+                pose.translation[axis] = static_cast<float>(curve.linked() ? curve.evaluate(time, bpm) : curve.evaluateWith(position[axis], time, bpm));
+            }
+        } else {
+            for (std::size_t axis = 0; axis < 3; ++axis) { pose.translation[axis] = static_cast<float>(curves[axis].evaluate(time, bpm)); }
+        }
+        for (std::size_t channel = 0; channel < 3; ++channel) { pose.colour[channel] = static_cast<float>(curves[9 + channel].evaluate(time, bpm)); }
+        return pose;
     }
-    if (spatial != nullptr && spatial->path != nullptr) {
-        const auto position = spatial->path->at(time);
-        const auto axis = [&](std::size_t index) { return curves[index].linked() ? curves[index].evaluate(time, bpm) : curves[index].evaluateWith(position[index], time, bpm); };
-        point.translate(axis(0), axis(1), axis(2));
-    } else {
-        point.translate(curves[0].evaluate(time, bpm), curves[1].evaluate(time, bpm), curves[2].evaluate(time, bpm));
+
+    // The source's colour (white when it has none) times the colour gains.
+    osci::Point colourOf(osci::Point point) const {
+        const auto uncoloured = point.r < 0;
+        point.r = std::clamp((uncoloured ? 1.0f : point.r) * colour[0], 0.0f, 1.0f);
+        point.g = std::clamp((uncoloured ? 1.0f : point.g) * colour[1], 0.0f, 1.0f);
+        point.b = std::clamp((uncoloured ? 1.0f : point.b) * colour[2], 0.0f, 1.0f);
+        return point;
     }
-    if (applyColour) { point = applySourceColour(point, curves, time, bpm); }
-    if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
-        || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
-        return { 0, 0, 0, 0, 0, 0 };
+    osci::Point apply(osci::Point point, bool applyColour) const {
+        const auto x = point.x * scale[0], y = point.y * scale[1], z = point.z * scale[2];
+        point.x = rotation[0][0] * x + rotation[0][1] * y + rotation[0][2] * z + translation[0];
+        point.y = rotation[1][0] * x + rotation[1][1] * y + rotation[1][2] * z + translation[1];
+        point.z = rotation[2][0] * x + rotation[2][1] * y + rotation[2][2] * z + translation[2];
+        if (applyColour) { point = colourOf(point); }
+        if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
+            || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
+            return { 0, 0, 0, 0, 0, 0 };
+        }
+        return point;
     }
-    return point;
+
+private:
+    // Rotation about X, then Y, then Z, as osci::Point::rotate.
+    static Matrix euler(double x, double y, double z) {
+        const auto cx = static_cast<float>(std::cos(x)), sx = static_cast<float>(std::sin(x));
+        const auto cy = static_cast<float>(std::cos(y)), sy = static_cast<float>(std::sin(y));
+        const auto cz = static_cast<float>(std::cos(z)), sz = static_cast<float>(std::sin(z));
+        const Matrix aboutX {{{1, 0, 0}, {0, cx, -sx}, {0, sx, cx}}};
+        const Matrix aboutY {{{cy, 0, sy}, {0, 1, 0}, {-sy, 0, cy}}};
+        const Matrix aboutZ {{{cz, -sz, 0}, {sz, cz, 0}, {0, 0, 1}}};
+        return multiply(aboutZ, multiply(aboutY, aboutX));
+    }
+    static Matrix multiply(const Matrix& a, const Matrix& b) {
+        Matrix result {};
+        for (std::size_t row = 0; row < 3; ++row) {
+            for (std::size_t column = 0; column < 3; ++column) {
+                result[row][column] = a[row][0] * b[0][column] + a[row][1] * b[1][column] + a[row][2] * b[2][column];
+            }
+        }
+        return result;
+    }
+};
+
+inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
+    return TransformPose::at(curves, time, bpm, spatial).apply(point, applyColour);
 }
 
 struct PreparedGroup {
@@ -88,9 +136,15 @@ struct PreparedGroup {
         const auto value = curves[12].evaluate(time, bpm);
         return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
     }
-    osci::Point apply(osci::Point point, double time, double bpm = 120) const {
-        return applyEffects(effects, applyTransform(point, curves, time, bpm, true, spatial.get()), time, bpm);
+    const TransformPose& pose(double time, double bpm) const {
+        return poses.at(time, [&] { return TransformPose::at(curves, time, bpm, spatial.get()); });
     }
+    osci::Point apply(osci::Point point, double time, double bpm = 120) const {
+        return applyEffects(effects, pose(time, bpm).apply(point, true), time, bpm);
+    }
+
+private:
+    TimeCache<TransformPose> poses;
 };
 
 // One authored clip's transform/effect scope. Runtime stages carry no document
@@ -105,6 +159,7 @@ struct PreparedClipStage {
     std::shared_ptr<const PreparedSpatial> spatial;
     double bpm = 120, contentBpm = 120;
     std::optional<ClipTiming> scopeClock;
+    TimeCache<TransformPose> poses;
 
     double scopeTime(double time) const { return scopeClock.has_value() ? scopeClock->localTime(time) : time; }
     double localTime(double time) const { return clock.localTime(time); }
@@ -125,9 +180,10 @@ struct PreparedClipStage {
     }
     osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
-        point = applySourceColour(point, curves, local, contentBpm);
+        const auto& pose = poses.at(local, [&] { return TransformPose::at(curves, local, contentBpm, spatial.get()); });
+        point = pose.colourOf(point);
         point = applyEffects(effects, point, local, contentBpm);
-        point = applyTransform(point, curves, local, contentBpm, false, spatial.get());
+        point = pose.apply(point, false);
         point = applyEffects(trackEffects, point, scopeTime(time), bpm);
         for (const auto& group : groups) { point = group.apply(point, scopeTime(time), bpm); }
         return applyEffects(compositionEffects, point, scopeTime(time), bpm);
@@ -569,11 +625,13 @@ struct PreparedComposition {
             return std::nullopt;
         }
         point = applyCompositionEffects(point, time);
-        const auto* camera = activeCamera(time);
-        if (camera != nullptr) {
-            const auto frame = camera->frame(time);
-            if (!frame.has_value() || PreparedCamera::depthOf(*frame, point) <= PreparedCamera::nearPlane) { return std::nullopt; }
-            point = PreparedCamera::project(*frame, point);
+        const auto& view = views.at(time, [&] {
+            const auto* camera = activeCamera(time);
+            return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::nullopt};
+        });
+        if (view.camera) {
+            if (!view.frame.has_value() || PreparedCamera::depthOf(*view.frame, point) <= PreparedCamera::nearPlane) { return std::nullopt; }
+            point = PreparedCamera::project(*view.frame, point);
         } else {
             // Empty camera collections retain the original fixed output framing.
             const auto depth = 4.0f - point.z;
@@ -593,6 +651,16 @@ struct PreparedComposition {
     osci::Point projectPoint(osci::Point point, double time) const {
         return projectVisible(point, time).value_or(osci::Point(0, 0, 0, 0, 0, 0));
     }
+
+private:
+    // The camera shown at a time and its frame (none without cameras).
+    struct View {
+        bool camera = false;
+        std::optional<PreparedCamera::Frame> frame;
+    };
+    TimeCache<View> views;
+
+public:
 
     double duration;
     double bpm = 120;
