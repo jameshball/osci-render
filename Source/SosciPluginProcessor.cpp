@@ -9,7 +9,6 @@ SosciAudioProcessor::SosciAudioProcessor() : CommonAudioProcessor(BusesPropertie
 SosciAudioProcessor::~SosciAudioProcessor() {}
 
 void SosciAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
-    juce::ScopedNoDenormals noDenormals;
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     if (isOfflineRenderActive()) {

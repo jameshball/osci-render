@@ -42,7 +42,7 @@ public:
     virtual VoiceEffectMap cloneVoiceEffectInstances() = 0;
     virtual ShapeSound* getActiveShapeSound() const = 0;
     virtual std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() = 0;
-    virtual DahdsrParams getCurrentDahdsrParams(int envelope = 0) const = 0;
+    virtual DahdsrParams getCurrentDahdsrParams(int envelope) const = 0;
     virtual double getVoiceSampleRate() = 0;
     virtual double noteToFrequency(int note, int channel) = 0;
     virtual int getNumPressedNotes() const = 0;

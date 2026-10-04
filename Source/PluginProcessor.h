@@ -162,8 +162,7 @@ public:
     // setters to any custom-target CC mappings that were restored inert by
     // MidiManager::load().
     void rebindAllModDepthCCMappings();
-    DahdsrParams getCurrentDahdsrParams() const;
-    DahdsrParams getCurrentDahdsrParams(int envIndex) const;
+    DahdsrParams getCurrentDahdsrParams(int envIndex) const override;
 
     VoiceParameters getVoiceParameters() override;
     VoiceTelemetry& getVoiceTelemetry() override { return voiceTelemetry; }
@@ -260,14 +259,14 @@ public:
 #endif
 
     // Number of MIDI notes currently held. Audio-thread only.
-    int getNumPressedNotes() const;
+    int getNumPressedNotes() const override;
     void sendMidiPanic(bool immediate);
 
     // Frequency of the globally-last-played note (before the current noteOn).
     // Used as glide source so any voice can portamento from the last note.
     double getLastPlayedNoteFreq() const;
 
-    ShapeSound* getActiveShapeSound() const { return fileController.getActiveSound(); }
+    ShapeSound* getActiveShapeSound() const override { return fileController.getActiveSound(); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -329,7 +328,7 @@ public:
     // Preview API: set/clear a temporary effect by ID for hover auditioning
     void setPreviewEffectId(const juce::String& effectId);
     void clearPreviewEffect();
-    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() { 
+    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() override { 
         return std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect); 
     }
 

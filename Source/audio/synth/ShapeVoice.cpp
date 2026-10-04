@@ -102,7 +102,7 @@ void ShapeVoice::voiceActivated(const VoiceState& vs, bool isLegato) {
         pendingFrameStart = true;
         pendingNoteOn = true;
 
-        dahdsr = context.getCurrentDahdsrParams();
+        dahdsr = context.getCurrentDahdsrParams(0);
         envState.reset(dahdsr);
         for (int e = 1; e < NUM_ENVELOPES; ++e) {
             envDahdsr[e] = context.getCurrentDahdsrParams(e);

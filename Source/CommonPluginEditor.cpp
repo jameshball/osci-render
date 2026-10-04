@@ -622,10 +622,6 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
 
 #if OSCI_PREMIUM
-std::shared_ptr<OfflineVisualiserParameters> CommonPluginEditor::captureOfflineVisualiserParameters() {
-    return std::make_shared<OfflineVisualiserParameters>(audioProcessor.visualiserParameters);
-}
-
 bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, const juce::File& muxAudio, const juce::File& outputFile, VideoEncodingConfiguration encodingConfiguration, VisualiserRenderer::RenderMode initialRenderMode, std::function<void()> completion, std::shared_ptr<OfflineVisualiserParameters> beamSnapshot) {
     // The renderer owns its onFinished closure until after its destructor has
     // joined the worker and detached GL. This guard therefore safely retains
@@ -708,7 +704,7 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
 
     auto* contentPtr = content.get();
     const juce::Point<int> preferredContentSize { content->getWidth(), content->getHeight() };
-    auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize);
+    auto overlay = std::make_unique<OfflineRenderOverlay>(std::move(content), preferredContentSize, offlineRenderTitle());
     *overlayHolder = overlay.get();
 
     overlay->onDismissRequested = [safeThis, wasVisualiserPaused, wasOfflineRenderActive, resultHolder] {

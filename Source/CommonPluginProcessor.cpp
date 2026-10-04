@@ -443,6 +443,8 @@ void CommonAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 }
 
 void CommonAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    // Every product's audio thread works without denormals.
+    juce::ScopedNoDenormals noDenormals;
     const int deviceNumSamples = buffer.getNumSamples();
     if (deviceNumSamples <= 0) {
         processBlockSkipped(false);

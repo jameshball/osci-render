@@ -551,7 +551,6 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
 }
 
 void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
-    juce::ScopedNoDenormals noDenormals;
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     if (isOfflineRenderActive()) {
@@ -1532,11 +1531,6 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
     // NOTE: visualiserParameters.effects and .audioEffects are NOT registered here.
     // They are animated/modulated on the renderer thread, not the audio thread.
     // See visualiserParameters.applyExternalModulation.
-}
-
-DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
-{
-    return envelopeParameters.getDahdsrParams(0);
 }
 
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams(int envIndex) const
