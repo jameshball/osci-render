@@ -45,7 +45,6 @@ public:
     void showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) override;
     void showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor);
     static void dismissPopover(juce::Component* content);
-    void showScopeSettings();
 
 
 private:
@@ -198,6 +197,8 @@ private:
     MotionCurveEditor curveEditor;
     MotionNotesEditor notesEditor;
     MotionCameraRig cameraRig;
+    MotionScopePanel scopePanel { processor };
+    MotionScopeHeading scopeHeading;
     MotionClipTimingPanel clipTimingPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectStack effectStack;

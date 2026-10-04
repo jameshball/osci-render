@@ -54,7 +54,7 @@ public:
         record.onColour = juce::Colour(0xffe5484d).withAlpha(.25f);
         textureOutput.setTooltip("Share the Scope's picture with other apps (Syphon/Spout)");
         canvas.setTooltip("Output canvas size");
-        settings.setTooltip("Beam and display settings");
+        settings.setTooltip("Scope properties: beam, display and timing");
         popout.setTooltip("Open the Scope in its own window");
         fullScreen.setTooltip("Full screen");
         setGroups({{&record, &textureOutput}, {&canvas, &settings}, {&popout, &fullScreen}});

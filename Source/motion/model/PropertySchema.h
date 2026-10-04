@@ -79,7 +79,24 @@ inline std::span<const PropertySpec> cameraPropertySpecs() {
     return specs;
 }
 
+// The Scope's picture: one row each, in the visualiser's own ranges.
+inline std::span<const PropertySpec> beamPropertySpecs() {
+    static constexpr PropertySpec specs[] {
+        {"intensity", "Intensity", "Intensity", "", 0, 10, 5, .02, 2, ""},
+        {"focus", "Focus", "Focus", "", .3, 10, 1, .02, 2, ""},
+        {"persistence", "Persistence", "Persistence", "", 0, 6, .5, .01, 2, ""},
+        {"afterglow", "Afterglow", "Afterglow", "", 0, 10, 1, .02, 2, ""},
+        {"glow", "Glow", "Glow", "", 0, 1, .3, .005, 2, ""},
+        {"hue", "Hue", "Hue", "", 0, 359, 125, 1, 0, "°"},
+        {"lineSaturation", "Saturation", "Saturation", "", 0, 5, 1, .01, 2, ""},
+        {"ambient", "Ambient", "Ambient", "", 0, 5, 0, .01, 2, ""},
+        {"visualiserSmoothing", "Smoothing", "Smoothing", "", 0, 1, 0, .005, 2, ""},
+    };
+    return specs;
+}
+
 inline std::span<const PropertySpec> propertySpecs(const PropertyTarget& target) {
+    if (target.beam) { return beamPropertySpecs(); }
     if (target.camera) { return cameraPropertySpecs(); }
     if (target.isAudio) { return audioPropertySpecs(); }
     return objectPropertySpecs();

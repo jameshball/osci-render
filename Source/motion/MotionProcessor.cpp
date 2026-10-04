@@ -7,6 +7,17 @@ MotionProcessor::MotionProcessor()
     : CommonAudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)) {
     addAllParameters();
     rgbEnabled = true;
+    // The document drives the Scope's beam and display properties: the audio
+    // thread publishes their values each block and the visualiser applies
+    // them to its animated values every frame.
+    for (std::size_t index = 0; index < scopeBeam.size(); ++index) { scopeBeam[index].store(static_cast<float>(motion::Beam::defaults[index])); }
+    scopeBeamSlots = std::make_unique<motion::ScopeBeamSlots>(visualiserParameters);
+    visualiserParameters.applyExternalModulation = [this](int samples) {
+        for (std::size_t index = 0; index < scopeBeam.size(); ++index) {
+            const auto value = scopeBeam[index].load(std::memory_order_relaxed);
+            scopeBeamSlots->write(index, samples, [value](int) { return value; });
+        }
+    };
     // Undo keeps whole-project snapshots (shared media is not copied); bound
     // the history to about 256 MiB while always keeping the last 20 steps.
     getUndoManager().setMaxNumberOfStoredUnits(256 * 1024, 20);
@@ -33,6 +44,7 @@ MotionProcessor::~MotionProcessor() {
     // Host teardown can occur off the message thread; exclude the controller's
     // timer before destroying its document access and publication callback.
     const juce::MessageManagerLock messageLock;
+    visualiserParameters.applyExternalModulation = nullptr;
     midiSession.reset();
     blender.reset();
     preparationWorker.reset();
@@ -293,6 +305,8 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     beamInterleave.store(static_cast<int>(beam.plannedInterleave()), std::memory_order_relaxed);
     audioTime = static_cast<double>(audioSample) / sampleRate;
     position.store(audioTime);
+    const auto picture = prepared->beam.at(audioTime);
+    for (std::size_t index = 0; index < picture.size(); ++index) { scopeBeam[index].store(picture[index], std::memory_order_relaxed); }
     juce::AudioBuffer<float> block(signal.getArrayOfWritePointers(), 6, count);
     threadManager.write(block, "VisualiserRenderer");
     routeSignalOutput(buffer);

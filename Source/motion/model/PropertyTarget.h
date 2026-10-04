@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Camera.h"
+#include "Beam.h"
 #include "Group.h"
 #include <string_view>
 #include <type_traits>
@@ -26,6 +27,8 @@ struct BasicPropertyTarget {
     double contentBpm = 0;
     // A musical clip under a tempo map follows the beats exactly.
     std::optional<ClipTiming::BeatWarp> warp;
+    // The Scope's picture (Project only), in project time like a camera.
+    bool beam = false;
     double curveBpm(double projectBpm) const { return contentBpm > 0 ? contentBpm : projectBpm; }
 
     double end() const { return start + duration; }
@@ -93,6 +96,13 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
     for (auto& camera : project.cameras) {
         if (camera.id == id) {
             return Target { camera.id, camera.name, 0.0, project.duration, 0.0, 1.0, &camera.properties, true };
+        }
+    }
+    if constexpr (requires { project.beam; }) {
+        if (project.beam.id == id) {
+            Target target { project.beam.id, "Scope", 0.0, project.duration, 0.0, 1.0, &project.beam.properties };
+            target.beam = true;
+            return target;
         }
     }
     return std::nullopt;

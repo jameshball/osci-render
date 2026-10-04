@@ -78,7 +78,7 @@ def snapshot():
 
 
 def intensity():
-    return next(node for node in nodes(snapshot()) if node.get("name") == "Scope intensity" and node.get("class") == "MotionScrubField")
+    return next(node for node in nodes(snapshot()) if node.get("componentName") == "intensity" and node.get("class") == "MotionScrubField")
 
 
 def scope_field(label):
@@ -97,40 +97,44 @@ def saved_scope():
     return [float(composition.get(name)) for name in ("scopeDwell", "scopeTravel", "scopeSettle")]
 
 
+def saved_intensity():
+    prop = saved().find("composition/scopeBeam/property[@name='intensity']")
+    return float(prop.get("base")), [(round(float(key.get("time")), 3), round(float(key.get("value")), 3)) for key in prop.findall("key")]
+
+
 def open_project():
     session.open_project(project)
     command("wait-for-locator", "--name", "Hero diamond.obj", "--class", "juce::Label", "--exact")
 
 
-def open_settings():
-    step("open beam settings", "click", "--name", "Scope settings", "--exact")
-    command("wait-for-locator", "--name", "Scope settings", "--class", "MotionScopeSettings", "--exact")
-
-
-def close_settings():
-    step("close beam settings", "press", "Escape", "--class", "juce::CallOutBox")
-    deadline = time.monotonic() + 5
-    while any(node.get("class") == "MotionScopeSettings" for node in nodes(snapshot())):
-        if time.monotonic() > deadline:
-            raise RuntimeError("Scope settings did not close")
-        time.sleep(0.1)
+def open_scope():
+    # The cog selects the Scope: its beam and display properties are rows in Properties.
+    step("select the Scope", "click", "--name", "Scope settings", "--exact")
+    command("wait-for-locator", "--name", "Key intensity", "--exact")
 
 
 def save(label):
-    # The popover is modal: close it to save from the editor, then reopen it.
-    close_settings()
     step(label, "press", "command + s", "--class", "MotionEditor")
-    open_settings()
+
+
+def seek(seconds):
+    field = next(node for node in nodes(snapshot()) if node.get("componentName") == "Timeline position")
+    step("edit playback position", "click", field["ref"], "--click-count", 2)
+    field = next(node for node in nodes(snapshot()) if node.get("componentName") == "Timeline position")
+    editor = next(node for node in nodes(field) if node.get("class") == "juce::TextEditor")
+    step("seek " + str(seconds), "fill", editor["ref"], str(seconds) + "s")
+    step("commit playback position", "press", "Return")
 
 
 try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     open_project()
-    open_settings()
+    open_scope()
     save("save baseline")
     if saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") != "1":
         step("enable upsampling", "click", "--name", "Upsample Audio", "--exact")
     step("set beam intensity", "set-value", intensity()["ref"], "6")
+    session.wait_for_undo("Change property")
     step("open scope presets", "click", "--name", "Scope presets", "--exact")
     step("choose laser timing", "click", "--name", "Laser (slow galvo)", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Undo Apply Laser (slow galvo) scope timing", "--role", "label", "--exact")
@@ -138,25 +142,39 @@ try:
     save("save beam settings")
     state = saved()
     assert state.find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") == "1"
-    assert float(state.find("beam/effects/parameter[@id='intensity']/parameter").get("value")) == 6
+    assert saved_intensity() == (6.0, []), saved_intensity()
     assert state.find("recording/recordingSettings") is not None
     assert saved_scope() == [80, 400, 150], saved_scope()
-    step("change intensity without saving", "set-value", intensity()["ref"], "2")
+    # Intensity animates like any property: a key here, a new value later keys there.
+    seek(0)
+    step("key intensity", "click", "--name", "Key intensity", "--exact")
+    session.wait_for_undo("Set keyframe")
+    seek(10)
+    step("intensity later", "set-value", intensity()["ref"], "2")
+    session.wait_for_undo("Change property")
+    save("save animated intensity")
+    assert saved_intensity()[1] == [(0.0, 6.0), (10.0, 2.0)], saved_intensity()
+    step("undo the later key", "click", "--name", "Undo", "--exact")
+    save("save after undo")
+    assert saved_intensity()[1] == [(0.0, 6.0)], saved_intensity()
+    step("redo the later key", "click", "--name", "Redo", "--exact")
+    save("save after redo")
+    step("change intensity without saving", "set-value", intensity()["ref"], "9")
     step("disable upsampling without saving", "click", "--name", "Upsample Audio", "--exact")
     step("change settle without saving", "set-value", scope_field("settle")["ref"], "0")
-    close_settings()
     open_project()
-    open_settings()
-    assert abs(float(intensity()["value"]) - 6) < .001
+    open_scope()
+    seek(10)
+    assert abs(float(intensity()["value"]) - 2) < .001, intensity()["value"]
     assert abs(float(scope_field("dwell")["value"]) - 80) < .001
     assert abs(float(scope_field("settle")["value"]) - 150) < .001
-    step("reopened beam settings", "screenshot", "--file", session.artifact_dir / "beam-settings.png", "--scale", "2")
+    step("reopened scope properties", "screenshot", "--file", session.artifact_dir / "beam-settings.png", "--scale", "2")
     # Resave restored runtime state, so this checks restoration rather than merely
     # inspecting the bytes written before changing the controls.
     save("resave restored beam")
     assert saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") == "1"
     assert saved_scope() == [80, 400, 150], saved_scope()
-    close_settings()
+    assert saved_intensity()[1] == [(0.0, 6.0), (10.0, 2.0)], saved_intensity()
     for moment in [64, 96, 128, 179]:
         field = next(node for node in nodes(snapshot()) if node.get("componentName") == "Timeline position")
         step("edit playback position", "click", field["ref"], "--click-count", 2)

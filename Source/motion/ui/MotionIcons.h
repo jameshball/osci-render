@@ -187,6 +187,15 @@ public:
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
         const auto bounds = getLocalBounds().toFloat().reduced(.5f);
         const auto active = getToggleState();
+        if (quiet && !active) {
+            // Just the glyph until hovered: a column of these stays light.
+            if (highlighted || down) {
+                g.setColour(juce::Colours::white.withAlpha(down ? .12f : .07f));
+                g.fillRoundedRectangle(bounds, motion::style::radius);
+            }
+            draw(g, icon, bounds, motion::style::muted().withAlpha(highlighted ? 1.0f : .6f), iconSize);
+            return;
+        }
         g.setColour(active ? on : (highlighted || down ? motion::style::raised().brighter(.15f) : motion::style::field()));
         g.fillRoundedRectangle(bounds, motion::style::radius);
         if (!active) {
@@ -196,6 +205,8 @@ public:
         draw(g, icon, bounds, active ? juce::Colours::white : motion::style::muted().withAlpha(highlighted ? 1.0f : .85f), iconSize);
     }
     float iconSize = 13.0f;
+    // No box until hovered or on.
+    bool quiet = false;
 private:
     Icon icon;
     juce::Colour on = motion::style::accent().withAlpha(.45f);

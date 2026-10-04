@@ -90,10 +90,11 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
     // The Scope's settings open as a popover from its cog; keeping
     // openSettings set also keeps the cog in the strip.
-    visualiser.openSettings = [this] { showScopeSettings(); };
-    visualiser.closeSettings = [this] {
-        if (popover != nullptr) { popover->dismiss(); }
-    };
+    // The Scope's cog selects the Scope, whose beam and display properties
+    // animate in Properties and the Graph like any other; keeping
+    // openSettings set also keeps the cog in the strip.
+    visualiser.openSettings = [this] { select(processor.document.project().beam.id); };
+    visualiser.closeSettings = [] {};
     // The scope's record, settings, popout and full-screen controls live in
     // the Scope panel header rather than on top of the picture.
     visualiserControls = &visualiser.detachControls(*this);
@@ -1055,10 +1056,6 @@ void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::R
     });
 }
 
-void MotionEditor::showScopeSettings() {
-    showPopover(std::make_unique<MotionScopeSettings>(processor), getLocalArea(&scopeTools, scopeTools.settings.getBounds()));
-}
-
 void MotionEditor::dismissPopover(juce::Component* content) {
     if (content == nullptr) { return; }
     auto* box = content->findParentComponentOfClass<juce::CallOutBox>();
@@ -1654,6 +1651,8 @@ motion::Id MotionEditor::toolCamera() const {
 // Look through and Key camera follow the selection, the playhead and edits;
 // a camera that cannot be looked through says why.
 void MotionEditor::refreshCameraTools() {
+    // The cog is lit while the Scope's properties are shown.
+    scopeTools.settings.setToggleState(selection != 0 && selection == processor.document.project().beam.id, juce::dontSendNotification);
     const auto camera = toolCamera();
     const auto driven = camera != 0 && camera == composition.drivenCamera();
     const auto blocker = composition.driveBlocker(camera);
@@ -2056,10 +2055,19 @@ void MotionEditor::refreshInspector() {
     // A camera's rig leads its Properties where a clip's timing would.
     const auto camera = selectionIsCamera();
     cameraRig.setCamera(camera ? selection : 0);
+    const auto scopeSelected = selection != 0 && selection == processor.document.project().beam.id;
     if (camera) {
         propertyInspector.setLead(&cameraRig, [this] { return cameraRig.preferredHeight(); });
+    } else if (scopeSelected) {
+        propertyInspector.setLead(&scopeHeading, [] { return MotionScopeHeading::preferredHeight(); });
     } else {
         propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
+    }
+    // The Scope has no effects; its fixed options follow its rows instead.
+    if (scopeSelected) {
+        propertyInspector.setTrail(&scopePanel, [] { return MotionScopePanel::preferredHeight(); });
+    } else {
+        propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); });
     }
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, selection);
@@ -2075,7 +2083,7 @@ void MotionEditor::refreshInspector() {
     } else if (track != project.tracks.end()) {
         if (track->kind == motion::TrackKind::visual) { owner = selection; }
         heading = std::pair<juce::String, juce::String>(juce::String(track->name), "Track");
-    } else if (editable && !target->camera && !target->isAudio) {
+    } else if (editable && !target->camera && !target->beam && !target->isAudio) {
         owner = selection;
     }
     propertyInspector.setHeading(heading);
@@ -2572,7 +2580,7 @@ void MotionEditor::exportVideo() {
     if (!processor.ensureFFmpegExists()) { return; }
     std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
     try {
-        beamSnapshot = captureOfflineVisualiserParameters();
+        beamSnapshot = std::make_shared<OfflineVisualiserParameters>(processor.visualiserParameters, OfflineVisualiserParameters::ExternalModulation::replace);
     } catch (const std::exception& error) {
         statusBar.show("Cannot capture the beam settings: " + juce::String(error.what()));
         return;
@@ -2646,6 +2654,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
         owner->showOverlay(std::move(overlay));
         // The worker owns one immutable prepared snapshot for both WAVs.
         owner->exports.addJob([owner, state, project, beamSnapshot, renderMode, config, destination, preparationOverlay, finished] {
+            std::shared_ptr<const motion::PreparedBeam> picture;
             std::shared_ptr<MotionVideoTemporaryFiles> temporary;
             auto result = juce::Result::ok();
             try {
@@ -2654,6 +2663,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                 if (result.wasOk() && !state->cancelled.load()) {
                     const auto rate = state->sampleRate;
                     const motion::PreparedComposition prepared(project, rate, &state->cancelled);
+                    picture = std::make_shared<const motion::PreparedBeam>(prepared.beam);
                     result = motion::SignalExporter::write(prepared, temporary->signal(), rate, state->cancelled, &state->progress);
                     if (result.wasOk() && config.includeAudio) {
                         result = motion::SoundtrackExporter::write(prepared, temporary->soundtrack(), rate, state->cancelled, &state->soundtrackProgress);
@@ -2664,7 +2674,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
             }
             // Native save-dialog callbacks have returned before this starts
             // the shared GL renderer and its own cancellable progress overlay.
-            juce::MessageManager::callAsync([owner, state, temporary, result, beamSnapshot, renderMode, config, destination, preparationOverlay, finished] {
+            juce::MessageManager::callAsync([owner, state, temporary, result, beamSnapshot, picture, renderMode, config, destination, preparationOverlay, finished] {
                 if (owner == nullptr) { return; }
                 if (state->cancelled.load() || result.failed()) {
                     if (preparationOverlay != nullptr) { owner->dismissOverlay(preparationOverlay.getComponent()); }
@@ -2673,8 +2683,19 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     if (finished) { finished(false); }
                     return;
                 }
-                auto startRender = [owner, state, temporary, config, destination, renderMode, beamSnapshot, finished] {
+                auto startRender = [owner, state, temporary, config, destination, renderMode, beamSnapshot, picture, finished] {
                     if (owner == nullptr) { return; }
+                    // Frames render in order from the start, so the beam
+                    // follows the document sample by sample.
+                    if (picture != nullptr) {
+                        auto slots = std::make_shared<motion::ScopeBeamSlots>(beamSnapshot->params);
+                        beamSnapshot->params.applyExternalModulation = [picture, slots, rate = state->sampleRate, cursor = std::make_shared<juce::int64>(0)](int samples) {
+                            for (std::size_t index = 0; index < motion::beamPropertyNames.size(); ++index) {
+                                slots->write(index, samples, [&](int sample) { return picture->value(index, static_cast<double>(*cursor + sample) / rate); });
+                            }
+                            *cursor += samples;
+                        };
+                    }
                     const auto started = owner->startOfflineVideoRender(temporary->signal(), config.includeAudio ? temporary->soundtrack() : juce::File(),
                         destination, config, renderMode, [owner, state, temporary, finished] {
                             // Completion can run from base-editor destruction;
@@ -2745,7 +2766,7 @@ void MotionEditor::continueCommandLineRender() {
     if (!processor.ensureFFmpegExists()) { failCommandLineRender("FFmpeg is unavailable."); return; }
     std::shared_ptr<OfflineVisualiserParameters> beamSnapshot;
     try {
-        beamSnapshot = captureOfflineVisualiserParameters();
+        beamSnapshot = std::make_shared<OfflineVisualiserParameters>(processor.visualiserParameters, OfflineVisualiserParameters::ExternalModulation::replace);
     } catch (const std::exception& error) {
         failCommandLineRender(error.what());
         return;
@@ -2831,15 +2852,16 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
     const auto target = motion::findPropertyTarget(processor.document.project(), id);
     const bool audio = target.has_value() && target->isAudio;
-    const auto count = audio ? 2 : definition != nullptr ? definition->parameters.size() : (camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size());
+    const bool beam = target.has_value() && target->beam;
+    const auto count = audio ? 2 : definition != nullptr ? definition->parameters.size() : beam ? motion::beamPropertyNames.size() : (camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size());
     std::size_t selectedIndex = 0;
     for (std::size_t index = 0; index < count; ++index) {
-        const std::string name = audio ? (index == 0 ? "gain" : "pan") : definition != nullptr ? definition->parameters[index].id : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
+        const std::string name = audio ? (index == 0 ? "gain" : "pan") : definition != nullptr ? definition->parameters[index].id : beam ? motion::beamPropertyNames[index] : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
         curveProperties.push_back(name);
         if (property == name) { selectedIndex = index; }
     }
     // A Lua clip's slider curves are graphable once they exist.
-    if (!audio && !camera && definition == nullptr && target.has_value() && target->properties != nullptr) {
+    if (!audio && !camera && !beam && definition == nullptr && target.has_value() && target->properties != nullptr) {
         for (const auto& spec : motion::luaSliderSpecs()) {
             const std::string name(spec.id);
             if (!target->properties->contains(name)) { continue; }

@@ -4,6 +4,7 @@
 #include "Timeline.h"
 #include "TimeGrid.h"
 #include "Camera.h"
+#include "Beam.h"
 #include "Group.h"
 #include "PreparedSource.h"
 #include "../live/LiveSourceFrames.h"
@@ -94,6 +95,8 @@ struct CompositionDefinition : Composition {
 struct Project : Composition {
     // The output display belongs to the whole project, not to one composition.
     ScopeProfile scope;
+    // The Scope's picture: animatable beam and display properties.
+    Beam beam;
     std::vector<std::shared_ptr<const Asset>> assets;
     std::vector<std::shared_ptr<const CompositionDefinition>> definitions;
 };
@@ -213,6 +216,7 @@ public:
     // drive yet, at a visible but contained default depth. One undo step.
     juce::Result routeModulator(Id modulator, Id target, const std::vector<std::string>& properties);
     static double defaultRouteAmount(const std::string& property);
+    static double routeAmount(const Project& project, Id target, const std::string& property);
     // Creates a modulator already driving one property, as one undo step.
     juce::Result addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId);
     juce::Result setRoute(const ModulationRoute& route);

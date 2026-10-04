@@ -571,7 +571,7 @@ struct Document::Change : juce::UndoableAction {
     bool performed = false;
     // KiB, so the undo manager can bound history by memory as well as count.
     int getSizeInUnits() override {
-        auto bytes = compositionBytes(before) + compositionBytes(after);
+        auto bytes = compositionBytes(before) + compositionBytes(after) + propertyBytes(before.beam.properties) + propertyBytes(after.beam.properties);
         const auto unique = [&](const auto& mine, const auto& theirs, const auto& size) {
             for (const auto& item : mine) {
                 if (item != nullptr && std::find(theirs.begin(), theirs.end(), item) == theirs.end()) { bytes += size(*item); }
@@ -601,6 +601,7 @@ Project Document::mergeScope(Project view) const {
     if (scopeId == 0) { return view; }
     auto whole = state;
     whole.scope = view.scope;
+    whole.beam = view.beam;
     whole.assets = std::move(view.assets);
     whole.definitions = std::move(view.definitions);
     const auto found = std::find_if(whole.definitions.begin(), whole.definitions.end(), [this](const auto& value) { return value->id == scopeId; });
@@ -889,6 +890,7 @@ static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
         cut.duration = spanUntil(cut.start, end);
     }
     for (auto& camera : next.cameras) { for (auto& [name, curve] : camera.properties) { scaleCurve(curve); } }
+    for (auto& [name, curve] : next.beam.properties) { scaleCurve(curve); }
     for (auto& group : next.groups) {
         for (auto& [name, curve] : group.properties) { scaleCurve(curve); }
         scaleEffects(group.effects);
@@ -2160,6 +2162,13 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
     return juce::Result::ok();
 }
 
+// A quarter of a Scope property's range; otherwise as defaultRouteAmount.
+double Document::routeAmount(const Project& project, Id target, const std::string& property) {
+    const auto found = findPropertyTarget(project, target);
+    const auto* spec = found.has_value() && found->beam ? findPropertySpec(beamPropertySpecs(), property) : nullptr;
+    return spec != nullptr ? 0.25 * (spec->maximum - spec->minimum) : defaultRouteAmount(property);
+}
+
 double Document::defaultRouteAmount(const std::string& property) {
     // A quarter unit keeps a moved or scaled object on the canvas; rotations
     // swing 45 degrees; colours move halfway.
@@ -2172,11 +2181,12 @@ juce::Result Document::routeModulator(Id modulator, Id target, const std::vector
     const auto& current = project();
     const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == modulator; });
     if (!hasModulator) { return juce::Result::fail("The modulator no longer exists."); }
+    if (scopeId != 0 && target == current.beam.id) { return juce::Result::fail("The Scope is modulated from the main composition."); }
     std::vector<ModulationRoute> added;
     for (const auto& property : properties) {
         const auto routed = std::any_of(current.routes.begin(), current.routes.end(), [&](const auto& route) { return route.modulator == modulator && route.target == target && route.property == property; });
         if (routed || !drivableProperty(current, target, property)) { continue; }
-        added.push_back({newId(), modulator, target, property, defaultRouteAmount(property), ModulationMode::add});
+        added.push_back({newId(), modulator, target, property, routeAmount(current, target, property), ModulationMode::add});
     }
     if (added.empty()) { return juce::Result::fail("It already drives that, or that cannot be modulated."); }
     edit("Route modulator", [added](Project& project) { project.routes.insert(project.routes.end(), added.begin(), added.end()); });
@@ -2191,6 +2201,7 @@ juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute r
     if (!modulator.valid() || !route.valid() || !drivableProperty(project(), route.target, route.property)) {
         return juce::Result::fail("A route needs an existing visual property.");
     }
+    if (scopeId != 0 && route.target == project().beam.id) { return juce::Result::fail("The Scope is modulated from the main composition."); }
     modulatorId = modulator.id;
     edit("Route new modulator", [modulator, route](Project& project) {
         project.modulators.push_back(modulator);
@@ -2231,6 +2242,9 @@ juce::Result Document::setLink(Id target, const std::string& property, std::opti
     if (link.has_value() && !drivableProperty(current, target, property)) { return juce::Result::fail("Audio clip gain and pan cannot be linked."); }
     if (link.has_value()) {
         if (!link->valid() || !hasPropertyCurve(current, link->source, link->property)) { return juce::Result::fail("Choose an existing property to link to."); }
+        // The Scope follows the main composition; nothing follows the Scope.
+        if (link->source == current.beam.id) { return juce::Result::fail("Scope properties cannot be linked to."); }
+        if (scopeId != 0 && target == current.beam.id) { return juce::Result::fail("The Scope is linked from the main composition."); }
         if (linkCreatesCycle(current, target, property, *link)) { return juce::Result::fail("That link would make the property depend on itself."); }
     }
     if (curve->link == link) { return juce::Result::ok(); }
@@ -2724,6 +2738,8 @@ juce::XmlElement Document::save() const {
     xml.setAttribute("scopeDwell", exactBakeNumber(state.scope.dwellMicros));
     xml.setAttribute("scopeTravel", exactBakeNumber(state.scope.travelMicrosPerUnit));
     xml.setAttribute("scopeSettle", exactBakeNumber(state.scope.settleMicros));
+    auto* beam = xml.createNewChildElement("scopeBeam");
+    for (const auto& [name, curve] : state.beam.properties) { saveProperty(*beam, name, curve); }
     for (const auto& asset : state.assets) {
         auto* item = xml.createNewChildElement("asset");
         item->setAttribute("id", juce::String(asset->id));
@@ -2793,7 +2809,9 @@ juce::XmlElement Document::save() const {
     return xml;
 }
 
-static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composition& project, const std::vector<std::shared_ptr<const Asset>>& assets, std::set<Id>& identities, const std::set<Id>& compositionIds) {
+// The main composition loads as the Project, so routes may target its Scope.
+template <typename CompositionType>
+static juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType& project, const std::vector<std::shared_ptr<const Asset>>& assets, std::set<Id>& identities, const std::set<Id>& compositionIds) {
     if (!xml.hasTagName("composition")) {
         return juce::Result::fail("Missing composition.");
     }
@@ -3285,6 +3303,22 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             return result;
         }
         project.assets.push_back(std::move(asset));
+    }
+    // The Scope's picture; a project saved without it keeps the defaults.
+    // Its identity is reserved, so nothing else may use it.
+    identities.insert(beamIdentity);
+    const auto* beam = xml.getChildByName("scopeBeam");
+    if (beam != nullptr) {
+        if (beam->getNextElementWithTagName("scopeBeam") != nullptr) { return juce::Result::fail("A project has one Scope."); }
+        std::set<std::string> properties;
+        for (auto* property : beam->getChildWithTagNameIterator("property")) {
+            const auto name = property->getStringAttribute("name").toStdString();
+            const auto found = project.beam.properties.find(name);
+            if (found == project.beam.properties.end() || !properties.insert(name).second) { return juce::Result::fail("Unknown or duplicate Scope property."); }
+            const auto result = loadProperty(*property, found->second);
+            if (result.failed()) { return result; }
+        }
+        if (!project.beam.valid()) { return juce::Result::fail("Invalid Scope property."); }
     }
     const auto main = loadCompositionContent(xml, project, project.assets, identities, compositionIds);
     if (main.failed()) { return main; }

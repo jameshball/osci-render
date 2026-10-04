@@ -19,6 +19,7 @@ void forEachPropertyMap(CompositionType& composition, Visitor&& visit) {
         for (auto& clip : track.clips) { visit(clip.id, clip.properties); effects(clip.effects); }
     }
     for (auto& camera : composition.cameras) { visit(camera.id, camera.properties); }
+    if constexpr (requires { composition.beam; }) { visit(composition.beam.id, composition.beam.properties); }
 }
 
 template <typename CompositionType>

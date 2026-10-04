@@ -19,6 +19,11 @@ public:
     void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const std::string& property) {
         drive(curve, scope, scopeClock, owner, property, 0);
     }
+    // The Scope's picture: the main composition's routes and links, on
+    // project-time curves the composition scope cannot look up itself.
+    void driveBeam(Curve& curve, const Project& project, const ClipTiming& projectClock, const std::string& property) {
+        attach(curve, project, projectClock, project.beam.id, ClipTiming(0.0, project.duration), property, 0);
+    }
     void driveEffects(std::vector<PreparedEffect>& prepared, const std::vector<EffectInstance>& effects, const Composition& scope, const ClipTiming& scopeClock) {
         for (std::size_t index = 0; index < prepared.size() && index < effects.size(); ++index) {
             const auto* definition = effectDefinition(effects[index].type);
@@ -44,8 +49,11 @@ private:
     void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const std::string& property, int depth) {
         const auto target = findPropertyTarget(scope, owner);
         if (!target.has_value()) { return; }
+        attach(curve, scope, scopeClock, owner, target->clock(), property, depth);
+    }
+    void attach(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const ClipTiming& ownerClock, const std::string& property, int depth) {
         auto drivers = std::make_shared<CurveDrivers>();
-        drivers->clock = target->clock();
+        drivers->clock = ownerClock;
         drivers->projectClock = scopeClock;
         for (const auto& route : scope.routes) {
             if (route.target != owner || route.property != property) { continue; }

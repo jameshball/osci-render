@@ -13,6 +13,7 @@
 #include "../audio/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
+#include "ScopeBeam.h"
 
 class MotionProcessor : public CommonAudioProcessor, private juce::AsyncUpdater {
 public:
@@ -111,6 +112,10 @@ private:
     std::atomic<bool> midiDeviceReady{false};
     bool recordingOwnsTransport = false; // Audio thread, or lifecycle with callbacks excluded.
     std::atomic<motion::Id> midiAuditionTarget {0};
+    // The Scope's picture at the last audio block, applied by the visualiser
+    // through its external modulation hook (see ScopeBeam.h).
+    std::array<std::atomic<float>, motion::beamPropertyNames.size()> scopeBeam;
+    std::unique_ptr<motion::ScopeBeamSlots> scopeBeamSlots;
     motion::Id previousAuditionTarget = 0;
     std::uint64_t liveMidiSample = 0;
     juce::int64 oscillatorSample = 0;

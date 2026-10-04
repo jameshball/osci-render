@@ -89,8 +89,13 @@ public:
         ownEffects(params.audioEffects);
     }
 
-    explicit OfflineVisualiserParameters(VisualiserParameters& source) : OfflineVisualiserParameters() {
-        if (source.applyExternalModulation) {
+    // A source's external modulation belongs to its processor: rejected by
+    // default, or left out for the caller to replace with its own offline
+    // modulation (osci-motion drives the beam from its document).
+    enum class ExternalModulation { reject, replace };
+
+    explicit OfflineVisualiserParameters(VisualiserParameters& source, ExternalModulation external = ExternalModulation::reject) : OfflineVisualiserParameters() {
+        if (source.applyExternalModulation && external == ExternalModulation::reject) {
             throw std::invalid_argument("External processor modulation cannot be captured as an independent offline beam snapshot.");
         }
         copyEffects(source.effects, params.effects);

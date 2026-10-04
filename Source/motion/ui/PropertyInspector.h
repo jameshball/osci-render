@@ -117,7 +117,7 @@ public:
         const auto specs = std::span<const motion::PropertySpec>(specList);
         const auto modes = currentModes();
         motionModes = modes.has_value();
-        auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
+        auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->beam)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
         signature << ":" << static_cast<int>(specList.size());
         if (signature != layoutSignature) {
             layoutSignature = signature;
@@ -149,7 +149,7 @@ public:
         if (!title.isBeingEdited()) { title.setText(editable ? juce::String(found->name.data(), found->name.size()) : heading.has_value() ? heading->first : juce::String(), juce::dontSendNotification); }
         // With several clips selected the header says so; edits apply to the
         // one named.
-        const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
+        const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->beam ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
         kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
         kind.setTooltip(editable && selectionCount > 1 ? juce::String(selectionCount) + " clips are selected; these fields edit only " + juce::String(found->name.data(), found->name.size()) + "." : juce::String());
         empty = !editable && !heading.has_value();
@@ -289,13 +289,30 @@ private:
         // Position: one spatial path; Rotation: quaternion orientation.
         std::unique_ptr<motion::icons::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
+        // A single value sits on one line: its name, then the value in the
+        // grid's last column, beside its keys.
+        bool compact() const { return fields.size() == 1 && mode == nullptr && swatch == nullptr; }
+        int preferredHeight() const { return compact() ? motion::style::controlHeight : 17 + motion::style::controlHeight; }
         void paint(juce::Graphics& g) override {
             g.setFont(motion::style::caption());
             g.setColour(motion::style::muted());
-            g.drawText(group, getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
+            g.drawText(group, compact() ? getLocalBounds().withRight(captionRight) : getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
         }
         void resized() override {
             auto area = getLocalBounds();
+            if (compact()) {
+                auto line = area;
+                next.setBounds(line.removeFromRight(12));
+                key.setBounds(line.removeFromRight(18));
+                previous.setBounds(line.removeFromRight(12));
+                line.removeFromRight(motion::style::gap);
+                const auto width = std::min(110, (line.getWidth() - motion::style::gap * 2) / 3);
+                auto value = line.withLeft(line.getX() + 2 * (width + motion::style::gap)).withWidth(width);
+                fields.front()->editor.setBounds(value);
+                modulate.setBounds(juce::Rectangle<int>(20, 18).withCentre({value.getX() - motion::style::gap - 10, line.getCentreY()}));
+                captionRight = modulate.getX() - motion::style::gap;
+                return;
+            }
             auto heading = area.removeFromTop(16);
             if (swatch != nullptr) {
                 // Beside the heading, as After Effects places a colour's swatch.
@@ -323,6 +340,7 @@ private:
                 line.removeFromLeft(motion::style::gap);
             }
         }
+        int captionRight = 0;
     };
     struct Gesture {
         motion::Project before;
@@ -357,6 +375,7 @@ private:
                 row->addAndMakeVisible(row->previous);
                 row->addAndMakeVisible(row->next);
                 row->modulate.setClickingTogglesState(false);
+                row->modulate.quiet = true;
                 row->modulate.setName("Modulate " + namePrefix + row->group.toLowerCase());
                 row->modulate.setTitle(row->modulate.getName());
                 row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph with its oscillator, modulator routes and link. Lit when something drives it.");
@@ -433,9 +452,12 @@ private:
             lead->setVisible(leading > 0);
             y += leading > 0 ? leading + motion::style::padding : 0;
         }
-        for (auto& row : rows) {
-            row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, 17 + motion::style::controlHeight);
-            y += 17 + motion::style::controlHeight + motion::style::padding;
+        for (std::size_t index = 0; index < rows.size(); ++index) {
+            auto& row = rows[index];
+            row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, row->preferredHeight());
+            // One-line values stack closer, as a list.
+            const auto nextCompact = index + 1 < rows.size() && rows[index + 1]->compact();
+            y += row->preferredHeight() + (row->compact() && nextCompact ? motion::style::gap : motion::style::padding);
         }
         const auto trailing = trail != nullptr && trailHeight ? trailHeight() : 0;
         if (trail != nullptr) {

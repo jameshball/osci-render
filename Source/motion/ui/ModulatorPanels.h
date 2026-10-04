@@ -28,7 +28,7 @@ inline juce::String propertyLabel(const Project& project, Id id, const std::stri
             if (parameter.id == property) { return juce::String(parameter.name); }
         }
     }
-    for (const auto specs : {objectPropertySpecs(), cameraPropertySpecs(), audioPropertySpecs()}) {
+    for (const auto specs : {objectPropertySpecs(), cameraPropertySpecs(), audioPropertySpecs(), beamPropertySpecs()}) {
         const auto* spec = findPropertySpec(specs, property);
         if (spec != nullptr) { return juce::String(spec->label.data(), spec->label.size()); }
     }

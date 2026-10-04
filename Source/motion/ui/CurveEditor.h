@@ -1049,6 +1049,10 @@ private:
     }
     double constrainedValue(const motion::PropertyTarget& target, double value, const std::string& property) const {
         if (target.isAudio) { return property == "pan" ? std::clamp(value, -1.0, 1.0) : std::clamp(value, 0.0, 4.0); }
+        if (target.beam) {
+            const auto* spec = motion::findPropertySpec(motion::beamPropertySpecs(), property);
+            return spec != nullptr ? spec->clamp(value) : value;
+        }
         if (target.isEffect) {
             const auto* effect = motion::findEffect(processor.document.project(), target.id);
             const auto* definition = effect != nullptr ? motion::effectDefinition(effect->type) : nullptr;
@@ -1058,7 +1062,7 @@ private:
                 }
             }
         }
-        if (!target.isEffect && !target.camera) {
+        if (!target.isEffect && !target.camera && !target.beam) {
             if (property == "red" || property == "green" || property == "blue") { return std::clamp(value, 0.0, 1.0); }
             if (property == "weight") { return std::clamp(value, 0.0, 1000000.0); }
         }

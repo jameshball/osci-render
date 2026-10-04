@@ -7,6 +7,7 @@
 #include "PreparedMidiPerformance.h"
 #include "PreparedDrivers.h"
 #include "../model/SpatialMotion.h"
+#include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"
 #include <array>
@@ -307,6 +308,25 @@ inline double beamCycleRate(double frameRate) {
     return frameRate * std::max(1.0, std::ceil(45.0 / frameRate - 1.0e-9));
 }
 
+// The Scope's picture in project time: each beam property's curve with its
+// routes, clamped to the visualiser's range (keys and modulation can
+// overshoot). Allocation-free, for the audio and offline render threads.
+struct PreparedBeam {
+    PreparedBeam() {
+        for (std::size_t index = 0; index < curves.size(); ++index) { curves[index] = Curve(Beam::defaults[index]); }
+    }
+    std::array<Curve, beamPropertyNames.size()> curves;
+    double bpm = 120;
+    float value(std::size_t property, double time) const {
+        return static_cast<float>(beamPropertySpecs()[property].clamp(curves[property].evaluate(time, bpm)));
+    }
+    std::array<float, beamPropertyNames.size()> at(double time) const {
+        std::array<float, beamPropertyNames.size()> values {};
+        for (std::size_t index = 0; index < curves.size(); ++index) { values[index] = value(index, time); }
+        return values;
+    }
+};
+
 struct PreparedComposition {
     explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
@@ -369,6 +389,13 @@ struct PreparedComposition {
             item.bpm = project.bpm;
             cameras.push_back(std::move(item));
         }
+        const Beam beamDefaults;
+        for (std::size_t index = 0; index < beamPropertyNames.size(); ++index) {
+            const auto found = project.beam.properties.find(beamPropertyNames[index]);
+            beam.curves[index] = found != project.beam.properties.end() ? found->second : beamDefaults.properties.at(beamPropertyNames[index]);
+            drivers.driveBeam(beam.curves[index], project, mainClock, beamPropertyNames[index]);
+        }
+        beam.bpm = project.bpm;
         for (const auto& cut : project.cameraCuts) {
             const auto camera = std::find_if(cameras.begin(), cameras.end(), [&](const auto& item) { return item.id == cut.camera; });
             if (cut.valid() && camera != cameras.end()) {
@@ -578,6 +605,7 @@ struct PreparedComposition {
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
+    PreparedBeam beam;
     // Tracks armed for live MIDI (at most LiveMidiInputs::maximumRoutes are used).
     struct LiveTrack { Id track; int channel; std::shared_ptr<const PreparedMidiInstrument> instrument; };
     std::vector<LiveTrack> liveTracks;
