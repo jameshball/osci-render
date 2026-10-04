@@ -26,6 +26,8 @@
             resource="0" file="tests/MotionCameraRigTest.cpp"/>
       <FILE id="MotionScopeBeamT" name="MotionScopeBeamTest.cpp" compile="1"
             resource="0" file="tests/MotionScopeBeamTest.cpp"/>
+      <FILE id="MotionPerfBench" name="MotionPerformanceBenchmark.cpp" compile="1"
+            resource="0" file="tests/MotionPerformanceBenchmark.cpp"/>
       <FILE id="MotionTempoMapT" name="MotionTempoMapTest.cpp" compile="1"
             resource="0" file="tests/MotionTempoMapTest.cpp"/>
       <FILE id="MotionTempoTool" name="MotionTempoToolsTest.cpp" compile="1"
