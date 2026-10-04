@@ -72,10 +72,17 @@ try:
     group = header_id("Group 1")
     source = header_bounds(track)
     timeline = find(snapshot(), lambda node: node.get("class") == "MotionTimelineView")["bounds"]
-    step("reject track drop on ruler", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
+    # Dragging a track past the top of the list lifts it out of its group,
+    # above everything; undo puts it back.
+    step("drag track above its group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
          timeline["x"] + 20, timeline["y"] + 8, "--steps", 20)
+    wait_undo("Reorder track")
+    moved = header_bounds(track)
+    if moved["y"] >= header_bounds(group)["y"] or moved["x"] >= source["x"]:
+        raise RuntimeError("Dragging to the top did not lift the track out of its group")
+    step("undo lift out of group", "click", "--name", "Undo", "--exact")
     if header_bounds(track) != source:
-        raise RuntimeError("Ruler drop changed track order or parent")
+        raise RuntimeError("Undo did not put the track back in its group")
     position = find(snapshot(), lambda node: node.get("componentName") == "position.x")
     step("translate group", "set-value", position["ref"], "0.35")
     wait_undo("Change property")
@@ -91,8 +98,11 @@ try:
     wait_undo("Create group")
     nested = header_id("Group 2")
     source, target = header_bounds(track), header_bounds(nested)
+    # Rows below a dragged track close up by its row, so a group below it is
+    # met one row higher.
+    target_y = target["y"] + target["h"] // 2 - (source["h"] + 4 - 6 if target["y"] > source["y"] else 0)
     step("drag track into nested group", "drag-xy", source["x"] + source["w"] // 2, source["y"] + source["h"] // 2,
-         target["x"] + target["w"] // 2, target["y"] + target["h"] // 2, "--steps", 20)
+         target["x"] + target["w"] // 2, target_y, "--steps", 20)
     wait_undo("Reorder track")
     if header_bounds(track)["x"] <= source["x"]:
         raise RuntimeError("Track did not become a nested child")
