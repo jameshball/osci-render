@@ -43,8 +43,8 @@ public:
         if (scale > 0) { zoomAround(event.x, scale); repaint(); }
     }
     void zoomAround(int x, double factor);
-    double pitchScroll = 0;
 private:
+    double pitchScroll = 0;
     void timerCallback() override;
     bool canAudition() const;
     const motion::Clip* currentClip() const;

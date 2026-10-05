@@ -16,7 +16,13 @@ class MotionCompositionView : public juce::Component, public juce::DragAndDropTa
 public:
     explicit MotionCompositionView(MotionProcessor& processor);
     ~MotionCompositionView() override;
-    motion::Id selected = 0;
+    // The selection the editor shows everywhere: highlighted here, with its gizmo.
+    void setSelection(motion::Id id) {
+        if (selected != id) {
+            selected = id;
+            repaint();
+        }
+    }
     std::function<void(bool)> onNavigationChanged;
     std::function<void()> onContextMenu;
     std::function<void(motion::Id, const std::string&)> onPropertyEdited;
@@ -107,6 +113,7 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
 
 private:
+    motion::Id selected = 0;
     // Why the scene is empty at the playhead, and where the next visual starts.
     juce::String emptyMessage() const;
     double editingTime() const;

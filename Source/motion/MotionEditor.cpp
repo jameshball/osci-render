@@ -1227,7 +1227,7 @@ void MotionEditor::select(motion::Id id) {
     const auto camera = selectionIsCamera();
     timeline.setSelection(id);
     timeline.revealSelection();
-    composition.selected = id;
+    composition.setSelection(id);
     // A free camera can be driven from the Scene until its button is released
     // or another camera is chosen.
     if (camera && composition.drivenCamera() != 0 && composition.drivenCamera() != id) { composition.setDrivenCamera(0); }
