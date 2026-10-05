@@ -49,6 +49,16 @@ public:
 
 
 private:
+    // Construction, by area of the workspace.
+    void setUpMenus();
+    void setUpCompositionNavigation();
+    void setUpScene();
+    void setUpScope();
+    void setUpTransport();
+    void setUpLibrary();
+    void setUpProperties();
+    void setUpTimeline();
+    void setUpGraph();
     bool openSourceFile(const juce::File& file) override;
 #if OSCI_PREMIUM
     juce::String offlineRenderTitle() const override { return "Export video"; }

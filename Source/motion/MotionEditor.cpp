@@ -5,6 +5,18 @@
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
+namespace {
+// Panel tabs at their natural width, in the panel title style.
+void styleTabs(osci::TabBar& tabs) {
+    tabs.setTabSpacing(1, 8);
+    tabs.setFont(motion::style::title());
+    tabs.setColour(osci::TabBar::backgroundColourId, motion::style::background());
+    tabs.setColour(osci::TabBar::textColourId, motion::style::muted());
+    tabs.setColour(osci::TabBar::selectedTextColourId, motion::style::text());
+    tabs.setColour(osci::TabBar::indicatorColourId, motion::style::accent());
+}
+}
+
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectStack(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
@@ -22,6 +34,67 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     visualiserControls = &visualiser.detachControls(*this);
     visualiser.onControlsChanged = [this] { resized(); };
     visualiser.setControlStyle(motion::style::text().withAlpha(.78f), 5);
+    // Children in paint order: each draws over those added before it.
+    for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
+        addAndMakeVisible(header);
+    }
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
+        addAndMakeVisible(component);
+    }
+    addChildComponent(scopeBack);
+    addChildComponent(scopeLabel);
+    addChildComponent(scopeShared);
+    for (const auto& [label, text] : std::initializer_list<std::pair<juce::Label*, const char*>> {{&compositionTitle, "Scene"}, {&outputTitle, "Scope"}}) {
+        addAndMakeVisible(label);
+        label->setText(text, juce::dontSendNotification);
+        label->setFont(motion::style::title());
+        label->setBorderSize(juce::BorderSize<int>(0));
+    }
+    // Tools live inside the Scene, Blender style; the header keeps its title
+    // and the view presets.
+    addAndMakeVisible(sceneTools);
+    addAndMakeVisible(sceneView);
+    addChildComponent(exportBar);
+    addAndMakeVisible(libraryTabs);
+    addChildComponent(graphSideViewport);
+    addChildComponent(modulatorLibrary);
+    addAndMakeVisible(tempoValue);
+    addAndMakeVisible(tempoLabel);
+    // The Scope's controls float over its top right, like the Scene's tools.
+    addAndMakeVisible(scopeTools);
+    addAndMakeVisible(monitorOutput);
+    addAndMakeVisible(outputLabel);
+    addAndMakeVisible(loopButton);
+    addAndMakeVisible(tapButton);
+    addChildComponent(effectLibrary);
+    addChildComponent(cancelExport);
+    addAndMakeVisible(inspectorTitle);
+    addChildComponent(curveList);
+    setUpMenus();
+    setUpCompositionNavigation();
+    setUpScene();
+    setUpScope();
+    setUpTransport();
+    setUpLibrary();
+    setUpProperties();
+    setUpTimeline();
+    setUpGraph();
+    processor.document.addChangeListener(this);
+    auto* holder = juce::StandalonePluginHolder::getInstance();
+    if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
+    sliderBakes.onStatus = [this](const juce::String& text, bool error) { statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice); };
+    sliderBakes.update();
+    composition.refresh();
+    timeline.refreshTracks();
+    refreshInspector();
+    startTimerHz(30);
+    setResizeLimits(1100, 700, 4096, 2160);
+    loadLayout();
+    juce::Desktop::getInstance().addFocusChangeListener(this);
+    resized();
+}
+
+void MotionEditor::setUpMenus() {
     // File is built when opened (it lists recent projects); the rest are
     // command lists.
     menus.addTopLevelMenu("File");
@@ -58,15 +131,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     registerCommands();
     initialiseMenuBar(menus);
     menuBar.setLookAndFeel(&motionLookAndFeel);
-    for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
-        addAndMakeVisible(header);
-    }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
-        addAndMakeVisible(component);
-    }
-    addChildComponent(scopeBack);
-    addChildComponent(scopeLabel);
-    addChildComponent(scopeShared);
+}
+
+void MotionEditor::setUpCompositionNavigation() {
     scopeShared.setText("Shared composition", juce::dontSendNotification);
     scopeShared.setFont(motion::style::body());
     scopeShared.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(0.55f));
@@ -82,16 +149,9 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         if (processor.document.editingComposition() == 0 || processor.document.generation() != scopeNameGeneration || name.isEmpty() || name.length() > 200) { return; }
         processor.document.edit("Rename composition", [name](motion::Project& project) { project.name = name; });
     };
-    for (const auto& [label, text] : std::initializer_list<std::pair<juce::Label*, const char*>> {{&compositionTitle, "Scene"}, {&outputTitle, "Scope"}}) {
-        addAndMakeVisible(label);
-        label->setText(text, juce::dontSendNotification);
-        label->setFont(motion::style::title());
-        label->setBorderSize(juce::BorderSize<int>(0));
-    }
-    outputHeader.setName("Scope");
-    // Tools live inside the Scene, Blender style; the header keeps its title
-    // and the view presets.
-    addAndMakeVisible(sceneTools);
+}
+
+void MotionEditor::setUpScene() {
     sceneTools.move.setToggleState(true, juce::dontSendNotification);
     sceneTools.move.onClick = [this] { composition.setTool(MotionTransformTool::move); };
     sceneTools.rotate.onClick = [this] { composition.setTool(MotionTransformTool::rotate); };
@@ -121,7 +181,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         refreshCameraTools();
         resized();
     };
-    addAndMakeVisible(sceneView);
     sceneView.setButtonText("Views");
     sceneView.setName("Scene view");
     sceneView.setTooltip("Look along an axis (numpad 1, 3, 7), frame the selection (F) or reset the view (0)");
@@ -130,25 +189,26 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     composition.onContextMenu = [this] { showSceneViewMenu(true); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
     composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
-    addChildComponent(exportBar);
-    addAndMakeVisible(libraryTabs);
-    graphSide.addAndMakeVisible(routingPanel);
-    graphSideViewport.setViewedComponent(&graphSide, false);
-    graphSideViewport.setScrollBarsShown(true, false);
-    graphSideViewport.setScrollBarThickness(6);
-    addChildComponent(graphSideViewport);
-    routingPanel.onLayoutChanged = [this] { layoutGraphSide(); };
-    addChildComponent(modulatorLibrary);
-    routingPanel.onError = [this](const juce::String& text) { statusBar.show(text); };
-    modulatorLibrary.onError = [this](const juce::String& text) { statusBar.show(text); };
-    routingPanel.onShowModulator = [this](motion::Id id) {
-        modulatorLibrary.select(id);
-        libraryTabs.setSelectedIndex(2);
+    composition.onOpenSource = [this](motion::Id id) {
+        const auto& project = processor.document.project();
+        const auto* clip = motion::findClip(project, id);
+        if (clip == nullptr) { return; }
+        if (clip->composition != 0) { enterComposition(clip->id); return; }
+        const auto asset = motion::findAsset(project.assets, clip->asset);
+        if (asset == nullptr) { return; }
+        if (asset->extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset->data.getData()), static_cast<int>(asset->data.getSize())))) {
+            showDrawingEditor(asset->id);
+        } else if (asset->extension.equalsIgnoreCase(".txt") || asset->extension.equalsIgnoreCase(".lua")) {
+            assetLibrary.onBake(asset->id);
+        }
     };
-    addAndMakeVisible(tempoValue);
-    addAndMakeVisible(tempoLabel);
-    // The Scope's controls float over its top right, like the Scene's tools.
-    addAndMakeVisible(scopeTools);
+    composition.onEffectPreview = [this](const std::string& type, std::optional<motion::Id> owner) { previewEffect(type, owner); };
+    composition.onEffectDropped = [this](const std::string& type, motion::Id owner) { addEffectTo(type, owner); };
+    composition.onSelection = [this](motion::Id id) { select(id); };
+}
+
+void MotionEditor::setUpScope() {
+    outputHeader.setName("Scope");
     visualiser.setControlButtonsHidden(true);
     using Control = VisualiserComponent::Control;
     scopeTools.record.onClick = [this] { visualiser.clickControl(Control::record, &scopeTools.record); };
@@ -175,12 +235,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         };
         showPopover(std::move(panel), getLocalArea(&scopeTools, scopeTools.canvas.getBounds()));
     };
-    addAndMakeVisible(monitorOutput);
+}
+
+void MotionEditor::setUpTransport() {
     outputLabel.setText("Output", juce::dontSendNotification);
     outputLabel.setFont(motion::style::caption());
     outputLabel.setColour(juce::Label::textColourId, motion::style::muted());
     outputLabel.setJustificationType(juce::Justification::centredRight);
-    addAndMakeVisible(outputLabel);
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
     monitorOutput.setColour(juce::ComboBox::arrowColourId, osci::Colours::textMuted());
@@ -194,7 +255,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto mode = static_cast<MotionProcessor::OutputMode>(monitorOutput.getSelectedId() - 1);
         if (mode == MotionProcessor::OutputMode::xyrgb) {
             auto* holder = juce::StandalonePluginHolder::getInstance();
-            const auto result = holder != nullptr ? holder->configureOutputChannels(5) : juce::Result::fail("Five-channel output requires the standalone audio device.");
+            const auto result = holder != nullptr ? holder->configureOutputOnlyChannels(5) : juce::Result::fail("Five-channel output requires the standalone audio device.");
             if (result.failed()) {
                 statusBar.show(result.getErrorMessage());
                 monitorOutput.setSelectedId(static_cast<int>(processor.getOutputMode()) + 1, juce::dontSendNotification);
@@ -206,7 +267,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     playButton.setTooltip("Play / pause (Space)");
     startButton.setTooltip("Go to start (Home)");
     endButton.setTooltip("Go to end (End)");
-    addAndMakeVisible(loopButton);
     loopButton.setTitle("Loop playback");
     loopButton.setTooltip("Loop playback (L). I and O set the loop at the playhead; drag the brace in the ruler.");
     loopButton.onClick = [this] { toggleLoop(); };
@@ -251,7 +311,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     tapButton.setWantsKeyboardFocus(false);
     tapButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     tapButton.onClick = [this] { tap(); };
-    addAndMakeVisible(tapButton);
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
     tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
@@ -272,18 +331,16 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             }
         }
     };
-    addChildComponent(effectLibrary);
+    exportBar.setName("Signal export progress");
+    cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
+    playButton.onClick = [this] { processor.playing.store(!processor.playing.load()); };
+}
+
+void MotionEditor::setUpLibrary() {
+    modulatorLibrary.onError = [this](const juce::String& text) { statusBar.show(text); };
     libraryHeader.setVisible(false);
     libraryTabs.setName("Library tabs");
-    // Panel tabs at their natural width, in the panel title style.
-    for (auto* tabs : {&libraryTabs, &timelineTabs}) {
-        tabs->setTabSpacing(1, 8);
-        tabs->setFont(motion::style::title());
-        tabs->setColour(osci::TabBar::backgroundColourId, motion::style::background());
-        tabs->setColour(osci::TabBar::textColourId, motion::style::muted());
-        tabs->setColour(osci::TabBar::selectedTextColourId, motion::style::text());
-        tabs->setColour(osci::TabBar::indicatorColourId, motion::style::accent());
-    }
+    styleTabs(libraryTabs);
     libraryTabs.addTab("Assets");
     libraryTabs.addTab("Effects");
     libraryTabs.addTab("Modulators");
@@ -297,109 +354,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     };
     // Double-clicking an effect adds it to what Properties shows.
     effectLibrary.onInsert = [this](const std::string& type) { effectStack.addEffect(type); };
-    effectStack.onPropertySelected = [this](motion::Id id, std::string property) { selectCurveTarget(id, property, false, true); };
-    effectStack.onShowOwner = [this](motion::Id id) { select(id); };
-    propertyInspector.onRouteModulator = [this](motion::Id modulator, motion::Id target, std::vector<std::string> properties) {
-        const auto result = processor.document.routeModulator(modulator, target, properties);
-        if (result.failed()) { statusBar.show(result.getErrorMessage()); return; }
-        modulatorLibrary.refresh();
-        if (!properties.empty()) { selectCurveTarget(target, properties.front(), selectionIsCamera(), true); }
-    };
-    effectStack.onHeightChanged = [this] { propertyInspector.relayout(); };
-    effectStack.onReveal = [this](juce::Component& card) { propertyInspector.reveal(card); };
-    timeline.onEffectAdded = [this](motion::Id owner, motion::Id) { select(owner); };
-    addChildComponent(cancelExport);
-    exportBar.setName("Signal export progress");
-    cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
-    // A clip's timing leads its Properties, as layer timing does in other editors.
-    inspectorLead.add(compositionSettings, [this] { return compositionSettings.preferredHeight(); });
-    inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
-    compositionSettings.onTiming = [this](int command) { applyTiming(command); };
-    compositionSettings.onError = [this](const juce::String& message) { statusBar.show(message); };
-    compositionSettings.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
-    inspectorLead.add(textAnimation, [this] { return textAnimation.preferredHeight(); });
-    propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
-    clipTimingPanel.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
-    textAnimation.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
-    // A change to the characters prepares the text source again in place.
-    textAnimation.onApply = [this](motion::Id id, motion::TextSettings settings) {
-        const auto& assets = processor.document.project().assets;
-        const auto found = motion::findAsset(assets, id);
-        if (found == nullptr) { return; }
-        // One preparation at a time: a later change waits for the current one.
-        if (!pendingImports.empty()) {
-            queuedTextAnimation = QueuedTextAnimation {id, settings, processor.document.generation()};
-            return;
-        }
-        // Only the animation is this section's; the text and its type stay
-        // as the source has them now.
-        auto merged = found->textSettings;
-        merged.animation = settings.animation;
-        merged.characterDelay = settings.characterDelay;
-        merged.characterDuration = settings.characterDuration;
-        merged.hold = settings.hold;
-        merged.amount = settings.amount;
-        SourceRequest request {{}, processor.position.load(), processor.document.generation(), found};
-        request.textSettings = merged;
-        beginSourceImport(request);
-    };
-    // The owner's effects follow its properties.
-    propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); });
-    addAndMakeVisible(inspectorTitle);
-    inspectorTitle.setText("Properties", juce::dontSendNotification);
-    inspectorTitle.setFont(motion::style::title());
-    inspectorTitle.setBorderSize(juce::BorderSize<int>(0));
-    timelineTabs.setName("Timeline tabs");
-    timelineTabs.addTab("Timeline");
-    timelineTabs.addTab("Graph");
-    timelineTabs.addTab("Notes");
-    timelineTabs.onSelectionChanged = [this](int index) {
-        // All three share the panel height the user chose: switching never
-        // moves the Scene or Scope.
-        timeline.setVisible(index == 0);
-        curveEditor.setVisible(index == 1);
-        notesEditor.setVisible(index == 2);
-        graphSideViewport.setVisible(index == 1 && curveTarget != 0);
-        curveList.setVisible(index == 1 && curveTarget != 0);
-        if (index == 1) { refreshCurveList(); }
-        resized();
-        if (index == 2) { notesEditor.fitContents(); }
-    };
-    curveEditor.setVisible(false);
-    notesEditor.setVisible(false);
-    addChildComponent(curveList);
-    for (const auto& spec : motion::objectPropertySpecs) { curveProperties.emplace_back(spec.id); }
-    curveList.onChoose = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
-    curveList.onShow = [this](const std::string& property, bool show) {
-        // Siblings of the edited channel are shown by default, so their eye hides them.
-        if (show) { shownCurves.insert(property); hiddenCurves.erase(property); } else { shownCurves.erase(property); hiddenCurves.insert(property); }
-        refreshCurveList();
-        curveEditor.repaint();
-    };
-    curveEditor.onPropertyChosen = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
-    curveEditor.onPreview = [this](const motion::PropertyMap* curves) {
-        auto preview = processor.document.project();
-        if (curves != nullptr) {
-            for (const auto& [name, curve] : *curves) {
-                auto* target = motion::findPropertyCurve(preview, curveTarget, name);
-                if (target != nullptr) { *target = curve; }
-            }
-        }
-        processor.previewComposition(preview);
-        composition.preview(preview);
-    };
-    timelineDivider.onStart = [this] { dividerStart = timelineFraction; };
-    timelineDivider.onDrag = [this](int delta) {
-        timelineFraction = std::clamp(dividerStart - static_cast<double>(delta) / workspaceHeight, 0.25, 0.65);
-        resized();
-    };
-    timelineDivider.onReset = [this] { timelineFraction = 0.34; resized(); };
-    previewDivider.onStart = [this] { dividerStart = previewFraction; };
-    previewDivider.onDrag = [this](int delta) {
-        previewFraction = std::clamp(dividerStart + static_cast<double>(delta) / previewWidth, 0.25, 0.75);
-        resized();
-    };
-    previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     importButton.onClick = [this] {
         juce::PopupMenu menu;
         menu.addItem(3, "Draw a shape...");
@@ -429,7 +383,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };
-    playButton.onClick = [this] { processor.playing.store(!processor.playing.load()); };
     assetLibrary.onReplace = [this](motion::Id id) { replaceSourceFile(id); };
     assetLibrary.onEditDrawing = [this](motion::Id id) { showDrawingEditor(id); };
     assetLibrary.onRemoveComposition = [this](motion::Id id) {
@@ -473,23 +426,112 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), found});
         showNextPreparationSettings();
     };
-    composition.onOpenSource = [this](motion::Id id) {
-        const auto& project = processor.document.project();
-        const auto* clip = motion::findClip(project, id);
-        if (clip == nullptr) { return; }
-        if (clip->composition != 0) { enterComposition(clip->id); return; }
-        const auto asset = motion::findAsset(project.assets, clip->asset);
-        if (asset == nullptr) { return; }
-        if (asset->extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset->data.getData()), static_cast<int>(asset->data.getSize())))) {
-            showDrawingEditor(asset->id);
-        } else if (asset->extension.equalsIgnoreCase(".txt") || asset->extension.equalsIgnoreCase(".lua")) {
-            assetLibrary.onBake(asset->id);
-        }
-    };
-    timeline.onOpenSource = [this](motion::Id id) { composition.onOpenSource(id); };
     assetLibrary.onCancelImport = [this] {
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
     };
+}
+
+void MotionEditor::setUpProperties() {
+    effectStack.onPropertySelected = [this](motion::Id id, std::string property) { selectCurveTarget(id, property, false, true); };
+    effectStack.onShowOwner = [this](motion::Id id) { select(id); };
+    propertyInspector.onRouteModulator = [this](motion::Id modulator, motion::Id target, std::vector<std::string> properties) {
+        const auto result = processor.document.routeModulator(modulator, target, properties);
+        if (result.failed()) { statusBar.show(result.getErrorMessage()); return; }
+        modulatorLibrary.refresh();
+        if (!properties.empty()) { selectCurveTarget(target, properties.front(), selectionIsCamera(), true); }
+    };
+    effectStack.onHeightChanged = [this] { propertyInspector.relayout(); };
+    effectStack.onReveal = [this](juce::Component& card) { propertyInspector.reveal(card); };
+    // A clip's timing leads its Properties, as layer timing does in other editors.
+    inspectorLead.add(compositionSettings, [this] { return compositionSettings.preferredHeight(); });
+    inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
+    compositionSettings.onTiming = [this](int command) { applyTiming(command); };
+    compositionSettings.onError = [this](const juce::String& message) { statusBar.show(message); };
+    compositionSettings.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    inspectorLead.add(textAnimation, [this] { return textAnimation.preferredHeight(); });
+    propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
+    clipTimingPanel.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    textAnimation.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    // A change to the characters prepares the text source again in place.
+    textAnimation.onApply = [this](motion::Id id, motion::TextSettings settings) {
+        const auto& assets = processor.document.project().assets;
+        const auto found = motion::findAsset(assets, id);
+        if (found == nullptr) { return; }
+        // One preparation at a time: a later change waits for the current one.
+        if (!pendingImports.empty()) {
+            queuedTextAnimation = QueuedTextAnimation {id, settings, processor.document.generation()};
+            return;
+        }
+        // Only the animation is this section's; the text and its type stay
+        // as the source has them now.
+        auto merged = found->textSettings;
+        merged.animation = settings.animation;
+        merged.characterDelay = settings.characterDelay;
+        merged.characterDuration = settings.characterDuration;
+        merged.hold = settings.hold;
+        merged.amount = settings.amount;
+        SourceRequest request {{}, processor.position.load(), processor.document.generation(), found};
+        request.textSettings = merged;
+        beginSourceImport(request);
+    };
+    // The owner's effects follow its properties.
+    propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); });
+    inspectorTitle.setText("Properties", juce::dontSendNotification);
+    inspectorTitle.setFont(motion::style::title());
+    inspectorTitle.setBorderSize(juce::BorderSize<int>(0));
+    propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, selectionIsCamera(), true); };
+    propertyInspector.onModulate = [this](motion::Id id, const std::string& property) {
+        selectCurveTarget(id, property, selectionIsCamera(), true);
+        timelineTabs.setSelectedIndex(1);
+    };
+    propertyInspector.onRename = [this](motion::Id id, const juce::String& text) {
+        processor.document.tryEdit("Rename camera", [id, name = text.toStdString()](motion::Project& project) {
+            for (auto& camera : project.cameras) {
+                if (camera.id == id && camera.name != name) { camera.name = name; return true; }
+            }
+            return false;
+        });
+    };
+    propertyInspector.selectedKeyTime = [this](motion::Id id) { return composition.selectedKeyContentTime(id); };
+    propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
+    propertyInspector.onShowPopover = [this](std::unique_ptr<juce::Component> content, juce::Component& anchor) { showPopover(std::move(content), getLocalArea(&anchor, anchor.getLocalBounds())); };
+}
+
+void MotionEditor::setUpTimeline() {
+    timelineDivider.setName("Resize timeline");
+    previewDivider.setName("Resize preview panels");
+    styleTabs(timelineTabs);
+    timeline.onEffectAdded = [this](motion::Id owner, motion::Id) { select(owner); };
+    timelineTabs.setName("Timeline tabs");
+    timelineTabs.addTab("Timeline");
+    timelineTabs.addTab("Graph");
+    timelineTabs.addTab("Notes");
+    timelineTabs.onSelectionChanged = [this](int index) {
+        // All three share the panel height the user chose: switching never
+        // moves the Scene or Scope.
+        timeline.setVisible(index == 0);
+        curveEditor.setVisible(index == 1);
+        notesEditor.setVisible(index == 2);
+        graphSideViewport.setVisible(index == 1 && curveTarget != 0);
+        curveList.setVisible(index == 1 && curveTarget != 0);
+        if (index == 1) { refreshCurveList(); }
+        resized();
+        if (index == 2) { notesEditor.fitContents(); }
+    };
+    notesEditor.setVisible(false);
+    timelineDivider.onStart = [this] { dividerStart = timelineFraction; };
+    timelineDivider.onDrag = [this](int delta) {
+        timelineFraction = std::clamp(dividerStart - static_cast<double>(delta) / workspaceHeight, 0.25, 0.65);
+        resized();
+    };
+    timelineDivider.onReset = [this] { timelineFraction = 0.34; resized(); };
+    previewDivider.onStart = [this] { dividerStart = previewFraction; };
+    previewDivider.onDrag = [this](int delta) {
+        previewFraction = std::clamp(dividerStart + static_cast<double>(delta) / previewWidth, 0.25, 0.75);
+        resized();
+    };
+    previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
+    timeline.onOpenSource = [this](motion::Id id) { composition.onOpenSource(id); };
     notesEditor.onEditInstrument = [this](motion::Id id) {
         const auto* clip = motion::findClip(processor.document.project(), id);
         if (clip == nullptr) { return; }
@@ -562,42 +604,44 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         assetLibrary.selectAsset(asset);
     };
     timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
-    composition.onEffectPreview = [this](const std::string& type, std::optional<motion::Id> owner) { previewEffect(type, owner); };
-    composition.onEffectDropped = [this](const std::string& type, motion::Id owner) { addEffectTo(type, owner); };
     timeline.onPreview = [this](const motion::Project* project) {
         processor.previewComposition(project != nullptr ? *project : processor.document.project());
         if (project != nullptr) { composition.preview(*project); } else { composition.refresh(); }
     };
-    composition.onSelection = timeline.onSelection;
-    propertyInspector.onPropertySelected = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, selectionIsCamera(), true); };
-    propertyInspector.onModulate = [this](motion::Id id, const std::string& property) {
-        selectCurveTarget(id, property, selectionIsCamera(), true);
-        timelineTabs.setSelectedIndex(1);
+}
+
+void MotionEditor::setUpGraph() {
+    graphSide.addAndMakeVisible(routingPanel);
+    graphSideViewport.setViewedComponent(&graphSide, false);
+    graphSideViewport.setScrollBarsShown(true, false);
+    graphSideViewport.setScrollBarThickness(6);
+    routingPanel.onLayoutChanged = [this] { layoutGraphSide(); };
+    routingPanel.onError = [this](const juce::String& text) { statusBar.show(text); };
+    routingPanel.onShowModulator = [this](motion::Id id) {
+        modulatorLibrary.select(id);
+        libraryTabs.setSelectedIndex(2);
     };
-    propertyInspector.onRename = [this](motion::Id id, const juce::String& text) {
-        processor.document.tryEdit("Rename camera", [id, name = text.toStdString()](motion::Project& project) {
-            for (auto& camera : project.cameras) {
-                if (camera.id == id && camera.name != name) { camera.name = name; return true; }
+    curveEditor.setVisible(false);
+    for (const auto& spec : motion::objectPropertySpecs) { curveProperties.emplace_back(spec.id); }
+    curveList.onChoose = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
+    curveList.onShow = [this](const std::string& property, bool show) {
+        // Siblings of the edited channel are shown by default, so their eye hides them.
+        if (show) { shownCurves.insert(property); hiddenCurves.erase(property); } else { shownCurves.erase(property); hiddenCurves.insert(property); }
+        refreshCurveList();
+        curveEditor.repaint();
+    };
+    curveEditor.onPropertyChosen = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
+    curveEditor.onPreview = [this](const motion::PropertyMap* curves) {
+        auto preview = processor.document.project();
+        if (curves != nullptr) {
+            for (const auto& [name, curve] : *curves) {
+                auto* target = motion::findPropertyCurve(preview, curveTarget, name);
+                if (target != nullptr) { *target = curve; }
             }
-            return false;
-        });
+        }
+        processor.previewComposition(preview);
+        composition.preview(preview);
     };
-    propertyInspector.selectedKeyTime = [this](motion::Id id) { return composition.selectedKeyContentTime(id); };
-    propertyInspector.onKeyTimeEdited = [this] { composition.retainSelectedKeyAfterEdit(); };
-    propertyInspector.onShowPopover = [this](std::unique_ptr<juce::Component> content, juce::Component& anchor) { showPopover(std::move(content), getLocalArea(&anchor, anchor.getLocalBounds())); };
-    processor.document.addChangeListener(this);
-    auto* holder = juce::StandalonePluginHolder::getInstance();
-    if (holder != nullptr) { holder->deviceManager.addChangeListener(this); }
-    sliderBakes.onStatus = [this](const juce::String& text, bool error) { statusBar.show(text, error ? MotionStatusBar::Kind::error : MotionStatusBar::Kind::notice); };
-    sliderBakes.update();
-    composition.refresh();
-    timeline.refreshTracks();
-    refreshInspector();
-    startTimerHz(30);
-    setResizeLimits(1100, 700, 4096, 2160);
-    loadLayout();
-    juce::Desktop::getInstance().addFocusChangeListener(this);
-    resized();
 }
 
 // The workspace layout is a per-user preference, not part of a project.
