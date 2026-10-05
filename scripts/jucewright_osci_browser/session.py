@@ -395,17 +395,19 @@ class BrowserSession:
 
     @staticmethod
     def reset_profile_layout(profile: dict, launch_home: Path) -> None:
-        """Start from the default workspace layout, whatever the user last arranged."""
+        """Start from the default workspace layout (any product's `<product>.layout.*`
+        settings), whatever the user last arranged."""
         support = Path(profile.get("supportDirectory", ""))
         if not support.is_dir() or not support.resolve().is_relative_to(launch_home.resolve()):
             return
         for settings in support.glob("*_globals.settings"):
             tree = ET.parse(settings)
             root = tree.getroot()
-            for entry in list(root):
-                if entry.get("name", "").startswith("motion.layout."):
-                    root.remove(entry)
-            tree.write(settings)
+            layout = [entry for entry in root if ".layout." in entry.get("name", "")]
+            for entry in layout:
+                root.remove(entry)
+            if layout:
+                tree.write(settings, xml_declaration=True, encoding="UTF-8")
 
     @staticmethod
     def disable_profile_audio_input(settings_file: Path, audio_output_override: str | None = None) -> str | None:

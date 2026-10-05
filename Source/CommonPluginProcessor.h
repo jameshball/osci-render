@@ -34,7 +34,8 @@ public:
 
     void addAllParameters();
     // Parameters left out of undo/redo; a product may leave out more (view
-    // toggles that are not edits). Called while parameters are bound.
+    // toggles that are not edits). Called by addAllParameters, which each
+    // derived constructor calls, never the base constructor.
     virtual bool isUndoExcluded(const juce::String& paramID) const { return paramID == "visualiserFullScreen"; }
 
     juce::UndoManager& getUndoManager() { return undoManager; }
@@ -53,8 +54,10 @@ public:
 
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
     virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
-    // Called on audio callback gates; products may acknowledge transient work.
-    virtual void processBlockSkipped(bool) {}
+    // Called instead of processBlockInternal when a block is not processed:
+    // `unavailable` is true while suspended or awaiting the legal notice (the
+    // buffer is cleared) and false for an empty block.
+    virtual void processBlockSkipped(bool unavailable) {}
     virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
     virtual bool supportsInternalSampleRateOverride() const { return false; }
 

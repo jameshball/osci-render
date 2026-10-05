@@ -12,9 +12,6 @@ public:
     virtual ~ImportServices() = default;
 
     virtual double getSampleRate() const = 0;
-    virtual float getImageThreshold(int blockSampleIndex) const = 0;
-    virtual int getImageStride(int blockSampleIndex) const = 0;
-    virtual bool getImageInverted() const = 0;
     virtual int getFractalDepth() const = 0;
 
     struct ImageSampleSettings {
@@ -26,9 +23,7 @@ public:
 
     // Everything an image source reads per sample, fetched in one call so
     // implementations can take any owner lock once per sample.
-    virtual ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const {
-        return { getSampleRate(), getImageThreshold(blockSampleIndex), getImageStride(blockSampleIndex), getImageInverted() };
-    }
+    virtual ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const = 0;
 
     virtual juce::File getFFmpegFile() const = 0;
     virtual void ensureFFmpegExists(std::function<void()> ready) = 0;

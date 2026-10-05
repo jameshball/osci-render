@@ -29,21 +29,6 @@ public:
         return processor != nullptr ? processor->currentSampleRate.load() : 44100.0;
     }
 
-    float getImageThreshold(int blockSampleIndex) const override {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        return processor != nullptr ? processor->imageThreshold->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) : 0.0f;
-    }
-
-    int getImageStride(int blockSampleIndex) const override {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        return processor != nullptr ? processor->imageStride->getAnimatedValue(0, static_cast<size_t>(blockSampleIndex)) : 1;
-    }
-
-    bool getImageInverted() const override {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        return processor != nullptr && processor->invertImage->getValue();
-    }
-
     ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const override {
         juce::SpinLock::ScopedLockType scope(ownerLock);
         if (processor == nullptr) {

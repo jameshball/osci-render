@@ -75,15 +75,14 @@ public:
     // The host adds the bar as its own child. While full screen, the bar comes
     // back under the picture so the controls stay on screen.
     juce::Component& detachControls(juce::Component& host);
-    // Restyles the control icons for a host with its own visual language
-    // (osci-motion). osci-render and sosci keep the defaults.
+    // Restyles the control icons for a host with its own visual language.
+    // Without a call the default style stays.
     void setControlStyle(juce::Colour iconColour, int edgeIndent);
     int controlsPreferredWidth();
-    // For a host that draws its own control buttons (osci-motion): while the
-    // bar is detached its buttons hide (the recording stopwatch, ffmpeg
-    // download and media timeline stay) and the host's buttons act through
-    // clickControl. Full screen brings the built-in buttons back.
-    // osci-render and sosci keep the built-in buttons.
+    // For a host that draws its own control buttons: while the bar is
+    // detached its buttons hide (the recording stopwatch, ffmpeg download and
+    // media timeline stay) and the host's buttons act through clickControl.
+    // Full screen brings the built-in buttons back.
     enum class Control { record, textureOutput, settings, popout, fullScreen };
     void setControlButtonsHidden(bool hidden);
     void clickControl(Control control, juce::Component* anchor);

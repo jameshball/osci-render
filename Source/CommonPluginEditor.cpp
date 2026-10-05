@@ -132,8 +132,8 @@ CommonPluginEditor::CommonPluginEditor(CommonAudioProcessor& p, juce::String app
     juce::MessageManager::callAsync([legalOwner, legalConfig] {
         if (legalOwner == nullptr) { return; }
         if (!osci::currentProduct().hostedServicesAvailable) {
-            // Motion is a new, unreleased product with no hosted legal/update
-            // registration. Do not query another product or record acceptance.
+            // A product without hosted legal and update services has nothing
+            // to accept; never query another product's documents.
             legalOwner->audioProcessor.legalNoticePending.store(false);
             return;
         }
@@ -600,7 +600,7 @@ void CommonPluginEditor::renderAudioFileToVideo() {
 
                 auto outputFile = outputChooser.getResult();
                 if (outputFile == juce::File()) {
-                    offlineRenderLog.event("output selection ended", "no file returned (cancelled or native dialog failed)");
+                    offlineRenderLog.cancelled("output selection");
                     return;
                 }
 
@@ -643,7 +643,7 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
     }
     const auto safeThis = juce::Component::SafePointer<CommonPluginEditor>(this);
     // Ensure FFmpeg exists. If it doesn't, this will prompt the user to download it.
-    if (!safeThis->audioProcessor.ensureFFmpegExists()) {
+    if (!audioProcessor.ensureFFmpegExists()) {
         offlineRenderLog.event("render deferred", "FFmpeg unavailable");
         return false;
     }
@@ -651,24 +651,24 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
     offlineRenderLog.event("FFmpeg ready");
 
     // Stop any live recording and pause the main visualiser.
-    if (safeThis->audioProcessor.haltRecording != nullptr) {
-        safeThis->audioProcessor.haltRecording();
+    if (audioProcessor.haltRecording != nullptr) {
+        audioProcessor.haltRecording();
     }
 
-    const bool wasVisualiserPaused = safeThis->visualiser.isPaused();
-    const bool wasOfflineRenderActive = safeThis->audioProcessor.isOfflineRenderActive();
+    const bool wasVisualiserPaused = visualiser.isPaused();
+    const bool wasOfflineRenderActive = audioProcessor.isOfflineRenderActive();
 
     // Make the plugin output silent and skip heavy processing during offline render.
-    safeThis->offlineRenderPreviousActiveState = wasOfflineRenderActive;
-    safeThis->audioProcessor.setOfflineRenderActive(true);
+    offlineRenderPreviousActiveState = wasOfflineRenderActive;
+    audioProcessor.setOfflineRenderActive(true);
 
     auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
     auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
 
     auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
-        safeThis->audioProcessor,
-        safeThis->audioProcessor.visualiserParameters,
-        safeThis->audioProcessor.threadManager,
+        audioProcessor,
+        audioProcessor.visualiserParameters,
+        audioProcessor.threadManager,
         inputSignal,
         muxAudio,
         outputFile,

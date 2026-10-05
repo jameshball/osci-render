@@ -9,21 +9,6 @@ public:
         return 48000.0;
     }
 
-    float getImageThreshold(int) const override {
-        ++individualCalls;
-        return 0.25f;
-    }
-
-    int getImageStride(int) const override {
-        ++individualCalls;
-        return 2;
-    }
-
-    bool getImageInverted() const override {
-        ++individualCalls;
-        return true;
-    }
-
     int getFractalDepth() const override { return 1; }
 
     ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const override {
@@ -44,22 +29,6 @@ public:
     mutable int individualCalls = 0;
     mutable int batchedCalls = 0;
     mutable int lastBlockSampleIndex = -1;
-};
-
-// Relies on the base class composing the settings from the individual getters.
-class DefaultImportServices final : public ImportServices {
-public:
-    double getSampleRate() const override { return 22050.0; }
-    float getImageThreshold(int blockSampleIndex) const override { return static_cast<float>(blockSampleIndex) * 0.1f; }
-    int getImageStride(int) const override { return 3; }
-    bool getImageInverted() const override { return true; }
-    int getFractalDepth() const override { return 1; }
-    juce::File getFFmpegFile() const override { return {}; }
-    void ensureFFmpegExists(std::function<void()>) override {}
-    void showError(juce::String, juce::String) override {}
-    void confirmLargeFile(juce::String, std::function<void()>, std::function<void()>) override {}
-    void performDeferredLoad(std::function<bool()>) override {}
-    void removeSource(FileParser*) override {}
 };
 }
 
@@ -83,16 +52,6 @@ public:
             expectEquals(services->batchedCalls, numSamples);
             expectEquals(services->individualCalls, 0);
             expectEquals(services->lastBlockSampleIndex, numSamples - 1);
-        }
-
-        beginTest("Default import settings compose the individual getters");
-        {
-            DefaultImportServices services;
-            const auto settings = services.getImageSampleSettings(5);
-            expectEquals(settings.sampleRate, 22050.0);
-            expectWithinAbsoluteError(settings.threshold, 0.5f, 1.0e-6f);
-            expectEquals(settings.stride, 3);
-            expect(settings.inverted);
         }
     }
 };

@@ -81,6 +81,7 @@ private:
     bool fullScreen = false;
     bool betaUpdatesEnabled = false;
     juce::Rectangle<int> windowedBounds;
+    bool lastOfflineRenderSuccess = false;
 public:
     PluginLookAndFeel lookAndFeel;
 
@@ -120,7 +121,6 @@ public:
 
     std::unique_ptr<juce::FileChooser> chooser;
     juce::MenuBarComponent menuBar;
-    bool lastOfflineRenderSuccess = false;
     juce::SharedResourcePointer<CustomTooltipWindow> tooltipWindow;
 
     osci::UndoRedoComponent undoRedoControls{

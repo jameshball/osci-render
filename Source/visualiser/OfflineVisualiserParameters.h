@@ -3,7 +3,7 @@
 #include <osci_render_core/osci_render_core.h>
 #include <osci_gui/visualiser/osci_VisualiserParameters.h>
 #include <algorithm>
-#include <array>
+#include <vector>
 #include <memory>
 #include <stdexcept>
 
@@ -15,23 +15,13 @@ class OfflineVisualiserParameters {
 private:
     // VisualiserParameters/Effect do not own their raw parameters: normally the
     // product AudioProcessor does. Destroy params/effects BEFORE this registry.
-    // The fixed registry avoids allocations while adopting the fresh raw fields.
-    std::array<std::unique_ptr<juce::AudioProcessorParameter>, 512> owned;
-    std::size_t ownedCount = 0;
+    std::vector<std::unique_ptr<juce::AudioProcessorParameter>> owned;
 
     void own(juce::AudioProcessorParameter* parameter) {
-        if (parameter == nullptr) {
-            return;
+        const auto known = std::any_of(owned.begin(), owned.end(), [parameter](const auto& item) { return item.get() == parameter; });
+        if (parameter != nullptr && !known) {
+            owned.emplace_back(parameter);
         }
-        for (std::size_t index = 0; index < ownedCount; ++index) {
-            if (owned[index].get() == parameter) {
-                return;
-            }
-        }
-        if (ownedCount == owned.size()) {
-            throw std::length_error("Offline visualiser parameter ownership capacity exceeded.");
-        }
-        owned[ownedCount++].reset(parameter);
     }
 
     void ownEffects(const std::vector<std::shared_ptr<osci::Effect>>& effects) {
@@ -91,7 +81,7 @@ public:
 
     // A source's external modulation belongs to its processor: rejected by
     // default, or left out for the caller to replace with its own offline
-    // modulation (osci-motion drives the beam from its document).
+    // modulation (a host that drives the beam from its own data).
     enum class ExternalModulation { reject, replace };
 
     explicit OfflineVisualiserParameters(VisualiserParameters& source, ExternalModulation external = ExternalModulation::reject) : OfflineVisualiserParameters() {

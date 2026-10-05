@@ -234,7 +234,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
     const auto fps = encodingConfiguration.frameRate;
     if (!std::isfinite(fps) || fps <= 0.0) {
         offlineRenderLog.event("render failed: invalid frame rate " + juce::String(fps, 2));
-        result.errorMessage = "Choose a finite positive frame rate in Recording Settings.";
+        result.errorMessage = "Invalid frame rate in Recording Settings.";
         return result;
     }
     const auto renderSize = encodingConfiguration.renderSize;
