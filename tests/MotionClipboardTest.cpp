@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/PropertyTarget.h"
 
 class MotionClipboardTest : public juce::UnitTest {
@@ -15,7 +16,7 @@ public:
             asset->id = document.newId(); asset->name = "triangle.obj"; asset->extension = ".obj";
             const juce::String obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
             asset->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-            motion::Document::decodeAsset(*asset);
+            motion::decodeAsset(*asset);
             auto a = motion::Document::makeClip(document.newId(), *asset, 0);
             a.duration = 2;
             a.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
@@ -212,7 +213,7 @@ public:
             square->id = original->id; square->name = "square.svg"; square->extension = ".svg";
             const juce::String svg("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><rect x='1' y='1' width='8' height='8' fill='none' stroke='black'/></svg>");
             square->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
-            expect(motion::Document::decodeAsset(*square).wasOk());
+            expect(motion::decodeAsset(*square).wasOk());
             expect(f.document.replaceAsset(original->id, square).wasOk());
             expect(f.document.project().assets[0]->name == "square.svg");
             expect(f.clip(f.first) != nullptr && f.clip(f.first)->asset == original->id, "clips keep their source identity");

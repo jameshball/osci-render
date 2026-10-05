@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 
 class MotionSpatialTest : public juce::UnitTest {
@@ -75,7 +76,7 @@ public:
             asset->id = document.newId(); asset->name = "point.obj"; asset->extension = ".obj";
             const juce::String obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
             asset->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-            motion::Document::decodeAsset(*asset);
+            motion::decodeAsset(*asset);
             auto clip = motion::Document::makeClip(document.newId(), *asset, 0);
             clip.duration = 4;
             clip.spatialPath = true;

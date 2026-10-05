@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cancellation.h"
 #include "CompositionGraph.h"
 #include "Group.h"
 #include <atomic>
@@ -40,7 +41,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
     std::vector<CompositionStage> stages;
     stages.reserve(maximumCompositionDepth + 1);
     const auto visit = [&](auto&& self, const auto& scope, const ClipTiming& clock) -> bool {
-        if (cancel != nullptr && cancel->load()) { result.error = "Composition preparation cancelled."; return false; }
+        if (cancelled(cancel)) { result.error = "Composition preparation cancelled."; return false; }
         if (!std::isfinite(scope.duration) || scope.duration <= 0 || !std::isfinite(scope.bpm) || scope.bpm <= 0) {
             result.error = "Invalid reusable composition duration or tempo.";
             return false;
@@ -58,7 +59,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
         for (const auto& track : scope.tracks) {
             if (!trackIsAudible(scope, track)) { continue; }
             for (const auto& clip : track.clips) {
-                if (cancel != nullptr && cancel->load()) { result.error = "Composition preparation cancelled."; return false; }
+                if (cancelled(cancel)) { result.error = "Composition preparation cancelled."; return false; }
                 const auto timing = clip.timing(scope.tempo());
                 if (!clip.valid() || !timing.valid() || !std::isfinite(timing.rate * visible->rate)
                     || timing.rate * visible->rate <= 0) {

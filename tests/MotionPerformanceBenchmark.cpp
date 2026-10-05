@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/BeamRenderer.h"
 
 // Times the Motion pipeline on a deliberately heavy project: preparation,
@@ -37,7 +38,7 @@ public:
         asset->id = document.newId(); asset->name = "sphere.obj"; asset->extension = ".obj";
         const auto obj = sphere(24, 32);
         asset->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-        motion::Document::decodeAsset(*asset);
+        motion::decodeAsset(*asset);
         project.assets = {asset};
         motion::Modulator wave;
         wave.id = document.newId();

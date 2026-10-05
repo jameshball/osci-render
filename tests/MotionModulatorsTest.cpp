@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/PropertyTarget.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 
@@ -16,7 +17,7 @@ public:
             asset->id = document.newId(); asset->name = "triangle.obj"; asset->extension = ".obj";
             const juce::String obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
             asset->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-            motion::Document::decodeAsset(*asset);
+            motion::decodeAsset(*asset);
             auto a = motion::Document::makeClip(document.newId(), *asset, 0);
             a.duration = 8;
             a.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});

@@ -80,6 +80,10 @@
             compile="1" resource="0" file="tests/OfflineVisualiserParametersTest.cpp"/>
       <FILE id="MotionDocC" name="Document.cpp" compile="1" resource="0"
             file="Source/motion/model/Document.cpp"/>
+      <FILE id="MotionDocSer" name="DocumentSerialisation.cpp" compile="1"
+            resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
+      <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
+            file="Source/motion/import/SourceDecoding.cpp"/>
     </GROUP>
     <GROUP id="SharedVoiceTest" name="Shared voice engine">
       <FILE id="SVEngTest" name="SharedVoiceEngineTest.cpp" compile="1" resource="0"

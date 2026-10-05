@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cancellation.h"
 #include "ClipTiming.h"
 #include "MidiNotes.h"
 #include "../render/MidiRecording.h"
@@ -23,8 +24,7 @@ struct MidiTakeNotes {
             if (clock == nullptr || !clock->warp.has_value()) { return take.config.beatAt(sample); }
             return clock->localTime(static_cast<double>(sample) / take.config.sampleRate) * take.config.sourceBpm / 60;
         };
-        const auto cancelled = [&] { return cancel != nullptr && cancel->load(); };
-        if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
         if (take.failure != MidiRecording::Failure::none || !take.config.valid()
             || take.firstSample < take.config.firstSample || take.endSample > take.config.endSample || take.endSample <= take.firstSample
             || take.events.size() > MidiRecording::maximumEvents) {
@@ -32,7 +32,7 @@ struct MidiTakeNotes {
         }
         auto previous = take.firstSample;
         for (const auto& event : take.events) {
-            if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
             const auto kind = event.bytes[0] & 0xf0;
             const auto length = kind == 0xc0 || kind == 0xd0 ? 2 : 3;
             if (event.sample < previous || event.sample >= take.endSample || kind < 0x80 || kind > 0xe0
@@ -80,7 +80,7 @@ struct MidiTakeNotes {
             else { close(held, pitch, index, beat); }
         };
         for (const auto& event : take.events) {
-            if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
             const int index = event.bytes[0] & 15, kind = event.bytes[0] & 0xf0;
             if (take.config.channel != 0 && index + 1 != take.config.channel) { continue; }
             const int key = event.bytes[1], value = event.bytes[2];
@@ -117,7 +117,7 @@ struct MidiTakeNotes {
             releasePending(channel, index, end);
             for (int pitch = 0; pitch < 128; ++pitch) {
                 while (!channel.held[static_cast<std::size_t>(pitch)].empty()) {
-                    if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
+                    if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
                     release(channel, index, pitch, end);
                 }
             }
@@ -125,7 +125,7 @@ struct MidiTakeNotes {
         if (full) { return {nullptr, 0, warnings, "MIDI content exceeds the note or identity limit."}; }
         const auto added = notes.size() - originalCount;
         auto result = MidiNotes::create(std::move(notes), std::move(controls));
-        if (cancelled()) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
         return {std::move(result.source), added, warnings, std::move(result.error)};
     } catch (const std::bad_alloc&) {
         return {nullptr, 0, 0, "Not enough memory to convert MIDI notes."};

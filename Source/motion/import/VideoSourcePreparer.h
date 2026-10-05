@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "RasterBeamBuilder.h"
 #include "VideoDecoderProcess.h"
 #include "../model/RasterSettings.h"
@@ -22,8 +23,7 @@ public:
         const std::atomic<bool>* cancel, std::atomic<double>* progress, Limits limits) {
         const auto invalid = settings.validate();
         if (!invalid.empty()) { return {nullptr, invalid}; }
-        const auto cancelled = [&] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
-        if (cancelled()) { return {nullptr, "Video preparation cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
         if (!executable.existsAsFile()) { return {nullptr, "Video decoding requires FFmpeg. Install it and prepare the source again."}; }
         if (data.getSize() == 0 || data.getSize() > 64 * 1024 * 1024) { return {nullptr, "Video source must contain 1 byte to 64 MiB."}; }
         const auto dimension = settings.resolution;
@@ -47,11 +47,11 @@ public:
         if (!decoder.start(args)) { return {nullptr, "Cannot start the video decoder."}; }
         const auto started = juce::Time::getMillisecondCounterHiRes();
         while (!decoder.waitForProcessToFinish(30)) {
-            if (cancelled()) { return {nullptr, "Video preparation cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
             if (juce::Time::getMillisecondCounterHiRes() - started > limits.decodeMilliseconds) { return {nullptr, "Video decoding timed out. Try a shorter or lower-resolution source."}; }
             if (output.getFile().getSize() > static_cast<juce::int64>((maximumFrames + 1) * frameBytes)) { return {nullptr, "Decoded video exceeds the temporary storage limit."}; }
         }
-        if (cancelled()) { return {nullptr, "Video preparation cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
         if (!decoder.wasSuccessful()) { return {nullptr, "Cannot decode this video. Check that it contains a supported, undamaged video stream."}; }
         const auto bytes = output.getFile().getSize();
         if (bytes <= 0 || static_cast<std::uint64_t>(bytes) % frameBytes != 0) { return {nullptr, "Video decoder returned no complete frames."}; }
@@ -68,7 +68,7 @@ public:
         trace.mode = settings.mode == RasterSettings::Mode::contours ? RasterBeamBuilder::Mode::contours : RasterBeamBuilder::Mode::scanlines;
         trace.threshold = settings.threshold; trace.invert = settings.invert; trace.pointsPerFrame = settings.pointsPerFrame;
         for (std::uint64_t frame = 0; frame < frames; ++frame) {
-            if (cancelled()) { return {nullptr, "Video preparation cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
             if (stream->read(rgba.data(), static_cast<int>(rgba.size())) != static_cast<int>(rgba.size())) { return {nullptr, "Decoded video frame is truncated."}; }
             auto beam = RasterBeamBuilder::build(rgba.data(), rgba.size(), dimension, dimension, trace, cancel);
             if (!beam) { return {nullptr, "Video frame " + std::to_string(frame + 1) + ": " + beam.error}; }

@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/LuaSliderBakes.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 
@@ -17,7 +18,7 @@ public:
         const juce::String script("return {slider_a * math.cos(phase), slider_a * math.sin(phase)}");
         asset->data.append(script.toRawUTF8(), script.getNumBytesAsUTF8());
         asset->bakeSettings.duration = 1; asset->bakeSettings.frameRate = 10; asset->bakeSettings.pointsPerFrame = 32;
-        const auto decoded = motion::Document::decodeAsset(*asset);
+        const auto decoded = motion::decodeAsset(*asset);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         auto clip = motion::Document::makeClip(document.newId(), *asset, 0);
         clip.duration = 2;
@@ -142,7 +143,7 @@ public:
         shape->id = asset->id; shape->name = "tri.obj"; shape->extension = ".obj";
         const juce::String obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
         shape->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-        expect(motion::Document::decodeAsset(*shape).wasOk());
+        expect(motion::decodeAsset(*shape).wasOk());
         expect(document.replaceAsset(asset->id, shape).wasOk());
         expect(!document.project().tracks[0].clips[0].properties.contains("slider.b"));
         motion::Project reloaded;
@@ -156,13 +157,13 @@ public:
             text->data.append(hello.toRawUTF8(), hello.getNumBytesAsUTF8());
             text->textSettings.animation = motion::TextSettings::Animation::rise;
             text->textSettings.characterDelay = 0.1; text->textSettings.characterDuration = 0.2; text->textSettings.hold = 1;
-            expect(motion::Document::decodeAsset(*text).wasOk());
+            expect(motion::decodeAsset(*text).wasOk());
             const auto& source = *text->source;
             expectEquals(static_cast<int>(source.frameCount()), 48); // (0.4 + 0.2 + 1) s at 30 fps
             expect(source.drawingAt(40) == source.drawingAt(47), "hold frames share one drawing");
             expect(source.drawingAt(0) != source.drawingAt(10));
             text->textSettings.hold = 30; text->textSettings.characterDelay = 30;
-            expect(motion::Document::decodeAsset(*text).failed(), "over 120 seconds is refused, not truncated");
+            expect(motion::decodeAsset(*text).failed(), "over 120 seconds is refused, not truncated");
         }
     }
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../model/Timeline.h"
 #include <array>
 #include <atomic>
@@ -33,8 +34,7 @@ public:
             || releaseSamples == 0 || releaseSamples > std::ceil(30 * sampleRate) + 1) {
             return {nullptr, "Invalid MIDI schedule timing or envelope release."};
         }
-        const auto cancelled = [&] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
-        if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
         const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(tempo);
         if (!timing.valid()) { return {nullptr, "Invalid resolved MIDI timing."}; }
         const auto first = quantize(timing.start, sampleRate), end = quantize(timing.end(), sampleRate);
@@ -47,7 +47,7 @@ public:
         const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
         const auto resolve = [&](double beat) { return timing.projectTime(beat * secondsPerBeat); };
         for (const auto& note : notes.notes()) {
-            if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
             const auto on = quantize(resolve(note.start), sampleRate), off = quantize(resolve(note.end()), sampleRate);
             if (!on || !off) { return {nullptr, "MIDI note timing exceeds the sample clock."}; }
             // PreparedVoiceEnvelope is Done at releaseSamples - 1. Excluding
@@ -71,7 +71,7 @@ public:
         std::array<std::uint32_t, maximumVoices> active {};
         std::size_t count = 0;
         for (std::size_t event = 0; event < events.size();) {
-            if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
             const auto sample = events[event].sample;
             do {
                 const auto& change = events[event++];
@@ -91,7 +91,7 @@ public:
             result->boundaries.push_back({sample, static_cast<std::uint32_t>(result->indices.size()), static_cast<std::uint8_t>(count)});
             result->indices.insert(result->indices.end(), active.begin(), active.begin() + static_cast<std::ptrdiff_t>(count));
         }
-        if (cancelled()) { return {nullptr, "MIDI preparation cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
         return {std::move(result), {}};
     } catch (const std::bad_alloc&) {
         return {nullptr, "Not enough memory to prepare MIDI playback."};

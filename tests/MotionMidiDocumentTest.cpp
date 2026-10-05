@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
 
@@ -14,7 +15,7 @@ public:
         const juce::String geometry("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
         source->data.append(geometry.toRawUTF8(), geometry.getNumBytesAsUTF8());
         beginTest("MIDI source bytes, import context and independent edits survive XML text round trip");
-        expect(motion::Document::decodeAsset(*source).wasOk());
+        expect(motion::decodeAsset(*source).wasOk());
         auto midi = std::make_shared<motion::Asset>();
         midi->id = document.newId(); midi->name = "phrase.mid"; midi->extension = ".mid"; midi->midiImportBpm = 170;
         // SMPTE 25 fps, 100 ticks/frame. One note lasts exactly one second;
@@ -22,7 +23,7 @@ public:
         const unsigned char bytes[] { 'M','T','h','d',0,0,0,6,0,0,0,1,0xe7,100,
             'M','T','r','k',0,0,0,17,0,0xb0,64,127,0,0x90,60,100,0x93,0x44,0x80,60,0,0,0xff,0x2f,0 };
         midi->data.append(bytes, sizeof(bytes));
-        const auto decoded = motion::Document::decodeAsset(*midi);
+        const auto decoded = motion::decodeAsset(*midi);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) { return; }
         expectEquals(midi->midiIgnoredEvents, 1);

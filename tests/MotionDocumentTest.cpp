@@ -3,6 +3,7 @@
 #include <thread>
 #include "../Source/parser/fractal/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 #include "../Source/motion/model/PropertyTarget.h"
 #include "../Source/motion/ui/MotionPath.h"
@@ -91,7 +92,7 @@ public:
         auto asset = std::make_shared<motion::Asset>();
         asset->id = 1; asset->name = "Title"; asset->extension = ".txt";
         const juce::String text("A"); asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
-        expect(motion::Document::decodeAsset(*asset).wasOk());
+        expect(motion::decodeAsset(*asset).wasOk());
         motion::Project project; project.assets.push_back(asset);
         motion::Track track; track.id = 3; track.clips.push_back(motion::Document::makeClip(2, *asset, 0)); project.tracks.push_back(track);
         juce::UndoManager undo; motion::Document document(undo); document.reset(project);
@@ -203,7 +204,7 @@ public:
         auto asset = std::make_shared<motion::Asset>();
         asset->id = 1; asset->name = "Curve.lsystem"; asset->extension = ".lsystem"; asset->fractalDepth = 4;
         asset->data.append(source.toRawUTF8(), source.getNumBytesAsUTF8());
-        expect(motion::Document::decodeAsset(*asset).wasOk());
+        expect(motion::decodeAsset(*asset).wasOk());
         juce::UndoManager undo, restoreUndo;
         motion::Document document(undo), restored(restoreUndo);
         document.edit("Fractal", [&](motion::Project& project) { project.assets.push_back(asset); });
@@ -226,7 +227,7 @@ public:
         expectEquals(restored.save().toString(), valid);
         const auto original = asset->source;
         asset->fractalDepth = 16;
-        expect(motion::Document::decodeAsset(*asset).failed());
+        expect(motion::decodeAsset(*asset).failed());
         expect(asset->source == original);
     }
 
@@ -312,7 +313,7 @@ public:
             title.extension = ".txt";
             title.textSettings = settings;
             title.data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
-            const auto result = motion::Document::decodeAsset(title);
+            const auto result = motion::decodeAsset(title);
             expect(result.wasOk(), result.getErrorMessage());
             if (result.failed() || title.source == nullptr) { return 0.0f; }
             float minX = 100, maxX = -100, minY = 100, maxY = -100;
@@ -354,7 +355,7 @@ public:
         title->textSettings.alignment = 1;
         title->textSettings.lineSpacing = 1.8;
         title->textSettings.tracking = 0.15;
-        expect(motion::Document::decodeAsset(*title).wasOk());
+        expect(motion::decodeAsset(*title).wasOk());
         typographyDocument.edit("Title", [&](motion::Project& project) { project.assets.push_back(title); });
         const auto typographyXml = typographyDocument.save();
         juce::UndoManager typographyRestoreUndo;
@@ -379,7 +380,7 @@ public:
         oversizedTitle.extension = ".txt";
         const auto oversizedText = juce::String::repeatedString("A", 16385);
         oversizedTitle.data.append(oversizedText.toRawUTF8(), oversizedText.getNumBytesAsUTF8());
-        expect(motion::Document::decodeAsset(oversizedTitle).failed());
+        expect(motion::decodeAsset(oversizedTitle).failed());
         expect(oversizedTitle.source == nullptr);
 
         juce::UndoManager undo;
@@ -391,7 +392,7 @@ public:
         const juce::String source("v -0.5 -0.5 0\nv 0.5 -0.5 0\nv 0 0.5 0\nf 1 2 3\n");
         asset->data.append(source.toRawUTF8(), source.getNumBytesAsUTF8());
         beginTest("Imported assets and independent clip curves survive a project round trip");
-        const auto decoded = motion::Document::decodeAsset(*asset);
+        const auto decoded = motion::decodeAsset(*asset);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) {
             return;
@@ -613,7 +614,7 @@ private:
             return;
         }
         auto asset = std::make_shared<motion::Asset>(wavAsset(2));
-        const auto decoded = motion::Document::decodeAsset(*asset);
+        const auto decoded = motion::decodeAsset(*asset);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) {
             return;
@@ -745,7 +746,7 @@ private:
         beginTest("Audio assets decode embedded PCM with stereo and mono boundary semantics");
         auto audio = std::make_shared<motion::Asset>(wavAsset(2));
         std::atomic<double> progress { -1 };
-        const auto result = motion::Document::decodeAsset(*audio, nullptr, &progress);
+        const auto result = motion::decodeAsset(*audio, nullptr, &progress);
         expect(result.wasOk(), result.getErrorMessage());
         if (result.failed()) {
             return;
@@ -760,19 +761,19 @@ private:
         expectEquals(audio->audio->sample(-1).left, 0.0f);
         expectEquals(audio->audio->sample(audio->audio->duration()).right, 0.0f);
         auto mono = wavAsset(1);
-        const auto monoResult = motion::Document::decodeAsset(mono);
+        const auto monoResult = motion::decodeAsset(mono);
         expect(monoResult.wasOk(), monoResult.getErrorMessage());
         if (monoResult.wasOk()) {
             expectEquals(mono.audio->sample(1.0 / 8000).left, mono.audio->sample(1.0 / 8000).right);
         }
         auto multichannel = wavAsset(3);
-        expect(motion::Document::decodeAsset(multichannel).failed());
+        expect(motion::decodeAsset(multichannel).failed());
         expect(multichannel.audio == nullptr);
         auto malformed = textAsset(".wav", "not audio");
-        expect(motion::Document::decodeAsset(malformed).failed());
+        expect(motion::decodeAsset(malformed).failed());
         const auto retained = audio->audio;
         std::atomic<bool> cancelled { true };
-        expect(motion::Document::decodeAsset(*audio, &cancelled, &progress).failed());
+        expect(motion::decodeAsset(*audio, &cancelled, &progress).failed());
         expect(audio->audio == retained);
         expectEquals(progress.load(), 0.0);
 
@@ -1669,7 +1670,7 @@ private:
         beginTest("GPLA immutable frames loop in clip-local seconds, including negative offsets");
         auto asset = std::make_shared<motion::Asset>(textAsset(".gpla", json));
         std::atomic<double> progress { -1.0 };
-        const auto result = motion::Document::decodeAsset(*asset, nullptr, &progress);
+        const auto result = motion::decodeAsset(*asset, nullptr, &progress);
         expect(result.wasOk(), result.getErrorMessage());
         if (result.failed()) {
             return;
@@ -1732,18 +1733,18 @@ private:
 
         beginTest("Blank animation frames remain dark and malformed or cancelled imports are atomic");
         auto blank = textAsset(".gpla", "{\"frames\":[" + frame + ",{\"focalLength\":1,\"objects\":[]}]}");
-        expect(motion::Document::decodeAsset(blank).wasOk());
+        expect(motion::decodeAsset(blank).wasOk());
         if (blank.source != nullptr) {
             const auto dark = blank.source->sample(1.5 / 30.0, 0.3);
             expectEquals(dark.r + dark.g + dark.b, 0.0f);
         }
         const auto retained = asset->source;
         std::atomic<bool> cancel { true };
-        expect(motion::Document::decodeAsset(*asset, &cancel, &progress).failed());
+        expect(motion::decodeAsset(*asset, &cancel, &progress).failed());
         expect(asset->source == retained);
         expectEquals(progress.load(), 0.0);
         auto invalid = textAsset(".gpla", json.replace("1,0,0,0,0,1", "1"));
-        expect(motion::Document::decodeAsset(invalid).failed());
+        expect(motion::decodeAsset(invalid).failed());
         std::vector<std::shared_ptr<const osci::PreparedDrawing>> drawings { asset->drawing, asset->drawing };
         motion::PreparedSource extreme(drawings, std::numeric_limits<double>::denorm_min());
         expectEquals(static_cast<int>(extreme.frameIndex(-1)), 0);
@@ -1781,7 +1782,7 @@ private:
         binary.write("END GPLA", 8);
         auto binaryAsset = textAsset(".gpla", "");
         binaryAsset.data = binary.getMemoryBlock();
-        const auto binaryResult = motion::Document::decodeAsset(binaryAsset);
+        const auto binaryResult = motion::decodeAsset(binaryAsset);
         expect(binaryResult.wasOk(), binaryResult.getErrorMessage());
         if (binaryResult.wasOk()) {
             expectEquals(binaryAsset.source->frameRate(), 24.0);
@@ -1792,7 +1793,7 @@ private:
         beginTest("Lottie JSON and dotLottie prepare identical animated geometry");
         const juce::String lottie = R"json({"v":"5.7.4","fr":30,"ip":0,"op":3,"w":100,"h":100,"nm":"Motion test","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Line","sr":1,"ks":{"o":{"a":0,"k":100},"r":{"a":0,"k":0},"p":{"a":1,"k":[{"t":0,"s":[0,0,0],"e":[20,0,0],"i":{"x":[0.833],"y":[0.833]},"o":{"x":[0.167],"y":[0.167]}},{"t":2,"s":[20,0,0]}]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}},"ao":0,"shapes":[{"ty":"sh","nm":"Line","ks":{"a":0,"k":{"i":[[0,0],[0,0]],"o":[[0,0],[0,0]],"v":[[10,50],[50,50]],"c":false}}},{"ty":"st","nm":"Stroke","c":{"a":0,"k":[0,0,1,1]},"o":{"a":0,"k":100},"w":{"a":0,"k":2},"lc":1,"lj":1,"ml":4,"bm":0}],"ip":0,"op":3,"st":0,"bm":0}]})json";
         auto lottieAsset = textAsset(".json", lottie);
-        const auto lottieResult = motion::Document::decodeAsset(lottieAsset);
+        const auto lottieResult = motion::decodeAsset(lottieAsset);
         expect(lottieResult.wasOk(), lottieResult.getErrorMessage());
         juce::ZipFile::Builder archive;
         archive.addEntry(new juce::MemoryInputStream(lottie.toRawUTF8(), lottie.getNumBytesAsUTF8(), true), 9, "animations/test.json", juce::Time());
@@ -1800,7 +1801,7 @@ private:
         expect(archive.writeToStream(zipped, nullptr));
         auto zippedAsset = textAsset(".lottie", "");
         zippedAsset.data = zipped.getMemoryBlock();
-        const auto zippedResult = motion::Document::decodeAsset(zippedAsset);
+        const auto zippedResult = motion::decodeAsset(zippedAsset);
         expect(zippedResult.wasOk(), zippedResult.getErrorMessage());
         if (lottieResult.wasOk() && zippedResult.wasOk()) {
             expectEquals(static_cast<int>(lottieAsset.source->frameCount()), 3);
@@ -1820,7 +1821,7 @@ private:
 
         }
         auto excessive = textAsset(".json", lottie.replace("\"op\":3", "\"op\":3601"));
-        expect(motion::Document::decodeAsset(excessive).failed());
+        expect(motion::decodeAsset(excessive).failed());
 #endif
     }
 
@@ -1997,7 +1998,7 @@ public:
             asset->id = 1; asset->name = name; asset->extension = fixtures.getChildFile(name).getFileExtension();
             expect(fixtures.getChildFile(name).loadFileAsData(asset->data));
             asset->rasterSettings.resolution = 64; asset->rasterSettings.pointsPerFrame = 1024; asset->rasterSettings.videoFrameRate = 24;
-            const auto prepared = motion::Document::decodeAsset(*asset, nullptr, nullptr, decoder);
+            const auto prepared = motion::decodeAsset(*asset, nullptr, nullptr, decoder);
             expect(prepared.wasOk(), prepared.getErrorMessage());
             if (prepared.failed()) { continue; }
             expectEquals(static_cast<int>(asset->source->frameCount()), 48);
@@ -2066,7 +2067,7 @@ public:
         motion::Asset single; single.id = 4; single.name = "single-frame.mp4"; single.extension = ".mp4";
         single.rasterSettings = reference->rasterSettings;
         expect(fixtures.getChildFile("single-frame.mp4").loadFileAsData(single.data));
-        const auto singleResult = motion::Document::decodeAsset(single, nullptr, nullptr, decoder);
+        const auto singleResult = motion::decodeAsset(single, nullptr, nullptr, decoder);
         expect(singleResult.wasOk(), singleResult.getErrorMessage());
         if (singleResult.wasOk()) { expectWithinAbsoluteError(motion::Document::makeClip(5, single, 0).duration, 1.0 / 24, 1e-12); }
         beginTest("Corrupt media, absent decoder, bounded output and cancellation reject cleanly");

@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 
 class MotionRasterImportTest : public juce::UnitTest {
 public:
@@ -22,7 +23,7 @@ public:
         png->data = encoded.getMemoryBlock();
         png->rasterSettings.resolution = 16;
         png->rasterSettings.pointsPerFrame = 256;
-        const auto decoded = motion::Document::decodeAsset(*png);
+        const auto decoded = motion::decodeAsset(*png);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) { return; }
         expectEquals(static_cast<int>(png->source->frameCount()), 1);
@@ -40,7 +41,7 @@ public:
         alpha.data = alphaData.getMemoryBlock();
         alpha.rasterSettings.resolution = 16;
         alpha.rasterSettings.pointsPerFrame = 256;
-        const auto alphaResult = motion::Document::decodeAsset(alpha);
+        const auto alphaResult = motion::decodeAsset(alpha);
         expect(alphaResult.wasOk(), alphaResult.getErrorMessage());
         if (alphaResult.wasOk()) {
             const auto colour = maximumColour(*alpha.source, 0);
@@ -58,7 +59,7 @@ public:
         gif->extension = ".gif";
         gif->data = gifData.getMemoryBlock();
         gif->rasterSettings.pointsPerFrame = 256;
-        const auto animated = motion::Document::decodeAsset(*gif);
+        const auto animated = motion::decodeAsset(*gif);
         expect(animated.wasOk(), animated.getErrorMessage());
         if (animated.failed()) { return; }
         expectEquals(static_cast<int>(gif->source->frameCount()), 3);
@@ -115,11 +116,11 @@ public:
         beginTest("Invalid settings and cancellation retain the prior prepared source");
         const auto previous = png->source;
         png->rasterSettings.threshold = -1;
-        expect(motion::Document::decodeAsset(*png).failed());
+        expect(motion::decodeAsset(*png).failed());
         expect(png->source == previous);
         png->rasterSettings.threshold = 0.02;
         std::atomic<bool> cancelled {true};
-        expect(motion::Document::decodeAsset(*png, &cancelled).failed());
+        expect(motion::decodeAsset(*png, &cancelled).failed());
         expect(png->source == previous);
     }
 private:

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../model/MidiInstrument.h"
 #include "../../audio/synth/PreparedNoteVoice.h"
 
@@ -27,7 +28,7 @@ struct PreparedMidiInstrument {
         result.envelope = prepareEnvelope(settings, rate, cancel);
         if (!result.envelope) { return std::nullopt; }
         for (std::size_t pitch = 0; pitch < result.pitches.size(); ++pitch) {
-            if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return std::nullopt; }
+            if (cancelled(cancel)) { return std::nullopt; }
             result.pitches[pitch] = osci_audio::PreparedNoteVoice::prepare(*result.envelope,
                 440 * std::exp2((static_cast<double>(pitch) - 69) / 12), 1, 1);
         }

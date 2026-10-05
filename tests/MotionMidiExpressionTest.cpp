@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/MidiTakeNotes.h"
 #include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/render/LiveMidiAudition.h"
@@ -17,7 +18,7 @@ public:
         asset->id = document.newId(); asset->name = "triangle.obj"; asset->extension = ".obj";
         const juce::String obj("v -0.5 -0.5 0\nv 0.5 -0.5 0\nv 0 0.5 0\nf 1 2 3\n");
         asset->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-        motion::Document::decodeAsset(*asset);
+        motion::decodeAsset(*asset);
         return asset;
     }
 

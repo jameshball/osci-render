@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "BlenderCapture.h"
 #include "../model/FrameTiming.h"
 #include <atomic>
@@ -21,7 +22,6 @@ struct BlenderCaptureArchive {
         std::string error;
         explicit operator bool() const { return error.empty() && !bytes.empty(); }
     };
-    static bool cancelled(const std::atomic<bool>* cancel) { return cancel != nullptr && cancel->load(); }
     static Encoded encode(const BlenderCapture& capture, const std::atomic<bool>* cancel = nullptr) {
         if (capture.failure != BlenderCapture::Failure::none) { return {{}, capture.error()}; }
         if (capture.frames.empty() || capture.frames.size() > BlenderCapture::maximumFrames

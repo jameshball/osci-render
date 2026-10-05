@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/live/LiveBlenderController.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/live/BlenderCaptureArchive.h"
 #include "../Source/motion/export/SignalExporter.h"
 #include <bit>
@@ -139,7 +140,7 @@ public:
         auto captured = std::make_shared<motion::Asset>();
         captured->id = 500; captured->name = "Recorded Blender"; captured->extension = ".blender-capture";
         captured->data.append(archive.bytes.data(), archive.bytes.size());
-        const auto decoded = motion::Document::decodeAsset(*captured);
+        const auto decoded = motion::decodeAsset(*captured);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         expect(captured->liveIdentity == nullptr && captured->source != nullptr && captured->source->frameCount() == decodedCapture.frames.size());
         if (decoded.failed() || captured->source == nullptr) { return; }
@@ -174,7 +175,7 @@ public:
         auto singleAsset = std::make_shared<motion::Asset>();
         singleAsset->id = 600; singleAsset->name = "One frame"; singleAsset->extension = ".blender-capture";
         singleAsset->data.append(singleArchive.bytes.data(), singleArchive.bytes.size());
-        expect(motion::Document::decodeAsset(*singleAsset).wasOk());
+        expect(motion::decodeAsset(*singleAsset).wasOk());
         expect(singleAsset->liveIdentity == nullptr && singleAsset->source != nullptr && singleAsset->source->frameCount() == 1
             && std::abs(singleAsset->source->duration() - .0125) < 1.0e-12, "Single-frame capture keeps measured duration instead of Blender frame rate");
         if (singleAsset->source != nullptr) {

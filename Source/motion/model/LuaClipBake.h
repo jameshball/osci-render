@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Document.h"
+#include "../import/SourceDecoding.h"
 #include "PropertySchema.h"
 #include "PreparedSource.h"
 #include "PropertyTarget.h"
@@ -62,7 +63,7 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
     // Cover the clip's content, within the source frame budget.
     const auto timing = clip.timing(tempo);
     const auto contentEnd = timing.localTime(timing.end());
-    const auto longest = static_cast<double>(Document::maximumSourceFrames) / plan.settings.frameRate;
+    const auto longest = static_cast<double>(maximumSourceFrames) / plan.settings.frameRate;
     plan.settings.duration = std::clamp(std::max(plan.settings.duration, contentEnd), 1.0 / plan.settings.frameRate, longest);
     plan.settings.duration = std::floor(plan.settings.duration * plan.settings.frameRate) / plan.settings.frameRate;
     juce::MemoryOutputStream key;

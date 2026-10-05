@@ -239,18 +239,6 @@ public:
     static juce::Result prepareLoad(const juce::XmlElement& xml, Project& output, const std::atomic<bool>* cancel = nullptr);
     std::function<void()> onChanged;
 
-    static constexpr std::size_t maximumSourceBytes = 64 * 1024 * 1024;
-    static constexpr std::size_t maximumSourceFrames = 3600;
-    static constexpr std::size_t maximumShapesPerFrame = 100000;
-    static constexpr std::size_t maximumSourceShapes = 1000000;
-    static juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr, const juce::File& videoDecoder = {});
-    static bool isVideoSource(const juce::String& extension) { return extension.equalsIgnoreCase(".mp4") || extension.equalsIgnoreCase(".mov"); }
-    static bool isRasterSource(const juce::String& extension) {
-        return isVideoSource(extension) || extension.equalsIgnoreCase(".png") || extension.equalsIgnoreCase(".jpg") || extension.equalsIgnoreCase(".jpeg") || extension.equalsIgnoreCase(".gif");
-    }
-    static bool isMidiSource(const juce::String& extension) {
-        return extension.equalsIgnoreCase(".mid") || extension.equalsIgnoreCase(".midi");
-    }
     static Clip makeCompositionClip(Id id, const CompositionDefinition& definition, double time);
     static Clip makeClip(Id id, const Asset& asset, double time);
     // "Fern.lsystem" becomes "Fern 2.lsystem" when another source has the name.

@@ -1,4 +1,5 @@
 #include "live/BlenderCaptureArchive.h"
+#include "import/SourceDecoding.h"
 #include "ui/BlenderSourcePanel.h"
 #include "MotionEditor.h"
 #include "export/SignalExporter.h"
@@ -88,8 +89,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     motionLookAndFeel.setControlCornerRadius(3.0f);
     setLookAndFeel(&motionLookAndFeel);
     visualiserSettings.setSurfaceColours(osci::Colours::veryDark(), osci::Colours::surface());
-    // The Scope's settings open as a popover from its cog; keeping
-    // openSettings set also keeps the cog in the strip.
     // The Scope's cog selects the Scope, whose beam and display properties
     // animate in Properties and the Graph like any other; keeping
     // openSettings set also keeps the cog in the strip.
@@ -540,7 +539,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         const auto& assets = processor.document.project().assets;
         const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
         if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !(*found)->extension.equalsIgnoreCase(".txt")
-                && !(*found)->extension.equalsIgnoreCase(".lsystem") && !motion::Document::isRasterSource((*found)->extension))) { return; }
+                && !(*found)->extension.equalsIgnoreCase(".lsystem") && !osci::files::isImage((*found)->extension))) { return; }
         preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
         showNextPreparationSettings();
     };
@@ -968,7 +967,7 @@ bool MotionEditor::openSourceFile(const juce::File& file) {
 }
 
 void MotionEditor::replaceSourceFile(motion::Id asset) {
-    chooser = std::make_unique<juce::FileChooser>("Replace source", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.lsystem;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+    chooser = std::make_unique<juce::FileChooser>("Replace source", processor.getLastOpenedDirectory(), osci::files::sourceWildcard());
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner, asset](const juce::FileChooser& chosen) {
         if (owner != nullptr && chosen.getResult().existsAsFile()) { owner->importSourceFile(chosen.getResult(), asset); }
@@ -977,9 +976,7 @@ void MotionEditor::replaceSourceFile(motion::Id asset) {
 
 bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement) {
     const auto extension = file.getFileExtension().toLowerCase();
-    if (extension != ".obj" && extension != ".svg" && extension != ".txt" && extension != ".lua" && extension != ".lsystem" && !motion::Document::isRasterSource(extension)
-        && !motion::Document::isMidiSource(extension) && extension != ".gpla" && extension != ".json" && extension != ".lottie"
-        && extension != ".wav" && extension != ".wave" && extension != ".aif" && extension != ".aiff" && extension != ".flac" && extension != ".ogg") {
+    if (!motion::isImportableSource(extension)) {
         importError = "This source type is not connected yet.";
         statusBar.show(importError);
         repaint();
@@ -988,11 +985,11 @@ bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, s
     SourceRequest request {file, placement.has_value() ? placement->first : processor.position.load(), processor.document.generation(), {}};
     request.relink = relink;
     if (placement.has_value()) { request.track = placement->second; }
-    if (relink != 0 && motion::Document::isMidiSource(extension)) {
+    if (relink != 0 && motion::isMidiSource(extension)) {
         statusBar.show("MIDI files are assigned to clips, not swapped in as their media.");
         return false;
     }
-    if (extension == ".lua" || extension == ".lsystem" || motion::Document::isRasterSource(extension)) {
+    if (extension == ".lua" || extension == ".lsystem" || osci::files::isImage(extension)) {
         preparationRequests.push_back(std::move(request));
         showNextPreparationSettings();
     } else {
@@ -1155,7 +1152,7 @@ void MotionEditor::openProject(const juce::File& file) {
 }
 
 void MotionEditor::chooseSourceFile() {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), "*.obj;*.svg;*.txt;*.lua;*.lsystem;*.png;*.jpg;*.jpeg;*.gif;*.mp4;*.mov;*.gpla;*.json;*.lottie;*.mid;*.midi;*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), motion::importWildcard());
         const juce::Component::SafePointer<MotionEditor> owner(this);
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [owner](const juce::FileChooser& chosen) {
@@ -1245,7 +1242,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
                 auto archive = motion::BlenderCaptureArchive::encode(*capture, &task->cancelled);
                 if (archive) {
                     asset->data.replaceAll(archive.bytes.data(), archive.bytes.size());
-                    result = motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress);
+                    result = motion::decodeAsset(*asset, &task->cancelled, &task->progress);
                 } else { result = juce::Result::fail(archive.error); }
             } catch (const std::exception& error) { result = juce::Result::fail("Cannot prepare capture: " + juce::String(error.what())); }
             juce::MessageManager::callAsync([owner, generation, identity, task, asset, result] {
@@ -1277,8 +1274,8 @@ void MotionEditor::showNextPreparationSettings() {
     preparationRequests.pop_front();
     const auto name = request.replacement != nullptr ? request.replacement->name : request.file.getFileName();
     const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
-    const bool raster = motion::Document::isRasterSource(extension);
-    const bool video = motion::Document::isVideoSource(extension);
+    const bool raster = osci::files::isImage(extension);
+    const bool video = osci::files::isVideo(extension);
     const bool text = extension.equalsIgnoreCase(".txt");
     const bool fractal = extension.equalsIgnoreCase(".lsystem");
     std::unique_ptr<juce::Component> content;
@@ -1338,7 +1335,7 @@ void MotionEditor::showNextPreparationSettings() {
 void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings settings, motion::RasterSettings rasterSettings) {
     if (request.generation != processor.document.generation()) { return; }
     const auto extension = request.replacement != nullptr ? request.replacement->extension : request.file.getFileExtension();
-    if (motion::Document::isVideoSource(extension) && request.uniqueClip == 0) {
+    if (osci::files::isVideo(extension) && request.uniqueClip == 0) {
         if (!processor.getFFmpegFile().existsAsFile()) {
             const juce::Component::SafePointer<MotionEditor> owner(this);
             processor.ensureFFmpegExists({}, [owner, request, settings, rasterSettings] {
@@ -1379,11 +1376,11 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                     } else {
                         asset->data = request.replacement->data;
                     }
-                    result = request.uniqueClip != 0 ? juce::Result::ok() : motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
-                } else if (request.file.getSize() > static_cast<juce::int64>(motion::Document::maximumSourceBytes)) {
+                    result = request.uniqueClip != 0 ? juce::Result::ok() : motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder);
+                } else if (request.file.getSize() > static_cast<juce::int64>(motion::maximumSourceBytes)) {
                     result = juce::Result::fail("This source exceeds the 64 MiB preparation limit.");
                 } else {
-                    result = request.file.loadFileAsData(asset->data) ? motion::Document::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder) : juce::Result::fail("Cannot read the source file.");
+                    result = request.file.loadFileAsData(asset->data) ? motion::decodeAsset(*asset, &task->cancelled, &task->progress, videoDecoder) : juce::Result::fail("Cannot read the source file.");
                 }
             } catch (const std::exception& error) {
                 result = juce::Result::fail("Cannot import this source: " + juce::String(error.what()));
@@ -1923,7 +1920,7 @@ void MotionEditor::previewText() {
     asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
     asset->textSettings = textEditor->currentSettings();
     asset->textSettings.animation = motion::TextSettings::Animation::none;
-    if (text.trim().isEmpty() || text.length() > 16384 || motion::Document::decodeAsset(*asset).failed()) {
+    if (text.trim().isEmpty() || text.length() > 16384 || motion::decodeAsset(*asset).failed()) {
         processor.previewComposition(project);
         return;
     }
@@ -1954,7 +1951,7 @@ void MotionEditor::previewDrawing() {
     asset->extension = ".svg";
     const auto svg = motion::drawing::toSvg(drawingEditor->current());
     asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
-    if (drawingEditor->current().empty() || motion::Document::decodeAsset(*asset).failed()) {
+    if (drawingEditor->current().empty() || motion::decodeAsset(*asset).failed()) {
         processor.previewComposition(project);
         return;
     }

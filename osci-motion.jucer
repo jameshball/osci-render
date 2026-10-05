@@ -438,6 +438,10 @@
               resource="0" file="Source/motion/import/RasterBeamBuilder.h"/>
         <FILE id="MotimportRasterSourcePreparerh" name="RasterSourcePreparer.h"
               compile="0" resource="0" file="Source/motion/import/RasterSourcePreparer.h"/>
+        <FILE id="MotimportSourceDecodingcpp" name="SourceDecoding.cpp" compile="1"
+              resource="0" file="Source/motion/import/SourceDecoding.cpp"/>
+        <FILE id="MotimportSourceDecodingh" name="SourceDecoding.h" compile="0"
+              resource="0" file="Source/motion/import/SourceDecoding.h"/>
         <FILE id="MotimportVideoDecoderProcessh" name="VideoDecoderProcess.h"
               compile="0" resource="0" file="Source/motion/import/VideoDecoderProcess.h"/>
         <FILE id="MotimportVideoSourcePreparerh" name="VideoSourcePreparer.h"
@@ -473,6 +477,8 @@
         <FILE id="MotmodelBeamh" name="Beam.h" compile="0" resource="0" file="Source/motion/model/Beam.h"/>
         <FILE id="MotCameraModel" name="Camera.h" compile="0" resource="0"
               file="Source/motion/model/Camera.h"/>
+        <FILE id="MotmodelCancellationh" name="Cancellation.h" compile="0"
+              resource="0" file="Source/motion/model/Cancellation.h"/>
         <FILE id="MotmodelClipTimingh" name="ClipTiming.h" compile="0" resource="0"
               file="Source/motion/model/ClipTiming.h"/>
         <FILE id="MotmodelCompositionExpansionh" name="CompositionExpansion.h"
@@ -481,6 +487,8 @@
               resource="0" file="Source/motion/model/CompositionGraph.h"/>
         <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
         <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
+        <FILE id="MotmodelDocumentSerialisationcpp" name="DocumentSerialisation.cpp"
+              compile="1" resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
         <FILE id="MotmodelDrawingh" name="Drawing.h" compile="0" resource="0"
               file="Source/motion/model/Drawing.h"/>
         <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
@@ -573,6 +581,8 @@
               file="Source/motion/render/TimeCache.h"/>
       </GROUP>
       <GROUP id="MotionSrcUi" name="ui">
+        <FILE id="MotuiAssetLibrarycpp" name="AssetLibrary.cpp" compile="1"
+              resource="0" file="Source/motion/ui/AssetLibrary.cpp"/>
         <FILE id="MotAssetLibrary" name="AssetLibrary.h" compile="0" resource="0"
               file="Source/motion/ui/AssetLibrary.h"/>
         <FILE id="MotuiBakeSettingsPanelh" name="BakeSettingsPanel.h" compile="0"
@@ -591,12 +601,18 @@
               resource="0" file="Source/motion/ui/CompositionGizmo.h"/>
         <FILE id="MotuiCompositionPanelh" name="CompositionPanel.h" compile="0"
               resource="0" file="Source/motion/ui/CompositionPanel.h"/>
+        <FILE id="MotuiCompositionViewcpp" name="CompositionView.cpp" compile="1"
+              resource="0" file="Source/motion/ui/CompositionView.cpp"/>
         <FILE id="MotCompositionView" name="CompositionView.h" compile="0"
               resource="0" file="Source/motion/ui/CompositionView.h"/>
+        <FILE id="MotuiCurveEditorcpp" name="CurveEditor.cpp" compile="1" resource="0"
+              file="Source/motion/ui/CurveEditor.cpp"/>
         <FILE id="MotCurveEditor" name="CurveEditor.h" compile="0" resource="0"
               file="Source/motion/ui/CurveEditor.h"/>
         <FILE id="MotuiCurveListh" name="CurveList.h" compile="0" resource="0"
               file="Source/motion/ui/CurveList.h"/>
+        <FILE id="MotuiDrawingEditorcpp" name="DrawingEditor.cpp" compile="1"
+              resource="0" file="Source/motion/ui/DrawingEditor.cpp"/>
         <FILE id="MotuiDrawingEditorh" name="DrawingEditor.h" compile="0" resource="0"
               file="Source/motion/ui/DrawingEditor.h"/>
         <FILE id="MotuiEditorCamerah" name="EditorCamera.h" compile="0" resource="0"
@@ -605,6 +621,8 @@
               compile="0" resource="0" file="Source/motion/ui/EditorTransformFrame.h"/>
         <FILE id="MotEffectLibrary" name="EffectLibrary.h" compile="0" resource="0"
               file="Source/motion/ui/EffectLibrary.h"/>
+        <FILE id="MotuiEffectStackcpp" name="EffectStack.cpp" compile="1" resource="0"
+              file="Source/motion/ui/EffectStack.cpp"/>
         <FILE id="MotuiEffectStackh" name="EffectStack.h" compile="0" resource="0"
               file="Source/motion/ui/EffectStack.h"/>
         <FILE id="MotuiFractalSettingsPanelh" name="FractalSettingsPanel.h"
@@ -623,6 +641,8 @@
               file="Source/motion/ui/MarkerPanel.h"/>
         <FILE id="MotuiMidiEnvelopePanelh" name="MidiEnvelopePanel.h" compile="0"
               resource="0" file="Source/motion/ui/MidiEnvelopePanel.h"/>
+        <FILE id="MotuiModulatorPanelscpp" name="ModulatorPanels.cpp" compile="1"
+              resource="0" file="Source/motion/ui/ModulatorPanels.cpp"/>
         <FILE id="MotModulatorPanels" name="ModulatorPanels.h" compile="0"
               resource="0" file="Source/motion/ui/ModulatorPanels.h"/>
         <FILE id="MotuiMotionIconsh" name="MotionIcons.h" compile="0" resource="0"
@@ -631,12 +651,14 @@
               file="Source/motion/ui/MotionPath.h"/>
         <FILE id="MotuiMotionStyleh" name="MotionStyle.h" compile="0" resource="0"
               file="Source/motion/ui/MotionStyle.h"/>
-        <FILE id="MotuiMotionTabsh" name="MotionTabs.h" compile="0" resource="0"
-              file="Source/motion/ui/MotionTabs.h"/>
+        <FILE id="MotuiNotesEditorcpp" name="NotesEditor.cpp" compile="1" resource="0"
+              file="Source/motion/ui/NotesEditor.cpp"/>
         <FILE id="MotuiNotesEditorh" name="NotesEditor.h" compile="0" resource="0"
               file="Source/motion/ui/NotesEditor.h"/>
         <FILE id="MotuiPlayheadStriph" name="PlayheadStrip.h" compile="0" resource="0"
               file="Source/motion/ui/PlayheadStrip.h"/>
+        <FILE id="MotuiPropertyInspectorcpp" name="PropertyInspector.cpp" compile="1"
+              resource="0" file="Source/motion/ui/PropertyInspector.cpp"/>
         <FILE id="MotuiPropertyInspectorh" name="PropertyInspector.h" compile="0"
               resource="0" file="Source/motion/ui/PropertyInspector.h"/>
         <FILE id="MotuiRasterSettingsPanelh" name="RasterSettingsPanel.h" compile="0"
@@ -655,6 +677,8 @@
               resource="0" file="Source/motion/ui/TextAnimationPanel.h"/>
         <FILE id="MotuiTextSourceEditorh" name="TextSourceEditor.h" compile="0"
               resource="0" file="Source/motion/ui/TextSourceEditor.h"/>
+        <FILE id="MotuiTimelineViewcpp" name="TimelineView.cpp" compile="1"
+              resource="0" file="Source/motion/ui/TimelineView.cpp"/>
         <FILE id="MotTimelineView" name="TimelineView.h" compile="0" resource="0"
               file="Source/motion/ui/TimelineView.h"/>
         <FILE id="mottrackhdr" name="TrackHeader.h" compile="0" resource="0"

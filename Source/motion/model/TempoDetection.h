@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cancellation.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -72,7 +73,6 @@ public:
 
 private:
     struct Flux { std::vector<double> all, low; };
-    static bool cancelled(const std::atomic<bool>* cancel) { return cancel != nullptr && cancel->load(std::memory_order_relaxed); }
 
     // One-pole low-passes split the signal at 150 Hz and 2 kHz.
     static Flux onsets(std::span<const float> mono, double sampleRate, const std::atomic<bool>* cancel) {

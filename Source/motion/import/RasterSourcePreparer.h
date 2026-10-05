@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../model/PreparedSource.h"
 #include "../model/RasterSettings.h"
 #include "RasterBeamBuilder.h"
@@ -46,7 +47,7 @@ public:
             // Area-average straight-alpha pixels through premultiplied RGB so
             // invisible pixel colours cannot bleed into the prepared outlines.
             for (int y = 0; y < height; ++y) {
-                if (cancel != nullptr && cancel->load()) { return {nullptr, "Image preparation cancelled."}; }
+                if (cancelled(cancel)) { return {nullptr, "Image preparation cancelled."}; }
                 const int top = y * image.height / height, bottom = (y + 1) * image.height / height;
                 for (int x = 0; x < width; ++x) {
                     const int left = x * image.width / width, right = (x + 1) * image.width / width;

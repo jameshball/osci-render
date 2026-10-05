@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../model/MidiNotes.h"
 #include "../model/Tempo.h"
 #include <algorithm>
@@ -205,7 +206,7 @@ private:
     }
     struct Error : std::runtime_error { using std::runtime_error::runtime_error; };
     static void checkCancel(const std::atomic<bool>* cancel) {
-        if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) { throw Error("MIDI import cancelled."); }
+        if (cancelled(cancel)) { throw Error("MIDI import cancelled."); }
     }
     struct Pending {
         std::uint64_t ticks, id;

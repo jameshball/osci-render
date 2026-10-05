@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 
 class MotionMidiEditingTest : public juce::UnitTest {
 public:
@@ -18,8 +19,8 @@ public:
             'M','T','r','k',0,0,0,13,0,0x90,60,100,0x83,0x60,0x80,60,0,0,0xff,0x2f,0 };
         midi->data.append(bytes, sizeof(bytes));
         beginTest("Assignment preserves geometry, resolved timing and curve keys");
-        expect(motion::Document::decodeAsset(*geometry).wasOk());
-        const auto decoded = motion::Document::decodeAsset(*midi);
+        expect(motion::decodeAsset(*geometry).wasOk());
+        const auto decoded = motion::decodeAsset(*midi);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) { return; }
         auto clip = motion::Document::makeClip(document.newId(), *geometry, 2);

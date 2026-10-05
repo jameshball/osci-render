@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/render/MidiRecordingSession.h"
+#include "../Source/motion/import/SourceDecoding.h"
 
 class MotionMidiRecordingSessionTest : public juce::UnitTest {
 public:
@@ -19,7 +20,7 @@ public:
             asset->id = document.newId(); asset->name = "triangle.obj"; asset->extension = ".obj";
             const juce::String obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
             asset->data.append(obj.toRawUTF8(), obj.getNumBytesAsUTF8());
-            auto result = motion::Document::decodeAsset(*asset);
+            auto result = motion::decodeAsset(*asset);
             if (result.failed()) { return result; }
             auto clip = motion::Document::makeClip(document.newId(), *asset, 2);
             clipId = clip.id; clip.duration = 4; clip.offset = .5; clip.rate = 2; clip.midi = std::move(base);

@@ -2,6 +2,7 @@
 #include "../Source/motion/import/LuaBaker.h"
 #include "../Source/motion/model/PreparedSource.h"
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 
 class MotionLuaBakerTest : public juce::UnitTest {
 public:
@@ -73,7 +74,7 @@ public:
         asset->bakeSettings.pointsPerFrame = 16;
         const juce::String script("return {step,0,0,1,0.5,0.25}");
         asset->data.append(script.toRawUTF8(), script.getNumBytesAsUTF8());
-        const auto decoded = motion::Document::decodeAsset(*asset);
+        const auto decoded = motion::decodeAsset(*asset);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) { return; }
         expect(asset->bakedData.getSize() > 0);
@@ -106,7 +107,7 @@ public:
         asset->bakeSettings.frameRate = 24000.0 / 1001.0;
         asset->bakeSettings.bpm = 120.12345678901234;
         asset->bakedData.reset();
-        expect(motion::Document::decodeAsset(*asset).wasOk());
+        expect(motion::decodeAsset(*asset).wasOk());
         const auto textual = juce::parseXML(document.save().toString());
         expect(textual != nullptr);
         if (textual != nullptr) {

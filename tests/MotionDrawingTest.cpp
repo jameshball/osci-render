@@ -1,5 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
+#include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/Drawing.h"
 
 class MotionDrawingTest : public juce::UnitTest {
@@ -82,7 +83,7 @@ public:
             asset.extension = ".svg";
             const auto svg = toSvg(drawing);
             asset.data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
-            const auto result = motion::Document::decodeAsset(asset);
+            const auto result = motion::decodeAsset(asset);
             expect(result.wasOk(), result.getErrorMessage());
             if (result.wasOk()) {
                 float minX = 10, maxX = -10, minY = 10, maxY = -10;
