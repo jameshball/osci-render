@@ -38,7 +38,7 @@ public:
     bool noteOn(int channel, int pitch, int velocity, std::uint64_t sample) {
         if (!validChannel(channel) || pitch < 0 || pitch > 127 || velocity < 0 || velocity > 127) { return false; }
         if (velocity == 0) { return noteOff(channel, pitch, sample); }
-        if (!instrument.pitches[static_cast<std::size_t>(pitch)] || !acceptTime(sample)
+        if (!instrument.plays(pitch) || !acceptTime(sample)
             || nextIdentity == std::numeric_limits<std::uint64_t>::max()) { return false; }
         Voice* chosen = nullptr;
         for (auto& voice : voices) {
@@ -156,7 +156,7 @@ public:
             const auto gain = envelopeValue(voice, sample).gain * (voice.velocity / 127.0) * expression[channel];
             if (cursor < gain) {
                 const auto& bend = bends[channel];
-                if (!bend.bent) { return instrument.voice(voice.id, voice.pitch, sample - voice.start, voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max()); }
+                if (!bend.bent) { return instrument.voice(voice.id, voice.pitch, sample - voice.start); }
                 return instrument.bentVoice(voice.id, voice.pitch, bend.integral(sample) - voice.integralStart, bend.factor);
             }
             cursor -= gain;

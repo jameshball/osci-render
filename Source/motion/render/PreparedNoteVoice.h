@@ -93,6 +93,24 @@ struct NoteVoiceValue {
 
 class PreparedNoteVoice {
 public:
+    // An oscillator's phase `age` samples in, at `step` cycles per sample.
+    // Modular multiplication keeps every intermediate in [0, 1). Casting the
+    // whole age to double loses adjacent samples beyond 2^53, and even much
+    // smaller products gradually discard fractional phase precision.
+    static double notePhase(double step, std::uint64_t age) {
+        double phase = 0;
+        while (age != 0) {
+            if ((age & 1) != 0) {
+                phase += step;
+                if (phase >= 1) { phase -= 1; }
+            }
+            age >>= 1;
+            step += step;
+            if (step >= 1) { step -= 1; }
+        }
+        return phase;
+    }
+
     // Frequency is resolved by the owning tuning service, not a DAW parameter.
     // Velocity tracking follows ShapeVoice: -1 inverted, 0 none, +1 full.
     static std::optional<PreparedNoteVoice> prepare(const PreparedVoiceEnvelope& envelope, double frequency, float velocity, float velocityTracking) {
@@ -104,22 +122,8 @@ public:
 
     NoteVoiceValue at(std::uint64_t ageSamples, std::uint64_t heldSamples) const {
         const auto value = envelope.at(ageSamples, heldSamples);
-        auto remaining = ageSamples;
-        auto step = frequency / envelope.sampleRate();
-        double phase = 0;
-        // Modular multiplication keeps every intermediate in [0, 1). Casting
-        // the whole age to double loses adjacent samples beyond 2^53, and even
-        // much smaller products gradually discard fractional phase precision.
-        while (remaining != 0) {
-            if ((remaining & 1) != 0) {
-                phase += step;
-                if (phase >= 1) { phase -= 1; }
-            }
-            remaining >>= 1;
-            step += step;
-            if (step >= 1) { step -= 1; }
-        }
-        return {frequency, phase, frequency / envelope.sampleRate(), value.gain, velocityGain, value.stage};
+        const auto step = frequency / envelope.sampleRate();
+        return {frequency, notePhase(step, ageSamples), step, value.gain, velocityGain, value.stage};
     }
 
 private:

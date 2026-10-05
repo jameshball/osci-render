@@ -17,8 +17,6 @@ struct PreparedMidiInstrument {
     MidiInstrument settings;
     double sampleRate = 0;
     std::optional<motion::PreparedVoiceEnvelope> envelope;
-    // Pitches above the output's Nyquist limit stay empty.
-    std::array<std::optional<motion::PreparedNoteVoice>, 128> pitches {};
 
     static std::optional<PreparedMidiInstrument> prepare(MidiInstrument settings, double rate, const std::atomic<bool>* cancel = nullptr) {
         if (!settings.valid()) { return std::nullopt; }
@@ -32,21 +30,19 @@ struct PreparedMidiInstrument {
         result.sampleRate = rate;
         result.envelope = motion::PreparedVoiceEnvelope::prepare(params, rate, cancel);
         if (!result.envelope) { return std::nullopt; }
-        for (std::size_t pitch = 0; pitch < result.pitches.size(); ++pitch) {
-            if (cancelled(cancel)) { return std::nullopt; }
-            result.pitches[pitch] = motion::PreparedNoteVoice::prepare(*result.envelope, frequency(static_cast<int>(pitch)), 1, 1);
-        }
         return result;
     }
 
     static double frequency(int pitch) { return 440 * std::exp2((pitch - 69) / 12.0); }
+    // Pitches above the output's Nyquist limit do not play.
+    bool plays(int pitch) const { return envelope.has_value() && pitch >= 0 && pitch <= 127 && frequency(pitch) <= sampleRate / 2; }
     // A pitch-bend position (-1 to 1) as a frequency factor.
     double bendFactor(double normalised) const { return std::exp2(settings.bendRange * normalised / 12); }
 
     // `note` sounding `pitch`, `age` samples after note-on.
-    MidiSelection voice(std::uint64_t note, int pitch, std::uint64_t age, std::uint64_t heldSamples) const {
-        const auto value = pitches[static_cast<std::size_t>(pitch)]->at(age, heldSamples);
-        return {note, value.phase, value.phaseSpan};
+    MidiSelection voice(std::uint64_t note, int pitch, std::uint64_t age) const {
+        const auto step = frequency(pitch) / sampleRate;
+        return {note, motion::PreparedNoteVoice::notePhase(step, age), step};
     }
     // Under pitch bend the phase integrates the bent frequency, so bends glide
     // rather than jump: `bentSamples` is that integral since note-on in unbent

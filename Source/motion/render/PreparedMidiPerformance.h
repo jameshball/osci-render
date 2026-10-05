@@ -19,7 +19,7 @@ public:
         const auto schedule = PreparedMidiSchedule::prepare(notes, clip, tempo, sampleRate, instrument->envelope->releaseSamples(), cancel, resolvedTiming);
         if (!schedule) { return {nullptr, schedule.error}; }
         for (std::uint32_t index = 0; index < schedule.schedule->voiceCount(); ++index) {
-            if (!instrument->pitches[static_cast<std::size_t>(schedule.schedule->voice(index).pitch)]) { return {nullptr, "A MIDI pitch exceeds the output sample rate's Nyquist limit."}; }
+            if (!instrument->plays(schedule.schedule->voice(index).pitch)) { return {nullptr, "A MIDI pitch exceeds the output sample rate's Nyquist limit."}; }
         }
         auto result = std::shared_ptr<PreparedMidiPerformance>(new PreparedMidiPerformance(std::move(instrument), schedule.schedule));
         // Controller changes as sample-indexed steps on the clip's own clock.
@@ -57,7 +57,7 @@ public:
             if (cursor < gain) {
                 const auto age = note.age(*oscillatorSample);
                 const auto& bend = bends[channel];
-                if (bend.empty()) { return instrument->voice(note.id, note.pitch, age, note.heldSamples()); }
+                if (bend.empty()) { return instrument->voice(note.id, note.pitch, age); }
                 const auto now = static_cast<double>(*oscillatorSample);
                 return instrument->bentVoice(note.id, note.pitch, bend.integral(now) - bend.integral(now - static_cast<double>(age)), bend.factorAt(now));
             }
