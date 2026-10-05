@@ -18,11 +18,8 @@ void MotionCurveEditor::setContextCurves(std::map<std::string, juce::Colour> cur
 }
 
 void MotionCurveEditor::followPlayhead(double time, bool playing) {
-    if (!playing) { following = false; followPaused = false; return; }
-    if (!following) { following = true; followPaused = false; }
     const auto inside = time >= viewStart && time <= viewEnd;
-    if (followPaused) { followPaused = !inside; return; }
-    if (!inside && !drag.has_value()) {
+    if (follow.update(playing, inside) && !drag.has_value()) {
         const auto span = viewEnd - viewStart;
         userView = true;
         setView(time - span * 0.02, time + span * 0.98);
@@ -618,23 +615,23 @@ void MotionCurveEditor::mouseWheelMove(const juce::MouseEvent& event, const juce
         return;
     }
     userView = true;
-    if (following) { followPaused = true; }
-    if (event.mods.isCommandDown() || event.mods.isCtrlDown()) {
-        zoomTime(event.position.x, std::exp((std::abs(wheel.deltaY) > std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.5));
-    } else if (event.mods.isAltDown()) {
+    follow.userMoved();
+    using Gesture = motion::ui::WheelGesture;
+    const Gesture gesture(event.mods, wheel);
+    if (gesture.kind == Gesture::Kind::zoomTime) {
+        zoomTime(event.position.x, gesture.factor);
+    } else if (gesture.kind == Gesture::Kind::scaleOther) {
         const auto anchor = valueAt(event.position.y);
         const auto ratio = (anchor - low) / (high - low);
-        const auto span = std::clamp((high - low) * std::exp(-wheel.deltaY * 2.5), 0.0001, 1.0e9);
+        const auto span = std::clamp((high - low) / gesture.factor, 0.0001, 1.0e9);
         low = anchor - span * ratio;
         high = low + span;
         normalizeValueRange();
     } else {
-        const auto dx = event.mods.isShiftDown() ? wheel.deltaY + wheel.deltaX : wheel.deltaX;
-        const auto dy = event.mods.isShiftDown() ? 0.0f : wheel.deltaY;
-        const auto seconds = -dx * 256 / plot().getWidth() * (viewEnd - viewStart);
-        if (dx != 0) { setView(viewStart + seconds, viewEnd + seconds); }
-        if (dy != 0) {
-            const auto shift = dy * 256 / plot().getHeight() * (high - low);
+        const auto seconds = -gesture.dx * Gesture::pixelsPerUnit / plot().getWidth() * (viewEnd - viewStart);
+        if (gesture.dx != 0) { setView(viewStart + seconds, viewEnd + seconds); }
+        if (gesture.dy != 0) {
+            const auto shift = gesture.dy * Gesture::pixelsPerUnit / plot().getHeight() * (high - low);
             low += shift; high += shift;
             normalizeValueRange();
         }
@@ -645,7 +642,7 @@ void MotionCurveEditor::mouseWheelMove(const juce::MouseEvent& event, const juce
 void MotionCurveEditor::mouseMagnify(const juce::MouseEvent& event, float scale) {
     if (drag.has_value() || !(scale > 0)) { return; }
     userView = true;
-    if (following) { followPaused = true; }
+    follow.userMoved();
     zoomTime(event.position.x, scale);
     repaint();
 }

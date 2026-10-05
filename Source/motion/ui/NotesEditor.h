@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "ViewNavigation.h"
 #include "MotionStyle.h"
 #include "PlayheadStrip.h"
 #include <set>

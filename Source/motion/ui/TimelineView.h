@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "ViewNavigation.h"
 #include "TrackHeader.h"
 #include "TrackLayout.h"
 #include <optional>
@@ -410,7 +411,7 @@ private:
     // Snaps a moving edge: magnets first, then the grid; Alt bypasses both.
     double snapEdge(double time, juce::ModifierKeys modifiers, const motion::Project& project, const std::set<motion::Id>& excludedClips, const std::vector<KeyRef>* movingKeys = nullptr, motion::Id excludedMarker = 0);
     std::optional<double> snapGuide;
-    bool following = false, followPaused = false;
+    motion::ui::PlayheadFollow follow;
     void seek(int x, juce::ModifierKeys modifiers);
     motion::icons::LabelButton addTrack {"Add track", motion::icons::Icon::add};
     motion::icons::Button snapButton {"Snapping", motion::icons::Icon::magnet};

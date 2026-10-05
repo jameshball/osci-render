@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "ViewNavigation.h"
 #include "DocumentMenu.h"
 #include "../model/KeyEdit.h"
 #include "../model/KeyEasing.h"
@@ -218,7 +219,8 @@ private:
     motion::PlayheadStrip playheadStrip;
     std::map<std::string, juce::Colour> contextCurves;
     std::set<std::string> hiddenCurves;
-    bool following = false, followPaused = false, scrubbing = false;
+    motion::ui::PlayheadFollow follow;
+    bool scrubbing = false;
     double viewStart = 0.0, viewEnd = 1.0;
     double low = -1.0, high = 1.0;
 };

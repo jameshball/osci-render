@@ -1407,17 +1407,18 @@ void MotionTimelineView::mouseWheelMove(const juce::MouseEvent& event, const juc
     if (before.has_value() || scrubbing) {
         return;
     }
-    if (event.mods.isCommandDown() || event.mods.isCtrlDown()) {
-        zoomAround(event.x, std::exp((std::abs(wheel.deltaY) > std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.5));
-    } else if (event.mods.isAltDown()) {
-        scaleTrackHeights(event.y, std::exp(wheel.deltaY * 2));
+    using Gesture = motion::ui::WheelGesture;
+    const Gesture gesture(event.mods, wheel);
+    if (gesture.kind == Gesture::Kind::zoomTime) {
+        zoomAround(event.x, gesture.factor);
+    } else if (gesture.kind == Gesture::Kind::scaleOther) {
+        scaleTrackHeights(event.y, gesture.factor);
     } else {
-        const auto dx = event.mods.isShiftDown() ? wheel.deltaY + wheel.deltaX : wheel.deltaX;
-        const auto dy = event.mods.isShiftDown() ? 0.0f : wheel.deltaY;
-        constexpr double pixelsPerUnit = 256;
-        if (dx != 0) { scrollTime = std::max(0.0, scrollTime - dx * pixelsPerUnit / pixelsPerSecond); }
-        if (dy != 0) { scrollY = std::clamp(scrollY - juce::roundToInt(dy * pixelsPerUnit), 0, maximumScrollY()); }
-        if (dx != 0) { userScrolled(); }
+        if (gesture.dx != 0) {
+            scrollTime = std::max(0.0, scrollTime - gesture.dx * Gesture::pixelsPerUnit / pixelsPerSecond);
+            userScrolled();
+        }
+        if (gesture.dy != 0) { scrollY = std::clamp(scrollY - juce::roundToInt(gesture.dy * Gesture::pixelsPerUnit), 0, maximumScrollY()); }
     }
     resized();
     repaint();
@@ -1439,7 +1440,7 @@ void MotionTimelineView::zoomAround(int x, double factor) {
 
 void MotionTimelineView::userScrolled() {
     viewAnimation.stopTimer();
-    if (following) { followPaused = true; }
+    follow.userMoved();
 }
 
 void MotionTimelineView::scaleTrackHeights(int y, double factor) {
@@ -1468,19 +1469,11 @@ void MotionTimelineView::setDefaultTrackHeight(int height) {
 }
 
 void MotionTimelineView::followPlayhead(double time, bool playing) {
-    if (!playing) { following = false; followPaused = false; return; }
-    if (!following) { following = true; followPaused = false; }
     const auto x = timeX(time);
-    const auto right = getWidth() - 16;
-    if (followPaused) {
-        if (x >= namesWidth && x <= right) { followPaused = false; }
-        return;
-    }
-    if (!followEnabled || before.has_value() || scrubbing || getWidth() <= namesWidth) { return; }
-    if (x > right || x < namesWidth) {
-        scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
-        repaint();
-    }
+    const auto visible = x >= namesWidth && x <= getWidth() - 16;
+    if (!follow.update(playing, visible) || !followEnabled || before.has_value() || scrubbing || getWidth() <= namesWidth) { return; }
+    scrollTime = std::max(0.0, time - 16 / pixelsPerSecond);
+    repaint();
 }
 
 bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {

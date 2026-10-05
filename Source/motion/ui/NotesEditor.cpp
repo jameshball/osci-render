@@ -364,16 +364,16 @@ bool MotionNotesEditor::keyPressed(const juce::KeyPress& key) {
 }
 
 void MotionNotesEditor::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) {
-    if (event.mods.isCommandDown() || event.mods.isCtrlDown()) {
-        zoomAround(event.x, std::exp((std::abs(wheel.deltaY) > std::abs(wheel.deltaX) ? wheel.deltaY : wheel.deltaX) * 2.5));
-    } else if (event.mods.isAltDown()) {
-        rowHeight = std::clamp(juce::roundToInt(rowHeight * std::exp(wheel.deltaY * 2)), 6, 40);
+    using Gesture = motion::ui::WheelGesture;
+    const Gesture gesture(event.mods, wheel);
+    if (gesture.kind == Gesture::Kind::zoomTime) {
+        zoomAround(event.x, gesture.factor);
+    } else if (gesture.kind == Gesture::Kind::scaleOther) {
+        rowHeight = std::clamp(juce::roundToInt(rowHeight * gesture.factor), 6, 40);
     } else {
-        const auto dx = event.mods.isShiftDown() ? wheel.deltaY + wheel.deltaX : wheel.deltaX;
-        const auto dy = event.mods.isShiftDown() ? 0.0f : wheel.deltaY;
-        if (dx != 0) { scrollBeat = std::max(0.0, scrollBeat - dx * 256 / pixelsPerBeat); }
-        if (dy != 0) {
-            pitchScroll += dy * 256 / rowHeight;
+        if (gesture.dx != 0) { scrollBeat = std::max(0.0, scrollBeat - gesture.dx * Gesture::pixelsPerUnit / pixelsPerBeat); }
+        if (gesture.dy != 0) {
+            pitchScroll += gesture.dy * Gesture::pixelsPerUnit / rowHeight;
             const auto rowsMoved = static_cast<int>(pitchScroll);
             pitchScroll -= rowsMoved;
             topPitch = std::clamp(topPitch + rowsMoved, std::min(127, gridBounds().getHeight() / rowHeight), 127);

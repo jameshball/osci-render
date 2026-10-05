@@ -708,6 +708,8 @@
               file="Source/motion/ui/TypedNumber.h"/>
         <FILE id="MotVideoSettings" name="VideoExportSettings.h" compile="0"
               resource="0" file="Source/motion/ui/VideoExportSettings.h"/>
+        <FILE id="MotuiViewNavigationh" name="ViewNavigation.h" compile="0"
+              resource="0" file="Source/motion/ui/ViewNavigation.h"/>
       </GROUP>
       <FILE id="MotionIcon" name="osci_mac.png" compile="0" resource="1"
             file="Resources/images/osci_mac.png"/>
