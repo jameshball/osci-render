@@ -649,7 +649,7 @@ void MotionEditor::closeTextEditor() {
     textEditor.reset();
     textPreviewDue = 0;
     for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
-    processor.previewComposition(processor.document.project());
+    processor.prepareComposition(processor.document.project());
     preparationSettingsOpen = false;
     resized();
     showNextPreparationSettings();
@@ -668,13 +668,13 @@ void MotionEditor::previewText() {
     asset->textSettings = textEditor->currentSettings();
     asset->textSettings.animation = motion::TextSettings::Animation::none;
     if (text.trim().isEmpty() || text.length() > 16384 || motion::decodeAsset(*asset).failed()) {
-        processor.previewComposition(project);
+        processor.prepareComposition(project);
         return;
     }
     for (auto& item : project.assets) {
         if (item->id == asset->id) { item = asset; }
     }
-    processor.previewComposition(project);
+    processor.prepareComposition(project);
 }
 
 void MotionEditor::closeDrawingEditor() {
@@ -682,7 +682,7 @@ void MotionEditor::closeDrawingEditor() {
     removeChildComponent(drawingEditor.get());
     drawingEditor.reset();
     for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
-    processor.previewComposition(processor.document.project());
+    processor.prepareComposition(processor.document.project());
     resized();
     showNextPreparationSettings();
 }
@@ -699,7 +699,7 @@ void MotionEditor::previewDrawing() {
     const auto svg = motion::drawing::toSvg(drawingEditor->current());
     asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
     if (drawingEditor->current().empty() || motion::decodeAsset(*asset).failed()) {
-        processor.previewComposition(project);
+        processor.prepareComposition(project);
         return;
     }
     if (drawingAsset != 0) {
@@ -716,7 +716,7 @@ void MotionEditor::previewDrawing() {
         track.insert(clip, project.tempo());
         project.tracks.push_back(track);
     }
-    processor.previewComposition(project);
+    processor.prepareComposition(project);
 }
 
 // Examples are written to a temporary folder and imported like any file;

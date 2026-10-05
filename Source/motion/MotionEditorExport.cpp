@@ -167,7 +167,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                         auto slots = std::make_shared<motion::ScopeBeamSlots>(beamSnapshot->params);
                         beamSnapshot->params.applyExternalModulation = [picture, slots, rate = state->sampleRate, cursor = std::make_shared<juce::int64>(0)](int samples) {
                             for (std::size_t index = 0; index < motion::beamPropertySpecs.size(); ++index) {
-                                slots->write(index, samples, [&](int sample) { return picture->value(index, static_cast<double>(*cursor + sample) / rate); });
+                                slots->fill(index, samples, [&](int sample) { return picture->value(index, static_cast<double>(*cursor + sample) / rate); });
                             }
                             *cursor += samples;
                         };

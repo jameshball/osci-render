@@ -603,7 +603,7 @@ void MotionEditor::setUpTimeline() {
     };
     timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
     timeline.onPreview = [this](const motion::Project* project) {
-        processor.previewComposition(project != nullptr ? *project : processor.document.project());
+        processor.prepareComposition(project != nullptr ? *project : processor.document.project());
         if (project != nullptr) { composition.preview(*project); } else { composition.refresh(); }
     };
 }
@@ -633,7 +633,7 @@ void MotionEditor::setUpGraph() {
                 if (target != nullptr) { *target = curve; }
             }
         }
-        processor.previewComposition(preview);
+        processor.prepareComposition(preview);
         composition.preview(preview);
     };
 }
@@ -678,7 +678,7 @@ MotionEditor::~MotionEditor() {
     visualiser.closeSettings = {};
     visualiser.onControlsChanged = {};
     curveEditor.onPreview = {};
-    processor.previewComposition(processor.document.project());
+    processor.prepareComposition(processor.document.project());
     processor.document.removeChangeListener(this);
     auto* holder = juce::StandalonePluginHolder::getInstance();
     if (holder != nullptr) { holder->deviceManager.removeChangeListener(this); }
@@ -1248,12 +1248,12 @@ void MotionEditor::previewEffect(const std::string& type, std::optional<motion::
     auto project = processor.document.project();
     auto* effects = owner.has_value() && definition != nullptr ? motion::findEffectOwner(project, *owner) : nullptr;
     if (effects == nullptr) {
-        processor.previewComposition(processor.document.project());
+        processor.prepareComposition(processor.document.project());
         composition.refresh();
         return;
     }
     effects->push_back(motion::makeEffect(std::numeric_limits<motion::Id>::max(), *definition));
-    processor.previewComposition(project);
+    processor.prepareComposition(project);
     composition.preview(project);
 }
 

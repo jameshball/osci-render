@@ -2,6 +2,7 @@
 
 #include "../model/Cancellation.h"
 #include "../model/Timeline.h"
+#include "SampleClock.h"
 #include <array>
 #include <atomic>
 
@@ -37,7 +38,7 @@ public:
         if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
         const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(tempo);
         if (!timing.valid()) { return {nullptr, "Invalid resolved MIDI timing."}; }
-        const auto first = quantize(timing.start, sampleRate), end = quantize(timing.end(), sampleRate);
+        const auto first = nearestSample(timing.start, sampleRate), end = nearestSample(timing.end(), sampleRate);
         if (!first || !end || *end <= *first) { return {nullptr, "MIDI clip must occupy at least one output sample."}; }
         auto result = std::shared_ptr<PreparedMidiSchedule>(new PreparedMidiSchedule());
         result->voices.reserve(notes.notes().size());
@@ -48,7 +49,7 @@ public:
         const auto resolve = [&](double beat) { return timing.projectTime(beat * secondsPerBeat); };
         for (const auto& note : notes.notes()) {
             if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
-            const auto on = quantize(resolve(note.start), sampleRate), off = quantize(resolve(note.end()), sampleRate);
+            const auto on = nearestSample(resolve(note.start), sampleRate), off = nearestSample(resolve(note.end()), sampleRate);
             if (!on || !off) { return {nullptr, "MIDI note timing exceeds the sample clock."}; }
             // PreparedVoiceEnvelope is Done at releaseSamples - 1. Excluding
             // that sample lets zero-release chords retrigger at full capacity.
@@ -112,12 +113,6 @@ public:
 private:
     // Note-on may precede project zero after a trim/slip. Preserve it so phase
     // and envelope age continue, instead of retriggering at the clip boundary.
-    static std::optional<std::int64_t> quantize(double seconds, double sampleRate) {
-        const auto value = std::round(seconds * sampleRate);
-        constexpr double maximumExactSample = 9007199254740991.0;
-        if (!std::isfinite(value) || std::abs(value) > maximumExactSample) { return std::nullopt; }
-        return static_cast<std::int64_t>(value);
-    }
     struct Boundary { std::int64_t sample; std::uint32_t offset; std::uint8_t count; };
     std::vector<Voice> voices;
     std::vector<Boundary> boundaries;

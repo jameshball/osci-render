@@ -137,7 +137,7 @@ public:
             const motion::ScopeBeamSlots slots(parameters);
             const auto before = parameters.intensityEffect->parameters[0]->getValueUnnormalised();
             parameters.intensityEffect->animateValues(16, nullptr);
-            slots.write(0, 16, [](int) { return 7.5f; });
+            slots.fill(0, 16, [](int) { return 7.5f; });
             parameters.intensityEffect->publishAnimatedToActual(16);
             expectWithinAbsoluteError(parameters.intensityEffect->getActualValue(), 7.5f, 1.0e-6f);
             expectWithinAbsoluteError(parameters.intensityEffect->parameters[0]->getValueUnnormalised(), before, 1.0e-6f);

@@ -76,13 +76,11 @@ public:
     motion::LiveBlenderController& blenderInputs() { return *blender; }
     bool isPreparingComposition() const { return acceptedPreparationRevision != preparationRevision; }
     juce::String getPreparationError() const { return preparationError; }
-    // Message-thread-only transient editing preview; never alters saved state.
-    void previewComposition(const motion::Project& project) {
-        requestComposition(project);
-    }
+    // Message thread: prepares `project` for playback off the audio thread.
+    // Editors pass transient previews this way too; saved state is untouched.
+    void prepareComposition(const motion::Project& project);
 
 private:
-    void requestComposition(const motion::Project& project);
     void handleAsyncUpdate() override;
     void routeSignalOutput(juce::AudioBuffer<float>& buffer);
     std::unique_ptr<motion::CompositionPreparationWorker> preparationWorker;

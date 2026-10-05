@@ -87,8 +87,7 @@ struct TransformPose {
         point.y = rotation[1][0] * x + rotation[1][1] * y + rotation[1][2] * z + translation[1];
         point.z = rotation[2][0] * x + rotation[2][1] * y + rotation[2][2] * z + translation[2];
         if (applyColour) { point = colourOf(point); }
-        if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
-            || !std::isfinite(point.r) || !std::isfinite(point.g) || !std::isfinite(point.b)) {
+        if (!point.isFinite()) {
             return { 0, 0, 0, 0, 0, 0 };
         }
         return point;
@@ -588,7 +587,7 @@ struct PreparedComposition {
     // exported or live signal carries huge off-screen excursions.
     static constexpr float outputLimit = 8.0f;
     std::optional<osci::Point> projectVisible(osci::Point point, double time) const {
-        if (!std::isfinite(time) || !std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
+        if (!std::isfinite(time) || !point.hasFinitePosition()) {
             return std::nullopt;
         }
         point = applyCompositionEffects(point, time);

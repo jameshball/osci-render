@@ -19,7 +19,7 @@ public:
     ~CompositionPreparationWorker() override {
         signalThreadShouldExit();
         {
-            const juce::SpinLock::ScopedLockType lock(mutex);
+            const juce::SpinLock::ScopedLockType lock(queueLock);
             if (running) { running->cancel.store(true); }
             if (pending) { pending->cancel.store(true); }
         }
@@ -31,7 +31,7 @@ public:
         auto next = std::make_shared<Request>(project, sampleRate, ++revision);
         std::shared_ptr<Request> replaced;
         {
-            const juce::SpinLock::ScopedLockType lock(mutex);
+            const juce::SpinLock::ScopedLockType lock(queueLock);
             replaced = std::move(pending);
             pending = std::move(next);
         }
@@ -39,7 +39,7 @@ public:
         return revision;
     }
     std::unique_ptr<Result> take() {
-        const juce::SpinLock::ScopedLockType lock(mutex);
+        const juce::SpinLock::ScopedLockType lock(queueLock);
         return std::move(completed);
     }
 
@@ -56,7 +56,7 @@ private:
             wake.wait();
             std::shared_ptr<Request> job;
             {
-                const juce::SpinLock::ScopedLockType lock(mutex);
+                const juce::SpinLock::ScopedLockType lock(queueLock);
                 job = std::move(pending);
                 running = job;
             }
@@ -72,7 +72,7 @@ private:
             std::unique_ptr<Result> obsolete;
             bool notify = false;
             {
-                const juce::SpinLock::ScopedLockType lock(mutex);
+                const juce::SpinLock::ScopedLockType lock(queueLock);
                 running.reset(); // job retains ownership until outside this lock.
                 if (!job->cancel.load() && !threadShouldExit()) {
                     obsolete = std::move(completed);
@@ -84,7 +84,7 @@ private:
         }
     }
     std::function<void()> ready;
-    juce::SpinLock mutex;
+    juce::SpinLock queueLock;
     juce::WaitableEvent wake;
     std::shared_ptr<Request> pending, running;
     std::unique_ptr<Result> completed;

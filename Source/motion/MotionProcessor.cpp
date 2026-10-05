@@ -15,7 +15,7 @@ MotionProcessor::MotionProcessor()
     visualiserParameters.applyExternalModulation = [this](int samples) {
         for (std::size_t index = 0; index < scopeBeam.size(); ++index) {
             const auto value = scopeBeam[index].load(std::memory_order_relaxed);
-            scopeBeamSlots->write(index, samples, [value](int) { return value; });
+            scopeBeamSlots->fill(index, samples, [value](int) { return value; });
         }
     };
     // Undo keeps whole-project snapshots (shared media is not copied); bound
@@ -35,7 +35,7 @@ MotionProcessor::MotionProcessor()
         loopEnd.store(project.loopEnd);
         looping.store(project.looping && project.hasLoop());
         if (document.viewOnlyChange()) { return; }
-        requestComposition(project);
+        prepareComposition(project);
     };
     document.onChanged();
 }
@@ -53,14 +53,14 @@ MotionProcessor::~MotionProcessor() {
     getUndoManager().clearUndoHistory();
 }
 
-void MotionProcessor::requestComposition(const motion::Project& project) {
+void MotionProcessor::prepareComposition(const motion::Project& project) {
     preparationSampleRate = requestedSampleRate.load();
     preparationRevision = preparationWorker->request(project, preparationSampleRate);
 }
 
 void MotionProcessor::handleAsyncUpdate() {
     if (preparationSampleRate != requestedSampleRate.load()) {
-        requestComposition(document.project());
+        prepareComposition(document.project());
         return;
     }
     // A result older than the latest request still plays until the newest

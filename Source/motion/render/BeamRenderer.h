@@ -140,12 +140,12 @@ private:
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
-    static double span(double ax, double ay, double bx, double by) {
+    static double distance(double ax, double ay, double bx, double by) {
         const auto dx = ax - bx, dy = ay - by;
         const auto value = std::sqrt(dx * dx + dy * dy);
         return std::isfinite(value) ? value : 2.0;
     }
-    static double distance(const osci::Point& a, const osci::Point& b) { return span(a.x, a.y, b.x, b.y); }
+    static double distance(const osci::Point& a, const osci::Point& b) { return distance(a.x, a.y, b.x, b.y); }
     static osci::Point dark(osci::Point point) { point.r = point.g = point.b = 0; return point; }
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
@@ -251,18 +251,15 @@ private:
         }
         const auto timing = timingFor(composition.scope, rate);
         const auto dwell = timing.dwell, settle = timing.settle;
-        const auto travel = [&](const osci::Point& a, const osci::Point& b) { return timing.travel(a, b); };
         order();
         improveOrder();
-        const auto entry = [&](std::size_t index) { return entryOf(index); };
-        const auto exit = [&](std::size_t index) { return exitOf(index); };
         // Too many layers for this cycle drop from the end of the travel order.
         std::int64_t budget = 0;
         std::array<std::int64_t, maximumLayers> counts{};
         while (layerCount > 0) {
             std::int64_t overhead = dwell + settle;
-            for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + settle + travel(exit(i - 1), entry(i)); }
-            overhead += dwell + travel(exit(layerCount - 1), entry(0));
+            for (std::size_t i = 1; i < layerCount; ++i) { overhead += 2 * dwell + settle + timing.travel(exitOf(i - 1), entryOf(i)); }
+            overhead += dwell + timing.travel(exitOf(layerCount - 1), entryOf(0));
             budget = total - overhead;
             std::int64_t minimum = 0;
             for (std::size_t i = 0; i < layerCount; ++i) { minimum += std::min(items[i].minimum, total); }
@@ -279,8 +276,8 @@ private:
         std::int64_t used = 0;
         for (std::size_t i = 0; i < layerCount; ++i) {
             const auto ideal = std::floor(items[i].weight * items[i].length * density);
-            const auto floor = std::min(items[i].minimum, budget);
-            counts[i] = std::max<std::int64_t>(floor, std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : floor);
+            const auto least = std::min(items[i].minimum, budget);
+            counts[i] = std::max<std::int64_t>(least, std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : least);
             used += counts[i];
         }
         // Complete strokes first: trim the layers furthest above their minimum.
@@ -306,26 +303,26 @@ private:
             if (count > 0) { push({Kind::hold, cursor, count, nullptr, nullptr, 0, false, dark(at), dark(at)}); cursor += count; }
         };
         // The beam arrives from the previous cycle's return jump.
-        hold(entry(0), dwell + settle);
+        hold(entryOf(0), dwell + settle);
         for (std::size_t i = 0; i < layerCount; ++i) {
             if (i > 0) {
-                hold(exit(i - 1), dwell);
-                const auto steps = travel(exit(i - 1), entry(i));
-                push({Kind::move, cursor, steps, nullptr, nullptr, 0, false, dark(exit(i - 1)), dark(entry(i))});
+                hold(exitOf(i - 1), dwell);
+                const auto steps = timing.travel(exitOf(i - 1), entryOf(i));
+                push({Kind::move, cursor, steps, nullptr, nullptr, 0, false, dark(exitOf(i - 1)), dark(entryOf(i))});
                 cursor += steps;
-                hold(entry(i), dwell + settle);
+                hold(entryOf(i), dwell + settle);
             }
             const auto& layer = items[i];
             push({layer.live != nullptr ? Kind::live : layer.midi ? Kind::midi : Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.live});
             cursor += counts[i];
         }
-        hold(exit(layerCount - 1), dwell);
-        const auto back = std::min(end - cursor, travel(exit(layerCount - 1), entry(0)));
+        hold(exitOf(layerCount - 1), dwell);
+        const auto back = std::min(end - cursor, timing.travel(exitOf(layerCount - 1), entryOf(0)));
         if (back > 0) {
-            push({Kind::move, cursor, back, nullptr, nullptr, 0, false, dark(exit(layerCount - 1)), dark(entry(0))});
+            push({Kind::move, cursor, back, nullptr, nullptr, 0, false, dark(exitOf(layerCount - 1)), dark(entryOf(0))});
             cursor += back;
         }
-        hold(entry(0), end - cursor);
+        hold(entryOf(0), end - cursor);
     }
 
     // Cycles needed to draw every visible layer's complete strokes once,
@@ -401,18 +398,18 @@ private:
             for (std::size_t i = 1; i < layerCount && work < maximumOrderingWork; ++i) {
                 const auto& before = ends[i - 1];
                 const auto& first = ends[i];
-                auto removed = span(before.exitX, before.exitY, first.entryX, first.entryY);
+                auto removed = distance(before.exitX, before.exitY, first.entryX, first.entryY);
                 for (std::size_t j = i; j < layerCount && work < maximumOrderingWork; ++j) {
                     ++work;
                     const auto& last = ends[j];
                     const auto& after = ends[j + 1 == layerCount ? 0 : j + 1];
-                    const auto change = span(before.exitX, before.exitY, last.exitX, last.exitY) + span(first.entryX, first.entryY, after.entryX, after.entryY)
-                        - removed - span(last.exitX, last.exitY, after.entryX, after.entryY);
+                    const auto change = distance(before.exitX, before.exitY, last.exitX, last.exitY) + distance(first.entryX, first.entryY, after.entryX, after.entryY)
+                        - removed - distance(last.exitX, last.exitY, after.entryX, after.entryY);
                     if (change < -1.0e-9) {
                         reverse(i, j);
                         work += static_cast<std::int64_t>(j - i + 1);
                         improved = true;
-                        removed = span(before.exitX, before.exitY, first.entryX, first.entryY);
+                        removed = distance(before.exitX, before.exitY, first.entryX, first.entryY);
                     }
                 }
             }

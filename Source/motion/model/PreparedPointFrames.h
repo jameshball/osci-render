@@ -14,6 +14,7 @@
 namespace motion {
 struct PointSample {
     float x = 0, y = 0, z = 0, r = 0, g = 0, b = 0;
+    bool hasFinitePosition() const { return std::isfinite(x) && std::isfinite(y) && std::isfinite(z); }
 };
 static_assert(sizeof(PointSample) == 6 * sizeof(float));
 
@@ -62,8 +63,7 @@ public:
         }
         bool explicitColour = false, anyDark = false;
         for (const auto& point : points) {
-            if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)
-                || !validColour(point)) { return { nullptr, "Point samples require finite XYZ and RGB in [0,1], or RGB all -1." }; }
+            if (!point.hasFinitePosition() || !validColour(point)) { return { nullptr, "Point samples require finite XYZ and RGB in [0,1], or RGB all -1." }; }
             explicitColour = explicitColour || point.r != -1;
             anyDark = anyDark || dark(point);
         }

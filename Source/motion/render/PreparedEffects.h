@@ -92,8 +92,7 @@ struct PreparedEffect {
         }
         output = ((1 - strength) * input + strength * output).withColour(
             input.r + strength * (output.r - input.r), input.g + strength * (output.g - input.g), input.b + strength * (output.b - input.b));
-        if (!std::isfinite(output.x) || !std::isfinite(output.y) || !std::isfinite(output.z)
-            || !std::isfinite(output.r) || !std::isfinite(output.g) || !std::isfinite(output.b)) {
+        if (!output.isFinite()) {
             return { 0, 0, 0, 0, 0, 0 };
         }
         return output;

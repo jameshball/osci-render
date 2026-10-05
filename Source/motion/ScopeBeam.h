@@ -28,7 +28,7 @@ public:
     }
     // Fills `samples` animated values of one property; `value(sample)` gives each.
     template <typename Value>
-    void write(std::size_t property, int samples, Value&& value) const {
+    void fill(std::size_t property, int samples, Value&& value) const {
         const auto& slot = slots[property];
         if (slot.effect == nullptr || samples <= 0) { return; }
         auto* buffer = slot.effect->getAnimatedValuesWritePointer(slot.index, static_cast<std::size_t>(samples));
