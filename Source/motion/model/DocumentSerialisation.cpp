@@ -664,8 +664,8 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     for (auto& track : project.tracks) {
         for (auto& clip : track.clips) {
             if (clip.luaBake == nullptr) { continue; }
-            const auto asset = std::find_if(assets.begin(), assets.end(), [&clip](const auto& item) { return item->id == clip.asset; });
-            const auto plan = asset == assets.end() ? std::nullopt : luaSliderPlan(**asset, clip, project);
+            const auto asset = findAsset(assets, clip.asset);
+            const auto plan = asset == nullptr ? std::nullopt : luaSliderPlan(*asset, clip, project);
             const auto& source = *clip.luaBake->source;
             const auto current = plan.has_value() && plan->key == clip.luaBake->key && source.frameCount() == plan->settings.frameCount() && source.frameRate() == plan->settings.frameRate;
             if (!current) { clip.luaBake.reset(); }

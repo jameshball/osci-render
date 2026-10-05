@@ -94,6 +94,12 @@ PropertyMap defaultProperties(const std::array<PropertySpec, size>& specs) {
     return properties;
 }
 
+// A target's curve for a spec, or the spec's default when it has none.
+inline Curve curveOrDefault(const PropertyMap& properties, const PropertySpec& spec) {
+    const auto found = properties.find(spec.id);
+    return found != properties.end() ? found->second : Curve(spec.defaultValue);
+}
+
 // Exactly these specs' properties, each valid and with every value in range.
 template <std::size_t size>
 bool validProperties(const PropertyMap& properties, const std::array<PropertySpec, size>& specs) {

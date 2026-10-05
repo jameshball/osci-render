@@ -117,7 +117,7 @@ auto findClip(CompositionType& composition, Id id) -> std::conditional_t<std::is
 }
 
 inline std::shared_ptr<const Asset> findAsset(const std::vector<std::shared_ptr<const Asset>>& assets, Id id) {
-    const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+    const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset != nullptr && asset->id == id; });
     return found != assets.end() ? *found : nullptr;
 }
 
@@ -129,6 +129,11 @@ struct Project : Composition {
     std::vector<std::shared_ptr<const Asset>> assets;
     std::vector<std::shared_ptr<const CompositionDefinition>> definitions;
 };
+
+inline std::shared_ptr<const CompositionDefinition> findDefinition(const Project& project, Id id) {
+    const auto found = std::find_if(project.definitions.begin(), project.definitions.end(), [id](const auto& definition) { return definition != nullptr && definition->id == id; });
+    return found != project.definitions.end() ? *found : nullptr;
+}
 
 // Editable state belongs to the message thread. Undo copies clip/curve values
 // but shares immutable asset payloads, so a drag never copies imported media.

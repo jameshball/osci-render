@@ -127,8 +127,7 @@ struct PreparedGroup {
 
     explicit PreparedGroup(const Group& group) : id(group.id), effects(prepareEffects(group.effects)) {
         for (std::size_t index = 0; index < objectPropertySpecs.size(); ++index) {
-            const auto found = group.properties.find(objectPropertySpecs[index].id);
-            curves[index] = found == group.properties.end() ? Curve(objectPropertySpecs[index].defaultValue) : found->second;
+            curves[index] = curveOrDefault(group.properties, objectPropertySpecs[index]);
         }
         spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
@@ -385,8 +384,7 @@ struct PreparedComposition {
             Id groupId = 0;
             const auto load = [&](PreparedChain::Link& link, const PropertyMap& properties, Id owner) {
                 for (std::size_t index = 0; index < objectPropertySpecs.size(); ++index) {
-                    const auto found = properties.find(objectPropertySpecs[index].id);
-                    link.curves[index] = found != properties.end() ? found->second : Curve(objectPropertySpecs[index].defaultValue);
+                    link.curves[index] = curveOrDefault(properties, objectPropertySpecs[index]);
                     drivers.drive(link.curves[index], project, mainClock, owner, objectPropertySpecs[index].id);
                 }
             };
@@ -424,15 +422,13 @@ struct PreparedComposition {
             if (camera.target != 0) { item.target = chainFor(camera.target, false); }
             if (camera.parent != 0) { item.parent = chainFor(camera.parent, true); }
             for (std::size_t index = 0; index < cameraPropertySpecs.size(); ++index) {
-                const auto found = camera.properties.find(cameraPropertySpecs[index].id);
-                item.curves[index] = found != camera.properties.end() ? found->second : Curve(cameraPropertySpecs[index].defaultValue);
+                item.curves[index] = curveOrDefault(camera.properties, cameraPropertySpecs[index]);
                 drivers.drive(item.curves[index], project, mainClock, camera.id, cameraPropertySpecs[index].id);
             }
             cameras.push_back(std::move(item));
         }
         for (std::size_t index = 0; index < beamPropertySpecs.size(); ++index) {
-            const auto found = project.beam.properties.find(beamPropertySpecs[index].id);
-            beam.curves[index] = found != project.beam.properties.end() ? found->second : Curve(beamPropertySpecs[index].defaultValue);
+            beam.curves[index] = curveOrDefault(project.beam.properties, beamPropertySpecs[index]);
             drivers.driveBeam(beam.curves[index], project, mainClock, beamPropertySpecs[index].id);
         }
         for (const auto& cut : project.cameraCuts) {
@@ -452,8 +448,7 @@ struct PreparedComposition {
             item.clock = timing;
             item.scopeClock = stage.scopeClock;
             for (std::size_t i = 0; i < objectPropertySpecs.size(); ++i) {
-                const auto curve = clip.properties.find(objectPropertySpecs[i].id);
-                item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
+                item.curves[i] = curveOrDefault(clip.properties, objectPropertySpecs[i]);
                 drivers.drive(item.curves[i], scope, stage.scopeClock, clip.id, objectPropertySpecs[i].id);
             }
             item.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, item.curves);
@@ -489,15 +484,15 @@ struct PreparedComposition {
             const auto& leaf = stages.back();
             const auto& clip = *leaf.clip;
             if (leaf.track->kind != TrackKind::visual) { return; }
-            const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-            if (asset == project.assets.end() || ((*asset)->source == nullptr && (*asset)->drawing == nullptr && (*asset)->liveIdentity == nullptr)) { return; }
+            const auto asset = findAsset(project.assets, clip.asset);
+            if (asset == nullptr || (asset->source == nullptr && asset->drawing == nullptr && asset->liveIdentity == nullptr)) { return; }
             PreparedClip item;
             static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1, scopeOf(stages, stages.size() - 1));
             item.rootTrack = stages.front().track->id;
-            item.liveIdentity = (*asset)->liveIdentity;
-            item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : (*asset)->source;
+            item.liveIdentity = asset->liveIdentity;
+            item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : asset->source;
             if (item.source == nullptr) {
-                item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {(*asset)->drawing}, 30.0);
+                item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {asset->drawing}, 30.0);
             }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));

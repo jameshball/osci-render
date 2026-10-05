@@ -106,10 +106,10 @@ Project Document::mergeScope(Project view) const {
 
 void Document::refreshScope() {
     if (scopeId == 0) { scopeView = {}; return; }
-    const auto found = std::find_if(state.definitions.begin(), state.definitions.end(), [this](const auto& value) { return value->id == scopeId; });
-    if (found == state.definitions.end()) { scopeId = 0; ++projectGeneration; scopeView = {}; return; }
+    const auto found = findDefinition(state, scopeId);
+    if (found == nullptr) { scopeId = 0; ++projectGeneration; scopeView = {}; return; }
     scopeView = state;
-    static_cast<Composition&>(scopeView) = **found;
+    static_cast<Composition&>(scopeView) = *found;
 }
 
 juce::Result Document::setMarker(Id id, double time, juce::String name) {
@@ -164,8 +164,7 @@ juce::Result Document::enterComposition(Id id) {
 // source; a replaced source (or a removed clip) leaves the bake behind.
 static void carryLuaBakes(Project& next, const Project& current) {
     const auto sourceOf = [](const Project& project, Id asset) -> const Asset* {
-        const auto found = std::find_if(project.assets.begin(), project.assets.end(), [asset](const auto& item) { return item->id == asset; });
-        return found == project.assets.end() ? nullptr : found->get();
+        return findAsset(project.assets, asset).get();
     };
     std::map<Id, std::pair<std::shared_ptr<const LuaClipBake>, const Asset*>> installed;
     const auto collect = [&](const Composition& composition) {
@@ -223,8 +222,7 @@ static void carryViewOptions(Project& next, const Project& current, const Projec
         if (to.looping == opposite.looping) { to.looping = from.looping && to.hasLoop(); }
     };
     const auto find = [](const Project& project, Id id) -> const Composition* {
-        const auto found = std::find_if(project.definitions.begin(), project.definitions.end(), [id](const auto& item) { return item != nullptr && item->id == id; });
-        return found == project.definitions.end() ? nullptr : found->get();
+        return findDefinition(project, id).get();
     };
     carry(next, current, other);
     for (auto& definition : next.definitions) {
@@ -656,13 +654,13 @@ bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
 
 juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> replacement) {
     const auto& assets = project().assets;
-    const auto found = std::find_if(assets.begin(), assets.end(), [assetId](const auto& asset) { return asset != nullptr && asset->id == assetId; });
-    if (found == assets.end()) { return juce::Result::fail("The source no longer exists."); }
+    const auto found = findAsset(assets, assetId);
+    if (found == nullptr) { return juce::Result::fail("The source no longer exists."); }
     if (replacement == nullptr || replacement->id != assetId) { return juce::Result::fail("Invalid replacement source."); }
     const auto audio = [](const Asset& asset) { return asset.audio != nullptr; };
     const auto midiOnly = [](const Asset& asset) { return asset.midi != nullptr && asset.drawing == nullptr && asset.source == nullptr; };
-    if (audio(**found) != audio(*replacement) || midiOnly(**found) || midiOnly(*replacement)) {
-        return juce::Result::fail(audio(**found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
+    if (audio(*found) != audio(*replacement) || midiOnly(*found) || midiOnly(*replacement)) {
+        return juce::Result::fail(audio(*found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
     }
     const bool lua = replacement->extension.equalsIgnoreCase(".lua");
     edit("Replace source", [assetId, replacement, lua](Project& project) {
@@ -694,9 +692,9 @@ juce::Result Document::renameAsset(Id assetId, juce::String name) {
     name = name.trim();
     if (name.isEmpty() || name.length() > 200 || name.containsAnyOf("\r\n")) { return juce::Result::fail("Use a source name of 1-200 characters on one line."); }
     const auto& assets = mainProject().assets;
-    const auto found = std::find_if(assets.begin(), assets.end(), [assetId](const auto& asset) { return asset != nullptr && asset->id == assetId; });
-    if (found == assets.end()) { return juce::Result::fail("The source no longer exists."); }
-    if ((*found)->name == name) { return juce::Result::ok(); }
+    const auto found = findAsset(assets, assetId);
+    if (found == nullptr) { return juce::Result::fail("The source no longer exists."); }
+    if (found->name == name) { return juce::Result::ok(); }
     edit("Rename source", [assetId, name](Project& project) {
         for (auto& asset : project.assets) {
             if (asset != nullptr && asset->id == assetId) {
@@ -973,9 +971,9 @@ bool Document::canReferenceComposition(Id definition) const {
     const auto visit = [&](auto&& self, Id id) -> bool {
         if (id == scopeId) { return false; }
         if (!visited.insert(id).second) { return true; }
-        const auto found = std::find_if(state.definitions.begin(), state.definitions.end(), [id](const auto& value) { return value->id == id; });
-        if (found == state.definitions.end()) { return false; }
-        for (const auto& track : (*found)->tracks) {
+        const auto found = findDefinition(state, id);
+        if (found == nullptr) { return false; }
+        for (const auto& track : found->tracks) {
             for (const auto& clip : track.clips) {
                 if (clip.composition != 0 && !self(self, clip.composition)) { return false; }
             }
@@ -1007,12 +1005,12 @@ juce::Result Document::insertComposition(Id definition, double time, Id trackId,
         return juce::Result::fail("Choose a valid composition that does not contain the current editing scope.");
     }
     auto candidate = project();
-    const auto source = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [definition](const auto& value) { return value->id == definition; });
-    if (source == candidate.definitions.end()) { return juce::Result::fail("The composition no longer exists."); }
+    const auto source = findDefinition(candidate, definition);
+    if (source == nullptr) { return juce::Result::fail("The composition no longer exists."); }
     auto highest = highestId();
     const auto required = trackId == 0 ? 2u : 1u;
     if (required > maximumId - highest) { return juce::Result::fail("There are no remaining clip identities."); }
-    auto clip = makeCompositionClip(++highest, **source, time);
+    auto clip = makeCompositionClip(++highest, *source, time);
     if (!clip.valid() || !clip.timing(candidate.tempo()).valid()) { return juce::Result::fail("The composition has invalid timing."); }
     if (trackId != 0) {
         const auto track = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [trackId](const auto& value) { return value.id == trackId; });
@@ -1040,9 +1038,9 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     if (track != nullptr && track->locked) { return juce::Result::fail("Unlock the track before making its composition unique."); }
     auto* target = findClip(candidate, clipId);
     if (target == nullptr || target->composition == 0) { return juce::Result::fail("Select a composition instance."); }
-    const auto found = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [&](const auto& value) { return value->id == target->composition; });
-    if (found == candidate.definitions.end()) { return juce::Result::fail("The referenced composition no longer exists."); }
-    auto copy = std::make_shared<CompositionDefinition>(**found);
+    const auto found = findDefinition(candidate, target->composition);
+    if (found == nullptr) { return juce::Result::fail("The referenced composition no longer exists."); }
+    auto copy = std::make_shared<CompositionDefinition>(*found);
     std::size_t required = 1 + copy->groups.size() + copy->tracks.size() + copy->cameras.size() + copy->cameraCuts.size() + copy->effects.size() + copy->markers.size()
         + copy->modulators.size() + copy->routes.size();
     for (const auto& group : copy->groups) { required += group.effects.size(); }

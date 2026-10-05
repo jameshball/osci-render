@@ -48,8 +48,8 @@ public:
         const auto scan = [&](const Composition& composition) {
             for (const auto& track : composition.tracks) {
                 for (const auto& clip : track.clips) {
-                    const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-                    auto plan = asset == project.assets.end() || clip.composition != 0 ? std::nullopt : planFor(**asset, clip, composition);
+                    const auto asset = findAsset(project.assets, clip.asset);
+                    auto plan = asset == nullptr || clip.composition != 0 ? std::nullopt : planFor(*asset, clip, composition);
                     if (!plan.has_value()) {
                         if (clip.luaBake != nullptr) { clear.push_back(clip.id); }
                         continue;
@@ -140,8 +140,8 @@ private:
             for (const auto& track : composition.tracks) {
                 for (const auto& clip : track.clips) {
                     if (clip.id != job.plan.clip || clip.composition != 0) { continue; }
-                    const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
-                    const auto plan = asset == project.assets.end() ? std::nullopt : planFor(**asset, clip, composition);
+                    const auto asset = findAsset(project.assets, clip.asset);
+                    const auto plan = asset == nullptr ? std::nullopt : planFor(*asset, clip, composition);
                     wanted = plan.has_value() && plan->key == job.plan.key;
                 }
             }
