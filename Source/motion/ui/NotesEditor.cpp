@@ -29,7 +29,7 @@ MotionNotesEditor::MotionNotesEditor(MotionProcessor& owner) : processor(owner) 
     audition.onClick = [this] { processor.setMidiAudition(audition.getToggleState() ? target : 0); refresh(); };
     envelopeButton.onClick = [this] { if (onEditInstrument) { onEditInstrument(target); } };
     // The empty state's one action, styled as the primary button.
-    create.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.45f));
+    motion::style::makePrimary(create);
     create.onClick = [this] { report(processor.document.assignMidi(target, 0)); refresh(); fit(); };
     fitButton.onClick = [this] { fit(); repaint(); };
     remove.onClick = [this] { report(processor.document.clearMidi(target)); refresh(); };

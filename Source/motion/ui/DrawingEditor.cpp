@@ -38,11 +38,10 @@ MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const
     name.setTooltip("Name");
     addAndMakeVisible(name);
     cancelButton.setButtonText("Cancel");
-    cancelButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
     doneButton.setButtonText(editing ? "Save" : "Add");
     doneButton.setTooltip(editing ? "Save the drawing" : "Add the drawing to the project");
-    doneButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f));
+    motion::style::makePrimary(doneButton);
     doneButton.onClick = [this] { finish(); };
     for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
     setTool(drawing.strokes.empty() ? Tool::pen : Tool::select);
@@ -63,22 +62,14 @@ void MotionDrawingEditor::setTool(Tool value) {
 }
 
 void MotionDrawingEditor::resized() {
-    auto header = getLocalBounds().removeFromTop(headerHeight).reduced(5, 3);
-    doneButton.setBounds(header.removeFromRight(64));
-    header.removeFromRight(motion::style::gap);
-    cancelButton.setBounds(header.removeFromRight(64));
-    header.removeFromRight(motion::style::padding);
+    const auto header = motion::style::sceneEditor::layoutHeader(getLocalBounds(), doneButton, cancelButton);
     name.setBounds(header.withWidth(std::min(header.getWidth(), 220)));
-    canvas = getLocalBounds().withTrimmedTop(headerHeight + 1);
+    canvas = motion::style::sceneEditor::page(getLocalBounds());
     tools.setBounds(canvas.getX() + 8, canvas.getY() + 8, tools.preferredWidth(), tools.preferredHeight());
 }
 
 void MotionDrawingEditor::paint(juce::Graphics& g) {
-    osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
-    g.setColour(osci::Colours::surface());
-    g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
-    g.setColour(osci::Colours::veryDark());
-    g.fillRect(canvas);
+    motion::style::sceneEditor::paint(g, getLocalBounds());
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(canvas);
     // A quarter-unit grid across the whole canvas, the axes and the output frame.

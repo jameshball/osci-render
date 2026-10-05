@@ -18,13 +18,12 @@ public:
         name.setBorderSize({0, 6, 0, 0});
         addAndMakeVisible(name);
         cancelButton.setButtonText("Cancel");
-        cancelButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
         doneButton.setName("Apply text");
         doneButton.setTitle("Apply text");
         doneButton.setButtonText("Save");
         doneButton.setTooltip("Save the text");
-        doneButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f));
+        motion::style::makePrimary(doneButton);
         doneButton.onClick = [this] { finish(); };
         for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
 
@@ -104,16 +103,10 @@ public:
     const motion::TextSettings& currentSettings() const { return settings; }
     void focusText() { text.grabKeyboardFocus(); text.moveCaretToEnd(); }
 
-    static constexpr int headerHeight = 30;
 
     void resized() override {
-        auto header = getLocalBounds().removeFromTop(headerHeight).reduced(5, 3);
-        doneButton.setBounds(header.removeFromRight(64));
-        header.removeFromRight(motion::style::gap);
-        cancelButton.setBounds(header.removeFromRight(64));
-        header.removeFromRight(motion::style::padding);
-        name.setBounds(header);
-        const auto page = getLocalBounds().withTrimmedTop(headerHeight + 1);
+        name.setBounds(motion::style::sceneEditor::layoutHeader(getLocalBounds(), doneButton, cancelButton));
+        const auto page = motion::style::sceneEditor::page(getLocalBounds());
         // The type bar floats 8 px in, like the Scene's tool strip: the font,
         // its style, alignment, then spacing. A narrow Scene folds it onto
         // two lines.
@@ -152,11 +145,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
-        g.setColour(osci::Colours::surface());
-        g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
-        g.setColour(osci::Colours::veryDark());
-        g.fillRect(getLocalBounds().withTrimmedTop(headerHeight + 1));
+        motion::style::sceneEditor::paint(g, getLocalBounds());
         // A floating panel like the popovers, so its fields read as fields.
         const auto bounds = bar.toFloat();
         g.setColour(osci::Colours::surface());

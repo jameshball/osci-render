@@ -269,7 +269,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
 
 void MotionEditor::showNextPreparationSettings() {
     // Queued sources wait while a dialog or a Scene editor is open.
-    if (preparationSettingsOpen || drawingEditor != nullptr) { return; }
+    if (preparationSettingsOpen || sceneEditor != nullptr) { return; }
     while (!preparationRequests.empty() && preparationRequests.front().generation != processor.document.generation()) { preparationRequests.pop_front(); }
     if (preparationRequests.empty()) { return; }
     auto request = std::move(preparationRequests.front());
@@ -499,10 +499,34 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     });
 }
 
+template <typename Editor>
+Editor& MotionEditor::openSceneEditor(std::unique_ptr<Editor> editor) {
+    auto& opened = *editor;
+    sceneEditor = std::move(editor);
+    sceneEditorGeneration = processor.document.generation();
+    addAndMakeVisible(opened);
+    opened.onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeSceneEditor(); } }); };
+    return opened;
+}
+
+void MotionEditor::closeSceneEditor() {
+    if (sceneEditor == nullptr) { return; }
+    // Text and Lua editors are the import queue's settings for their source.
+    if (sceneEditorAs<MotionDrawingEditor>() == nullptr) { preparationSettingsOpen = false; }
+    removeChildComponent(sceneEditor.get());
+    sceneEditor.reset();
+    textPreviewDue = 0;
+    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
+    // Drop the preview of what was being edited.
+    processor.prepareComposition(processor.document.project());
+    resized();
+    showNextPreparationSettings();
+}
+
 // Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
 // SVG in a temporary folder and imported like any file, relinking an edit.
 void MotionEditor::showDrawingEditor(motion::Id asset) {
-    if (drawingEditor != nullptr || textEditor != nullptr || luaEditor != nullptr) { return; }
+    if (sceneEditor != nullptr) { return; }
     motion::drawing::Drawing initial;
     juce::String name;
     const auto& assets = processor.document.mainProject().assets;
@@ -520,12 +544,9 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
     }
     // The drawing takes over the Scene; the Scope shows it live as a beam.
     drawingAsset = asset;
-    drawingGeneration = processor.document.generation();
-    drawingEditor = std::make_unique<MotionDrawingEditor>(initial, name, asset != 0);
-    addAndMakeVisible(*drawingEditor);
-    drawingEditor->onChanged = [this] { previewDrawing(); };
-    drawingEditor->onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeDrawingEditor(); } }); };
-    drawingEditor->onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
+    auto& editor = openSceneEditor(std::make_unique<MotionDrawingEditor>(initial, name, asset != 0));
+    editor.onChanged = [this] { previewDrawing(); };
+    editor.onDone = [this](const motion::drawing::Drawing& drawing, const juce::String& text) {
         const auto folder = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("osci-motion drawings");
         const auto file = folder.getChildFile(juce::File::createLegalFileName(text) + ".svg");
         if (!folder.createDirectory().wasOk() || !file.replaceWithText(motion::drawing::toSvg(drawing))) {
@@ -535,34 +556,31 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
         const auto asset = drawingAsset;
         juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), file, asset] {
             if (owner == nullptr) { return; }
-            owner->closeDrawingEditor();
+            owner->closeSceneEditor();
             owner->importSourceFile(file, asset);
         });
     };
     resized();
     previewDrawing();
-    drawingEditor->grabKeyboardFocus();
+    editor.grabKeyboardFocus();
 }
 
 void MotionEditor::showTextEditor(SourceRequest request) {
-    if (request.replacement == nullptr || textEditor != nullptr || drawingEditor != nullptr || luaEditor != nullptr) { return; }
+    if (request.replacement == nullptr || sceneEditor != nullptr) { return; }
     const auto& asset = *request.replacement;
     const auto draft = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())));
     const auto settings = request.textSettings.value_or(asset.textSettings);
     textRequest = request;
-    textGeneration = processor.document.generation();
     // Other queued sources wait until the text is saved or cancelled.
     preparationSettingsOpen = true;
-    textEditor = std::make_unique<MotionTextSourceEditor>(draft, asset.name.upToLastOccurrenceOf(".", false, false), settings, request.preparationError);
-    addAndMakeVisible(*textEditor);
-    textEditor->onChanged = [this] { textPreviewDue = juce::Time::getMillisecondCounterHiRes() + 120; };
-    textEditor->onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeTextEditor(); } }); };
-    textEditor->onDone = [this](const juce::String& text, const motion::TextSettings& chosen) {
-        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), editor = textEditor.get(), text, chosen] {
+    auto& editor = openSceneEditor(std::make_unique<MotionTextSourceEditor>(draft, asset.name.upToLastOccurrenceOf(".", false, false), settings, request.preparationError));
+    editor.onChanged = [this] { textPreviewDue = juce::Time::getMillisecondCounterHiRes() + 120; };
+    editor.onDone = [this, opened = &editor](const juce::String& text, const motion::TextSettings& chosen) {
+        juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), opened, text, chosen] {
             // A second Save before this runs finds the editor already gone.
-            if (owner == nullptr || owner->textEditor.get() != editor) { return; }
+            if (owner == nullptr || owner->sceneEditor.get() != opened) { return; }
             auto next = owner->textRequest;
-            owner->closeTextEditor();
+            owner->closeSceneEditor();
             if (owner->processor.document.generation() != next.generation) { return; }
             // The source may have changed while the editor was open (its
             // animation, an undo): build on what it is now.
@@ -585,11 +603,11 @@ void MotionEditor::showTextEditor(SourceRequest request) {
     };
     resized();
     previewText();
-    textEditor->focusText();
+    editor.focusText();
 }
 
 void MotionEditor::showLuaEditor(SourceRequest request) {
-    if (luaEditor != nullptr || textEditor != nullptr || drawingEditor != nullptr) { return; }
+    if (sceneEditor != nullptr) { return; }
     const auto editing = request.replacement != nullptr;
     const auto code = editing ? request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())))
                               : request.file.loadFileAsString();
@@ -600,13 +618,10 @@ void MotionEditor::showLuaEditor(SourceRequest request) {
     initial = request.retrySettings.value_or(initial);
     const auto title = (editing ? request.replacement->name : request.file.getFileName()).upToLastOccurrenceOf(".", false, false);
     luaRequest = request;
-    luaGeneration = processor.document.generation();
     luaSubmitted = false;
     preparationSettingsOpen = true;
-    luaEditor = std::make_unique<MotionLuaSourceEditor>(code, title, initial, editing, request.preparationError);
-    addAndMakeVisible(*luaEditor);
-    luaEditor->onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeLuaEditor(); } }); };
-    luaEditor->onDone = [this, original = code](motion::BakeSettings settings, const juce::String& written) {
+    auto& editor = openSceneEditor(std::make_unique<MotionLuaSourceEditor>(code, title, initial, editing, request.preparationError));
+    editor.onDone = [this, original = code](motion::BakeSettings settings, const juce::String& written) {
         if (luaSubmitted) { return; }
         auto next = luaRequest;
         next.preparationError.clear();
@@ -625,47 +640,26 @@ void MotionEditor::showLuaEditor(SourceRequest request) {
         luaSubmitted = true;
         juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this), next, settings] {
             if (owner == nullptr) { return; }
-            owner->closeLuaEditor();
+            owner->closeSceneEditor();
             if (owner->processor.document.generation() == next.generation) { owner->beginSourceImport(next, settings); }
         });
     };
     resized();
-    luaEditor->focusCode();
-}
-
-void MotionEditor::closeLuaEditor() {
-    if (luaEditor == nullptr) { return; }
-    removeChildComponent(luaEditor.get());
-    luaEditor.reset();
-    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
-    preparationSettingsOpen = false;
-    resized();
-    showNextPreparationSettings();
-}
-
-void MotionEditor::closeTextEditor() {
-    if (textEditor == nullptr) { return; }
-    removeChildComponent(textEditor.get());
-    textEditor.reset();
-    textPreviewDue = 0;
-    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
-    processor.prepareComposition(processor.document.project());
-    preparationSettingsOpen = false;
-    resized();
-    showNextPreparationSettings();
+    editor.focusCode();
 }
 
 // The words being written, on the output: the source is swapped in place,
 // still, so typing stays quick; its animation plays once saved.
 void MotionEditor::previewText() {
     textPreviewDue = 0;
-    if (textEditor == nullptr || textRequest.replacement == nullptr) { return; }
+    const auto* editor = sceneEditorAs<MotionTextSourceEditor>();
+    if (editor == nullptr || textRequest.replacement == nullptr) { return; }
     auto project = processor.document.project();
     auto asset = std::make_shared<motion::Asset>(*textRequest.replacement);
-    const auto text = textEditor->currentText();
+    const auto text = editor->currentText();
     asset->data.reset();
     asset->data.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
-    asset->textSettings = textEditor->currentSettings();
+    asset->textSettings = editor->currentSettings();
     asset->textSettings.animation = motion::TextSettings::Animation::none;
     if (text.trim().isEmpty() || text.length() > 16384 || motion::decodeAsset(*asset).failed()) {
         processor.prepareComposition(project);
@@ -677,28 +671,19 @@ void MotionEditor::previewText() {
     processor.prepareComposition(project);
 }
 
-void MotionEditor::closeDrawingEditor() {
-    if (drawingEditor == nullptr) { return; }
-    removeChildComponent(drawingEditor.get());
-    drawingEditor.reset();
-    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
-    processor.prepareComposition(processor.document.project());
-    resized();
-    showNextPreparationSettings();
-}
-
 // The drawing in progress on the output: an edited source is swapped in place;
 // a new one plays on a track of its own for the whole project.
 void MotionEditor::previewDrawing() {
-    if (drawingEditor == nullptr) { return; }
+    const auto* editor = sceneEditorAs<MotionDrawingEditor>();
+    if (editor == nullptr) { return; }
     auto project = processor.document.project();
     auto asset = std::make_shared<motion::Asset>();
     asset->id = drawingAsset != 0 ? drawingAsset : std::numeric_limits<motion::Id>::max() - 1;
     asset->name = "Drawing.svg";
     asset->extension = ".svg";
-    const auto svg = motion::drawing::toSvg(drawingEditor->current());
+    const auto svg = motion::drawing::toSvg(editor->current());
     asset->data.append(svg.toRawUTF8(), svg.getNumBytesAsUTF8());
-    if (drawingEditor->current().empty() || motion::decodeAsset(*asset).failed()) {
+    if (editor->current().empty() || motion::decodeAsset(*asset).failed()) {
         processor.prepareComposition(project);
         return;
     }

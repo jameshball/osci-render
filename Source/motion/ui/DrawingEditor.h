@@ -19,7 +19,6 @@ public:
 
     void setTool(Tool value);
 
-    static constexpr int headerHeight = 30;
     void resized() override;
 
     void paint(juce::Graphics& g) override;

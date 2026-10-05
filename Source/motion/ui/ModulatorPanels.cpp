@@ -494,7 +494,6 @@ MotionRoutingPanel::MotionRoutingPanel(MotionProcessor& owner) : processor(owner
     link.setButtonText("Link to...");
     link.setName("Link property");
     link.setTitle("Link property");
-    link.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     link.onClick = [this] { showLinkMenu(); };
     unlink.setButtonText("Unlink");
     unlink.setName("Unlink property");

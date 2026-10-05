@@ -126,27 +126,27 @@ private:
     void dragOperationStarted(const juce::DragAndDropTarget::SourceDetails&) override;
     void dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) override;
     void importExample(const juce::String& resource);
+    // A source being drawn or written takes over the Scene, one at a time,
+    // until it is saved or cancelled, or another project opens.
+    std::unique_ptr<juce::Component> sceneEditor;
+    std::uint64_t sceneEditorGeneration = 0;
+    template <typename Editor>
+    Editor* sceneEditorAs() const { return dynamic_cast<Editor*>(sceneEditor.get()); }
+    template <typename Editor>
+    Editor& openSceneEditor(std::unique_ptr<Editor> editor);
+    void closeSceneEditor();
     void showDrawingEditor(motion::Id asset);
+    void previewDrawing();
+    motion::Id drawingAsset = 0;
     // Text sources are written in the Scene, with the Scope previewing them.
     void showTextEditor(SourceRequest request);
-    void closeTextEditor();
     void previewText();
-    std::unique_ptr<MotionTextSourceEditor> textEditor;
-    void showLuaEditor(SourceRequest request);
-    void closeLuaEditor();
-    std::unique_ptr<MotionLuaSourceEditor> luaEditor;
-    SourceRequest luaRequest;
-    std::uint64_t luaGeneration = 0;
-    bool luaSubmitted = false;
     SourceRequest textRequest;
-    std::uint64_t textGeneration = 0;
     // Typing previews after a short pause rather than on every key.
     double textPreviewDue = 0;
-    void closeDrawingEditor();
-    void previewDrawing();
-    std::unique_ptr<MotionDrawingEditor> drawingEditor;
-    motion::Id drawingAsset = 0;
-    std::uint64_t drawingGeneration = 0;
+    void showLuaEditor(SourceRequest request);
+    SourceRequest luaRequest;
+    bool luaSubmitted = false;
     // `chosen`: the user picked this property; otherwise a new target opens
     // on its first animated channel.
     void selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen = false);

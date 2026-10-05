@@ -18,14 +18,13 @@ public:
         name.setBorderSize({0, 6, 0, 0});
         addAndMakeVisible(name);
         cancelButton.setButtonText("Cancel");
-        cancelButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
         addAndMakeVisible(cancelButton);
         auto& bake = baking.bakeButton();
         bake.setButtonText(editing ? "Bake" : "Add");
         bake.setTitle("Bake source");
         bake.setTooltip("Prepare the source (Cmd+Return)");
-        bake.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f));
+        motion::style::makePrimary(bake);
         addAndMakeVisible(bake);
         baking.setEmbedded(true);
         motion::style::styleFields(baking);
@@ -58,16 +57,10 @@ public:
     std::function<void()> onCancel;
     void focusCode() { editor.getEditor().grabKeyboardFocus(); }
 
-    static constexpr int headerHeight = 30;
 
     void resized() override {
-        auto header = getLocalBounds().removeFromTop(headerHeight).reduced(5, 3);
-        baking.bakeButton().setBounds(header.removeFromRight(64));
-        header.removeFromRight(motion::style::gap);
-        cancelButton.setBounds(header.removeFromRight(64));
-        header.removeFromRight(motion::style::padding);
-        name.setBounds(header);
-        auto page = getLocalBounds().withTrimmedTop(headerHeight + 1).reduced(8);
+        name.setBounds(motion::style::sceneEditor::layoutHeader(getLocalBounds(), baking.bakeButton(), cancelButton));
+        auto page = motion::style::sceneEditor::page(getLocalBounds()).reduced(8);
         // The code takes the full width; the bake settings are a card below.
         card = page.removeFromBottom(MotionBakeSettingsPanel::embeddedHeight + 2 * 10);
         baking.setBounds(card.reduced(12, 10));
@@ -80,11 +73,7 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
-        g.setColour(osci::Colours::surface());
-        g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
-        g.setColour(osci::Colours::veryDark());
-        g.fillRect(getLocalBounds().withTrimmedTop(headerHeight + 1));
+        motion::style::sceneEditor::paint(g, getLocalBounds());
         const auto bounds = card.toFloat();
         g.setColour(osci::Colours::surface());
         g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);

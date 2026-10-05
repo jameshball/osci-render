@@ -286,6 +286,33 @@ public:
 
 // One form layout for every dialog: captions beside or above fields, and
 // the action buttons right-aligned on the last line.
+// The one action a panel exists for (Save, Add, Bake) stands out in the accent.
+inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f)); }
+
+// The frame the Scene's source editors share: a header with the source's
+// name on the left and Cancel and the primary action on the right, over a
+// dark page.
+namespace sceneEditor {
+inline constexpr int headerHeight = 30;
+// Places the header's buttons and returns the room left for the name.
+inline juce::Rectangle<int> layoutHeader(juce::Rectangle<int> bounds, juce::Component& primary, juce::Component& cancel) {
+    auto header = bounds.removeFromTop(headerHeight).reduced(5, 3);
+    primary.setBounds(header.removeFromRight(64));
+    header.removeFromRight(gap);
+    cancel.setBounds(header.removeFromRight(64));
+    header.removeFromRight(padding);
+    return header;
+}
+inline juce::Rectangle<int> page(juce::Rectangle<int> bounds) { return bounds.withTrimmedTop(headerHeight + 1); }
+inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds) {
+    osci::PanelHeader::paintBackground(g, bounds.removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
+    g.setColour(osci::Colours::surface());
+    g.fillRect(bounds.removeFromTop(1));
+    g.setColour(osci::Colours::veryDark());
+    g.fillRect(bounds);
+}
+}
+
 namespace dialog {
 inline constexpr int margin = 12;
 inline constexpr int row = 28;

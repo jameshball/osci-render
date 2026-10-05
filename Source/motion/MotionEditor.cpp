@@ -183,7 +183,6 @@ void MotionEditor::setUpScene() {
     };
     sceneView.setName("Scene view");
     sceneView.setTooltip("Look along an axis (numpad 1, 3, 7), frame the selection (F) or reset the view (0)");
-    sceneView.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     sceneView.onClick = [this] { showSceneViewMenu(false); };
     composition.onContextMenu = [this] { showSceneViewMenu(true); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
@@ -304,7 +303,6 @@ void MotionEditor::setUpTransport() {
     tapButton.setTitle("Tap tempo");
     tapButton.setTooltip("Tap on the beat (four taps or more). The tempo is set when you stop tapping. Detect it from the soundtrack in the timing menu.");
     tapButton.setWantsKeyboardFocus(false);
-    tapButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     tapButton.onClick = [this] { tap(); };
     tempoValue.setName("Project tempo");
     tempoValue.setEditable(false, true);
@@ -834,7 +832,6 @@ void MotionEditor::resized() {
     composition.setBounds(editing.withTrimmedTop(1));
     sceneTools.toFront(false);
     // A drawing or text being edited takes over the Scene.
-    juce::Component* sceneEditor = drawingEditor != nullptr ? static_cast<juce::Component*>(drawingEditor.get()) : textEditor != nullptr ? static_cast<juce::Component*>(textEditor.get()) : luaEditor.get();
     if (sceneEditor != nullptr) {
         sceneEditor->setBounds(viewportBounds);
         for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
@@ -1099,9 +1096,7 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
 
 void MotionEditor::refreshFromDocument() {
     // A drawing belongs to the project it was started in.
-    if (drawingEditor != nullptr && processor.document.generation() != drawingGeneration) { closeDrawingEditor(); }
-    if (textEditor != nullptr && processor.document.generation() != textGeneration) { closeTextEditor(); }
-    if (luaEditor != nullptr && processor.document.generation() != luaGeneration) { closeLuaEditor(); }
+    if (sceneEditor != nullptr && processor.document.generation() != sceneEditorGeneration) { closeSceneEditor(); }
     // An undo or a delete can remove what was selected.
     if (selection != 0 && !selectionExists()) { select(0); }
     sliderBakes.requestUpdate();
