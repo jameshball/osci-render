@@ -1,4 +1,5 @@
 #include "PropertyInspector.h"
+#include "../model/KeyEdit.h"
 #include "../../parser/FileFormatRegistry.h"
 
 MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : processor(owner) {
@@ -140,7 +141,7 @@ void MotionPropertyInspector::refreshValues() {
             if (curve == nullptr) { continue; }
             field->editor.setValue(curve->evaluateBase(time));
             anyAnimated = anyAnimated || curve->animated();
-            allKeyed = allKeyed && hasKey(*curve, time);
+            allKeyed = allKeyed && motion::keyedit::hasKey(*curve, time);
         }
         // A locked track's values show but do not edit.
         for (auto& field : row->fields) { field->editor.setEnabled(!found->locked); }
@@ -430,16 +431,11 @@ double MotionPropertyInspector::keyTime(const motion::PropertyTarget& found) con
     return found.localTime(processor.document.project().frameTime(processor.position.load()));
 }
 
-bool MotionPropertyInspector::hasKey(const motion::Curve& curve, double time) {
-    const auto& keys = curve.keyframes();
-    return std::any_of(keys.begin(), keys.end(), [time](const auto& key) { return std::abs(key.time - time) < 1.0e-6; });
-}
-
 void MotionPropertyInspector::apply(motion::Project& project, const std::string& property, double value, double time) const {
     auto* curve = motion::findPropertyCurve(project, target, property);
     if (curve == nullptr) { curve = createSlider(project, property); }
     if (curve == nullptr) { return; }
-    if (curve->animated()) { curve->setKeyValue(time, value); } else { curve->base = value; }
+    motion::keyedit::setValue(*curve, time, value);
 }
 
 void MotionPropertyInspector::beginGesture(const std::string& property) {
@@ -520,14 +516,14 @@ void MotionPropertyInspector::toggleKeys(Row& row) {
     bool allKeyed = true;
     for (auto& field : row.fields) {
         const auto* curve = found->curve(std::string(field->spec.id));
-        allKeyed = allKeyed && curve != nullptr && hasKey(*curve, time);
+        allKeyed = allKeyed && curve != nullptr && motion::keyedit::hasKey(*curve, time);
     }
     processor.document.edit(allKeyed ? "Remove keyframe" : "Set keyframe", [&](motion::Project& project) {
         for (auto& field : row.fields) {
             auto* curve = motion::findPropertyCurve(project, target, std::string(field->spec.id));
             if (curve == nullptr) { curve = createSlider(project, std::string(field->spec.id)); }
             if (curve == nullptr) { continue; }
-            if (allKeyed) { curve->removeKey(time); } else { curve->setKeyValue(time, curve->evaluateBase(time)); }
+            motion::keyedit::setKeyed(*curve, time, !allKeyed);
         }
     });
     if (!row.fields.empty() && onPropertySelected) { onPropertySelected(target, std::string(row.fields.front()->spec.id)); }

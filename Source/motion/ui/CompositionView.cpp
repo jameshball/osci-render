@@ -1,4 +1,5 @@
 #include "CompositionView.h"
+#include "../model/KeyEdit.h"
 
 MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : processor(processor) {
     setName("Composition preview");
@@ -122,15 +123,8 @@ void MotionCompositionView::toggleCameraKey(motion::Id id) {
             if (item.id != id) { continue; }
             for (const auto& spec : motion::cameraPropertySpecs) {
                 auto& curve = item.properties[std::string(spec.id)];
-                if (curve.link.has_value()) { continue; }
-                const auto value = curve.evaluateBase(time);
-                if (!keyed) {
-                    curve.setKeyValue(time, value);
-                    continue;
-                }
-                curve.removeKey(time);
                 // Without keys the camera keeps the pose it had here.
-                if (!curve.animated()) { curve.base = value; }
+                if (!curve.link.has_value()) { motion::keyedit::setKeyed(curve, time, !keyed); }
             }
         }
     });

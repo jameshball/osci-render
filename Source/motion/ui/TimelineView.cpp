@@ -1,4 +1,5 @@
 #include "TimelineView.h"
+#include "../model/KeyEdit.h"
 
 MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
     setName("Composition timeline");
@@ -2289,13 +2290,8 @@ void MotionTimelineView::deleteCameraKey(motion::Id id, double time) {
         bool removed = false;
         for (auto& camera : project.cameras) {
             if (camera.id != id) { continue; }
-            for (auto& [name, curve] : camera.properties) {
-                const auto value = curve.evaluateBase(time);
-                if (!curve.removeKey(time)) { continue; }
-                removed = true;
-                // Without keys the camera keeps the pose it had here.
-                if (!curve.animated()) { curve.base = value; }
-            }
+            // Without keys the camera keeps the pose it had here.
+            for (auto& [name, curve] : camera.properties) { removed = motion::keyedit::setKeyed(curve, time, false) || removed; }
         }
         return removed;
     });

@@ -32,6 +32,32 @@ inline const Keyframe* findKey(const Curve& curve, double time) {
     const auto found = std::find_if(keys.begin(), keys.end(), [time](const Keyframe& key) { return sameTime(key.time, time); });
     return found != keys.end() ? &*found : nullptr;
 }
+inline bool hasKey(const Curve& curve, double time) { return findKey(curve, time) != nullptr; }
+
+// A typed or dragged value: keyed at `time` on an animated curve, otherwise
+// the curve's constant value.
+inline void setValue(Curve& curve, double time, double value) {
+    if (curve.animated()) {
+        curve.setKeyValue(time, value);
+    } else {
+        curve.base = value;
+    }
+}
+
+// Keys the curve's own value at `time`, or removes the key there; a curve
+// left without keys keeps the value it had at `time`. False when nothing
+// changed.
+inline bool setKeyed(Curve& curve, double time, bool keyed) {
+    const auto value = curve.evaluateBase(time);
+    if (keyed) {
+        if (hasKey(curve, time)) { return false; }
+        curve.setKeyValue(time, value);
+        return true;
+    }
+    if (!curve.removeKey(time)) { return false; }
+    if (!curve.animated()) { curve.base = value; }
+    return true;
+}
 
 // Sets the interpolation leaving the key at `time`; false when there is no
 // such key or it already has it. Bezier handles start on the automatic

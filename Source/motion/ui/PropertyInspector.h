@@ -106,7 +106,6 @@ private:
 
     // Keys land on frames so they align with the timeline grid and exports.
     double keyTime(const motion::PropertyTarget& found) const;
-    static bool hasKey(const motion::Curve& curve, double time);
     void apply(motion::Project& project, const std::string& property, double value, double time) const;
     void beginGesture(const std::string& property);
     void previewValue(const std::string& property, double value);

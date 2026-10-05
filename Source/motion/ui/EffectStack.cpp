@@ -1,4 +1,5 @@
 #include "EffectStack.h"
+#include "../model/KeyEdit.h"
 
 void MotionEffectStack::setOwner(std::optional<motion::Id> value, motion::Id clip) {
     if (value != owner || clip != context) {
@@ -428,12 +429,10 @@ void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {
     const auto* curve = target.has_value() ? target->curve(property) : nullptr;
     if (curve == nullptr) { return; }
     const auto local = target->localTime(frameTime());
-    const auto& keys = curve->keyframes();
-    const bool keyed = std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return std::abs(key.time - local) < 1.0e-6; });
+    const bool keyed = motion::keyedit::hasKey(*curve, local);
     processor.document.edit(keyed ? "Remove keyframe" : "Key effect parameter", [id, property, local, keyed](motion::Project& project) {
         auto* changed = motion::findPropertyCurve(project, id, property);
-        if (changed == nullptr) { return; }
-        if (keyed) { changed->removeKey(local); } else { changed->setKeyValue(local, changed->evaluateBase(local)); }
+        if (changed != nullptr) { motion::keyedit::setKeyed(*changed, local, !keyed); }
     });
     if (onPropertySelected) { onPropertySelected(id, property); }
 }
@@ -464,7 +463,7 @@ void MotionEffectStack::setValue(motion::Id id, const std::string& property, dou
     const auto operation = [id, property, value, local](motion::Project& project) {
         auto* changed = motion::findPropertyCurve(project, id, property);
         if (changed == nullptr) { return; }
-        if (changed->animated()) { changed->setKeyValue(local, value); } else { changed->base = value; }
+        motion::keyedit::setValue(*changed, local, value);
     };
     if (gesture.active()) {
         const auto previous = motion::findPropertyTarget(gesture.start(), id);
