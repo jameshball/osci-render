@@ -409,89 +409,265 @@
       <FILE id="TJDqWs" name="LookAndFeel.h" compile="0" resource="0" file="Source/LookAndFeel.h"/>
     </GROUP>
     <GROUP id="MotionSrc" name="Motion">
-      <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
-      <FILE id="MotionMotionProcessorh" name="MotionProcessor.h" compile="0"
-            resource="0" file="Source/motion/MotionProcessor.h"/>
-      <FILE id="MotionMotionProcessorcpp" name="MotionProcessor.cpp" compile="1"
-            resource="0" file="Source/motion/MotionProcessor.cpp"/>
-      <FILE id="MotionMotionEditorh" name="MotionEditor.h" compile="0" resource="0"
-            file="Source/motion/MotionEditor.h"/>
       <FILE id="MotionMotionEditorcpp" name="MotionEditor.cpp" compile="1"
             resource="0" file="Source/motion/MotionEditor.cpp"/>
+      <FILE id="MotionMotionEditorh" name="MotionEditor.h" compile="0" resource="0"
+            file="Source/motion/MotionEditor.h"/>
+      <FILE id="MotionMotionProcessorcpp" name="MotionProcessor.cpp" compile="1"
+            resource="0" file="Source/motion/MotionProcessor.cpp"/>
+      <FILE id="MotionMotionProcessorh" name="MotionProcessor.h" compile="0"
+            resource="0" file="Source/motion/MotionProcessor.h"/>
+      <FILE id="MotScopeBeamh" name="ScopeBeam.h" compile="0" resource="0"
+            file="Source/motion/ScopeBeam.h"/>
+      <GROUP id="MotionSrcExport" name="export">
+        <FILE id="MotSignalExport" name="SignalExporter.h" compile="0" resource="0"
+              file="Source/motion/export/SignalExporter.h"/>
+        <FILE id="MotMusicExport" name="SoundtrackExporter.h" compile="0" resource="0"
+              file="Source/motion/export/SoundtrackExporter.h"/>
+        <FILE id="MotWavExport" name="WavExporter.h" compile="0" resource="0"
+              file="Source/motion/export/WavExporter.h"/>
+      </GROUP>
+      <GROUP id="MotionSrcImport" name="import">
+        <FILE id="MotimportBakedSourceArchiveh" name="BakedSourceArchive.h"
+              compile="0" resource="0" file="Source/motion/import/BakedSourceArchive.h"/>
+        <FILE id="MotimportLuaBakerh" name="LuaBaker.h" compile="0" resource="0"
+              file="Source/motion/import/LuaBaker.h"/>
+        <FILE id="MotimportMidiSourcePreparerh" name="MidiSourcePreparer.h"
+              compile="0" resource="0" file="Source/motion/import/MidiSourcePreparer.h"/>
+        <FILE id="MotimportRasterBeamBuilderh" name="RasterBeamBuilder.h" compile="0"
+              resource="0" file="Source/motion/import/RasterBeamBuilder.h"/>
+        <FILE id="MotimportRasterSourcePreparerh" name="RasterSourcePreparer.h"
+              compile="0" resource="0" file="Source/motion/import/RasterSourcePreparer.h"/>
+        <FILE id="MotimportVideoDecoderProcessh" name="VideoDecoderProcess.h"
+              compile="0" resource="0" file="Source/motion/import/VideoDecoderProcess.h"/>
+        <FILE id="MotimportVideoSourcePreparerh" name="VideoSourcePreparer.h"
+              compile="0" resource="0" file="Source/motion/import/VideoSourcePreparer.h"/>
+      </GROUP>
+      <GROUP id="MotionSrcLive" name="live">
+        <FILE id="MotliveBlenderCaptureh" name="BlenderCapture.h" compile="0"
+              resource="0" file="Source/motion/live/BlenderCapture.h"/>
+        <FILE id="MotliveBlenderCaptureArchiveh" name="BlenderCaptureArchive.h"
+              compile="0" resource="0" file="Source/motion/live/BlenderCaptureArchive.h"/>
+        <FILE id="MotliveBlenderFrameh" name="BlenderFrame.h" compile="0" resource="0"
+              file="Source/motion/live/BlenderFrame.h"/>
+        <FILE id="MotliveBlenderReceiverh" name="BlenderReceiver.h" compile="0"
+              resource="0" file="Source/motion/live/BlenderReceiver.h"/>
+        <FILE id="MotliveBlenderSourceSettingsh" name="BlenderSourceSettings.h"
+              compile="0" resource="0" file="Source/motion/live/BlenderSourceSettings.h"/>
+        <FILE id="MotliveLiveBlenderControllerh" name="LiveBlenderController.h"
+              compile="0" resource="0" file="Source/motion/live/LiveBlenderController.h"/>
+        <FILE id="MotliveLiveSourceExchangeh" name="LiveSourceExchange.h" compile="0"
+              resource="0" file="Source/motion/live/LiveSourceExchange.h"/>
+        <FILE id="MotliveLiveSourceFramesh" name="LiveSourceFrames.h" compile="0"
+              resource="0" file="Source/motion/live/LiveSourceFrames.h"/>
+        <FILE id="MotlivePreparedBlenderFrameh" name="PreparedBlenderFrame.h"
+              compile="0" resource="0" file="Source/motion/live/PreparedBlenderFrame.h"/>
+        <FILE id="MotlivePreparedBlenderInputh" name="PreparedBlenderInput.h"
+              compile="0" resource="0" file="Source/motion/live/PreparedBlenderInput.h"/>
+      </GROUP>
+      <GROUP id="MotionSrcModel" name="model">
+        <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
+              file="Source/motion/model/Animation.h"/>
+        <FILE id="MotmodelBakeSettingsh" name="BakeSettings.h" compile="0"
+              resource="0" file="Source/motion/model/BakeSettings.h"/>
+        <FILE id="MotmodelBeamh" name="Beam.h" compile="0" resource="0" file="Source/motion/model/Beam.h"/>
+        <FILE id="MotCameraModel" name="Camera.h" compile="0" resource="0"
+              file="Source/motion/model/Camera.h"/>
+        <FILE id="MotmodelClipTimingh" name="ClipTiming.h" compile="0" resource="0"
+              file="Source/motion/model/ClipTiming.h"/>
+        <FILE id="MotmodelCompositionExpansionh" name="CompositionExpansion.h"
+              compile="0" resource="0" file="Source/motion/model/CompositionExpansion.h"/>
+        <FILE id="MotmodelCompositionGraphh" name="CompositionGraph.h" compile="0"
+              resource="0" file="Source/motion/model/CompositionGraph.h"/>
+        <FILE id="MotionDoc" name="Document.cpp" compile="1" resource="0" file="Source/motion/model/Document.cpp"/>
+        <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
+        <FILE id="MotmodelDrawingh" name="Drawing.h" compile="0" resource="0"
+              file="Source/motion/model/Drawing.h"/>
+        <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
+        <FILE id="MotmodelFrameTimingh" name="FrameTiming.h" compile="0" resource="0"
+              file="Source/motion/model/FrameTiming.h"/>
+        <FILE id="motgroupmodel" name="Group.h" compile="0" resource="0" file="Source/motion/model/Group.h"/>
+        <FILE id="MotmodelKeyEasingh" name="KeyEasing.h" compile="0" resource="0"
+              file="Source/motion/model/KeyEasing.h"/>
+        <FILE id="MotKeyEdit" name="KeyEdit.h" compile="0" resource="0" file="Source/motion/model/KeyEdit.h"/>
+        <FILE id="MotmodelLuaClipBakeh" name="LuaClipBake.h" compile="0" resource="0"
+              file="Source/motion/model/LuaClipBake.h"/>
+        <FILE id="MotmodelMidiInstrumenth" name="MidiInstrument.h" compile="0"
+              resource="0" file="Source/motion/model/MidiInstrument.h"/>
+        <FILE id="MotmodelMidiNotesh" name="MidiNotes.h" compile="0" resource="0"
+              file="Source/motion/model/MidiNotes.h"/>
+        <FILE id="MotmodelMidiTakeNotesh" name="MidiTakeNotes.h" compile="0"
+              resource="0" file="Source/motion/model/MidiTakeNotes.h"/>
+        <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
+              file="Source/motion/model/Modulation.h"/>
+        <FILE id="motmodgraph" name="ModulationGraph.h" compile="0" resource="0"
+              file="Source/motion/model/ModulationGraph.h"/>
+        <FILE id="motmodulators" name="Modulators.h" compile="0" resource="0"
+              file="Source/motion/model/Modulators.h"/>
+        <FILE id="MotmodelPointFrameCacheh" name="PointFrameCache.h" compile="0"
+              resource="0" file="Source/motion/model/PointFrameCache.h"/>
+        <FILE id="MotmodelPreparedPointFramesh" name="PreparedPointFrames.h"
+              compile="0" resource="0" file="Source/motion/model/PreparedPointFrames.h"/>
+        <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
+              file="Source/motion/model/PreparedSource.h"/>
+        <FILE id="MotmodelPropertySchemah" name="PropertySchema.h" compile="0"
+              resource="0" file="Source/motion/model/PropertySchema.h"/>
+        <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"
+              file="Source/motion/model/PropertyTarget.h"/>
+        <FILE id="MotmodelRasterSettingsh" name="RasterSettings.h" compile="0"
+              resource="0" file="Source/motion/model/RasterSettings.h"/>
+        <FILE id="MotmodelScopeProfileh" name="ScopeProfile.h" compile="0"
+              resource="0" file="Source/motion/model/ScopeProfile.h"/>
+        <FILE id="MotmodelSpatialMotionh" name="SpatialMotion.h" compile="0"
+              resource="0" file="Source/motion/model/SpatialMotion.h"/>
+        <FILE id="MotmodelTapTempoh" name="TapTempo.h" compile="0" resource="0"
+              file="Source/motion/model/TapTempo.h"/>
+        <FILE id="MotmodelTempoh" name="Tempo.h" compile="0" resource="0" file="Source/motion/model/Tempo.h"/>
+        <FILE id="MotmodelTempoDetectionh" name="TempoDetection.h" compile="0"
+              resource="0" file="Source/motion/model/TempoDetection.h"/>
+        <FILE id="MotmodelTextSettingsh" name="TextSettings.h" compile="0"
+              resource="0" file="Source/motion/model/TextSettings.h"/>
+        <FILE id="mottimegrid" name="TimeGrid.h" compile="0" resource="0" file="Source/motion/model/TimeGrid.h"/>
+        <FILE id="MotTimeline" name="Timeline.h" compile="0" resource="0" file="Source/motion/model/Timeline.h"/>
+      </GROUP>
+      <GROUP id="MotionSrcRender" name="render">
+        <FILE id="MotrenderBeamRendererh" name="BeamRenderer.h" compile="0"
+              resource="0" file="Source/motion/render/BeamRenderer.h"/>
+        <FILE id="MotrenderBeamTransitionGuardh" name="BeamTransitionGuard.h"
+              compile="0" resource="0" file="Source/motion/render/BeamTransitionGuard.h"/>
+        <FILE id="MotrenderCompositionPreparationWorkerh" name="CompositionPreparationWorker.h"
+              compile="0" resource="0" file="Source/motion/render/CompositionPreparationWorker.h"/>
+        <FILE id="MotCompositionRenderer" name="CompositionRenderer.h" compile="0"
+              resource="0" file="Source/motion/render/CompositionRenderer.h"/>
+        <FILE id="MotrenderLiveMidiAuditionh" name="LiveMidiAudition.h" compile="0"
+              resource="0" file="Source/motion/render/LiveMidiAudition.h"/>
+        <FILE id="MotrenderLiveMidiInputsh" name="LiveMidiInputs.h" compile="0"
+              resource="0" file="Source/motion/render/LiveMidiInputs.h"/>
+        <FILE id="MotrenderLiveMidiPerformanceh" name="LiveMidiPerformance.h"
+              compile="0" resource="0" file="Source/motion/render/LiveMidiPerformance.h"/>
+        <FILE id="MotrenderLuaSliderBakesh" name="LuaSliderBakes.h" compile="0"
+              resource="0" file="Source/motion/render/LuaSliderBakes.h"/>
+        <FILE id="MotrenderMidiRecordingh" name="MidiRecording.h" compile="0"
+              resource="0" file="Source/motion/render/MidiRecording.h"/>
+        <FILE id="MotrenderMidiRecordingSessionh" name="MidiRecordingSession.h"
+              compile="0" resource="0" file="Source/motion/render/MidiRecordingSession.h"/>
+        <FILE id="motpreparedaudio" name="PreparedAudio.h" compile="0" resource="0"
+              file="Source/motion/render/PreparedAudio.h"/>
+        <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
+              resource="0" file="Source/motion/render/PreparedDrivers.h"/>
+        <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
+              resource="0" file="Source/motion/render/PreparedEffects.h"/>
+        <FILE id="MotrenderPreparedMidiInstrumenth" name="PreparedMidiInstrument.h"
+              compile="0" resource="0" file="Source/motion/render/PreparedMidiInstrument.h"/>
+        <FILE id="MotrenderPreparedMidiPerformanceh" name="PreparedMidiPerformance.h"
+              compile="0" resource="0" file="Source/motion/render/PreparedMidiPerformance.h"/>
+        <FILE id="MotrenderPreparedMidiScheduleh" name="PreparedMidiSchedule.h"
+              compile="0" resource="0" file="Source/motion/render/PreparedMidiSchedule.h"/>
+        <FILE id="motsoundtrack" name="PreparedSoundtrack.h" compile="0" resource="0"
+              file="Source/motion/render/PreparedSoundtrack.h"/>
+        <FILE id="MotSampleClock" name="SampleClock.h" compile="0" resource="0"
+              file="Source/motion/render/SampleClock.h"/>
+        <FILE id="MotrenderTimeCacheh" name="TimeCache.h" compile="0" resource="0"
+              file="Source/motion/render/TimeCache.h"/>
+      </GROUP>
+      <GROUP id="MotionSrcUi" name="ui">
+        <FILE id="MotAssetLibrary" name="AssetLibrary.h" compile="0" resource="0"
+              file="Source/motion/ui/AssetLibrary.h"/>
+        <FILE id="MotuiBakeSettingsPanelh" name="BakeSettingsPanel.h" compile="0"
+              resource="0" file="Source/motion/ui/BakeSettingsPanel.h"/>
+        <FILE id="MotuiBlenderSourcePanelh" name="BlenderSourcePanel.h" compile="0"
+              resource="0" file="Source/motion/ui/BlenderSourcePanel.h"/>
+        <FILE id="MotCameraPanel" name="CameraPanel.h" compile="0" resource="0"
+              file="Source/motion/ui/CameraPanel.h"/>
+        <FILE id="MotCanvasSize" name="CanvasSizeEditor.h" compile="0" resource="0"
+              file="Source/motion/ui/CanvasSizeEditor.h"/>
+        <FILE id="MotClipTiming" name="ClipTimingPanel.h" compile="0" resource="0"
+              file="Source/motion/ui/ClipTimingPanel.h"/>
+        <FILE id="MotColourPicker" name="ColourPicker.h" compile="0" resource="0"
+              file="Source/motion/ui/ColourPicker.h"/>
+        <FILE id="MotuiCompositionGizmoh" name="CompositionGizmo.h" compile="0"
+              resource="0" file="Source/motion/ui/CompositionGizmo.h"/>
+        <FILE id="MotuiCompositionPanelh" name="CompositionPanel.h" compile="0"
+              resource="0" file="Source/motion/ui/CompositionPanel.h"/>
+        <FILE id="MotCompositionView" name="CompositionView.h" compile="0"
+              resource="0" file="Source/motion/ui/CompositionView.h"/>
+        <FILE id="MotCurveEditor" name="CurveEditor.h" compile="0" resource="0"
+              file="Source/motion/ui/CurveEditor.h"/>
+        <FILE id="MotuiCurveListh" name="CurveList.h" compile="0" resource="0"
+              file="Source/motion/ui/CurveList.h"/>
+        <FILE id="MotuiDrawingEditorh" name="DrawingEditor.h" compile="0" resource="0"
+              file="Source/motion/ui/DrawingEditor.h"/>
+        <FILE id="MotuiEditorCamerah" name="EditorCamera.h" compile="0" resource="0"
+              file="Source/motion/ui/EditorCamera.h"/>
+        <FILE id="MotuiEditorTransformFrameh" name="EditorTransformFrame.h"
+              compile="0" resource="0" file="Source/motion/ui/EditorTransformFrame.h"/>
+        <FILE id="MotEffectLibrary" name="EffectLibrary.h" compile="0" resource="0"
+              file="Source/motion/ui/EffectLibrary.h"/>
+        <FILE id="MotuiEffectStackh" name="EffectStack.h" compile="0" resource="0"
+              file="Source/motion/ui/EffectStack.h"/>
+        <FILE id="MotuiFractalSettingsPanelh" name="FractalSettingsPanel.h"
+              compile="0" resource="0" file="Source/motion/ui/FractalSettingsPanel.h"/>
+        <FILE id="MotGrabCursorC" name="GrabCursor.cpp" compile="1" resource="0"
+              file="Source/motion/ui/GrabCursor.cpp"/>
+        <FILE id="MotGrabCursorH" name="GrabCursor.h" compile="0" resource="0"
+              file="Source/motion/ui/GrabCursor.h"/>
+        <FILE id="MotGrabCursorM" name="GrabCursor_mac.mm" compile="1" resource="0"
+              file="Source/motion/ui/GrabCursor_mac.mm"/>
+        <FILE id="MotuiLineBatchh" name="LineBatch.h" compile="0" resource="0"
+              file="Source/motion/ui/LineBatch.h"/>
+        <FILE id="MotuiLuaSourceEditorh" name="LuaSourceEditor.h" compile="0"
+              resource="0" file="Source/motion/ui/LuaSourceEditor.h"/>
+        <FILE id="MotuiMarkerPanelh" name="MarkerPanel.h" compile="0" resource="0"
+              file="Source/motion/ui/MarkerPanel.h"/>
+        <FILE id="MotuiMidiEnvelopePanelh" name="MidiEnvelopePanel.h" compile="0"
+              resource="0" file="Source/motion/ui/MidiEnvelopePanel.h"/>
+        <FILE id="MotModulatorPanels" name="ModulatorPanels.h" compile="0"
+              resource="0" file="Source/motion/ui/ModulatorPanels.h"/>
+        <FILE id="MotuiMotionIconsh" name="MotionIcons.h" compile="0" resource="0"
+              file="Source/motion/ui/MotionIcons.h"/>
+        <FILE id="MotuiMotionPathh" name="MotionPath.h" compile="0" resource="0"
+              file="Source/motion/ui/MotionPath.h"/>
+        <FILE id="MotuiMotionStyleh" name="MotionStyle.h" compile="0" resource="0"
+              file="Source/motion/ui/MotionStyle.h"/>
+        <FILE id="MotuiMotionTabsh" name="MotionTabs.h" compile="0" resource="0"
+              file="Source/motion/ui/MotionTabs.h"/>
+        <FILE id="MotuiNotesEditorh" name="NotesEditor.h" compile="0" resource="0"
+              file="Source/motion/ui/NotesEditor.h"/>
+        <FILE id="MotuiPlayheadStriph" name="PlayheadStrip.h" compile="0" resource="0"
+              file="Source/motion/ui/PlayheadStrip.h"/>
+        <FILE id="MotuiPropertyInspectorh" name="PropertyInspector.h" compile="0"
+              resource="0" file="Source/motion/ui/PropertyInspector.h"/>
+        <FILE id="MotuiRasterSettingsPanelh" name="RasterSettingsPanel.h" compile="0"
+              resource="0" file="Source/motion/ui/RasterSettingsPanel.h"/>
+        <FILE id="MotuiSceneToolbarh" name="SceneToolbar.h" compile="0" resource="0"
+              file="Source/motion/ui/SceneToolbar.h"/>
+        <FILE id="MotuiScopeSettingsh" name="ScopeSettings.h" compile="0" resource="0"
+              file="Source/motion/ui/ScopeSettings.h"/>
+        <FILE id="MotuiScrubFieldh" name="ScrubField.h" compile="0" resource="0"
+              file="Source/motion/ui/ScrubField.h"/>
+        <FILE id="MotuiShortcutsOverlayh" name="ShortcutsOverlay.h" compile="0"
+              resource="0" file="Source/motion/ui/ShortcutsOverlay.h"/>
+        <FILE id="MotuiStatusBarh" name="StatusBar.h" compile="0" resource="0"
+              file="Source/motion/ui/StatusBar.h"/>
+        <FILE id="MotuiTextAnimationPanelh" name="TextAnimationPanel.h" compile="0"
+              resource="0" file="Source/motion/ui/TextAnimationPanel.h"/>
+        <FILE id="MotuiTextSourceEditorh" name="TextSourceEditor.h" compile="0"
+              resource="0" file="Source/motion/ui/TextSourceEditor.h"/>
+        <FILE id="MotTimelineView" name="TimelineView.h" compile="0" resource="0"
+              file="Source/motion/ui/TimelineView.h"/>
+        <FILE id="mottrackhdr" name="TrackHeader.h" compile="0" resource="0"
+              file="Source/motion/ui/TrackHeader.h"/>
+        <FILE id="mottracklayout" name="TrackLayout.h" compile="0" resource="0"
+              file="Source/motion/ui/TrackLayout.h"/>
+        <FILE id="MotuiTransformGizmoh" name="TransformGizmo.h" compile="0"
+              resource="0" file="Source/motion/ui/TransformGizmo.h"/>
+        <FILE id="MotVideoSettings" name="VideoExportSettings.h" compile="0"
+              resource="0" file="Source/motion/ui/VideoExportSettings.h"/>
+      </GROUP>
       <FILE id="MotionIcon" name="osci_mac.png" compile="0" resource="1"
             file="Resources/images/osci_mac.png"/>
-      <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
-            file="Source/motion/model/Animation.h"/>
-      <FILE id="motpreparedaudio" name="PreparedAudio.h" compile="0" resource="0"
-            file="Source/motion/render/PreparedAudio.h"/>
-      <FILE id="motsoundtrack" name="PreparedSoundtrack.h" compile="0" resource="0"
-            file="Source/motion/render/PreparedSoundtrack.h"/>
-      <FILE id="mottimegrid" name="TimeGrid.h" compile="0" resource="0" file="Source/motion/model/TimeGrid.h"/>
-      <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
-            file="Source/motion/model/Modulation.h"/>
-      <FILE id="motmodulators" name="Modulators.h" compile="0" resource="0"
-            file="Source/motion/model/Modulators.h"/>
-      <FILE id="motmodgraph" name="ModulationGraph.h" compile="0" resource="0"
-            file="Source/motion/model/ModulationGraph.h"/>
-      <FILE id="MotDocument" name="Document.h" compile="0" resource="0" file="Source/motion/model/Document.h"/>
-      <FILE id="MotTimeline" name="Timeline.h" compile="0" resource="0" file="Source/motion/model/Timeline.h"/>
-      <FILE id="motgroupmodel" name="Group.h" compile="0" resource="0" file="Source/motion/model/Group.h"/>
-      <FILE id="MotCompositionRenderer" name="CompositionRenderer.h" compile="0"
-            resource="0" file="Source/motion/render/CompositionRenderer.h"/>
-      <FILE id="MotAssetLibrary" name="AssetLibrary.h" compile="0" resource="0"
-            file="Source/motion/ui/AssetLibrary.h"/>
-      <FILE id="MotClipTiming" name="ClipTimingPanel.h" compile="0" resource="0"
-            file="Source/motion/ui/ClipTimingPanel.h"/>
-      <FILE id="MotCameraPanel" name="CameraPanel.h" compile="0" resource="0"
-            file="Source/motion/ui/CameraPanel.h"/>
-      <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"
-            file="Source/motion/model/PropertyTarget.h"/>
-      <FILE id="MotKeyEdit" name="KeyEdit.h" compile="0" resource="0" file="Source/motion/model/KeyEdit.h"/>
-      <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
-      <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
-            resource="0" file="Source/motion/render/PreparedEffects.h"/>
-      <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
-            resource="0" file="Source/motion/render/PreparedDrivers.h"/>
-      <FILE id="MotModulatorPanels" name="ModulatorPanels.h" compile="0"
-            resource="0" file="Source/motion/ui/ModulatorPanels.h"/>
-      <FILE id="MotEffectLibrary" name="EffectLibrary.h" compile="0" resource="0"
-            file="Source/motion/ui/EffectLibrary.h"/>
-      <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
-            file="Source/motion/model/PreparedSource.h"/>
-      <FILE id="MotSampleClock" name="SampleClock.h" compile="0" resource="0"
-            file="Source/motion/render/SampleClock.h"/>
-      <FILE id="MotSignalExport" name="SignalExporter.h" compile="0" resource="0"
-            file="Source/motion/export/SignalExporter.h"/>
-      <FILE id="MotWavExport" name="WavExporter.h" compile="0" resource="0"
-            file="Source/motion/export/WavExporter.h"/>
-      <FILE id="MotMusicExport" name="SoundtrackExporter.h" compile="0" resource="0"
-            file="Source/motion/export/SoundtrackExporter.h"/>
-      <FILE id="MotCanvasSize" name="CanvasSizeEditor.h" compile="0" resource="0"
-            file="Source/motion/ui/CanvasSizeEditor.h"/>
-      <FILE id="MotColourPicker" name="ColourPicker.h" compile="0" resource="0"
-            file="Source/motion/ui/ColourPicker.h"/>
-      <FILE id="MotGrabCursorH" name="GrabCursor.h" compile="0" resource="0"
-            file="Source/motion/ui/GrabCursor.h"/>
-      <FILE id="MotGrabCursorC" name="GrabCursor.cpp" compile="1" resource="0"
-            file="Source/motion/ui/GrabCursor.cpp"/>
-      <FILE id="MotGrabCursorM" name="GrabCursor_mac.mm" compile="1" resource="0"
-            file="Source/motion/ui/GrabCursor_mac.mm"/>
-      <FILE id="MotVideoSettings" name="VideoExportSettings.h" compile="0"
-            resource="0" file="Source/motion/ui/VideoExportSettings.h"/>
       <FILE id="OfflineBeamSnap" name="OfflineVisualiserParameters.h" compile="0"
             resource="0" file="Source/visualiser/OfflineVisualiserParameters.h"/>
-      <FILE id="MotCurveEditor" name="CurveEditor.h" compile="0" resource="0"
-            file="Source/motion/ui/CurveEditor.h"/>
-      <FILE id="MotCameraModel" name="Camera.h" compile="0" resource="0"
-            file="Source/motion/model/Camera.h"/>
-      <FILE id="MotCompositionView" name="CompositionView.h" compile="0"
-            resource="0" file="Source/motion/ui/CompositionView.h"/>
-      <FILE id="MotTimelineView" name="TimelineView.h" compile="0" resource="0"
-            file="Source/motion/ui/TimelineView.h"/>
-      <FILE id="mottrackhdr" name="TrackHeader.h" compile="0" resource="0"
-            file="Source/motion/ui/TrackHeader.h"/>
-      <FILE id="mottracklayout" name="TrackLayout.h" compile="0" resource="0"
-            file="Source/motion/ui/TrackLayout.h"/>
     </GROUP>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_WEB_BROWSER="0" JUCE_USE_MP3AUDIOFORMAT="1"
