@@ -79,7 +79,7 @@ public:
         juce::ignoreUnused(fps);
         error.setFont(motion::style::body());
         error.setBorderSize({});
-        error.setColour(juce::Label::textColourId, motion::style::danger());
+        error.setColour(juce::Label::textColourId, osci::Colours::danger());
         canvas.onChange = [this] { error.setText({}, juce::dontSendNotification); };
         apply.onClick = [this] {
             const auto size = canvas.value();

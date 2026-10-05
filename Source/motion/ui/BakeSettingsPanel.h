@@ -66,7 +66,7 @@ public:
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         note.setVisible(false);
         error.setName("Bake validation error");
-        error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
+        error.setColour(juce::Label::textColourId, motion::style::error());
         bake.setName("Bake source");
         bake.setButtonText("Bake source");
         bake.onClick = [this] {

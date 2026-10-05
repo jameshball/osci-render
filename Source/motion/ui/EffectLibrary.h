@@ -68,9 +68,9 @@ private:
         void paint(juce::Graphics& g) override {
             const auto hover = fade.value();
             const auto bounds = getLocalBounds().toFloat();
-            g.setColour(motion::style::field().interpolatedWith(motion::style::raised(), hover));
+            g.setColour(osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover));
             g.fillRoundedRectangle(bounds, motion::style::radius + 1);
-            g.setColour(motion::style::accent().withAlpha(.1f + .35f * hover));
+            g.setColour(osci::Colours::accentColor().withAlpha(.1f + .35f * hover));
             g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
             auto area = getLocalBounds().reduced(motion::style::gap);
             const auto thumb = area.removeFromLeft(area.getHeight()).toFloat();
@@ -80,7 +80,7 @@ private:
             g.setColour(tint.withAlpha(.55f + .45f * hover));
             g.strokePath(thumbnail, juce::PathStrokeType(1.0f), transform);
             area.removeFromLeft(motion::style::padding);
-            g.setColour(motion::style::text());
+            g.setColour(osci::Colours::text());
             g.setFont(motion::style::body());
             g.drawText(getName(), area, juce::Justification::centredLeft, true);
         }

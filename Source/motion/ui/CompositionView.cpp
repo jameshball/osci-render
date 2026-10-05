@@ -215,7 +215,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
             // Long, fast jumps fade so the drawn shape reads over them.
             const auto distance = previous->getDistanceFrom(*next);
             const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
-            const auto colour = highlighted ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
+            const auto colour = highlighted ? motion::style::selection() : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
             (highlighted ? highlightedLines : lines).add({ *previous, *next }, colour.withAlpha(alpha * 0.8f));
             previous = next;
             previousLit = lit;
@@ -242,7 +242,7 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
             return std::array<motion::editor::Vec3, 4> {centre - right * half + up * half, centre + right * half + up * half, centre + right * half - up * half, centre - right * half - up * half};
         };
         const bool isActive = &camera == active, isSelected = camera.id == selected;
-        const auto colour = isSelected ? juce::Colour(0xff9affb3) : isActive ? motion::style::text() : motion::style::muted();
+        const auto colour = isSelected ? motion::style::selection() : isActive ? osci::Colours::text() : osci::Colours::textMuted();
         g.setColour(colour.withAlpha(isSelected || isActive ? .85f : .5f));
         const auto corners = rectangle(.45);
         // Seen from (nearly) inside the camera the pyramid would fill
@@ -529,11 +529,11 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
     if (effectDrag) {
         // Over empty space the whole Scene is the target.
         const auto everything = dropHover.has_value() && *dropHover == 0;
-        g.setColour(motion::style::accent().withAlpha(everything ? .9f : .3f));
+        g.setColour(osci::Colours::accentColor().withAlpha(everything ? .9f : .3f));
         g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(2.0f), motion::style::panelRadius, everything ? 2.0f : 1.0f);
         if (everything) {
             auto label = getLocalBounds().removeFromBottom(30).withSizeKeepingCentre(110, 22);
-            g.setColour(motion::style::accent().withAlpha(.85f));
+            g.setColour(osci::Colours::accentColor().withAlpha(.85f));
             g.fillRoundedRectangle(label.toFloat(), motion::style::radius + 2);
             g.setColour(juce::Colours::white);
             g.setFont(motion::style::body());
@@ -676,7 +676,7 @@ void MotionCompositionView::updateMotionPath() {
 void MotionCompositionView::paintMotionPath(juce::Graphics& g) {
     if (!showMotionPath || navigating || selected == 0) { return; }
     updateMotionPath();
-    const auto colour = juce::Colour(0xffb8d4ea);
+    const auto colour = motion::style::motionPath();
     std::optional<juce::Point<float>> previous;
     for (const auto& point : motionPath.points) {
         const auto screen = screenPoint(point.position);

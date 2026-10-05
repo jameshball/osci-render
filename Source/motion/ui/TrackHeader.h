@@ -31,7 +31,7 @@ public:
         solo.onClick = [this] { if (onSolo) { onSolo(id); } };
         lock.onClick = [this] { if (onLock) { onLock(id); } };
         arm.onClick = [this] { if (onArm) { onArm(id); } };
-        arm.setOnColour(juce::Colour(0xffb04545));
+        arm.setOnColour(motion::style::record().darker(.5f));
         mute.setOnColour(juce::Colour(0xff8b6434));
         solo.setOnColour(juce::Colour(0xff347b52));
         lock.setOnColour(juce::Colour(0xff5c5f6b));

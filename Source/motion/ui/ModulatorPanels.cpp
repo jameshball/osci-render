@@ -4,7 +4,7 @@ namespace motion::ui {
 void LabelledScrub::setup(juce::Component& owner, const juce::String& text, const juce::String& name, const PropertySpec& spec) {
     label.setText(text, juce::dontSendNotification);
     label.setFont(style::caption());
-    label.setColour(juce::Label::textColourId, style::muted());
+    label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     field.setName(name);
     field.setTitle(name);
     field.setSpec(spec);
@@ -21,7 +21,7 @@ void LabelledScrub::layout(juce::Rectangle<int>& area) {
 
 RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> report) : document(document), report(std::move(report)) {
     label.setFont(style::caption());
-    label.setColour(juce::Label::textColourId, style::text());
+    label.setColour(juce::Label::textColourId, osci::Colours::text());
     amount.setSpec(amountSpec);
     amount.onChange = [this](double value) { apply(value, route.mode); };
     amount.onCommit = [this](double value) { apply(value, route.mode); };
@@ -171,12 +171,12 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     bind(lowest, [](auto& modulator, double value) { modulator.lowestPitch = static_cast<int>(value); });
     bind(highest, [](auto& modulator, double value) { modulator.highestPitch = static_cast<int>(value); });
     routesTitle.setFont(motion::style::caption());
-    routesTitle.setColour(juce::Label::textColourId, motion::style::muted());
+    routesTitle.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     routesTitle.setText("Drives", juce::dontSendNotification);
     content.addAndMakeVisible(routesTitle);
     routesHint.setText("Drag the card onto a property.", juce::dontSendNotification);
     routesHint.setFont(motion::style::caption());
-    routesHint.setColour(juce::Label::textColourId, motion::style::muted());
+    routesHint.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     routesHint.setJustificationType(juce::Justification::topLeft);
     content.addAndMakeVisible(routesHint);
     processor.document.addChangeListener(this);
@@ -342,10 +342,10 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     const auto active = modulator.id == owner.selected;
     const auto hover = fade.value();
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(active ? motion::style::raised().interpolatedWith(motion::style::accent(), .1f) : motion::style::field().interpolatedWith(motion::style::raised(), hover));
+    g.setColour(active ? osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), .1f) : osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover));
     g.fillRoundedRectangle(bounds, motion::style::radius + 1);
     if (active) {
-        g.setColour(motion::style::accent().withAlpha(.7f));
+        g.setColour(osci::Colours::accentColor().withAlpha(.7f));
         g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
     }
     auto area = getLocalBounds().reduced(motion::style::gap + 2, motion::style::gap);
@@ -355,10 +355,10 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 7), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
     area.removeFromLeft(motion::style::padding);
     g.setFont(motion::style::caption());
-    g.setColour(routes == 0 ? motion::style::muted().withAlpha(.7f) : motion::style::accent().brighter(.3f));
+    g.setColour(routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : osci::Colours::accentColor().brighter(.3f));
     g.drawText(routes == 0 ? juce::String("Not routed") : routes == 1 ? juce::String("Drives 1") : "Drives " + juce::String(routes), area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
     g.setFont(motion::style::body());
-    g.setColour(motion::style::text());
+    g.setColour(osci::Colours::text());
     g.drawText(juce::String(modulator.name), area, juce::Justification::bottomLeft, true);
 }
 
@@ -383,9 +383,9 @@ void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool hi
     fade.setTarget(highlighted);
     const auto bounds = getLocalBounds().toFloat();
     const auto on = getToggleState();
-    g.setColour(on ? motion::style::accent().withAlpha(down ? .45f : .35f) : juce::Colours::white.withAlpha(down ? .12f : .04f + .05f * fade.value()));
+    g.setColour(on ? osci::Colours::accentColor().withAlpha(down ? .45f : .35f) : juce::Colours::white.withAlpha(down ? .12f : .04f + .05f * fade.value()));
     g.fillRoundedRectangle(bounds, motion::style::radius);
-    motion::ui::paintModulatorShape(g, shape, bounds.reduced(5, 8), on ? juce::Colours::white : motion::style::text().withAlpha(.6f + .4f * fade.value()), 1.3f);
+    motion::ui::paintModulatorShape(g, shape, bounds.reduced(5, 8), on ? juce::Colours::white : osci::Colours::text().withAlpha(.6f + .4f * fade.value()), 1.3f);
 }
 
 const motion::Modulator* MotionModulatorLibrary::current() const {
@@ -485,7 +485,7 @@ void MotionModulatorLibrary::Content::paint(juce::Graphics& g) {
     const auto area = owner.previewArea.toFloat();
     g.setColour(juce::Colours::black.withAlpha(.35f));
     g.fillRoundedRectangle(area, motion::style::radius);
-    g.setColour(motion::style::outline().withAlpha(.4f));
+    g.setColour(osci::Colours::outlineSubtle().withAlpha(.4f));
     g.drawHorizontalLine(juce::roundToInt(area.getCentreY()), area.getX() + 4, area.getRight() - 4);
     motion::ui::paintModulatorShape(g, *modulator, area.reduced(8, 6), motion::style::key(), 1.6f);
 }
@@ -495,7 +495,7 @@ MotionRoutingPanel::MotionRoutingPanel(MotionProcessor& owner) : processor(owner
     link.setButtonText("Link to...");
     link.setName("Link property");
     link.setTitle("Link property");
-    link.setColour(juce::TextButton::buttonColourId, motion::style::raised());
+    link.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     link.onClick = [this] { showLinkMenu(); };
     unlink.setButtonText("Unlink");
     unlink.setName("Unlink property");

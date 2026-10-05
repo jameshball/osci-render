@@ -25,7 +25,7 @@ public:
         parent.onChange = [this] { applyRig(); };
         for (auto* label : {&lookAtLabel, &parentLabel}) {
             label->setFont(motion::style::caption());
-            label->setColour(juce::Label::textColourId, motion::style::muted());
+            label->setColour(juce::Label::textColourId, osci::Colours::textMuted());
             label->setBorderSize({});
             addAndMakeVisible(label);
         }

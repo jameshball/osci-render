@@ -94,7 +94,7 @@ public:
         note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
 
         error.setName("Image preparation validation error");
-        error.setColour(juce::Label::textColourId, juce::Colour(0xffe98080));
+        error.setColour(juce::Label::textColourId, motion::style::error());
         if (isVideo) {
         }
         prepare.setName(isVideo ? "Prepare video" : "Prepare image");

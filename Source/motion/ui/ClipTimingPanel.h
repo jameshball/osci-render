@@ -15,7 +15,7 @@ public:
         setName("Clip timing inspector");
         title.setText("Timing", juce::dontSendNotification);
         title.setFont(motion::style::caption());
-        title.setColour(juce::Label::textColourId, motion::style::muted());
+        title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
         const std::array<const char*, 4> labels {"Start", "Duration", "Offset", "Speed"};
@@ -29,7 +29,7 @@ public:
         for (std::size_t i = 0; i < values.size(); ++i) {
             captions[i].setText(labels[i], juce::dontSendNotification);
             captions[i].setFont(motion::style::caption());
-            captions[i].setColour(juce::Label::textColourId, motion::style::muted());
+            captions[i].setColour(juce::Label::textColourId, osci::Colours::textMuted());
             addAndMakeVisible(captions[i]);
             auto& value = values[i];
             value.setName(names[i]); value.setTitle(names[i]);
@@ -43,7 +43,7 @@ public:
             addAndMakeVisible(value);
         }
         details.setFont(motion::style::caption());
-        details.setColour(juce::Label::textColourId, motion::style::muted());
+        details.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         details.setJustificationType(juce::Justification::centredRight);
         addAndMakeVisible(details);
         status.setFont(motion::style::caption());
@@ -75,7 +75,7 @@ public:
         // Which clock the clip keeps, on the heading line.
         details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "In beats" : "In seconds", juce::dontSendNotification);
         details.setTooltip(clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo changes" : "Keeps its time when the tempo changes");
-        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : motion::style::muted());
+        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
         status.setVisible(clip != nullptr && status.getText().isNotEmpty());
         setVisible(clip != nullptr);

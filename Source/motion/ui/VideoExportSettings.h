@@ -31,8 +31,8 @@ public:
         note.setJustificationType(juce::Justification::topLeft);
         error.setFont(motion::style::body());
         error.setBorderSize({});
-        error.setColour(juce::Label::textColourId, motion::style::danger());
-        soundtrack.setColour(juce::ToggleButton::textColourId, motion::style::text());
+        error.setColour(juce::Label::textColourId, osci::Colours::danger());
+        soundtrack.setColour(juce::ToggleButton::textColourId, osci::Colours::text());
         canvas.onChange = [this] { error.setText({}, juce::dontSendNotification); };
         exportButton.setButtonText("Choose file and export...");
         exportButton.onClick = [this] {

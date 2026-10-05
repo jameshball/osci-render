@@ -14,7 +14,7 @@ public:
         setOverlayTitle("Keyboard shortcuts");
         filter.setName("Filter shortcuts");
         filter.setTitle("Filter shortcuts");
-        filter.setTextToShowWhenEmpty("Filter: type an action or a key", motion::style::muted());
+        filter.setTextToShowWhenEmpty("Filter: type an action or a key", osci::Colours::textMuted());
         filter.onTextChange = [this] { list.setFilter(filter.getText()); resized(); };
         filter.onEscapeKey = [this] { if (filter.isEmpty()) { dismiss(); } else { filter.clear(); } };
         list.sections = &sections;
@@ -65,7 +65,7 @@ private:
                 }
                 if (shown.empty()) { continue; }
                 any = true;
-                g.setColour(motion::style::accent());
+                g.setColour(osci::Colours::accentColor());
                 g.setFont(motion::style::title());
                 g.drawText(section.title, 0, y + 10, getWidth(), 20, juce::Justification::centredLeft);
                 g.setColour(juce::Colours::white.withAlpha(.08f));
@@ -81,7 +81,7 @@ private:
                 }
             }
             if (!any) {
-                g.setColour(motion::style::muted());
+                g.setColour(osci::Colours::textMuted());
                 g.setFont(motion::style::body());
                 g.drawText("No shortcut matches \"" + query + "\".", getLocalBounds().removeFromTop(40), juce::Justification::centred);
             }

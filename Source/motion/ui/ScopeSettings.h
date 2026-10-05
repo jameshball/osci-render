@@ -11,7 +11,7 @@ namespace motion::scope {
 inline void heading(juce::Label& label, const juce::String& text) {
     label.setText(text, juce::dontSendNotification);
     label.setFont(motion::style::caption());
-    label.setColour(juce::Label::textColourId, motion::style::text());
+    label.setColour(juce::Label::textColourId, osci::Colours::text());
     label.setBorderSize({});
 }
 struct Grid {
@@ -36,7 +36,7 @@ public:
     }
     int idealWidth() const { return juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::caption(), getButtonText()))) + caret + 8; }
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
-        const auto colour = (highlighted || down ? motion::style::text() : motion::style::muted());
+        const auto colour = (highlighted || down ? osci::Colours::text() : osci::Colours::textMuted());
         auto area = getLocalBounds();
         auto arrow = area.removeFromRight(caret).toFloat().withSizeKeepingCentre(7.0f, 4.0f);
         juce::Path path;
@@ -84,7 +84,7 @@ public:
         overlay.setTooltip("Graticule or screen drawn over the beam");
         auto* screen = parameters.screenOverlay;
         for (int id = 1; id <= screen->max.load(); ++id) { overlay.addItem(screen->getText(screen->getNormalisedValue(static_cast<float>(id))), id); }
-        overlay.setColour(juce::ComboBox::backgroundColourId, motion::style::field());
+        overlay.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
         overlay.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         overlay.onChange = [this] {
             if (updating) { return; }
@@ -199,7 +199,7 @@ private:
     void caption(juce::Label& label, const juce::String& text) {
         label.setText(text, juce::dontSendNotification);
         label.setFont(motion::style::caption());
-        label.setColour(juce::Label::textColourId, motion::style::muted());
+        label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         addAndMakeVisible(label);
     }
     void changeListenerCallback(juce::ChangeBroadcaster*) override { refresh(); }

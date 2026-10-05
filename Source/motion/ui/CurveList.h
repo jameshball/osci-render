@@ -26,7 +26,7 @@ public:
         animatedOnly.setTitle(animatedOnly.getName());
         animatedOnly.setTooltip("Show only keyed or modulated channels, like After Effects' U");
         animatedOnly.setToggleState(true, juce::dontSendNotification);
-        animatedOnly.setOnColour(motion::style::accent().withAlpha(.3f));
+        animatedOnly.setOnColour(osci::Colours::accentColor().withAlpha(.3f));
         animatedOnly.onClick = [this] { layout(); };
         addAndMakeVisible(animatedOnly);
     }
@@ -52,7 +52,7 @@ public:
         }
         if (!same) { revealSelected(); }
     }
-    void paint(juce::Graphics& g) override { g.fillAll(motion::style::sunken()); }
+    void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surfaceSunken()); }
     void resized() override {
         auto area = getLocalBounds();
         // A filter chip sized to its words, not a full-width button.
@@ -88,7 +88,7 @@ private:
         void paint(juce::Graphics& g) override {
             auto bounds = getLocalBounds();
             if (selected) {
-                g.setColour(motion::style::accent().withAlpha(.22f));
+                g.setColour(osci::Colours::accentColor().withAlpha(.22f));
                 g.fillRoundedRectangle(bounds.toFloat().reduced(2, 1), 3.0f);
             } else if (hovered) {
                 g.setColour(juce::Colours::white.withAlpha(.05f));
@@ -102,7 +102,7 @@ private:
             auto marks = bounds.removeFromRight(26);
             if (channel.keyed) { motion::style::drawDiamond(g, {static_cast<float>(marks.getX() + 6), static_cast<float>(marks.getCentreY())}, 3.5f, true); }
             if (channel.driven) {
-                g.setColour(motion::style::accent());
+                g.setColour(osci::Colours::accentColor());
                 g.setFont(motion::style::caption());
                 g.drawText("~", marks.withTrimmedLeft(12), juce::Justification::centred);
             }

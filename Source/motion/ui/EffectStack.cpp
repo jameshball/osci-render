@@ -88,18 +88,18 @@ void MotionEffectStack::resized() {
 
 void MotionEffectStack::paint(juce::Graphics& g) {
     if (!cards.empty() || dragActive) {
-        g.setColour(motion::style::muted());
+        g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::caption());
         g.drawText("Effects", getLocalBounds().removeFromTop(headingHeight), juce::Justification::centredLeft, false);
     }
     if (!dropZone.isEmpty()) {
-        g.setColour(motion::style::accent().withAlpha(dropHover ? .18f : .07f));
+        g.setColour(osci::Colours::accentColor().withAlpha(dropHover ? .18f : .07f));
         g.fillRoundedRectangle(dropZone.toFloat(), motion::style::radius);
         const float dashes[] {4.0f, 3.0f};
         juce::Path outline, dashed;
         outline.addRoundedRectangle(dropZone.toFloat().reduced(.5f), motion::style::radius);
         juce::PathStrokeType(1.0f).createDashedStroke(dashed, outline, dashes, 2);
-        g.setColour(motion::style::accent().withAlpha(dropHover ? .9f : .45f));
+        g.setColour(osci::Colours::accentColor().withAlpha(dropHover ? .9f : .45f));
         g.fillPath(dashed);
     }
 }
@@ -227,22 +227,22 @@ void MotionEffectStack::Card::resized() {
 }
 
 void MotionEffectStack::Card::paint(juce::Graphics& g) {
-    g.setColour(motion::style::raised().withAlpha(.45f));
+    g.setColour(osci::Colours::surfaceRaised().withAlpha(.45f));
     g.fillRoundedRectangle(getLocalBounds().toFloat(), motion::style::radius + 1);
     auto header = getLocalBounds().reduced(motion::style::gap, 0).removeFromTop(headerHeight);
     // The on/off box, then the name (dimmed when bypassed).
     box = header.removeFromLeft(22).toFloat().withSizeKeepingCentre(12, 12);
-    g.setColour(motion::style::text().withAlpha(.6f));
+    g.setColour(osci::Colours::text().withAlpha(.6f));
     g.drawRoundedRectangle(box, 2, 1.2f);
     if (enabled) {
-        g.setColour(motion::style::accent());
+        g.setColour(osci::Colours::accentColor());
         g.fillRoundedRectangle(box.reduced(2.5f), 1.5f);
     }
-    g.setColour(motion::style::text().withAlpha(enabled ? 1.0f : .4f));
+    g.setColour(osci::Colours::text().withAlpha(enabled ? 1.0f : .4f));
     g.setFont(motion::style::title());
     g.drawText(name, header.withTrimmedRight(headerHeight), juce::Justification::centredLeft, true);
     g.setFont(motion::style::caption());
-    g.setColour(motion::style::muted().withAlpha(enabled ? 1.0f : .5f));
+    g.setColour(osci::Colours::textMuted().withAlpha(enabled ? 1.0f : .5f));
     auto area = getLocalBounds().reduced(motion::style::gap, 0).withTrimmedTop(headerHeight);
     for (const auto& row : rows) {
         g.drawText(row->label, area.removeFromTop(motion::style::controlHeight).removeFromLeft(labelWidth).withTrimmedLeft(4), juce::Justification::centredLeft, true);
@@ -301,7 +301,7 @@ void MotionEffectStack::refreshStages() {
         auto chip = std::make_unique<juce::TextButton>(label);
         chip->setName("Effects of " + label.upToFirstOccurrenceOf(juce::String::fromUTF8(" \xc2\xb7"), false, false));
         chip->setTooltip("Also applied");
-        chip->setColour(juce::TextButton::buttonColourId, motion::style::field());
+        chip->setColour(juce::TextButton::buttonColourId, osci::Colours::veryDark());
         // Showing another stage rebuilds these chips, so it waits.
         chip->onClick = [this, id = id] {
             juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MotionEffectStack>(this), id] { if (safe != nullptr && safe->onShowOwner) { safe->onShowOwner(id); } });

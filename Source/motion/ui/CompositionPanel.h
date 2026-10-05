@@ -14,14 +14,14 @@ public:
         setName("Composition settings");
         title.setText("Timing", juce::dontSendNotification);
         title.setFont(motion::style::caption());
-        title.setColour(juce::Label::textColourId, motion::style::muted());
+        title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
         const std::array<const char*, 4> labels {"Length", "Frames", "Tempo", "Meter"};
         for (std::size_t index = 0; index < captions.size(); ++index) {
             captions[index].setText(labels[index], juce::dontSendNotification);
             captions[index].setFont(motion::style::caption());
-            captions[index].setColour(juce::Label::textColourId, motion::style::muted());
+            captions[index].setColour(juce::Label::textColourId, osci::Colours::textMuted());
             addAndMakeVisible(captions[index]);
         }
         for (auto [field, name, tip] : {std::tuple {&length, "Composition length", "How long the composition runs, in seconds; it is never shorter than its last clip"},
@@ -32,7 +32,7 @@ public:
             field->setEditable(false, true);
             field->setJustificationType(juce::Justification::centredRight);
             field->setFont(motion::style::body());
-            field->setColour(juce::Label::backgroundColourId, motion::style::field());
+            field->setColour(juce::Label::backgroundColourId, osci::Colours::veryDark());
             addAndMakeVisible(*field);
         }
         length.onTextChange = [this] { if (!updating) { applyLength(); } };
@@ -45,7 +45,7 @@ public:
         meter.setTooltip("Beats in a bar");
         for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", 400 + beats); }
         for (auto* combo : {&frameRate, &meter}) {
-            combo->setColour(juce::ComboBox::backgroundColourId, motion::style::field());
+            combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
             combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
             combo->onChange = [this, combo] { if (!updating && onTiming) { onTiming(combo->getSelectedId()); } };
             addAndMakeVisible(*combo);

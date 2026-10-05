@@ -82,7 +82,7 @@ public:
         where.setText("From bar " + juce::String(static_cast<int>(std::floor(beat / bar)) + 1) + ", beat " + juce::String(beat - bar * std::floor(beat / bar) + 1, beat == std::round(beat) ? 0 : 2) + " onwards", juce::dontSendNotification);
         motion::style::dialog::caption(where);
         motion::style::dialog::caption(tempoLabel);
-        ramp.setColour(juce::ToggleButton::textColourId, motion::style::text());
+        ramp.setColour(juce::ToggleButton::textColourId, osci::Colours::text());
         status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.setTitle("Save tempo");

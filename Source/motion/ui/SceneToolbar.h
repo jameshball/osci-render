@@ -50,8 +50,8 @@ public:
     MotionScopeToolbar() {
         setName("Scope tools");
         record.setTooltip("Record the Scope's picture and sound");
-        record.tint = juce::Colour(0xffe5484d);
-        record.onColour = juce::Colour(0xffe5484d).withAlpha(.25f);
+        record.tint = motion::style::record();
+        record.onColour = motion::style::record().withAlpha(.25f);
         textureOutput.setTooltip("Share the Scope's picture with other apps (Syphon/Spout)");
         canvas.setTooltip("Output canvas size");
         settings.setTooltip("Scope properties: beam, display and timing");

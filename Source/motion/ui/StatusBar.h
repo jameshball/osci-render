@@ -21,7 +21,7 @@ public:
         addAndMakeVisible(message);
         stats.setFont(motion::style::caption());
         stats.setJustificationType(juce::Justification::centredRight);
-        stats.setColour(juce::Label::textColourId, motion::style::subtle());
+        stats.setColour(juce::Label::textColourId, osci::Colours::textSubtle());
         addAndMakeVisible(stats);
     }
 
@@ -30,7 +30,7 @@ public:
         current = kind;
         message.setText(text, juce::dontSendNotification);
         message.setTooltip(text);
-        message.setColour(juce::Label::textColourId, kind == Kind::error ? motion::style::danger() : kind == Kind::warning ? motion::style::warning() : motion::style::muted());
+        message.setColour(juce::Label::textColourId, kind == Kind::error ? osci::Colours::danger() : kind == Kind::warning ? osci::Colours::warning() : osci::Colours::textMuted());
         dismiss.setVisible(true);
         if (kind == Kind::notice) { startTimer(6000); } else { stopTimer(); }
         resized();
@@ -49,7 +49,7 @@ public:
 
     void paint(juce::Graphics& g) override {
         if (message.getText().isNotEmpty() && current != Kind::notice) {
-            g.setColour((current == Kind::error ? motion::style::danger() : motion::style::warning()).withAlpha(.08f));
+            g.setColour((current == Kind::error ? osci::Colours::danger() : osci::Colours::warning()).withAlpha(.08f));
             g.fillRoundedRectangle(message.getBounds().expanded(4, 0).toFloat(), motion::style::radius);
         }
     }
@@ -66,7 +66,7 @@ private:
         Close() : juce::Button("Dismiss") {}
         void paintButton(juce::Graphics& g, bool highlighted, bool) override {
             const auto b = getLocalBounds().toFloat().reduced(4.5f);
-            g.setColour(motion::style::muted().withAlpha(highlighted ? 1.0f : .6f));
+            g.setColour(osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .6f));
             g.drawLine(b.getX(), b.getY(), b.getRight(), b.getBottom(), 1.3f);
             g.drawLine(b.getRight(), b.getY(), b.getX(), b.getBottom(), 1.3f);
         }

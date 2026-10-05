@@ -79,7 +79,7 @@ private:
         timerCallback();
     }
     void timerCallback() override {
-        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? juce::Colours::orange : osci::Colours::textMuted());
+        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : connectionStatus ? connectionStatus() : "Not connected", juce::dontSendNotification);
         if (existing) {
             const bool recording = isCapturing && isCapturing();

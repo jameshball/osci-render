@@ -10,10 +10,10 @@ namespace {
 void styleTabs(osci::TabBar& tabs) {
     tabs.setTabSpacing(1, 8);
     tabs.setFont(motion::style::title());
-    tabs.setColour(osci::TabBar::backgroundColourId, motion::style::background());
-    tabs.setColour(osci::TabBar::textColourId, motion::style::muted());
-    tabs.setColour(osci::TabBar::selectedTextColourId, motion::style::text());
-    tabs.setColour(osci::TabBar::indicatorColourId, motion::style::accent());
+    tabs.setColour(osci::TabBar::backgroundColourId, osci::Colours::veryDark());
+    tabs.setColour(osci::TabBar::textColourId, osci::Colours::textMuted());
+    tabs.setColour(osci::TabBar::selectedTextColourId, osci::Colours::text());
+    tabs.setColour(osci::TabBar::indicatorColourId, osci::Colours::accentColor());
 }
 }
 
@@ -33,7 +33,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // the Scope panel header rather than on top of the picture.
     visualiserControls = &visualiser.detachControls(*this);
     visualiser.onControlsChanged = [this] { resized(); };
-    visualiser.setControlStyle(motion::style::text().withAlpha(.78f), 5);
+    visualiser.setControlStyle(osci::Colours::text().withAlpha(.78f), 5);
     // Children in paint order: each draws over those added before it.
     for (auto* header : { &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
@@ -239,7 +239,7 @@ void MotionEditor::setUpScope() {
 void MotionEditor::setUpTransport() {
     outputLabel.setText("Output", juce::dontSendNotification);
     outputLabel.setFont(motion::style::caption());
-    outputLabel.setColour(juce::Label::textColourId, motion::style::muted());
+    outputLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     outputLabel.setJustificationType(juce::Justification::centredRight);
     monitorOutput.setName("Audio output mode");
     monitorOutput.setColour(juce::ComboBox::backgroundColourId, osci::Colours::surfaceRaised());
@@ -278,7 +278,7 @@ void MotionEditor::setUpTransport() {
     timeLabel.setJustificationType(juce::Justification::centred);
     tempoValue.setFont(motion::style::body());
     tempoLabel.setFont(motion::style::caption());
-    tempoLabel.setColour(juce::Label::textColourId, motion::style::muted());
+    tempoLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     refreshTiming();
     tempoLabel.setText("BPM", juce::dontSendNotification);
     timeLabel.setName("Timeline position");
@@ -864,7 +864,7 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     if (scopeFullScreen) { return; }
     // Every panel has the same rounded corners, whatever its content paints.
     const auto scope = outputHeader.getBounds().getUnion(visualiser.getBounds());
-    graphics.setColour(motion::style::background());
+    graphics.setColour(osci::Colours::veryDark());
     for (const auto& panel : {libraryBounds, viewportBounds, scope, inspectorBounds, timelineBounds}) {
         if (panel.isEmpty()) { continue; }
         juce::Path corners;
@@ -877,7 +877,7 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     graphics.setColour(osci::Colours::outlineSubtle());
     const auto panel = focusedPanel();
     if (!panel.isEmpty()) {
-        graphics.setColour(motion::style::accent().withAlpha(.45f));
+        graphics.setColour(osci::Colours::accentColor().withAlpha(.45f));
         graphics.drawRoundedRectangle(panel.toFloat().reduced(.5f), 5.0f, 1.0f);
     }
 }

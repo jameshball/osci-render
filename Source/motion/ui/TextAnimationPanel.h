@@ -45,7 +45,7 @@ public:
         setName("Text animation inspector");
         title.setText("Characters", juce::dontSendNotification);
         title.setFont(motion::style::caption());
-        title.setColour(juce::Label::textColourId, motion::style::muted());
+        title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
         const std::array<const char*, 6> tips {"Every character shows at once", "Characters appear one by one", "Characters rise into place", "Characters pop in with a small overshoot", "Characters bob in a looping wave", "Characters fly in from all around"};
@@ -67,7 +67,7 @@ public:
         for (std::size_t index = 0; index < fields.size(); ++index) {
             captions[index].setText(labels[index], juce::dontSendNotification);
             captions[index].setFont(motion::style::caption());
-            captions[index].setColour(juce::Label::textColourId, motion::style::muted());
+            captions[index].setColour(juce::Label::textColourId, osci::Colours::textMuted());
             addAndMakeVisible(captions[index]);
             auto& field = fields[index];
             field.setName(juce::String("Text animation ") + labels[index]);

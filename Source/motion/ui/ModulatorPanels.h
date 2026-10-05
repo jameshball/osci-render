@@ -132,7 +132,7 @@ public:
     void refresh();
 
     void resized() override;
-    void paint(juce::Graphics& g) override { g.fillAll(motion::style::panel()); }
+    void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surface()); }
 
 private:
     static constexpr int cardHeight = 40;

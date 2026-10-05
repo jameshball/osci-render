@@ -96,7 +96,7 @@ void MotionAssetLibrary::setError(const juce::String& error) {
 
 void MotionAssetLibrary::updateStatus() {
     cancelImport.setVisible(importStatus.isNotEmpty());
-    status.setColour(juce::Label::textColourId, hasError && importStatus.isEmpty() ? juce::Colours::orange : osci::Colours::text().withAlpha(0.6f));
+    status.setColour(juce::Label::textColourId, hasError && importStatus.isEmpty() ? motion::style::error() : osci::Colours::text().withAlpha(0.6f));
     const auto row = list.getSelectedRow();
     const auto midi = validAssetRow(row) ? assets[static_cast<std::size_t>(row)]->midi : nullptr;
     // Only say something the row does not already show; the generic
@@ -255,7 +255,7 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
     }
     const auto& asset = *assets[static_cast<std::size_t>(row)];
     if (asset.audio != nullptr) {
-        graphics.setColour(juce::Colour(0xff97c7df).withAlpha(.6f));
+        graphics.setColour(motion::style::waveform().withAlpha(.6f));
         const auto columns = static_cast<int>(area.getWidth());
         for (int x = 0; x < columns; ++x) {
             const auto from = asset.audio->duration() * x / columns, to = asset.audio->duration() * (x + 1) / columns;

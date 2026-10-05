@@ -13,9 +13,9 @@ public:
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         editor.setFont(motion::style::body());
         editor.setJustification(juce::Justification::centredRight);
-        editor.setColour(juce::TextEditor::backgroundColourId, motion::style::field());
-        editor.setColour(juce::TextEditor::outlineColourId, motion::style::accent().withAlpha(.6f));
-        editor.setColour(juce::TextEditor::focusedOutlineColourId, motion::style::accent());
+        editor.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+        editor.setColour(juce::TextEditor::outlineColourId, osci::Colours::accentColor().withAlpha(.6f));
+        editor.setColour(juce::TextEditor::focusedOutlineColourId, osci::Colours::accentColor());
         editor.setIndents(4, 3);
         editor.addListener(this);
         addChildComponent(editor);
@@ -40,20 +40,20 @@ public:
 
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(motion::style::field());
+        g.setColour(osci::Colours::veryDark());
         g.fillRoundedRectangle(bounds, motion::style::radius);
         if (hovered || dragging || hasKeyboardFocus(false)) {
-            g.setColour((hasKeyboardFocus(false) ? motion::style::accent() : motion::style::outline()).withAlpha(.8f));
+            g.setColour((hasKeyboardFocus(false) ? osci::Colours::accentColor() : osci::Colours::outlineSubtle()).withAlpha(.8f));
             g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
         }
         auto text = getLocalBounds().reduced(5, 0);
         if (axisColour.has_value() || prefix.isNotEmpty()) {
             g.setFont(motion::style::caption());
-            g.setColour(axisColour.value_or(motion::style::muted()).withAlpha(isEnabled() ? 1.0f : .4f));
+            g.setColour(axisColour.value_or(osci::Colours::textMuted()).withAlpha(isEnabled() ? 1.0f : .4f));
             g.drawText(prefix, text.removeFromLeft(9), juce::Justification::centredLeft);
         }
         g.setFont(motion::style::body());
-        g.setColour(motion::style::text().withAlpha(isEnabled() ? 1.0f : .4f));
+        g.setColour(osci::Colours::text().withAlpha(isEnabled() ? 1.0f : .4f));
         g.drawText(showMixed ? juce::String("-") : format(value), text, juce::Justification::centredRight);
     }
     void resized() override { editor.setBounds(getLocalBounds()); }

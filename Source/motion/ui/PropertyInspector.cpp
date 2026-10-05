@@ -8,7 +8,7 @@ MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : proce
     viewport.setScrollBarThickness(6);
     addAndMakeVisible(viewport);
     title.setFont(motion::style::title());
-    title.setColour(juce::Label::textColourId, motion::style::text());
+    title.setColour(juce::Label::textColourId, osci::Colours::text());
     title.setName("Inspector title");
     title.setBorderSize({});
     kind.setBorderSize({});
@@ -18,7 +18,7 @@ MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : proce
         refresh();
     };
     kind.setFont(motion::style::caption());
-    kind.setColour(juce::Label::textColourId, motion::style::muted());
+    kind.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     kind.setJustificationType(juce::Justification::centredRight);
     addAndMakeVisible(title);
     addAndMakeVisible(kind);
@@ -108,7 +108,7 @@ void MotionPropertyInspector::refresh() {
         };
         row->misaligned = on && keyed && (times(*x) != times(*y) || times(*x) != times(*z));
         row->mode->setToggleState(on, juce::dontSendNotification);
-        row->mode->setOnColour(row->misaligned ? motion::style::warning().withAlpha(.6f) : motion::style::accent().withAlpha(.45f));
+        row->mode->setOnColour(row->misaligned ? osci::Colours::warning().withAlpha(.6f) : osci::Colours::accentColor().withAlpha(.45f));
         const juce::String base = path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out)."
                                        : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock.";
         row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
@@ -198,7 +198,7 @@ void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
             if (!child->isVisible()) { continue; }
             if (child->getProperties().contains("routeProperties") && dynamic_cast<MotionScrubField*>(child) != nullptr) {
                 const auto area = getLocalArea(child, child->getLocalBounds()).toFloat();
-                g.setColour(motion::style::accent().withAlpha(child == dropTarget.getComponent() ? .95f : .35f));
+                g.setColour(osci::Colours::accentColor().withAlpha(child == dropTarget.getComponent() ? .95f : .35f));
                 g.drawRoundedRectangle(area.reduced(.5f), motion::style::radius, child == dropTarget.getComponent() ? 2.0f : 1.0f);
             }
             outline(*child);
@@ -207,14 +207,14 @@ void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
     outline(content);
     auto* row = dropTarget.getComponent();
     if (row != nullptr && dynamic_cast<MotionScrubField*>(row) == nullptr) {
-        g.setColour(motion::style::accent().withAlpha(.9f));
+        g.setColour(osci::Colours::accentColor().withAlpha(.9f));
         g.drawRoundedRectangle(getLocalArea(row, row->getLocalBounds()).toFloat().expanded(2), motion::style::radius + 1, 2.0f);
     }
 }
 
 void MotionPropertyInspector::paint(juce::Graphics& g) {
     if (!empty) { return; }
-    g.setColour(motion::style::muted());
+    g.setColour(osci::Colours::textMuted());
     g.setFont(motion::style::body());
     g.drawFittedText("Select an object, group, audio clip or camera to edit its properties.",
         getLocalBounds().withTrimmedTop(40).reduced(motion::style::padding * 2, 0).removeFromTop(60), juce::Justification::topLeft, 3);
@@ -255,7 +255,7 @@ void MotionPropertyInspector::Swatch::setColour(juce::Colour value) {
 
 void MotionPropertyInspector::Row::paint(juce::Graphics& g) {
     g.setFont(motion::style::caption());
-    g.setColour(motion::style::muted());
+    g.setColour(osci::Colours::textMuted());
     g.drawText(group, compact() ? getLocalBounds().withRight(captionRight) : getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
 }
 

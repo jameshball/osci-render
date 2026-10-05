@@ -24,17 +24,17 @@ public:
                 g.setColour(juce::Colours::white.withAlpha(down ? .12f : .07f));
                 g.fillRoundedRectangle(bounds, style::radius);
             }
-            paintContent(g, bounds, style::muted().withAlpha(highlighted ? 1.0f : .6f));
+            paintContent(g, bounds, osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .6f));
             return;
         }
-        g.setColour(active ? on : (highlighted || down ? style::raised().brighter(.15f) : style::field()));
+        g.setColour(active ? on : (highlighted || down ? osci::Colours::surfaceRaised().brighter(.15f) : osci::Colours::veryDark()));
         g.fillRoundedRectangle(bounds, style::radius);
         if (!active) {
             // An outline marks it as a toggle, not a heading.
             g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
             g.drawRoundedRectangle(bounds.reduced(.5f), style::radius, 1.0f);
         }
-        paintContent(g, bounds, active ? juce::Colours::white : style::muted().withAlpha(highlighted ? 1.0f : .85f));
+        paintContent(g, bounds, active ? juce::Colours::white : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .85f));
     }
 
     float iconSize = 13.0f;
@@ -59,6 +59,6 @@ private:
 
     std::optional<icons::Icon> icon;
     // Toggles light up in the same muted green as the tool strips.
-    juce::Colour on = style::accent().withAlpha(.45f);
+    juce::Colour on = osci::Colours::accentColor().withAlpha(.45f);
 };
 }

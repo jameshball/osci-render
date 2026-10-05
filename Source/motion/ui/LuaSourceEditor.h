@@ -18,14 +18,14 @@ public:
         name.setBorderSize({0, 6, 0, 0});
         addAndMakeVisible(name);
         cancelButton.setButtonText("Cancel");
-        cancelButton.setColour(juce::TextButton::buttonColourId, motion::style::raised());
+        cancelButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
         addAndMakeVisible(cancelButton);
         auto& bake = baking.bakeButton();
         bake.setButtonText(editing ? "Bake" : "Add");
         bake.setTitle("Bake source");
         bake.setTooltip("Prepare the source (Cmd+Return)");
-        bake.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.5f));
+        bake.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f));
         addAndMakeVisible(bake);
         baking.setEmbedded(true);
         motion::style::styleFields(baking);
@@ -35,15 +35,15 @@ public:
         // button row (its frame clips it away).
         auto& codeView = editor.getEditor();
         codeView.setFont(motion::style::mono());
-        codeView.setColour(juce::CodeEditorComponent::backgroundColourId, motion::style::field());
-        codeView.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, motion::style::field());
-        codeView.setColour(juce::CodeEditorComponent::lineNumberTextId, motion::style::muted().withAlpha(.6f));
-        codeView.setColour(juce::CodeEditorComponent::highlightColourId, motion::style::accent().withAlpha(.3f));
+        codeView.setColour(juce::CodeEditorComponent::backgroundColourId, osci::Colours::veryDark());
+        codeView.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, osci::Colours::veryDark());
+        codeView.setColour(juce::CodeEditorComponent::lineNumberTextId, osci::Colours::textMuted().withAlpha(.6f));
+        codeView.setColour(juce::CodeEditorComponent::highlightColourId, osci::Colours::accentColor().withAlpha(.3f));
         codeFrame.addAndMakeVisible(editor);
         addAndMakeVisible(codeFrame);
         failure.setName("Source preparation error");
         failure.setFont(motion::style::caption());
-        failure.setColour(juce::Label::textColourId, motion::style::danger());
+        failure.setColour(juce::Label::textColourId, osci::Colours::danger());
         failure.setJustificationType(juce::Justification::topLeft);
         failure.setText(preparationError, juce::dontSendNotification);
         failure.setTooltip(preparationError);
@@ -80,13 +80,13 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), motion::style::background());
-        g.setColour(motion::style::panel());
+        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
+        g.setColour(osci::Colours::surface());
         g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
-        g.setColour(motion::style::background());
+        g.setColour(osci::Colours::veryDark());
         g.fillRect(getLocalBounds().withTrimmedTop(headerHeight + 1));
         const auto bounds = card.toFloat();
-        g.setColour(motion::style::panel());
+        g.setColour(osci::Colours::surface());
         g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
         g.setColour(juce::Colours::white.withAlpha(.08f));
         g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);

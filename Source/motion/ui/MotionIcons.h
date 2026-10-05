@@ -127,14 +127,14 @@ public:
             g.setColour(juce::Colours::white.withAlpha(down ? .14f : .08f * fade.value()));
             g.fillRoundedRectangle(bounds, motion::style::radius + 1);
         }
-        const auto idle = motion::style::text().withAlpha(.72f);
-        const auto colour = tint.has_value() ? *tint : on ? juce::Colours::white : idle.interpolatedWith(motion::style::text(), fade.value());
+        const auto idle = osci::Colours::text().withAlpha(.72f);
+        const auto colour = tint.has_value() ? *tint : on ? juce::Colours::white : idle.interpolatedWith(osci::Colours::text(), fade.value());
         draw(g, icon, bounds, colour.withMultipliedAlpha(isEnabled() ? 1.0f : .35f), iconSize);
     }
     // A glyph that keeps its own colour (the red record dot), and the fill
     // behind a button that is on.
     std::optional<juce::Colour> tint;
-    juce::Colour onColour = motion::style::accent().withAlpha(.35f);
+    juce::Colour onColour = osci::Colours::accentColor().withAlpha(.35f);
 private:
     Icon icon;
     motion::style::Fade fade {*this};
@@ -156,10 +156,10 @@ public:
         fade.setTarget(highlighted && isEnabled());
         const auto bounds = getLocalBounds().toFloat();
         if (fade.value() > 0.0f || down) {
-            g.setColour(motion::style::accent().withAlpha(down ? .22f : .12f * fade.value()));
+            g.setColour(osci::Colours::accentColor().withAlpha(down ? .22f : .12f * fade.value()));
             g.fillRoundedRectangle(bounds, motion::style::radius + 1);
         }
-        const auto colour = motion::style::accent().brighter(.35f).withMultipliedAlpha(isEnabled() ? 1.0f : .35f);
+        const auto colour = osci::Colours::accentColor().brighter(.35f).withMultipliedAlpha(isEnabled() ? 1.0f : .35f);
         auto area = getLocalBounds().withTrimmedLeft(leading);
         draw(g, icon, area.removeFromLeft(static_cast<int>(iconSize)).toFloat(), colour, iconSize);
         area.removeFromLeft(gap);
@@ -199,7 +199,7 @@ public:
     }
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(motion::style::background().withAlpha(.86f));
+        g.setColour(osci::Colours::veryDark().withAlpha(.86f));
         g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
         g.setColour(juce::Colours::white.withAlpha(.08f));
         g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);

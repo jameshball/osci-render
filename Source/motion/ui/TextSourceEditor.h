@@ -18,13 +18,13 @@ public:
         name.setBorderSize({0, 6, 0, 0});
         addAndMakeVisible(name);
         cancelButton.setButtonText("Cancel");
-        cancelButton.setColour(juce::TextButton::buttonColourId, motion::style::raised());
+        cancelButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
         doneButton.setName("Apply text");
         doneButton.setTitle("Apply text");
         doneButton.setButtonText("Save");
         doneButton.setTooltip("Save the text");
-        doneButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.5f));
+        doneButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f));
         doneButton.onClick = [this] { finish(); };
         for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
 
@@ -39,7 +39,7 @@ public:
             family.addItem(settings.family + " (not installed)", families.size() + 1);
         }
         family.setSelectedId(settings.family.isEmpty() ? 1 : families.indexOf(settings.family) + 2, juce::dontSendNotification);
-        family.setColour(juce::ComboBox::backgroundColourId, motion::style::field());
+        family.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
         family.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         family.onChange = [this] {
             const auto index = family.getSelectedId() - 2;
@@ -72,7 +72,7 @@ public:
         tracking.setName("Text tracking");
         for (auto* caption : {&lineCaption, &trackingCaption}) {
             caption->setFont(motion::style::caption());
-            caption->setColour(juce::Label::textColourId, motion::style::muted());
+            caption->setColour(juce::Label::textColourId, osci::Colours::textMuted());
             caption->setJustificationType(juce::Justification::centredRight);
             addAndMakeVisible(*caption);
         }
@@ -85,7 +85,7 @@ public:
         text.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
         text.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         text.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
-        text.setColour(juce::TextEditor::textColourId, motion::style::text());
+        text.setColour(juce::TextEditor::textColourId, osci::Colours::text());
         text.setText(initial, false);
         text.onTextChange = [this] { changed(); };
         addAndMakeVisible(text);
@@ -152,14 +152,14 @@ public:
     }
 
     void paint(juce::Graphics& g) override {
-        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), motion::style::background());
-        g.setColour(motion::style::panel());
+        osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
+        g.setColour(osci::Colours::surface());
         g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
-        g.setColour(motion::style::background());
+        g.setColour(osci::Colours::veryDark());
         g.fillRect(getLocalBounds().withTrimmedTop(headerHeight + 1));
         // A floating panel like the popovers, so its fields read as fields.
         const auto bounds = bar.toFloat();
-        g.setColour(motion::style::panel());
+        g.setColour(osci::Colours::surface());
         g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
         g.setColour(juce::Colours::white.withAlpha(.08f));
         g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);
@@ -204,7 +204,7 @@ private:
         const auto tooLong = content.length() > 16384;
         doneButton.setEnabled(content.trim().isNotEmpty() && !tooLong && (content != original || settings != originalSettings));
         const auto message = tooLong ? juce::String("Maximum 16,384 characters") : error;
-        status.setColour(juce::Label::textColourId, message.isNotEmpty() ? motion::style::danger() : motion::style::muted());
+        status.setColour(juce::Label::textColourId, message.isNotEmpty() ? osci::Colours::danger() : osci::Colours::textMuted());
         status.setText(message.isNotEmpty() ? message : juce::String(content.length()) + (content.length() == 1 ? " character" : " characters"), juce::dontSendNotification);
         if (notify) {
             error.clear();

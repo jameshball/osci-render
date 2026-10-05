@@ -34,15 +34,15 @@ MotionDrawingEditor::MotionDrawingEditor(motion::drawing::Drawing initial, const
     name.setIndents(6, 0);
     name.setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
     name.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
-    name.setColour(juce::TextEditor::focusedOutlineColourId, motion::style::accent().withAlpha(.6f));
+    name.setColour(juce::TextEditor::focusedOutlineColourId, osci::Colours::accentColor().withAlpha(.6f));
     name.setTooltip("Name");
     addAndMakeVisible(name);
     cancelButton.setButtonText("Cancel");
-    cancelButton.setColour(juce::TextButton::buttonColourId, motion::style::raised());
+    cancelButton.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
     cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
     doneButton.setButtonText(editing ? "Save" : "Add");
     doneButton.setTooltip(editing ? "Save the drawing" : "Add the drawing to the project");
-    doneButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.5f));
+    doneButton.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f));
     doneButton.onClick = [this] { finish(); };
     for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
     setTool(drawing.strokes.empty() ? Tool::pen : Tool::select);
@@ -74,10 +74,10 @@ void MotionDrawingEditor::resized() {
 }
 
 void MotionDrawingEditor::paint(juce::Graphics& g) {
-    osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), motion::style::background());
-    g.setColour(motion::style::panel());
+    osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
+    g.setColour(osci::Colours::surface());
     g.fillRect(getLocalBounds().withTrimmedTop(headerHeight).removeFromTop(1));
-    g.setColour(motion::style::background());
+    g.setColour(osci::Colours::veryDark());
     g.fillRect(canvas);
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(canvas);
@@ -104,14 +104,14 @@ void MotionDrawingEditor::paint(juce::Graphics& g) {
         const auto selected = static_cast<int>(index) == selectedStroke;
         g.setColour(motion::style::key().withAlpha(.14f));
         g.strokePath(path, juce::PathStrokeType(5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), transform);
-        g.setColour(selected ? juce::Colour(0xffc8ffd8) : motion::style::key());
+        g.setColour(selected ? motion::style::selection() : motion::style::key());
         g.strokePath(path, juce::PathStrokeType(selected ? 2.0f : 1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), transform);
     }
     paintPreview(g);
     if (selectedStroke >= 0 && selectedStroke < static_cast<int>(drawing.strokes.size())) { paintAnchors(g, drawing.strokes[static_cast<std::size_t>(selectedStroke)], true); }
     if (activeStroke >= 0 && activeStroke < static_cast<int>(drawing.strokes.size())) { paintAnchors(g, drawing.strokes[static_cast<std::size_t>(activeStroke)], false); }
     if (snapTarget.has_value()) {
-        g.setColour(motion::style::accent().brighter(.4f));
+        g.setColour(osci::Colours::accentColor().brighter(.4f));
         g.drawEllipse(juce::Rectangle<float>(14, 14).withCentre(toScreen(*snapTarget)), 1.5f);
     }
 }
@@ -382,7 +382,7 @@ void MotionDrawingEditor::paintAnchors(juce::Graphics& g, const motion::drawing:
             }
         }
         const auto box = juce::Rectangle<float>(8, 8).withCentre(centre);
-        g.setColour(selected ? motion::style::accent().brighter(.4f) : juce::Colours::black);
+        g.setColour(selected ? osci::Colours::accentColor().brighter(.4f) : juce::Colours::black);
         if (anchor.smooth) { g.fillEllipse(box); } else { g.fillRect(box); }
         g.setColour(juce::Colours::white);
         if (anchor.smooth) { g.drawEllipse(box, 1.2f); } else { g.drawRect(box, 1.2f); }

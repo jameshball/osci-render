@@ -104,7 +104,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     g.setColour(osci::Colours::text());
     g.setFont(motion::style::body());
     if (storedCurve == nullptr) {
-        g.setColour(motion::style::muted());
+        g.setColour(osci::Colours::textMuted());
         g.drawText("Select a property", getLocalBounds(), juce::Justification::centred);
         return;
     }
@@ -117,7 +117,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     g.setFont(motion::style::title());
     g.drawText(motion::propertyLabel(processor.document.project(), targetId, propertyName), 12, 3, 160, 22, juce::Justification::centredLeft);
     g.setFont(motion::style::body());
-    g.setColour(motion::style::muted());
+    g.setColour(osci::Colours::textMuted());
     // Name the owner's kind when it isn't a clip, so a camera or effect
     // curve is never mistaken for the selected clip's.
     const juce::String owner(clip->name.data(), clip->name.size());
@@ -126,7 +126,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     if (modulated) {
         g.setColour(primaryColour(*clip));
         g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
-        g.setColour(juce::Colour(0xff80baff));
+        g.setColour(motion::style::result());
         g.drawText("Result", getWidth() - 90, 3, 65, 22, juce::Justification::centredLeft);
     }
     g.setFont(motion::style::caption());
@@ -222,7 +222,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
                 const auto value = constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time)), propertyName);
                 if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
             }
-            g.setColour(juce::Colour(0xff80baff));
+            g.setColour(motion::style::result());
             g.strokePath(result, juce::PathStrokeType(1.4f));
         }
         if (selectedTime.has_value()) {
@@ -232,7 +232,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
                     const auto handle = tangentPoint(*clip, curve, *selected, mode);
                     if (handle.has_value()) {
                         const auto keyPosition = keyPoint(*clip, *selected);
-                        g.setColour(juce::Colour(0xffe7bc6c).withAlpha(0.75f));
+                        g.setColour(motion::style::tangent().withAlpha(0.75f));
                         g.drawLine(keyPosition.x, keyPosition.y, handle->x, handle->y, 1.0f);
                         g.fillEllipse(handle->x - 4, handle->y - 4, 8, 8);
                     }
@@ -250,7 +250,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         }
         if (snapGuide.has_value()) {
             const auto guide = timeX(*snapGuide);
-            g.setColour(motion::style::accent().withAlpha(.75f));
+            g.setColour(osci::Colours::accentColor().withAlpha(.75f));
             const float dashes[] {4.0f, 3.0f};
             g.drawDashedLine(juce::Line<float>(guide, area.getY(), guide, area.getBottom()), dashes, 2, 1.0f);
         }

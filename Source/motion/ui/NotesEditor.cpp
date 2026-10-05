@@ -5,7 +5,7 @@ MotionNotesEditor::MotionNotesEditor(MotionProcessor& owner) : processor(owner) 
     setWantsKeyboardFocus(true);
     for (auto* button : {&create, &fitButton, &remove, &audition, &envelopeButton, &record, &cancelRecording}) { addAndMakeVisible(button); }
     // On the raised header the buttons take the dark field fill, so they read as buttons.
-    for (auto* button : {&fitButton, &remove, &audition, &envelopeButton, &record, &cancelRecording}) { button->setColour(juce::TextButton::buttonColourId, motion::style::field()); }
+    for (auto* button : {&fitButton, &remove, &audition, &envelopeButton, &record, &cancelRecording}) { button->setColour(juce::TextButton::buttonColourId, osci::Colours::veryDark()); }
     record.setName("Record MIDI notes"); cancelRecording.setName("Cancel MIDI recording");
     record.setTooltip("Record unquantized notes, velocity and sustain into this clip. Existing notes are kept. Other controllers are not applied yet.");
     record.onClick = [this] {
@@ -29,7 +29,7 @@ MotionNotesEditor::MotionNotesEditor(MotionProcessor& owner) : processor(owner) 
     audition.onClick = [this] { processor.setMidiAudition(audition.getToggleState() ? target : 0); refresh(); };
     envelopeButton.onClick = [this] { if (onEditInstrument) { onEditInstrument(target); } };
     // The empty state's one action, styled as the primary button.
-    create.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.45f));
+    create.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.45f));
     create.onClick = [this] { report(processor.document.assignMidi(target, 0)); refresh(); fit(); };
     fitButton.onClick = [this] { fit(); repaint(); };
     remove.onClick = [this] { report(processor.document.clearMidi(target)); refresh(); };
@@ -103,7 +103,7 @@ void MotionNotesEditor::refresh() {
     updating = false;
     record.setButtonText(recording ? (processor.midiRecordingSession().stopping() ? "Finishing..." : "Stop recording") : "Record notes");
     record.setEnabled(recording ? !processor.midiRecordingSession().stopping() : available && !isLocked() && clip->composition == 0);
-    record.setColour(juce::TextButton::buttonColourId, recording ? juce::Colour(0xff8b3039) : motion::style::field());
+    record.setColour(juce::TextButton::buttonColourId, recording ? motion::style::record().darker(.5f) : osci::Colours::veryDark());
     cancelRecording.setVisible(recording);
     // Clip-bound actions appear once a visual clip is chosen.
     record.setVisible(clip != nullptr || recording);
@@ -111,7 +111,7 @@ void MotionNotesEditor::refresh() {
     envelopeButton.setVisible(clip != nullptr);
     const auto& status = processor.midiRecordingSession().message();
     recordingStatus.setText(error.isNotEmpty() ? error : status, juce::dontSendNotification);
-    recordingStatus.setColour(juce::Label::textColourId, error.isNotEmpty() || processor.midiRecordingSession().hasError() ? juce::Colours::orange : osci::Colours::textMuted());
+    recordingStatus.setColour(juce::Label::textColourId, error.isNotEmpty() || processor.midiRecordingSession().hasError() ? motion::style::error() : osci::Colours::textMuted());
     recordingStatus.setVisible(error.isNotEmpty() || status.isNotEmpty());
     resized(); repaint();
 }
@@ -149,7 +149,7 @@ void MotionNotesEditor::paint(juce::Graphics& g) {
     const auto* clip = currentClip();
     // Without a clip the tab name already says what this is; no header bar.
     if (clip == nullptr && preview == nullptr) {
-        g.setColour(motion::style::muted());
+        g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::body());
         g.drawText("Select a clip", getLocalBounds(), juce::Justification::centred);
         return;
@@ -160,7 +160,7 @@ void MotionNotesEditor::paint(juce::Graphics& g) {
     const auto titleEnd = pattern != nullptr ? velocity.getX() - 73 : envelopeButton.getX();
     g.drawText(clip == nullptr ? "Notes" : juce::String(clip->name), 12, 0, std::max(0, titleEnd - 12), 30, juce::Justification::centredLeft);
     if (pattern == nullptr) {
-        g.setColour(motion::style::muted());
+        g.setColour(osci::Colours::textMuted());
         g.drawText(isLocked() ? "The track is locked" : processor.midiRecordingSession().busy() ? "Recording: play your MIDI keyboard" : "No notes yet", getLocalBounds().reduced(12).translated(0, -12), juce::Justification::centred);
         return;
     }
@@ -239,7 +239,8 @@ void MotionNotesEditor::paint(juce::Graphics& g) {
         g.setColour(motion::style::playhead());
         g.drawVerticalLine(*playhead, 30, static_cast<float>(lane.getBottom()));
     }
-    g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(motion::style::caption());
+    g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : motion::style::error());
+    g.setFont(motion::style::caption());
     if (!recordingStatus.isVisible()) {
         g.drawText(error.isEmpty() ? (isLocked() ? "Track locked" : juce::String()) : error,
         8, getHeight() - 20, getWidth() - 16, 20, juce::Justification::centredLeft);

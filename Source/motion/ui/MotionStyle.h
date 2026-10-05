@@ -54,25 +54,22 @@ inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const ju
     return item;
 }
 
-inline juce::Colour background() { return osci::Colours::veryDark(); }
-inline juce::Colour panel() { return osci::Colours::surface(); }
-inline juce::Colour raised() { return osci::Colours::surfaceRaised(); }
-inline juce::Colour sunken() { return osci::Colours::surfaceSunken(); }
-inline juce::Colour field() { return osci::Colours::veryDark(); }
-inline juce::Colour text() { return osci::Colours::text(); }
-inline juce::Colour muted() { return osci::Colours::textMuted(); }
-inline juce::Colour subtle() { return osci::Colours::textSubtle(); }
-inline juce::Colour outline() { return osci::Colours::outlineSubtle(); }
-inline juce::Colour accent() { return osci::Colours::accentColor(); }
-inline juce::Colour danger() { return osci::Colours::danger(); }
-inline juce::Colour warning() { return osci::Colours::warning(); }
-inline juce::Colour gridMinor() { return osci::Colours::gridMinor(); }
-inline juce::Colour gridMajor() { return osci::Colours::gridMajor(); }
 
 // Beam-adjacent accents: keys and the playhead share the phosphor green.
 inline juce::Colour key() { return juce::Colour(0xff72de98); }
-inline juce::Colour playhead() { return juce::Colour(0xff72de98); }
+inline juce::Colour playhead() { return key(); }
 inline juce::Colour marker() { return juce::Colour(0xffcfb779); }
+inline juce::Colour tempo() { return juce::Colour(0xff8fb6e8); }
+// The selected stroke or point, brighter than the key green.
+inline juce::Colour selection() { return juce::Colour(0xff9affb3); }
+// A modulated property's value after its drivers, beside its keys.
+inline juce::Colour result() { return juce::Colour(0xff80baff); }
+inline juce::Colour tangent() { return juce::Colour(0xffe7bc6c); }
+inline juce::Colour motionPath() { return juce::Colour(0xffb8d4ea); }
+inline juce::Colour waveform() { return juce::Colour(0xff97c7df); }
+inline juce::Colour record() { return juce::Colour(0xffe5484d); }
+// Softer than osci::Colours::danger() for text and refusals on dark panels.
+inline juce::Colour error() { return juce::Colour(0xffe98080); }
 inline juce::Colour axisX() { return juce::Colour(0xffe07a7a); }
 inline juce::Colour axisY() { return juce::Colour(0xff7ad69a); }
 inline juce::Colour axisZ() { return juce::Colour(0xff7aa6e0); }
@@ -156,7 +153,7 @@ public:
     void paintButton(juce::Graphics& g, bool highlighted, bool) override {
         auto area = getLocalBounds().toFloat();
         const auto open = getToggleState();
-        const auto colour = highlighted ? motion::style::text() : motion::style::muted();
+        const auto colour = highlighted ? osci::Colours::text() : osci::Colours::textMuted();
         const auto arrow = area.removeFromLeft(12).withSizeKeepingCentre(8, 8);
         juce::Path chevron;
         if (open) {
@@ -176,7 +173,7 @@ public:
 };
 
 inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
-    g.setColour(panel());
+    g.setColour(osci::Colours::surface());
     g.fillRoundedRectangle(bounds.toFloat(), panelRadius);
 }
 // After Effects' key glyphs: square hold, diamond linear, hourglass eased,
@@ -233,7 +230,7 @@ public:
             juce::DropShadow(juce::Colours::black.withAlpha(.55f), 14, {0, 4}).drawForPath(shadow, path);
         }
         g.drawImageAt(cachedImage, 0, 0);
-        g.setColour(panel());
+        g.setColour(osci::Colours::surface());
         g.fillPath(path);
         g.setColour(juce::Colours::white.withAlpha(.1f));
         g.strokePath(path, juce::PathStrokeType(1.0f));
@@ -293,7 +290,7 @@ inline constexpr int buttonHeight = 30;
 inline constexpr int buttonWidth = 120;
 inline void caption(juce::Label& label) {
     label.setFont(body());
-    label.setColour(juce::Label::textColourId, muted());
+    label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     label.setBorderSize({});
     label.setJustificationType(juce::Justification::centredLeft);
 }
@@ -325,11 +322,11 @@ inline void styleField(juce::Component& component) {
         // indent would push single lines low.
         const auto centred = (editor->getJustificationType().getFlags() & juce::Justification::verticallyCentred) != 0;
         editor->setIndents(DialogLookAndFeel::fieldIndent - editor->getBorder().getLeft(), centred ? 0 : editor->getTopIndent());
-        editor->setColour(juce::TextEditor::backgroundColourId, field());
+        editor->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
         editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     }
     if (combo != nullptr) {
-        combo->setColour(juce::ComboBox::backgroundColourId, field());
+        combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
         combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
     }
 }

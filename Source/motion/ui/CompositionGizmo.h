@@ -80,7 +80,7 @@ struct MotionCompositionGizmo {
 
     void paint(juce::Graphics& g, int hover) const {
         if (!visible) { return; }
-        const std::array<juce::Colour, 3> colours { juce::Colour(0xffee7f87), juce::Colour(0xff79cda2), juce::Colour(0xff77a9ef) };
+        const std::array<juce::Colour, 3> colours {motion::style::axisX(), motion::style::axisY(), motion::style::axisZ()};
         for (int axis = 0; axis < 3; ++axis) {
             const auto& points = axes[axis].points;
             if (points.empty()) { continue; }
@@ -106,7 +106,7 @@ struct MotionCompositionGizmo {
             }
         }
         if (tool != MotionTransformTool::rotate) {
-            g.setColour(hover == 3 ? juce::Colours::white : juce::Colour(0xffd6dadd));
+            g.setColour(hover == 3 ? juce::Colours::white : osci::Colours::text());
             g.fillRect(juce::Rectangle<float>(8, 8).withCentre(origin));
         }
     }
