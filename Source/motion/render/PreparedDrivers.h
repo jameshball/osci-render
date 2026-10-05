@@ -40,25 +40,40 @@ private:
         std::map<ModulatorId, std::shared_ptr<const PreparedModulator>> modulators;
         std::map<std::pair<Id, std::string>, std::shared_ptr<const Curve>> sources;
     };
+    // A scope's routes by the property they drive.
+    using RouteIndex = std::map<std::pair<Id, std::string_view>, std::vector<const ModulationRoute*>>;
     static constexpr int maximumLinkDepth = 64;
 
     ScopeState& state(const Composition& scope, const ClipTiming& clock) {
         return scopes[ScopeKey {&scope, clock.start, clock.offset, clock.rate}];
     }
+    const std::vector<const ModulationRoute*>* routesInto(const Composition& scope, Id owner, std::string_view property) {
+        auto [index, added] = routeIndexes.try_emplace(&scope);
+        if (added) {
+            for (const auto& route : scope.routes) { index->second[{route.target, route.property}].push_back(&route); }
+        }
+        const auto found = index->second.find({owner, property});
+        return found != index->second.end() ? &found->second : nullptr;
+    }
 
+    // Most curves have no route or link; only driven ones need their owner's clock.
     void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, std::string_view property, int depth) {
+        if (!curve.link.has_value() && routesInto(scope, owner, property) == nullptr) { return; }
         const auto target = findPropertyTarget(scope, owner);
         if (!target.has_value()) { return; }
         attach(curve, scope, scopeClock, owner, target->clock(), property, depth);
     }
     void attach(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const ClipTiming& ownerClock, std::string_view property, int depth) {
+        const auto* routes = routesInto(scope, owner, property);
+        if (routes == nullptr && !curve.link.has_value()) { return; }
         auto drivers = std::make_shared<CurveDrivers>();
         drivers->clock = ownerClock;
         drivers->projectClock = scopeClock;
-        for (const auto& route : scope.routes) {
-            if (route.target != owner || route.property != property) { continue; }
-            auto modulator = prepare(scope, scopeClock, route.modulator);
-            if (modulator != nullptr) { drivers->routes.push_back({std::move(modulator), route.amount, route.mode}); }
+        if (routes != nullptr) {
+            for (const auto* route : *routes) {
+                auto modulator = prepare(scope, scopeClock, route->modulator);
+                if (modulator != nullptr) { drivers->routes.push_back({std::move(modulator), route->amount, route->mode}); }
+            }
         }
         if (curve.link.has_value() && depth < maximumLinkDepth) {
             const auto source = findPropertyTarget(scope, curve.link->source);
@@ -162,5 +177,6 @@ private:
 
     Loudness loudness;
     std::map<ScopeKey, ScopeState> scopes;
+    std::map<const Composition*, RouteIndex> routeIndexes;
 };
 }
