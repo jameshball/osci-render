@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "TypedNumber.h"
 
 #include "../model/TimeGrid.h"
 #include <osci_gui/osci_gui.h>
@@ -86,7 +87,10 @@ public:
         status.setFont(motion::style::body());
         status.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         apply.setTitle("Save tempo");
-        apply.onClick = [this] { if (apply.isEnabled() && onApply) { onApply(tempo.getText().getDoubleValue(), ramp.getToggleState()); } };
+        apply.onClick = [this] {
+            const auto value = motion::ui::parseNumber(tempo.getText());
+            if (apply.isEnabled() && value.has_value() && onApply) { onApply(*value, ramp.getToggleState()); }
+        };
         for (auto* component : std::initializer_list<juce::Component*>{&tempo, &tempoLabel, &where, &ramp, &status, &apply}) { addAndMakeVisible(component); }
         refresh();
     }
@@ -103,8 +107,8 @@ public:
     }
 private:
     void refresh() {
-        const auto value = tempo.getText().getDoubleValue();
-        const bool valid = std::isfinite(value) && value >= 1 && value <= 1000;
+        const auto value = motion::ui::parseNumber(tempo.getText()).value_or(0);
+        const bool valid = value >= 1 && value <= 1000;
         apply.setEnabled(valid);
         status.setText(valid ? "" : "Tempo: 1-1000 BPM", juce::dontSendNotification);
     }

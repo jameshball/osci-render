@@ -315,10 +315,9 @@ void MotionEditor::setUpTransport() {
     tempoValue.setColour(juce::Label::backgroundColourId, osci::Colours::surfaceRaised());
     tempoValue.setJustificationType(juce::Justification::centred);
     tempoValue.onTextChange = [this] {
-        const auto text = tempoValue.getText().trim();
-        char* end = nullptr;
-        const auto value = std::strtod(text.toRawUTF8(), &end);
-        if (text.isEmpty() || end == nullptr || *end != '\0' || !std::isfinite(value) || value < 1 || value > 1000) {
+        const auto typed = motion::ui::parseNumber(tempoValue.getText());
+        const auto value = typed.value_or(0);
+        if (value < 1 || value > 1000) {
             tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
             return;
         }

@@ -704,6 +704,8 @@
               file="Source/motion/ui/TrackLayout.h"/>
         <FILE id="MotuiTransformGizmoh" name="TransformGizmo.h" compile="0"
               resource="0" file="Source/motion/ui/TransformGizmo.h"/>
+        <FILE id="MotuiTypedNumberh" name="TypedNumber.h" compile="0" resource="0"
+              file="Source/motion/ui/TypedNumber.h"/>
         <FILE id="MotVideoSettings" name="VideoExportSettings.h" compile="0"
               resource="0" file="Source/motion/ui/VideoExportSettings.h"/>
       </GROUP>

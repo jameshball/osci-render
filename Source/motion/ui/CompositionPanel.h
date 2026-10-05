@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "TypedNumber.h"
 #include "MotionStyle.h"
 #include <array>
 #include <functional>
@@ -96,16 +97,8 @@ public:
 
 private:
     static constexpr int rowHeight = 28;
-    static std::optional<double> number(juce::String text) {
-        text = text.trim();
-        if (text.endsWithIgnoreCase("s")) { text = text.dropLastCharacters(1).trim(); }
-        char* end = nullptr;
-        const auto value = std::strtod(text.toRawUTF8(), &end);
-        if (text.isEmpty() || end == nullptr || *end != '\0' || !std::isfinite(value)) { return std::nullopt; }
-        return value;
-    }
     void applyLength() {
-        const auto value = number(length.getText());
+        const auto value = motion::ui::parseNumber(length.getText(), "s");
         auto& document = processor.document;
         double lastClip = 0;
         for (const auto& track : document.project().tracks) {
@@ -121,7 +114,7 @@ private:
         refresh();
     }
     void applyTempo() {
-        const auto value = number(tempo.getText());
+        const auto value = motion::ui::parseNumber(tempo.getText(), "s");
         if (!value.has_value() || *value < 1 || *value > 1000) {
             if (onError) { onError("Enter a tempo between 1 and 1000 BPM."); }
         } else if (*value != processor.document.project().bpm) {

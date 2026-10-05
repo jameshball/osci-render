@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "TypedNumber.h"
 #include "MotionStyle.h"
 #include <array>
 #include <cstdlib>
@@ -127,10 +128,7 @@ private:
             parsed = grid.parseDuration(text.toStdString(), timing.start);
         } else {
             // Offset is in seconds; its "s" is optional.
-            const auto digits = index == 2 && text.endsWithIgnoreCase("s") ? text.dropLastCharacters(1).trim() : text;
-            char* end = nullptr;
-            const auto number = std::strtod(digits.toRawUTF8(), &end);
-            if (!digits.isEmpty() && end != digits.toRawUTF8() && *end == '\0' && std::isfinite(number)) { parsed = number; }
+            parsed = motion::ui::parseNumber(text, index == 2 ? "s" : "");
         }
         if (!parsed.has_value()) {
             error = index < 2 ? "Enter a time like the ruler shows (" + juce::String(grid.positionLabel(timing.start)) + "), or seconds with s." : "Enter a finite number.";

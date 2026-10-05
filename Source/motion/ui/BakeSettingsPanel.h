@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/BakeSettings.h"
+#include "TypedNumber.h"
 #include <JuceHeader.h>
 #include "MotionStyle.h"
 #include <array>
@@ -142,20 +143,17 @@ private:
         stream << std::setprecision(9) << value;
         return juce::String(stream.str());
     }
-    static bool number(const juce::String& text, double& result) {
-        const auto trimmed = text.trim();
-        char* end = nullptr;
-        result = std::strtod(trimmed.toRawUTF8(), &end);
-        return trimmed.isNotEmpty() && end != nullptr && *end == '\0' && std::isfinite(result);
-    }
     void refresh() {
         auto next = settings;
         juce::String message;
-        if (durationEdited && !number(duration.getText(), next.duration)) {
+        const auto typedDuration = motion::ui::parseNumber(duration.getText()), typedTempo = motion::ui::parseNumber(bpm.getText());
+        if (durationEdited && !typedDuration.has_value()) {
             message = "Enter a finite duration in seconds.";
-        } else if (tempoEdited && !number(bpm.getText(), next.bpm)) {
+        } else if (tempoEdited && !typedTempo.has_value()) {
             message = "Enter a tempo between 1 and 1000 BPM.";
         }
+        if (durationEdited) { next.duration = typedDuration.value_or(next.duration); }
+        if (tempoEdited) { next.bpm = typedTempo.value_or(next.bpm); }
         const auto seedText = seed.getText().trim();
         if (message.isEmpty()) {
             if (seedText.isEmpty() || seedText.length() > 10 || !seedText.containsOnly("0123456789") || seedText.getLargeIntValue() > 0xffffffffLL) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "TypedNumber.h"
 #include "../model/PropertySchema.h"
 
 // A compact numeric field. Horizontal drag scrubs (Shift fine, Cmd coarse),
@@ -112,10 +113,8 @@ public:
             bool isReadOnly() const override { return !owner.isEnabled(); }
             juce::String getCurrentValueAsString() const override { return owner.format(owner.value, false); }
             void setValueAsString(const juce::String& text) override {
-                char* end = nullptr;
-                const auto trimmed = text.trim();
-                const auto parsed = std::strtod(trimmed.toRawUTF8(), &end);
-                if (trimmed.isNotEmpty() && end != nullptr && *end == '\0' && std::isfinite(parsed)) { owner.commit(owner.spec.clamp(parsed)); }
+                const auto parsed = motion::ui::parseNumber(text);
+                if (parsed.has_value()) { owner.commit(owner.spec.clamp(*parsed)); }
             }
             MotionScrubField& owner;
         };
@@ -136,13 +135,11 @@ private:
     void textEditorFocusLost(juce::TextEditor&) override { finishTyping(true); }
     void finishTyping(bool accept) {
         if (!editor.isVisible()) { return; }
-        const auto text = editor.getText().trim().trimCharactersAtEnd("°");
+        const auto parsed = motion::ui::parseNumber(editor.getText(), "°");
         editor.setVisible(false);
         if (!accept) { if (onCancel) { onCancel(); } return; }
-        char* end = nullptr;
-        const auto parsed = std::strtod(text.toRawUTF8(), &end);
-        if (text.isEmpty() || end == nullptr || *end != '\0' || !std::isfinite(parsed)) { repaint(); return; }
-        commit(spec.clamp(parsed));
+        if (!parsed.has_value()) { repaint(); return; }
+        commit(spec.clamp(*parsed));
     }
     void commit(double next) {
         value = next;
