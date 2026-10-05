@@ -30,13 +30,13 @@ struct LiveMidiInputs {
         for (auto& route : routes) { route.performance.reset(); }
     }
     // Channel messages reach every route listening to their channel.
-    bool apply(const unsigned char* data, int size, std::uint64_t sample, bool (*dispatch)(LiveMidiPerformance&, const unsigned char*, int, std::uint64_t)) {
+    bool handle(const unsigned char* data, int size, std::uint64_t sample) {
         if (data == nullptr || size < 1) { return false; }
         const auto channel = (data[0] & 15) + 1;
         bool changed = false;
         for (std::size_t index = 0; index < count; ++index) {
             auto& route = routes[index];
-            if (route.channel == 0 || route.channel == channel) { changed = dispatch(route.performance, data, size, sample) || changed; }
+            if (route.channel == 0 || route.channel == channel) { changed = route.performance.handle(data, size, sample) || changed; }
         }
         return changed;
     }

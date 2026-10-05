@@ -435,6 +435,8 @@
               compile="0" resource="0" file="Source/motion/import/FractalPreparation.h"/>
         <FILE id="MotimportLuaBakerh" name="LuaBaker.h" compile="0" resource="0"
               file="Source/motion/import/LuaBaker.h"/>
+        <FILE id="MotimportLuaSliderBakesh" name="LuaSliderBakes.h" compile="0"
+              resource="0" file="Source/motion/import/LuaSliderBakes.h"/>
         <FILE id="MotimportMidiSourcePreparerh" name="MidiSourcePreparer.h"
               compile="0" resource="0" file="Source/motion/import/MidiSourcePreparer.h"/>
         <FILE id="MotimportRasterBeamBuilderh" name="RasterBeamBuilder.h" compile="0"
@@ -517,6 +519,8 @@
               file="Source/motion/model/Modulators.h"/>
         <FILE id="MotmodelPointFrameCacheh" name="PointFrameCache.h" compile="0"
               resource="0" file="Source/motion/model/PointFrameCache.h"/>
+        <FILE id="MotmodelPreparedAudioh" name="PreparedAudio.h" compile="0"
+              resource="0" file="Source/motion/model/PreparedAudio.h"/>
         <FILE id="MotmodelPreparedPointFramesh" name="PreparedPointFrames.h"
               compile="0" resource="0" file="Source/motion/model/PreparedPointFrames.h"/>
         <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
@@ -559,14 +563,10 @@
               resource="0" file="Source/motion/render/LiveMidiInputs.h"/>
         <FILE id="MotrenderLiveMidiPerformanceh" name="LiveMidiPerformance.h"
               compile="0" resource="0" file="Source/motion/render/LiveMidiPerformance.h"/>
-        <FILE id="MotrenderLuaSliderBakesh" name="LuaSliderBakes.h" compile="0"
-              resource="0" file="Source/motion/render/LuaSliderBakes.h"/>
         <FILE id="MotrenderMidiRecordingh" name="MidiRecording.h" compile="0"
               resource="0" file="Source/motion/render/MidiRecording.h"/>
         <FILE id="MotrenderMidiRecordingSessionh" name="MidiRecordingSession.h"
               compile="0" resource="0" file="Source/motion/render/MidiRecordingSession.h"/>
-        <FILE id="motpreparedaudio" name="PreparedAudio.h" compile="0" resource="0"
-              file="Source/motion/render/PreparedAudio.h"/>
         <FILE id="MotrenderPreparedDrawingh" name="PreparedDrawing.h" compile="0"
               resource="0" file="Source/motion/render/PreparedDrawing.h"/>
         <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"

@@ -15,9 +15,9 @@ public:
 
     juce::Result listen(Id id, bool enabled) {
         prune();
-        const auto asset = findAsset(id);
+        const auto asset = liveAsset(id);
         if (asset == nullptr) { return juce::Result::fail("The Blender source no longer exists."); }
-        auto* session = findSession(asset->liveIdentity);
+        const auto* session = findSession(asset->liveIdentity);
         if (enabled) {
             for (const auto& item : sessions) {
                 const auto state = item.input->status().state;
@@ -41,29 +41,29 @@ public:
         for (const auto& item : sessions) {
             if (item.input->capturing()) { return juce::Result::fail("Finish or cancel the current Blender capture first."); }
         }
-        const auto* asset = findAsset(id);
-        auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        const auto* asset = liveAsset(id);
+        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
         if (session == nullptr || !listening(id)) { return juce::Result::fail("Start listening before recording a capture."); }
         return session->input->beginCapture(asset->blenderSettings.freezeOnDisconnect) ? juce::Result::ok() : juce::Result::fail("A capture is already running.");
     }
     std::unique_ptr<BlenderCapture> finishCapture(Id id) {
-        const auto* asset = findAsset(id);
-        auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        const auto* asset = liveAsset(id);
+        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
         return session != nullptr ? session->input->finishCapture() : nullptr;
     }
     void cancelCapture(Id id) {
-        const auto* asset = findAsset(id);
-        auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        const auto* asset = liveAsset(id);
+        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
         if (session != nullptr) { session->input->cancelCapture(); }
     }
     void cancelAllCaptures() { for (const auto& session : sessions) { session.input->cancelCapture(); } }
     bool capturing(Id id) const {
-        const auto* asset = findAsset(id);
+        const auto* asset = liveAsset(id);
         const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
         return session != nullptr && session->input->capturing();
     }
     juce::String statusText(Id id) const {
-        const auto asset = findAsset(id);
+        const auto asset = liveAsset(id);
         if (asset == nullptr) { return "Source unavailable"; }
         const auto* session = findSession(asset->liveIdentity);
         if (session == nullptr) { return "Offline - start listening to connect Blender"; }
@@ -83,7 +83,7 @@ public:
         return {};
     }
     bool listening(Id id) const {
-        const auto asset = findAsset(id);
+        const auto asset = liveAsset(id);
         const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
         if (session == nullptr) { return false; }
         const auto state = session->input->status().state;
@@ -91,7 +91,7 @@ public:
     }
     void poll() {
         prune();
-        for (const auto& session : sessions) { session.input->captureError(); }
+        for (const auto& session : sessions) { session.input->checkCaptureTime(); }
         std::vector<LiveSourceFrames::Entry> entries;
         for (const auto& asset : document.mainProject().assets) {
             const auto* session = findSession(asset->liveIdentity);
@@ -119,14 +119,16 @@ private:
         std::unique_ptr<PreparedBlenderInput> input;
     };
     static constexpr std::size_t maximumInputs = 16;
-    const Asset* findAsset(Id id) const {
-        for (const auto& asset : document.mainProject().assets) {
-            if (asset->id == id && asset->liveIdentity != nullptr) { return asset.get(); }
-        }
-        return nullptr;
+    const Asset* liveAsset(Id id) const {
+        const auto asset = findAsset(document.mainProject().assets, id);
+        return asset != nullptr && asset->liveIdentity != nullptr ? asset.get() : nullptr;
     }
-    Session* findSession(const std::shared_ptr<const LiveSourceIdentity>& identity) const {
-        for (const auto& session : sessions) { if (identity != nullptr && session.identity == identity) { return const_cast<Session*>(&session); } }
+    // Sessions own their inputs through pointers, so a const session still
+    // controls its input.
+    const Session* findSession(const std::shared_ptr<const LiveSourceIdentity>& identity) const {
+        for (const auto& session : sessions) {
+            if (identity != nullptr && session.identity == identity) { return &session; }
+        }
         return nullptr;
     }
     void prune() {

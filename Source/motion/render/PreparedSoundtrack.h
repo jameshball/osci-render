@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PreparedAudio.h"
+#include "../model/PreparedAudio.h"
 #include "../model/CompositionExpansion.h"
 #include "../model/PropertySpecs.h"
 

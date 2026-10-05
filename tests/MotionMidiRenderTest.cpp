@@ -394,32 +394,32 @@ private:
         motion::LiveMidiPerformance live;
         expect(live.prepare(48000));
         const unsigned char on[] {0x90, 69, 127};
-        expect(!motion::applyLiveMidi(live, nullptr, 3, 0));
-        for (const int size : {-1, 0, 1, 2, 4}) { expect(!motion::applyLiveMidi(live, on, size, 0)); }
+        expect(!live.handle(nullptr, 3, 0));
+        for (const int size : {-1, 0, 1, 2, 4}) { expect(!live.handle(on, size, 0)); }
         for (const auto message : {std::array<unsigned char, 3>{0xf0, 1, 2}, {0xe0, 0, 128}, {0xa0, 69, 100},
             {0xb0, 1, 127}, {0x90, 128, 127}, {0x90, 69, 128}, {0x10, 69, 127}}) {
-            expect(!motion::applyLiveMidi(live, message.data(), 3, 0));
+            expect(!live.handle(message.data(), 3, 0));
         }
         expect(live.select(10, .1).note == 0);
-        expect(motion::applyLiveMidi(live, on, 3, 7));
+        expect(live.handle(on, 3, 7));
         expect(live.select(6, .1).note == 0);
         expect(live.select(11, .1).note != 0);
         const unsigned char pedalDown[] {0xb0, 64, 64}, off[] {0x80, 69, 0}, resetControllers[] {0xb0, 121, 0};
-        expect(motion::applyLiveMidi(live, pedalDown, 3, 12));
-        expect(motion::applyLiveMidi(live, off, 3, 13));
+        expect(live.handle(pedalDown, 3, 12));
+        expect(live.handle(off, 3, 13));
         expect(live.select(14, .1).note != 0);
-        expect(motion::applyLiveMidi(live, resetControllers, 3, 15));
+        expect(live.handle(resetControllers, 3, 15));
         expect(live.select(15, .1).note == 0);
         const unsigned char channel16[] {0x9f, 72, 127}, zeroVelocity[] {0x9f, 72, 0};
-        expect(motion::applyLiveMidi(live, channel16, 3, 16));
-        expect(motion::applyLiveMidi(live, zeroVelocity, 3, 17));
+        expect(live.handle(channel16, 3, 16));
+        expect(live.handle(zeroVelocity, 3, 17));
         expect(live.select(17, .1).note == 0);
         const unsigned char allNotes[] {0xb0, 123, 0}, allSound[] {0xb0, 120, 0};
-        expect(motion::applyLiveMidi(live, on, 3, 18));
-        expect(motion::applyLiveMidi(live, allNotes, 3, 19));
+        expect(live.handle(on, 3, 18));
+        expect(live.handle(allNotes, 3, 19));
         expect(live.select(19, .1).note == 0);
-        expect(motion::applyLiveMidi(live, on, 3, 20));
-        expect(motion::applyLiveMidi(live, allSound, 3, 21));
+        expect(live.handle(on, 3, 20));
+        expect(live.handle(allSound, 3, 21));
         expect(live.select(21, .1).note == 0);
 
         beginTest("Live audition applies the selected source transforms and RGB without changing timeline MIDI");

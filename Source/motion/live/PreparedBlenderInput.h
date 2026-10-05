@@ -25,7 +25,8 @@ public:
     std::unique_ptr<BlenderCapture> finishCapture() { return receiver.finishCapture(); }
     void cancelCapture() { receiver.cancelCapture(); }
     bool capturing() const { return receiver.capturing(); }
-    juce::String captureError() { return receiver.captureError(); }
+    void checkCaptureTime() { receiver.checkCaptureTime(); }
+    juce::String captureError() const { return receiver.captureError(); }
     BlenderReceiver::Status status() const { return receiver.getStatus(); }
     Frame frame() const {
         const juce::SpinLock::ScopedLockType guard(lock);

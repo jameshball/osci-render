@@ -1,7 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
-#include "../Source/motion/render/LuaSliderBakes.h"
+#include "../Source/motion/import/LuaSliderBakes.h"
 #include "../Source/motion/render/CompositionRenderer.h"
 
 class MotionLuaSlidersTest : public juce::UnitTest {

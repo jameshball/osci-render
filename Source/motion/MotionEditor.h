@@ -15,7 +15,7 @@
 #include "ui/EffectLibrary.h"
 #include "ui/EffectStack.h"
 #include "ui/ModulatorPanels.h"
-#include "render/LuaSliderBakes.h"
+#include "import/LuaSliderBakes.h"
 #include "model/TapTempo.h"
 #include "model/TempoDetection.h"
 #include "ui/PropertyInspector.h"

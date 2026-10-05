@@ -6,26 +6,6 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 namespace motion {
-// Inspect short messages directly: constructing a JUCE MidiMessage for an
-// arbitrary incoming SysEx packet can allocate on the audio thread.
-inline bool applyLiveMidi(LiveMidiPerformance& performance, const unsigned char* data, int size, std::uint64_t sample) {
-    if (data == nullptr || size != 3 || data[1] > 127 || data[2] > 127) { return false; }
-    const auto channel = (data[0] & 15) + 1;
-    switch (data[0] & 0xf0) {
-        case 0x80: return performance.noteOff(channel, data[1], sample);
-        case 0x90: return performance.noteOn(channel, data[1], data[2], sample);
-        case 0xe0: return performance.pitchBend(channel, (data[2] << 7 | data[1]) - 8192, sample);
-        case 0xb0:
-            if (data[1] == 11) { return performance.setExpression(channel, data[2]); }
-            if (data[1] == 64) { return performance.sustain(channel, data[2] >= 64, sample); }
-            if (data[1] == 120) { return performance.allSoundOff(channel); }
-            if (data[1] == 123) { return performance.allNotesOff(channel, sample); }
-            if (data[1] == 121) { return performance.resetControllers(channel, sample); }
-            return false;
-        default: return false;
-    }
-}
-
 // One cursor per block. The buffer must remain unchanged/alive while iterating;
 // offsets advance monotonically and absoluteClock already includes the offset.
 // Null performance consumes input without enabling or retaining live audition.
@@ -37,10 +17,10 @@ public:
         while (next != end && (*next).samplePosition <= offset) {
             const auto message = *next;
             if (performance != nullptr) {
-                const auto accepted = applyLiveMidi(*performance, message.data, message.numBytes, absoluteClock);
+                const auto accepted = performance->handle(message.data, message.numBytes, absoluteClock);
                 changed = changed || accepted;
             }
-            if (inputs != nullptr) { changed = inputs->apply(message.data, message.numBytes, absoluteClock, &applyLiveMidi) || changed; }
+            if (inputs != nullptr) { changed = inputs->handle(message.data, message.numBytes, absoluteClock) || changed; }
             ++next;
         }
         return changed;

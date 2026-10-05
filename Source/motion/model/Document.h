@@ -13,7 +13,7 @@
 #include "RasterSettings.h"
 #include "TextSettings.h"
 #include "ScopeProfile.h"
-#include "../render/PreparedAudio.h"
+#include "PreparedAudio.h"
 #include <atomic>
 #include "../render/PreparedDrawing.h"
 

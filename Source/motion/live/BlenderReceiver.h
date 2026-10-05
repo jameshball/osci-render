@@ -86,11 +86,14 @@ public:
             old = std::move(capture);
         }
     }
-    juce::String captureError() {
+    // Ends a capture that has run past its time limit, even between frames.
+    void checkCaptureTime() {
         const juce::SpinLock::ScopedLockType guard(lock);
-        if (capture == nullptr) { return {}; }
-        capture->checkTime(nowSeconds());
-        return capture->error();
+        if (capture != nullptr) { capture->checkTime(nowSeconds()); }
+    }
+    juce::String captureError() const {
+        const juce::SpinLock::ScopedLockType guard(lock);
+        return capture != nullptr ? juce::String(capture->error()) : juce::String();
     }
     bool capturing() const {
         const juce::SpinLock::ScopedLockType guard(lock);

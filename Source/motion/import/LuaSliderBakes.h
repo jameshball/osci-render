@@ -3,9 +3,9 @@
 #include "../model/Document.h"
 #include "../model/LuaClipBake.h"
 #include "../model/PropertySchema.h"
-#include "../import/LuaBaker.h"
-#include "../import/BakedSourceArchive.h"
-#include "PreparedDrivers.h"
+#include "LuaBaker.h"
+#include "BakedSourceArchive.h"
+#include "../render/PreparedDrivers.h"
 #include <functional>
 #include <map>
 

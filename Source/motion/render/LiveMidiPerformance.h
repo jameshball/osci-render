@@ -128,6 +128,25 @@ public:
         }
         return changed;
     }
+    // A raw short message. Inspected directly: constructing a JUCE MidiMessage
+    // for an arbitrary incoming SysEx packet can allocate on the audio thread.
+    bool handle(const unsigned char* data, int size, std::uint64_t sample) {
+        if (data == nullptr || size != 3 || data[1] > 127 || data[2] > 127) { return false; }
+        const auto channel = (data[0] & 15) + 1;
+        switch (data[0] & 0xf0) {
+            case 0x80: return noteOff(channel, data[1], sample);
+            case 0x90: return noteOn(channel, data[1], data[2], sample);
+            case 0xe0: return pitchBend(channel, (data[2] << 7 | data[1]) - 8192, sample);
+            case 0xb0:
+                if (data[1] == 11) { return setExpression(channel, data[2]); }
+                if (data[1] == 64) { return sustain(channel, data[2] >= 64, sample); }
+                if (data[1] == 120) { return allSoundOff(channel); }
+                if (data[1] == 123) { return allNotesOff(channel, sample); }
+                if (data[1] == 121) { return resetControllers(channel, sample); }
+                return false;
+            default: return false;
+        }
+    }
     MidiSelection select(std::uint64_t sample, double allocationPhase) const {
         if (!instrument.envelope || !std::isfinite(allocationPhase) || allocationPhase < 0 || allocationPhase >= 1) { return {}; }
         auto cursor = allocationPhase * static_cast<double>(activeCount(sample));

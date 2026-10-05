@@ -101,12 +101,12 @@ public:
             motion::LiveMidiPerformance live;
             expect(live.prepare(48000, settings));
             const unsigned char on[] {0x90, 69, 127}, bend[] {0xe0, 0x7f, 0x7f}, quiet[] {0xb0, 11, 0};
-            expect(motion::applyLiveMidi(live, on, 3, 100));
+            expect(live.handle(on, 3, 100));
             const auto before = live.select(1000, 0.1);
-            expect(motion::applyLiveMidi(live, bend, 3, 2000));
+            expect(live.handle(bend, 3, 2000));
             const auto after = live.select(3000, 0.1);
             expectWithinAbsoluteError(after.phaseSpan / before.phaseSpan, std::exp2(8191 / 8192.0), 1.0e-9);
-            expect(motion::applyLiveMidi(live, quiet, 3, 3000));
+            expect(live.handle(quiet, 3, 3000));
             expect(live.select(4000, 0.1).note == 0);
         }
         beginTest("Controller modulators follow a clip's CC; armed tracks save and draw live notes");
@@ -158,7 +158,7 @@ public:
             inputs.clockOffset = 0;
             expectEquals(lit(&inputs), 0);
             const unsigned char on[] {0x90, 69, 127};
-            expect(inputs.apply(on, 3, 288000, &motion::applyLiveMidi));
+            expect(inputs.handle(on, 3, 288000));
             renderer.reset();
             expect(lit(&inputs) > 1000, "a held live note draws the track's clip");
             expectEquals(lit(nullptr), 0);
