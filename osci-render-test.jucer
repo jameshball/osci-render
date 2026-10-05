@@ -60,6 +60,8 @@
             resource="0" file="tests/MotionMidiImportTest.cpp"/>
       <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
             resource="0" file="tests/MotionSignalExportTest.cpp"/>
+      <FILE id="MotionPerfT" name="MotionPerformanceTest.cpp" compile="1"
+            resource="0" file="tests/MotionPerformanceTest.cpp"/>
       <FILE id="MotionRasterDecoderT" name="MotionRasterDecoderTest.cpp"
             compile="1" resource="0" file="tests/MotionRasterDecoderTest.cpp"/>
       <FILE id="MotionRasterImportT" name="MotionRasterImportTest.cpp" compile="1"
