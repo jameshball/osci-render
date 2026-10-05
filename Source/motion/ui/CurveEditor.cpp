@@ -115,7 +115,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     const auto modulated = drivers != nullptr;
     const auto area = plot();
     g.setFont(motion::style::title());
-    g.drawText(propertyLabel(*clip), 12, 3, 160, 22, juce::Justification::centredLeft);
+    g.drawText(motion::propertyLabel(processor.document.project(), targetId, propertyName), 12, 3, 160, 22, juce::Justification::centredLeft);
     g.setFont(motion::style::body());
     g.setColour(motion::style::muted());
     // Name the owner's kind when it isn't a clip, so a camera or effect
@@ -765,16 +765,14 @@ std::vector<std::pair<std::string, juce::Colour>> MotionCurveEditor::siblings(co
     if (current == nullptr || target.isEffect) { return result; }
     for (const auto& spec : specs) {
         if (spec.group != current->group || spec.id == current->id || target.curve(std::string(spec.id)) == nullptr || hiddenCurves.contains(std::string(spec.id))) { continue; }
-        const auto axis = spec.axis.empty() ? ' ' : spec.axis[0];
-        result.emplace_back(std::string(spec.id), axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : motion::style::axisZ());
+        result.emplace_back(std::string(spec.id), motion::style::axisColour(spec.axis, motion::style::axisZ()));
     }
     return result;
 }
 
 juce::Colour MotionCurveEditor::primaryColour(const motion::PropertyTarget& target) const {
     const auto* spec = target.isEffect ? nullptr : motion::findPropertySpec(motion::propertySpecs(target), propertyName);
-    const auto axis = spec == nullptr || spec->axis.empty() ? ' ' : spec->axis[0];
-    return axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : axis == 'Z' || axis == 'B' ? motion::style::axisZ() : juce::Colour(0xff70da91);
+    return motion::style::axisColour(spec != nullptr ? spec->axis : std::string_view());
 }
 
 std::shared_ptr<const motion::CurveDrivers> MotionCurveEditor::resultDrivers(const motion::Curve& curve) {
@@ -832,22 +830,6 @@ const motion::Curve* MotionCurveEditor::displayed(const motion::PropertyTarget& 
         }
     }
     return target.curve(property);
-}
-
-juce::String MotionCurveEditor::propertyLabel(const motion::PropertyTarget& target) const {
-    if (target.isEffect) {
-        const auto* effect = motion::findEffect(processor.document.project(), targetId);
-        const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
-        if (definition != nullptr) {
-            for (const auto& parameter : definition->parameters) {
-                if (parameter.id == propertyName) { return juce::String(parameter.name); }
-            }
-        }
-        return juce::String(propertyName);
-    }
-    const auto* spec = motion::findPropertySpec(motion::propertySpecs(target), propertyName);
-    if (spec == nullptr && propertyName.starts_with("slider.")) { spec = motion::findPropertySpec(motion::luaSliderSpecs, propertyName); }
-    return spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(propertyName);
 }
 
 bool MotionCurveEditor::targetLocked() const {

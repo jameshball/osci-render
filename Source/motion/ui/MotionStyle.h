@@ -76,6 +76,15 @@ inline juce::Colour marker() { return juce::Colour(0xffcfb779); }
 inline juce::Colour axisX() { return juce::Colour(0xffe07a7a); }
 inline juce::Colour axisY() { return juce::Colour(0xff7ad69a); }
 inline juce::Colour axisZ() { return juce::Colour(0xff7aa6e0); }
+// A spec's axis (X/Y/Z, or R/G/B for colour) as its colour; anything else
+// takes the fallback.
+inline juce::Colour axisColour(std::string_view axis, juce::Colour fallback = key()) {
+    const auto letter = axis.empty() ? ' ' : axis[0];
+    if (letter == 'X' || letter == 'R') { return axisX(); }
+    if (letter == 'Y' || letter == 'G') { return axisY(); }
+    if (letter == 'Z' || letter == 'B') { return axisZ(); }
+    return fallback;
+}
 
 // Clip families are distinguished by hue at equal, low saturation.
 inline juce::Colour visualClip() { return juce::Colour(0xff34524a); }

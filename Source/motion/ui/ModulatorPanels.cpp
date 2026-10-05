@@ -459,7 +459,7 @@ void MotionModulatorLibrary::showRoutes() {
     const auto& project = processor.document.project();
     std::vector<std::pair<motion::ModulationRoute, juce::String>> shown;
     for (const auto& route : project.routes) {
-        if (route.modulator == selected) { shown.emplace_back(route, motion::ui::describeProperty(project, route.target, route.property)); }
+        if (route.modulator == selected) { shown.emplace_back(route, motion::describeProperty(project, route.target, route.property)); }
     }
     motion::ui::RouteRow::showAll(routes, content, shown, processor.document, [this](const juce::Result& result) { report(result); });
     routesTitle.setVisible(current() != nullptr);
@@ -549,7 +549,7 @@ void MotionRoutingPanel::refresh() {
     offset.setVisible(linked);
     delay.setVisible(linked);
     if (linked) {
-        linkSource.setText(juce::String(juce::CharPointer_UTF8("\xe2\x86\x90 ")) + motion::ui::describeProperty(project, curve->link->source, curve->link->property), juce::dontSendNotification);
+        linkSource.setText(juce::String(juce::CharPointer_UTF8("\xe2\x86\x90 ")) + motion::describeProperty(project, curve->link->source, curve->link->property), juce::dontSendNotification);
         scale.field.setValue(curve->link->scale);
         offset.field.setValue(curve->link->offset);
         delay.field.setValue(curve->link->delay);
@@ -602,7 +602,7 @@ void MotionRoutingPanel::showLinkMenu() {
         for (const auto& [name, curve] : properties) {
             if (owner == targetId && name == propertyName) { continue; }
             choices.push_back({owner, name});
-            sub.addItem(static_cast<int>(choices.size()), motion::ui::propertyLabel(project, owner, name));
+            sub.addItem(static_cast<int>(choices.size()), motion::propertyLabel(project, owner, name));
         }
         if (sub.getNumItems() > 0) { menu.addSubMenu(title, sub); }
     };

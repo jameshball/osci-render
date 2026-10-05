@@ -130,7 +130,6 @@ private:
     // The drag preview of a group curve while dragging, otherwise the stored curve.
     const motion::Curve* displayed(const motion::PropertyTarget& target, const std::string& property) const;
     // The name the inspector and channel list use, never the internal id.
-    juce::String propertyLabel(const motion::PropertyTarget& target) const;
     static const motion::Curve* findCurve(const std::optional<motion::PropertyTarget>& target, const std::string& property) {
         return target.has_value() ? target->curve(property) : nullptr;
     }

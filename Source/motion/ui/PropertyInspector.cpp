@@ -379,8 +379,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         editor.setTooltip(juce::String(spec.label.data(), spec.label.size()) + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
         if (spec.axis.size() == 1) {
             editor.setPrefix(juce::String(spec.axis.data(), spec.axis.size()));
-            const auto axis = spec.axis[0];
-            editor.setAxisColour(axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : motion::style::axisZ());
+            editor.setAxisColour(motion::style::axisColour(spec.axis, motion::style::axisZ()));
         }
         const std::string property(spec.id);
         editor.onBegin = [this, property] { beginGesture(property); };

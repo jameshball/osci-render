@@ -1434,27 +1434,16 @@ void MotionEditor::refreshCurveList() {
         curveEditor.setContextCurves({});
         return;
     }
-    const auto* effect = motion::findEffect(project, curveTarget);
-    const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
     std::vector<MotionCurveList::Channel> channels;
     std::map<std::string, juce::Colour> colours;
     for (const auto& name : curveProperties) {
         MotionCurveList::Channel channel;
         channel.id = name;
-        const auto* spec = target.has_value() && definition == nullptr ? motion::findPropertySpec(motion::propertySpecs(*target), name) : nullptr;
-        if (spec == nullptr && target.has_value() && name.rfind("slider.", 0) == 0) { spec = motion::findPropertySpec(motion::luaSliderSpecs, name); }
-        if (definition != nullptr) {
-            for (const auto& parameter : definition->parameters) { if (parameter.id == name) { channel.label = juce::String(parameter.name); } }
-            channel.group = "Effect";
-        } else if (spec != nullptr) {
-            channel.label = juce::String(spec->label.data(), spec->label.size());
-            channel.group = juce::String(spec->group.data(), spec->group.size());
-        } else {
-            channel.label = juce::String(name).replace(".", " ");
-        }
-        const auto axis = spec != nullptr && !spec->axis.empty() ? spec->axis[0] : ' ';
-        channel.colour = axis == 'X' || axis == 'R' ? motion::style::axisX() : axis == 'Y' || axis == 'G' ? motion::style::axisY() : axis == 'Z' || axis == 'B' ? motion::style::axisZ() : motion::style::key();
-        const auto* curve = target.has_value() ? target->curve(name) : nullptr;
+        const auto spec = motion::specFor(project, curveTarget, name);
+        channel.label = spec.has_value() ? juce::String(spec->label.data(), spec->label.size()) : juce::String(name).replace(".", " ");
+        channel.group = spec.has_value() ? juce::String(spec->group.data(), spec->group.size()) : juce::String();
+        channel.colour = motion::style::axisColour(spec.has_value() ? spec->axis : std::string_view());
+        const auto* curve = target->curve(name);
         channel.keyed = curve != nullptr && !curve->keyframes().empty();
         const auto routed = std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == curveTarget && route.property == name; });
         channel.driven = routed || (curve != nullptr && curve->link.has_value());

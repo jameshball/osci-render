@@ -7,41 +7,6 @@
 #include "ScrubField.h"
 
 namespace motion::ui {
-inline const EffectInstance* findEffect(const Project& project, Id id) {
-    const EffectInstance* found = nullptr;
-    const auto scan = [&](const std::vector<EffectInstance>& list) {
-        for (const auto& effect : list) { if (effect.id == id) { found = &effect; } }
-    };
-    scan(project.effects);
-    for (const auto& group : project.groups) { scan(group.effects); }
-    for (const auto& track : project.tracks) {
-        scan(track.effects);
-        for (const auto& clip : track.clips) { scan(clip.effects); }
-    }
-    return found;
-}
-
-inline juce::String propertyLabel(const Project& project, Id id, const std::string& property) {
-    const auto* effect = findEffect(project, id);
-    const auto* definition = effect != nullptr ? effectDefinition(effect->type) : nullptr;
-    if (definition != nullptr) {
-        for (const auto& parameter : definition->parameters) {
-            if (parameter.id == property) { return juce::String(parameter.name); }
-        }
-    }
-    for (const auto specs : std::initializer_list<std::span<const PropertySpec>> {objectPropertySpecs, cameraPropertySpecs, audioPropertySpecs, beamPropertySpecs}) {
-        const auto* spec = findPropertySpec(specs, property);
-        if (spec != nullptr) { return juce::String(spec->label.data(), spec->label.size()); }
-    }
-    return juce::String(property);
-}
-
-inline juce::String describeProperty(const Project& project, Id id, const std::string& property) {
-    const auto target = findPropertyTarget(project, id);
-    const auto owner = target.has_value() ? juce::String(target->name.data(), target->name.size()) : juce::String("Missing");
-    return owner + juce::String(juce::CharPointer_UTF8(" \xc2\xb7 ")) + propertyLabel(project, id, property);
-}
-
 inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1, .01, 3, " Hz"};
 inline constexpr PropertySpec beatsSpec {"beats", "Beats", "", "", 0.0625, 64, 1, .25, 3, " beats"};
 inline constexpr PropertySpec phaseSpec {"phase", "Phase", "", "", 0, 360, 0, 1, 1, "\xc2\xb0"};
