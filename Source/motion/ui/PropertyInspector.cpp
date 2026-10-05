@@ -25,7 +25,8 @@ MotionPropertyInspector::MotionPropertyInspector(MotionProcessor& owner) : proce
 }
 
 void MotionPropertyInspector::setLead(juce::Component* component, std::function<int()> height) {
-    if (lead != nullptr && lead != component) { content.removeChildComponent(lead); }
+    if (component == lead) { return; }
+    if (lead != nullptr) { content.removeChildComponent(lead); }
     lead = component;
     leadHeight = std::move(height);
     if (lead != nullptr) { content.addChildComponent(lead); }
@@ -33,7 +34,8 @@ void MotionPropertyInspector::setLead(juce::Component* component, std::function<
 }
 
 void MotionPropertyInspector::setTrail(juce::Component* component, std::function<int()> height) {
-    if (trail != nullptr && trail != component) { content.removeChildComponent(trail); }
+    if (component == trail) { return; }
+    if (trail != nullptr) { content.removeChildComponent(trail); }
     trail = component;
     trailHeight = std::move(height);
     if (trail != nullptr) { content.addChildComponent(trail); }
@@ -41,6 +43,7 @@ void MotionPropertyInspector::setTrail(juce::Component* component, std::function
 }
 
 void MotionPropertyInspector::setHeading(std::optional<std::pair<juce::String, juce::String>> value) {
+    if (value == heading) { return; }
     heading = std::move(value);
     refresh();
 }
@@ -121,7 +124,12 @@ void MotionPropertyInspector::refresh() {
     // Children repaint their own changes; only the empty message is painted here.
     const auto wasEmpty = std::exchange(empty, !editable && !heading.has_value());
     if (empty != wasEmpty) { repaint(); }
-    if (!editable) { return; }
+    refreshValues();
+}
+
+void MotionPropertyInspector::refreshValues() {
+    const auto found = motion::findPropertyTarget(processor.document.project(), target);
+    if (!found.has_value() || found->isEffect) { return; }
     const auto time = keyTime(*found);
     for (auto& row : rows) {
         bool allKeyed = true, anyAnimated = false, modulated = false;

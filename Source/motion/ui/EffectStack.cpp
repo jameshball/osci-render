@@ -196,7 +196,9 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
 void MotionEffectStack::Card::update() {
     const auto& project = stack.processor.document.project();
     const auto* effect = motion::findEffect(project, id);
-    enabled = effect != nullptr && effect->enabled;
+    // Fields and keys repaint themselves; the card only shows its switch.
+    const auto wasEnabled = std::exchange(enabled, effect != nullptr && effect->enabled);
+    if (enabled != wasEnabled) { repaint(); }
     const auto target = motion::findPropertyTarget(project, id);
     if (!target.has_value()) { return; }
     const auto local = target->localTime(stack.frameTime());
@@ -208,7 +210,6 @@ void MotionEffectStack::Card::update() {
         const bool keyed = std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return std::abs(key.time - local) < 1.0e-6; });
         row->key.setState(keyed ? osci::KeyframeButton::State::keyed : (curve->animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
     }
-    repaint();
 }
 
 void MotionEffectStack::Card::resized() {

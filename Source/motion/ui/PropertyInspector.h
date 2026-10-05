@@ -47,9 +47,11 @@ public:
     motion::Id getTarget() const { return target; }
     void setSelectionCount(std::size_t count);
 
-    // Rebuilds rows only when the target's property set changes; otherwise
-    // updates values and key states in place (cheap enough for 30 Hz).
+    // Rebuilds rows only when the target's property set changes, updates the
+    // header and modes, then the values.
     void refresh();
+    // Only the values and key states at the playhead, for playback ticks.
+    void refreshValues();
 
     // Modulators dragged from the library route to the field or row dropped on.
     std::function<void(motion::Id modulator, motion::Id target, std::vector<std::string> properties)> onRouteModulator;
