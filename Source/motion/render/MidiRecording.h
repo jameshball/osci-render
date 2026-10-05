@@ -142,9 +142,13 @@ public:
         const auto current = state();
         if (current != State::armed && current != State::recording) { return; }
         if (current == State::armed) { count = 0; first = end = config.firstSample; reason = EndReason::stopped; }
-        if (cancelToken.load(std::memory_order_acquire) == config.token) { finish(Failure::cancelled); }
-        else if (stopToken.load(std::memory_order_acquire) == config.token) { finish(Failure::none); }
-        else if (timingUnavailable) { finish(Failure::unavailable); }
+        if (cancelToken.load(std::memory_order_acquire) == config.token) {
+            finish(Failure::cancelled);
+        } else if (stopToken.load(std::memory_order_acquire) == config.token) {
+            finish(Failure::none);
+        } else if (timingUnavailable) {
+            finish(Failure::unavailable);
+        }
     }
 
     // Device lifecycle only after callbacks and other lifecycle calls are excluded. No message-thread

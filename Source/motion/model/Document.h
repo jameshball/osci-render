@@ -281,6 +281,8 @@ public:
     }
 
 private:
+    // The Scope belongs to the main composition: nothing inside another drives it.
+    bool beamOutsideMain(Id target) const { return scopeId != 0 && target == state.beam.id; }
     Id highestId() const;
     juce::Result retempo(std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
     juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);

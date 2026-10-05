@@ -76,8 +76,11 @@ struct MidiTakeNotes {
             auto& queue = channel.held[static_cast<std::size_t>(pitch)];
             if (queue.empty()) { return; }
             const auto held = queue.front(); queue.pop_front();
-            if (channel.sustain) { channel.pending.push_back({held, pitch}); }
-            else { close(held, pitch, index, beat); }
+            if (channel.sustain) {
+                channel.pending.push_back({held, pitch});
+            } else {
+                close(held, pitch, index, beat);
+            }
         };
         for (const auto& event : take.events) {
             if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
@@ -86,9 +89,11 @@ struct MidiTakeNotes {
             const int key = event.bytes[1], value = event.bytes[2];
             auto& channel = (*channels)[static_cast<std::size_t>(index)];
             const auto beat = beatAt(event.sample);
-            if (kind == 0x90 && value != 0) { channel.held[static_cast<std::size_t>(key)].push_back({beat, value}); }
-            else if (kind == 0x80 || kind == 0x90) { release(channel, index, key, beat); }
-            else if (kind == 0xb0 && (key == 64 || key == 121)) {
+            if (kind == 0x90 && value != 0) {
+                channel.held[static_cast<std::size_t>(key)].push_back({beat, value});
+            } else if (kind == 0x80 || kind == 0x90) {
+                release(channel, index, key, beat);
+            } else if (kind == 0xb0 && (key == 64 || key == 121)) {
                 channel.sustain = key == 64 && value >= 64;
                 if (!channel.sustain) { releasePending(channel, index, beat); }
             } else if (kind == 0xb0 && (key == 120 || key == 123)) {

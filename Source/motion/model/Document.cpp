@@ -129,8 +129,9 @@ juce::Result Document::setMarker(Id id, double time, juce::String name) {
         lastId = id;
     }
     edit(adding ? "Add marker" : "Edit marker", [id, time, name, adding](Project& project) {
-        if (adding) { project.markers.push_back({id, time, name}); }
-        else {
+        if (adding) {
+            project.markers.push_back({id, time, name});
+        } else {
             for (auto& marker : project.markers) { if (marker.id == id) { marker.time = time; marker.name = name; } }
         }
         std::sort(project.markers.begin(), project.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
@@ -912,8 +913,9 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
             auto timing = clip.timing(candidate.tempo());
             double displacement = 0;
             for (const auto& interval : removed) {
-                if (interval.end() <= timing.start) { displacement += interval.duration(); }
-                else if (interval.start < timing.end() && timing.start < interval.end()) {
+                if (interval.end() <= timing.start) {
+                    displacement += interval.duration();
+                } else if (interval.start < timing.end() && timing.start < interval.end()) {
                     return juce::Result::fail("Ripple delete cannot close an overlapping clip interval.");
                 }
             }
@@ -1657,6 +1659,7 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
     const auto& current = project();
     const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == route.modulator; });
     if (!route.valid() || !hasModulator || !drivableProperty(current, route.target, route.property)) { return juce::Result::fail("A route needs an existing modulator and a visual property."); }
+    if (beamOutsideMain(route.target)) { return juce::Result::fail("The Scope is modulated from the main composition."); }
     id = route.id;
     edit("Route modulator", [route](Project& project) { project.routes.push_back(route); });
     return juce::Result::ok();
@@ -1681,7 +1684,7 @@ juce::Result Document::routeModulator(Id modulator, Id target, const std::vector
     const auto& current = project();
     const auto hasModulator = std::any_of(current.modulators.begin(), current.modulators.end(), [&](const auto& item) { return item.id == modulator; });
     if (!hasModulator) { return juce::Result::fail("The modulator no longer exists."); }
-    if (scopeId != 0 && target == current.beam.id) { return juce::Result::fail("The Scope is modulated from the main composition."); }
+    if (beamOutsideMain(target)) { return juce::Result::fail("The Scope is modulated from the main composition."); }
     std::vector<ModulationRoute> added;
     for (const auto& property : properties) {
         const auto routed = std::any_of(current.routes.begin(), current.routes.end(), [&](const auto& route) { return route.modulator == modulator && route.target == target && route.property == property; });
@@ -1701,7 +1704,7 @@ juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute r
     if (!modulator.valid() || !route.valid() || !drivableProperty(project(), route.target, route.property)) {
         return juce::Result::fail("A route needs an existing visual property.");
     }
-    if (scopeId != 0 && route.target == project().beam.id) { return juce::Result::fail("The Scope is modulated from the main composition."); }
+    if (beamOutsideMain(route.target)) { return juce::Result::fail("The Scope is modulated from the main composition."); }
     modulatorId = modulator.id;
     edit("Route new modulator", [modulator, route](Project& project) {
         project.modulators.push_back(modulator);
@@ -1744,7 +1747,7 @@ juce::Result Document::setLink(Id target, const std::string& property, std::opti
         if (!link->valid() || !hasPropertyCurve(current, link->source, link->property)) { return juce::Result::fail("Choose an existing property to link to."); }
         // The Scope follows the main composition; nothing follows the Scope.
         if (link->source == current.beam.id) { return juce::Result::fail("Scope properties cannot be linked to."); }
-        if (scopeId != 0 && target == current.beam.id) { return juce::Result::fail("The Scope is linked from the main composition."); }
+        if (beamOutsideMain(target)) { return juce::Result::fail("The Scope is linked from the main composition."); }
         if (linkCreatesCycle(current, target, property, *link)) { return juce::Result::fail("That link would make the property depend on itself."); }
     }
     if (curve->link == link) { return juce::Result::ok(); }

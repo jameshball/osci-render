@@ -319,22 +319,15 @@ struct PreparedCamera {
         }
         return result;
     }
-    bool visible(osci::Point point, double time) const {
-        const auto current = frame(time);
-        return current.has_value() && depthOf(*current, point) > nearPlane;
-    }
-    static constexpr float nearPlane = 0.05f;
-    osci::Point projectPoint(osci::Point point, double time) const {
-        const auto current = frame(time);
-        return current.has_value() ? project(*current, point) : osci::Point(0, 0, 0, 0, 0, 0);
-    }
+    // Points nearer than this to a camera are not drawn.
+    static constexpr double nearPlane = 0.05;
     static double depthOf(const Frame& frame, const osci::Point& point) {
         return dot(subtract({point.x, point.y, point.z}, frame.position), frame.forward);
     }
     static osci::Point project(const Frame& frame, osci::Point point) {
         const auto offset = subtract({point.x, point.y, point.z}, frame.position);
         const auto depth = dot(offset, frame.forward);
-        if (!std::isfinite(depth) || depth <= 0.05) { return { 0, 0, 0, 0, 0, 0 }; }
+        if (!std::isfinite(depth) || depth <= nearPlane) { return { 0, 0, 0, 0, 0, 0 }; }
         point.x = static_cast<float>(dot(offset, frame.right) * frame.focalLength / depth);
         point.y = static_cast<float>(dot(offset, frame.up) * frame.focalLength / depth);
         point.z = 1.0f;

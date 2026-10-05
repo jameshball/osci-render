@@ -243,12 +243,11 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         // before this block produces a sample, even if it raced the start above.
         releaseRecordingTransport();
     }
+    // The beam keeps drawing while stopped (the picture at the playhead, and
+    // held notes on armed tracks); starting or stopping guards the jump.
     const auto running = playing.load() && requestedPlay;
-    // A held note on an armed track draws even while the transport is stopped.
-    const auto drawing = running || freezeWhenStopped.load() || liveInputs.sounding(liveMidiSample);
-    if (running != wasPlaying || drawing != wasDrawing) { transitionGuard.begin(); }
+    if (running != wasPlaying) { transitionGuard.begin(); }
     wasPlaying = running;
-    wasDrawing = drawing;
     juce::int64 loopStartSample = 0, loopEndSample = 0;
     // A take records straight through: no loop while recording MIDI.
     const auto takeOpen = midiRecording.state() == motion::MidiRecording::State::armed || midiRecording.state() == motion::MidiRecording::State::recording;
@@ -268,7 +267,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         if (running) { oscillatorSample = audioSample; }
         liveInputs.clockOffset = static_cast<std::int64_t>(liveMidiSample) - static_cast<std::int64_t>(oscillatorSample);
         auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running, liveFrames)
-            : drawing ? beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames, liveInputs.count > 0 ? &liveInputs : nullptr) : osci::Point(0, 0, 0, 0, 0, 0);
+            : beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames, liveInputs.count > 0 ? &liveInputs : nullptr);
         point = transitionGuard.apply(point);
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);

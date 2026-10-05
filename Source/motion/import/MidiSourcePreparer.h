@@ -100,8 +100,9 @@ public:
                     const auto beat = static_cast<double>(ticks) * beatsPerTick;
                     if (!std::isfinite(beat) || beat > maximumBeats) { throw Error("MIDI event time exceeds one million beats."); }
                     auto status = static_cast<unsigned>(track.peek());
-                    if ((status & 0x80) != 0) { track.byte(); }
-                    else {
+                    if ((status & 0x80) != 0) {
+                        track.byte();
+                    } else {
                         if (runningStatus == 0) { throw Error("MIDI running status has no preceding channel message."); }
                         status = runningStatus;
                     }
@@ -115,8 +116,11 @@ public:
                             if (++noteOns > maximumNotes) { throw Error("MIDI file exceeds the 100000-note import limit."); }
                             const auto index = static_cast<int>(pending.size());
                             pending.push_back({ ticks, noteOns, static_cast<int>(first), static_cast<int>(second), static_cast<int>(channel), -1 });
-                            if (tails[key] >= 0) { pending[static_cast<std::size_t>(tails[key])].next = index; }
-                            else { heads[key] = index; }
+                            if (tails[key] >= 0) {
+                                pending[static_cast<std::size_t>(tails[key])].next = index;
+                            } else {
+                                heads[key] = index;
+                            }
                             tails[key] = index;
                         } else if (type == 0x80 || (type == 0x90 && second == 0)) {
                             const auto index = heads[key];

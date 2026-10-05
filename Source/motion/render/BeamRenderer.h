@@ -50,7 +50,6 @@ public:
 
     // Cycles never straddle a frame of the project's frame rate, so exported
     // video frames integrate a whole number of cycles and do not pulse.
-    static double cycleRateFor(double frameRate) { return beamCycleRate(frameRate); }
     static std::int64_t cycleStart(std::int64_t cycle, double rate, double cycleRate) {
         return static_cast<std::int64_t>(std::ceil(static_cast<double>(cycle) * rate / cycleRate - 1.0e-9));
     }
@@ -140,17 +139,13 @@ private:
         const LiveMidiPerformance* live = nullptr;
     };
 
-    static double distance(const osci::Point& a, const osci::Point& b) {
-        const auto dx = static_cast<double>(a.x) - b.x, dy = static_cast<double>(a.y) - b.y;
-        const auto value = std::sqrt(dx * dx + dy * dy);
-        return std::isfinite(value) ? value : 2.0;
-    }
-    // distance() on cached endpoints, for the ordering inner loop.
+    // The beam's travel between two points; a non-finite one counts as far.
     static double span(double ax, double ay, double bx, double by) {
         const auto dx = ax - bx, dy = ay - by;
         const auto value = std::sqrt(dx * dx + dy * dy);
         return std::isfinite(value) ? value : 2.0;
     }
+    static double distance(const osci::Point& a, const osci::Point& b) { return span(a.x, a.y, b.x, b.y); }
     static osci::Point dark(osci::Point point) { point.r = point.g = point.b = 0; return point; }
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
@@ -161,7 +156,6 @@ private:
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
         planned = true; planFirst = first; planEnd = end; planRate = rate; planTime = time;
         segmentCount = 0; layerCount = 0; lastSegment = 0;
-        auto& items = *layers;
         for (const auto& clip : composition.clips) {
             if (layerCount == maximumLayers) { break; }
             if (!clip.active(time)) { continue; }

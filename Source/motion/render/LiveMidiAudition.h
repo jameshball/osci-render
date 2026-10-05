@@ -51,7 +51,8 @@ private:
 
 inline osci::Point sampleLiveMidiAudition(const PreparedComposition& composition, const PreparedClip& clip, const LiveMidiPerformance& performance, double time, std::uint64_t clock, double rate, bool advancing = false, const LiveSourceFrames* liveFrames = nullptr) {
     if (!std::isfinite(time) || !std::isfinite(rate) || rate <= 0) { return {0, 0, 0, 0, 0, 0}; }
-    const auto phaseAt = [rate](std::uint64_t index) { return std::fmod(static_cast<double>(index) * 60 / rate, 1.0); };
+    // Voices share the beam's cycle, as in playback and export.
+    const auto phaseAt = [rate, cycleRate = composition.beamRate](std::uint64_t index) { return std::fmod(static_cast<double>(index) * cycleRate / rate, 1.0); };
     const auto current = performance.select(clock, phaseAt(clock));
     if (current.note == 0) { return {0, 0, 0, 0, 0, 0}; }
     const auto previous = clock == 0 ? LiveMidiPerformance::Selection{} : performance.select(clock - 1, phaseAt(clock - 1));

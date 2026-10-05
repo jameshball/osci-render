@@ -30,7 +30,7 @@ public:
     motion::Id getMidiAudition() const { return midiAuditionTarget.load(); }
     motion::MidiRecording& midiRecorder() { return midiRecording; }
     motion::MidiRecordingSession& midiRecordingSession() { return *midiSession; }
-    // Exports use the live rate so the file matches what the scope showed.
+    // The live rate: exports use it so the file matches what the scope showed.
     double exportSampleRate() const {
         const auto rate = std::round(requestedSampleRate.load());
         return std::isfinite(rate) && rate >= 8000 && rate <= 768000 ? rate : 48000.0;
@@ -43,7 +43,6 @@ public:
     void prepareToPlayInternal(double sampleRate, int samplesPerBlock) override;
     motion::Document document { getUndoManager() };
     std::atomic<bool> playing { false };
-    std::atomic<bool> freezeWhenStopped { true };
     std::atomic<double> position { 0.0 };
     // Loop playback (seconds); the editor mirrors the project's loop range.
     std::atomic<double> loopStart { 0.0 }, loopEnd { 0.0 };
@@ -55,8 +54,8 @@ public:
         if (audioIdle()) { position.store(onSampleGrid(std::max(0.0, seconds))); }
     }
     // The audio thread reports positions on its sample grid; idle seeks match it.
-    double onSampleGrid(double seconds) {
-        const auto rate = getSampleRate() > 0 ? getSampleRate() : 48000.0;
+    double onSampleGrid(double seconds) const {
+        const auto rate = exportSampleRate();
         const auto index = motion::sampleIndex(seconds, rate);
         return index.has_value() ? static_cast<double>(*index) / rate : seconds;
     }
@@ -93,7 +92,7 @@ private:
     juce::String preparationError;
     std::atomic<bool> preparationFailed {false};
     std::uint64_t previousRevision = 0;
-    bool wasPlaying = false, wasDrawing = false;
+    bool wasPlaying = false;
     motion::BeamTransitionGuard transitionGuard;
     motion::BeamRenderer beam;
     motion::LiveMidiPerformance liveMidi;

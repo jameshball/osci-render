@@ -50,7 +50,10 @@ private:
                 } catch (...) {
                     // Retain the last prepared frame; the owner can report a
                     // preparation failure without publishing partial geometry.
+                    // The failed frame is not tried again.
                     failed.store(true);
+                    connection = incoming.connection;
+                    serial = incoming.serial;
                 }
             }
             wait(16);
