@@ -29,6 +29,33 @@ public:
     MotionMidiImportTest() : juce::UnitTest("Motion MIDI import", "MotionMidi") {}
     void runTest() override {
         using namespace motion_midi_test;
+        beginTest("Notes released under the sustain pedal last until it lifts, as in recorded takes");
+        {
+            Bytes pedal;
+            event(pedal, 0, { 0xb0, 64, 127 });
+            event(pedal, 0, { 0x90, 60, 100 });
+            event(pedal, 240, { 0x80, 60, 0 });  // Released at beat 0.5, held by the pedal.
+            event(pedal, 0, { 0x90, 64, 100 });
+            event(pedal, 240, { 0xb0, 64, 0 });  // Pedal lifts at beat 1.
+            event(pedal, 240, { 0x80, 64, 0 });  // Released at beat 1.5 with the pedal up.
+            event(pedal, 0, { 0xb0, 64, 127 });
+            event(pedal, 0, { 0x90, 67, 100 });
+            event(pedal, 240, { 0x80, 67, 0 });  // Held to the end of the track at beat 3.
+            end(pedal, 480);
+            const auto result = prepare(file({ pedal }));
+            expect(static_cast<bool>(result), juce::String(result.error));
+            if (result) {
+                const auto& notes = result.source->notes();
+                expectEquals(static_cast<int>(notes.size()), 3);
+                if (notes.size() == 3) {
+                    expectWithinAbsoluteError(notes[0].duration, 1.0, 1e-12);
+                    expectWithinAbsoluteError(notes[1].duration, 1.0, 1e-12);
+                    expectWithinAbsoluteError(notes[2].duration, 1.5, 1e-12);
+                }
+                expectEquals(result.ignoredEvents, 0);
+            }
+        }
+
         beginTest("PPQ notes retain beats, velocity/channel and initial suggested tempo");
         Bytes track;
         event(track, 0, { 0xff, 0x51, 3, 0x09, 0x27, 0xc0 }); // 600000us =>100 BPM.
@@ -110,9 +137,10 @@ public:
         const auto noteTrack = simpleTrack(); controls.insert(controls.end(), noteTrack.begin(), noteTrack.end());
         const auto ignored = prepare(file({ controls }));
         expect(static_cast<bool>(ignored), juce::String(ignored.error));
-        // Sustain, program change, meta text and SysEx are excluded; pitch bend is kept.
+        // Program change, meta text and SysEx are excluded; the sustain pedal
+        // shapes note lengths and pitch bend is kept.
         if (ignored) {
-            expectEquals(ignored.ignoredEvents, 4);
+            expectEquals(ignored.ignoredEvents, 3);
             expectEquals(static_cast<int>(ignored.source->controls().size()), 1);
         }
 

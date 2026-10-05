@@ -22,7 +22,7 @@ namespace motion {
 class MidiSourcePreparer {
 public:
     static constexpr std::size_t maximumEncodedBytes = 4 * 1024 * 1024;
-    static constexpr std::size_t maximumNotes = 100000, maximumEvents = 200000;
+    static constexpr std::size_t maximumEvents = 200000;
     static constexpr double maximumBeats = 1000000;
     struct Result {
         std::shared_ptr<const MidiNotes> source;
@@ -38,6 +38,8 @@ public:
     // Same-key overlaps pair FIFO within each track/channel/pitch, then tracks
     // flatten as simultaneous voices. Unmatched offs, dangling ons and zero-length
     // notes reject the whole file; no fabricated holds or partial source is returned.
+    // As in recorded takes, a note released while its channel's sustain pedal
+    // is down lasts until the pedal lifts (or the track ends).
     static Result prepare(const void* data, std::size_t size, double projectBpm, const std::atomic<bool>* cancel = nullptr) {
         try {
             checkCancel(cancel);
@@ -88,6 +90,16 @@ public:
                 std::array<int, 2048> heads, tails;
                 heads.fill(-1); tails.fill(-1);
                 std::vector<Pending> pending;
+                // Notes released under each channel's sustain pedal, ending when it lifts.
+                std::array<bool, 16> sustained {};
+                std::array<std::vector<Pending>, 16> held;
+                const auto lift = [&](unsigned channel, double beat) {
+                    for (const auto& on : held[channel - 1]) {
+                        const auto startBeat = static_cast<double>(on.ticks) * beatsPerTick;
+                        notes.push_back({ on.id, startBeat, beat - startBeat, on.pitch, on.velocity, on.channel });
+                    }
+                    held[channel - 1].clear();
+                };
                 std::uint64_t ticks = 0;
                 unsigned runningStatus = 0;
                 bool ended = false;
@@ -113,7 +125,7 @@ public:
                         const auto second = type == 0xc0 || type == 0xd0 ? 0U : track.dataByte();
                         const auto key = (channel - 1) * 128 + first;
                         if (type == 0x90 && second != 0) {
-                            if (++noteOns > maximumNotes) { throw Error("MIDI file exceeds the 100000-note import limit."); }
+                            if (++noteOns > MidiNotes::maximumNotes) { throw Error("MIDI file exceeds the 100000-note import limit."); }
                             const auto index = static_cast<int>(pending.size());
                             pending.push_back({ ticks, noteOns, static_cast<int>(first), static_cast<int>(second), static_cast<int>(channel), -1 });
                             if (tails[key] >= 0) {
@@ -127,11 +139,19 @@ public:
                             if (index < 0) { throw Error("MIDI note-off has no matching note-on in its track and channel."); }
                             const auto& on = pending[static_cast<std::size_t>(index)];
                             if (ticks == on.ticks) { throw Error("MIDI contains a zero-duration note. Remove it or give it a positive length."); }
-                            const auto startBeat = static_cast<double>(on.ticks) * beatsPerTick;
-                            notes.push_back({ on.id, startBeat, beat - startBeat, on.pitch, on.velocity, on.channel });
+                            if (sustained[channel - 1]) {
+                                held[channel - 1].push_back(on);
+                            } else {
+                                const auto startBeat = static_cast<double>(on.ticks) * beatsPerTick;
+                                notes.push_back({ on.id, startBeat, beat - startBeat, on.pitch, on.velocity, on.channel });
+                            }
                             heads[key] = on.next;
                             if (heads[key] < 0) { tails[key] = -1; }
-                        } else if (type == 0xe0 || (type == 0xb0 && first != 64 && first < 120)) {
+                        } else if (type == 0xb0 && (first == 64 || first == 121)) {
+                            // The pedal, or a controller reset that lifts it.
+                            sustained[channel - 1] = first == 64 && second >= 64;
+                            if (!sustained[channel - 1]) { lift(channel, beat); }
+                        } else if (type == 0xe0 || (type == 0xb0 && first < 120)) {
                             // Pitch bend and continuous controllers persist with the notes.
                             if (controls.size() >= MidiNotes::maximumControls) { throw Error("MIDI file exceeds the 400000 controller-change import limit."); }
                             const auto value = type == 0xe0 ? static_cast<int>((second << 7) | first) - 8192 : static_cast<int>(second);
@@ -172,6 +192,7 @@ public:
                     }
                 }
                 if (!ended) { throw Error("MIDI track is missing its end-of-track event."); }
+                for (unsigned channel = 1; channel <= 16; ++channel) { lift(channel, static_cast<double>(ticks) * beatsPerTick); }
                 if (std::any_of(heads.begin(), heads.end(), [](int value) { return value >= 0; })) {
                     throw Error("MIDI contains an unfinished note-on. Add its note-off before importing.");
                 }

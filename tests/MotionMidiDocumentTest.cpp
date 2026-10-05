@@ -26,7 +26,7 @@ public:
         const auto decoded = motion::decodeAsset(*midi);
         expect(decoded.wasOk(), decoded.getErrorMessage());
         if (decoded.failed()) { return; }
-        expectEquals(midi->midiIgnoredEvents, 1);
+        expectEquals(midi->midiIgnoredEvents, 0);
         auto clip = motion::Document::makeClip(document.newId(), *source, 0);
         clip.midiAsset = midi->id; clip.midi = midi->midi;
         auto sibling = clip; sibling.id = document.newId(); sibling.start = 10;
@@ -51,7 +51,7 @@ public:
         expect(restoredAsset.data == midi->data);
         expectEquals(restoredAsset.midiImportBpm, 170.0);
         expectEquals(restoredAsset.midiSuggestedBpm, 170.0);
-        expectEquals(restoredAsset.midiIgnoredEvents, 1);
+        expectEquals(restoredAsset.midiIgnoredEvents, 0);
         const auto& restoredClips = restored.project().tracks[0].clips;
         const auto& actual = restoredClips[0].midi->notes()[0];
         expect(actual.id == note.id && actual.start == note.start && actual.duration == note.duration);
