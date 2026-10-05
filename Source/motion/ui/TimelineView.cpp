@@ -1643,13 +1643,15 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
     // Key summary ticks along the bottom edge.
     g.setColour(motion::style::key().withAlpha(.8f * opacity));
     double lastX = -10;
+    juce::Path ticks;
     for (const auto time : clipKeyTimes(clip)) {
         const auto x = static_cast<float>(timeX(time));
         if (x - lastX < 3 || x < bounds.getX() - 2 || x > bounds.getRight() + 2) { continue; }
         // Keys on a clip edge are inset so they are never cut in half.
-        motion::style::drawDiamond(g, {std::clamp(x, bounds.getX() + 3.0f, std::max(bounds.getX() + 3.0f, bounds.getRight() - 3.0f)), bounds.getBottom() - 5.0f}, 3.5f, true);
+        motion::style::addDiamond(ticks, {std::clamp(x, bounds.getX() + 3.0f, std::max(bounds.getX() + 3.0f, bounds.getRight() - 3.0f)), bounds.getBottom() - 5.0f}, 3.5f);
         lastX = x;
     }
+    g.fillPath(ticks);
 }
 
 void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int height) const {
@@ -1994,6 +1996,8 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
     g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
     const auto opacity = !motion::trackIsAudible(project, tracks[static_cast<std::size_t>(index)]) ? 0.38f : 1.0f;
     for (const auto& clip : tracks[static_cast<std::size_t>(index)].clips) {
+        // Only clips in the repainted region: during playback, the playhead's strip.
+        if (!g.clipRegionIntersects(clipBounds(clip, index))) { continue; }
         paintClip(g, clip, tracks[static_cast<std::size_t>(index)], index, opacity);
     }
 }
