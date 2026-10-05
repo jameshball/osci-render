@@ -28,7 +28,7 @@ RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> 
     mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
     mode.onClick = [this] { apply(amount.getValue(), route.mode == ModulationMode::add ? ModulationMode::multiply : ModulationMode::add); };
     remove.setTooltip("Stop driving this property");
-    remove.iconSize = 14.0f;
+    remove.setIconPadding(5);
     remove.onClick = [this] { this->report(this->document.removeRoute(route.id)); };
     for (auto* component : std::initializer_list<juce::Component*> {&label, &amount, &mode, &remove}) { addAndMakeVisible(component); }
 }

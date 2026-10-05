@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "Chip.h"
 #include "DocumentMenu.h"
 #include "../model/ModulationGraph.h"
 #include "MotionIcons.h"
@@ -52,7 +53,7 @@ private:
     juce::Label label;
     MotionScrubField amount;
     juce::TextButton mode;
-    icons::Button remove {"Remove route", icons::Icon::close};
+    osci::CloseButton remove {"Remove route"};
 };
 }
 
@@ -193,7 +194,7 @@ private:
     std::vector<std::pair<motion::Modulator, int>> listedCards;
     motion::style::Disclosure more {"More modulator settings"};
     bool showMore = false;
-    motion::style::Chip hertz {"Hz"}, beatsChip {"Beats"};
+    motion::ui::Chip hertz {"Hz"}, beatsChip {"Beats"};
     juce::ComboBox source, controller, channel;
     std::vector<motion::Id> sourceIds;
     juce::Label name, routesTitle, routesHint;

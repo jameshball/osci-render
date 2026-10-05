@@ -350,7 +350,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->key.setWantsKeyboardFocus(false);
             if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                 const bool path = row->group == "Position";
-                row->mode = std::make_unique<motion::icons::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
+                row->mode = std::make_unique<motion::ui::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
                 row->mode->setName(namePrefix + (path ? "Spatial path" : "Quaternion rotation"));
                 row->mode->setTitle(row->mode->getName());
                 row->mode->setTooltip(path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out). Keys all three axes together."

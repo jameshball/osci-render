@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/Timeline.h"
+#include "Chip.h"
 #include "MotionIcons.h"
 #include "GrabCursor.h"
 
@@ -172,6 +173,6 @@ private:
             }
         }
     } grip;
-    motion::icons::Chip lock {"Lock", motion::icons::Icon::lock};
-    motion::style::Chip mute {"M"}, solo {"S"}, arm {juce::String(juce::CharPointer_UTF8("\xe2\x97\x8f"))};
+    motion::ui::Chip lock {"Lock", motion::icons::Icon::lock};
+    motion::ui::Chip mute {"M"}, solo {"S"}, arm {juce::String(juce::CharPointer_UTF8("\xe2\x97\x8f"))};
 };

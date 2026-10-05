@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionIcons.h"
+#include "Chip.h"
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
@@ -83,10 +84,10 @@ private:
         std::vector<std::unique_ptr<Field>> fields;
         std::unique_ptr<Swatch> swatch;
         osci::KeyframeButton key;
-        motion::icons::Chip modulate {"Modulate", motion::icons::Icon::wave};
+        motion::ui::Chip modulate {"Modulate", motion::icons::Icon::wave};
         motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
         // Position: one spatial path; Rotation: quaternion orientation.
-        std::unique_ptr<motion::icons::Chip> mode;
+        std::unique_ptr<motion::ui::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
         // A single value sits on one line: its name, then the value in the
         // grid's last column, beside its keys.

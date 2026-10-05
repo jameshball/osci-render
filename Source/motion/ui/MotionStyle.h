@@ -175,30 +175,6 @@ public:
     }
 };
 
-class Chip final : public juce::Button {
-public:
-    explicit Chip(const juce::String& text) : juce::Button(text), label(text) { setClickingTogglesState(true); }
-    void setOnColour(juce::Colour colour) { on = colour; repaint(); }
-    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
-        const auto bounds = getLocalBounds().toFloat().reduced(.5f);
-        const auto active = getToggleState();
-        g.setColour(active ? on : (highlighted || down ? osci::Colours::surfaceRaised().brighter(.15f) : osci::Colours::veryDark()));
-        g.fillRoundedRectangle(bounds, 3.0f);
-        if (!active) {
-            // An outline marks it as a toggle, not a heading.
-            g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
-            g.drawRoundedRectangle(bounds.reduced(.5f), 3.0f, 1.0f);
-        }
-        g.setColour(active ? juce::Colours::white : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .8f));
-        g.setFont(caption());
-        g.drawText(label, getLocalBounds(), juce::Justification::centred, false);
-    }
-private:
-    juce::String label;
-    // Toggles light up in the same muted green as the tool strips.
-    juce::Colour on = osci::Colours::accentColor().withAlpha(.45f);
-};
-
 inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
     g.setColour(panel());
     g.fillRoundedRectangle(bounds.toFloat(), panelRadius);

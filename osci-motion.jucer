@@ -512,6 +512,7 @@
         <FILE id="MotuiBlenderSourcePanelh" name="BlenderSourcePanel.h" compile="0" resource="0" file="Source/motion/ui/BlenderSourcePanel.h"/>
         <FILE id="MotCameraPanel" name="CameraPanel.h" compile="0" resource="0" file="Source/motion/ui/CameraPanel.h"/>
         <FILE id="MotCanvasSize" name="CanvasSizeEditor.h" compile="0" resource="0" file="Source/motion/ui/CanvasSizeEditor.h"/>
+        <FILE id="MotuiChiph" name="Chip.h" compile="0" resource="0" file="Source/motion/ui/Chip.h"/>
         <FILE id="MotClipTiming" name="ClipTimingPanel.h" compile="0" resource="0" file="Source/motion/ui/ClipTimingPanel.h"/>
         <FILE id="MotColourPicker" name="ColourPicker.h" compile="0" resource="0" file="Source/motion/ui/ColourPicker.h"/>
         <FILE id="MotuiCompositionGizmoh" name="CompositionGizmo.h" compile="0" resource="0" file="Source/motion/ui/CompositionGizmo.h"/>

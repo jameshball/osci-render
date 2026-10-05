@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "Chip.h"
 #include "MotionStyle.h"
 #include "ScrubField.h"
 #include <array>
@@ -187,8 +188,8 @@ private:
     int lastHeight = 0;
     std::optional<std::pair<motion::Id, motion::TextSettings>> pending;
     juce::Label title;
-    motion::style::Chip none {"None"}, typeOn {"Type"}, rise {"Rise"}, pop {"Pop"}, wave {"Wave"}, scatter {"Scatter"};
-    std::array<motion::style::Chip*, 6> kinds {&none, &typeOn, &rise, &pop, &wave, &scatter};
+    motion::ui::Chip none {"None"}, typeOn {"Type"}, rise {"Rise"}, pop {"Pop"}, wave {"Wave"}, scatter {"Scatter"};
+    std::array<motion::ui::Chip*, 6> kinds {&none, &typeOn, &rise, &pop, &wave, &scatter};
     std::array<juce::Label, 4> captions;
     std::array<MotionScrubField, 4> fields;
 };

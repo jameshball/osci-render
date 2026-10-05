@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "MotionIcons.h"
+#include "Chip.h"
 
 // The Graph's channel list (like Blender's or After Effects' graph editor):
 // every animatable property of the target, with its axis colour, whether it
@@ -169,7 +170,7 @@ private:
         }
     }
     static constexpr int rowHeight = 22;
-    motion::style::Chip animatedOnly {"Animated only"};
+    motion::ui::Chip animatedOnly {"Animated only"};
     std::vector<Channel> channels;
     std::vector<std::unique_ptr<Row>> rows;
     std::string selected;
