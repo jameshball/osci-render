@@ -143,18 +143,13 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     }
     const auto grid = processor.document.project().timeGrid();
     const auto step = grid.tickStep(area.getWidth() / (viewEnd - viewStart));
-    const auto firstTick = std::ceil(viewStart / step) * step;
-    const auto rawCount = std::ceil((viewEnd - viewStart) / step) + 1.0;
-    const auto count = std::isfinite(rawCount) ? static_cast<int>(std::clamp(rawCount, 0.0, 1000.0)) : 0;
-    for (int index = 0; index < count; ++index) {
-        const auto time = firstTick + index * step;
-        if (!std::isfinite(time) || time > viewEnd) { break; }
+    grid.forEachTick(viewStart, viewEnd, step, [&](double time) {
         const auto x = timeX(time);
         g.setColour(juce::Colours::white.withAlpha(0.07f));
         g.drawLine(x, area.getY(), x, area.getBottom());
         g.setColour(osci::Colours::text().withAlpha(0.65f));
         g.drawText(juce::String(grid.label(time, step)), juce::roundToInt(x) - 34, juce::roundToInt(area.getBottom()) + 3, 68, 17, juce::Justification::centred);
-    }
+    });
     {
         // Channels shown from the list, faint and not editable.
         juce::Graphics::ScopedSaveState context(g);

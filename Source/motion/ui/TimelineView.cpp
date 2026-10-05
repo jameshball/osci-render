@@ -64,7 +64,9 @@ MotionTimelineView::ViewState MotionTimelineView::viewState() const {
 
 void MotionTimelineView::restoreView(const ViewState& state) {
     ensureTrackRows();
-    pixelsPerSecond = state.zoom; scrollTime = state.scroll; scrollY = state.scrollY;
+    pixelsPerSecond = std::isfinite(state.zoom) ? std::clamp(state.zoom, 0.000001, 500.0) : 70.0;
+    scrollTime = std::isfinite(state.scroll) ? std::max(0.0, state.scroll) : 0.0;
+    scrollY = state.scrollY;
     selectedMarker = 0;
     selected = state.primary; selectedClips = state.selected; collapsedGroups = state.collapsed; expandedTracks = state.expanded;
     std::erase_if(collapsedGroups, [this](auto id) { return motion::findGroup(processor.document.project(), id) == nullptr; });
@@ -584,52 +586,25 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     g.fillRect(area.removeFromTop(toolsHeight));
     if (showsMarkerBand()) { fillCard(g, markerBandTop(), markerBandHeight, osci::Colours::surfaceRaised(), osci::Colours::surfaceRaised().darker(.15f)); }
     g.setFont(motion::style::body());
-    pixelsPerSecond = std::isfinite(pixelsPerSecond) ? std::clamp(pixelsPerSecond, 0.000001, 500.0) : 70.0;
-    scrollTime = std::isfinite(scrollTime) ? std::max(0.0, scrollTime) : 0.0;
-    const auto visibleSeconds = std::max(0, getWidth() - namesWidth) / pixelsPerSecond;
+    const auto viewEnd = scrollTime + std::max(0, getWidth() - namesWidth) / pixelsPerSecond;
     const auto grid = processor.document.project().timeGrid();
     const auto step = grid.tickStep(pixelsPerSecond);
     const auto minorStep = grid.display == motion::TimeDisplay::beats ? grid.snapBeats * 60.0 / grid.bpm : 1.0 / grid.frameRate;
-    // In beats, ticks step through beats so they follow tempo changes.
-    const bool musical = grid.display == motion::TimeDisplay::beats && grid.tempoChanges != nullptr;
-    const auto tickAt = [&](double first, double stride, int index) {
-        return musical ? grid.tickTime(first + index * stride) : first + index * stride;
-    };
-    const auto firstOf = [&](double stride) {
-        return musical ? std::floor(grid.beatAt(scrollTime) / stride) * stride : std::floor(scrollTime / stride) * stride;
-    };
-    const auto beatsPerSecond = grid.bpm / 60.0;
-    const auto minorStride = musical ? grid.snapBeats : minorStep;
-    const auto majorStride = musical ? step * beatsPerSecond : step;
     if (grid.snapping && minorStep * pixelsPerSecond >= 9 && minorStep < step) {
-        const auto first = firstOf(minorStride);
-        const auto count = musical ? 4000 : std::clamp(static_cast<int>(std::ceil(visibleSeconds / minorStep)) + 2, 0, 1000);
         g.setColour(juce::Colours::white.withAlpha(0.035f));
-        for (int tick = 0; tick < count; ++tick) {
-            const auto x = timeX(tickAt(first, minorStride, tick));
-            if (x > getWidth()) { break; }
-            if (x >= namesWidth) { g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight())); }
-        }
+        grid.forEachTick(scrollTime, viewEnd, minorStep, [&](double time) { g.drawVerticalLine(timeX(time), rulerHeight, static_cast<float>(getHeight())); });
     }
-    const auto firstTick = firstOf(majorStride);
-    const auto tickCount = musical ? 4000 : std::clamp(static_cast<int>(std::ceil(visibleSeconds / step)) + 2, 0, 1000);
-    for (int tick = 0; tick < tickCount; ++tick) {
-        const auto time = tickAt(firstTick, majorStride, tick);
-        if (timeX(time) > getWidth()) { break; }
+    grid.forEachTick(scrollTime, viewEnd, step, [&](double time) {
         const auto x = timeX(time);
-        if (x < namesWidth) {
-            continue;
-        }
         g.setColour(juce::Colours::white.withAlpha(0.06f));
         g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
         g.setColour(osci::Colours::text().withAlpha(0.7f));
         g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, 26, juce::Justification::centredLeft);
-    }
+    });
     paintLoop(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);
     const auto& tracks = processor.document.project().tracks;
-    scrollY = std::clamp(scrollY, 0, maximumScrollY());
     g.saveState();
     g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
     // A dragged track lifts out of the list and the other rows slide by

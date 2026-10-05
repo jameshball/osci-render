@@ -11,7 +11,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include "Tempo.h"
 
 namespace motion {
 enum class TimeDisplay { seconds, frames, beats };
@@ -62,6 +61,26 @@ struct TimeGrid {
         }
         return niceStep(target);
     }
+
+    // Calls visit(seconds) for each grid line from `from` to `to`, `stride`
+    // seconds apart at the base tempo. In beats the lines fall on beats, so
+    // they follow every tempo change. Capped so no zoom can stall a paint.
+    template <typename Visit>
+    void forEachTick(double from, double to, double stride, Visit&& visit) const {
+        const auto musical = display == TimeDisplay::beats && tempoChanges != nullptr && validTempo();
+        const Tempo clock(bpm, musical ? tempoChanges : nullptr);
+        const auto unit = musical ? stride / beatSeconds() : stride;
+        const auto start = musical ? clock.beats(from) : from;
+        if (!std::isfinite(unit) || unit <= 0 || !std::isfinite(start)) { return; }
+        const auto first = std::ceil(start / unit);
+        for (int index = 0; index < maximumTicks; ++index) {
+            const auto position = (first + index) * unit;
+            const auto time = musical ? clock.seconds(position) : position;
+            if (!std::isfinite(time) || time > to) { return; }
+            visit(time);
+        }
+    }
+    static constexpr int maximumTicks = 4000;
 
     std::string label(double seconds, double tickStepSeconds) const {
         if (!std::isfinite(seconds)) { return "\xE2\x80\x94"; }
@@ -238,11 +257,6 @@ private:
         return std::isfinite(bpm) && bpm > 0 && std::isfinite(value) && value > 0 ? value : 0.5;
     }
     int meter() const { return beatsPerBar > 0 ? beatsPerBar : 4; }
-public:
-    // Ruler ticks in beats mode fall on beats, so they follow tempo changes.
-    double tickTime(double beat) const { return tempoChanges != nullptr && validTempo() ? Tempo(bpm, tempoChanges).seconds(beat) : beat * beatSeconds(); }
-    double beatAt(double seconds) const { return tempoChanges != nullptr && validTempo() ? Tempo(bpm, tempoChanges).beats(seconds) : seconds / beatSeconds(); }
-private:
     static double powerOfTwo(double value) {
         const auto result = std::exp2(std::ceil(std::log2(value)));
         return std::isfinite(result) ? std::max(result, std::numeric_limits<double>::denorm_min()) : std::numeric_limits<double>::max();

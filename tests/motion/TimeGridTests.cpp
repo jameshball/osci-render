@@ -117,5 +117,20 @@ int main() {
     grid.snapBeats = nan;
     assert(grid.positionLabel(2) == "2.1.000");
     assert(grid.snap(0.0625) == 0.125);
+    const auto ticks = [](const motion::TimeGrid& grid, double from, double to, double stride) {
+        std::vector<double> result;
+        grid.forEachTick(from, to, stride, [&](double time) { result.push_back(time); });
+        return result;
+    };
+    grid = motion::TimeGrid();
+    assert((ticks(grid, 0.5, 3.0, 1) == std::vector<double> {1, 2, 3}));
+    assert(ticks(grid, 0, 1, 0).empty() && ticks(grid, nan, 1, 1).empty());
+    assert(ticks(grid, 0, huge, tiny).size() == motion::TimeGrid::maximumTicks);
+    // In beats, ticks fall on beats: at 120 then 60 BPM from beat 4, the
+    // ticks one beat apart run every half second, then every second.
+    grid.display = motion::TimeDisplay::beats;
+    grid.tempoChanges = std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{4, 60, false}});
+    const auto beats = ticks(grid, 1.0, 3.5, 0.5);
+    assert(beats.size() == 4 && close(beats[0], 1) && close(beats[1], 1.5) && close(beats[2], 2) && close(beats[3], 3));
     std::cout << "TimeGrid tests passed\n";
 }
