@@ -98,7 +98,7 @@ public:
         // Per-sample transport time carries rounding; half a sample of drift is
         // the same cycle, anything more is a seek.
         const auto latched = advancing ? time - static_cast<double>(index - first) / rate : time;
-        if (!planned || first != planFirst || generation != planGeneration || rate != planRate || advancing != planAdvancing
+        if (!planned || first != planFirst || end != planEnd || generation != planGeneration || rate != planRate || advancing != planAdvancing
             || std::abs(latched - planTime) > 0.5 / rate) {
             plan(composition, latched, first, end, rate, liveFrames);
             planGeneration = generation;

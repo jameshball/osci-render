@@ -185,6 +185,30 @@ public:
             expect(travel < 2.0, "Greedy order travels " + juce::String(travel) + " instead of 4.5 in document order");
         }
 
+        beginTest("A window whose span grows from its own start is replanned, not left dark");
+        {
+            // One square, then forty more layers from the middle of the third
+            // cycle: the fourth needs a two-cycle window aligned back to the
+            // third, which was planned as one cycle.
+            std::vector<Layer> list {{square(1, .1f)}};
+            for (int index = 0; index < 40; ++index) { list.push_back({strokes(static_cast<motion::Id>(10 + index), 6), -.5 + .025 * index, .2}); }
+            auto layers = project(list);
+            const double rate = 48000;
+            const motion::PreparedComposition probe(layers, rate);
+            const auto start = static_cast<double>(motion::BeamRenderer::cycleStart(2, rate, probe.beamRate) + motion::BeamRenderer::cycleStart(3, rate, probe.beamRate)) / 2 / rate;
+            for (std::size_t track = 1; track < layers.tracks.size(); ++track) {
+                auto& clip = layers.tracks[track].clips[0];
+                clip.start = start;
+                clip.duration = layers.duration - start;
+            }
+            const motion::PreparedComposition composition(layers, rate);
+            motion::BeamRenderer beam;
+            for (std::int64_t index = 0; index < 6; ++index) {
+                const auto points = cycle(composition, rate, index, beam);
+                expect(std::any_of(points.begin(), points.end(), [](const auto& point) { return !dark(point); }), "cycle " + juce::String(index) + " has light");
+            }
+        }
+
         beginTest("Random access, sequential playback and signal export are sample-identical");
         for (const auto& profile : {motion::ScopeProfile{}, motion::scopeProfilePresets[1].profile, motion::ScopeProfile{37.5, 55.25, 20}}) {
             const auto shape = square(1, .1f);
