@@ -311,7 +311,6 @@ private:
     juce::String importError, lastPreparationError;
 
     MainMenuBarModel menus;
-    osci::PanelHeader libraryHeader { "Assets" };
     osci::PanelHeader viewportHeader;
     // Titled by outputTitle, which gives way when the header is tight.
     osci::PanelHeader outputHeader;

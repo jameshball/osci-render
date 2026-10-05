@@ -7,6 +7,7 @@ bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bp
 }
 }
 
+// Menu 0 (File) is built by buildFileMenu, so its commands only bind keys.
 void MotionEditor::addCommand(int menu, juce::String name, juce::KeyPress key, juce::String shortcut, std::function<void()> action) {
     if (menu != 0) { menus.addMenuItem(menu, name, action, motion::style::shortcutText(shortcut)); }
     commands.push_back({menu, std::move(name), std::move(shortcut), key, std::move(action)});
@@ -134,7 +135,7 @@ void MotionEditor::registerCommands() {
     };
     addCommand(5, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
     addCommand(5, "Zoom out", juce::KeyPress('-', command, 0), "Cmd+-", [zoom] { zoom(1 / 1.5); });
-    addCommand(5, "Fit timeline to project", juce::KeyPress(), "F", [this] { timeline.fitToProject(); });
+    addCommand(5, "Fit timeline to project", juce::KeyPress(), "F", [this] { timeline.fitProject(); });
     addCommand(5, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight + 8); });
     addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight - 8); });
     menus.addToggleMenuItem(5, "Follow playhead", [this] { timeline.followEnabled = !timeline.followEnabled; saveLayout(); }, [this] { return timeline.followEnabled; });

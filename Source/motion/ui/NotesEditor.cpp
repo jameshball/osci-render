@@ -116,11 +116,15 @@ void MotionNotesEditor::refresh() {
     resized(); repaint();
 }
 
+// Recording status is polled only while the editor shows; hiding it ends
+// any recording or audition it started.
 void MotionNotesEditor::visibilityChanged() {
     if (isVisible()) {
+        startTimerHz(15);
         fit();
         refresh();
     } else {
+        stopTimer();
         processor.midiRecordingSession().cancel();
         processor.setMidiAudition(0);
     }

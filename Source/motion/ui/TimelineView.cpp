@@ -22,9 +22,7 @@ MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : proces
         button->setTooltip(tip);
         button->iconSize = 16.0f;
         button->onClick = [this, value] {
-            cancelGesture();
-            tool = value;
-            repaint();
+            setTool(value);
         };
         addAndMakeVisible(button);
     }
@@ -217,8 +215,25 @@ void MotionTimelineView::revealTime(double seconds) {
     }
 }
 
+void MotionTimelineView::setTool(Tool next) {
+    cancelGesture();
+    tool = next;
+    updateToolButtons();
+    repaint();
+}
+
+// The tool strip shows the tool in use and whether snapping is on.
+void MotionTimelineView::updateToolButtons() {
+    snapButton.setToggleState(processor.document.project().gridSnap, juce::dontSendNotification);
+    selectTool.setToggleState(tool == Tool::move, juce::dontSendNotification);
+    slipTool.setToggleState(tool == Tool::slip, juce::dontSendNotification);
+    stretchTool.setToggleState(tool == Tool::stretch, juce::dontSendNotification);
+    rippleTool.setToggleState(tool == Tool::ripple, juce::dontSendNotification);
+}
+
 void MotionTimelineView::refreshTracks() {
     const auto& project = processor.document.project();
+    updateToolButtons();
     ensureTrackRows();
     validateTrackDrag();
     // A drag whose source went away never says it left.
@@ -612,11 +627,6 @@ void MotionTimelineView::paint(juce::Graphics& g) {
     paintLoop(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);
-    snapButton.setToggleState(processor.document.project().gridSnap, juce::dontSendNotification);
-    selectTool.setToggleState(tool == Tool::move, juce::dontSendNotification);
-    slipTool.setToggleState(tool == Tool::slip, juce::dontSendNotification);
-    stretchTool.setToggleState(tool == Tool::stretch, juce::dontSendNotification);
-    rippleTool.setToggleState(tool == Tool::ripple, juce::dontSendNotification);
     const auto& tracks = processor.document.project().tracks;
     scrollY = std::clamp(scrollY, 0, maximumScrollY());
     g.saveState();
@@ -1430,7 +1440,6 @@ void MotionTimelineView::zoomAround(int x, double factor) {
 void MotionTimelineView::userScrolled() {
     viewAnimation.stopTimer();
     if (following) { followPaused = true; }
-    if (onUserScroll) { onUserScroll(); }
 }
 
 void MotionTimelineView::scaleTrackHeights(int y, double factor) {
@@ -1529,9 +1538,7 @@ bool MotionTimelineView::keyPressed(const juce::KeyPress& key) {
             return true;
         }
         if (character == 'v' || character == 's' || character == 'r' || character == 'b') {
-            cancelGesture();
-            tool = character == 'b' ? Tool::ripple : character == 'v' ? Tool::move : (character == 's' ? Tool::slip : Tool::stretch);
-            repaint();
+            setTool(character == 'b' ? Tool::ripple : character == 'v' ? Tool::move : (character == 's' ? Tool::slip : Tool::stretch));
             return true;
         }
         if (character == 'f') {

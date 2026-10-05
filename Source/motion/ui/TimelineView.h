@@ -107,7 +107,8 @@ public:
     }};
     std::pair<double, double> animationFrom, animationTo;
     double animationStart = 0;
-    void fitToProject() { fitProject(); }
+    // Zooms and scrolls so the whole composition fits.
+    void fitProject();
 
     void revealTime(double seconds);
 
@@ -194,7 +195,6 @@ public:
     // the pointer in place.
     void scaleTrackHeights(int y, double factor);
     void setDefaultTrackHeight(int height);
-    std::function<void()> onUserScroll;
 
     // Page-follows the playhead during playback, like Premiere and Ableton. A
     // manual scroll while playing pauses following until the playhead is back
@@ -358,7 +358,6 @@ private:
     // Right-clicking empty track space offers what people look for first.
     void showSpaceMenu();
 
-    void fitProject();
 
     bool gestureIsCurrent();
 
@@ -432,6 +431,8 @@ private:
     int originalRow = 0;
     int downX = 0;
     Tool tool = Tool::move;
+    void setTool(Tool next);
+    void updateToolButtons();
     Mode mode = Mode::move;
     std::uint64_t expectedRevision = 0;
     mutable motion::Id selectedMarker = 0;

@@ -246,8 +246,6 @@ public:
     ~MotionRoutingPanel() override { processor.document.removeChangeListener(this); }
 
     std::function<void(const juce::String&)> onError;
-    // Opens the library on a modulator (after creating one from the menu).
-    std::function<void(motion::Id)> onShowModulator;
 
     void setTarget(motion::Id id, std::string property);
     void refresh();

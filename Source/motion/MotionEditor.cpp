@@ -35,7 +35,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     visualiser.onControlsChanged = [this] { resized(); };
     visualiser.setControlStyle(motion::style::text().withAlpha(.78f), 5);
     // Children in paint order: each draws over those added before it.
-    for (auto* header : { &libraryHeader, &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
+    for (auto* header : { &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
     for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
@@ -181,7 +181,6 @@ void MotionEditor::setUpScene() {
         refreshCameraTools();
         resized();
     };
-    sceneView.setButtonText("Views");
     sceneView.setName("Scene view");
     sceneView.setTooltip("Look along an axis (numpad 1, 3, 7), frame the selection (F) or reset the view (0)");
     sceneView.setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised());
@@ -338,7 +337,6 @@ void MotionEditor::setUpTransport() {
 
 void MotionEditor::setUpLibrary() {
     modulatorLibrary.onError = [this](const juce::String& text) { statusBar.show(text); };
-    libraryHeader.setVisible(false);
     libraryTabs.setName("Library tabs");
     styleTabs(libraryTabs);
     libraryTabs.addTab("Assets");
@@ -447,11 +445,13 @@ void MotionEditor::setUpProperties() {
     inspectorLead.add(clipTimingPanel, [this] { return clipTimingPanel.preferredHeight(); });
     compositionSettings.onTiming = [this](int command) { applyTiming(command); };
     compositionSettings.onError = [this](const juce::String& message) { statusBar.show(message); };
-    compositionSettings.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    // Panels in the lead resize it, and Properties lays out again.
+    const auto relayoutLead = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    compositionSettings.onHeightChanged = relayoutLead;
     inspectorLead.add(textAnimation, [this] { return textAnimation.preferredHeight(); });
     propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
-    clipTimingPanel.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
-    textAnimation.onHeightChanged = [this] { inspectorLead.resized(); propertyInspector.relayout(); };
+    clipTimingPanel.onHeightChanged = relayoutLead;
+    textAnimation.onHeightChanged = relayoutLead;
     // A change to the characters prepares the text source again in place.
     textAnimation.onApply = [this](motion::Id id, motion::TextSettings settings) {
         const auto& assets = processor.document.project().assets;
@@ -512,8 +512,6 @@ void MotionEditor::setUpTimeline() {
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
         notesEditor.setVisible(index == 2);
-        graphSideViewport.setVisible(index == 1 && curveTarget != 0);
-        curveList.setVisible(index == 1 && curveTarget != 0);
         if (index == 1) { refreshCurveList(); }
         resized();
         if (index == 2) { notesEditor.fitContents(); }
@@ -617,10 +615,6 @@ void MotionEditor::setUpGraph() {
     graphSideViewport.setScrollBarThickness(6);
     routingPanel.onLayoutChanged = [this] { layoutGraphSide(); };
     routingPanel.onError = [this](const juce::String& text) { statusBar.show(text); };
-    routingPanel.onShowModulator = [this](motion::Id id) {
-        modulatorLibrary.select(id);
-        libraryTabs.setSelectedIndex(2);
-    };
     curveEditor.setVisible(false);
     for (const auto& spec : motion::objectPropertySpecs) { curveProperties.emplace_back(spec.id); }
     curveList.onChoose = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
@@ -792,8 +786,7 @@ void MotionEditor::resized() {
     const auto extra = std::max(0, getWidth() - 1440);
     libraryBounds = area.removeFromLeft(std::clamp(190 + extra / 10, 190, 280));
     auto library = libraryBounds;
-    libraryHeader.setBounds(library.removeFromTop(30));
-    libraryTabs.setBounds(libraryHeader.getBounds());
+    libraryTabs.setBounds(library.removeFromTop(30));
     effectLibrary.setBounds(library.reduced(4, 0));
     modulatorLibrary.setBounds(library);
     importButton.setBounds(library.removeFromTop(42).reduced(8, 6));
@@ -908,8 +901,8 @@ void MotionEditor::paint(juce::Graphics& graphics) {
     }
 }
 
-// Files dropped on the timeline land where they were dropped (time and
-// track, as in Premiere); anywhere else they go in at the playhead.
+// Small edits (a marker, a tempo change, the canvas) open in a panel that
+// points at what was clicked instead of covering the window.
 void MotionEditor::showPopover(std::unique_ptr<juce::Component> content, juce::Rectangle<int> anchor) {
     auto* panel = content.get();
     motion::style::styleFields(*panel);
@@ -1250,8 +1243,6 @@ void MotionEditor::select(motion::Id id) {
     repaint();
 }
 
-// Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
-// SVG in a temporary folder and imported like any file, relinking an edit.
 void MotionEditor::previewEffect(const std::string& type, std::optional<motion::Id> owner) {
     const auto* definition = motion::effectDefinition(type);
     auto project = processor.document.project();
@@ -1380,7 +1371,6 @@ bool MotionEditor::keyPressed(const juce::KeyPress& key) {
     return CommonPluginEditor::keyPressed(key);
 }
 
-// Menu 0 (File) is built by buildFileMenu, so its commands only bind keys.
 void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property, bool camera, bool chosen) {
     const auto hadTarget = curveTarget != 0;
     const juce::ScopeGuard relayout {[this, hadTarget] { if ((curveTarget != 0) != hadTarget) { resized(); } }};

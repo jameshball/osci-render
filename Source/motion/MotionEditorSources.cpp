@@ -27,6 +27,8 @@ private:
 };
 }
 
+// Files dropped on the timeline land where they were dropped (time and
+// track, as in Premiere); anywhere else they go in at the playhead.
 void MotionEditor::filesDropped(const juce::StringArray& files, int x, int y) {
     std::optional<std::pair<double, motion::Id>> placement;
     if (timeline.isShowing()) { placement = timeline.dropTarget(timeline.getLocalPoint(this, juce::Point<int>(x, y))); }
@@ -76,8 +78,6 @@ bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, s
     return true;
 }
 
-// Small edits (a marker, a tempo change, the canvas) open in a panel that
-// points at what was clicked instead of covering the window.
 void MotionEditor::openProject(const juce::File& file) {
     if (file == juce::File()) { return; }
     if (projectLoad != nullptr) { projectLoad->cancelled.store(true); }
@@ -499,6 +499,8 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     });
 }
 
+// Draw a new source, or edit a drawn one (`asset`). The drawing is saved as
+// SVG in a temporary folder and imported like any file, relinking an edit.
 void MotionEditor::showDrawingEditor(motion::Id asset) {
     if (drawingEditor != nullptr || textEditor != nullptr || luaEditor != nullptr) { return; }
     motion::drawing::Drawing initial;

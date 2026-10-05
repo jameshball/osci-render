@@ -36,7 +36,7 @@ void MotionEffectStack::refresh() {
         for (const auto& effect : *effects) { ids.push_back(effect.id); }
     }
     std::optional<motion::Id> added;
-    if (ids.size() == listed.size() + 1 && std::find(ids.begin(), ids.end(), ids.back()) != ids.end()) {
+    if (ids.size() == listed.size() + 1) {
         for (const auto id : ids) {
             if (std::find(listed.begin(), listed.end(), id) == listed.end()) { added = id; }
         }
