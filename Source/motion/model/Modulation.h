@@ -97,6 +97,8 @@ struct Modulation {
                 const auto t = fraction * fraction * (3 - 2 * fraction);
                 return noise(cycle) * (1 - t) + noise(cycle + 1) * t;
             }
+            // The soundtrack's loudness is read from the soundtrack, not a cycle.
+            case ModulationWaveform::soundtrack: return 0;
         }
         return 0;
     }

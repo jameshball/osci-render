@@ -33,6 +33,28 @@ inline const Keyframe* findKey(const Curve& curve, double time) {
     return found != keys.end() ? &*found : nullptr;
 }
 
+// Sets the interpolation leaving the key at `time`; false when there is no
+// such key or it already has it. Bezier handles start on the automatic
+// tangents, so switching to Bezier keeps the segment's shape.
+inline bool setInterpolation(Curve& curve, double time, Interpolation next) {
+    const auto* found = findKey(curve, time);
+    if (found == nullptr || found->interpolation == next) { return false; }
+    auto updated = *found;
+    const auto& keys = curve.keyframes();
+    const auto index = static_cast<std::size_t>(found - keys.data());
+    if (next == Interpolation::cubic && updated.interpolation != Interpolation::cubic && index + 1 < keys.size()) {
+        auto following = keys[index + 1];
+        updated.outgoingSlope = curve.automaticSlope(index);
+        updated.outgoingInfluence = Keyframe::defaultInfluence;
+        following.incomingSlope = curve.automaticSlope(index + 1);
+        following.incomingInfluence = Keyframe::defaultInfluence;
+        if (updated.interpolation == Interpolation::smooth) { curve.setKey(following); }
+    }
+    updated.interpolation = next;
+    curve.setKey(updated);
+    return true;
+}
+
 // Retimes the selected keys of every curve with mapTime and offsets their values
 // by valueDelta (then constrain(property, value) when given). The selection moves
 // as a unit, so key counts never change: the edit is rejected when a new time is

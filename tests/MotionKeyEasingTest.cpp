@@ -27,7 +27,7 @@ public:
             expectWithinAbsoluteError(keys[0].outgoingSlope, 1.0, 1e-12);
             expectWithinAbsoluteError(keys[2].incomingSlope, -1.0, 1e-12);
             // Speed is zero at the key, so values flatten towards it.
-            expect(curve.evaluate(0.95, 120) > 0.98, "the curve settles into the key");
+            expect(curve.evaluate(0.95) > 0.98, "the curve settles into the key");
             expect(!motion::easeKey(curve, 1, true, true), "easing again changes nothing");
         }
         beginTest("Ease in and ease out touch one side; a hold still holds");

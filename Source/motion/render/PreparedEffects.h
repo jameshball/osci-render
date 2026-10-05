@@ -43,13 +43,13 @@ struct PreparedEffect {
         // Wobble's offset, which depends only on the time.
         float wobble = 0;
     };
-    Parameters parametersAt(double time, double bpm) const {
+    Parameters parametersAt(double time) const {
         Parameters result;
         if (!enabled || !std::isfinite(time) || (range.has_value() && (time < range->start || time >= range->end()))) {
             return result;
         }
         for (std::size_t index = 0; index < count; ++index) {
-            const auto value = curves[index].evaluate(time, bpm);
+            const auto value = curves[index].evaluate(time);
             if (!std::isfinite(value)) {
                 return result;
             }
@@ -60,8 +60,8 @@ struct PreparedEffect {
         return result;
     }
 
-    osci::Point apply(osci::Point input, double time, double bpm = 120) const {
-        const auto& parameters = cached.at(time, [&] { return parametersAt(time, bpm); });
+    osci::Point apply(osci::Point input, double time) const {
+        const auto& parameters = cached.at(time, [&] { return parametersAt(time); });
         if (!parameters.active) {
             return input;
         }
@@ -112,9 +112,9 @@ inline std::vector<PreparedEffect> prepareEffects(const std::vector<EffectInstan
     return prepared;
 }
 
-inline osci::Point applyEffects(const std::vector<PreparedEffect>& effects, osci::Point point, double time, double bpm = 120) {
+inline osci::Point applyEffects(const std::vector<PreparedEffect>& effects, osci::Point point, double time) {
     for (const auto& effect : effects) {
-        point = effect.apply(point, time, bpm);
+        point = effect.apply(point, time);
     }
     return point;
 }

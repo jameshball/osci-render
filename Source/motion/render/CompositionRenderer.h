@@ -33,10 +33,10 @@ struct TransformPose {
     std::array<float, 3> scale {1, 1, 1}, translation {}, colour {1, 1, 1};
     Matrix rotation {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
 
-    static TransformPose at(const std::array<Curve, 13>& curves, double time, double bpm, const PreparedSpatial* spatial) {
+    static TransformPose at(const std::array<Curve, 13>& curves, double time, const PreparedSpatial* spatial) {
         TransformPose pose;
         constexpr auto radians = std::numbers::pi / 180.0;
-        for (std::size_t axis = 0; axis < 3; ++axis) { pose.scale[axis] = static_cast<float>(curves[6 + axis].evaluate(time, bpm)); }
+        for (std::size_t axis = 0; axis < 3; ++axis) { pose.scale[axis] = static_cast<float>(curves[6 + axis].evaluate(time)); }
         // A linked rotation axis replaces its keys, so orientation interpolation
         // only applies while every rotation axis is keyed.
         const bool oriented = spatial != nullptr && spatial->orientation != nullptr && !curves[3].linked() && !curves[4].linked() && !curves[5].linked();
@@ -47,7 +47,7 @@ struct TransformPose {
             for (std::size_t axis = 0; axis < 3; ++axis) {
                 const auto& curve = curves[3 + axis];
                 const auto keyed = curve.evaluateBase(time);
-                extra[axis] = (curve.evaluateWith(keyed, time, bpm) - keyed) * radians;
+                extra[axis] = (curve.evaluateWith(keyed, time) - keyed) * radians;
             }
             const auto orientation = spatial->orientation->at(time);
             Matrix keyed {};
@@ -57,18 +57,18 @@ struct TransformPose {
             }
             pose.rotation = multiply(keyed, euler(extra[0], extra[1], extra[2]));
         } else {
-            pose.rotation = euler(curves[3].evaluate(time, bpm) * radians, curves[4].evaluate(time, bpm) * radians, curves[5].evaluate(time, bpm) * radians);
+            pose.rotation = euler(curves[3].evaluate(time) * radians, curves[4].evaluate(time) * radians, curves[5].evaluate(time) * radians);
         }
         if (spatial != nullptr && spatial->path != nullptr) {
             const auto position = spatial->path->at(time);
             for (std::size_t axis = 0; axis < 3; ++axis) {
                 const auto& curve = curves[axis];
-                pose.translation[axis] = static_cast<float>(curve.linked() ? curve.evaluate(time, bpm) : curve.evaluateWith(position[axis], time, bpm));
+                pose.translation[axis] = static_cast<float>(curve.linked() ? curve.evaluate(time) : curve.evaluateWith(position[axis], time));
             }
         } else {
-            for (std::size_t axis = 0; axis < 3; ++axis) { pose.translation[axis] = static_cast<float>(curves[axis].evaluate(time, bpm)); }
+            for (std::size_t axis = 0; axis < 3; ++axis) { pose.translation[axis] = static_cast<float>(curves[axis].evaluate(time)); }
         }
-        for (std::size_t channel = 0; channel < 3; ++channel) { pose.colour[channel] = static_cast<float>(curves[9 + channel].evaluate(time, bpm)); }
+        for (std::size_t channel = 0; channel < 3; ++channel) { pose.colour[channel] = static_cast<float>(curves[9 + channel].evaluate(time)); }
         return pose;
     }
 
@@ -115,8 +115,8 @@ private:
     }
 };
 
-inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, double bpm = 120, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
-    return TransformPose::at(curves, time, bpm, spatial).apply(point, applyColour);
+inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
+    return TransformPose::at(curves, time, spatial).apply(point, applyColour);
 }
 
 struct PreparedGroup {
@@ -132,15 +132,15 @@ struct PreparedGroup {
         }
         spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
-    double weight(double time, double bpm = 120) const {
-        const auto value = curves[12].evaluate(time, bpm);
+    double weight(double time) const {
+        const auto value = curves[12].evaluate(time);
         return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
     }
-    const TransformPose& pose(double time, double bpm) const {
-        return poses.at(time, [&] { return TransformPose::at(curves, time, bpm, spatial.get()); });
+    const TransformPose& pose(double time) const {
+        return poses.at(time, [&] { return TransformPose::at(curves, time, spatial.get()); });
     }
-    osci::Point apply(osci::Point point, double time, double bpm = 120) const {
-        return applyEffects(effects, pose(time, bpm).apply(point, true), time, bpm);
+    osci::Point apply(osci::Point point, double time) const {
+        return applyEffects(effects, pose(time).apply(point, true), time);
     }
 
 private:
@@ -157,14 +157,13 @@ struct PreparedClipStage {
     std::vector<PreparedEffect> effects, trackEffects, compositionEffects;
     std::vector<PreparedGroup> groups;
     std::shared_ptr<const PreparedSpatial> spatial;
-    double bpm = 120, contentBpm = 120;
     std::optional<ClipTiming> scopeClock;
     TimeCache<TransformPose> poses;
 
     double scopeTime(double time) const { return scopeClock.has_value() ? scopeClock->localTime(time) : time; }
     double localTime(double time) const { return clock.localTime(time); }
     double localWeight(double time) const {
-        const auto value = curves[12].evaluate(localTime(time), contentBpm);
+        const auto value = curves[12].evaluate(localTime(time));
         return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0;
     }
     bool accumulateWeightLog(double time, double& logarithm) const {
@@ -172,7 +171,7 @@ struct PreparedClipStage {
         if (value <= 0) { return false; }
         logarithm += std::log(value);
         for (const auto& group : groups) {
-            const auto factor = group.weight(scopeTime(time), bpm);
+            const auto factor = group.weight(scopeTime(time));
             if (factor <= 0) { return false; }
             logarithm += std::log(factor);
         }
@@ -180,13 +179,13 @@ struct PreparedClipStage {
     }
     osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
-        const auto& pose = poses.at(local, [&] { return TransformPose::at(curves, local, contentBpm, spatial.get()); });
+        const auto& pose = poses.at(local, [&] { return TransformPose::at(curves, local, spatial.get()); });
         point = pose.colourOf(point);
-        point = applyEffects(effects, point, local, contentBpm);
+        point = applyEffects(effects, point, local);
         point = pose.apply(point, false);
-        point = applyEffects(trackEffects, point, scopeTime(time), bpm);
-        for (const auto& group : groups) { point = group.apply(point, scopeTime(time), bpm); }
-        return applyEffects(compositionEffects, point, scopeTime(time), bpm);
+        point = applyEffects(trackEffects, point, scopeTime(time));
+        for (const auto& group : groups) { point = group.apply(point, scopeTime(time)); }
+        return applyEffects(compositionEffects, point, scopeTime(time));
     }
 };
 
@@ -212,7 +211,7 @@ struct PreparedClip : PreparedClipStage {
             return std::min(1000000.0, std::exp(std::min(logarithm, std::log(1000000.0))));
         }
         auto value = localWeight(time);
-        for (const auto& group : groups) { value *= group.weight(scopeTime(time), bpm); }
+        for (const auto& group : groups) { value *= group.weight(scopeTime(time)); }
         // A direct leaf has at most 32 ancestors bounded to 1e6 each.
         return std::clamp(value, 0.0, 1000000.0);
     }
@@ -240,7 +239,6 @@ struct PreparedChain {
         std::array<Curve, 13> curves;
         std::shared_ptr<const PreparedSpatial> spatial;
         ClipTiming clock;
-        double bpm = 120;
         bool clip = false;
     };
     std::vector<Link> links; // inner to outer
@@ -249,7 +247,7 @@ struct PreparedChain {
         osci::Point point(static_cast<float>(position[0]), static_cast<float>(position[1]), static_cast<float>(position[2]));
         for (const auto& link : links) {
             const auto local = link.clip ? link.clock.localTime(time) : time;
-            point = applyTransform(point, link.curves, local, link.bpm, false, link.spatial.get());
+            point = applyTransform(point, link.curves, local, false, link.spatial.get());
         }
         return {point.x, point.y, point.z};
     }
@@ -258,7 +256,6 @@ struct PreparedChain {
 struct PreparedCamera {
     Id id;
     std::array<Curve, 7> curves;
-    double bpm = 120;
     PreparedChain target, parent;
 
     struct Frame {
@@ -271,7 +268,7 @@ struct PreparedCamera {
     std::optional<Frame> frame(double time) const {
         std::array<double, 7> values;
         for (std::size_t index = 0; index < values.size(); ++index) {
-            values[index] = curves[index].evaluate(time, bpm);
+            values[index] = curves[index].evaluate(time);
             if (!std::isfinite(values[index])) { return std::nullopt; }
         }
         // Cubic interpolation can overshoot otherwise valid FOV key values.
@@ -365,9 +362,8 @@ struct PreparedBeam {
         for (std::size_t index = 0; index < curves.size(); ++index) { curves[index] = Curve(beamPropertySpecs[index].defaultValue); }
     }
     std::array<Curve, beamPropertySpecs.size()> curves;
-    double bpm = 120;
     float value(std::size_t property, double time) const {
-        return static_cast<float>(beamPropertySpecs[property].clamp(curves[property].evaluate(time, bpm)));
+        return static_cast<float>(beamPropertySpecs[property].clamp(curves[property].evaluate(time)));
     }
     std::array<float, beamPropertySpecs.size()> at(double time) const {
         std::array<float, beamPropertySpecs.size()> values {};
@@ -377,7 +373,7 @@ struct PreparedBeam {
 };
 
 struct PreparedComposition {
-    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), bpm(project.bpm), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
+    explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
         PreparedDrivers drivers([this, cancel, purpose]() -> std::shared_ptr<const SoundtrackEnvelope> {
             return purpose == CompositionPurpose::signal ? loudnessEnvelope(cancel) : nullptr;
@@ -403,7 +399,6 @@ struct PreparedComposition {
                     link.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, link.curves);
                     const auto timing = clip.timing(project.tempo());
                     link.clock = timing;
-                    link.bpm = clip.curveBpm(project.tempo());
                     link.clip = true;
                     chain.links.push_back(std::move(link));
                     groupId = track.group;
@@ -419,7 +414,6 @@ struct PreparedComposition {
                 PreparedChain::Link link;
                 load(link, group->properties, group->id);
                 link.spatial = prepareSpatial(group->spatialPath, group->quaternionRotation, link.curves);
-                link.bpm = project.bpm;
                 chain.links.push_back(std::move(link));
                 groupId = group->parent;
             }
@@ -434,7 +428,6 @@ struct PreparedComposition {
                 item.curves[index] = found != camera.properties.end() ? found->second : Curve(cameraPropertySpecs[index].defaultValue);
                 drivers.drive(item.curves[index], project, mainClock, camera.id, cameraPropertySpecs[index].id);
             }
-            item.bpm = project.bpm;
             cameras.push_back(std::move(item));
         }
         for (std::size_t index = 0; index < beamPropertySpecs.size(); ++index) {
@@ -442,7 +435,6 @@ struct PreparedComposition {
             beam.curves[index] = found != project.beam.properties.end() ? found->second : Curve(beamPropertySpecs[index].defaultValue);
             drivers.driveBeam(beam.curves[index], project, mainClock, beamPropertySpecs[index].id);
         }
-        beam.bpm = project.bpm;
         for (const auto& cut : project.cameraCuts) {
             const auto camera = std::find_if(cameras.begin(), cameras.end(), [&](const auto& item) { return item.id == cut.camera; });
             if (cut.valid() && camera != cameras.end()) {
@@ -459,8 +451,6 @@ struct PreparedComposition {
             item.id = clip.id; item.start = timing.start; item.end = timing.end(); item.offset = timing.offset; item.rate = timing.rate;
             item.clock = timing;
             item.scopeClock = stage.scopeClock;
-            item.bpm = stage.bpm;
-            item.contentBpm = clip.curveBpm(stage.tempo);
             for (std::size_t i = 0; i < objectPropertySpecs.size(); ++i) {
                 const auto curve = clip.properties.find(objectPropertySpecs[i].id);
                 item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
@@ -604,7 +594,7 @@ struct PreparedComposition {
     }
 
     osci::Point applyCompositionEffects(osci::Point point, double time) const {
-        return applyEffects(effects, point, time, bpm);
+        return applyEffects(effects, point, time);
     }
 
     // Output space is the unit square. Geometry behind the camera has no
@@ -654,7 +644,6 @@ private:
 public:
 
     double duration;
-    double bpm = 120;
     double sampleRate = 48000;
     double beamRate = 60;
     ScopeProfile scope;

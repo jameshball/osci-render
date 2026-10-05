@@ -2,12 +2,17 @@
 
 #include "PreparedAudio.h"
 #include "../model/CompositionExpansion.h"
+#include "../model/PropertySpecs.h"
 
 namespace motion {
-// Constructed with the visual snapshot on the message thread. Sampling owns no
+// Built with each prepared composition, off the audio thread. Sampling owns no
 // temporary shared pointers and performs no allocation or mutable playback work.
 class PreparedSoundtrack {
 public:
+    static constexpr const PropertySpec& gainSpec = audioPropertySpecs[0];
+    static constexpr const PropertySpec& panSpec = audioPropertySpecs[1];
+    static_assert(gainSpec.id == "gain" && panSpec.id == "pan");
+
     template <typename ProjectType>
     explicit PreparedSoundtrack(const ProjectType& project, const std::atomic<bool>* cancel = nullptr) {
         // A concrete stages type and a plain loop: clang 18 (Ubuntu 24.04's
@@ -16,22 +21,23 @@ public:
         const auto expanded = expandComposition(project, [&](const auto&, const std::vector<CompositionStage>& stages) {
             const auto& leaf = stages.back();
             if (leaf.track->kind != TrackKind::audio) { return; }
-            auto asset = project.assets.end();
-            for (auto candidate = project.assets.begin(); candidate != project.assets.end(); ++candidate) {
-                if (*candidate != nullptr && (*candidate)->id == leaf.clip->asset) {
-                    asset = candidate;
+            // Generic over the project type, so not findAsset.
+            const typename decltype(project.assets)::value_type* found = nullptr;
+            for (const auto& candidate : project.assets) {
+                if (candidate != nullptr && candidate->id == leaf.clip->asset) {
+                    found = &candidate;
                     break;
                 }
             }
-            if (asset == project.assets.end() || (*asset)->audio == nullptr) { return; }
-            ClipSource source {leaf.clipClock, (*asset)->audio, {}};
+            if (found == nullptr || (*found)->audio == nullptr) { return; }
+            const auto& asset = *found;
+            ClipSource source {leaf.clipClock, asset->audio, {}};
             for (const auto& stage : stages) {
-                const auto gain = stage.clip->properties.find("gain");
-                const auto pan = stage.clip->properties.find("pan");
+                const auto gain = stage.clip->properties.find(gainSpec.id);
+                const auto pan = stage.clip->properties.find(panSpec.id);
                 source.mix.push_back({stage.clipClock,
-                    gain == stage.clip->properties.end() ? Curve(1) : gain->second,
-                    pan == stage.clip->properties.end() ? Curve(0) : pan->second,
-                    stage.clip->curveBpm(stage.tempo)});
+                    gain == stage.clip->properties.end() ? Curve(gainSpec.defaultValue) : gain->second,
+                    pan == stage.clip->properties.end() ? Curve(panSpec.defaultValue) : pan->second});
             }
             clips.push_back(std::move(source));
         }, cancel);
@@ -57,11 +63,11 @@ public:
             double leftGain = 1, rightGain = 1;
             for (const auto& stage : clip.mix) {
                 const auto stageTime = stage.clock.localTime(projectTime);
-                const auto gainValue = stage.gain.evaluate(stageTime, stage.contentBpm);
-                const auto panValue = stage.pan.evaluate(stageTime, stage.contentBpm);
+                const auto gainValue = stage.gain.evaluate(stageTime);
+                const auto panValue = stage.pan.evaluate(stageTime);
                 if (!std::isfinite(gainValue) || !std::isfinite(panValue)) { leftGain = rightGain = 0; break; }
-                const auto gain = std::clamp(gainValue, 0.0, 4.0);
-                const auto pan = std::clamp(panValue, -1.0, 1.0);
+                const auto gain = gainSpec.clamp(gainValue);
+                const auto pan = panSpec.clamp(panValue);
                 leftGain *= gain * (pan > 0 ? 1.0 - pan : 1.0);
                 rightGain *= gain * (pan < 0 ? 1.0 + pan : 1.0);
             }
@@ -80,7 +86,6 @@ private:
     struct MixStage {
         ClipTiming clock;
         Curve gain, pan;
-        double contentBpm;
     };
     struct ClipSource {
         ClipTiming clock;

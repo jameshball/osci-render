@@ -63,25 +63,23 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
     }
     for (auto& effect : project.effects) {
         if (effect.id == id) {
-            return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+            return Target { .id = effect.id, .name = effect.name, .duration = project.duration, .properties = &effect.properties, .isEffect = true };
         }
     }
     for (auto& group : project.groups) {
         if (group.id == id) {
-            return Target { group.id, group.name, 0.0, project.duration, 0.0, 1.0, &group.properties, false, false, true };
+            return Target { .id = group.id, .name = group.name, .duration = project.duration, .properties = &group.properties, .isGroup = true };
         }
         for (auto& effect : group.effects) {
             if (effect.id == id) {
-                return Target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
+                return Target { .id = effect.id, .name = effect.name, .duration = project.duration, .properties = &effect.properties, .isEffect = true };
             }
         }
     }
     for (auto& track : project.tracks) {
         for (auto& effect : track.effects) {
             if (effect.id == id) {
-                Target target { effect.id, effect.name, 0.0, project.duration, 0.0, 1.0, &effect.properties, false, true };
-                target.locked = track.locked;
-                return target;
+                return Target { .id = effect.id, .name = effect.name, .duration = project.duration, .properties = &effect.properties, .isEffect = true, .locked = track.locked };
             }
         }
         for (auto& clip : track.clips) {
@@ -90,22 +88,19 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
             // Only the owner's timing: under a tempo map it is not free.
             const auto timing = clip.timing(project.tempo());
             const auto owner = effect != clip.effects.end();
-            Target target { owner ? effect->id : clip.id, owner ? std::string_view(effect->name) : std::string_view(clip.name), timing.start, timing.duration(), timing.offset, timing.rate,
-                            owner ? &effect->properties : &clip.properties, false, owner, false, !owner && track.kind == TrackKind::audio, clip.curveBpm(project.tempo()), timing.warp };
-            target.locked = track.locked;
-            return target;
+            return Target { .id = owner ? effect->id : clip.id, .name = owner ? std::string_view(effect->name) : std::string_view(clip.name), .start = timing.start, .duration = timing.duration(),
+                            .offset = timing.offset, .rate = timing.rate, .properties = owner ? &effect->properties : &clip.properties, .isEffect = owner, .isAudio = !owner && track.kind == TrackKind::audio,
+                            .contentBpm = clip.curveBpm(project.tempo()), .warp = timing.warp, .locked = track.locked };
         }
     }
     for (auto& camera : project.cameras) {
         if (camera.id == id) {
-            return Target { camera.id, camera.name, 0.0, project.duration, 0.0, 1.0, &camera.properties, true };
+            return Target { .id = camera.id, .name = camera.name, .duration = project.duration, .properties = &camera.properties, .camera = true };
         }
     }
     if constexpr (requires { project.beam; }) {
         if (project.beam.id == id) {
-            Target target { project.beam.id, "Scope", 0.0, project.duration, 0.0, 1.0, &project.beam.properties };
-            target.beam = true;
-            return target;
+            return Target { .id = project.beam.id, .name = "Scope", .duration = project.duration, .properties = &project.beam.properties, .beam = true };
         }
     }
     return std::nullopt;

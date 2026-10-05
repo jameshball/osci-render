@@ -70,7 +70,6 @@ struct CurveDrivers {
     std::vector<Route> routes;
     std::shared_ptr<const Curve> linkSource;
     ClipTiming linkClock; // composition -> source local
-    double linkBpm = 120;
     PropertyLink link;
     double compositionTime(double local) const { return clock.projectTime(local); }
     double projectTime(double composition) const { return projectClock.projectTime(composition); }
@@ -82,14 +81,14 @@ public:
     Curve() = default;
     explicit Curve(double initialValue) : base(initialValue) {}
 
-    double evaluate(double time, double bpm = 120) const {
-        return evaluateWith(linked() ? linkedValue(time) : evaluateBase(time), time, bpm);
+    double evaluate(double time) const {
+        return evaluateWith(linked() ? linkedValue(time) : evaluateBase(time), time);
     }
     bool linked() const { return drivers != nullptr && drivers->linkSource != nullptr; }
 
     // Applies this property's routed modulators to a given
     // authored value (keys, a link, or a spatial path's coordinate).
-    double evaluateWith(double authored, double time, double bpm = 120) const {
+    double evaluateWith(double authored, double time) const {
         const auto baseValue = std::isfinite(authored) ? authored : (std::isfinite(base) ? base : 0.0);
         auto value = baseValue;
         if (drivers != nullptr && !drivers->routes.empty()) {
@@ -199,7 +198,7 @@ private:
         const auto& d = *drivers;
         const auto composition = d.compositionTime(time) - d.link.delay;
         const auto sourceLocal = d.linkClock.localTime(composition);
-        return d.linkSource->evaluate(sourceLocal, d.linkBpm) * d.link.scale + d.link.offset;
+        return d.linkSource->evaluate(sourceLocal) * d.link.scale + d.link.offset;
     }
     static double hermite(double a, double b, double span, double t, double outSlope, double inSlope) {
         const auto t2 = t * t, t3 = t2 * t;

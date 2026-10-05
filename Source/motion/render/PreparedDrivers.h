@@ -67,7 +67,6 @@ private:
                 drivers->link = *curve.link;
                 drivers->linkSource = std::move(sourceCurve);
                 drivers->linkClock = source->clock();
-                drivers->linkBpm = source->curveBpm(scope.bpm);
             }
         }
         if (drivers->routes.empty() && drivers->linkSource == nullptr) { return; }

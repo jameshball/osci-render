@@ -219,7 +219,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
             juce::Path result;
             for (int i = 0; i <= steps; ++i) {
                 const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-                const auto value = constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time), clip->curveBpm(processor.document.project().bpm)), propertyName);
+                const auto value = constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time)), propertyName);
                 if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
             }
             g.setColour(juce::Colour(0xff80baff));
@@ -1106,7 +1106,7 @@ void MotionCurveEditor::fit(bool primaryOnly) {
         const auto local = clip->localTime(std::lerp(first, last, i / 256.0));
         const auto base = curve->evaluateBase(local);
         low = std::min(low, base); high = std::max(high, base);
-        const auto value = constrainedValue(*clip, curve->evaluate(local, clip->curveBpm(processor.document.project().bpm)), propertyName);
+        const auto value = constrainedValue(*clip, curve->evaluate(local), propertyName);
         low = std::min(low, value);
         high = std::max(high, value);
     }
@@ -1233,24 +1233,7 @@ void MotionCurveEditor::showKeyMenu() {
         processor.document.edit(keys.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, keys, next](motion::Project& project) {
             for (const auto& ref : keys) {
                 auto* target = mutableCurve(project, id, ref.property);
-                const auto* found = target != nullptr ? findKey(*target, ref.time) : nullptr;
-                if (found == nullptr) {
-                    continue;
-                }
-                auto updated = *found;
-                const auto& keyframes = target->keyframes();
-                const auto index = static_cast<std::size_t>(found - keyframes.data());
-                // Bezier handles start on the automatic tangents: the shape holds.
-                if (next == motion::Interpolation::cubic && updated.interpolation != motion::Interpolation::cubic && index + 1 < keyframes.size()) {
-                    auto following = keyframes[index + 1];
-                    updated.outgoingSlope = target->automaticSlope(index);
-                    updated.outgoingInfluence = motion::Keyframe::defaultInfluence;
-                    following.incomingSlope = target->automaticSlope(index + 1);
-                    following.incomingInfluence = motion::Keyframe::defaultInfluence;
-                    if (updated.interpolation == motion::Interpolation::smooth) { target->setKey(following); }
-                }
-                updated.interpolation = next;
-                target->setKey(updated);
+                if (target != nullptr) { motion::keyedit::setInterpolation(*target, ref.time, next); }
             }
         });
         refresh();

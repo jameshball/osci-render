@@ -1913,22 +1913,7 @@ void MotionTimelineView::showKeyMenu() {
                         if (key.clip != clip.id || track.locked) { continue; }
                         const auto found = clip.properties.find(key.property);
                         if (found == clip.properties.end()) { continue; }
-                        auto& curve = found->second;
-                        const auto& all = curve.keyframes();
-                        for (std::size_t index = 0; index < all.size(); ++index) {
-                            if (!sameTime(all[index].time, key.time) || all[index].interpolation == shape) { continue; }
-                            auto updated = all[index];
-                            if (shape == motion::Interpolation::cubic && index + 1 < all.size()) {
-                                auto following = all[index + 1];
-                                updated.outgoingSlope = curve.automaticSlope(index);
-                                following.incomingSlope = curve.automaticSlope(index + 1);
-                                curve.setKey(following);
-                            }
-                            updated.interpolation = shape;
-                            curve.setKey(updated);
-                            any = true;
-                            break;
-                        }
+                        any = motion::keyedit::setInterpolation(found->second, key.time, shape) || any;
                     }
                 }
             }

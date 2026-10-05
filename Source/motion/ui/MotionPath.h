@@ -73,20 +73,19 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
     for (const auto* group : parents) {
         if (!collect(group->properties, 9, false)) { return {{}, true}; }
     }
-    const auto value = [](const auto& properties, int index, double time, double bpm) {
+    const auto value = [](const auto& properties, int index, double time) {
         const auto found = properties.find(objectPropertySpecs[static_cast<std::size_t>(index)].id);
-        return found == properties.end() ? objectPropertySpecs[static_cast<std::size_t>(index)].defaultValue : found->second.evaluate(time, bpm);
+        return found == properties.end() ? objectPropertySpecs[static_cast<std::size_t>(index)].defaultValue : found->second.evaluate(time);
     };
     MotionPath path;
     path.points.reserve(times.size());
     bool broken = true;
     for (const auto& [time, flags] : times) {
         const auto local = selected->localTime(time, project.tempo());
-        const auto bpm = selected->curveBpm(project.tempo());
-        Vec3 position {value(selected->properties, 0, local, bpm), value(selected->properties, 1, local, bpm), value(selected->properties, 2, local, bpm)};
+        Vec3 position {value(selected->properties, 0, local), value(selected->properties, 1, local), value(selected->properties, 2, local)};
         for (const auto* group : parents) {
             std::array<double, 9> values;
-            for (int axis = 0; axis < 9; ++axis) { values[static_cast<std::size_t>(axis)] = value(group->properties, axis, time, project.bpm); }
+            for (int axis = 0; axis < 9; ++axis) { values[static_cast<std::size_t>(axis)] = value(group->properties, axis, time); }
             constexpr auto radians = std::numbers::pi / 180.0;
             const transform_detail::Affine transform {{values[0], values[1], values[2]}, {values[3] * radians, values[4] * radians, values[5] * radians}, {values[6], values[7], values[8]}};
             position = transform.direction(position) + transform.position;

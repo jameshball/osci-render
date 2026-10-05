@@ -29,7 +29,7 @@ int main() {
     clip.offset = 3;
     clip.rate = 2;
     clip.properties["position.x"] = motion::Curve(4);
-    project.tracks.push_back({ 1, "Objects", { clip } });
+    project.tracks.push_back({ .id = 1, .name = "Objects", .clips = { clip } });
     motion::Camera camera;
     camera.id = 20;
     camera.name = "Wide";

@@ -30,12 +30,12 @@ struct Affine {
     }
 };
 template <typename PropertyMap>
-std::optional<Affine> evaluate(const PropertyMap& properties, double time, double bpm) {
+std::optional<Affine> evaluate(const PropertyMap& properties, double time) {
     std::array<double, 9> values;
     for (std::size_t i = 0; i < values.size(); ++i) {
         const auto found = properties.find(objectPropertySpecs[i].id);
         if (found != properties.end() && !found->second.valid()) { return std::nullopt; }
-        values[i] = found == properties.end() ? (i >= 6 ? 1.0 : 0.0) : found->second.evaluate(time, bpm);
+        values[i] = found == properties.end() ? objectPropertySpecs[i].defaultValue : found->second.evaluate(time);
         if (!std::isfinite(values[i])) { return std::nullopt; }
     }
     constexpr auto radians = std::numbers::pi / 180.0;
@@ -43,7 +43,7 @@ std::optional<Affine> evaluate(const PropertyMap& properties, double time, doubl
         { values[3] * radians, values[4] * radians, values[5] * radians },
         { values[6], values[7], values[8] } };
 }
-inline bool hasEffects(const std::vector<EffectInstance>& effects, double time, double bpm) {
+inline bool hasEffects(const std::vector<EffectInstance>& effects, double time) {
     for (const auto& effect : effects) {
         if (!effect.enabled || (effect.range.has_value() && (time < effect.range->start || time >= effect.range->end()))) {
             continue;
@@ -51,7 +51,7 @@ inline bool hasEffects(const std::vector<EffectInstance>& effects, double time, 
         const auto strength = effect.properties.find("strength");
         // Unknown/malformed effects are conservatively treated as active.
         if (strength == effect.properties.end()) { return true; }
-        const auto value = strength->second.evaluate(time, bpm);
+        const auto value = strength->second.evaluate(time);
         if (!std::isfinite(value) || value > 0) { return true; }
     }
     return false;
@@ -95,12 +95,12 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
             if (clip.id != clipId) { continue; }
             const auto local = clip.localTime(projectTime, project.tempo());
             if (!std::isfinite(local)) { return std::nullopt; }
-            const auto own = transform_detail::evaluate(clip.properties, local, clip.curveBpm(project.tempo()));
+            const auto own = transform_detail::evaluate(clip.properties, local);
             if (!own.has_value()) { return std::nullopt; }
             TransformFrame frame;
             frame.worldOrigin = own->position;
-            frame.hasPostTransformEffects = transform_detail::hasEffects(track.effects, projectTime, project.bpm)
-                || transform_detail::hasEffects(project.effects, projectTime, project.bpm);
+            frame.hasPostTransformEffects = transform_detail::hasEffects(track.effects, projectTime)
+                || transform_detail::hasEffects(project.effects, projectTime);
             auto groupId = track.group;
             std::array<Id, maximumGroupDepth> seen {};
             while (groupId != 0) {
@@ -110,7 +110,7 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
                 }
                 const auto* group = findGroup(project, groupId);
                 if (group == nullptr) { return std::nullopt; }
-                const auto parent = transform_detail::evaluate(group->properties, projectTime, project.bpm);
+                const auto parent = transform_detail::evaluate(group->properties, projectTime);
                 if (!parent.has_value() || parent->scale.x == 0 || parent->scale.y == 0 || parent->scale.z == 0) {
                     return std::nullopt;
                 }
@@ -123,7 +123,7 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
                     if (!basis.finite()) { return std::nullopt; }
                 }
                 frame.hasPostTransformEffects = frame.hasPostTransformEffects
-                    || transform_detail::hasEffects(group->effects, projectTime, project.bpm);
+                    || transform_detail::hasEffects(group->effects, projectTime);
                 groupId = group->parent;
             }
             for (const auto axis : { Vec3 { 1, 0, 0 }, Vec3 { 0, 1, 0 }, Vec3 { 0, 0, 1 } }) {
@@ -204,7 +204,7 @@ std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id 
         if (track.kind != TrackKind::visual) { continue; }
         for (const auto& clip : track.clips) {
             if (clip.id != clipId) { continue; }
-            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime, project.tempo()), clip.curveBpm(project.tempo()));
+            const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime, project.tempo()));
             if (!transform.has_value()) { return std::nullopt; }
             return EulerGizmoFrame { *parent, transform->rotation, transform->scale };
         }

@@ -96,7 +96,7 @@ private:
                 for (const auto& spec : luaSliderSpecs) {
                     const auto found = job->plan.sliders.find(std::string(spec.id));
                     const auto index = static_cast<std::size_t>(spec.id.back() - 'a');
-                    values[index] = found == job->plan.sliders.end() ? 0.0 : std::clamp(found->second.evaluate(seconds, job->plan.bpm), 0.0, 1.0);
+                    values[index] = found == job->plan.sliders.end() ? 0.0 : std::clamp(found->second.evaluate(seconds), 0.0, 1.0);
                 }
             });
             std::shared_ptr<LuaClipBake> bake;

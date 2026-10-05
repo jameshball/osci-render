@@ -75,6 +75,15 @@ int main() {
     assert(!scaleKeyTimes(curves, span, 0.5, 1.5, 0.25, 0, 3).has_value());
     assert(!scaleKeyTimes(curves, span, 0.5, 1.5, 3.5, 0, 3).has_value());
     assert(!scaleKeyTimes(curves, { { "position.x", 1 }, { "position.y", 0.5 } }, 0.5, 1, 2, 0, 3).has_value());
+    // Switching a smooth key to Bezier starts its handles on the automatic
+    // tangents with default influence; a second switch changes nothing.
+    auto curve = curves.at("position.y");
+    assert(motion::keyedit::setInterpolation(curve, 0.5, motion::Interpolation::cubic));
+    const auto& bezier = curve.keyframes()[0];
+    assert(bezier.interpolation == motion::Interpolation::cubic && bezier.outgoingInfluence == motion::Keyframe::defaultInfluence);
+    assert(close(bezier.outgoingSlope, curves.at("position.y").automaticSlope(0)));
+    assert(!motion::keyedit::setInterpolation(curve, 0.5, motion::Interpolation::cubic));
+    assert(!motion::keyedit::setInterpolation(curve, 0.75, motion::Interpolation::linear));
     std::cout << "KeyEditTests passed\n";
     return 0;
 }

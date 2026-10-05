@@ -111,7 +111,7 @@ public:
             if (driven.has_value()) {
                 // A square LFO swings the slider by the route's amount around its base.
                 const auto& slider = driven->sliders.at("slider.a");
-                expect(std::abs(slider.evaluate(0.1, 120) - slider.evaluate(0.6, 120)) > 0.5, "the routed LFO moves the slider");
+                expect(std::abs(slider.evaluate(0.1) - slider.evaluate(0.6)) > 0.5, "the routed LFO moves the slider");
             }
             document.edit("Deepen route", [](motion::Project& updated) { updated.routes[0].amount = 0.25; });
             const auto deeper = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], document.project());
