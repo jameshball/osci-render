@@ -2,7 +2,7 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
-#include "../Source/motion/model/MidiTakeNotes.h"
+#include "../Source/motion/render/MidiTakeNotes.h"
 
 class MotionTempoMapTest : public juce::UnitTest {
 public:

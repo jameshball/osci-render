@@ -7,15 +7,15 @@
 #include "Beam.h"
 #include "Group.h"
 #include "PreparedSource.h"
-#include "../live/LiveSourceFrames.h"
-#include "../live/BlenderSourceSettings.h"
+#include "LiveSourceIdentity.h"
+#include "BlenderSourceSettings.h"
 #include "BakeSettings.h"
 #include "RasterSettings.h"
 #include "TextSettings.h"
 #include "ScopeProfile.h"
 #include "PreparedAudio.h"
 #include <atomic>
-#include "../render/PreparedDrawing.h"
+#include "PreparedDrawing.h"
 
 namespace motion {
 struct Asset {

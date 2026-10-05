@@ -1,5 +1,6 @@
 #pragma once
 
+#include "LiveSourceFrames.h"
 #include "PreparedBlenderInput.h"
 #include "../model/Document.h"
 #include <functional>

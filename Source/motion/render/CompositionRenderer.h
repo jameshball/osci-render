@@ -9,6 +9,7 @@
 #include "PreparedDrivers.h"
 #include "../model/SpatialMotion.h"
 #include "../model/Vec3.h"
+#include "../live/LiveSourceFrames.h"
 #include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"

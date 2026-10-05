@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../render/PreparedDrawing.h"
+#include "PreparedDrawing.h"
 #include "PreparedPointFrames.h"
 #include "FrameTiming.h"
 #include <memory>

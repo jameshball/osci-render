@@ -1,15 +1,12 @@
 #pragma once
 
+#include "../model/LiveSourceIdentity.h"
 #include "../model/PreparedSource.h"
 #include <algorithm>
 #include <functional>
 #include <stdexcept>
 
 namespace motion {
-// Runtime identity is shared by an asset and its prepared clips, never derived
-// from reusable document IDs. Replacing a project/source creates a fresh key.
-struct LiveSourceIdentity final {};
-
 // Build on the publisher thread, then publish one immutable set for an entire
 // audio block. The editor retains a separate shared snapshot of the same data;
 // it must never acquire from the audio thread's PreparedState exchange.

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Document.h"
-#include "../import/SourceDecoding.h"
+#include "AssetKinds.h"
 #include "PropertySchema.h"
 #include "PreparedSource.h"
 #include "PropertyTarget.h"

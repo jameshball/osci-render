@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Cancellation.h"
-#include "ClipTiming.h"
-#include "MidiNotes.h"
-#include "../render/MidiRecording.h"
+#include "../model/Cancellation.h"
+#include "../model/ClipTiming.h"
+#include "../model/MidiNotes.h"
+#include "MidiRecording.h"
 #include <deque>
 
 namespace motion {

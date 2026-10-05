@@ -5,7 +5,6 @@
 #include "ModulationGraph.h"
 #include "PropertySchema.h"
 #include "../import/BakedSourceArchive.h"
-#include "../import/MidiSourcePreparer.h"
 #include "../import/SourceDecoding.h"
 #include <charconv>
 #include <iomanip>

@@ -1,7 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
-#include "../Source/motion/model/MidiTakeNotes.h"
+#include "../Source/motion/render/MidiTakeNotes.h"
 #include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/render/LiveMidiAudition.h"
 #include "../Source/motion/import/MidiSourcePreparer.h"

@@ -1,4 +1,4 @@
-#include "../../Source/motion/model/MidiTakeNotes.h"
+#include "../../Source/motion/render/MidiTakeNotes.h"
 #include <cstdlib>
 #include <iostream>
 

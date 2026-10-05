@@ -461,8 +461,6 @@
               file="Source/motion/live/BlenderFrame.h"/>
         <FILE id="MotliveBlenderReceiverh" name="BlenderReceiver.h" compile="0"
               resource="0" file="Source/motion/live/BlenderReceiver.h"/>
-        <FILE id="MotliveBlenderSourceSettingsh" name="BlenderSourceSettings.h"
-              compile="0" resource="0" file="Source/motion/live/BlenderSourceSettings.h"/>
         <FILE id="MotliveLiveBlenderControllerh" name="LiveBlenderController.h"
               compile="0" resource="0" file="Source/motion/live/LiveBlenderController.h"/>
         <FILE id="MotliveLiveSourceExchangeh" name="LiveSourceExchange.h" compile="0"
@@ -477,9 +475,13 @@
       <GROUP id="MotionSrcModel" name="model">
         <FILE id="MotAnimation" name="Animation.h" compile="0" resource="0"
               file="Source/motion/model/Animation.h"/>
+        <FILE id="MotmodelAssetKindsh" name="AssetKinds.h" compile="0" resource="0"
+              file="Source/motion/model/AssetKinds.h"/>
         <FILE id="MotmodelBakeSettingsh" name="BakeSettings.h" compile="0"
               resource="0" file="Source/motion/model/BakeSettings.h"/>
         <FILE id="MotmodelBeamh" name="Beam.h" compile="0" resource="0" file="Source/motion/model/Beam.h"/>
+        <FILE id="MotmodelBlenderSourceSettingsh" name="BlenderSourceSettings.h"
+              compile="0" resource="0" file="Source/motion/model/BlenderSourceSettings.h"/>
         <FILE id="MotCameraModel" name="Camera.h" compile="0" resource="0"
               file="Source/motion/model/Camera.h"/>
         <FILE id="MotmodelCancellationh" name="Cancellation.h" compile="0"
@@ -503,14 +505,14 @@
         <FILE id="MotmodelKeyEasingh" name="KeyEasing.h" compile="0" resource="0"
               file="Source/motion/model/KeyEasing.h"/>
         <FILE id="MotKeyEdit" name="KeyEdit.h" compile="0" resource="0" file="Source/motion/model/KeyEdit.h"/>
+        <FILE id="MotmodelLiveSourceIdentityh" name="LiveSourceIdentity.h"
+              compile="0" resource="0" file="Source/motion/model/LiveSourceIdentity.h"/>
         <FILE id="MotmodelLuaClipBakeh" name="LuaClipBake.h" compile="0" resource="0"
               file="Source/motion/model/LuaClipBake.h"/>
         <FILE id="MotmodelMidiInstrumenth" name="MidiInstrument.h" compile="0"
               resource="0" file="Source/motion/model/MidiInstrument.h"/>
         <FILE id="MotmodelMidiNotesh" name="MidiNotes.h" compile="0" resource="0"
               file="Source/motion/model/MidiNotes.h"/>
-        <FILE id="MotmodelMidiTakeNotesh" name="MidiTakeNotes.h" compile="0"
-              resource="0" file="Source/motion/model/MidiTakeNotes.h"/>
         <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
               file="Source/motion/model/Modulation.h"/>
         <FILE id="motmodgraph" name="ModulationGraph.h" compile="0" resource="0"
@@ -521,6 +523,8 @@
               resource="0" file="Source/motion/model/PointFrameCache.h"/>
         <FILE id="MotmodelPreparedAudioh" name="PreparedAudio.h" compile="0"
               resource="0" file="Source/motion/model/PreparedAudio.h"/>
+        <FILE id="MotmodelPreparedDrawingh" name="PreparedDrawing.h" compile="0"
+              resource="0" file="Source/motion/model/PreparedDrawing.h"/>
         <FILE id="MotmodelPreparedPointFramesh" name="PreparedPointFrames.h"
               compile="0" resource="0" file="Source/motion/model/PreparedPointFrames.h"/>
         <FILE id="MotPreparedSource" name="PreparedSource.h" compile="0" resource="0"
@@ -567,8 +571,8 @@
               resource="0" file="Source/motion/render/MidiRecording.h"/>
         <FILE id="MotrenderMidiRecordingSessionh" name="MidiRecordingSession.h"
               compile="0" resource="0" file="Source/motion/render/MidiRecordingSession.h"/>
-        <FILE id="MotrenderPreparedDrawingh" name="PreparedDrawing.h" compile="0"
-              resource="0" file="Source/motion/render/PreparedDrawing.h"/>
+        <FILE id="MotrenderMidiTakeNotesh" name="MidiTakeNotes.h" compile="0"
+              resource="0" file="Source/motion/render/MidiTakeNotes.h"/>
         <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
               resource="0" file="Source/motion/render/PreparedDrivers.h"/>
         <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"

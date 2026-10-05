@@ -1,5 +1,5 @@
 #include <JuceHeader.h>
-#include "../Source/motion/render/PreparedDrawing.h"
+#include "../Source/motion/model/PreparedDrawing.h"
 #include "../Source/motion/model/Animation.h"
 
 class MotionDrawingGuardTest final : public juce::UnitTest {

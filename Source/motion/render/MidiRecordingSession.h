@@ -3,7 +3,7 @@
 #include "MidiRecording.h"
 #include "SampleClock.h"
 #include "../model/Document.h"
-#include "../model/MidiTakeNotes.h"
+#include "MidiTakeNotes.h"
 #include <functional>
 
 namespace motion {

@@ -3,7 +3,7 @@
 #include <JuceHeader.h>
 #include "MotionStyle.h"
 #include <osci_gui/osci_gui.h>
-#include "../live/BlenderSourceSettings.h"
+#include "../model/BlenderSourceSettings.h"
 
 class MotionBlenderSourcePanel final : public juce::Component, private juce::Timer {
 public:
