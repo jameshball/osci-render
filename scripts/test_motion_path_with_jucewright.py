@@ -97,7 +97,7 @@ def saved_keys(axis):
     root = ET.fromstring(data[8:8 + struct.unpack("<I", data[4:8])[0]])
     property_xml = root.find("./composition/track/clip[@name='Path object']/property[@name='position." + axis + "']")
     assert property_xml is not None
-    return [(float(key.get("time")), float(key.get("value")), key.get("interpolation"), float(key.get("in")), float(key.get("out")))
+    return [(float(key.get("time")), float(key.get("value")), key.get("interpolation"), float(key.get("in", "0")), float(key.get("out", "0")))
             for key in property_xml.findall("key")]
 
 

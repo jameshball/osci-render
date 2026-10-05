@@ -203,7 +203,7 @@ try:
     step("select all keys", "press", "command + a", "--class", "MotionCurveEditor")
     step("easy ease", "press", "F9", "--class", "MotionCurveEditor")
     eased = keys("weight")
-    assert eased[0].get("interpolation") == "3" and float(eased[0].get("out")) == 0 and float(eased[1].get("in")) == 0, [k.attrib for k in eased]
+    assert eased[0].get("interpolation") == "3" and float(eased[0].get("out", "0")) == 0 and float(eased[1].get("in", "0")) == 0, [k.attrib for k in eased]
     # Alt+Shift+P keys position at the playhead, as in After Effects.
     step("key position", "press", "alt + shift + p", "--class", "MotionCurveEditor")
     keyed = keys("position.x")
