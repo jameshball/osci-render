@@ -107,10 +107,10 @@ private:
         }
         if (modulator->kind == ModulatorKind::controller) { collectSteps(*prepared, *modulator, scope); }
         if (modulator->kind == ModulatorKind::envelope) {
-            prepared->attack = modulator->attack;
-            prepared->decay = modulator->decay;
-            prepared->sustain = modulator->sustain;
-            prepared->release = modulator->release;
+            prepared->envelope.attackSeconds = modulator->attack;
+            prepared->envelope.decaySeconds = modulator->decay;
+            prepared->envelope.sustainLevel = modulator->sustain;
+            prepared->envelope.releaseSeconds = modulator->release;
             collectNotes(*prepared, *modulator, scope);
         }
         std::shared_ptr<const PreparedModulator> result = std::move(prepared);

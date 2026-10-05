@@ -180,7 +180,8 @@ public:
         {
             motion::PreparedModulator envelope;
             envelope.kind = motion::ModulatorKind::envelope;
-            envelope.attack = 0; envelope.decay = 0; envelope.sustain = 0.25; envelope.release = 0.1;
+            envelope.envelope.sustainLevel = 0.25;
+            envelope.envelope.releaseSeconds = 0.1;
             envelope.notes.push_back({0, 60, 1});
             for (int index = 0; index < 2000; ++index) { envelope.notes.push_back({0.5 + index * 0.02, 0.5 + index * 0.02 + 0.01, 0.8}); }
             envelope.buildIndex();

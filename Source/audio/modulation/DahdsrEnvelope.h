@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <cmath>
+#include "DahdsrSegments.h"
 
 // Centralized constants for audio/MIDI quirks.
 namespace osci_audio
@@ -22,29 +23,6 @@ inline constexpr float kDahdsrTimeStepSeconds = 0.00001f;
 // Envelope time-axis zoom bounds (seconds).
 inline constexpr double kEnvelopeZoomMinSeconds = 0.05;
 inline constexpr double kEnvelopeZoomMaxSeconds = 30.0;
-
-inline float evalCurve01(float curveValue, float pos)
-{
-    pos = juce::jlimit(0.0f, 1.0f, pos);
-
-    if (std::abs(curveValue) <= 0.001f)
-        return pos;
-
-    const float denom = 1.0f - std::exp(curveValue);
-    const float numer = 1.0f - std::exp(pos * curveValue);
-    return (denom != 0.0f) ? (numer / denom) : pos;
-}
-
-inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
-
-inline float evalSegment(float start, float end, double elapsed, double duration, float curve)
-{
-    if (duration <= 0.0)
-        return end;
-    const float pos = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
-    const float shaped = evalCurve01(curve, pos);
-    return lerp(start, end, shaped);
-}
 
 // Maximum absolute power value for smooth/power segments (matches Vital's kMaxPower).
 inline constexpr float kMaxPower = 20.0f;
@@ -81,39 +59,6 @@ inline float evalSmoothPowerSegment(float start, float end, double elapsed, doub
     t = juce::jlimit(0.0f, 1.0f, powerScale(t, power));
     return start + t * (end - start);
 }
-}
-
-struct DahdsrParams
-{
-    double delaySeconds = 0.0;
-    double attackSeconds = 0.0;
-    double attackLevel = 1.0;
-    double holdSeconds = 0.0;
-    double decaySeconds = 0.0;
-    double sustainLevel = 0.0; // [0..1]
-    double releaseSeconds = 0.0;
-
-    float attackCurve = 0.0f;
-    float decayCurve = 0.0f;
-    float releaseCurve = 0.0f;
-};
-enum class DahdsrStage {
-    Delay, Attack, Hold, Decay, Sustain, Release, Done,
-};
-
-// Shared segment evaluation for live voices and immutable, seekable voices.
-// Advancing a stage and quantizing its duration remain clock responsibilities.
-inline float evaluateDahdsrStage(DahdsrStage stage, const DahdsrParams& params, double elapsed, float releaseStart = 0) {
-    switch (stage) {
-        case DahdsrStage::Delay: return 0;
-        case DahdsrStage::Attack: return osci_audio::evalSegment(0, static_cast<float>(params.attackLevel), elapsed, params.attackSeconds, params.attackCurve);
-        case DahdsrStage::Hold: return static_cast<float>(params.attackLevel);
-        case DahdsrStage::Decay: return osci_audio::evalSegment(static_cast<float>(params.attackLevel), static_cast<float>(params.sustainLevel), elapsed, params.decaySeconds, params.decayCurve);
-        case DahdsrStage::Sustain: return static_cast<float>(params.sustainLevel);
-        case DahdsrStage::Release: return osci_audio::evalSegment(releaseStart, 0, elapsed, params.releaseSeconds, params.releaseCurve);
-        case DahdsrStage::Done: return 0;
-    }
-    return 0;
 }
 
 // Lightweight per-voice envelope evaluator (hot path).

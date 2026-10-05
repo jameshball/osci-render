@@ -2,6 +2,7 @@
 
 #include "Modulation.h"
 #include "Tempo.h"
+#include "../../audio/modulation/DahdsrSegments.h"
 #include <optional>
 #include <algorithm>
 #include <set>
@@ -80,7 +81,8 @@ struct PreparedModulator {
     std::shared_ptr<const SoundtrackEnvelope> soundtrack; // project time
     std::vector<Note> notes; // composition seconds, sorted by start
     std::vector<std::pair<double, double>> steps; // controller: (seconds, value), sorted
-    double attack = 0, decay = 0, sustain = 0, release = 0;
+    // Envelopes shape each note with osci-render's DAHDSR segments.
+    DahdsrParams envelope;
 
     // Indexes, for each interval between note starts and release ends, the
     // notes that can sound there, so evaluation visits only those (bounded
@@ -134,22 +136,20 @@ struct PreparedModulator {
     }
 
 private:
-    double reach(const Note& note) const { return note.end + std::max(0.0, release); }
+    double reach(const Note& note) const { return note.end + std::max(0.0, envelope.releaseSeconds); }
     std::vector<double> boundaries;
     std::vector<std::uint32_t> offsets, active;
-    double held(double age) const {
-        if (age < attack) { return attack > 0 ? age / attack : 1.0; }
-        age -= attack;
-        if (age < decay) { return 1 - (1 - sustain) * (age / decay); }
-        return sustain;
+    float held(double age) const {
+        if (age < envelope.attackSeconds) { return evaluateDahdsrStage(DahdsrStage::Attack, envelope, age); }
+        age -= envelope.attackSeconds;
+        if (age < envelope.decaySeconds) { return evaluateDahdsrStage(DahdsrStage::Decay, envelope, age); }
+        return evaluateDahdsrStage(DahdsrStage::Sustain, envelope, age);
     }
     double envelopeAt(const Note& note, double time) const {
         const auto age = time - note.start;
         if (age < 0) { return 0; }
         if (time < note.end) { return held(age) * note.level; }
-        const auto released = time - note.end;
-        if (release <= 0 || released >= release) { return 0; }
-        return held(note.end - note.start) * note.level * (1 - released / release);
+        return evaluateDahdsrStage(DahdsrStage::Release, envelope, time - note.end, held(note.end - note.start)) * note.level;
     }
 };
 }

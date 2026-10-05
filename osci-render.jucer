@@ -268,6 +268,8 @@
         <GROUP id="{AUD_MODULATION}" name="modulation">
           <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
                 file="Source/audio/modulation/DahdsrEnvelope.h"/>
+          <FILE id="DhsSeg" name="DahdsrSegments.h" compile="0" resource="0"
+                file="Source/audio/modulation/DahdsrSegments.h"/>
           <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/modulation/LfoState.h"/>
           <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/modulation/LfoState.cpp"/>
           <FILE id="LfPmH1" name="LfoPresetManager.h" compile="0" resource="0"
