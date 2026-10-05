@@ -35,6 +35,27 @@ bool drivableProperty(const CompositionType& composition, Id target, const std::
     return found.has_value() && !found->isAudio && found->curve(property) != nullptr;
 }
 
+// The same rule for many references at once: every owner's properties by
+// id, built in one pass.
+class DrivableProperties {
+public:
+    template <typename CompositionType>
+    explicit DrivableProperties(const CompositionType& composition) {
+        forEachPropertyMap(composition, [this](Id owner, const PropertyMap& properties) { owners.emplace(owner, &properties); });
+        for (const auto& track : composition.tracks) {
+            if (track.kind != TrackKind::audio) { continue; }
+            for (const auto& clip : track.clips) { owners.erase(clip.id); }
+        }
+    }
+    bool contains(Id owner, std::string_view property) const {
+        const auto found = owners.find(owner);
+        return found != owners.end() && found->second->contains(property);
+    }
+
+private:
+    std::map<Id, const PropertyMap*> owners;
+};
+
 // A visual media clip (the kind that can carry MIDI or be a camera target).
 template <typename CompositionType>
 bool hasVisualClip(const CompositionType& composition, Id clipId) {
@@ -71,8 +92,9 @@ std::string validateModulation(const CompositionType& composition) {
             return "A MIDI modulator follows a clip that does not exist in its composition.";
         }
     }
+    const DrivableProperties drivable(composition);
     for (const auto& route : composition.routes) {
-        if (!route.valid() || !modulators.contains(route.modulator) || !drivableProperty(composition, route.target, route.property)) {
+        if (!route.valid() || !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property)) {
             return "A modulation route references a missing modulator or property.";
         }
     }
@@ -80,7 +102,7 @@ std::string validateModulation(const CompositionType& composition) {
     forEachPropertyMap(composition, [&](Id owner, const auto& properties) {
         for (const auto& [name, curve] : properties) {
             if (!error.empty() || !curve.link.has_value()) { continue; }
-            if (!drivableProperty(composition, owner, name)) { error = "Audio clip gain and pan cannot be linked."; continue; }
+            if (!drivable.contains(owner, name)) { error = "Audio clip gain and pan cannot be linked."; continue; }
             if (!hasPropertyCurve(composition, curve.link->source, curve.link->property)) { error = "A property link references a missing property."; continue; }
             if (linkCreatesCycle(composition, owner, name, *curve.link)) { error = "Property links must not form a cycle."; }
         }
@@ -125,8 +147,9 @@ void pruneReferences(CompositionType& composition) {
         modulators.insert(modulator.id);
         if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) { modulator.source = 0; }
     }
+    const DrivableProperties drivable(composition);
     std::erase_if(composition.routes, [&](const auto& route) {
-        return !modulators.contains(route.modulator) || !drivableProperty(composition, route.target, route.property);
+        return !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);
     });
     std::vector<std::pair<Id, std::string>> broken;
     forEachPropertyMap(composition, [&](Id owner, const auto& properties) {
