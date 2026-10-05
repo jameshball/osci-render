@@ -179,7 +179,7 @@ private:
         voice.heldSamples = sample - voice.start;
         voice.released = true;
     }
-    osci_audio::PreparedVoiceEnvelope::Value envelopeValue(const Voice& voice, std::uint64_t sample) const {
+    motion::PreparedVoiceEnvelope::Value envelopeValue(const Voice& voice, std::uint64_t sample) const {
         auto age = sample - voice.start;
         // UINT64_MAX is the kernel's unreleased sentinel. At the final clock
         // tick evaluate held gain one tick earlier; oscillator phase stays exact.

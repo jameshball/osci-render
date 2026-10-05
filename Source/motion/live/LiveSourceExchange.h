@@ -1,7 +1,7 @@
 #pragma once
 
 #include "LiveSourceFrames.h"
-#include "../../audio/PreparedState.h"
+#include "../render/PreparedState.h"
 
 namespace motion {
 class LiveSourceExchange {
@@ -23,7 +23,7 @@ public:
     // borrowed Block is in use. No reference count changes on this path.
     const Block* acquire() noexcept { return exchange.acquire(); }
 private:
-    osci::PreparedState<Block> exchange;
+    motion::PreparedState<Block> exchange;
     std::shared_ptr<const LiveSourceFrames> preview;
     std::uint64_t revision = 0;
 };

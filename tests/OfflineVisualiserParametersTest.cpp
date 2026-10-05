@@ -1,6 +1,6 @@
 #include <JuceHeader.h>
 #include "../Source/visualiser/OfflineVisualiserParameters.h"
-#include "../Source/visualiser/VisualiserState.h"
+#include "../Source/motion/VisualiserState.h"
 
 class OfflineVisualiserParametersTest : public juce::UnitTest {
 public:

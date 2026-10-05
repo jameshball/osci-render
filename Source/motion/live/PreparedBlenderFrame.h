@@ -12,7 +12,7 @@ inline std::shared_ptr<const PreparedSource> prepareBlenderFrame(const BlenderFr
     for (const auto& segment : frame.segments) {
         lines.push_back(std::make_unique<osci::Line>(osci::Point(segment.x1, segment.y1, 0), osci::Point(segment.x2, segment.y2, 0)));
     }
-    auto drawing = std::make_shared<const osci::PreparedDrawing>(std::move(lines));
-    return std::make_shared<const PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>>{std::move(drawing)}, frame.frameRate);
+    auto drawing = std::make_shared<const motion::PreparedDrawing>(std::move(lines));
+    return std::make_shared<const PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>>{std::move(drawing)}, frame.frameRate);
 }
 }

@@ -1,7 +1,7 @@
 #include "MotionProcessor.h"
 #include "MotionEditor.h"
 #include "render/SampleClock.h"
-#include "../visualiser/VisualiserState.h"
+#include "VisualiserState.h"
 
 MotionProcessor::MotionProcessor()
     : CommonAudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)) {

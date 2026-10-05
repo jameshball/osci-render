@@ -15,7 +15,7 @@
 #include "ScopeProfile.h"
 #include "../render/PreparedAudio.h"
 #include <atomic>
-#include "../../audio/synth/PreparedDrawing.h"
+#include "../render/PreparedDrawing.h"
 
 namespace motion {
 struct Asset {
@@ -31,7 +31,7 @@ struct Asset {
     int fractalDepth = 3;
     juce::MemoryBlock bakedData;
     juce::String bakeKey;
-    std::shared_ptr<const osci::PreparedDrawing> drawing;
+    std::shared_ptr<const motion::PreparedDrawing> drawing;
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedAudio> audio;
     std::shared_ptr<const MidiNotes> midi;

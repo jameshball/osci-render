@@ -1,7 +1,7 @@
 #include <JuceHeader.h>
 #include "../Source/motion/render/BeamRenderer.h"
 #include <thread>
-#include "../Source/parser/fractal/FractalPreparation.h"
+#include "../Source/motion/import/FractalPreparation.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
@@ -182,23 +182,23 @@ public:
     void testFractal() {
         beginTest("Fractal expansion is bounded, normalized and validates branch syntax");
         const juce::String source(R"({"axiom":"F","angle":90,"rules":[{"variable":"F","replacement":"F+F-F-F+F"}]})");
-        const auto prepared = osci::fractal::prepare(source, 3);
+        const auto prepared = motion::fractal::prepare(source, 3);
         expect(static_cast<bool>(prepared));
         expectEquals(static_cast<int>(prepared.segments.size()), 125);
         for (const auto& segment : prepared.segments) {
             for (const auto coordinate : segment) { expect(std::isfinite(coordinate) && std::abs(coordinate) <= 1.000001); }
         }
-        expect(!osci::fractal::prepare(juce::String::repeatedString("[", 50000) + "0" + juce::String::repeatedString("]", 50000), 0));
-        expect(!osci::fractal::prepare(juce::String(R"({"axiom":"F","extra":'"',"deep":)") + juce::String::repeatedString("[", 50000) + "0" + juce::String::repeatedString("]", 50000) + "}", 0));
-        expect(!osci::fractal::prepare(source, 15));
-        expect(!osci::fractal::prepare(source, -1));
-        expect(!osci::fractal::prepare(R"({"axiom":"F]"})", 0));
-        expect(!osci::fractal::prepare(R"({"axiom":"[F"})", 0));
-        expect(!osci::fractal::prepare(R"({"axiom":"X"})", 0));
-        expect(!osci::fractal::prepare(R"({"axiom":"F","angle":"90"})", 0));
-        expect(!osci::fractal::prepare(R"({"axiom":"F","rules":[{"variable":"F","replacement":"F"},{"variable":"F","replacement":"FF"}]})", 1));
+        expect(!motion::fractal::prepare(juce::String::repeatedString("[", 50000) + "0" + juce::String::repeatedString("]", 50000), 0));
+        expect(!motion::fractal::prepare(juce::String(R"({"axiom":"F","extra":'"',"deep":)") + juce::String::repeatedString("[", 50000) + "0" + juce::String::repeatedString("]", 50000) + "}", 0));
+        expect(!motion::fractal::prepare(source, 15));
+        expect(!motion::fractal::prepare(source, -1));
+        expect(!motion::fractal::prepare(R"({"axiom":"F]"})", 0));
+        expect(!motion::fractal::prepare(R"({"axiom":"[F"})", 0));
+        expect(!motion::fractal::prepare(R"({"axiom":"X"})", 0));
+        expect(!motion::fractal::prepare(R"({"axiom":"F","angle":"90"})", 0));
+        expect(!motion::fractal::prepare(R"({"axiom":"F","rules":[{"variable":"F","replacement":"F"},{"variable":"F","replacement":"FF"}]})", 1));
         std::atomic<bool> cancelled {true};
-        expect(!osci::fractal::prepare(source, 3, &cancelled));
+        expect(!motion::fractal::prepare(source, 3, &cancelled));
 
         beginTest("Fractal depth and prepared geometry survive project reopening; invalid depth is atomic");
         auto asset = std::make_shared<motion::Asset>();
@@ -1745,7 +1745,7 @@ private:
         expectEquals(progress.load(), 0.0);
         auto invalid = textAsset(".gpla", json.replace("1,0,0,0,0,1", "1"));
         expect(motion::decodeAsset(invalid).failed());
-        std::vector<std::shared_ptr<const osci::PreparedDrawing>> drawings { asset->drawing, asset->drawing };
+        std::vector<std::shared_ptr<const motion::PreparedDrawing>> drawings { asset->drawing, asset->drawing };
         motion::PreparedSource extreme(drawings, std::numeric_limits<double>::denorm_min());
         expectEquals(static_cast<int>(extreme.frameIndex(-1)), 0);
 

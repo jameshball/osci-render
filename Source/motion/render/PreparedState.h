@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <memory>
 
-namespace osci {
+namespace motion {
 
 // One editing/publishing thread, one render thread. The render thread borrows
 // immutable state at block boundaries; allocation and destruction stay on the

@@ -1,4 +1,4 @@
-#include "../../Source/audio/PreparedState.h"
+#include "../../Source/motion/render/PreparedState.h"
 #include <cstdlib>
 #include <iostream>
 #include <thread>
@@ -22,7 +22,7 @@ struct State {
 int main() {
     constexpr int count = 20000;
     {
-        osci::PreparedState<State, 4> exchange;
+        motion::PreparedState<State, 4> exchange;
         std::atomic<bool> finished { false };
         std::atomic<int> last { 0 };
         std::thread render([&] {

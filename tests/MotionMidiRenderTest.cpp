@@ -610,7 +610,7 @@ private:
         auto asset = std::make_shared<motion::Asset>(); asset->id = 1; asset->name = "Line";
         std::vector<std::unique_ptr<osci::Shape>> shapes;
         shapes.push_back(std::make_unique<osci::Line>(osci::Point(2, 0, 0, 1, 1, 1), osci::Point(3, 1, 0, 1, 1, 1)));
-        asset->drawing = std::make_shared<osci::PreparedDrawing>(std::move(shapes));
+        asset->drawing = std::make_shared<motion::PreparedDrawing>(std::move(shapes));
         motion::Clip clip; clip.id = 2; clip.asset = 1; clip.name = "MIDI line"; clip.duration = 1;
         clip.midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}}).source;
         clip.properties["red"] = motion::Curve(.2); clip.properties["green"] = motion::Curve(.4); clip.properties["blue"] = motion::Curve(.8);

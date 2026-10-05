@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace osci::fractal {
+namespace motion::fractal {
 // Single-depth preparation for immutable consumers. Render's live multi-level
 // cache remains separate; no parser or mutable turtle state crosses threads.
 struct Prepared {

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../modulation/DahdsrEnvelope.h"
+#include "../../audio/modulation/DahdsrEnvelope.h"
 #include <array>
 #include <atomic>
 #include <cstdint>
 #include <optional>
 #include <utility>
 
-namespace osci_audio {
+namespace motion {
 // Immutable musical state, independent of source ownership, project parameters
 // and the product's choice of spatial mixing or drawing-budget allocation.
 class PreparedVoiceEnvelope {
@@ -23,13 +23,13 @@ public:
     static std::optional<PreparedVoiceEnvelope> prepare(const DahdsrParams& params, double sampleRate, const std::atomic<bool>* cancel = nullptr) {
         if (!std::isfinite(sampleRate) || sampleRate < 1 || sampleRate > 768000) { return std::nullopt; }
         for (const auto duration : {params.delaySeconds, params.attackSeconds, params.holdSeconds, params.decaySeconds, params.releaseSeconds}) {
-            if (!std::isfinite(duration) || duration < 0 || duration > kDahdsrTimeMaxSeconds) { return std::nullopt; }
+            if (!std::isfinite(duration) || duration < 0 || duration > osci_audio::kDahdsrTimeMaxSeconds) { return std::nullopt; }
         }
         for (const auto level : {params.attackLevel, params.sustainLevel}) {
             if (!std::isfinite(level) || level < 0 || level > 1) { return std::nullopt; }
         }
         for (const auto curve : {params.attackCurve, params.decayCurve, params.releaseCurve}) {
-            if (!std::isfinite(curve) || std::abs(curve) > kMaxPower) { return std::nullopt; }
+            if (!std::isfinite(curve) || std::abs(curve) > osci_audio::kMaxPower) { return std::nullopt; }
         }
         PreparedVoiceEnvelope result;
         result.samples.fill(0);
@@ -98,7 +98,7 @@ public:
         if (!std::isfinite(frequency) || frequency <= 0 || frequency > envelope.sampleRate() / 2
             || !std::isfinite(velocity) || velocity < 0 || velocity > 1
             || !std::isfinite(velocityTracking) || velocityTracking < -1 || velocityTracking > 1) { return std::nullopt; }
-        return PreparedNoteVoice(envelope, frequency, voiceVelocityGain(velocity, velocityTracking));
+        return PreparedNoteVoice(envelope, frequency, osci_audio::voiceVelocityGain(velocity, velocityTracking));
     }
 
     NoteVoiceValue at(std::uint64_t ageSamples, std::uint64_t heldSamples) const {

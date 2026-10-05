@@ -1,5 +1,5 @@
 #include <JuceHeader.h>
-#include "../Source/audio/synth/PreparedDrawing.h"
+#include "../Source/motion/render/PreparedDrawing.h"
 #include "../Source/motion/model/Animation.h"
 
 class MotionDrawingGuardTest final : public juce::UnitTest {
@@ -87,7 +87,7 @@ public:
         std::vector<std::unique_ptr<osci::Shape>> separated;
         line(separated, 0, 0, 1, 0);
         line(separated, 5, 2, 6, 2);
-        osci::PreparedDrawing drawing(std::move(separated));
+        motion::PreparedDrawing drawing(std::move(separated));
         for (const auto phase : {0.495, 0.5, 0.505}) {
             const auto original = drawing.sample(phase);
             const auto guarded = drawing.sample(phase, 0.01);
@@ -105,7 +105,7 @@ public:
         line(polygon, 1, 0, 1, 1);
         line(polygon, 1, 1, 0, 1);
         line(polygon, 0, 1, 0, 0);
-        osci::PreparedDrawing closed(std::move(polygon));
+        motion::PreparedDrawing closed(std::move(polygon));
         for (const auto phase : {0.0, 0.25, 0.5, 0.75, 0.999}) {
             expect(!dark(closed.sample(phase, 0.01)));
             expect(!dark(closed.sample(phase, 1)));
@@ -115,7 +115,7 @@ public:
         std::vector<std::unique_ptr<osci::Shape>> openShapes;
         line(openShapes, 0, 0, 1, 0);
         line(openShapes, 1, 0, 2, 0);
-        osci::PreparedDrawing open(std::move(openShapes));
+        motion::PreparedDrawing open(std::move(openShapes));
         expect(!dark(open.sample(0.5, 0.02)), "Connected join is not a discontinuity");
         expect(dark(open.sample(0.005, 0.02)) && dark(open.sample(0.995, 0.02)));
         expect(!dark(open.sample(0.005)), "Zero span retains existing brightness");
@@ -127,30 +127,30 @@ public:
         line(zeros, -100, -100, -100, -100);
         line(zeros, 1, 0, 0, 0);
         line(zeros, 100, 100, 100, 100);
-        osci::PreparedDrawing zeroFiltered(std::move(zeros));
+        motion::PreparedDrawing zeroFiltered(std::move(zeros));
         for (const auto phase : {0.0, 0.5, 0.999}) { expect(!dark(zeroFiltered.sample(phase, 0.02))); }
         expectWithinAbsoluteError(zeroFiltered.sample(1).x, 0.0f, 0.00001f);
         std::vector<std::unique_ptr<osci::Shape>> gapWithZeros;
         line(gapWithZeros, 0, 0, 1, 0);
         line(gapWithZeros, 1, 0, 1, 0);
         line(gapWithZeros, 5, 0, 6, 0);
-        osci::PreparedDrawing gaps(std::move(gapWithZeros));
+        motion::PreparedDrawing gaps(std::move(gapWithZeros));
         expect(dark(gaps.sample(.5, .01)));
         std::vector<std::unique_ptr<osci::Shape>> allZero;
         line(allZero, 1, 1, 1, 1);
-        osci::PreparedDrawing empty(std::move(allZero));
+        motion::PreparedDrawing empty(std::move(allZero));
         expect(empty.empty() && dark(empty.sample(0.5, 0.1)));
 
         beginTest("Tolerance is absolute and includes Z discontinuities");
         std::vector<std::unique_ptr<osci::Shape>> closeEnough;
         line(closeEnough, 0, 0, 1, 0);
         line(closeEnough, 1, 0.0000001f, 0, 0);
-        osci::PreparedDrawing tolerance(std::move(closeEnough));
+        motion::PreparedDrawing tolerance(std::move(closeEnough));
         expect(!dark(tolerance.sample(.5, .01)));
         std::vector<std::unique_ptr<osci::Shape>> depth;
         depth.push_back(std::make_unique<osci::Line>(osci::Point(0, 0, 0), osci::Point(1, 0, 0)));
         depth.push_back(std::make_unique<osci::Line>(osci::Point(1, 0, 2), osci::Point(2, 0, 2)));
-        osci::PreparedDrawing depthGap(std::move(depth));
+        motion::PreparedDrawing depthGap(std::move(depth));
         expect(dark(depthGap.sample(.5, .01)), "Depth jumps also blank inherited colour");
 
         beginTest("Invalid and large spans remain bounded and preserve geometry");
@@ -170,7 +170,7 @@ public:
         std::vector<std::unique_ptr<osci::Shape>> unequal;
         line(unequal, 0, 0, 1, 0);
         line(unequal, 10, 0, 12, 0);
-        osci::PreparedDrawing uneven(std::move(unequal));
+        motion::PreparedDrawing uneven(std::move(unequal));
         for (const auto phase : {0.25, 0.375}) {
             expect(!dark(uneven.sample(phase)));
             expect(dark(uneven.sample(phase, .125)));
@@ -233,7 +233,7 @@ public:
         std::vector<std::unique_ptr<osci::Shape>> curvedShapes;
         curvedShapes.push_back(std::make_unique<osci::CubicBezierCurve>(0, 0, 0, 1, 1, 1, 1, 0));
         osci::CubicBezierCurve reference(0, 0, 0, 1, 1, 1, 1, 0);
-        osci::PreparedDrawing curved(std::move(curvedShapes));
+        motion::PreparedDrawing curved(std::move(curvedShapes));
         expectEquals(curved.minimumTraversalSamples(), std::int64_t(4));
         for (std::int64_t index = 1; index <= 4; ++index) {
             const auto expected = reference.nextVector(static_cast<float>(index - 1) / 3.0f);
@@ -247,7 +247,7 @@ public:
         beginTest("Traversal preserves explicit colour and is independent of sample order");
         std::vector<std::unique_ptr<osci::Shape>> colouredShapes;
         colouredShapes.push_back(std::make_unique<ColourLine>());
-        osci::PreparedDrawing coloured(std::move(colouredShapes));
+        motion::PreparedDrawing coloured(std::move(colouredShapes));
         std::array<osci::Point, 19> ordered;
         for (std::int64_t index = 0; index < 19; ++index) { ordered[static_cast<std::size_t>(index)] = coloured.sampleTraversal(index, 19); }
         // Multiplication by seven permutes all indices modulo this prime count.

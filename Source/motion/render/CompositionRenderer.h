@@ -514,7 +514,7 @@ struct PreparedComposition {
             item.liveIdentity = (*asset)->liveIdentity;
             item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : (*asset)->source;
             if (item.source == nullptr) {
-                item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const osci::PreparedDrawing>> {(*asset)->drawing}, 30.0);
+                item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {(*asset)->drawing}, 30.0);
             }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));

@@ -1,10 +1,11 @@
 #pragma once
 
-#include "RecordingParameters.h"
+#include "../visualiser/RecordingParameters.h"
 #include <osci_gui/visualiser/osci_VisualiserParameters.h>
 
-// Product-independent authored output state. Deliberately excludes synth,
-// transport, device routing and processor-owned external modulation state.
+// The Scope's authored output state, saved with a project. Deliberately
+// excludes synth, transport, device routing and processor-owned external
+// modulation state.
 namespace VisualiserState {
 inline void save(juce::XmlElement& project, VisualiserParameters& parameters, RecordingParameters& recording) {
     auto* beam = project.createNewChildElement("beam");

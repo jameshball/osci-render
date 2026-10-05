@@ -1,5 +1,5 @@
 #include <JuceHeader.h>
-#include "../Source/audio/synth/PreparedNoteVoice.h"
+#include "../Source/motion/render/PreparedNoteVoice.h"
 #include "../Source/motion/render/PreparedMidiSchedule.h"
 
 class PreparedNoteVoiceTest : public juce::UnitTest {
@@ -29,7 +29,7 @@ public:
                     params.decayCurve = shape == 1 ? 5 : -9;
                     params.releaseCurve = shape == 1 ? -4 : 14;
                 }
-                const auto prepared = osci_audio::PreparedVoiceEnvelope::prepare(params, rate);
+                const auto prepared = motion::PreparedVoiceEnvelope::prepare(params, rate);
                 expect(prepared.has_value());
                 if (!prepared) { continue; }
                 for (const auto holdSeconds : {0.0, .0005, .003, .012, .02, .04}) {
@@ -59,10 +59,10 @@ public:
 
         beginTest("Pitch phase and velocity are independent of query order and block boundaries");
         DahdsrParams sustained; sustained.sustainLevel = 1; sustained.releaseSeconds = .005;
-        const auto envelope = osci_audio::PreparedVoiceEnvelope::prepare(sustained, 48000);
+        const auto envelope = motion::PreparedVoiceEnvelope::prepare(sustained, 48000);
         expect(envelope.has_value());
         if (!envelope) { return; }
-        const auto voice = osci_audio::PreparedNoteVoice::prepare(*envelope, 440, .25f, 1);
+        const auto voice = motion::PreparedNoteVoice::prepare(*envelope, 440, .25f, 1);
         expect(voice.has_value());
         if (!voice) { return; }
         for (const auto blockSize : {1, 17, 64, 511, 1024}) {
@@ -78,10 +78,10 @@ public:
         expect(!voice->at(4800 + envelope->releaseSamples(), 4800).active());
         const auto retrigger = voice->at(0, 4800);
         expectEquals(retrigger.phase, 0.0);
-        const auto inverted = osci_audio::PreparedNoteVoice::prepare(*envelope, 440, .25f, -1);
+        const auto inverted = motion::PreparedNoteVoice::prepare(*envelope, 440, .25f, -1);
         expect(inverted.has_value());
         if (inverted) { expectEquals(inverted->at(10, 4800).velocityGain, 1.75f); }
-        const auto exactPhase = osci_audio::PreparedNoteVoice::prepare(*envelope, 6000, 1, 1);
+        const auto exactPhase = motion::PreparedNoteVoice::prepare(*envelope, 6000, 1, 1);
         expect(exactPhase.has_value());
         if (exactPhase) {
             const auto late = (std::uint64_t(1) << 63) + 3;
@@ -95,7 +95,7 @@ public:
         longParams.attackSeconds = 30; longParams.releaseSeconds = 30;
         longParams.sustainLevel = .4; longParams.attackCurve = 20; longParams.releaseCurve = -20;
         constexpr double highRate = 768000;
-        const auto longEnvelope = osci_audio::PreparedVoiceEnvelope::prepare(longParams, highRate);
+        const auto longEnvelope = motion::PreparedVoiceEnvelope::prepare(longParams, highRate);
         expect(longEnvelope.has_value());
         if (longEnvelope) {
             DahdsrState live; live.reset(longParams);
@@ -120,7 +120,7 @@ public:
         DahdsrParams scheduledParams;
         scheduledParams.attackSeconds = .03; scheduledParams.decaySeconds = .04;
         scheduledParams.sustainLevel = .7; scheduledParams.releaseSeconds = .025;
-        const auto scheduledEnvelope = osci_audio::PreparedVoiceEnvelope::prepare(scheduledParams, 48000);
+        const auto scheduledEnvelope = motion::PreparedVoiceEnvelope::prepare(scheduledParams, 48000);
         const auto pattern = motion::MidiNotes::create({{1, 0, .25, 60, 127, 1}, {2, .125, .375, 60, 64, 1}});
         motion::Clip scheduledClip;
         scheduledClip.id = 1; scheduledClip.offset = .05; scheduledClip.duration = .3;
@@ -129,7 +129,7 @@ public:
         if (scheduled) {
             for (std::uint32_t index = 0; index < scheduled.schedule->voiceCount(); ++index) {
                 const auto& note = scheduled.schedule->voice(index);
-                const auto noteVoice = osci_audio::PreparedNoteVoice::prepare(*scheduledEnvelope, 440, note.velocity / 127.0f, 1);
+                const auto noteVoice = motion::PreparedNoteVoice::prepare(*scheduledEnvelope, 440, note.velocity / 127.0f, 1);
                 DahdsrState stepped; stepped.reset(scheduledParams);
                 std::vector<float> gains;
                 for (auto sample = note.on; sample < note.end; ++sample) {
@@ -152,17 +152,17 @@ public:
         }
 
         beginTest("Preparation rejects invalid and cancelled settings");
-        expect(!osci_audio::PreparedVoiceEnvelope::prepare(sustained, 0));
-        expect(!osci_audio::PreparedVoiceEnvelope::prepare(sustained, 1000000));
+        expect(!motion::PreparedVoiceEnvelope::prepare(sustained, 0));
+        expect(!motion::PreparedVoiceEnvelope::prepare(sustained, 1000000));
         std::atomic<bool> cancelled {true};
-        expect(!osci_audio::PreparedVoiceEnvelope::prepare(sustained, 48000, &cancelled));
+        expect(!motion::PreparedVoiceEnvelope::prepare(sustained, 48000, &cancelled));
         auto bad = sustained; bad.attackSeconds = 31;
-        expect(!osci_audio::PreparedVoiceEnvelope::prepare(bad, 48000));
+        expect(!motion::PreparedVoiceEnvelope::prepare(bad, 48000));
         bad = sustained; bad.attackCurve = std::numeric_limits<float>::infinity();
-        expect(!osci_audio::PreparedVoiceEnvelope::prepare(bad, 48000));
-        expect(!osci_audio::PreparedNoteVoice::prepare(*envelope, -1, 1, 1));
-        expect(!osci_audio::PreparedNoteVoice::prepare(*envelope, 30000, 1, 1));
-        expect(!osci_audio::PreparedNoteVoice::prepare(*envelope, 440, 2, 1));
+        expect(!motion::PreparedVoiceEnvelope::prepare(bad, 48000));
+        expect(!motion::PreparedNoteVoice::prepare(*envelope, -1, 1, 1));
+        expect(!motion::PreparedNoteVoice::prepare(*envelope, 30000, 1, 1));
+        expect(!motion::PreparedNoteVoice::prepare(*envelope, 440, 2, 1));
     }
 };
 static PreparedNoteVoiceTest preparedNoteVoiceTest;

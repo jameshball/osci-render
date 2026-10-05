@@ -16,7 +16,7 @@ public:
         for (std::size_t i = 1; i < corners.size(); ++i) { lines.push_back(std::make_unique<osci::Line>(corners[i - 1], corners[i])); }
         auto asset = std::make_shared<motion::Asset>();
         asset->id = id;
-        asset->drawing = std::make_shared<osci::PreparedDrawing>(std::move(lines));
+        asset->drawing = std::make_shared<motion::PreparedDrawing>(std::move(lines));
         return asset;
     }
     static std::shared_ptr<motion::Asset> square(motion::Id id, float half) {
@@ -31,7 +31,7 @@ public:
         }
         auto asset = std::make_shared<motion::Asset>();
         asset->id = id;
-        asset->drawing = std::make_shared<osci::PreparedDrawing>(std::move(lines));
+        asset->drawing = std::make_shared<motion::PreparedDrawing>(std::move(lines));
         return asset;
     }
     struct Layer { std::shared_ptr<motion::Asset> asset; double x = 0, y = 0, weight = 1; };

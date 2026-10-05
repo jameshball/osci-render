@@ -10,7 +10,7 @@
 #include "render/LiveMidiAudition.h"
 #include "render/MidiRecording.h"
 #include "render/MidiRecordingSession.h"
-#include "../audio/PreparedState.h"
+#include "render/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
 #include "ScopeBeam.h"
@@ -120,7 +120,7 @@ private:
     std::uint64_t liveMidiSample = 0;
     juce::int64 oscillatorSample = 0;
     std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
-    osci::PreparedState<motion::PreparedComposition> composition;
+    motion::PreparedState<motion::PreparedComposition> composition;
     motion::LiveSourceExchange liveSources;
     std::unique_ptr<motion::LiveBlenderController> blender;
     std::uint64_t previousLiveRevision = 0;

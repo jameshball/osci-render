@@ -47,7 +47,7 @@ private:
     // Keyed by the prepared data itself, so a replaced source re-traces.
     struct Thumbnail {
         std::shared_ptr<const motion::PreparedSource> source;
-        std::shared_ptr<const osci::PreparedDrawing> drawing;
+        std::shared_ptr<const motion::PreparedDrawing> drawing;
         juce::Path path;
     };
     mutable std::vector<Thumbnail> thumbnails;

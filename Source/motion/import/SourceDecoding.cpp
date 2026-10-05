@@ -7,7 +7,7 @@
 #include "../live/BlenderCaptureArchive.h"
 #include "../model/Cancellation.h"
 #include "../model/Drawing.h"
-#include "../../parser/fractal/FractalPreparation.h"
+#include "FractalPreparation.h"
 #include <cstring>
 #include <new>
 #if OSCI_PREMIUM
@@ -52,7 +52,7 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
         || !std::isfinite(frameCount / frameRate)) {
         return juce::Result::fail("Animation must contain 1-3600 frames with a frame rate between 0 and 1000 fps.");
     }
-    std::vector<std::shared_ptr<const osci::PreparedDrawing>> frames;
+    std::vector<std::shared_ptr<const motion::PreparedDrawing>> frames;
     frames.reserve(static_cast<std::size_t>(frameCount));
     std::size_t totalShapes = 0;
     bool hasGeometry = false;
@@ -73,7 +73,7 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
         if (shapes.size() > maximumShapesPerFrame || totalShapes > maximumSourceShapes) {
             return juce::Result::fail("Animation exceeds the geometry budget (100000 shapes per frame or 1000000 total). Simplify or shorten the source.");
         }
-        auto drawing = std::make_shared<osci::PreparedDrawing>(std::move(shapes));
+        auto drawing = std::make_shared<motion::PreparedDrawing>(std::move(shapes));
         hasGeometry = hasGeometry || !drawing->empty();
         frames.push_back(std::move(drawing));
         if (progress != nullptr) {
@@ -408,7 +408,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (extension == ".blender-capture") {
         auto capture = BlenderCaptureArchive::decode({static_cast<const std::uint8_t*>(asset.data.getData()), asset.data.getSize()}, cancel);
         if (!capture) { return juce::Result::fail(capture.error); }
-        std::vector<std::shared_ptr<const osci::PreparedDrawing>> drawings;
+        std::vector<std::shared_ptr<const motion::PreparedDrawing>> drawings;
         drawings.reserve(capture.frames.size());
         for (const auto& frame : capture.frames) {
             if (cancelled(cancel)) { return juce::Result::fail("Capture preparation cancelled."); }
@@ -417,7 +417,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             for (const auto& segment : frame->segments) {
                 lines.push_back(std::make_unique<osci::Line>(osci::Point(segment.x1, segment.y1, 0), osci::Point(segment.x2, segment.y2, 0)));
             }
-            drawings.push_back(std::make_shared<const osci::PreparedDrawing>(std::move(lines)));
+            drawings.push_back(std::make_shared<const motion::PreparedDrawing>(std::move(lines)));
             if (progress != nullptr) { progress->store(static_cast<double>(drawings.size()) / capture.frames.size()); }
         }
         asset.source = std::make_shared<const PreparedSource>(std::move(drawings), std::move(capture.timing));
@@ -586,7 +586,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     ImportShapes shapes;
     const auto content = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
     if (extension == ".lsystem") {
-        const auto prepared = osci::fractal::prepare(content, asset.fractalDepth, cancel);
+        const auto prepared = motion::fractal::prepare(content, asset.fractalDepth, cancel);
         if (!prepared) { return juce::Result::fail(prepared.error); }
         shapes.reserve(prepared.segments.size());
         for (const auto& segment : prepared.segments) {

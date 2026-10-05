@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../audio/synth/PreparedDrawing.h"
+#include "../render/PreparedDrawing.h"
 #include "PreparedPointFrames.h"
 #include "FrameTiming.h"
 #include <memory>
@@ -12,7 +12,7 @@ namespace motion {
 // the render thread; sampling only reads shared drawings and fixed frame data.
 class PreparedSource {
 public:
-    PreparedSource(std::vector<std::shared_ptr<const osci::PreparedDrawing>> frames, double framesPerSecond)
+    PreparedSource(std::vector<std::shared_ptr<const motion::PreparedDrawing>> frames, double framesPerSecond)
         : frames(std::move(frames)), framesPerSecond(framesPerSecond) {}
 
     explicit PreparedSource(std::shared_ptr<const PreparedPointFrames> points)
@@ -25,7 +25,7 @@ public:
         }
     }
 
-    PreparedSource(std::vector<std::shared_ptr<const osci::PreparedDrawing>> frameDrawings, std::shared_ptr<const FrameTiming> frameTiming)
+    PreparedSource(std::vector<std::shared_ptr<const motion::PreparedDrawing>> frameDrawings, std::shared_ptr<const FrameTiming> frameTiming)
         : frames(std::move(frameDrawings)), framesPerSecond(frameTiming != nullptr ? frameTiming->averageFrameRate() : 0), timing(std::move(frameTiming)) {
         if (frames.empty() || timing == nullptr || frames.size() != timing->frameCount()) {
             throw std::invalid_argument("Prepared drawing frames and timing must have matching frame counts.");
@@ -64,9 +64,9 @@ public:
         return index >= static_cast<double>(frames.size()) ? frames.size() - 1 : static_cast<std::size_t>(index);
     }
 
-    std::shared_ptr<const osci::PreparedDrawing> firstFrame() const { return frames.empty() ? nullptr : frames.front(); }
+    std::shared_ptr<const motion::PreparedDrawing> firstFrame() const { return frames.empty() ? nullptr : frames.front(); }
     // Vector frame for exact traversal; null for point-frame sources.
-    const osci::PreparedDrawing* drawingAt(std::size_t frame) const { return frame < frames.size() ? frames[frame].get() : nullptr; }
+    const motion::PreparedDrawing* drawingAt(std::size_t frame) const { return frame < frames.size() ? frames[frame].get() : nullptr; }
 
     // Samples one latched frame. phaseSpan blanks drawing discontinuities and
     // point-source travel exactly as sample() does, without frame guards.
@@ -108,7 +108,7 @@ private:
         const auto end = timing != nullptr ? timing->frameEnd(index) : static_cast<double>(index + 1) / framesPerSecond;
         return wrapped - span <= start || wrapped + span >= end;
     }
-    const std::vector<std::shared_ptr<const osci::PreparedDrawing>> frames;
+    const std::vector<std::shared_ptr<const motion::PreparedDrawing>> frames;
     const double framesPerSecond;
     const std::shared_ptr<const PreparedPointFrames> points;
     const std::shared_ptr<const FrameTiming> timing;

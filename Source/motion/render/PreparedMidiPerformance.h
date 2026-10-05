@@ -41,7 +41,7 @@ public:
             const auto pitch = schedule.schedule->voice(index).pitch;
             if (result->pitches[static_cast<std::size_t>(pitch)]) { continue; }
             const auto frequency = 440 * std::exp2((pitch - 69) / 12.0);
-            auto voice = osci_audio::PreparedNoteVoice::prepare(*envelope, frequency, 1, 1);
+            auto voice = motion::PreparedNoteVoice::prepare(*envelope, frequency, 1, 1);
             if (!voice) { return {nullptr, "A MIDI pitch exceeds the output sample rate's Nyquist limit."}; }
             result->pitches[static_cast<std::size_t>(pitch)] = std::move(voice);
         }
@@ -106,11 +106,11 @@ private:
     }
     std::array<BendTable, 16> bends;
     std::array<std::vector<Step>, 16> expression;
-    PreparedMidiPerformance(osci_audio::PreparedVoiceEnvelope envelope, std::shared_ptr<const PreparedMidiSchedule> schedule, double sampleRate)
+    PreparedMidiPerformance(motion::PreparedVoiceEnvelope envelope, std::shared_ptr<const PreparedMidiSchedule> schedule, double sampleRate)
         : envelope(std::move(envelope)), schedule(std::move(schedule)), sampleRate(sampleRate) {}
-    osci_audio::PreparedVoiceEnvelope envelope;
+    motion::PreparedVoiceEnvelope envelope;
     std::shared_ptr<const PreparedMidiSchedule> schedule;
-    std::array<std::optional<osci_audio::PreparedNoteVoice>, 128> pitches;
+    std::array<std::optional<motion::PreparedNoteVoice>, 128> pitches;
     double sampleRate;
 };
 }
