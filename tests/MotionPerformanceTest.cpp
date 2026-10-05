@@ -3,6 +3,9 @@
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/render/BeamRenderer.h"
+#if JUCE_MAC
+#include <malloc/malloc.h>
+#endif
 
 // Timings for Motion's heavy paths on synthetic stress projects. Opt-in, as
 // timings mean little in Debug or under a sanitizer: set MOTION_BENCHMARK=1
@@ -23,7 +26,7 @@ public:
         beginTest("Nested compositions");
         benchmarkProject("nested", nestedProject());
         beginTest("MIDI chords");
-        benchmarkRender("midi", midiProject());
+        benchmarkProject("midi", midiProject());
         beginTest("Imports");
         benchmarkImports();
     }
@@ -37,6 +40,16 @@ private:
         const auto start = juce::Time::getMillisecondCounterHiRes();
         for (int index = 0; index < repeats; ++index) { function(); }
         return (juce::Time::getMillisecondCounterHiRes() - start) / repeats;
+    }
+    // Heap in use, where the platform reports it.
+    static double heapMebibytes() {
+       #if JUCE_MAC
+        malloc_statistics_t statistics;
+        malloc_zone_statistics(nullptr, &statistics);
+        return static_cast<double>(statistics.size_in_use) / (1024 * 1024);
+       #else
+        return 0;
+       #endif
     }
     void report(const juce::String& scenario, double value, const juce::String& unit) {
         logMessage(scenario.paddedRight(' ', 44) + juce::String(value, 2).paddedLeft(' ', 10) + " " + unit);
@@ -169,6 +182,17 @@ private:
     }
 
     void benchmarkProject(const juce::String& name, const motion::Project& project) {
+        {
+            const auto before = heapMebibytes();
+            const motion::PreparedComposition signal(project, sampleRate);
+            const auto prepared = heapMebibytes();
+            const motion::PreparedComposition geometry(project, sampleRate, nullptr, motion::CompositionPurpose::editorGeometry);
+            report(name + ": memory, prepared for signal", prepared - before, "MiB");
+            report(name + ": memory, prepared for the editor", heapMebibytes() - prepared, "MiB");
+            const auto copied = heapMebibytes();
+            const auto snapshot = project;
+            report(name + ": memory, one project snapshot", heapMebibytes() - copied, "MiB");
+        }
         report(name + ": prepare for signal", milliseconds([&] { const motion::PreparedComposition prepared(project, sampleRate); }, 3), "ms");
         report(name + ": prepare editor geometry", milliseconds([&] { const motion::PreparedComposition prepared(project, sampleRate, nullptr, motion::CompositionPurpose::editorGeometry); }, 3), "ms");
         juce::UndoManager undo;
