@@ -674,6 +674,8 @@
               file="Source/motion/ui/NotesEditor.h"/>
         <FILE id="MotuiPlayheadStriph" name="PlayheadStrip.h" compile="0" resource="0"
               file="Source/motion/ui/PlayheadStrip.h"/>
+        <FILE id="MotuiPreviewGestureh" name="PreviewGesture.h" compile="0"
+              resource="0" file="Source/motion/ui/PreviewGesture.h"/>
         <FILE id="MotuiPropertyInspectorcpp" name="PropertyInspector.cpp" compile="1"
               resource="0" file="Source/motion/ui/PropertyInspector.cpp"/>
         <FILE id="MotuiPropertyInspectorh" name="PropertyInspector.h" compile="0"

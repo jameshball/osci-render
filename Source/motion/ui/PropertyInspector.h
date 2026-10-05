@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionIcons.h"
+#include "PreviewGesture.h"
 #include "Chip.h"
 
 #include "../MotionProcessor.h"
@@ -97,11 +98,6 @@ private:
         void resized() override;
         int captionRight = 0;
     };
-    struct Gesture {
-        motion::Project before;
-        std::uint64_t revision;
-        motion::Id target;
-    };
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;
@@ -158,7 +154,8 @@ private:
     std::vector<motion::PropertySpec> specList;
     motion::Id target = 0;
     juce::String layoutSignature = "none", namePrefix;
-    std::optional<Gesture> gesture;
+    motion::ui::PreviewGesture gesture {processor.document};
+    motion::Id gestureTarget = 0;
     double gestureTime = 0;
-    bool changed = false, empty = true, showsHeader = true, motionModes = false;
+    bool empty = true, showsHeader = true, motionModes = false;
 };

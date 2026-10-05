@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "PreviewGesture.h"
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
@@ -101,7 +102,7 @@ public:
             field.editor.setComponentID("motion.scope." + juce::String(spec.id.data(), spec.id.size()));
             field.editor.setTooltip(index == 0 ? "How long the beam stays dark at both ends of every jump"
                 : index == 1 ? "Dark move time per unit of screen distance" : "Wait after each jump before drawing, for slow scopes and galvos");
-            field.editor.onBegin = [this] { beginGesture(); };
+            field.editor.onBegin = [this] { gesture.begin(); };
             field.editor.onChange = [this, index](double value) { previewValue(index, value); };
             field.editor.onEnd = [this] { endGesture(); };
             field.editor.onCancel = [this] { refresh(); };
@@ -128,7 +129,7 @@ public:
     static constexpr int preferredHeight() { return sectionGap + motion::scope::headingHeight + 2 * rowHeight + rowGap + sectionGap + motion::scope::headingHeight + 3 * rowHeight + 2 * rowGap; }
 
     void refresh() {
-        if (gesture.has_value() && processor.document.revision() != gesture->revision) { gesture.reset(); }
+        if (gesture.stale()) { gesture.reset(); }
         const auto& scope = processor.document.project().scope;
         fields[0].editor.setValue(scope.dwellMicros);
         fields[1].editor.setValue(scope.travelMicrosPerUnit);
@@ -181,11 +182,6 @@ private:
         juce::Label caption;
         MotionScrubField editor;
     };
-    struct Gesture {
-        motion::Project before;
-        std::uint64_t revision;
-    };
-
     void caption(juce::Label& label, const juce::String& text) {
         label.setText(text, juce::dontSendNotification);
         label.setFont(motion::style::caption());
@@ -206,24 +202,11 @@ private:
             scope.settleMicros = clamped;
         }
     }
-    void beginGesture() {
-        gesture = Gesture{processor.document.project(), processor.document.revision()};
-        changed = false;
-    }
     void previewValue(std::size_t index, double value) {
-        if (!gesture.has_value()) { return; }
-        auto updated = gesture->before;
-        apply(updated.scope, index, value);
-        processor.document.preview(std::move(updated));
-        gesture->revision = processor.document.revision();
-        changed = true;
+        gesture.preview([index, value](motion::Project& project) { apply(project.scope, index, value); });
     }
     void endGesture() {
-        if (gesture.has_value() && changed && processor.document.revision() == gesture->revision) {
-            processor.document.commit("Change scope timing", std::move(gesture->before));
-        }
-        gesture.reset();
-        changed = false;
+        gesture.commit("Change scope timing");
         refresh();
     }
     void commitValue(std::size_t index, double value) {
@@ -259,6 +242,6 @@ private:
     juce::ToggleButton upsample;
     std::array<Field, 3> fields;
     motion::scope::MenuLink presets {"Presets"};
-    std::optional<Gesture> gesture;
-    bool changed = false, updating = false;
+    motion::ui::PreviewGesture gesture {processor.document};
+    bool updating = false;
 };

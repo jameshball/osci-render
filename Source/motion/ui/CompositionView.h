@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "PreviewGesture.h"
 
 #include "../MotionProcessor.h"
 #include "EditorCamera.h"
@@ -147,7 +148,7 @@ private:
     motion::LineBatch lines, highlightedLines;
     std::optional<motion::Id> dropHover;
     bool effectDrag = false;
-    std::optional<motion::Project> before;
+    motion::ui::PreviewGesture edit {processor.document};
     juce::Point<float> down;
     motion::editor::Camera camera, cameraAtDown;
     struct Pose {
@@ -187,8 +188,6 @@ private:
     juce::String dragHint;
     bool navigating = false, navigationDrag = false, panDrag = false;
     double lastTick = 0;
-    bool changed = false;
     motion::Id editSelection = 0;
     double editTime = 0;
-    std::uint64_t editRevision = 0;
 };

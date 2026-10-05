@@ -441,14 +441,15 @@ void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {
 void MotionEffectStack::beginGesture(motion::Id id, const std::string& property) {
     cancelGesture();
     cancelledGesture = false;
-    gesture = Gesture {processor.document.project(), processor.document.revision(), id, property, frameTime()};
+    gesture.begin();
+    gestureTime = frameTime();
     if (onPropertySelected) { onPropertySelected(id, property); }
 }
 
 void MotionEffectStack::setValue(motion::Id id, const std::string& property, double value) {
     if (cancelledGesture) { return; }
-    if (gesture.has_value() && gesture->revision != processor.document.revision()) { gesture.reset(); cancelledGesture = true; return; }
-    const auto time = gesture.has_value() ? gesture->time : frameTime();
+    if (gesture.stale()) { gesture.reset(); cancelledGesture = true; return; }
+    const auto time = gesture.active() ? gestureTime : frameTime();
     const auto target = motion::findPropertyTarget(processor.document.project(), id);
     const auto* curve = target.has_value() ? target->curve(property) : nullptr;
     if (curve == nullptr) { return; }
@@ -459,21 +460,16 @@ void MotionEffectStack::setValue(motion::Id id, const std::string& property, dou
     for (const auto& parameter : definition->parameters) {
         if (parameter.id == property) { value = std::clamp(value, parameter.min, parameter.max); }
     }
-    if (!gesture.has_value() && value == curve->evaluateBase(local)) { return; }
+    if (!gesture.active() && value == curve->evaluateBase(local)) { return; }
     const auto operation = [id, property, value, local](motion::Project& project) {
         auto* changed = motion::findPropertyCurve(project, id, property);
         if (changed == nullptr) { return; }
         if (changed->animated()) { changed->setKeyValue(local, value); } else { changed->base = value; }
     };
-    if (gesture.has_value()) {
-        auto project = gesture->before;
-        operation(project);
-        const auto previous = motion::findPropertyTarget(gesture->before, id);
+    if (gesture.active()) {
+        const auto previous = motion::findPropertyTarget(gesture.start(), id);
         const auto* original = previous.has_value() ? previous->curve(property) : nullptr;
-        gesture->changed = original != nullptr && original->evaluateBase(local) != value;
-        if (!gesture->changed) { project = gesture->before; }
-        processor.document.preview(std::move(project));
-        gesture->revision = processor.document.revision();
+        gesture.preview(operation, original != nullptr && original->evaluateBase(local) != value);
     } else {
         processor.document.editCoalesced("Change effect parameter", "effect:" + juce::String(id) + ":" + juce::String(property), operation);
     }
@@ -481,16 +477,11 @@ void MotionEffectStack::setValue(motion::Id id, const std::string& property, dou
 
 void MotionEffectStack::finishGesture() {
     cancelledGesture = false;
-    if (!gesture.has_value()) { return; }
-    auto done = std::move(*gesture);
-    gesture.reset();
-    if (done.changed && done.revision == processor.document.revision()) { processor.document.commit("Change effect parameter", std::move(done.before)); }
+    gesture.commit("Change effect parameter");
 }
 
 void MotionEffectStack::cancelGesture() {
-    if (!gesture.has_value()) { return; }
+    if (!gesture.active()) { return; }
     cancelledGesture = true;
-    auto done = std::move(*gesture);
-    gesture.reset();
-    if (done.changed && done.revision == processor.document.revision()) { processor.document.preview(std::move(done.before)); }
+    gesture.cancel();
 }

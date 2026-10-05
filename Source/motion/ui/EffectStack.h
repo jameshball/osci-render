@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "PreviewGesture.h"
 #include "DocumentMenu.h"
 #include "MotionIcons.h"
 #include "ScrubField.h"
@@ -54,7 +55,6 @@ public:
 
 private:
     static constexpr int headingHeight = 20, chipHeight = 22, dropZoneHeight = 36;
-    struct Gesture { motion::Project before; std::uint64_t revision; motion::Id effect; std::string property; double time; bool changed = false; };
 
     // One effect: header (on/off, name, close) and a row per parameter.
     class Card final : public juce::Component {
@@ -105,7 +105,8 @@ private:
     std::vector<std::unique_ptr<Card>> cards;
     std::vector<std::pair<juce::String, motion::Id>> listedStages;
     std::vector<std::unique_ptr<juce::TextButton>> stages;
-    std::optional<Gesture> gesture;
+    motion::ui::PreviewGesture gesture {processor.document};
+    double gestureTime = 0;
     std::vector<float> cardShift;
     int dragged = -1, gapIndex = -1, gapHeight = 0;
     juce::TimedCallback cardAnimation {[this] { stepCards(); }};

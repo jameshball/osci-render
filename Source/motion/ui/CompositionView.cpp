@@ -225,7 +225,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     highlightedLines.stroke(g, 1.4f);
     paintCameras(g, time);
     paintMotionPath(g);
-    currentGizmo().paint(g, before.has_value() ? dragAxis : hoverHandle);
+    currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle);
 }
 
 void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
@@ -407,7 +407,7 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
         if (!factor.has_value()) { return; }
         scaleFactor = *factor;
     }
-    auto project = *before;
+    auto project = edit.start();
     const auto target = motion::findPropertyTarget(project, editSelection);
     if (!target.has_value()) { return; }
     bool anyChange = false;
@@ -448,23 +448,16 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
             if (animated && curve != nullptr) { curve->setKeyValue(localTime, curve->evaluateBase(localTime)); }
         }
     }
-    changed = anyChange;
-    processor.document.preview(std::move(project));
-    editRevision = processor.document.revision();
-    if (pathKey.has_value()) { pathKey->revision = editRevision; }
+    edit.show(std::move(project), anyChange);
+    if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
 }
 
 void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
     navigationDrag = false;
     if (validGesture()) {
-        if (changed) {
-            processor.document.commit(tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object", std::move(*before));
-            // The Graph shows the channel the drag changed.
-            if (onPropertyEdited && !editedProperty.empty()) { onPropertyEdited(editSelection, editedProperty); }
-        } else if (dragStarted) {
-            processor.document.preview(std::move(*before));
-        }
-        before.reset();
+        const auto label = tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object";
+        // The Graph shows the channel the drag changed.
+        if (edit.commit(label) && onPropertyEdited && !editedProperty.empty()) { onPropertyEdited(editSelection, editedProperty); }
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
     }
 }
@@ -553,7 +546,7 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
 }
 
 void MotionCompositionView::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) {
-    if (navigating || before.has_value()) { return; }
+    if (navigating || edit.active()) { return; }
     const auto pixels = juce::Point<double>(wheel.deltaX, wheel.deltaY) * 256.0;
     if (!wheel.isSmooth || event.mods.isCommandDown() || event.mods.isCtrlDown()) {
         if (wheel.isInertial) { return; }
@@ -570,7 +563,7 @@ void MotionCompositionView::mouseWheelMove(const juce::MouseEvent& event, const 
 }
 
 void MotionCompositionView::mouseMagnify(const juce::MouseEvent&, float scale) {
-    if (navigating || before.has_value() || !(scale > 0)) { return; }
+    if (navigating || edit.active() || !(scale > 0)) { return; }
     camera.dolly(-std::log(static_cast<double>(scale)));
     repaint();
 }
@@ -761,9 +754,7 @@ bool MotionCompositionView::beginGesture(double time) {
     // touched only once the pointer actually drags.
     editTime = time;
     editSelection = selected;
-    before = processor.document.project();
-    editRevision = processor.document.revision();
-    changed = false;
+    edit.begin();
     dragStarted = false;
     return true;
 }
@@ -793,18 +784,15 @@ void MotionCompositionView::releaseCursor() {
 
 void MotionCompositionView::cancelGesture() {
     if (validGesture()) {
-        processor.document.preview(std::move(*before));
-        before.reset();
+        edit.cancel();
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
     }
     navigationDrag = false;
 }
 
 bool MotionCompositionView::validGesture() {
-    if (before.has_value() && editRevision != processor.document.revision()) {
-        before.reset();
-    }
-    return before.has_value();
+    if (edit.stale()) { edit.reset(); }
+    return edit.active();
 }
 
 juce::Rectangle<float> MotionCompositionView::outputFrame() const {

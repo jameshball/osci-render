@@ -76,7 +76,7 @@ void MotionPropertyInspector::setSelectionCount(std::size_t count) {
 void MotionPropertyInspector::refresh() {
     const auto found = motion::findPropertyTarget(processor.document.project(), target);
     const bool editable = found.has_value() && !found->isEffect;
-    if (gesture.has_value() && processor.document.revision() != gesture->revision) { cancelGesture(); }
+    if (gesture.stale()) { cancelGesture(); }
     specList.clear();
     if (editable) {
         const auto base = motion::propertySpecs(*found);
@@ -445,36 +445,24 @@ void MotionPropertyInspector::apply(motion::Project& project, const std::string&
 void MotionPropertyInspector::beginGesture(const std::string& property) {
     const auto found = motion::findPropertyTarget(processor.document.project(), target);
     if (!found.has_value() || found->locked) { return; }
-    gesture = Gesture{processor.document.project(), processor.document.revision(), target};
+    gesture.begin();
+    gestureTarget = target;
     gestureTime = keyTime(*found);
     if (onPropertySelected) { onPropertySelected(target, property); }
 }
 
 void MotionPropertyInspector::previewValue(const std::string& property, double value) {
-    if (!gesture.has_value() || gesture->target != target) { return; }
-    auto updated = gesture->before;
-    apply(updated, property, value, gestureTime);
-    processor.document.preview(std::move(updated));
-    gesture->revision = processor.document.revision();
-    changed = true;
+    if (!gesture.active() || gestureTarget != target) { return; }
+    gesture.preview([&](motion::Project& project) { apply(project, property, value, gestureTime); });
 }
 
 void MotionPropertyInspector::endGesture(const juce::String& name) {
-    if (gesture.has_value() && changed && processor.document.revision() == gesture->revision) {
-        processor.document.commit(name.toStdString(), std::move(gesture->before));
-        if (onKeyTimeEdited) { onKeyTimeEdited(); }
-    }
-    gesture.reset();
-    changed = false;
+    if (gesture.commit(name) && onKeyTimeEdited) { onKeyTimeEdited(); }
     refresh();
 }
 
 void MotionPropertyInspector::cancelGesture() {
-    if (gesture.has_value() && changed && processor.document.revision() == gesture->revision) {
-        processor.document.preview(gesture->before);
-    }
-    gesture.reset();
-    changed = false;
+    gesture.cancel();
 }
 
 MotionColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
@@ -492,14 +480,12 @@ void MotionPropertyInspector::openColourPicker(Row& row) {
     auto picker = std::make_unique<MotionColourPicker>(colourOf(row));
     picker->onBegin = [this] { beginGesture("red"); };
     picker->onChange = [this](MotionColourPicker::Rgb rgb) {
-        if (!gesture.has_value() || gesture->target != target) { return; }
-        auto updated = gesture->before;
-        for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"red", rgb[0]}, {"green", rgb[1]}, {"blue", rgb[2]}}) {
-            apply(updated, property, value, gestureTime);
-        }
-        processor.document.preview(std::move(updated));
-        gesture->revision = processor.document.revision();
-        changed = true;
+        if (!gesture.active() || gestureTarget != target) { return; }
+        gesture.preview([&](motion::Project& project) {
+            for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"red", rgb[0]}, {"green", rgb[1]}, {"blue", rgb[2]}}) {
+                apply(project, property, value, gestureTime);
+            }
+        });
     };
     picker->onEnd = [this] { endGesture("Change colour"); };
     onShowPopover(std::move(picker), *row.swatch);
