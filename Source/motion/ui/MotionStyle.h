@@ -99,28 +99,19 @@ inline const std::array<TrackLabel, 9>& trackLabels() {
 }
 
 // A short eased fade for hover feedback. It runs only while changing.
-class Fade final : private juce::Timer {
+class Fade final {
 public:
-    explicit Fade(juce::Component& owner) : component(owner) {}
+    explicit Fade(juce::Component& owner) : animation(&owner) {
+        animation.setValueChangedCallback([&owner](float) { owner.repaint(); });
+    }
     void setTarget(bool on) {
-        const auto target = on ? 1.0f : 0.0f;
-        if (target != goal) {
-            goal = target;
-            startTimerHz(60);
-        }
+        if (on != animation.getTargetState()) { animation.animateTo(on, 120, juce::Easings::createEaseOut()); }
     }
-    float value() const { return current; }
+    // Buttons call this from buttonStateChanged(): lit while hovered and enabled.
+    void follow(const juce::Button& button) { setTarget(button.isOver() && button.isEnabled()); }
+    float value() const { return animation.getProgress(); }
 private:
-    void timerCallback() override {
-        current += (goal - current) * .3f;
-        if (std::abs(goal - current) < .02f) {
-            current = goal;
-            stopTimer();
-        }
-        component.repaint();
-    }
-    juce::Component& component;
-    float current = 0.0f, goal = 0.0f;
+    osci::ToggleAnimationController animation;
 };
 
 // A borderless chevron for compact previous/next navigation.

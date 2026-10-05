@@ -156,6 +156,7 @@ private:
     class ShapeButton final : public juce::Button {
     public:
         ShapeButton(const juce::String& text, motion::ModulatorKind kind, motion::ModulationWaveform waveform);
+        void buttonStateChanged() override { fade.follow(*this); }
         void paintButton(juce::Graphics& g, bool highlighted, bool down) override;
     private:
         motion::Modulator shape;

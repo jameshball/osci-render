@@ -379,8 +379,7 @@ MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motio
     if (text == "Pitch bend") { shape.controller = motion::MidiControl::pitchBend; }
 }
 
-void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool highlighted, bool down) {
-    fade.setTarget(highlighted);
+void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool, bool down) {
     const auto bounds = getLocalBounds().toFloat();
     const auto on = getToggleState();
     g.setColour(on ? osci::Colours::accentColor().withAlpha(down ? .45f : .35f) : juce::Colours::white.withAlpha(down ? .12f : .04f + .05f * fade.value()));

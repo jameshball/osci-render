@@ -116,8 +116,8 @@ public:
         }
     }
     float iconSize = 18.0f;
-    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
-        fade.setTarget(highlighted && isEnabled());
+    void buttonStateChanged() override { fade.follow(*this); }
+    void paintButton(juce::Graphics& g, bool, bool down) override {
         const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
         const auto on = getToggleState();
         if (on) {
@@ -152,8 +152,8 @@ public:
     }
     // The natural width: icon, gap, text and side padding.
     int idealWidth() const { return juce::roundToInt(leading + iconSize + gap + juce::TextLayout::getStringWidth(motion::style::body(), getButtonText()) + trailing); }
-    void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
-        fade.setTarget(highlighted && isEnabled());
+    void buttonStateChanged() override { fade.follow(*this); }
+    void paintButton(juce::Graphics& g, bool, bool down) override {
         const auto bounds = getLocalBounds().toFloat();
         if (fade.value() > 0.0f || down) {
             g.setColour(osci::Colours::accentColor().withAlpha(down ? .22f : .12f * fade.value()));
