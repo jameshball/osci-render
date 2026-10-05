@@ -267,8 +267,8 @@ void MotionPropertyInspector::Row::resized() {
         key.setBounds(line.removeFromRight(18));
         previous.setBounds(line.removeFromRight(12));
         line.removeFromRight(motion::style::gap);
-        const auto width = std::min(110, (line.getWidth() - motion::style::gap * 2) / 3);
-        auto value = line.withLeft(line.getX() + 2 * (width + motion::style::gap)).withWidth(width);
+        const motion::style::PropertyGrid grid(getWidth());
+        const auto value = line.withLeft(grid.value).withWidth(grid.column);
         fields.front()->editor.setBounds(value);
         modulate.setBounds(juce::Rectangle<int>(20, 18).withCentre({value.getX() - motion::style::gap - 10, line.getCentreY()}));
         captionRight = modulate.getX() - motion::style::gap;

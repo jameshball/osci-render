@@ -6,23 +6,13 @@
 #include "ScrubField.h"
 
 namespace motion::scope {
-// Section headings and one-line rows share the Properties grid: names on the
-// left, values in the last of three columns, beside where keys would be.
+// Section headings and one-line rows match Properties (style::PropertyGrid).
 inline void heading(juce::Label& label, const juce::String& text) {
     label.setText(text, juce::dontSendNotification);
     label.setFont(motion::style::caption());
     label.setColour(juce::Label::textColourId, osci::Colours::text());
     label.setBorderSize({});
 }
-struct Grid {
-    explicit Grid(int width) {
-        const auto line = width - 12 - 18 - 12 - motion::style::gap;
-        column = std::min(110, (line - motion::style::gap * 2) / 3);
-        value = 2 * (column + motion::style::gap);
-        keys = line + motion::style::gap;
-    }
-    int column = 0, value = 0, keys = 0;
-};
 inline constexpr int headingHeight = 18;
 
 // A small text menu in a heading line: muted text and a caret, brighter
@@ -155,7 +145,7 @@ public:
     }
 
     void resized() override {
-        const motion::scope::Grid grid(getWidth());
+        const motion::style::PropertyGrid grid(getWidth());
         auto area = getLocalBounds().withTrimmedTop(sectionGap);
         const auto line = [&](juce::Label& caption) {
             auto row = area.removeFromTop(rowHeight);

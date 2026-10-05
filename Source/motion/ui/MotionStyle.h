@@ -172,6 +172,19 @@ public:
     }
 };
 
+// Properties' one-line rows: names on the left, the value in the last of
+// three columns, then the previous, key and next buttons at the right edge.
+struct PropertyGrid {
+    static constexpr int keyButtons = 12 + 18 + 12;
+    explicit PropertyGrid(int width) {
+        const auto line = width - keyButtons - gap;
+        column = std::min(110, (line - gap * 2) / 3);
+        value = 2 * (column + gap);
+        keys = line + gap;
+    }
+    int column = 0, value = 0, keys = 0;
+};
+
 inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
     g.setColour(osci::Colours::surface());
     g.fillRoundedRectangle(bounds.toFloat(), panelRadius);
