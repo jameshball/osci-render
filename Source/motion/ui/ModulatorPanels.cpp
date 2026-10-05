@@ -342,7 +342,7 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     const auto active = modulator.id == owner.selected;
     const auto hover = fade.value();
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(active ? osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), .1f) : osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover));
+    g.setColour(active ? osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), .1f) : motion::style::cardFill(hover));
     g.fillRoundedRectangle(bounds, motion::style::radius + 1);
     if (active) {
         g.setColour(osci::Colours::accentColor().withAlpha(.7f));
@@ -350,8 +350,7 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     }
     auto area = getLocalBounds().reduced(motion::style::gap + 2, motion::style::gap);
     const auto picture = area.removeFromLeft(44).toFloat();
-    g.setColour(juce::Colours::black.withAlpha(.35f));
-    g.fillRoundedRectangle(picture, motion::style::radius);
+    motion::style::fillWell(g, picture);
     motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 7), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
     area.removeFromLeft(motion::style::padding);
     g.setFont(motion::style::caption());
@@ -482,8 +481,7 @@ void MotionModulatorLibrary::Content::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black.withAlpha(.45f));
     g.drawHorizontalLine(owner.separatorY, static_cast<float>(motion::style::padding), static_cast<float>(getWidth() - motion::style::padding));
     const auto area = owner.previewArea.toFloat();
-    g.setColour(juce::Colours::black.withAlpha(.35f));
-    g.fillRoundedRectangle(area, motion::style::radius);
+    motion::style::fillWell(g, area);
     g.setColour(osci::Colours::outlineSubtle().withAlpha(.4f));
     g.drawHorizontalLine(juce::roundToInt(area.getCentreY()), area.getX() + 4, area.getRight() - 4);
     motion::ui::paintModulatorShape(g, *modulator, area.reduced(8, 6), motion::style::key(), 1.6f);

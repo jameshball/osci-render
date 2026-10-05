@@ -240,8 +240,7 @@ juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
 }
 
 void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const {
-    graphics.setColour(juce::Colours::black.withAlpha(.35f));
-    graphics.fillRoundedRectangle(box.toFloat(), motion::style::radius);
+    motion::style::fillWell(graphics, box.toFloat());
     const auto area = box.toFloat().reduced(4);
     graphics.setColour(motion::style::key().withAlpha(.85f));
     if (definitionRow(row)) {

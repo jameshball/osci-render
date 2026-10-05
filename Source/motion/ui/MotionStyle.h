@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
+#include <array>
 
 // One place for osci-motion's visual language: a restrained dark palette built
 // on the shared osci theme, four type styles and a 4 px spacing grid.
@@ -181,6 +182,20 @@ inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
     g.setColour(osci::Colours::surface());
     g.fillRoundedRectangle(bounds.toFloat(), panelRadius);
 }
+// A panel floating over a page, outlined like the popovers.
+inline void fillFloatingPanel(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour fill) {
+    g.setColour(fill);
+    g.fillRoundedRectangle(bounds, panelRadius + 1);
+    g.setColour(juce::Colours::white.withAlpha(.08f));
+    g.drawRoundedRectangle(bounds.reduced(.5f), panelRadius + 1, 1.0f);
+}
+// The dark well behind a thumbnail or preview.
+inline void fillWell(juce::Graphics& g, juce::Rectangle<float> bounds) {
+    g.setColour(juce::Colours::black.withAlpha(.35f));
+    g.fillRoundedRectangle(bounds, radius);
+}
+// A library card's fill as the pointer fades over it.
+inline juce::Colour cardFill(float hover) { return osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover); }
 // Many diamonds share one path, filled once.
 inline void addDiamond(juce::Path& path, juce::Point<float> centre, float radius) {
     path.startNewSubPath(centre.x, centre.y - radius);
@@ -309,6 +324,34 @@ inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds) {
     g.fillRect(bounds.removeFromTop(1));
     g.setColour(osci::Colours::veryDark());
     g.fillRect(bounds);
+}
+}
+
+// The sections under an object's properties (timing, composition, text
+// animation): a muted heading, then four captioned fields two to a row.
+namespace inspector {
+inline constexpr int headingHeight = 16;
+inline constexpr int row = 28;
+inline void styleCaption(juce::Label& label, const juce::String& text) {
+    label.setText(text, juce::dontSendNotification);
+    label.setFont(caption());
+    label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+}
+inline void styleHeading(juce::Label& label, const juce::String& text) {
+    styleCaption(label, text);
+    label.setBorderSize({0, 2, 0, 0});
+}
+inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields) {
+    for (std::size_t line = 0; line < 2; ++line) {
+        auto bounds = area.removeFromTop(row);
+        const auto half = bounds.getWidth() / 2;
+        for (std::size_t column = 0; column < 2; ++column) {
+            const auto index = line * 2 + column;
+            auto cell = bounds.removeFromLeft(half).withTrimmedRight(column == 0 ? 6 : 0);
+            captions[index].setBounds(cell.removeFromLeft(56));
+            fields[index]->setBounds(cell.reduced(0, 3));
+        }
+    }
 }
 }
 

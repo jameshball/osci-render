@@ -13,10 +13,7 @@ class MotionClipTimingPanel : public juce::Component {
 public:
     explicit MotionClipTimingPanel(MotionProcessor& owner) : processor(owner) {
         setName("Clip timing inspector");
-        title.setText("Timing", juce::dontSendNotification);
-        title.setFont(motion::style::caption());
-        title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        title.setBorderSize({0, 2, 0, 0});
+        motion::style::inspector::styleHeading(title, "Timing");
         addAndMakeVisible(title);
         const std::array<const char*, 4> labels {"Start", "Duration", "Offset", "Speed"};
         const std::array<const char*, 4> names {"Clip start", "Clip duration", "Clip source offset", "Clip speed"};
@@ -27,9 +24,7 @@ public:
             "Playback multiplier. 1 is normal speed; 2 is twice as fast. Clip duration stays unchanged."
         };
         for (std::size_t i = 0; i < values.size(); ++i) {
-            captions[i].setText(labels[i], juce::dontSendNotification);
-            captions[i].setFont(motion::style::caption());
-            captions[i].setColour(juce::Label::textColourId, osci::Colours::textMuted());
+            motion::style::inspector::styleCaption(captions[i], labels[i]);
             addAndMakeVisible(captions[i]);
             auto& value = values[i];
             value.setName(names[i]); value.setTitle(names[i]);
@@ -57,7 +52,7 @@ public:
     }
     std::function<void()> onHeightChanged;
     bool hasClip() const { return findClip() != nullptr; }
-    int preferredHeight() const { return hasClip() ? 16 + 2 * rowHeight + (status.isVisible() ? 30 : 0) + 4 : 0; }
+    int preferredHeight() const { return hasClip() ? motion::style::inspector::headingHeight + 2 * motion::style::inspector::row + (status.isVisible() ? 30 : 0) + 4 : 0; }
     void refresh() {
         if (editGeneration != processor.document.generation() || editRevision != processor.document.revision()) { discardEditors(); }
         const auto* clip = findClip();
@@ -84,19 +79,10 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds();
-        auto heading = area.removeFromTop(16);
+        auto heading = area.removeFromTop(motion::style::inspector::headingHeight);
         details.setBounds(heading.removeFromRight(80));
         title.setBounds(heading);
-        for (std::size_t line = 0; line < 2; ++line) {
-            auto row = area.removeFromTop(rowHeight);
-            const auto half = row.getWidth() / 2;
-            for (std::size_t column = 0; column < 2; ++column) {
-                auto cell = row.removeFromLeft(half).withTrimmedRight(column == 0 ? 6 : 0);
-                const auto i = line * 2 + column;
-                captions[i].setBounds(cell.removeFromLeft(56));
-                values[i].setBounds(cell.reduced(0, 3));
-            }
-        }
+        motion::style::inspector::layoutFields(area, captions, {&values[0], &values[1], &values[2], &values[3]});
         status.setBounds(area.removeFromTop(30));
     }
     // Three decimals, more only when the value needs them (no trailing zeros).
@@ -148,7 +134,6 @@ private:
         error = result.failed() ? result.getErrorMessage() : juce::String();
         refresh();
     }
-    static constexpr int rowHeight = 28;
     MotionProcessor& processor;
     motion::Id selected = 0;
     std::uint64_t editRevision = 0, editGeneration = 0;

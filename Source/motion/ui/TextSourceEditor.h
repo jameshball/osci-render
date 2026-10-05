@@ -148,10 +148,7 @@ public:
         motion::style::sceneEditor::paint(g, getLocalBounds());
         // A floating panel like the popovers, so its fields read as fields.
         const auto bounds = bar.toFloat();
-        g.setColour(osci::Colours::surface());
-        g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
-        g.setColour(juce::Colours::white.withAlpha(.08f));
-        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);
+        motion::style::fillFloatingPanel(g, bounds, osci::Colours::surface());
         g.setColour(juce::Colours::white.withAlpha(.1f));
         for (const auto& separator : separators) { g.fillRect(separator); }
     }

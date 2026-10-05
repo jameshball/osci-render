@@ -14,10 +14,7 @@ class MotionTextAnimationPanel final : public juce::Component {
 public:
     explicit MotionTextAnimationPanel(MotionProcessor& owner) : processor(owner) {
         setName("Text animation inspector");
-        title.setText("Characters", juce::dontSendNotification);
-        title.setFont(motion::style::caption());
-        title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        title.setBorderSize({0, 2, 0, 0});
+        motion::style::inspector::styleHeading(title, "Characters");
         addAndMakeVisible(title);
         const std::array<const char*, 6> chipTips {"Every character shows at once", "Characters appear one by one", "Characters rise into place", "Characters pop in with a small overshoot", "Characters bob in a looping wave", "Characters fly in from all around"};
         for (std::size_t index = 0; index < kinds.size(); ++index) {
@@ -36,9 +33,7 @@ public:
         const std::array<const char*, 4> labels {"Stagger", "Each", "Hold", "Amount"};
         const std::array<const char*, 4> fieldTips {"Seconds between one character starting and the next", "Seconds each character takes to arrive", "Seconds the finished text holds before the source loops", "How far characters travel (1 is one character height)"};
         for (std::size_t index = 0; index < fields.size(); ++index) {
-            captions[index].setText(labels[index], juce::dontSendNotification);
-            captions[index].setFont(motion::style::caption());
-            captions[index].setColour(juce::Label::textColourId, osci::Colours::textMuted());
+            motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
             auto& field = fields[index];
             field.setName(juce::String("Text animation ") + labels[index]);
@@ -64,7 +59,7 @@ public:
     int preferredHeight() const {
         const auto* asset = textAsset();
         if (asset == nullptr) { return 0; }
-        return 16 + 30 + (current().animated() ? 2 * rowHeight : 0) + 10;
+        return motion::style::inspector::headingHeight + 30 + (current().animated() ? 2 * motion::style::inspector::row : 0) + 10;
     }
     void refresh() {
         const auto previous = lastHeight;
@@ -87,7 +82,7 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds();
-        title.setBounds(area.removeFromTop(16));
+        title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
         // Six kinds share one row, edge to edge.
         auto chips = area.removeFromTop(30).withTrimmedTop(3).withTrimmedBottom(3);
         const auto each = (chips.getWidth() - 4 * static_cast<int>(kinds.size() - 1)) / static_cast<int>(kinds.size());
@@ -97,23 +92,14 @@ public:
         }
         const auto* asset = textAsset();
         const auto animated = asset != nullptr && current().animated();
-        // The same two-column rows as the clip's timing.
-        for (std::size_t line = 0; line < 2; ++line) {
-            auto row = animated ? area.removeFromTop(rowHeight) : juce::Rectangle<int>();
-            const auto half = row.getWidth() / 2;
-            for (std::size_t column = 0; column < 2; ++column) {
-                const auto index = line * 2 + column;
-                auto cell = row.removeFromLeft(half).withTrimmedRight(column == 0 ? 6 : 0);
-                captions[index].setVisible(animated);
-                fields[index].setVisible(animated);
-                captions[index].setBounds(cell.removeFromLeft(56));
-                fields[index].setBounds(cell.reduced(0, 3));
-            }
+        for (std::size_t index = 0; index < fields.size(); ++index) {
+            captions[index].setVisible(animated);
+            fields[index].setVisible(animated);
         }
+        if (animated) { motion::style::inspector::layoutFields(area, captions, {&fields[0], &fields[1], &fields[2], &fields[3]}); }
     }
 
 private:
-    static constexpr int rowHeight = 28;
     const motion::Asset* textAsset() const {
         const auto& project = processor.document.project();
         const auto* clip = motion::findClip(project, selected);

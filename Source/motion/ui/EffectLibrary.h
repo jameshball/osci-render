@@ -68,14 +68,13 @@ private:
         void paint(juce::Graphics& g) override {
             const auto hover = fade.value();
             const auto bounds = getLocalBounds().toFloat();
-            g.setColour(osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover));
+            g.setColour(motion::style::cardFill(hover));
             g.fillRoundedRectangle(bounds, motion::style::radius + 1);
             g.setColour(osci::Colours::accentColor().withAlpha(.1f + .35f * hover));
             g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
             auto area = getLocalBounds().reduced(motion::style::gap);
             const auto thumb = area.removeFromLeft(area.getHeight()).toFloat();
-            g.setColour(juce::Colours::black.withAlpha(.35f));
-            g.fillRoundedRectangle(thumb, motion::style::radius);
+            motion::style::fillWell(g, thumb);
             const auto transform = juce::AffineTransform::scale(thumb.getWidth() * .5f, -thumb.getHeight() * .5f).translated(thumb.getCentre());
             g.setColour(tint.withAlpha(.55f + .45f * hover));
             g.strokePath(thumbnail, juce::PathStrokeType(1.0f), transform);

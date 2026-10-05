@@ -13,16 +13,11 @@ class MotionCompositionPanel final : public juce::Component {
 public:
     explicit MotionCompositionPanel(MotionProcessor& owner) : processor(owner) {
         setName("Composition settings");
-        title.setText("Timing", juce::dontSendNotification);
-        title.setFont(motion::style::caption());
-        title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        title.setBorderSize({0, 2, 0, 0});
+        motion::style::inspector::styleHeading(title, "Timing");
         addAndMakeVisible(title);
         const std::array<const char*, 4> labels {"Length", "Frames", "Tempo", "Meter"};
         for (std::size_t index = 0; index < captions.size(); ++index) {
-            captions[index].setText(labels[index], juce::dontSendNotification);
-            captions[index].setFont(motion::style::caption());
-            captions[index].setColour(juce::Label::textColourId, osci::Colours::textMuted());
+            motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
         }
         for (auto [field, name, tip] : {std::tuple {&length, "Composition length", "How long the composition runs, in seconds; it is never shorter than its last clip"},
@@ -64,7 +59,7 @@ public:
         refresh();
         if (onHeightChanged) { onHeightChanged(); }
     }
-    int preferredHeight() const { return shown ? 16 + 2 * rowHeight + 10 : 0; }
+    int preferredHeight() const { return shown ? motion::style::inspector::headingHeight + 2 * motion::style::inspector::row + 10 : 0; }
     void refresh() {
         if (!shown) { return; }
         const auto& project = processor.document.project();
@@ -80,22 +75,11 @@ public:
     }
     void resized() override {
         auto area = getLocalBounds();
-        title.setBounds(area.removeFromTop(16));
-        const std::array<juce::Component*, 4> fields {&length, &frameRate, &tempo, &meter};
-        for (std::size_t line = 0; line < 2; ++line) {
-            auto row = area.removeFromTop(rowHeight);
-            const auto half = row.getWidth() / 2;
-            for (std::size_t column = 0; column < 2; ++column) {
-                const auto index = line * 2 + column;
-                auto cell = row.removeFromLeft(half).withTrimmedRight(column == 0 ? 6 : 0);
-                captions[index].setBounds(cell.removeFromLeft(56));
-                fields[index]->setBounds(cell.reduced(0, 3));
-            }
-        }
+        title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
+        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter});
     }
 
 private:
-    static constexpr int rowHeight = 28;
     void applyLength() {
         const auto value = motion::ui::parseNumber(length.getText(), "s");
         auto& document = processor.document;

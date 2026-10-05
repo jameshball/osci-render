@@ -199,10 +199,7 @@ public:
     }
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(osci::Colours::veryDark().withAlpha(.86f));
-        g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
-        g.setColour(juce::Colours::white.withAlpha(.08f));
-        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);
+        motion::style::fillFloatingPanel(g, bounds, osci::Colours::veryDark().withAlpha(.86f));
         g.setColour(juce::Colours::white.withAlpha(.1f));
         for (const auto y : separators) { g.fillRect(static_cast<float>(inset + 4), static_cast<float>(y), static_cast<float>(cell - 8), 1.0f); }
     }

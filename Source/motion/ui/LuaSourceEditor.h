@@ -74,11 +74,7 @@ public:
 
     void paint(juce::Graphics& g) override {
         motion::style::sceneEditor::paint(g, getLocalBounds());
-        const auto bounds = card.toFloat();
-        g.setColour(osci::Colours::surface());
-        g.fillRoundedRectangle(bounds, motion::style::panelRadius + 1);
-        g.setColour(juce::Colours::white.withAlpha(.08f));
-        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::panelRadius + 1, 1.0f);
+        motion::style::fillFloatingPanel(g, card.toFloat(), osci::Colours::surface());
     }
 
     bool keyPressed(const juce::KeyPress& key) override {
