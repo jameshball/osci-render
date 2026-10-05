@@ -8,9 +8,10 @@
 #if OSCI_PREMIUM
 
 #include "../CommonPluginProcessor.h"
-#include "OfflineVisualiserParameters.h"
 #include "../video/FFmpegEncoderManager.h"
 #include <osci_file_import/osci_file_import.h>
+
+class OfflineVisualiserParameters;
 
 class OfflineAudioToVideoRendererComponent;
 

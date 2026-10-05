@@ -10,7 +10,7 @@
 #include <osci_gui/osci_gui.h>
 #include "components/ProductUpdateConfig.h"
 #if OSCI_PREMIUM
-#include "visualiser/OfflineVisualiserParameters.h"
+class OfflineVisualiserParameters;
 #endif
 
 #if (DEBUG || OSCI_PROFILING) && JUCE_MODULE_AVAILABLE_jucewright

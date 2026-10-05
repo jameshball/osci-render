@@ -1,4 +1,5 @@
 #include "MotionEditor.h"
+#include "../visualiser/OfflineVisualiserParameters.h"
 #include "export/SignalExporter.h"
 #include "export/SoundtrackExporter.h"
 #include "ui/VideoExportSettings.h"

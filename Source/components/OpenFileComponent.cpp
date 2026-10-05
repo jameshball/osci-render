@@ -210,9 +210,9 @@ void OpenFileComponent::openFileChooser()
         auto& files = audioProcessor.getFileController();
         auto results = chooserRef.getResults();
         if (results.isEmpty()) return;
-
+        
         if (onClosed) onClosed();
-
+        
         for (auto& file : results) {
             if (file != juce::File()) {
                 audioProcessor.setLastOpenedDirectory(file.getParentDirectory());

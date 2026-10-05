@@ -576,13 +576,9 @@ void CommonPluginEditor::renderAudioFileToVideo() {
             // Step 2: choose output video file (default: inputName + codec extension)
             const auto encodingConfiguration = safeThis->recordingSettings.createVideoEncodingConfiguration();
             const auto& ext = encodingConfiguration.fileExtension;
-            const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(
-                inputFile.getFileNameWithoutExtension() + "." + ext);
+            const auto suggestedOutput = inputFile.getParentDirectory().getChildFile(inputFile.getFileNameWithoutExtension() + "." + ext);
 
-            safeThis->chooser = std::make_unique<juce::FileChooser>(
-                "Choose an output video file",
-                suggestedOutput,
-                "*." + ext);
+            safeThis->chooser = std::make_unique<juce::FileChooser>("Choose an output video file", suggestedOutput, "*." + ext);
 
             auto saveFlags = juce::FileBrowserComponent::saveMode |
                 juce::FileBrowserComponent::canSelectFiles |
@@ -665,16 +661,8 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
     auto resultHolder = std::make_shared<std::optional<OfflineAudioToVideoRendererComponent::Result>>();
     auto overlayHolder = std::make_shared<juce::Component::SafePointer<OfflineRenderOverlay>>();
 
-    auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(
-        audioProcessor,
-        audioProcessor.visualiserParameters,
-        audioProcessor.threadManager,
-        inputSignal,
-        muxAudio,
-        outputFile,
-        initialRenderMode,
-        encodingConfiguration,
-        std::move(beamSnapshot));
+    auto content = std::make_unique<OfflineAudioToVideoRendererComponent>(audioProcessor, audioProcessor.visualiserParameters, audioProcessor.threadManager, inputSignal, muxAudio,
+        outputFile, initialRenderMode, encodingConfiguration, std::move(beamSnapshot));
 
     content->setSize(700, 520);
 
@@ -720,14 +708,12 @@ bool CommonPluginEditor::startOfflineVideoRender(const juce::File& inputSignal, 
         if (resultHolder != nullptr && resultHolder->has_value()) {
             const auto& r = resultHolder->value();
             if (!r.success && !r.cancelled) {
-                osci::showOverlayMessage(*safeThis.getComponent(),
-                                         "Render Failed",
-                                         r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
+                osci::showOverlayMessage(*safeThis.getComponent(), "Render Failed", r.errorMessage.isNotEmpty() ? r.errorMessage : "An error occurred while rendering.");
             }
         }
     };
 
-    safeThis->showOverlay(std::move(overlay));
+    showOverlay(std::move(overlay));
     offlineRenderLog.event("render UI opened");
     contentPtr->start();
     return true;

@@ -1,5 +1,6 @@
 #include "OfflineAudioToVideoRenderer.h"
 #include "OfflineFrameSchedule.h"
+#include "OfflineVisualiserParameters.h"
 
 #if OSCI_PREMIUM
 
@@ -657,6 +658,7 @@ OfflineAudioToVideoRendererComponent::Result OfflineAudioToVideoRendererComponen
 
     if (shouldCancel()) {
         tempVideoFile.deleteFile();
+        offlineRenderLog.event("render cancelled before finalise");
         result.cancelled = true;
         return result;
     }

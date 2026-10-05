@@ -591,6 +591,8 @@
         <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
         <FILE id="FmtReg1" name="FileFormatRegistry.h" compile="0" resource="0"
               file="Source/parser/FileFormatRegistry.h"/>
+        <FILE id="ImpSvc1" name="ImportServices.h" compile="0" resource="0"
+              file="Source/parser/ImportServices.h"/>
         <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla"/>
         <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
           <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
@@ -641,6 +643,8 @@
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.cpp"/>
         <FILE id="oAVr1b" name="OfflineAudioToVideoRenderer.h" compile="0"
               resource="0" file="Source/visualiser/OfflineAudioToVideoRenderer.h"/>
+        <FILE id="OffVisP1" name="OfflineVisualiserParameters.h" compile="0"
+              resource="0" file="Source/visualiser/OfflineVisualiserParameters.h"/>
         <FILE id="Ju0mVn" name="VisualiserComponent.cpp" compile="1" resource="0"
               file="Source/visualiser/VisualiserComponent.cpp"/>
         <FILE id="oFrmPr0" name="FramePresenter.h" compile="0" resource="0"
@@ -695,6 +699,8 @@
             file="Source/CommonPluginProcessor.cpp"/>
       <FILE id="PGeV6d" name="CommonPluginProcessor.h" compile="0" resource="0"
             file="Source/CommonPluginProcessor.h"/>
+      <FILE id="ProdId1" name="ProductIdentity.h" compile="0" resource="0"
+            file="Source/ProductIdentity.h"/>
       <FILE id="FSlMnC" name="FileController.cpp" compile="1" resource="0"
             file="Source/FileController.cpp"/>
       <FILE id="FSlMnH" name="FileController.h" compile="0" resource="0"
