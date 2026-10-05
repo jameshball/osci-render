@@ -79,7 +79,7 @@ public:
             dragging = true;
             if (onBegin) { onBegin(); }
         }
-        const auto scale = event.mods.isShiftDown() ? .1 : (event.mods.isCommandDown() ? 10.0 : 1.0);
+        const auto scale = stepScale(event.mods);
         accumulated += dx * spec.step * scale;
         const auto next = spec.clamp(round(startValue + accumulated));
         if (next != value) {
@@ -99,7 +99,7 @@ public:
         if (key == juce::KeyPress::returnKey) { beginTyping(); return true; }
         if (key.getKeyCode() == juce::KeyPress::upKey || key.getKeyCode() == juce::KeyPress::downKey) {
             const auto direction = key.getKeyCode() == juce::KeyPress::upKey ? 1.0 : -1.0;
-            const auto scale = key.getModifiers().isShiftDown() ? .1 : (key.getModifiers().isCommandDown() ? 10.0 : 1.0);
+            const auto scale = stepScale(key.getModifiers());
             commit(spec.clamp(round(value + direction * spec.step * scale)));
             return true;
         }
@@ -130,6 +130,8 @@ public:
     }
 
 private:
+    // Dragging and arrow keys alike: Shift for fine steps, Cmd for coarse.
+    static double stepScale(const juce::ModifierKeys& mods) { return mods.isShiftDown() ? .1 : mods.isCommandDown() ? 10.0 : 1.0; }
     void textEditorReturnKeyPressed(juce::TextEditor&) override { finishTyping(true); }
     void textEditorEscapeKeyPressed(juce::TextEditor&) override { finishTyping(false); }
     void textEditorFocusLost(juce::TextEditor&) override { finishTyping(true); }
