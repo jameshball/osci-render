@@ -2,11 +2,37 @@
 
 #include "Timeline.h"
 #include <map>
+#include <memory>
 #include <set>
+#include <type_traits>
+#include <utility>
 
 namespace motion {
 inline constexpr std::size_t maximumCompositionDepth = 32;
 inline constexpr std::size_t maximumExpandedClips = 100000;
+
+// Visits the main composition, then each reusable definition.
+template <typename ProjectType, typename Visit>
+void forEachComposition(const ProjectType& project, Visit&& visit) {
+    visit(project);
+    for (const auto& definition : project.definitions) {
+        if (definition != nullptr) { visit(*definition); }
+    }
+}
+
+// Changes the main composition and each definition `needs` picks. Those
+// definitions are copied first: snapshots elsewhere share them unchanged.
+template <typename ProjectType, typename Needs, typename Change>
+void changeEachComposition(ProjectType& project, Needs&& needs, Change&& change) {
+    using Definition = typename std::remove_cvref_t<decltype(project.definitions)>::value_type::element_type;
+    if (needs(std::as_const(project))) { change(project); }
+    for (auto& definition : project.definitions) {
+        if (definition == nullptr || !needs(std::as_const(*definition))) { continue; }
+        auto copy = std::make_shared<std::remove_const_t<Definition>>(*definition);
+        change(*copy);
+        definition = std::move(copy);
+    }
+}
 
 struct CompositionGraphResult {
     std::string error;
@@ -126,8 +152,7 @@ std::size_t sourceReferenceCount(const ProjectType& project, Id asset) {
             for (const auto& clip : track.clips) { if (clip.asset == asset && asset != 0) { ++count; } }
         }
     };
-    scope(project);
-    for (const auto& definition : project.definitions) { if (definition != nullptr) { scope(*definition); } }
+    forEachComposition(project, scope);
     return count;
 }
 

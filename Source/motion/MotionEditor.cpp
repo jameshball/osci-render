@@ -1117,9 +1117,8 @@ void MotionEditor::refreshFromDocument() {
     if (!scopeLabel.isBeingEdited()) { scopeLabel.setText(processor.document.project().name, juce::dontSendNotification); }
     juce::String parentName = "Main";
     if (!scopeHistory.empty() && scopeHistory.back().scope != 0) {
-        for (const auto& definition : processor.document.mainProject().definitions) {
-            if (definition->id == scopeHistory.back().scope) { parentName = definition->name; }
-        }
+        const auto parent = motion::findDefinition(processor.document.mainProject(), scopeHistory.back().scope);
+        if (parent != nullptr) { parentName = parent->name; }
     }
     scopeBack.setButtonText("Back to " + parentName);
     for (const auto& task : pendingImports) {

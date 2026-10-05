@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/CompositionGraph.h"
 #include "../model/Document.h"
 #include "../model/LuaClipBake.h"
 #include "../model/PropertySchema.h"
@@ -58,8 +59,7 @@ public:
                 }
             }
         };
-        scan(project);
-        for (const auto& definition : project.definitions) { if (definition != nullptr) { scan(*definition); } }
+        forEachComposition(project, scan);
         for (const auto id : clear) { document.setLuaBake(id, nullptr); }
         // Jobs whose clip no longer wants them (deleted, sliders removed)
         // stop, so they do not hold up the single worker.
@@ -146,8 +146,7 @@ private:
                 }
             }
         };
-        scan(project);
-        for (const auto& definition : project.definitions) { if (definition != nullptr) { scan(*definition); } }
+        forEachComposition(project, scan);
         return wanted;
     }
 

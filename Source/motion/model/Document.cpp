@@ -174,8 +174,7 @@ static void carryLuaBakes(Project& next, const Project& current) {
             }
         }
     };
-    collect(current);
-    for (const auto& definition : current.definitions) { collect(*definition); }
+    forEachComposition(current, collect);
     if (installed.empty()) { return; }
     const auto carried = [&](const Clip& clip) -> std::shared_ptr<const LuaClipBake> {
         const auto found = installed.find(clip.id);
@@ -195,13 +194,7 @@ static void carryLuaBakes(Project& next, const Project& current) {
             }
         }
     };
-    carry(next);
-    for (auto& definition : next.definitions) {
-        if (!needsCarry(*definition)) { continue; }
-        auto copy = std::make_shared<CompositionDefinition>(*definition);
-        carry(*copy);
-        definition = std::move(copy);
-    }
+    changeEachComposition(next, needsCarry, carry);
 }
 
 // A loop never reaches past the composition; one that no longer fits is dropped.
@@ -255,8 +248,7 @@ static void carryViewOptions(Project& next, const Project& current, const Projec
 static void carryTrackHeights(Project& next, const Project& current) {
     std::map<Id, int> heights;
     const auto collect = [&](const Composition& composition) { for (const auto& track : composition.tracks) { heights[track.id] = track.height; } };
-    collect(current);
-    for (const auto& definition : current.definitions) { if (definition != nullptr) { collect(*definition); } }
+    forEachComposition(current, collect);
     const auto differs = [&](const Composition& composition) {
         return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
             const auto found = heights.find(track.id);
@@ -269,14 +261,7 @@ static void carryTrackHeights(Project& next, const Project& current) {
             if (found != heights.end()) { track.height = found->second; }
         }
     };
-    if (differs(next)) { carry(next); }
-    for (auto& definition : next.definitions) {
-        // Shared definitions are copied only when a height actually differs.
-        if (definition == nullptr || !differs(*definition)) { continue; }
-        auto copy = std::make_shared<CompositionDefinition>(*definition);
-        carry(*copy);
-        definition = std::move(copy);
-    }
+    changeEachComposition(next, differs, carry);
 }
 
 void Document::apply(Project value) {
@@ -453,16 +438,11 @@ static juce::Result retimed(const Project& state, double initialBpm, std::shared
     // position, like beat-anchored clips. Seconds projects keep seconds.
     if (state.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, after); }
     for (auto& track : next.tracks) {
-        std::sort(track.clips.begin(), track.clips.end(), [&after](const auto& a, const auto& b) { return a.timing(after).start < b.timing(after).start; });
-        double previousEnd = 0;
-        for (const auto& clip : track.clips) {
-            const auto timing = clip.timing(after);
-            if (!clip.valid() || !timing.valid() || timing.start < previousEnd) {
-                return juce::Result::fail("That tempo would overlap clips on " + juce::String(track.name) + ". Move them apart or onto separate tracks first.");
-            }
-            previousEnd = timing.end();
-            next.duration = std::max(next.duration, previousEnd);
+        const auto end = track.sortClips(after);
+        if (!end.has_value()) {
+            return juce::Result::fail("That tempo would overlap clips on " + juce::String(track.name) + ". Move them apart or onto separate tracks first.");
         }
+        next.duration = std::max(next.duration, *end);
     }
     return juce::Result::ok();
 }
@@ -560,8 +540,7 @@ std::size_t Document::assetUses(Id assetId) const {
             for (const auto& clip : track.clips) { if (clip.midiAsset == assetId && assetId != 0) { ++count; } }
         }
     };
-    midi(whole);
-    for (const auto& definition : whole.definitions) { if (definition != nullptr) { midi(*definition); } }
+    forEachComposition(whole, midi);
     return count;
 }
 
@@ -573,34 +552,27 @@ bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     std::map<Id, int> wanted;
     for (const auto& [id, height] : heights) { wanted[id] = height == 0 ? 0 : std::clamp(height, Track::minimumHeight, Track::maximumHeight); }
     std::set<Id> found;
-    const auto update = [&](Composition& composition) {
-        bool changed = false;
-        for (auto& track : composition.tracks) {
+    forEachComposition(state, [&](const Composition& composition) {
+        for (const auto& track : composition.tracks) { if (wanted.contains(track.id)) { found.insert(track.id); } }
+    });
+    const auto differs = [&](const Composition& composition) {
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
             const auto height = wanted.find(track.id);
-            if (height == wanted.end()) { continue; }
-            found.insert(track.id);
-            if (track.height != height->second) {
-                track.height = height->second;
-                changed = true;
-            }
-        }
-        return changed;
+            return height != wanted.end() && track.height != height->second;
+        });
     };
-    auto next = state;
-    bool changed = update(next);
-    for (auto& definition : next.definitions) {
-        if (definition == nullptr) { continue; }
-        const auto owns = std::any_of(definition->tracks.begin(), definition->tracks.end(), [&](const auto& track) { return wanted.contains(track.id); });
-        if (!owns) { continue; }
-        auto copy = std::make_shared<CompositionDefinition>(*definition);
-        if (update(*copy)) {
-            definition = std::move(copy);
-            changed = true;
-        }
-    }
     // View state: no undo step, no revision bump and no change broadcast (it
     // affects neither playback nor any other view); the timeline relayouts
     // itself and the next save writes it.
+    bool changed = false;
+    auto next = state;
+    changeEachComposition(next, differs, [&](Composition& composition) {
+        changed = true;
+        for (auto& track : composition.tracks) {
+            const auto height = wanted.find(track.id);
+            if (height != wanted.end()) { track.height = height->second; }
+        }
+    });
     if (changed) {
         state = std::move(next);
         refreshScope();
@@ -663,13 +635,12 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
                 }
             }
         };
-        clear(project);
-        for (auto& definition : project.definitions) {
-            if (definition == nullptr) { continue; }
-            auto copy = std::make_shared<CompositionDefinition>(*definition);
-            clear(*copy);
-            definition = std::move(copy);
-        }
+        const auto uses = [assetId](const Composition& composition) {
+            return std::any_of(composition.tracks.begin(), composition.tracks.end(), [assetId](const auto& track) {
+                return std::any_of(track.clips.begin(), track.clips.end(), [assetId](const auto& clip) { return clip.asset == assetId; });
+            });
+        };
+        changeEachComposition(project, uses, clear);
     });
     return juce::Result::ok();
 }
@@ -873,14 +844,8 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
             ++found;
         }
         if (removed.empty()) { continue; }
-        if (ripple) {
-            std::sort(track.clips.begin(), track.clips.end(), [&](const auto& a, const auto& b) { return a.timing(candidate.tempo()).start < b.timing(candidate.tempo()).start; });
-            double previousEnd = 0;
-            for (const auto& clip : track.clips) {
-                const auto timing = clip.timing(candidate.tempo());
-                if (!timing.valid() || timing.start < previousEnd) { return juce::Result::fail("Ripple delete requires non-overlapping clip intervals."); }
-                previousEnd = timing.end();
-            }
+        if (ripple && !track.sortClips(candidate.tempo()).has_value()) {
+            return juce::Result::fail("Ripple delete requires non-overlapping clip intervals.");
         }
         std::erase_if(track.clips, [&](const auto& clip) { return requested.contains(clip.id); });
         if (!ripple) { continue; }
@@ -1302,7 +1267,7 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
         const auto tempo = project.tempo();
         for (auto& track : tracks) {
             for (const auto& clip : track.clips) { project.duration = std::max(project.duration, clip.timing(tempo).end()); }
-            std::sort(track.clips.begin(), track.clips.end(), [&tempo](const auto& a, const auto& b) { return a.timing(tempo).start < b.timing(tempo).start; });
+            track.sortClips(tempo);
         }
         project.tracks = std::move(tracks);
     });
@@ -1327,13 +1292,10 @@ juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
                 return juce::Result::ok();
             }
             edit("Change clip timing", [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
-                auto& clips = project.tracks[trackIndex].clips;
+                auto& track = project.tracks[trackIndex];
                 project.duration = std::max(project.duration, changed.timing(project.tempo()).end());
-                clips[clipIndex] = changed;
-                const auto tempo = project.tempo();
-                std::sort(clips.begin(), clips.end(), [&tempo](const auto& a, const auto& b) {
-                    return a.timing(tempo).start < b.timing(tempo).start;
-                });
+                track.clips[clipIndex] = changed;
+                track.sortClips(project.tempo());
             });
             return juce::Result::ok();
         }

@@ -246,6 +246,19 @@ struct Track {
         return true;
     }
 
+    // Puts the clips in start order at `tempo`. Returns where the last ends,
+    // or nothing when a clip is invalid or two overlap.
+    std::optional<double> sortClips(const Tempo& tempo) {
+        std::sort(clips.begin(), clips.end(), [&tempo](const auto& left, const auto& right) { return left.timing(tempo).start < right.timing(tempo).start; });
+        double end = 0;
+        for (const auto& clip : clips) {
+            const auto timing = clip.timing(tempo);
+            if (!clip.valid() || !timing.valid() || timing.start < end) { return std::nullopt; }
+            end = timing.end();
+        }
+        return end;
+    }
+
     const Clip* at(double projectTime, const Tempo& tempo) const {
         // Tempo can change the ordering of mixed beat/seconds clips.
         for (const auto& clip : clips) {
@@ -275,9 +288,7 @@ inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSe
     if (std::adjacent_find(identities.begin(), identities.end()) != identities.end()) {
         return false;
     }
-    std::sort(candidate.clips.begin(), candidate.clips.end(), [&bpm](const auto& left, const auto& right) {
-        return left.timing(bpm).start < right.timing(bpm).start;
-    });
+    candidate.sortClips(bpm);
     double previousEnd = 0;
     ClipTiming original;
     std::size_t selected = candidate.clips.size();
