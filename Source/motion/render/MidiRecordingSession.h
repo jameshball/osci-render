@@ -31,7 +31,6 @@ public:
     }
     bool busy() const { return token != 0 || job != nullptr; }
     bool stopping() const { return stopRequested || job != nullptr; }
-    Id targetId() const { return target; }
     const juce::String& message() const { return status; }
     bool hasError() const { return error; }
 
@@ -116,7 +115,7 @@ public:
             if (result.failed()) { status = result.getErrorMessage(); error = true; return; }
             const auto added = static_cast<int>(completed->result.addedCount);
             status = "Recorded " + juce::String(added) + (added == 1 ? " note." : " notes.");
-            if (completed->result.ignoredControllerCount != 0) { status += " Other controller messages were not applied."; }
+            if (completed->result.unsupportedMessageCount != 0) { status += " Aftertouch, program change and All Sound Off messages were not applied."; }
             return;
         }
         auto take = recorder.collect();

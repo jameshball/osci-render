@@ -72,6 +72,10 @@ struct Clip {
         return resolved;
     }
     double curveBpm(const Tempo& tempo) const { return timeBase == ClipTimeBase::beats ? contentBpm : tempo.initialBpm(); }
+    // A beat of the clip's MIDI in content seconds, and in project seconds on
+    // its resolved timing.
+    double contentSeconds(double beat, const Tempo& tempo) const { return beat * 60 / curveBpm(tempo); }
+    double beatTime(double beat, const Tempo& tempo, const ClipTiming& timing) const { return timing.projectTime(contentSeconds(beat, tempo)); }
     bool setTiming(ClipTiming value, const Tempo& tempo) {
         if (!tempo.valid() || !value.valid()) { return false; }
         auto next = *this;

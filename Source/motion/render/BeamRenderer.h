@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 
 namespace motion {
@@ -149,8 +150,28 @@ private:
     static osci::Point dark(osci::Point point) { point.r = point.g = point.b = 0; return point; }
     static bool lit(const osci::Point& point) { return point.r > 0 || point.g > 0 || point.b > 0; }
 
-    osci::Point output(const PreparedComposition& composition, const Layer& layer, osci::Point raw) const {
-        return composition.projectVisible(layer.clip->processPoint(raw, planTime), planTime).value_or(osci::Point(0, 0, 0, 0, 0, 0));
+    // A clip's point on screen at the plan time; none behind the camera.
+    std::optional<osci::Point> place(const PreparedComposition& composition, const PreparedClip& clip, const osci::Point& raw) const {
+        return composition.projectVisible(clip.processPoint(raw, planTime), planTime);
+    }
+
+    // A clip drawn at `time`: its weight, source frame and the fewest samples
+    // that draw its strokes completely.
+    struct Visible {
+        double weight;
+        const PreparedSource* source;
+        std::size_t frame;
+        std::int64_t minimum;
+    };
+    static std::optional<Visible> visible(const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
+        if (!clip.active(time)) { return std::nullopt; }
+        const auto weight = clip.weight(time);
+        if (!(weight > 0)) { return std::nullopt; }
+        const auto* source = clip.resolveSource(liveFrames);
+        if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
+        const auto frame = source->frameIndex(clip.localTime(time));
+        const auto* drawing = clip.midi == nullptr ? source->drawingAt(frame) : nullptr;
+        return Visible {weight, source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2)};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -158,22 +179,14 @@ private:
         segmentCount = 0; layerCount = 0; lastSegment = 0;
         for (const auto& clip : composition.clips) {
             if (layerCount == maximumLayers) { break; }
-            if (!clip.active(time)) { continue; }
-            const auto weight = clip.weight(time);
-            if (!(weight > 0)) { continue; }
-            const auto* source = clip.resolveSource(liveFrames);
-            if (source == nullptr || source->frameCount() == 0) { continue; }
-            Layer layer{&clip, source, source->frameIndex(clip.localTime(time)), weight, 0, {}, {}, clip.midi != nullptr, 2};
-            const auto* drawing = source->drawingAt(layer.frame);
-            if (drawing != nullptr && !layer.midi) {
-                layer.minimum = std::max<std::int64_t>(2, drawing->minimumTraversalSamples());
-            }
+            const auto shown = visible(clip, time, liveFrames);
+            if (!shown.has_value()) { continue; }
             double voices = 1;
-            if (layer.midi) {
+            if (clip.midi != nullptr) {
                 voices = static_cast<double>(clip.midi->activeCount(time));
                 if (voices == 0) { continue; }
             }
-            measure(composition, layer, voices);
+            measure(composition, {&clip, shown->source, shown->frame, shown->weight, 0, {}, {}, clip.midi != nullptr, shown->minimum}, voices);
         }
         // Armed tracks draw their live voices with the track's clip under the
         // playhead (or its nearest clip while the playhead is between clips).
@@ -193,7 +206,7 @@ private:
                 if (chosen == nullptr) { continue; }
                 const auto* source = chosen->resolveSource(liveFrames);
                 if (source == nullptr || source->frameCount() == 0) { continue; }
-                const auto position = std::clamp(time, chosen->start, std::nextafter(chosen->end, chosen->start));
+                const auto position = chosen->clampToContent(time);
                 Layer layer{chosen, source, source->frameIndex(chosen->localTime(position)), std::max(1.0, chosen->weight(position)), 0, {}, {}, true, 2, &input.performance};
                 measure(composition, layer, voices);
             }
@@ -203,43 +216,39 @@ private:
 
     // Lengths and endpoints from probes; appends the layer.
     void measure(const PreparedComposition& composition, Layer layer, double voices) {
-        auto& items = *layers;
-        const auto* source = layer.source;
-        {
-            // Vector drawings know their exact length; probes only measure how
-            // the clip's transforms, effects and camera scale it on screen. The
-            // ratio of projected to source distance is uniform under affine
-            // transforms, so pen-up jumps measure scale as well as strokes do.
-            // Point frames have no stored length: sum their lit steps directly.
-            const auto* vector = source->drawingAt(layer.frame);
-            const auto probes = vector != nullptr ? lengthProbes : pointLengthProbes;
-            osci::Point previousRaw, previousPoint;
-            double sourceDistance = 0, projectedDistance = 0, litDistance = 0;
-            for (int probe = 0; probe < probes; ++probe) {
-                const auto phase = static_cast<double>(probe) / (probes - 1);
-                const auto raw = source->sampleFrame(layer.frame, phase);
-                const auto point = output(composition, layer, raw);
-                if (probe == 0) {
-                    layer.start = point;
-                } else {
-                    const auto dx = static_cast<double>(raw.x) - previousRaw.x, dy = static_cast<double>(raw.y) - previousRaw.y, dz = static_cast<double>(raw.z) - previousRaw.z;
-                    const auto step = std::sqrt(dx * dx + dy * dy + dz * dz);
-                    const auto projected = distance(previousPoint, point);
-                    if (std::isfinite(step) && std::isfinite(projected)) { sourceDistance += step; projectedDistance += projected; }
-                    if (lit(previousPoint) && lit(point)) { litDistance += projected; }
-                }
-                layer.end = point;
-                previousRaw = raw; previousPoint = point;
-            }
-            if (vector != nullptr) {
-                const auto scale = sourceDistance > 1.0e-9 ? projectedDistance / sourceDistance : 1.0;
-                layer.length = vector->length() * (std::isfinite(scale) ? scale : 1.0);
+        // Vector drawings know their exact length; probes only measure how
+        // the clip's transforms, effects and camera scale it on screen. The
+        // ratio of projected to source distance is uniform under affine
+        // transforms, so pen-up jumps measure scale as well as strokes do.
+        // Point frames have no stored length: sum their lit steps directly.
+        const auto* vector = layer.source->drawingAt(layer.frame);
+        const auto probes = vector != nullptr ? lengthProbes : pointLengthProbes;
+        osci::Point previousRaw, previousPoint;
+        double sourceDistance = 0, projectedDistance = 0, litDistance = 0;
+        for (int probe = 0; probe < probes; ++probe) {
+            const auto phase = static_cast<double>(probe) / (probes - 1);
+            const auto raw = layer.source->sampleFrame(layer.frame, phase);
+            const auto point = place(composition, *layer.clip, raw).value_or(osci::Point(0, 0, 0, 0, 0, 0));
+            if (probe == 0) {
+                layer.start = point;
             } else {
-                layer.length = litDistance;
+                const auto dx = static_cast<double>(raw.x) - previousRaw.x, dy = static_cast<double>(raw.y) - previousRaw.y, dz = static_cast<double>(raw.z) - previousRaw.z;
+                const auto step = std::sqrt(dx * dx + dy * dy + dz * dz);
+                const auto projected = distance(previousPoint, point);
+                if (std::isfinite(step) && std::isfinite(projected)) { sourceDistance += step; projectedDistance += projected; }
+                if (lit(previousPoint) && lit(point)) { litDistance += projected; }
             }
-            layer.length = std::max(minimumLayerLength, layer.length) * voices;
-            items[layerCount++] = layer;
+            layer.end = point;
+            previousRaw = raw; previousPoint = point;
         }
+        if (vector != nullptr) {
+            const auto scale = sourceDistance > 1.0e-9 ? projectedDistance / sourceDistance : 1.0;
+            layer.length = vector->length() * (std::isfinite(scale) ? scale : 1.0);
+        } else {
+            layer.length = litDistance;
+        }
+        layer.length = std::max(minimumLayerLength, layer.length) * voices;
+        (*layers)[layerCount++] = layer;
     }
 
     void finishPlan(const PreparedComposition& composition, std::int64_t first, std::int64_t end, double rate) {
@@ -328,6 +337,8 @@ private:
     // Cycles needed to draw every visible layer's complete strokes once,
     // from minimum traversal budgets plus dwell, settle and a unit of travel
     // per jump, capped at the maximum span. Cheap: no geometry is transformed.
+    // Armed live-input layers are not counted: they share the span the
+    // timeline's own layers need.
     static std::int64_t spanFor(const PreparedComposition& composition, double time, double rate, std::int64_t cycleSamples, const LiveSourceFrames* liveFrames) {
         if (cycleSamples <= 0) { return 1; }
         const auto timing = timingFor(composition.scope, rate);
@@ -336,11 +347,9 @@ private:
         std::size_t counted = 0;
         for (const auto& clip : composition.clips) {
             if (counted == maximumLayers) { break; }
-            if (!clip.active(time) || !(clip.weight(time) > 0)) { continue; }
-            const auto* source = clip.resolveSource(liveFrames);
-            if (source == nullptr || source->frameCount() == 0) { continue; }
-            const auto* drawing = clip.midi == nullptr ? source->drawingAt(source->frameIndex(clip.localTime(time))) : nullptr;
-            demand += static_cast<double>(std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2) + jump);
+            const auto shown = visible(clip, time, liveFrames);
+            if (!shown.has_value()) { continue; }
+            demand += static_cast<double>(shown->minimum + jump);
             ++counted;
         }
         return std::clamp<std::int64_t>(static_cast<std::int64_t>(std::ceil(demand / static_cast<double>(cycleSamples))), 1, maximumSpan);
@@ -352,8 +361,7 @@ private:
         auto& items = *layers;
         reversedFlags.fill(false);
         for (std::size_t placed = 1; placed < layerCount; ++placed) {
-            const auto& last = items[placed - 1];
-            const auto at = last.midi ? last.start : (reversedFlags[placed - 1] ? last.start : last.end);
+            const auto at = exitOf(placed - 1);
             auto best = placed;
             bool bestReversed = false;
             auto bestDistance = std::numeric_limits<double>::infinity();
@@ -480,7 +488,7 @@ private:
                     raw = segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
                 }
                 // Behind the camera there is no position: hold dark at the entry.
-                return composition.projectVisible(segment->clip->processPoint(raw, planTime), planTime).value_or(dark(segment->from));
+                return place(composition, *segment->clip, raw).value_or(dark(segment->from));
             }
             case Kind::live: {
                 if (liveInputs == nullptr) { return dark(segment->from); }
@@ -509,7 +517,7 @@ private:
         if (current.note == 0) { return dark(segment.from); }
         const auto raw = segment.source->sampleFrame(segment.frame, current.phase, current.phaseSpan);
         const bool edge = j == 0 || j == segment.count - 1 || at(j - 1).note != current.note || at(j + 1).note != current.note;
-        const auto projected = composition.projectVisible(segment.clip->processPoint(raw, planTime), planTime);
+        const auto projected = place(composition, *segment.clip, raw);
         if (!projected.has_value()) { return dark(segment.from); }
         return edge ? dark(*projected) : *projected;
     }

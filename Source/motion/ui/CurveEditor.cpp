@@ -979,7 +979,7 @@ double MotionCurveEditor::constrainedValue(const motion::PropertyTarget& target,
     }
     if (!target.isEffect && !target.camera && !target.beam) {
         if (property == "red" || property == "green" || property == "blue") { return std::clamp(value, 0.0, 1.0); }
-        if (property == "weight") { return std::clamp(value, 0.0, 1000000.0); }
+        if (property == "weight") { return std::clamp(value, 0.0, motion::maximumWeight); }
     }
     return target.camera && property == "fov" ? std::clamp(value, 0.001, 179.999) : value;
 }

@@ -24,11 +24,7 @@ public:
         auto result = std::shared_ptr<PreparedMidiPerformance>(new PreparedMidiPerformance(std::move(instrument), schedule.schedule));
         // Controller changes as sample-indexed steps on the clip's own clock.
         const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(tempo);
-        const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
-        const auto sampleAt = [&](double beat) {
-            const auto seconds = timing.projectTime(beat * secondsPerBeat);
-            return std::max(0.0, std::round(seconds * sampleRate));
-        };
+        const auto sampleAt = [&](double beat) { return std::max(0.0, std::round(clip.beatTime(beat, tempo, timing) * sampleRate)); };
         for (const auto& control : notes.controls()) {
             const auto channel = static_cast<std::size_t>(control.channel - 1);
             if (control.number == MidiControl::pitchBend) {

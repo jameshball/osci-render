@@ -23,6 +23,11 @@ inline constexpr double unbounded = 1.0e6;
 // 2 atan(1/4): a 0.5-wide frame fills the view at the default distance of 4.
 inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 
+// Every effective weight (a clip's times its groups') saturates at the
+// property's own maximum, so products stay finite.
+inline constexpr double maximumWeight = unbounded;
+inline double clampWeight(double value) { return std::isfinite(value) ? std::clamp(value, 0.0, maximumWeight) : 0.0; }
+
 // Clips (visual) and groups.
 inline constexpr std::array<PropertySpec, 13> objectPropertySpecs {{
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},

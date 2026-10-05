@@ -21,9 +21,7 @@ public:
         const auto* session = findSession(asset->liveIdentity);
         if (enabled) {
             for (const auto& item : sessions) {
-                const auto state = item.input->status().state;
-                if (item.identity != asset->liveIdentity && item.port == asset->blenderSettings.port
-                    && (state == BlenderReceiver::State::listening || state == BlenderReceiver::State::connected)) {
+                if (item.identity != asset->liveIdentity && item.port == asset->blenderSettings.port && active(item.input->status().state)) {
                     return juce::Result::fail("Another Blender source is using this port. Choose a different port.");
                 }
             }
@@ -42,25 +40,21 @@ public:
         for (const auto& item : sessions) {
             if (item.input->capturing()) { return juce::Result::fail("Finish or cancel the current Blender capture first."); }
         }
-        const auto* asset = liveAsset(id);
-        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
-        if (session == nullptr || !listening(id)) { return juce::Result::fail("Start listening before recording a capture."); }
-        return session->input->beginCapture(asset->blenderSettings.freezeOnDisconnect) ? juce::Result::ok() : juce::Result::fail("A capture is already running.");
+        const auto* session = sessionFor(id);
+        if (session == nullptr || !active(session->input->status().state)) { return juce::Result::fail("Start listening before recording a capture."); }
+        return session->input->beginCapture(liveAsset(id)->blenderSettings.freezeOnDisconnect) ? juce::Result::ok() : juce::Result::fail("A capture is already running.");
     }
     std::unique_ptr<BlenderCapture> finishCapture(Id id) {
-        const auto* asset = liveAsset(id);
-        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        const auto* session = sessionFor(id);
         return session != nullptr ? session->input->finishCapture() : nullptr;
     }
     void cancelCapture(Id id) {
-        const auto* asset = liveAsset(id);
-        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        const auto* session = sessionFor(id);
         if (session != nullptr) { session->input->cancelCapture(); }
     }
     void cancelAllCaptures() { for (const auto& session : sessions) { session.input->cancelCapture(); } }
     bool capturing(Id id) const {
-        const auto* asset = liveAsset(id);
-        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+        const auto* session = sessionFor(id);
         return session != nullptr && session->input->capturing();
     }
     juce::String statusText(Id id) const {
@@ -84,11 +78,8 @@ public:
         return {};
     }
     bool listening(Id id) const {
-        const auto asset = liveAsset(id);
-        const auto* session = asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
-        if (session == nullptr) { return false; }
-        const auto state = session->input->status().state;
-        return state == BlenderReceiver::State::connected || state == BlenderReceiver::State::listening;
+        const auto* session = sessionFor(id);
+        return session != nullptr && active(session->input->status().state);
     }
     void poll() {
         prune();
@@ -132,6 +123,11 @@ private:
         }
         return nullptr;
     }
+    const Session* sessionFor(Id id) const {
+        const auto* asset = liveAsset(id);
+        return asset != nullptr ? findSession(asset->liveIdentity) : nullptr;
+    }
+    static bool active(BlenderReceiver::State state) { return state == BlenderReceiver::State::listening || state == BlenderReceiver::State::connected; }
     void prune() {
         std::erase_if(sessions, [this](const auto& session) {
             return std::none_of(document.mainProject().assets.begin(), document.mainProject().assets.end(), [&](const auto& asset) { return asset->liveIdentity == session.identity; });

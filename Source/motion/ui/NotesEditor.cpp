@@ -265,7 +265,7 @@ void MotionNotesEditor::mouseDown(const juce::MouseEvent& event) {
     const auto* clip = currentClip();
     if (clip == nullptr || clip->midi == nullptr) { return; }
     if (event.y >= 30 && event.y < gridBounds().getY() && event.x >= keyboardWidth) {
-        const auto local = beatAt(event.x) * 60 / clip->curveBpm(processor.document.project().tempo());
+        const auto local = clip->contentSeconds(beatAt(event.x), processor.document.project().tempo());
         const auto timing = clip->timing(processor.document.project().tempo());
         processor.seek(std::clamp(timing.projectTime(local), timing.start, timing.end())); return;
     }

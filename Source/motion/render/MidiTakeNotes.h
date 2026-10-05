@@ -9,11 +9,12 @@
 namespace motion {
 // Off-thread conversion of a take into notes, sustain-held note lengths, and
 // persistent controller changes (pitch bend and continuous controllers). The
-// warning count covers messages with no stored meaning (aftertouch, program).
+// unsupported count covers aftertouch and program changes, and All Sound
+// Off, whose hard cut becomes a normal release.
 struct MidiTakeNotes {
     struct Result {
         std::shared_ptr<const MidiNotes> source;
-        std::size_t addedCount = 0, ignoredControllerCount = 0;
+        std::size_t addedCount = 0, unsupportedMessageCount = 0;
         std::string error;
         explicit operator bool() const { return source != nullptr; }
     };
@@ -33,10 +34,7 @@ struct MidiTakeNotes {
         auto previous = take.firstSample;
         for (const auto& event : take.events) {
             if (cancelled(cancel)) { return {nullptr, 0, 0, "MIDI conversion cancelled."}; }
-            const auto kind = event.bytes[0] & 0xf0;
-            const auto length = kind == 0xc0 || kind == 0xd0 ? 2 : 3;
-            if (event.sample < previous || event.sample >= take.endSample || kind < 0x80 || kind > 0xe0
-                || event.size != length || event.bytes[1] > 127 || (length == 3 && event.bytes[2] > 127)) {
+            if (event.sample < previous || event.sample >= take.endSample || !MidiRecording::validChannelMessage(event.bytes.data(), event.size)) {
                 return {nullptr, 0, 0, "Invalid MIDI event ordering, range or bytes."};
             }
             previous = event.sample;

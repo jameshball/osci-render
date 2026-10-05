@@ -1,6 +1,5 @@
 #include "MotionProcessor.h"
 #include "MotionEditor.h"
-#include "render/SampleClock.h"
 #include "VisualiserState.h"
 
 MotionProcessor::MotionProcessor()
@@ -74,7 +73,7 @@ void MotionProcessor::handleAsyncUpdate() {
     // A failed edit keeps playing the last good snapshot instead of blanking;
     // the editor reports the error. The audio thread only ever sees snapshots
     // that prepared completely.
-    if (result->composition != nullptr && preparationError.isEmpty() && result->composition->preparationError.isEmpty()) {
+    if (result->composition != nullptr && preparationError.isEmpty()) {
         result->composition->publicationRevision = result->revision;
         composition.publish(std::move(result->composition));
     }
@@ -144,20 +143,19 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     const auto unavailableRecording = [&] {
         midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(std::max<juce::int64>(0, audioSample)), static_cast<std::uint32_t>(std::max(0, count)), playing.load(), false);
     };
-    if (count > signal.getNumSamples()) { unavailableRecording(); midi.clear(); liveMidi.reset(); liveInputs.reset(); return; }
+    if (count > signal.getNumSamples()) { unavailableRecording(); midi.clear(); resetLiveMidi(); return; }
     // Shared output gain/clip buffers are allocated during prepareToPlay, but
     // must be populated each block before music monitoring or physical XY output.
     volumeEffect->animateValues(count, nullptr);
     thresholdEffect->animateValues(count, nullptr);
     if (prepared == nullptr || prepared->preparationError.isNotEmpty() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
         unavailableRecording();
-        liveMidi.reset(); liveInputs.reset();
+        resetLiveMidi();
         midi.clear();
         transitionGuard.begin();
         for (int i = 0; i < count; ++i) {
             const auto point = transitionGuard.apply({0, 0, 0, 0, 0, 0});
-            signal.setSample(0, i, point.x); signal.setSample(1, i, point.y); signal.setSample(2, i, point.z);
-            signal.setSample(3, i, 0); signal.setSample(4, i, 0); signal.setSample(5, i, 0);
+            writeSignal(i, point.withColour(0, 0, 0));
         }
         juce::AudioBuffer<float> silent(signal.getArrayOfWritePointers(), 6, count);
         threadManager.write(silent, "VisualiserRenderer");
@@ -172,7 +170,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     if (!durationIndex.has_value() || *durationIndex < 1) {
         unavailableRecording();
         midi.clear();
-        liveMidi.reset(); liveInputs.reset();
+        resetLiveMidi();
         return;
     }
     const auto durationSamples = *durationIndex;
@@ -187,7 +185,7 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto resolvedAudition = audition != nullptr ? auditionId : 0;
     if (resolvedAudition != previousAuditionTarget) {
-        liveMidi.reset(); liveInputs.reset();
+        resetLiveMidi();
         previousAuditionTarget = resolvedAudition;
         transitionGuard.begin();
     }
@@ -216,14 +214,14 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     if (requested >= 0.0 && std::isfinite(requested)) {
         audioSample = motion::sampleIndex(std::min(requested, prepared->duration), sampleRate).value_or(0);
         oscillatorSample = audioSample;
-        liveMidi.reset(); liveInputs.reset();
+        resetLiveMidi();
         transitionGuard.begin();
     }
     const auto recordingStart = midiRecording.transportStart();
     if (recordingStart.has_value()) {
         audioSample = static_cast<juce::int64>(std::min<std::uint64_t>(*recordingStart, static_cast<std::uint64_t>(durationSamples - 1)));
         oscillatorSample = audioSample;
-        liveMidi.reset(); liveInputs.reset();
+        resetLiveMidi();
         playing.store(true);
         recordingOwnsTransport = true;
         transitionGuard.begin();
@@ -277,15 +275,10 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
             buffer.setSample(0, i, static_cast<float>(std::clamp(audio.left * gain, -limit, limit)));
             buffer.setSample(1, i, static_cast<float>(std::clamp(audio.right * gain, -limit, limit)));
         }
-        signal.setSample(0, i, point.x);
-        signal.setSample(1, i, point.y);
-        signal.setSample(2, i, point.z);
-        signal.setSample(3, i, point.r);
-        signal.setSample(4, i, point.g);
-        signal.setSample(5, i, point.b);
+        writeSignal(i, point);
         ++oscillatorSample;
         if (liveMidiSample == std::numeric_limits<std::uint64_t>::max()) {
-            liveMidi.reset(); liveInputs.reset();
+            resetLiveMidi();
             liveMidiSample = 0;
             transitionGuard.begin();
         } else { ++liveMidiSample; }

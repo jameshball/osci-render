@@ -45,8 +45,7 @@ public:
         struct Event { std::int64_t sample; std::uint32_t voice; bool on; };
         std::vector<Event> events;
         events.reserve(notes.notes().size() * 2);
-        const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
-        const auto resolve = [&](double beat) { return timing.projectTime(beat * secondsPerBeat); };
+        const auto resolve = [&](double beat) { return clip.beatTime(beat, tempo, timing); };
         for (const auto& note : notes.notes()) {
             if (cancelled(cancel)) { return {nullptr, "MIDI preparation cancelled."}; }
             const auto on = nearestSample(resolve(note.start), sampleRate), off = nearestSample(resolve(note.end()), sampleRate);

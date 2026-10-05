@@ -3,32 +3,8 @@
 #include "CompositionRenderer.h"
 #include "LiveMidiPerformance.h"
 #include "LiveMidiInputs.h"
-#include <juce_audio_basics/juce_audio_basics.h>
 
 namespace motion {
-// One cursor per block. The buffer must remain unchanged/alive while iterating;
-// offsets advance monotonically and absoluteClock already includes the offset.
-// Null performance consumes input without enabling or retaining live audition.
-class LiveMidiInputCursor {
-public:
-    explicit LiveMidiInputCursor(const juce::MidiBuffer& buffer) : next(buffer.cbegin()), end(buffer.cend()) {}
-    bool dispatch(LiveMidiPerformance* performance, int offset, std::uint64_t absoluteClock, LiveMidiInputs* inputs = nullptr) {
-        bool changed = false;
-        while (next != end && (*next).samplePosition <= offset) {
-            const auto message = *next;
-            if (performance != nullptr) {
-                const auto accepted = performance->handle(message.data, message.numBytes, absoluteClock);
-                changed = changed || accepted;
-            }
-            if (inputs != nullptr) { changed = inputs->handle(message.data, message.numBytes, absoluteClock) || changed; }
-            ++next;
-        }
-        return changed;
-    }
-private:
-    juce::MidiBufferIterator next, end;
-};
-
 inline osci::Point sampleLiveMidiAudition(const PreparedComposition& composition, const PreparedClip& clip, const LiveMidiPerformance& performance, double time, std::uint64_t clock, double rate, bool advancing = false, const LiveSourceFrames* liveFrames = nullptr) {
     if (!std::isfinite(time) || !std::isfinite(rate) || rate <= 0) { return {0, 0, 0, 0, 0, 0}; }
     // Voices share the beam's cycle, as in playback and export.
@@ -40,13 +16,13 @@ inline osci::Point sampleLiveMidiAudition(const PreparedComposition& composition
         : performance.select(clock + 1, phaseAt(clock + 1));
     // A clip can be auditioned outside its timeline interval. Its nearest
     // content position supplies geometry/transforms while note age stays live.
-    const auto position = std::clamp(time, clip.start, std::nextafter(clip.end, clip.start));
+    const auto position = clip.clampToContent(time);
     auto point = composition.projectPoint(clip.sample(position, current.phase, current.phaseSpan, advancing ? 1 / rate : 0, liveFrames), position);
     bool blank = previous.note != current.note || next.note != current.note;
     if (advancing) {
         const auto frame = std::round(time * rate);
-        const auto before = std::clamp((frame - 1) / rate, clip.start, std::nextafter(clip.end, clip.start));
-        const auto after = std::clamp((frame + 1) / rate, clip.start, std::nextafter(clip.end, clip.start));
+        const auto before = clip.clampToContent((frame - 1) / rate);
+        const auto after = clip.clampToContent((frame + 1) / rate);
         blank = blank || composition.activeCamera(before) != composition.activeCamera(position)
             || composition.activeCamera(after) != composition.activeCamera(position);
         const auto* source = clip.resolveSource(liveFrames);

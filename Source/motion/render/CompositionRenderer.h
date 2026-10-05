@@ -134,8 +134,7 @@ struct PreparedGroup {
         spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
     double weight(double time) const {
-        const auto value = curves[12].evaluate(time);
-        return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0.0;
+        return clampWeight(curves[12].evaluate(time));
     }
     const TransformPose& pose(double time) const {
         return poses.at(time, [&] { return TransformPose::at(curves, time, spatial.get()); });
@@ -152,7 +151,7 @@ private:
 // pointers; each clock maps main seconds directly to its authored coordinate.
 struct PreparedClipStage {
     Id id = 0;
-    double start = 0, end = 0, offset = 0, rate = 1;
+    double start = 0, end = 0;
     ClipTiming clock; // main seconds -> content, exact under a tempo map
     std::array<Curve, 13> curves;
     std::vector<PreparedEffect> effects, trackEffects, compositionEffects;
@@ -162,10 +161,11 @@ struct PreparedClipStage {
     TimeCache<TransformPose> poses;
 
     double scopeTime(double time) const { return scopeClock.has_value() ? scopeClock->localTime(time) : time; }
+    // The nearest time inside the clip's own interval.
+    double clampToContent(double time) const { return std::clamp(time, start, std::nextafter(end, start)); }
     double localTime(double time) const { return clock.localTime(time); }
     double localWeight(double time) const {
-        const auto value = curves[12].evaluate(localTime(time));
-        return std::isfinite(value) ? std::clamp(value, 0.0, 1000000.0) : 0;
+        return clampWeight(curves[12].evaluate(localTime(time)));
     }
     bool accumulateWeightLog(double time, double& logarithm) const {
         const auto value = localWeight(time);
@@ -209,12 +209,12 @@ struct PreparedClip : PreparedClipStage {
             for (const auto& ancestor : ancestors) {
                 if (!ancestor.accumulateWeightLog(time, logarithm)) { return 0; }
             }
-            return std::min(1000000.0, std::exp(std::min(logarithm, std::log(1000000.0))));
+            return std::min(maximumWeight, std::exp(std::min(logarithm, std::log(maximumWeight))));
         }
         auto value = localWeight(time);
         for (const auto& group : groups) { value *= group.weight(scopeTime(time)); }
-        // A direct leaf has at most 32 ancestors bounded to 1e6 each.
-        return std::clamp(value, 0.0, 1000000.0);
+        // A direct leaf has at most 32 ancestors bounded to maximumWeight each.
+        return std::clamp(value, 0.0, maximumWeight);
     }
     const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
         if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
@@ -223,7 +223,7 @@ struct PreparedClip : PreparedClipStage {
     osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, const LiveSourceFrames* liveFrames = nullptr) const {
         const auto* resolved = resolveSource(liveFrames);
         if (resolved == nullptr) { return {0, 0, 0, 0, 0, 0}; }
-        return processPoint(resolved->sample(localTime(time), phase, phaseSpan, std::abs(rate) * timeSpan), time);
+        return processPoint(resolved->sample(localTime(time), phase, phaseSpan, std::abs(clock.rate) * timeSpan), time);
     }
     osci::Point processPoint(osci::Point point, double time) const {
         point = processStage(point, time);
@@ -321,17 +321,14 @@ struct PreparedCamera {
     static constexpr double minimumAxis = 1.0e-9;
     // Points nearer than this to a camera are not drawn.
     static constexpr double nearPlane = 0.05;
-    static double depthOf(const Frame& frame, const osci::Point& point) {
-        return (Vec3 {point.x, point.y, point.z} - frame.position).dot(frame.forward);
-    }
-    static osci::Point project(const Frame& frame, osci::Point point) {
+    // The point on the camera's image plane; none at or behind the near plane.
+    static std::optional<osci::Point> project(const Frame& frame, osci::Point point) {
         const auto offset = Vec3 {point.x, point.y, point.z} - frame.position;
         const auto depth = offset.dot(frame.forward);
-        if (!std::isfinite(depth) || depth <= nearPlane) { return { 0, 0, 0, 0, 0, 0 }; }
+        if (!std::isfinite(depth) || depth <= nearPlane) { return std::nullopt; }
         point.x = static_cast<float>(offset.dot(frame.right) * frame.focalLength / depth);
         point.y = static_cast<float>(offset.dot(frame.up) * frame.focalLength / depth);
         point.z = 1.0f;
-        if (!std::isfinite(point.x) || !std::isfinite(point.y)) { return { 0, 0, 0, 0, 0, 0 }; }
         return point;
     }
 };
@@ -365,6 +362,8 @@ struct PreparedBeam {
 struct PreparedComposition {
     explicit PreparedComposition(const Project& project, double destinationSampleRate = 48000, const std::atomic<bool>* cancel = nullptr, CompositionPurpose purpose = CompositionPurpose::signal) : duration(project.duration), sampleRate(destinationSampleRate), beamRate(beamCycleRate(project.frameRate)), scope(project.scope), soundtrack(project, cancel), effects(prepareEffects(project.effects)) {
         if (!soundtrack.preparationError.empty()) { preparationError = soundtrack.preparationError; return; }
+        // Editor geometry is rebuilt during drags; loudness modulation only
+        // matters to the signal, so the envelope is built there alone.
         PreparedDrivers drivers([this, cancel, purpose]() -> std::shared_ptr<const SoundtrackEnvelope> {
             return purpose == CompositionPurpose::signal ? loudnessEnvelope(cancel) : nullptr;
         });
@@ -435,7 +434,7 @@ struct PreparedComposition {
             const auto& clip = *stage.clip;
             const auto& timing = stage.clipClock;
             PreparedClipStage item;
-            item.id = clip.id; item.start = timing.start; item.end = timing.end(); item.offset = timing.offset; item.rate = timing.rate;
+            item.id = clip.id; item.start = timing.start; item.end = timing.end();
             item.clock = timing;
             item.scopeClock = stage.scopeClock;
             for (std::size_t i = 0; i < objectPropertySpecs.size(); ++i) {
@@ -515,13 +514,11 @@ struct PreparedComposition {
             if (clip == clips.end()) { continue; }
             liveTracks.push_back({track.id, track.midiInput == Track::anyMidiChannel ? 0 : track.midiInput, clip->liveInstrument});
         }
-        // Editor geometry is rebuilt during drags; loudness modulation only
-        // matters to the signal, so the envelope is built there alone.
     }
 
     // Geometry probe: the beam allocation at one phase of a static multiplexed
-    // cycle. Output signals use BeamRenderer; this stays for editor and model
-    // checks that need a direct time/phase lookup.
+    // cycle. Output signals use BeamRenderer; tests use this direct time/phase
+    // lookup to check the allocation.
     osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const LiveSourceFrames* liveFrames = nullptr) const {
         if (oscillatorTime < 0) { oscillatorTime = time; }
         if (!std::isfinite(time) || !std::isfinite(phase) || !std::isfinite(phaseSpan) || phaseSpan < 0) { return {0, 0, 0, 0, 0, 0}; }
@@ -595,8 +592,9 @@ struct PreparedComposition {
             return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::nullopt};
         });
         if (view.camera) {
-            if (!view.frame.has_value() || PreparedCamera::depthOf(*view.frame, point) <= PreparedCamera::nearPlane) { return std::nullopt; }
-            point = PreparedCamera::project(*view.frame, point);
+            const auto projected = view.frame.has_value() ? PreparedCamera::project(*view.frame, point) : std::nullopt;
+            if (!projected.has_value()) { return std::nullopt; }
+            point = *projected;
         } else {
             // Empty camera collections retain the original fixed output framing.
             const auto depth = 4.0f - point.z;

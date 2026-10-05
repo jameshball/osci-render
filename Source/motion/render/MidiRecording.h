@@ -50,6 +50,14 @@ public:
         EndReason reason = EndReason::stopped;
     };
     static constexpr std::size_t maximumEvents = 262144;
+    // A whole channel message: a note, controller, program, pressure or bend
+    // status with exactly its data bytes.
+    static bool validChannelMessage(const unsigned char* bytes, int size) {
+        if (bytes == nullptr || (size != 2 && size != 3)) { return false; }
+        const auto kind = bytes[0] & 0xf0;
+        const auto required = kind == 0xc0 || kind == 0xd0 ? 2 : 3;
+        return kind >= 0x80 && kind <= 0xe0 && size == required && bytes[1] <= 127 && (size == 2 || bytes[2] <= 127);
+    }
     explicit MidiRecording(std::size_t capacity = maximumEvents)
         : capacity(std::clamp<std::size_t>(capacity, 1, maximumEvents)), events(std::make_unique<Event[]>(this->capacity)) {}
 
@@ -118,10 +126,7 @@ public:
     // Audio-thread only; offsets must be monotonically nondecreasing. Unsupported
     // system/SysEx messages are ignored, never truncated into channel messages.
     void event(int offset, const unsigned char* bytes, int size) {
-        if (!blockOpen || bytes == nullptr || (size != 2 && size != 3)) { return; }
-        const auto kind = bytes[0] & 0xf0;
-        const auto required = kind == 0xc0 || kind == 0xd0 ? 2 : 3;
-        if (kind < 0x80 || kind > 0xe0 || size != required || bytes[1] > 127 || (size == 3 && bytes[2] > 127)) { return; }
+        if (!blockOpen || !validChannelMessage(bytes, size)) { return; }
         const auto delta = static_cast<std::uint64_t>(std::max(0, offset));
         if (delta >= blockEnd - blockFirst) { return; }
         const auto sample = blockFirst + delta;

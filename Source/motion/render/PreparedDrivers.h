@@ -99,7 +99,7 @@ private:
         copy->drivers.reset();
         drive(*copy, scope, scopeClock, owner, property, depth);
         std::shared_ptr<const Curve> result = std::move(copy);
-        state(scope, scopeClock).sources[key] = result;
+        cache.insert_or_assign(key, result);
         return result;
     }
 
@@ -135,44 +135,34 @@ private:
 
     // Controller changes as held steps in composition seconds.
     static void collectSteps(PreparedModulator& prepared, const Modulator& modulator, const Composition& scope) {
-        for (const auto& track : scope.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != modulator.source || clip.midi == nullptr) { continue; }
-                const auto timing = clip.timing(scope.tempo());
-                if (!timing.valid()) { return; }
-                const auto secondsPerBeat = 60 / clip.curveBpm(scope.tempo());
-                for (const auto& control : clip.midi->controls()) {
-                    if (control.number != modulator.controller || (modulator.controllerChannel != 0 && control.channel != modulator.controllerChannel)) { continue; }
-                    const auto seconds = timing.projectTime(control.beat * secondsPerBeat);
-                    prepared.steps.emplace_back(std::clamp(seconds, timing.start, timing.end()), control.normalised());
-                }
-                std::stable_sort(prepared.steps.begin(), prepared.steps.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-                return;
-            }
+        const auto* clip = findClip(scope, modulator.source);
+        const auto tempo = scope.tempo();
+        if (clip == nullptr || clip->midi == nullptr) { return; }
+        const auto timing = clip->timing(tempo);
+        if (!timing.valid()) { return; }
+        for (const auto& control : clip->midi->controls()) {
+            if (control.number != modulator.controller || (modulator.controllerChannel != 0 && control.channel != modulator.controllerChannel)) { continue; }
+            prepared.steps.emplace_back(std::clamp(clip->beatTime(control.beat, tempo, timing), timing.start, timing.end()), control.normalised());
         }
+        std::stable_sort(prepared.steps.begin(), prepared.steps.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
     }
 
     static void collectNotes(PreparedModulator& prepared, const Modulator& modulator, const Composition& scope) {
-        for (const auto& track : scope.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != modulator.source || clip.midi == nullptr) { continue; }
-                const auto timing = clip.timing(scope.tempo());
-                if (!timing.valid()) { return; }
-                const auto secondsPerBeat = 60 / clip.curveBpm(scope.tempo());
-                const auto resolve = [&](double beat) { return timing.projectTime(beat * secondsPerBeat); };
-                for (const auto& note : clip.midi->notes()) {
-                    if (note.pitch < modulator.lowestPitch || note.pitch > modulator.highestPitch) { continue; }
-                    const auto start = std::max(timing.start, resolve(note.start));
-                    const auto end = std::min(timing.end(), resolve(note.end()));
-                    if (!(end > start)) { continue; }
-                    const auto level = (1 - modulator.velocity) + modulator.velocity * note.velocity / 127.0;
-                    prepared.notes.push_back({start, end, level});
-                }
-                std::sort(prepared.notes.begin(), prepared.notes.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
-                prepared.buildIndex();
-                return;
-            }
+        const auto* clip = findClip(scope, modulator.source);
+        const auto tempo = scope.tempo();
+        if (clip == nullptr || clip->midi == nullptr) { return; }
+        const auto timing = clip->timing(tempo);
+        if (!timing.valid()) { return; }
+        for (const auto& note : clip->midi->notes()) {
+            if (note.pitch < modulator.lowestPitch || note.pitch > modulator.highestPitch) { continue; }
+            const auto start = std::max(timing.start, clip->beatTime(note.start, tempo, timing));
+            const auto end = std::min(timing.end(), clip->beatTime(note.end(), tempo, timing));
+            if (!(end > start)) { continue; }
+            const auto level = (1 - modulator.velocity) + modulator.velocity * note.velocity / 127.0;
+            prepared.notes.push_back({start, end, level});
         }
+        std::sort(prepared.notes.begin(), prepared.notes.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
+        prepared.buildIndex();
     }
 
     Loudness loudness;

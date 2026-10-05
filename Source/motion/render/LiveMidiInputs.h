@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LiveMidiPerformance.h"
+#include <juce_audio_basics/juce_audio_basics.h>
 #include <array>
 
 namespace motion {
@@ -20,12 +21,6 @@ struct LiveMidiInputs {
     // Live sample clock of the oscillator sample the planner is drawing.
     std::int64_t clockOffset = 0;
 
-    bool sounding(std::uint64_t clock) const {
-        for (std::size_t index = 0; index < count; ++index) {
-            if (routes[index].performance.activeCount(clock) > 0) { return true; }
-        }
-        return false;
-    }
     void reset() {
         for (auto& route : routes) { route.performance.reset(); }
     }
@@ -40,5 +35,28 @@ struct LiveMidiInputs {
         }
         return changed;
     }
+};
+
+// One cursor per block. The buffer must remain unchanged/alive while iterating;
+// offsets advance monotonically and absoluteClock already includes the offset.
+// Null performance consumes input without enabling or retaining live audition.
+class LiveMidiInputCursor {
+public:
+    explicit LiveMidiInputCursor(const juce::MidiBuffer& buffer) : next(buffer.cbegin()), end(buffer.cend()) {}
+    bool dispatch(LiveMidiPerformance* performance, int offset, std::uint64_t absoluteClock, LiveMidiInputs* inputs = nullptr) {
+        bool changed = false;
+        while (next != end && (*next).samplePosition <= offset) {
+            const auto message = *next;
+            if (performance != nullptr) {
+                const auto accepted = performance->handle(message.data, message.numBytes, absoluteClock);
+                changed = changed || accepted;
+            }
+            if (inputs != nullptr) { changed = inputs->handle(message.data, message.numBytes, absoluteClock) || changed; }
+            ++next;
+        }
+        return changed;
+    }
+private:
+    juce::MidiBufferIterator next, end;
 };
 }

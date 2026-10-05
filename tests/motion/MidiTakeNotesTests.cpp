@@ -49,7 +49,7 @@ int main() {
         event(t, 600, 0xb0, 1, 20); event(t, 600, 0xa0, 61, 30);
         event(t, 700, 0x90, 62, 100);
         auto r = MidiTakeNotes::convert(t);
-        check(r && r.addedCount == 3 && r.ignoredControllerCount == 4, "unsupported program/aftertouch/hardcut warnings");
+        check(r && r.addedCount == 3 && r.unsupportedMessageCount == 4, "unsupported program/aftertouch/hardcut warnings");
         check(r.source->controls().size() == 2, "pitch bend and CC 1 persist");
         check(r.source->notes()[0].duration == 2 && r.source->notes()[1].duration == 1, "CC123 sustain and CC120 immediate close");
         check(r.source->notes()[2].duration == 4, "held note closes at actual stop");

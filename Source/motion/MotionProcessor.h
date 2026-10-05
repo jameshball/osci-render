@@ -83,6 +83,12 @@ public:
 private:
     void handleAsyncUpdate() override;
     void routeSignalOutput(juce::AudioBuffer<float>& buffer);
+    // Audio thread: held live notes end with any jump in the clock.
+    void resetLiveMidi() { liveMidi.reset(); liveInputs.reset(); }
+    void writeSignal(int index, const osci::Point& point) {
+        const std::array<float, 6> values {point.x, point.y, point.z, point.r, point.g, point.b};
+        for (int channel = 0; channel < 6; ++channel) { signal.setSample(channel, index, values[static_cast<std::size_t>(channel)]); }
+    }
     std::unique_ptr<motion::CompositionPreparationWorker> preparationWorker;
     std::uint64_t preparationRevision = 0, acceptedPreparationRevision = 0;
     std::atomic<double> requestedSampleRate {48000};
