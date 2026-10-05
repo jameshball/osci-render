@@ -177,6 +177,7 @@ private:
         juce::String saved;
         report(name + ": save", milliseconds([&] { saved = document.save().toString(); }), "ms");
         report(name + ": saved size", saved.getNumBytesAsUTF8() / 1024.0, "KiB");
+        writeProjectFile(name, document);
         const auto xml = juce::XmlDocument::parse(saved);
         motion::Project loaded;
         report(name + ": load", milliseconds([&] {
@@ -196,6 +197,19 @@ private:
         auto window = project;
         window.duration = std::min(project.duration, renderSeconds);
         benchmarkRender(name, window);
+    }
+
+    // With MOTION_BENCHMARK_PROJECTS set to a folder, each stress project is
+    // also written there as a project file, to profile in the app.
+    static void writeProjectFile(const juce::String& name, const motion::Document& document) {
+        const juce::File folder(juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_PROJECTS", ""));
+        if (!folder.isDirectory()) { return; }
+        juce::XmlElement project("motion-project");
+        project.setAttribute("schema", 1);
+        project.addChildElement(new juce::XmlElement(document.save()));
+        juce::MemoryBlock data;
+        juce::AudioProcessor::copyXmlToBinary(project, data);
+        folder.getChildFile(name + ".osci-motion").replaceWithData(data.getData(), data.getSize());
     }
 
     void benchmarkRender(const juce::String& name, const motion::Project& project) {
