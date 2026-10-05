@@ -41,14 +41,6 @@ inline juce::String describeProperty(const Project& project, Id id, const std::s
     return owner + juce::String(juce::CharPointer_UTF8(" \xc2\xb7 ")) + propertyLabel(project, id, property);
 }
 
-inline juce::String describeModulator(const Modulator& modulator) {
-    if (modulator.kind == ModulatorKind::envelope) { return "Envelope"; }
-    if (modulator.kind == ModulatorKind::controller) { return modulator.controller == MidiControl::pitchBend ? "Pitch bend" : "CC " + juce::String(modulator.controller); }
-    static const char* shapes[] { "Sine", "Triangle", "Saw", "Square", "Smooth random", "Random steps", "Loudness" };
-    const auto index = static_cast<int>(modulator.shape.waveform);
-    return index >= 0 && index < 7 ? juce::String(shapes[index]) : juce::String("Oscillator");
-}
-
 inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1, .01, 3, " Hz"};
 inline constexpr PropertySpec beatsSpec {"beats", "Beats", "", "", 0.0625, 64, 1, .25, 3, " beats"};
 inline constexpr PropertySpec phaseSpec {"phase", "Phase", "", "", 0, 360, 0, 1, 1, "\xc2\xb0"};
@@ -80,6 +72,76 @@ struct LabelledScrub {
         label.setBounds(row.removeFromLeft(62));
         field.setBounds(row);
     }
+};
+
+// One modulator route, seen from either end: what it connects to above its
+// amount, add or multiply, and removal. Rows are reused as routes change, so
+// owners call show() rather than rebuilding them.
+class RouteRow final : public juce::Component {
+public:
+    static constexpr int height = style::controlHeight * 2;
+
+    RouteRow(Document& document, std::function<void(const juce::Result&)> report) : document(document), report(std::move(report)) {
+        label.setFont(style::caption());
+        label.setColour(juce::Label::textColourId, style::text());
+        amount.setSpec(amountSpec);
+        amount.onChange = [this](double value) { apply(value, route.mode); };
+        amount.onCommit = [this](double value) { apply(value, route.mode); };
+        mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
+        mode.onClick = [this] { apply(amount.getValue(), route.mode == ModulationMode::add ? ModulationMode::multiply : ModulationMode::add); };
+        remove.setTooltip("Stop driving this property");
+        remove.iconSize = 14.0f;
+        remove.onClick = [this] { this->report(this->document.removeRoute(route.id)); };
+        for (auto* component : std::initializer_list<juce::Component*> {&label, &amount, &mode, &remove}) { addAndMakeVisible(component); }
+    }
+    // `text` names the route's other end: its target, or its modulator.
+    void show(const ModulationRoute& value, const juce::String& text) {
+        route = value;
+        if (label.getText() != text) {
+            label.setText(text, juce::dontSendNotification);
+            for (auto [component, name] : {std::pair<juce::Component*, const char*> {&amount, "Route amount "}, {&mode, "Route mode "}, {&remove, "Remove route "}}) {
+                component->setName(name + text);
+                component->setTitle(name + text);
+            }
+        }
+        amount.setValue(route.amount);
+        mode.setButtonText(route.mode == ModulationMode::multiply ? juce::String::fromUTF8("\xc3\x97") : juce::String("+"));
+    }
+    bool isEditing() const { return amount.isEditing(); }
+    void resized() override {
+        auto area = getLocalBounds();
+        label.setBounds(area.removeFromTop(area.getHeight() / 2));
+        remove.setBounds(area.removeFromRight(24));
+        mode.setBounds(area.removeFromRight(24).reduced(1));
+        amount.setBounds(area.reduced(0, 1));
+    }
+
+    // Shows `routes` in `rows`, reusing rows in order and adding or removing
+    // the difference.
+    static void showAll(std::vector<std::unique_ptr<RouteRow>>& rows, juce::Component& parent, const std::vector<std::pair<ModulationRoute, juce::String>>& routes, Document& document, const std::function<void(const juce::Result&)>& report) {
+        rows.resize(std::min(rows.size(), routes.size()));
+        while (rows.size() < routes.size()) {
+            rows.push_back(std::make_unique<RouteRow>(document, report));
+            parent.addAndMakeVisible(*rows.back());
+        }
+        for (std::size_t index = 0; index < routes.size(); ++index) { rows[index]->show(routes[index].first, routes[index].second); }
+    }
+
+private:
+    void apply(double value, ModulationMode next) {
+        auto edited = route;
+        edited.amount = value;
+        edited.mode = next;
+        report(document.setRoute(edited));
+    }
+
+    Document& document;
+    std::function<void(const juce::Result&)> report;
+    ModulationRoute route;
+    juce::Label label;
+    MotionScrubField amount;
+    juce::TextButton mode;
+    icons::Button remove {"Remove route", icons::Icon::close};
 };
 }
 
@@ -342,7 +404,7 @@ public:
             }
             source.setTextWhenNoChoicesAvailable("No MIDI clips yet");
         }
-        rebuildRoutes();
+        showRoutes();
         resized();
         repaint();
     }
@@ -408,7 +470,7 @@ public:
             routesTitle.setBounds(area.removeFromTop(18));
             if (routesHint.isVisible()) { routesHint.setBounds(area.removeFromTop(36)); }
             for (auto& route : routes) {
-                route->setBounds(area.removeFromTop(motion::style::controlHeight * 2));
+                route->setBounds(area.removeFromTop(motion::ui::RouteRow::height));
                 area.removeFromTop(motion::style::gap);
             }
         }
@@ -553,24 +615,24 @@ private:
     void report(const juce::Result& result) {
         if (result.failed() && onError) { onError(result.getErrorMessage()); }
     }
-    void rebuildRoutes() {
-        routes.clear();
+    void showRoutes() {
         const auto& project = processor.document.project();
+        std::vector<std::pair<motion::ModulationRoute, juce::String>> shown;
         for (const auto& route : project.routes) {
-            if (route.modulator != selected) { continue; }
-            auto row = std::make_unique<RouteRow>(*this, route, motion::ui::describeProperty(project, route.target, route.property));
-            content.addAndMakeVisible(*row);
-            routes.push_back(std::move(row));
+            if (route.modulator == selected) { shown.emplace_back(route, motion::ui::describeProperty(project, route.target, route.property)); }
         }
+        motion::ui::RouteRow::showAll(routes, content, shown, processor.document, [this](const juce::Result& result) { report(result); });
         routesTitle.setVisible(current() != nullptr);
         routesHint.setVisible(current() != nullptr && routes.empty());
     }
     void changeListenerCallback(juce::ChangeBroadcaster*) override {
+        // Hidden, it refreshes when its tab is shown.
+        if (!isShowing()) { return; }
         // A scrub in progress keeps its own value until release.
         for (auto* row : {&rate, &phase, &seed, &attack, &decay, &sustain, &release, &velocity, &lowest, &highest}) {
             if (row->field.isEditing()) { return; }
         }
-        for (const auto& route : routes) { if (route->amount.isEditing()) { return; } }
+        for (const auto& route : routes) { if (route->isEditing()) { return; } }
         refresh();
     }
     // The selected modulator's output over two cycles, above its settings.
@@ -592,50 +654,6 @@ private:
     private:
         MotionModulatorLibrary& owner;
     };
-    // One route: what it drives, its depth, mode and removal.
-    struct RouteRow final : juce::Component {
-        RouteRow(MotionModulatorLibrary& owner, const motion::ModulationRoute& route, const juce::String& text) : owner(owner), route(route) {
-            target.setText(text, juce::dontSendNotification);
-            target.setFont(motion::style::caption());
-            target.setColour(juce::Label::textColourId, motion::style::text());
-            amount.setName("Route amount " + text);
-            amount.setTitle("Route amount " + text);
-            amount.setSpec(motion::ui::amountSpec);
-            amount.setValue(route.amount);
-            amount.onChange = [this](double value) { apply(value, this->route.mode); };
-            amount.onCommit = [this](double value) { apply(value, this->route.mode); };
-            mode.setButtonText(route.mode == motion::ModulationMode::multiply ? juce::String::fromUTF8("\xc3\x97") : juce::String("+"));
-            mode.setName("Route mode " + text);
-            mode.setTitle("Route mode " + text);
-            mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
-            mode.onClick = [this] { apply(amount.getValue(), this->route.mode == motion::ModulationMode::add ? motion::ModulationMode::multiply : motion::ModulationMode::add); };
-            remove.setName("Remove route " + text);
-            remove.setTitle("Remove route " + text);
-            remove.setTooltip("Stop driving this property");
-            remove.iconSize = 14.0f;
-            remove.onClick = [this] { this->owner.report(this->owner.processor.document.removeRoute(this->route.id)); };
-            for (auto* component : std::initializer_list<juce::Component*> {&target, &amount, &mode, &remove}) { addAndMakeVisible(component); }
-        }
-        void apply(double value, motion::ModulationMode next) {
-            auto edited = route;
-            edited.amount = value;
-            edited.mode = next;
-            owner.report(owner.processor.document.setRoute(edited));
-        }
-        void resized() override {
-            auto area = getLocalBounds();
-            target.setBounds(area.removeFromTop(area.getHeight() / 2));
-            remove.setBounds(area.removeFromRight(24));
-            mode.setBounds(area.removeFromRight(24).reduced(1));
-            amount.setBounds(area.reduced(0, 1));
-        }
-        MotionModulatorLibrary& owner;
-        motion::ModulationRoute route;
-        juce::Label target;
-        MotionScrubField amount;
-        juce::TextButton mode;
-        motion::icons::Button remove {"Remove route", motion::icons::Icon::close};
-    };
 
     MotionProcessor& processor;
     motion::Id selected = 0;
@@ -653,7 +671,7 @@ private:
     juce::Label name, routesTitle, routesHint;
     motion::ui::LabelledScrub rate, phase, seed, attack, decay, sustain, release, velocity, lowest, highest;
     std::vector<std::unique_ptr<Card>> cards;
-    std::vector<std::unique_ptr<RouteRow>> routes;
+    std::vector<std::unique_ptr<motion::ui::RouteRow>> routes;
     juce::Rectangle<int> previewArea;
     int separatorY = 0;
 };
@@ -708,15 +726,13 @@ public:
     void refresh() {
         const auto& project = processor.document.project();
         const auto* curve = motion::findPropertyCurve(project, targetId, propertyName);
-        rows.clear();
+        std::vector<std::pair<motion::ModulationRoute, juce::String>> shown;
         for (const auto& item : project.routes) {
             if (item.target != targetId || item.property != propertyName) { continue; }
             const auto modulator = std::find_if(project.modulators.begin(), project.modulators.end(), [&](const auto& value) { return value.id == item.modulator; });
-            if (modulator == project.modulators.end()) { continue; }
-            auto row = std::make_unique<Row>(*this, item, juce::String(modulator->name));
-            addAndMakeVisible(*row);
-            rows.push_back(std::move(row));
+            if (modulator != project.modulators.end()) { shown.emplace_back(item, juce::String(modulator->name)); }
         }
+        motion::ui::RouteRow::showAll(rows, *this, shown, processor.document, [this](const juce::Result& result) { report(result); });
         const auto drivable = motion::drivableProperty(project, targetId, propertyName);
         link.setEnabled(drivable);
         const auto linked = curve != nullptr && curve->link.has_value();
@@ -735,7 +751,7 @@ public:
         repaint();
     }
     int preferredHeight() const {
-        auto height = 30 + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap);
+        auto height = 30 + static_cast<int>(rows.size()) * (motion::ui::RouteRow::height + motion::style::gap);
         height += motion::style::controlHeight + motion::style::gap;
         if (linkSource.isVisible()) { height += 20 + 3 * (motion::style::controlHeight + motion::style::gap); }
         return height + motion::style::padding;
@@ -744,7 +760,7 @@ public:
         auto area = getLocalBounds().reduced(7, 0);
         area.removeFromTop(30);
         for (auto& row : rows) {
-            row->setBounds(area.removeFromTop(motion::style::controlHeight));
+            row->setBounds(area.removeFromTop(motion::ui::RouteRow::height));
             area.removeFromTop(motion::style::gap);
         }
         auto header = area.removeFromTop(motion::style::controlHeight);
@@ -768,40 +784,6 @@ public:
     }
 
 private:
-    struct Row final : juce::Component {
-        Row(MotionRoutingPanel& owner, const motion::ModulationRoute& route, const juce::String& text) : owner(owner), route(route) {
-            name.setText(text, juce::dontSendNotification);
-            name.setFont(motion::style::caption());
-            amount.setName("Routed amount " + text);
-            amount.setTitle("Routed amount " + text);
-            amount.setSpec(motion::ui::amountSpec);
-            amount.setValue(route.amount);
-            amount.onChange = [this](double value) { edit(value); };
-            amount.onCommit = [this](double value) { edit(value); };
-            remove.setButtonText("x");
-            remove.setName("Unroute " + text);
-            remove.setTitle("Unroute " + text);
-            remove.onClick = [this] { this->owner.report(this->owner.processor.document.removeRoute(this->route.id)); };
-            for (auto* component : std::initializer_list<juce::Component*> {&name, &amount, &remove}) { addAndMakeVisible(component); }
-        }
-        void edit(double value) {
-            auto edited = route;
-            edited.amount = value;
-            owner.report(owner.processor.document.setRoute(edited));
-        }
-        void resized() override {
-            auto area = getLocalBounds();
-            remove.setBounds(area.removeFromRight(24));
-            name.setBounds(area.removeFromLeft(area.getWidth() / 2));
-            amount.setBounds(area.reduced(2, 1));
-        }
-        MotionRoutingPanel& owner;
-        motion::ModulationRoute route;
-        juce::Label name;
-        MotionScrubField amount;
-        juce::TextButton remove;
-    };
-
     void showLinkMenu() {
         const auto& project = processor.document.project();
         juce::PopupMenu menu;
@@ -835,7 +817,7 @@ private:
     }
     void changeListenerCallback(juce::ChangeBroadcaster*) override {
         for (auto* row : {&scale, &offset, &delay}) { if (row->field.isEditing()) { return; } }
-        for (const auto& row : rows) { if (row->amount.isEditing()) { return; } }
+        for (const auto& row : rows) { if (row->isEditing()) { return; } }
         refresh();
         if (onLayoutChanged) { onLayoutChanged(); }
     }
@@ -850,6 +832,6 @@ private:
     juce::TextButton link, unlink;
     juce::Label linkSource;
     motion::ui::LabelledScrub scale, offset, delay;
-    std::vector<std::unique_ptr<Row>> rows;
+    std::vector<std::unique_ptr<motion::ui::RouteRow>> rows;
     std::vector<std::pair<motion::Id, std::string>> choices;
 };

@@ -106,7 +106,7 @@ try:
     field = first(tree, lambda node: node.get("componentName") == "position.y")["bounds"]
     step("route lfo by dragging", "drag-xy", card["x"] + 30, card["y"] + card["h"] // 2, field["x"] + field["w"] // 2, field["y"] + field["h"] // 2, "--steps", 20)
     wait_undo("Route modulator")
-    step("route amount", "set-value", "--name", "Routed amount LFO 1", "0.4")
+    step("route amount", "set-value", "--name", "Route amount LFO 1", "0.4")
     wait_undo("Change route")
     # Link the follower's position x to the leader's, delayed by half a second.
     step("timeline for follower", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
@@ -139,7 +139,7 @@ try:
     # The Position row's modulation chip opens the axis that is driven: the LFO routes into Y.
     step("modulate position", "click", "--name", "Modulate position", "--exact")
     command("wait-for-locator", "--name", "Curve Position Y", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
-    command("wait-for-locator", "--name", "Routed amount LFO 1", "--exact", "--timeout-ms", 5000)
+    command("wait-for-locator", "--name", "Route amount LFO 1", "--exact", "--timeout-ms", 5000)
     step("modulate screenshot", "screenshot", "--file", session.artifact_dir / "modulate.png")
     # Deleting the modulator removes its route; undo restores both.
     step("modulator tab again", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
