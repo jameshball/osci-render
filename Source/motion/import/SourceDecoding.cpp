@@ -19,29 +19,65 @@ namespace motion {
 namespace {
 using ImportShapes = std::vector<std::unique_ptr<osci::Shape>>;
 
-juce::String sourceBakeKey(const Asset& asset) {
+// What a baked cache was made from: the settings `write` records, then the
+// source bytes, hashed. A cache with another key is stale.
+juce::String bakeKey(const Asset& asset, const std::function<void(juce::MemoryOutputStream&)>& write) {
     juce::MemoryOutputStream metadata;
     metadata.writeInt(1); // Bake algorithm/context version, separate from cache wire version.
-    metadata.writeDouble(asset.bakeSettings.duration);
-    metadata.writeDouble(asset.bakeSettings.frameRate);
-    metadata.writeDouble(asset.bakeSettings.bpm);
-    metadata.writeInt64(static_cast<juce::int64>(asset.bakeSettings.pointsPerFrame));
-    metadata.writeInt64(asset.bakeSettings.seed);
+    write(metadata);
     metadata.write(asset.data.getData(), asset.data.getSize());
     return juce::SHA256(metadata.getData(), metadata.getDataSize()).toHexString();
 }
 
+juce::String sourceBakeKey(const Asset& asset) {
+    return bakeKey(asset, [&settings = asset.bakeSettings](juce::MemoryOutputStream& metadata) {
+        metadata.writeDouble(settings.duration);
+        metadata.writeDouble(settings.frameRate);
+        metadata.writeDouble(settings.bpm);
+        metadata.writeInt64(static_cast<juce::int64>(settings.pointsPerFrame));
+        metadata.writeInt64(settings.seed);
+    });
+}
+
 juce::String videoBakeKey(const Asset& asset) {
-    juce::MemoryOutputStream metadata;
-    metadata.writeInt(1);
-    metadata.writeInt(static_cast<int>(asset.rasterSettings.mode));
-    metadata.writeDouble(asset.rasterSettings.threshold);
-    metadata.writeBool(asset.rasterSettings.invert);
-    metadata.writeInt(asset.rasterSettings.resolution);
-    metadata.writeDouble(asset.rasterSettings.videoFrameRate);
-    metadata.writeInt64(static_cast<juce::int64>(asset.rasterSettings.pointsPerFrame));
-    metadata.write(asset.data.getData(), asset.data.getSize());
-    return juce::SHA256(metadata.getData(), metadata.getDataSize()).toHexString();
+    return bakeKey(asset, [&settings = asset.rasterSettings](juce::MemoryOutputStream& metadata) {
+        metadata.writeInt(static_cast<int>(settings.mode));
+        metadata.writeDouble(settings.threshold);
+        metadata.writeBool(settings.invert);
+        metadata.writeInt(settings.resolution);
+        metadata.writeDouble(settings.videoFrameRate);
+        metadata.writeInt64(static_cast<juce::int64>(settings.pointsPerFrame));
+    });
+}
+
+// A source kept with a baked cache: the saved cache when its key matches,
+// or `bake()` run afresh and archived. Either way the frames must have the
+// shape the asset's settings ask for.
+juce::Result prepareBaked(Asset& asset, const juce::String& key, const std::function<PreparedPointFrames::Result()>& bake, const std::function<bool(const PreparedPointFrames&)>& matches,
+        const std::atomic<bool>* cancel, std::atomic<double>* progress) {
+    PreparedPointFrames::Result prepared;
+    juce::MemoryBlock archive;
+    if (asset.bakedData.getSize() > 0) {
+        if (asset.bakeKey != key) { return juce::Result::fail("The source's cache does not match its contents and settings. Prepare it again."); }
+        prepared = BakedSourceArchive::decode(asset.bakedData);
+    } else {
+        prepared = bake();
+        if (prepared) {
+            auto encoded = BakedSourceArchive::encode(*prepared.source);
+            if (!encoded) { return juce::Result::fail(encoded.error); }
+            archive = std::move(encoded.data);
+        }
+    }
+    if (!prepared) { return juce::Result::fail(prepared.error); }
+    if (!matches(*prepared.source)) { return juce::Result::fail("The source's cache does not have the frames its settings ask for."); }
+    if (cancelled(cancel)) { return juce::Result::fail("Source preparation cancelled."); }
+    asset.source = std::make_shared<const PreparedSource>(prepared.source);
+    asset.drawing.reset();
+    asset.audio.reset();
+    if (archive.getSize() > 0) { asset.bakedData = std::move(archive); }
+    asset.bakeKey = key;
+    if (progress != nullptr) { progress->store(1); }
+    return juce::Result::ok();
 }
 
 // repeatsPrevious(frame) lets identical frames share one drawing (and count
@@ -441,31 +477,9 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (osci::files::isVideo(extension)) {
         const auto invalid = asset.rasterSettings.validate();
         if (!invalid.empty()) { return juce::Result::fail(invalid); }
-        const auto key = videoBakeKey(asset);
-        PreparedPointFrames::Result prepared;
-        juce::MemoryBlock archive;
-        if (asset.bakedData.getSize() > 0) {
-            if (asset.bakeKey != key) { return juce::Result::fail("Video cache does not match its source and tracing settings. Prepare the source again."); }
-            prepared = BakedSourceArchive::decode(asset.bakedData);
-        } else {
-            prepared = VideoSourcePreparer::prepare(asset.data, videoDecoder, asset.rasterSettings, cancel, progress);
-            if (prepared) {
-                auto encoded = BakedSourceArchive::encode(*prepared.source);
-                if (!encoded) { return juce::Result::fail(encoded.error); }
-                archive = std::move(encoded.data);
-            }
-        }
-        if (!prepared) { return juce::Result::fail(prepared.error); }
-        if (prepared.source->frameRate() != asset.rasterSettings.videoFrameRate || prepared.source->pointsPerFrame() != asset.rasterSettings.pointsPerFrame) {
-            return juce::Result::fail("Video cache metadata does not match its tracing settings.");
-        }
-        if (cancelled(cancel)) { return juce::Result::fail("Video preparation cancelled."); }
-        asset.source = std::make_shared<const PreparedSource>(prepared.source);
-        asset.drawing.reset(); asset.audio.reset();
-        if (archive.getSize() > 0) { asset.bakedData = std::move(archive); }
-        asset.bakeKey = key;
-        if (progress != nullptr) { progress->store(1); }
-        return juce::Result::ok();
+        const auto& settings = asset.rasterSettings;
+        return prepareBaked(asset, videoBakeKey(asset), [&] { return VideoSourcePreparer::prepare(asset.data, videoDecoder, settings, cancel, progress); },
+            [&settings](const PreparedPointFrames& frames) { return frames.frameRate() == settings.videoFrameRate && frames.pointsPerFrame() == settings.pointsPerFrame; }, cancel, progress);
     }
     if (osci::files::isImage(extension)) {
         const auto prepared = RasterSourcePreparer::prepare(asset.data.getData(), asset.data.getSize(), asset.rasterSettings, cancel, progress);
@@ -480,35 +494,12 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (extension == ".lua") {
         const auto settingsError = asset.bakeSettings.validate();
         if (!settingsError.empty()) { return juce::Result::fail(settingsError); }
-        const auto key = sourceBakeKey(asset);
-        PreparedPointFrames::Result prepared;
-        juce::MemoryBlock archive;
-        if (asset.bakedData.getSize() > 0) {
-            if (asset.bakeKey != key) { return juce::Result::fail("Baked source does not match its script and settings. Rebuild the source cache."); }
-            prepared = BakedSourceArchive::decode(asset.bakedData);
-        } else {
-            prepared = LuaBaker::bake(asset.name, juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())), asset.bakeSettings, cancel, progress);
-            if (prepared) {
-                auto encoded = BakedSourceArchive::encode(*prepared.source);
-                if (!encoded) { return juce::Result::fail(encoded.error); }
-                archive = std::move(encoded.data);
-            }
-        }
-        if (!prepared) { return juce::Result::fail(prepared.error); }
-        if (prepared.source->frameCount() != asset.bakeSettings.frameCount()
-            || prepared.source->frameRate() != asset.bakeSettings.frameRate
-            || prepared.source->pointsPerFrame() != asset.bakeSettings.pointsPerFrame) {
-            return juce::Result::fail("Baked source metadata does not match its settings.");
-        }
-        if (cancelled(cancel)) { return juce::Result::fail("Source import cancelled."); }
-        auto source = std::make_shared<const PreparedSource>(prepared.source);
-        asset.source = std::move(source);
-        asset.drawing.reset();
-        asset.audio.reset();
-        if (archive.getSize() > 0) { asset.bakedData = std::move(archive); }
-        asset.bakeKey = key;
-        if (progress != nullptr) { progress->store(1); }
-        return juce::Result::ok();
+        const auto& settings = asset.bakeSettings;
+        const auto script = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+        return prepareBaked(asset, sourceBakeKey(asset), [&] { return LuaBaker::bake(asset.name, script, settings, cancel, progress); },
+            [&settings](const PreparedPointFrames& frames) {
+                return frames.frameCount() == settings.frameCount() && frames.frameRate() == settings.frameRate && frames.pointsPerFrame() == settings.pointsPerFrame;
+            }, cancel, progress);
     }
     if (osci::files::isAudio(extension)) {
         juce::AudioFormatManager formats;

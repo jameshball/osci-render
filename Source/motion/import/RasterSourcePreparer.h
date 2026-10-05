@@ -36,11 +36,6 @@ public:
         const auto height = std::max(1, static_cast<int>(std::round(image.height * scale)));
         std::vector<PointSample> points;
         points.reserve(image.frames.size() * settings.pointsPerFrame);
-        RasterBeamBuilder::Settings trace;
-        trace.mode = settings.mode == RasterSettings::Mode::contours ? RasterBeamBuilder::Mode::contours : RasterBeamBuilder::Mode::scanlines;
-        trace.threshold = settings.threshold;
-        trace.invert = settings.invert;
-        trace.pointsPerFrame = settings.pointsPerFrame;
         std::vector<std::uint8_t> rgba(static_cast<std::size_t>(width) * height * 4);
         for (std::size_t frameIndex = 0; frameIndex < image.frames.size(); ++frameIndex) {
             const auto& frame = image.frames[frameIndex];
@@ -70,7 +65,7 @@ public:
                     rgba[index + 3] = static_cast<std::uint8_t>(alpha / pixels);
                 }
             }
-            auto beam = RasterBeamBuilder::build(rgba.data(), rgba.size(), width, height, trace, cancel);
+            auto beam = RasterBeamBuilder::build(rgba.data(), rgba.size(), width, height, settings, cancel);
             if (!beam) { return {nullptr, "Frame " + std::to_string(frameIndex + 1) + ": " + beam.error}; }
             points.insert(points.end(), beam.points.begin(), beam.points.end());
             if (progress != nullptr) { progress->store(0.2 + 0.8 * static_cast<double>(frameIndex + 1) / image.frames.size()); }

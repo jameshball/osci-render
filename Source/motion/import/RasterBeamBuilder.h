@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../model/Cancellation.h"
-#include "../model/PreparedPointFrames.h"
+#include "../model/RasterSettings.h"
 #include <array>
 #include <atomic>
 #include <numeric>
@@ -13,13 +13,6 @@ namespace motion {
 // retained, so a small point budget fails rather than cutting across corners.
 class RasterBeamBuilder {
 public:
-    enum class Mode { contours, scanlines };
-    struct Settings {
-        double threshold = 0.1;
-        bool invert = false;
-        Mode mode = Mode::contours;
-        std::size_t pointsPerFrame = 1024;
-    };
     struct Result {
         std::vector<PointSample> points;
         std::string error;
@@ -30,7 +23,7 @@ public:
     // thresholding and emission; alpha is never inverted. Transparent pixels
     // are always blank. Output uses linear interpolation safely, including the
     // last-to-first seam: travel endpoints have RGB=0 and unchanged geometry.
-    static Result build(const std::uint8_t* rgba, std::size_t bytes, int width, int height, const Settings& settings,
+    static Result build(const std::uint8_t* rgba, std::size_t bytes, int width, int height, const RasterSettings& settings,
             const std::atomic<bool>* cancel = nullptr) {
         if (width < 1 || height < 1 || width > 512 || height > 512 || rgba == nullptr
             || bytes != static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4) {
@@ -38,7 +31,7 @@ public:
         }
         if (!std::isfinite(settings.threshold) || settings.threshold < 0 || settings.threshold > 1
             || settings.pointsPerFrame < 16 || settings.pointsPerFrame > 16384
-            || (settings.mode != Mode::contours && settings.mode != Mode::scanlines)) {
+            || (settings.mode != RasterSettings::Mode::contours && settings.mode != RasterSettings::Mode::scanlines)) {
             return {{}, "Invalid raster trace settings or point budget (16-16384)."};
         }
         if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
@@ -77,7 +70,7 @@ public:
                 paths.push_back(std::move(path));
                 return true;
             };
-            if (settings.mode == Mode::scanlines) {
+            if (settings.mode == RasterSettings::Mode::scanlines) {
                 for (int y = 0; y < height; ++y) {
                     if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                     const int direction = (y & 1) == 0 ? 1 : -1;

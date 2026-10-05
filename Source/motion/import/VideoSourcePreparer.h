@@ -64,13 +64,10 @@ public:
         std::vector<std::uint8_t> rgba(static_cast<std::size_t>(frameBytes));
         std::vector<PointSample> points;
         points.reserve(static_cast<std::size_t>(frames) * settings.pointsPerFrame);
-        RasterBeamBuilder::Settings trace;
-        trace.mode = settings.mode == RasterSettings::Mode::contours ? RasterBeamBuilder::Mode::contours : RasterBeamBuilder::Mode::scanlines;
-        trace.threshold = settings.threshold; trace.invert = settings.invert; trace.pointsPerFrame = settings.pointsPerFrame;
         for (std::uint64_t frame = 0; frame < frames; ++frame) {
             if (cancelled(cancel)) { return {nullptr, "Video preparation cancelled."}; }
             if (stream->read(rgba.data(), static_cast<int>(rgba.size())) != static_cast<int>(rgba.size())) { return {nullptr, "Decoded video frame is truncated."}; }
-            auto beam = RasterBeamBuilder::build(rgba.data(), rgba.size(), dimension, dimension, trace, cancel);
+            auto beam = RasterBeamBuilder::build(rgba.data(), rgba.size(), dimension, dimension, settings, cancel);
             if (!beam) { return {nullptr, "Video frame " + std::to_string(frame + 1) + ": " + beam.error}; }
             points.insert(points.end(), beam.points.begin(), beam.points.end());
             if (progress != nullptr) { progress->store(.2 + .8 * static_cast<double>(frame + 1) / frames); }

@@ -16,7 +16,7 @@ struct Image {
     void set(int x, int y, std::array<std::uint8_t, 4> rgba = {255, 255, 255, 255}) {
         std::copy(rgba.begin(), rgba.end(), pixels.begin() + (static_cast<std::size_t>(y) * width + x) * 4);
     }
-    motion::RasterBeamBuilder::Result build(motion::RasterBeamBuilder::Settings settings = {}, const std::atomic<bool>* cancel = nullptr) const {
+    motion::RasterBeamBuilder::Result build(const motion::RasterSettings& settings, const std::atomic<bool>* cancel = nullptr) const {
         return motion::RasterBeamBuilder::build(pixels.data(), pixels.size(), width, height, settings, cancel);
     }
 };
@@ -44,7 +44,8 @@ std::size_t pathCount(const motion::RasterBeamBuilder::Result& result) {
 }
 int main() {
     using Builder = motion::RasterBeamBuilder;
-    Builder::Settings settings;
+    motion::RasterSettings settings;
+    settings.threshold = 0.1;
     settings.pointsPerFrame = 64;
     Image rectangle(8, 4);
     for (int y = 1; y < 3; ++y) { for (int x = 2; x < 6; ++x) { rectangle.set(x, y, {255, 64, 32, 255}); } }
@@ -98,7 +99,7 @@ int main() {
     settings.threshold = 0;
     check(pathCount(black.build(settings)) == 0, "zero threshold does not light black");
 
-    settings.mode = Builder::Mode::scanlines;
+    settings.mode = motion::RasterSettings::Mode::scanlines;
     settings.threshold = .1;
     Image scan(4, 2);
     for (int y = 0; y < 2; ++y) { for (int x = 0; x < 4; ++x) { scan.set(x, y, {static_cast<std::uint8_t>(64 + 40 * x), 180, 255, 255}); } }
@@ -111,7 +112,7 @@ int main() {
     check(scanResult.points[1].r < scanResult.points[20].r, "scanlines retain varying source colour");
     verify(islands.build(settings), 64);
 
-    settings.mode = Builder::Mode::contours;
+    settings.mode = motion::RasterSettings::Mode::contours;
     settings.pointsPerFrame = 16;
     Image complex(5, 5);
     for (int y = 0; y < 5; y += 2) { for (int x = 0; x < 5; x += 2) { complex.set(x, y); } }
@@ -134,7 +135,7 @@ int main() {
     for (unsigned bits = 0; bits < 512; ++bits) {
         Image tiny(3, 3);
         for (int i = 0; i < 9; ++i) { if ((bits & (1u << i)) != 0) { tiny.set(i % 3, i / 3); } }
-        for (const auto mode : {Builder::Mode::contours, Builder::Mode::scanlines}) {
+        for (const auto mode : {motion::RasterSettings::Mode::contours, motion::RasterSettings::Mode::scanlines}) {
             settings.mode = mode;
             verify(tiny.build(settings), 128);
         }
@@ -142,9 +143,9 @@ int main() {
     Image maximum(512, 512);
     for (int y = 0; y < 512; ++y) { for (int x = 0; x < 512; ++x) { maximum.set(x, y); } }
     settings.pointsPerFrame = 16384;
-    settings.mode = Builder::Mode::contours;
+    settings.mode = motion::RasterSettings::Mode::contours;
     verify(maximum.build(settings), 16384);
-    settings.mode = Builder::Mode::scanlines;
+    settings.mode = motion::RasterSettings::Mode::scanlines;
     auto maximumScan = maximum.build(settings);
     verify(maximumScan, 16384);
     check(pathCount(maximumScan) == 512, "maximum raster retains every scanline");
