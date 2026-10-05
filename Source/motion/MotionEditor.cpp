@@ -269,11 +269,8 @@ void MotionEditor::setUpTransport() {
     loopButton.setTitle("Loop playback");
     loopButton.setTooltip("Loop playback (L). I and O set the loop at the playhead; drag the brace in the ruler.");
     loopButton.onClick = [this] { toggleLoop(); };
-    startButton.onClick = [this] { processor.seek(0); timeline.revealTime(0); };
-    endButton.onClick = [this] {
-        const auto end = processor.document.project().duration;
-        processor.seek(end); timeline.revealTime(end);
-    };
+    startButton.onClick = [this] { seekAndReveal(0); };
+    endButton.onClick = [this] { seekAndReveal(processor.document.project().duration); };
     timeLabel.setFont(motion::style::mono());
     timeLabel.setJustificationType(juce::Justification::centred);
     tempoValue.setFont(motion::style::body());
@@ -301,8 +298,7 @@ void MotionEditor::setUpTransport() {
                 + " seconds. Use seconds (90s or 1:30s), frames (240f), or bar.beat.tick in the musical display.");
             return;
         }
-        processor.seek(*requested);
-        timeline.revealTime(*requested);
+        seekAndReveal(*requested);
     };
     tapButton.setName("Tap tempo");
     tapButton.setTitle("Tap tempo");
@@ -331,7 +327,7 @@ void MotionEditor::setUpTransport() {
     };
     exportBar.setName("Signal export progress");
     cancelExport.onClick = [this] { if (exportState != nullptr) { exportState->cancelled.store(true); } };
-    playButton.onClick = [this] { processor.playing.store(!processor.playing.load()); };
+    playButton.onClick = [this] { togglePlayback(); };
 }
 
 void MotionEditor::setUpLibrary() {

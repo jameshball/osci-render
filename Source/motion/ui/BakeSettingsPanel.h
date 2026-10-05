@@ -23,8 +23,6 @@ public:
         for (auto* input : { &duration, &seed, &bpm }) {
             input->setFont(motion::style::body());
             input->setJustification(juce::Justification::centredLeft);
-            input->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-            input->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
             input->setSelectAllWhenFocused(true);
         }
         duration.setText(displayNumber(initial.duration), false);
@@ -49,11 +47,7 @@ public:
             samples.addItem(juce::String(static_cast<juce::int64>(strides[index])), static_cast<int>(index + 1));
             if (strides[index] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(index + 1), juce::dontSendNotification); }
         }
-        for (auto* combo : { &frameRate, &samples }) {
-            combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
-            combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
-            combo->onChange = [this] { refresh(); };
-        }
+        for (auto* combo : { &frameRate, &samples }) { combo->onChange = [this] { refresh(); }; }
         duration.onTextChange = [this] { durationEdited = true; refresh(); };
         bpm.onTextChange = [this] { tempoEdited = true; refresh(); };
         seed.onTextChange = [this] { refresh(); };

@@ -16,8 +16,6 @@ public:
         policy.setSelectedId(settings.freezeOnDisconnect ? 1 : 2, juce::dontSendNotification);
         for (auto* editor : {&name, &port}) {
             editor->setFont(motion::style::body());
-            editor->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-            editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
             editor->setColour(juce::TextEditor::textColourId, osci::Colours::text());
         }
         for (auto* label : {&nameLabel, &portLabel, &policyLabel, &status, &note}) {

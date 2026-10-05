@@ -17,8 +17,6 @@ public:
         position.setTooltip("Use the current time display, or append s for seconds or f for frames.");
         for (auto* field : {&name, &position}) {
             field->setFont(motion::style::body());
-            field->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-            field->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
             field->setSelectAllWhenFocused(true);
             field->onTextChange = [this] { refresh(); };
             field->onReturnKey = [this] { apply.triggerClick(); };
@@ -73,8 +71,6 @@ public:
         tempo.setTitle("Tempo change BPM");
         tempo.setText(juce::String(bpm, bpm == std::round(bpm) ? 0 : 2), false);
         tempo.setFont(motion::style::body());
-        tempo.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-        tempo.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         tempo.setSelectAllWhenFocused(true);
         tempo.setInputRestrictions(8, "0123456789.");
         tempo.onTextChange = [this] { refresh(); };

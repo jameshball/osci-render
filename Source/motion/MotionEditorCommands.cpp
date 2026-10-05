@@ -101,12 +101,9 @@ void MotionEditor::registerCommands() {
         });
     }
 
-    addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { processor.playing.store(!processor.playing.load()); });
-    addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { processor.seek(0); timeline.revealTime(0); });
-    addCommand(3, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] {
-        const auto end = processor.document.project().duration;
-        processor.seek(end); timeline.revealTime(end);
-    });
+    addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { togglePlayback(); });
+    addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { seekAndReveal(0); });
+    addCommand(3, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] { seekAndReveal(processor.document.project().duration); });
     addCommand(3, "Record armed track", juce::KeyPress('r', shift, 0), "Shift+R", [this] { recordArmedTrack(); });
     addCommand(3, "Previous frame", juce::KeyPress(juce::KeyPress::leftKey), "Left", [this] { stepFrames(-1); });
     addCommand(3, "Next frame", juce::KeyPress(juce::KeyPress::rightKey), "Right", [this] { stepFrames(1); });
@@ -187,8 +184,7 @@ void MotionEditor::stepFrames(int frames) {
     const auto current = std::round(processor.position.load() * rate);
     const auto next = std::clamp((current + frames) / rate, 0.0, project.duration);
     processor.playing.store(false);
-    processor.seek(next);
-    timeline.revealTime(next);
+    seekAndReveal(next);
 }
 
 // The Views button's menu; right-clicking the Scene adds keying for the
@@ -232,6 +228,15 @@ void MotionEditor::showSceneViewMenu(bool atMouse) {
         }
         if (result == 30) { owner->timelineTabs.setSelectedIndex(0); owner->timeline.revealSelection(); }
     });
+}
+
+void MotionEditor::togglePlayback() {
+    processor.playing.store(!processor.playing.load());
+}
+
+void MotionEditor::seekAndReveal(double time) {
+    processor.seek(time);
+    timeline.revealTime(time);
 }
 
 // L toggles looping. Without a range yet, it loops the selection, or the
@@ -306,8 +311,7 @@ void MotionEditor::jumpToEdit(bool forward) {
     }
     if (!best.has_value()) { return; }
     const auto time = std::clamp(*best, 0.0, processor.document.project().duration);
-    processor.seek(time);
-    timeline.revealTime(time);
+    seekAndReveal(time);
 }
 
 // J/K, like After Effects: the previous or next visible item - a key of the
@@ -333,8 +337,7 @@ void MotionEditor::jumpToKey(bool forward) {
     }
     if (!best.has_value()) { return; }
     const auto time = std::clamp(*best, 0.0, processor.document.project().duration);
-    processor.seek(time);
-    timeline.revealTime(time);
+    seekAndReveal(time);
 }
 
 // Records into the first armed track's clip under the playhead (or the next

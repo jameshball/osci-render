@@ -184,6 +184,8 @@ private:
     void stepFrames(int frames);
     void jumpToKey(bool forward);
     void jumpToEdit(bool forward);
+    void togglePlayback();
+    void seekAndReveal(double time);
     void toggleLoop();
     void setLoopEdge(bool start);
     void loopSelection();
