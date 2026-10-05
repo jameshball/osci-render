@@ -27,11 +27,10 @@ bool hasPropertyCurve(const CompositionType& composition, Id target, const std::
     return findPropertyCurve(composition, target, property) != nullptr;
 }
 
-// Visual properties can be driven by routes and links; audio clip gain and
-// pan, and Lua sliders, use their authored curves only.
+// Visual properties (Lua sliders included: their bakes follow them) can be
+// driven by routes and links; audio clip gain and pan use their curves only.
 template <typename CompositionType>
 bool drivableProperty(const CompositionType& composition, Id target, const std::string& property) {
-    // Lua sliders take routes and links too: their bakes follow them.
     const auto found = findPropertyTarget(composition, target);
     return found.has_value() && !found->isAudio && found->curve(property) != nullptr;
 }
@@ -72,7 +71,6 @@ std::string validateModulation(const CompositionType& composition) {
             return "A MIDI modulator follows a clip that does not exist in its composition.";
         }
     }
-    std::set<std::pair<std::uint64_t, std::string>> routed;
     for (const auto& route : composition.routes) {
         if (!route.valid() || !modulators.contains(route.modulator) || !drivableProperty(composition, route.target, route.property)) {
             return "A modulation route references a missing modulator or property.";

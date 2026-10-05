@@ -456,13 +456,13 @@ private:
         auto project = initial;
         project.tracks[0].clips.resize(1);
         auto& clip = project.tracks[0].clips[0];
-        clip.effects.push_back(motion::makeEffect(std::numeric_limits<motion::Id>::max() - 1, *motion::effectDefinition("rotate")));
+        clip.effects.push_back(motion::makeEffect(motion::Document::maximumId - 1, *motion::effectDefinition("rotate")));
         document.reset(project);
         const auto revision = document.revision();
         motion::Id duplicate = 999;
         expect(document.duplicateClip(clip.id, duplicate).failed());
         expect(duplicate == 0 && document.revision() == revision && !undo.canUndo());
-        expect(document.newId() == std::numeric_limits<motion::Id>::max());
+        expect(document.newId() == motion::Document::maximumId);
     }
 };
 

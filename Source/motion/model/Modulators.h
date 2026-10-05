@@ -34,12 +34,7 @@ struct Modulator {
     // source clip's pattern, on one channel or any (0).
     int controller = 1, controllerChannel = 0;
 
-    bool operator==(const Modulator& other) const {
-        return id == other.id && name == other.name && kind == other.kind && shape == other.shape && source == other.source
-            && attack == other.attack && decay == other.decay && sustain == other.sustain && release == other.release
-            && velocity == other.velocity && lowestPitch == other.lowestPitch && highestPitch == other.highestPitch
-            && controller == other.controller && controllerChannel == other.controllerChannel;
-    }
+    bool operator==(const Modulator&) const = default;
     bool valid() const {
         const auto time = [](double value) { return std::isfinite(value) && value >= 0 && value <= 60; };
         return id != 0 && !name.empty() && name.size() <= 120 && static_cast<int>(kind) >= 0 && static_cast<int>(kind) <= 2

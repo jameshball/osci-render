@@ -32,6 +32,7 @@ struct Keyframe {
     double incomingInfluence = defaultInfluence;
     double outgoingInfluence = defaultInfluence;
 
+    bool operator==(const Keyframe&) const = default;
     static bool validInfluence(double value) { return std::isfinite(value) && value > 0.0 && value <= 1.0; }
     bool valid() const {
         return std::isfinite(time) && std::isfinite(value) && std::isfinite(incomingSlope) && std::isfinite(outgoingSlope)
@@ -191,18 +192,7 @@ public:
 
     // Authored content equality: keys, base and link; runtime
     // drivers are ignored.
-    bool sameAuthoring(const Curve& other) const {
-        if (base != other.base || link != other.link || keys.size() != other.keys.size()) { return false; }
-        for (std::size_t index = 0; index < keys.size(); ++index) {
-            const auto& a = keys[index];
-            const auto& b = other.keys[index];
-            if (a.time != b.time || a.value != b.value || a.interpolation != b.interpolation || a.incomingSlope != b.incomingSlope
-                || a.outgoingSlope != b.outgoingSlope || a.incomingInfluence != b.incomingInfluence || a.outgoingInfluence != b.outgoingInfluence) {
-                return false;
-            }
-        }
-        return true;
-    }
+    bool sameAuthoring(const Curve& other) const { return base == other.base && link == other.link && keys == other.keys; }
 
 private:
     double linkedValue(double time) const {

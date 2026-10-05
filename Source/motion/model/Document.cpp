@@ -124,7 +124,7 @@ juce::Result Document::setMarker(Id id, double time, juce::String name) {
     if (!adding && found->time == time && found->name == name) { return juce::Result::ok(); }
     if (adding) {
         const auto highest = highestId();
-        if (highest >= static_cast<Id>(std::numeric_limits<juce::int64>::max())) { return juce::Result::fail("No marker identities remain."); }
+        if (highest >= maximumId) { return juce::Result::fail("No marker identities remain."); }
         id = highest + 1;
         lastId = id;
     }
@@ -534,7 +534,7 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
             if (clip.id != clipId) { continue; }
             if (track.locked || clip.asset != expected->id) { return juce::Result::fail("The selected clip is locked or its source has changed."); }
             const auto highest = highestId();
-            if (highest == std::numeric_limits<Id>::max()) { return juce::Result::fail("There are no remaining source identities."); }
+            if (highest >= maximumId) { return juce::Result::fail("There are no remaining source identities."); }
             if (copy->liveIdentity != nullptr) { copy->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
             copy->id = highest + 1;
             copy->name = copy->liveIdentity != nullptr ? expected->name + " copy" : expected->name.upToLastOccurrenceOf(".", false, false) + " copy " + juce::String(static_cast<juce::uint64>(copy->id)) + expected->extension;
@@ -749,7 +749,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
     std::map<Id, Id> overflowTracks, owners;
     for (const auto& copied : clips) {
         auto clip = copied.clip;
-        if (static_cast<Id>(clip.effects.size() + state.routes.size()) + 2 > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for pasted clips."); }
+        if (static_cast<Id>(clip.effects.size() + state.routes.size()) + 2 > maximumId - highest) { return juce::Result::fail("There are no remaining identities for pasted clips."); }
         auto timing = clip.timing(state.tempo());
         timing.moveTo(timing.start - first + time);
         if (!clip.setTiming(timing, state.tempo())) { return juce::Result::fail("The pasted selection has invalid timing."); }
@@ -792,11 +792,7 @@ juce::Result Document::pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, 
     if (keys.empty()) { return juce::Result::fail("The clipboard has no keyframes."); }
     const auto target = findPropertyTarget(project(), clipId);
     if (!target.has_value() || target->isEffect) { return juce::Result::fail("Select a clip, group or camera to paste keyframes onto."); }
-    for (const auto& track : project().tracks) {
-        for (const auto& clip : track.clips) {
-            if (clip.id == clipId && track.locked) { return juce::Result::fail("Unlock the track before pasting keyframes."); }
-        }
-    }
+    if (target->locked) { return juce::Result::fail("Unlock the track before pasting keyframes."); }
     const auto changed = tryEdit(keys.size() > 1 ? "Paste keyframes" : "Paste keyframe", [&](Project& updated) {
         const auto found = findPropertyTarget(updated, clipId);
         if (!found.has_value()) { return false; }
@@ -845,7 +841,7 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     std::map<Id, Id> owners;
     for (auto& [index, copy] : copies) {
         const auto required = static_cast<Id>(copy.effects.size() + state.routes.size()) + 1;
-        if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining identities for duplicated clips."); }
+        if (required > maximumId - highest) { return juce::Result::fail("There are no remaining identities for duplicated clips."); }
         const auto original = copy.id;
         auto timing = copy.timing(state.tempo());
         timing.moveTo(timing.start + (last - first));
@@ -1015,7 +1011,7 @@ juce::Result Document::insertComposition(Id definition, double time, Id trackId,
     if (source == candidate.definitions.end()) { return juce::Result::fail("The composition no longer exists."); }
     auto highest = highestId();
     const auto required = trackId == 0 ? 2u : 1u;
-    if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining clip identities."); }
+    if (required > maximumId - highest) { return juce::Result::fail("There are no remaining clip identities."); }
     auto clip = makeCompositionClip(++highest, **source, time);
     if (!clip.valid() || !clip.timing(candidate.tempo()).valid()) { return juce::Result::fail("The composition has invalid timing."); }
     if (trackId != 0) {
@@ -1055,7 +1051,7 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
         for (const auto& clip : track.clips) { required += clip.effects.size(); }
     }
     auto highest = highestId();
-    if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining composition identities."); }
+    if (required > maximumId - highest) { return juce::Result::fail("There are no remaining composition identities."); }
     // Every renumbered property owner, so routes and links can follow.
     std::map<Id, Id> owners;
     const auto effects = [&](auto& values) {
@@ -1186,7 +1182,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     for (const auto& track : definition->tracks) { required += track.effects.size(); }
     for (const auto& group : state.groups) { if (requiredGroups.contains(group.id)) { required += group.effects.size(); } }
     required += 2 * state.routes.size() + state.modulators.size();
-    if (required > std::numeric_limits<Id>::max() - highest) { return juce::Result::fail("There are no remaining composition identities."); }
+    if (required > maximumId - highest) { return juce::Result::fail("There are no remaining composition identities."); }
     definition->id = ++highest;
     // copies: every root owner copied (not moved) into the definition.
     std::map<Id, Id> groupIds, copies;

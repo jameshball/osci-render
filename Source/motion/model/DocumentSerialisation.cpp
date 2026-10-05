@@ -530,16 +530,8 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 return clipEffects;
             }
             if (track.kind == TrackKind::audio) {
-                if (!clip.effects.empty() || clip.properties.size() != 2 || !clip.properties.contains("gain") || !clip.properties.contains("pan")) {
-                    return juce::Result::fail("Audio clips require gain and pan curves and cannot contain visual effects or properties.");
-                }
-                for (const auto* name : { "gain", "pan" }) {
-                    const auto& curve = clip.properties.at(name);
-                    const bool gain = std::string_view(name) == "gain";
-                    const auto validValue = [gain](double value) { return std::isfinite(value) && value >= (gain ? 0.0 : -1.0) && value <= (gain ? 4.0 : 1.0); };
-                    if (!curve.valid() || !validValue(curve.base) || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [&](const auto& key) { return !validValue(key.value); })) {
-                        return juce::Result::fail("Audio gain must be between 0 and 4, and pan between -1 and 1.");
-                    }
+                if (!clip.effects.empty() || !validProperties(clip.properties, audioPropertySpecs)) {
+                    return juce::Result::fail("Audio clips need gain (0 to 4) and pan (-1 to 1) curves and cannot contain visual effects or properties.");
                 }
             }
             if (!track.insert(std::move(clip), project.tempo())) {

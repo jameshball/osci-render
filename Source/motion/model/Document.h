@@ -143,7 +143,12 @@ public:
     juce::Result removeMarker(Id id);
     std::uint64_t generation() const { return projectGeneration; }
     std::uint64_t revision() const { return stateRevision; }
-    Id newId() { return ++lastId; }
+    // Identities stay below the Scope's reserved one, so it never collides.
+    static constexpr Id maximumId = beamIdentity - 1;
+    Id newId() {
+        jassert(lastId < maximumId);
+        return ++lastId;
+    }
     void edit(juce::String label, std::function<void(Project&)> operation);
     // Records nothing, and changes no revision, when the operation declines.
     bool tryEdit(juce::String label, std::function<bool(Project&)> operation);
