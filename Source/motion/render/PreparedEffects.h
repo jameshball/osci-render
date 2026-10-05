@@ -78,7 +78,8 @@ struct PreparedEffect {
             case Kind::bulge: output = bulge(input, values[1]); break;
             case Kind::ripple: output = ripple(input, values[1], values[2], values[3]); break;
             case Kind::colour: output = colour(input, values[1], values[2], values[3]); break;
-            case Kind::vortex: output = vortex(input, values[1], values[2], values[3]); break;
+            // Strength mixes every effect below, so the kernel runs at full strength.
+            case Kind::vortex: output = vortex(input, 1, values[1], values[2]); break;
             case Kind::bitCrush: output = bitCrush(input, values[1]); break;
             case Kind::twist: output = twist(input, values[1]); break;
             case Kind::polygon: output = polygon(input, values[1], values[2], values[3], values[4]); break;

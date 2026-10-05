@@ -33,7 +33,7 @@ inline const std::vector<EffectDefinition>& effectCatalog() {
         { EffectKind::swirl, "swirl", "Swirl", {{"strength", "Strength", 1, 0, 1}, {"swirl", "Swirl", 0.4, -1, 1}} },
         { EffectKind::bulge, "bulge", "Bulge", {{"strength", "Strength", 1, 0, 1}, {"bulge", "Bulge", 0.5, 0, 1}} },
         { EffectKind::ripple, "ripple", "Ripple", {{"strength", "Strength", 1, 0, 1}, {"rippleDepth", "Depth", 0.2, 0, 1}, {"ripplePhase", "Phase", 0, -1, 1}, {"rippleAmount", "Amount", 0.1, 0, 1}} },
-        { EffectKind::vortex, "vortex", "Vortex", {{"strength", "Strength", 1, 0, 1}, {"vortexStrength", "Vortex strength", 0.6, 0, 1}, {"vortexAmount", "Amount", 2, 2, 6}, {"vortexRotation", "Rotation", 0.25, 0, 1}} },
+        { EffectKind::vortex, "vortex", "Vortex", {{"strength", "Strength", 0.6, 0, 1}, {"vortexAmount", "Amount", 2, 2, 6}, {"vortexRotation", "Rotation", 0.25, 0, 1}} },
         { EffectKind::colour, "colour", "Colour", {{"strength", "Strength", 1, 0, 1}, {"hue", "Hue (degrees)", 0, -180, 180}, {"saturation", "Saturation", 1, 0, 2}, {"brightness", "Brightness", 1, 0, 2}} },
         { EffectKind::bitCrush, "bitCrush", "Bit crush", {{"strength", "Strength", 1, 0, 1}, {"crush", "Crush", 0.7, 0, 1}} },
         { EffectKind::twist, "twist", "Twist", {{"strength", "Strength", 1, 0, 1}, {"twist", "Twist", 0.5, -1, 1}} },
