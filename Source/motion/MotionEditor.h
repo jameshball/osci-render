@@ -260,7 +260,7 @@ private:
     std::unique_ptr<juce::TimedCallback> tapCommit;
     bool detectingTempo = false;
     double lastPaintedPosition = -1;
-    int idleTicks = 0;
+    int ticks = 0;
     std::shared_ptr<const motion::LiveSourceFrames> lastLiveFrames;
     juce::Component* visualiserControls = nullptr;
     motion::Id soundtrackClip() const;

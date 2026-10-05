@@ -7,6 +7,7 @@
 #include "../model/PropertyTarget.h"
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
+#include "PlayheadStrip.h"
 #include <optional>
 #include <set>
 #include <limits>
@@ -35,6 +36,7 @@ public:
         contextCurves = std::move(curves);
         repaint();
     }
+    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
     // Page-follows the playhead during playback unless the view was just moved.
     void followPlayhead(double time, bool playing) {
         if (!playing) { following = false; followPaused = false; return; }
@@ -132,6 +134,7 @@ public:
 
     void paint(juce::Graphics& g) override {
         g.fillAll(osci::Colours::veryDark());
+        playheadStrip.drawn(std::nullopt);
         const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
         const auto* storedCurve = findCurve(clip, propertyName);
         g.setColour(osci::Colours::text());
@@ -275,9 +278,12 @@ public:
             for (const auto& key : curve.keyframes()) {
                 drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : colour, key);
             }
-            const auto x = timeX(processor.position.load());
-            g.setColour(motion::style::playhead());
-            g.drawLine(x, area.getY(), x, area.getBottom(), 1.0f);
+            const auto x = playheadX();
+            if (x.has_value()) {
+                playheadStrip.drawn(x);
+                g.setColour(motion::style::playhead());
+                g.drawVerticalLine(*x, area.getY(), area.getBottom());
+            }
             if (snapGuide.has_value()) {
                 const auto guide = timeX(*snapGuide);
                 g.setColour(motion::style::accent().withAlpha(.75f));
@@ -1005,6 +1011,11 @@ private:
             high = 1.0;
         }
     }
+    std::optional<int> playheadX() const {
+        const auto x = juce::roundToInt(timeX(processor.position.load()));
+        if (x < plot().getX() || x > plot().getRight()) { return std::nullopt; }
+        return x;
+    }
     float timeX(double time) const {
         auto normalized = (time - viewStart) / (viewEnd - viewStart);
         if (!std::isfinite(normalized)) { normalized = time < viewStart ? -10.0 : 11.0; }
@@ -1343,6 +1354,7 @@ private:
     juce::Point<float> marqueeStart;
     std::optional<Drag> drag;
     std::optional<double> snapGuide;     // Project time of the magnet a drag is snapped to.
+    motion::PlayheadStrip playheadStrip;
     std::map<std::string, juce::Colour> contextCurves;
     std::set<std::string> hiddenCurves;
     bool following = false, followPaused = false, scrubbing = false;

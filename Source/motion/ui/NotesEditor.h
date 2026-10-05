@@ -2,6 +2,7 @@
 
 #include "../MotionProcessor.h"
 #include "MotionStyle.h"
+#include "PlayheadStrip.h"
 #include <set>
 
 // Clip-local beat editor. Gestures preview immutable note content locally and
@@ -74,6 +75,7 @@ public:
         refresh();
     }
     ~MotionNotesEditor() override { stopTimer(); processor.midiRecordingSession().cancel(); processor.setMidiAudition(0); }
+    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
     void setSelection(motion::Id id) {
         if (target == id) { refresh(); return; }
         processor.midiRecordingSession().cancel();
@@ -142,6 +144,7 @@ public:
     }
     void paint(juce::Graphics& g) override {
         g.fillAll(osci::Colours::veryDark());
+        playheadStrip.drawn(std::nullopt);
         const auto* clip = currentClip();
         // Without a clip the tab name already says what this is; no header bar.
         if (clip == nullptr && preview == nullptr) {
@@ -229,10 +232,11 @@ public:
         }
         g.setColour(osci::Colours::text().withAlpha(.55f)); g.setFont(motion::style::caption());
         g.drawText("Velocity", 5, lane.getY() + 4, keyboardWidth - 8, 15, juce::Justification::centredLeft);
-        if (clip != nullptr && clip->contains(processor.position.load(), processor.document.project().tempo())) {
-            const auto beat = clip->localTime(processor.position.load(), processor.document.project().tempo()) * clip->curveBpm(processor.document.project().tempo()) / 60;
-            const auto x = beatX(beat);
-            if (x >= keyboardWidth && x < getWidth()) { g.setColour(osci::Colours::accentColor().withAlpha(.65f)); g.drawVerticalLine(x, 30, static_cast<float>(lane.getBottom())); }
+        const auto playhead = playheadX();
+        playheadStrip.drawn(playhead);
+        if (playhead.has_value()) {
+            g.setColour(motion::style::playhead());
+            g.drawVerticalLine(*playhead, 30, static_cast<float>(lane.getBottom()));
         }
         g.setColour(error.isEmpty() ? osci::Colours::text().withAlpha(.55f) : juce::Colours::orange); g.setFont(motion::style::caption());
         if (!recordingStatus.isVisible()) {
@@ -425,6 +429,15 @@ private:
     double snap(double beat, const juce::ModifierKeys& mods) const { return std::max(0.0, !mods.isAltDown() && processor.document.project().gridSnap ? std::round(beat / snapStep()) * snapStep() : beat); }
     juce::Rectangle<int> gridBounds() const { return {keyboardWidth, 30 + rulerHeight, std::max(0, getWidth() - keyboardWidth), std::max(1, getHeight() - 30 - rulerHeight - 80)}; }
     juce::Rectangle<int> velocityBounds() const { return {keyboardWidth, getHeight() - 78, std::max(0, getWidth() - keyboardWidth), 58}; }
+    std::optional<int> playheadX() const {
+        const auto* clip = currentClip();
+        const auto tempo = processor.document.project().tempo();
+        const auto position = processor.position.load();
+        if (clip == nullptr || !clip->contains(position, tempo)) { return std::nullopt; }
+        const auto x = beatX(clip->localTime(position, tempo) * clip->curveBpm(tempo) / 60);
+        if (x < keyboardWidth || x >= getWidth()) { return std::nullopt; }
+        return x;
+    }
     int beatX(double beat) const { return keyboardWidth + juce::roundToInt(std::clamp((beat - scrollBeat) * pixelsPerBeat, -1000000.0, 1000000.0)); }
     double beatAt(int x) const { return std::max(0.0, scrollBeat + (x - keyboardWidth) / pixelsPerBeat); }
     int pitchY(int pitch) const { return gridBounds().getY() + (topPitch - pitch) * rowHeight; }
@@ -441,6 +454,7 @@ private:
     MotionProcessor& processor;
     motion::Id target = 0;
     std::set<motion::Id> selected, marqueeSelection;
+    motion::PlayheadStrip playheadStrip;
     std::shared_ptr<const motion::MidiNotes> original, preview;
     std::uint64_t dragRevision = 0;
     bool dragging = false, marquee = false, updating = false, additiveMarquee = false;

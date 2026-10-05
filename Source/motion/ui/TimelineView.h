@@ -10,6 +10,7 @@
 #include "../model/PropertySchema.h"
 #include "../model/KeyEasing.h"
 #include "MotionIcons.h"
+#include "PlayheadStrip.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
     struct Row : motion::TrackRow {
@@ -506,10 +507,18 @@ public:
         paintScrollBars(g);
         paintPlayhead(g);
     }
-    void paintPlayhead(juce::Graphics& g) const {
-        const auto playhead = timeX(processor.position.load());
-        if (playhead < namesWidth || playhead > getWidth()) { return; }
-        g.setColour(juce::Colour(0xff7de5a0));
+    std::optional<int> playheadX() const {
+        const auto x = timeX(processor.position.load());
+        if (x < namesWidth || x > getWidth()) { return std::nullopt; }
+        return x;
+    }
+    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
+    void paintPlayhead(juce::Graphics& g) {
+        const auto x = playheadX();
+        playheadStrip.drawn(x);
+        if (!x.has_value()) { return; }
+        const auto playhead = *x;
+        g.setColour(motion::style::playhead());
         g.drawVerticalLine(playhead, 0, static_cast<float>(getHeight()));
         juce::Path head;
         head.addTriangle(playhead - 5, 0, playhead + 5, 0, playhead, 8);
@@ -2769,6 +2778,7 @@ private:
         motion::Id group = 0;
     };
     std::optional<TrackDrag> trackDrag;
+    motion::PlayheadStrip playheadStrip;
     std::vector<float> rowShift;
     juce::TimedCallback rowAnimation {[this] { stepRows(); }};
     // A drag ends where it began if the document changes under it (an undo,

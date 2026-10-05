@@ -183,7 +183,12 @@ public:
         setClickingTogglesState(true);
         setWantsKeyboardFocus(false);
     }
-    void setOnColour(juce::Colour colour) { on = colour; repaint(); }
+    void setOnColour(juce::Colour colour) {
+        if (on != colour) {
+            on = colour;
+            repaint();
+        }
+    }
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
         const auto bounds = getLocalBounds().toFloat().reduced(.5f);
         const auto active = getToggleState();

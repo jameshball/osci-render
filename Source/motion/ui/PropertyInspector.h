@@ -152,8 +152,10 @@ public:
         const juce::String kindText = !editable ? (heading.has_value() ? heading->second : juce::String()) : found->beam ? juce::String() : found->camera ? "Camera" : found->isGroup ? "Group" : found->isAudio ? "Audio" : sourceKind(target);
         kind.setText(editable && selectionCount > 1 ? "Editing 1 of " + juce::String(selectionCount) : kindText, juce::dontSendNotification);
         kind.setTooltip(editable && selectionCount > 1 ? juce::String(selectionCount) + " clips are selected; these fields edit only " + juce::String(found->name.data(), found->name.size()) + "." : juce::String());
-        empty = !editable && !heading.has_value();
-        if (!editable) { repaint(); return; }
+        // Children repaint their own changes; only the empty message is painted here.
+        const auto wasEmpty = std::exchange(empty, !editable && !heading.has_value());
+        if (empty != wasEmpty) { repaint(); }
+        if (!editable) { return; }
         const auto time = keyTime(*found);
         for (auto& row : rows) {
             bool allKeyed = true, anyAnimated = false, modulated = false;
@@ -180,7 +182,6 @@ public:
                 row->swatch->setColour(juce::Colour::fromFloatRGBA(static_cast<float>(rgb[0]), static_cast<float>(rgb[1]), static_cast<float>(rgb[2]), 1.0f));
             }
         }
-        repaint();
     }
 
     // Modulators dragged from the library route to the field or row dropped on.

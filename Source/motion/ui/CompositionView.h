@@ -8,6 +8,7 @@
 #include "MotionPath.h"
 #include "CompositionGizmo.h"
 #include "TransformGizmo.h"
+#include "LineBatch.h"
 #include "../model/PropertyTarget.h"
 
 class MotionCompositionView : public juce::Component, public juce::DragAndDropTarget, private juce::Timer {
@@ -232,6 +233,7 @@ public:
             const auto sampleCount = source->previewSampleCount();
             const auto previewSpan = source->previewPhaseSpan();
             const auto firstPoint = clip.sample(sampleTime, 0, previewSpan, 0, liveFrames.get());
+            const auto highlighted = clip.editorId() == selected || (dropHover.has_value() && *dropHover != 0 && clip.editorId() == *dropHover);
             auto previous = projected(firstPoint, time);
             bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
             for (std::size_t i = 1; i <= sampleCount; ++i) {
@@ -243,16 +245,17 @@ public:
                     previousLit = lit;
                     continue;
                 }
+                // Long, fast jumps fade so the drawn shape reads over them.
                 const auto distance = previous->getDistanceFrom(*next);
                 const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
-                const auto highlighted = clip.editorId() == selected || (dropHover.has_value() && *dropHover != 0 && clip.editorId() == *dropHover);
                 const auto colour = highlighted ? juce::Colour(0xff9affb3) : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
-                g.setColour(colour.withAlpha(alpha * 0.8f));
-                g.drawLine({ *previous, *next }, highlighted ? 1.4f : 1.0f);
+                (highlighted ? highlightedLines : lines).add({ *previous, *next }, colour.withAlpha(alpha * 0.8f));
                 previous = next;
                 previousLit = lit;
             }
         }
+        lines.stroke(g, 1.0f);
+        highlightedLines.stroke(g, 1.4f);
         paintCameras(g, time);
         paintMotionPath(g);
         currentGizmo().paint(g, before.has_value() ? dragAxis : hoverHandle);
@@ -879,6 +882,8 @@ private:
     motion::editor::MotionPath motionPath;
     MotionProcessor& processor;
     std::unique_ptr<motion::PreparedComposition> prepared;
+    // The preview's segments, stroked together; the selection's draw on top.
+    motion::LineBatch lines, highlightedLines;
     std::optional<motion::Id> dropHover;
     bool effectDrag = false;
     std::optional<motion::Project> before;

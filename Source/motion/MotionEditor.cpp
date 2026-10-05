@@ -1573,11 +1573,11 @@ void MotionEditor::timerCallback() {
     if (timeLabel.isBeingEdited() && (positionEditGeneration != processor.document.generation() || positionEditRevision != processor.document.revision())) { timeLabel.hideEditor(true); }
     if (!timeLabel.isBeingEdited()) { timeLabel.setText(juce::String(processor.document.project().timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification); }
     if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
-    // Views that draw the playhead repaint only while it moves.
+    // A moving playhead repaints only its own columns of the time views. A
+    // slow full refresh (about 3 Hz) still catches anything that changes
+    // without an edit or a playhead move, and live inputs (armed MIDI
+    // tracks, Blender capture) repaint everything while stopped too.
     const auto position = processor.position.load();
-    // A slow refresh (about 3 Hz) still catches anything that changes
-    // without an edit or a playhead move.
-    // Live inputs (armed MIDI tracks, Blender capture) draw while stopped too.
     const auto liveFrames = processor.liveSourcePreview();
     const auto isArmed = [](const auto& track) { return track.midiInput != 0; };
     const auto& mainTracks = processor.document.mainProject().tracks;
@@ -1586,17 +1586,23 @@ void MotionEditor::timerCallback() {
     // The snapshot is held, so a new one can never reuse the old address.
     const auto live = armed || liveFrames != lastLiveFrames;
     lastLiveFrames = liveFrames;
-    const auto moved = position != lastPaintedPosition || playing || ++idleTicks % 10 == 0;
+    const auto slowTick = ++ticks % 10 == 0;
+    const auto refresh = live || slowTick;
+    const auto moved = position != lastPaintedPosition || playing;
     lastPaintedPosition = position;
     timeline.followPlayhead(position, playing);
     if (curveEditor.isVisible() && timeline.followEnabled) { curveEditor.followPlayhead(position, playing); }
-    if (moved || live) {
+    if (refresh) {
         timeline.repaint();
         if (notesEditor.isVisible()) { notesEditor.repaint(); }
         if (curveEditor.isVisible()) { curveEditor.repaint(); }
-        composition.repaint();
+    } else if (moved) {
+        timeline.repaintPlayhead();
+        if (notesEditor.isVisible()) { notesEditor.repaintPlayhead(); }
+        if (curveEditor.isVisible()) { curveEditor.repaintPlayhead(); }
     }
-    if (moved) {
+    if (refresh || moved) { composition.repaint(); }
+    if (moved || slowTick) {
         refreshInspector();
         refreshCameraTools();
         effectStack.updateValues();
