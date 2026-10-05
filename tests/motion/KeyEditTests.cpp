@@ -84,6 +84,14 @@ int main() {
     assert(close(bezier.outgoingSlope, curves.at("position.y").automaticSlope(0)));
     assert(!motion::keyedit::setInterpolation(curve, 0.5, motion::Interpolation::cubic));
     assert(!motion::keyedit::setInterpolation(curve, 0.75, motion::Interpolation::linear));
+
+    // A straight segment stays straight as a Bezier: both handles take its slope.
+    motion::Curve line;
+    line.setKey({0, 0, motion::Interpolation::linear});
+    line.setKey({1, 2, motion::Interpolation::linear});
+    line.setKey({2, 0, motion::Interpolation::linear});
+    assert(motion::keyedit::setInterpolation(line, 0, motion::Interpolation::cubic));
+    for (const auto time : {0.25, 0.5, 0.75}) { assert(close(line.evaluate(time), 2 * time)); }
     std::cout << "KeyEditTests passed\n";
     return 0;
 }

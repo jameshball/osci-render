@@ -59,9 +59,22 @@ inline bool setKeyed(Curve& curve, double time, bool keyed) {
     return true;
 }
 
+// The slope the segment leaving key `from` has at key `at` (`from` or the
+// next one): a straight segment's own slope, a Bezier's handle, otherwise
+// the curve's automatic tangent. A Bezier with these slopes keeps the
+// segment's shape.
+inline double segmentSlope(const Curve& curve, std::size_t from, std::size_t at) {
+    const auto& keys = curve.keyframes();
+    const auto& start = keys[from];
+    const auto& end = keys[from + 1];
+    if (start.interpolation == Interpolation::linear) { return (end.value - start.value) / (end.time - start.time); }
+    if (start.interpolation == Interpolation::cubic) { return at == from ? start.outgoingSlope : end.incomingSlope; }
+    return curve.automaticSlope(at);
+}
+
 // Sets the interpolation leaving the key at `time`; false when there is no
-// such key or it already has it. Bezier handles start on the automatic
-// tangents, so switching to Bezier keeps the segment's shape.
+// such key or it already has it. Switching to Bezier keeps the segment's
+// shape (see segmentSlope).
 inline bool setInterpolation(Curve& curve, double time, Interpolation next) {
     const auto* found = findKey(curve, time);
     if (found == nullptr || found->interpolation == next) { return false; }
@@ -70,11 +83,11 @@ inline bool setInterpolation(Curve& curve, double time, Interpolation next) {
     const auto index = static_cast<std::size_t>(found - keys.data());
     if (next == Interpolation::cubic && updated.interpolation != Interpolation::cubic && index + 1 < keys.size()) {
         auto following = keys[index + 1];
-        updated.outgoingSlope = curve.automaticSlope(index);
+        updated.outgoingSlope = segmentSlope(curve, index, index);
         updated.outgoingInfluence = Keyframe::defaultInfluence;
-        following.incomingSlope = curve.automaticSlope(index + 1);
+        following.incomingSlope = segmentSlope(curve, index, index + 1);
         following.incomingInfluence = Keyframe::defaultInfluence;
-        if (updated.interpolation == Interpolation::smooth) { curve.setKey(following); }
+        curve.setKey(following);
     }
     updated.interpolation = next;
     curve.setKey(updated);
