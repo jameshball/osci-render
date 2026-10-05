@@ -233,7 +233,7 @@ private:
     MotionCurveList curveList;
     std::set<std::string> shownCurves, hiddenCurves;
     void refreshCurveList();
-    MotionDivider timelineDivider { false }, previewDivider { true };
+    osci::PanelDivider timelineDivider { false }, previewDivider { true };
     double timelineFraction = 0.34, previewFraction = 0.5;
     double dividerStart = 0;
     int previewWidth = 1, workspaceHeight = 1;

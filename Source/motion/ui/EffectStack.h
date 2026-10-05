@@ -69,7 +69,7 @@ private:
         void mouseDrag(const juce::MouseEvent& event) override;
     private:
         static constexpr int headerHeight = 28, labelWidth = 92;
-        struct Row { std::string id; juce::String label; MotionScrubField field; osci::KeyframeButton key; };
+        struct Row { std::string id; juce::String label; motion::ui::ScrubField field; osci::KeyframeButton key; };
         MotionEffectStack& stack;
         motion::Id id;
         juce::String name;

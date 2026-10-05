@@ -99,7 +99,7 @@ try:
     step("select visual clip", "click", "--class", "MotionTimelineView", "--position", "240,77")
     step("open notes workspace", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
     # Give the piano roll the room it used to take for itself.
-    step("taller notes", "drag", "--name", "Resize timeline", "--class", "MotionDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
+    step("taller notes", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
     step("create note pattern", "click", "--name", "Create notes", "--exact")
     step("draw first note", "click", "--class", "MotionNotesEditor", "--position", "222,170", "--click-count", "2")
     command("wait-for-locator", "--name", "Undo Add MIDI note", "--role", "label", "--exact")

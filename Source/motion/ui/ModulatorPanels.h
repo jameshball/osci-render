@@ -21,7 +21,7 @@ inline constexpr PropertySpec delaySpec {"delay", "Delay", "", "", -3600, 3600, 
 // A labelled scrub row; owners set the spec and callbacks.
 struct LabelledScrub {
     juce::Label label;
-    MotionScrubField field;
+    motion::ui::ScrubField field;
     void setup(juce::Component& owner, const juce::String& text, const juce::String& name, const PropertySpec& spec);
     void setVisible(bool visible) { label.setVisible(visible); field.setVisible(visible); }
     void layout(juce::Rectangle<int>& area);
@@ -51,7 +51,7 @@ private:
     std::function<void(const juce::Result&)> report;
     ModulationRoute route;
     juce::Label label;
-    MotionScrubField amount;
+    motion::ui::ScrubField amount;
     juce::TextButton mode;
     osci::CloseButton remove {"Remove route"};
 };

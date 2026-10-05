@@ -86,7 +86,7 @@ try:
     # Route it into the leader's position y from the graph column.
     step("select leader", "click", "--class", "MotionTimelineView", "--position", "350,64")
     step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
-    step("taller graph", "drag", "--name", "Resize timeline", "--class", "MotionDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
+    step("taller graph", "drag", "--name", "Resize timeline", "--class", "osci::PanelDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
     step("all channels", "click", "--name", "Animated channels only", "--exact")
     step("choose position y", "click", "--name", "Curve Position Y", "--exact")
     # Dragging the LFO's card onto the Y field in Properties routes it there.

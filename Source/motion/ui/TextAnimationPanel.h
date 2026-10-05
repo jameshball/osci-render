@@ -191,5 +191,5 @@ private:
     motion::ui::Chip none {"None"}, typeOn {"Type"}, rise {"Rise"}, pop {"Pop"}, wave {"Wave"}, scatter {"Scatter"};
     std::array<motion::ui::Chip*, 6> kinds {&none, &typeOn, &rise, &pop, &wave, &scatter};
     std::array<juce::Label, 4> captions;
-    std::array<MotionScrubField, 4> fields;
+    std::array<motion::ui::ScrubField, 4> fields;
 };

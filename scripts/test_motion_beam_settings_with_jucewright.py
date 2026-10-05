@@ -78,11 +78,11 @@ def snapshot():
 
 
 def intensity():
-    return next(node for node in nodes(snapshot()) if node.get("componentName") == "intensity" and node.get("class") == "MotionScrubField")
+    return next(node for node in nodes(snapshot()) if node.get("componentName") == "intensity" and node.get("class") == "motion::ui::ScrubField")
 
 
 def scope_field(label):
-    return next(node for node in nodes(snapshot()) if node.get("class") == "MotionScrubField" and "Scope " + label in (node.get("name"), node.get("componentName")))
+    return next(node for node in nodes(snapshot()) if node.get("class") == "motion::ui::ScrubField" and "Scope " + label in (node.get("name"), node.get("componentName")))
 
 
 def saved():

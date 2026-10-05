@@ -180,7 +180,7 @@ private:
     }};
     struct Field {
         juce::Label caption;
-        MotionScrubField editor;
+        motion::ui::ScrubField editor;
     };
     void caption(juce::Label& label, const juce::String& text) {
         label.setText(text, juce::dontSendNotification);

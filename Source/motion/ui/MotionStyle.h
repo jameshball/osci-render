@@ -383,11 +383,3 @@ inline void unstyleDialogs(juce::Component& component, DialogLookAndFeel& look) 
 }
 }
 
-// A resize handle that shows its grip only on hover, focus or drag.
-class MotionDivider final : public osci::PanelDivider {
-public:
-    using osci::PanelDivider::PanelDivider;
-    void paint(juce::Graphics& g) override {
-        if (isMouseOverOrDragging() || hasKeyboardFocus(false)) { osci::PanelDivider::paint(g); }
-    }
-};

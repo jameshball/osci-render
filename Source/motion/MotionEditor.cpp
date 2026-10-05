@@ -493,6 +493,7 @@ void MotionEditor::setUpProperties() {
 void MotionEditor::setUpTimeline() {
     timelineDivider.setName("Resize timeline");
     previewDivider.setName("Resize preview panels");
+    for (auto* divider : {&timelineDivider, &previewDivider}) { divider->setQuiet(true); }
     styleTabs(timelineTabs);
     timeline.onEffectAdded = [this](motion::Id owner, motion::Id) { select(owner); };
     timelineTabs.setName("Timeline tabs");

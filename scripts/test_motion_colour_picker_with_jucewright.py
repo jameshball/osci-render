@@ -86,7 +86,7 @@ try:
     step("open picker", "click", "--name", "Colour swatch", "--exact")
     command("wait-for-locator", "--name", "Colour picker", "--exact")
     step("picker", "screenshot", "--file", session.artifact_dir / "colour-picker.png", "--scale", 2)
-    x, y, w, h = box(find(lambda n: n.get("name") == "Colour picker"))
+    x, y, w, h = box(find(lambda n: n.get("componentName") == "Colour picker"))
     # Hue strip: blue (two thirds along). Square: full saturation and brightness.
     strip_y = y + 10 + 136 + 10 + 6
     step("pick hue", "drag-xy", x + 10 + 100, strip_y, x + 10 + round(200 * 2 / 3), strip_y, "--steps", 8)

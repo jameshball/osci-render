@@ -225,6 +225,6 @@ private:
     using Tool = motion::icons::Button;
     Tool bold {"Bold", motion::icons::Icon::bold}, italic {"Italic", motion::icons::Icon::italic};
     Tool alignLeft {"Align left", motion::icons::Icon::alignLeft}, alignCentre {"Align centre", motion::icons::Icon::alignCentre}, alignRight {"Align right", motion::icons::Icon::alignRight};
-    MotionScrubField lineSpacing, tracking;
+    motion::ui::ScrubField lineSpacing, tracking;
     juce::TextEditor text;
 };

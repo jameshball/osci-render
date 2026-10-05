@@ -9,7 +9,6 @@
 #include "../model/PropertyTarget.h"
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
-#include "PlayheadStrip.h"
 #include <optional>
 #include <set>
 #include <limits>
@@ -216,7 +215,7 @@ private:
     juce::Point<float> marqueeStart;
     std::optional<Drag> drag;
     std::optional<double> snapGuide;     // Project time of the magnet a drag is snapped to.
-    motion::PlayheadStrip playheadStrip;
+    osci::PlayheadStrip playheadStrip;
     std::map<std::string, juce::Colour> contextCurves;
     std::set<std::string> hiddenCurves;
     motion::ui::PlayheadFollow follow;

@@ -3,7 +3,6 @@
 #include "../MotionProcessor.h"
 #include "ViewNavigation.h"
 #include "MotionStyle.h"
-#include "PlayheadStrip.h"
 #include <set>
 
 // Clip-local beat editor. Gestures preview immutable note content locally and
@@ -67,7 +66,7 @@ private:
     MotionProcessor& processor;
     motion::Id target = 0;
     std::set<motion::Id> selected, marqueeSelection;
-    motion::PlayheadStrip playheadStrip;
+    osci::PlayheadStrip playheadStrip;
     std::shared_ptr<const motion::MidiNotes> original, preview;
     std::uint64_t dragRevision = 0;
     bool dragging = false, marquee = false, updating = false, additiveMarquee = false;

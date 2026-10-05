@@ -610,8 +610,6 @@
         <FILE id="MotuiChiph" name="Chip.h" compile="0" resource="0" file="Source/motion/ui/Chip.h"/>
         <FILE id="MotClipTiming" name="ClipTimingPanel.h" compile="0" resource="0"
               file="Source/motion/ui/ClipTimingPanel.h"/>
-        <FILE id="MotColourPicker" name="ColourPicker.h" compile="0" resource="0"
-              file="Source/motion/ui/ColourPicker.h"/>
         <FILE id="MotuiCompositionGizmoh" name="CompositionGizmo.h" compile="0"
               resource="0" file="Source/motion/ui/CompositionGizmo.h"/>
         <FILE id="MotuiCompositionPanelh" name="CompositionPanel.h" compile="0"
@@ -650,8 +648,6 @@
               file="Source/motion/ui/GrabCursor.h"/>
         <FILE id="MotGrabCursorM" name="GrabCursor_mac.mm" compile="1" resource="0"
               file="Source/motion/ui/GrabCursor_mac.mm"/>
-        <FILE id="MotuiLineBatchh" name="LineBatch.h" compile="0" resource="0"
-              file="Source/motion/ui/LineBatch.h"/>
         <FILE id="MotuiLuaSourceEditorh" name="LuaSourceEditor.h" compile="0"
               resource="0" file="Source/motion/ui/LuaSourceEditor.h"/>
         <FILE id="MotuiMarkerPanelh" name="MarkerPanel.h" compile="0" resource="0"
@@ -672,8 +668,6 @@
               file="Source/motion/ui/NotesEditor.cpp"/>
         <FILE id="MotuiNotesEditorh" name="NotesEditor.h" compile="0" resource="0"
               file="Source/motion/ui/NotesEditor.h"/>
-        <FILE id="MotuiPlayheadStriph" name="PlayheadStrip.h" compile="0" resource="0"
-              file="Source/motion/ui/PlayheadStrip.h"/>
         <FILE id="MotuiPreviewGestureh" name="PreviewGesture.h" compile="0"
               resource="0" file="Source/motion/ui/PreviewGesture.h"/>
         <FILE id="MotuiPropertyInspectorcpp" name="PropertyInspector.cpp" compile="1"

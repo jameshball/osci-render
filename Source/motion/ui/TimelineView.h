@@ -11,7 +11,6 @@
 #include "../model/PropertySchema.h"
 #include "../model/KeyEasing.h"
 #include "MotionIcons.h"
-#include "PlayheadStrip.h"
 #include "DocumentMenu.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
@@ -332,7 +331,7 @@ private:
         motion::Id group = 0;
     };
     std::optional<TrackDrag> trackDrag;
-    motion::PlayheadStrip playheadStrip;
+    osci::PlayheadStrip playheadStrip;
     std::vector<float> rowShift;
     juce::TimedCallback rowAnimation {[this] { stepRows(); }};
     // A drag ends where it began if the document changes under it (an undo,

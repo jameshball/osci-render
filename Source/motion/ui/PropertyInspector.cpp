@@ -197,7 +197,7 @@ void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
     std::function<void(juce::Component&)> outline = [&](juce::Component& parent) {
         for (auto* child : parent.getChildren()) {
             if (!child->isVisible()) { continue; }
-            if (child->getProperties().contains("routeProperties") && dynamic_cast<MotionScrubField*>(child) != nullptr) {
+            if (child->getProperties().contains("routeProperties") && dynamic_cast<motion::ui::ScrubField*>(child) != nullptr) {
                 const auto area = getLocalArea(child, child->getLocalBounds()).toFloat();
                 g.setColour(osci::Colours::accentColor().withAlpha(child == dropTarget.getComponent() ? .95f : .35f));
                 g.drawRoundedRectangle(area.reduced(.5f), motion::style::radius, child == dropTarget.getComponent() ? 2.0f : 1.0f);
@@ -207,7 +207,7 @@ void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
     };
     outline(content);
     auto* row = dropTarget.getComponent();
-    if (row != nullptr && dynamic_cast<MotionScrubField*>(row) == nullptr) {
+    if (row != nullptr && dynamic_cast<motion::ui::ScrubField*>(row) == nullptr) {
         g.setColour(osci::Colours::accentColor().withAlpha(.9f));
         g.drawRoundedRectangle(getLocalArea(row, row->getLocalBounds()).toFloat().expanded(2), motion::style::radius + 1, 2.0f);
     }
@@ -461,8 +461,8 @@ void MotionPropertyInspector::cancelGesture() {
     gesture.cancel();
 }
 
-MotionColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
-    MotionColourPicker::Rgb rgb {1.0, 1.0, 1.0};
+osci::ColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
+    osci::ColourPicker::Rgb rgb {1.0, 1.0, 1.0};
     for (const auto& field : row.fields) {
         const auto id = std::string(field->spec.id);
         const auto index = id == "red" ? 0 : id == "green" ? 1 : id == "blue" ? 2 : -1;
@@ -473,9 +473,9 @@ MotionColourPicker::Rgb MotionPropertyInspector::colourOf(const Row& row) {
 
 void MotionPropertyInspector::openColourPicker(Row& row) {
     if (row.swatch == nullptr || !onShowPopover) { return; }
-    auto picker = std::make_unique<MotionColourPicker>(colourOf(row));
+    auto picker = std::make_unique<osci::ColourPicker>(colourOf(row));
     picker->onBegin = [this] { beginGesture("red"); };
-    picker->onChange = [this](MotionColourPicker::Rgb rgb) {
+    picker->onChange = [this](osci::ColourPicker::Rgb rgb) {
         if (!gesture.active() || gestureTarget != target) { return; }
         gesture.preview([&](motion::Project& project) {
             for (const auto& [property, value] : std::initializer_list<std::pair<const char*, double>> {{"red", rgb[0]}, {"green", rgb[1]}, {"blue", rgb[2]}}) {

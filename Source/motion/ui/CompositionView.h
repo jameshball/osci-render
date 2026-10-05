@@ -9,7 +9,6 @@
 #include "MotionPath.h"
 #include "CompositionGizmo.h"
 #include "TransformGizmo.h"
-#include "LineBatch.h"
 #include "../model/PropertyTarget.h"
 
 class MotionCompositionView : public juce::Component, public juce::DragAndDropTarget, private juce::Timer {
@@ -155,7 +154,7 @@ private:
     MotionProcessor& processor;
     std::unique_ptr<motion::PreparedComposition> prepared;
     // The preview's segments, stroked together; the selection's draw on top.
-    motion::LineBatch lines, highlightedLines;
+    osci::LineBatch lines, highlightedLines;
     std::optional<motion::Id> dropHover;
     bool effectDrag = false;
     motion::ui::PreviewGesture edit {processor.document};

@@ -7,9 +7,10 @@
 // A compact numeric field. Horizontal drag scrubs (Shift fine, Cmd coarse),
 // double-click or Return types a value, Escape cancels. Every gesture reports
 // begin/change/end so owners can preview live and commit one undo step.
-class MotionScrubField final : public juce::Component, public juce::SettableTooltipClient, private juce::TextEditor::Listener {
+namespace motion::ui {
+class ScrubField final : public juce::Component, public juce::SettableTooltipClient, private juce::TextEditor::Listener {
 public:
-    MotionScrubField() {
+    ScrubField() {
         setWantsKeyboardFocus(true);
         setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
         editor.setFont(motion::style::body());
@@ -109,14 +110,14 @@ public:
     // it as one complete, validated edit.
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override {
         struct Value final : juce::AccessibilityTextValueInterface {
-            explicit Value(MotionScrubField& owner) : owner(owner) {}
+            explicit Value(ScrubField& owner) : owner(owner) {}
             bool isReadOnly() const override { return !owner.isEnabled(); }
             juce::String getCurrentValueAsString() const override { return owner.format(owner.value, false); }
             void setValueAsString(const juce::String& text) override {
-                const auto parsed = motion::ui::parseNumber(text);
+                const auto parsed = parseNumber(text);
                 if (parsed.has_value()) { owner.commit(owner.spec.clamp(*parsed)); }
             }
-            MotionScrubField& owner;
+            ScrubField& owner;
         };
         return std::make_unique<juce::AccessibilityHandler>(*this, juce::AccessibilityRole::editableText, juce::AccessibilityActions(),
             juce::AccessibilityHandler::Interfaces{std::make_unique<Value>(*this)});
@@ -137,7 +138,7 @@ private:
     void textEditorFocusLost(juce::TextEditor&) override { finishTyping(true); }
     void finishTyping(bool accept) {
         if (!editor.isVisible()) { return; }
-        const auto parsed = motion::ui::parseNumber(editor.getText(), "°");
+        const auto parsed = parseNumber(editor.getText(), "°");
         editor.setVisible(false);
         if (!accept) { if (onCancel) { onCancel(); } return; }
         if (!parsed.has_value()) { repaint(); return; }
@@ -166,3 +167,4 @@ private:
     float lastX = 0;
     bool hovered = false, dragging = false, moved = false, showMixed = false;
 };
+}

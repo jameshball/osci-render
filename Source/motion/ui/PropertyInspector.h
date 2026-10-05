@@ -6,7 +6,6 @@
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
-#include "ColourPicker.h"
 #include "../model/PropertySchema.h"
 #include "../model/SpatialMotion.h"
 #include "../model/Drawing.h"
@@ -71,7 +70,7 @@ private:
     struct Field {
         explicit Field(const motion::PropertySpec& value) : spec(value) {}
         motion::PropertySpec spec;
-        MotionScrubField editor;
+        motion::ui::ScrubField editor;
     };
     // The Colour row's swatch: the colour at the playhead; a click opens the picker.
     struct Swatch : juce::Button {
@@ -112,7 +111,7 @@ private:
     void endGesture(const juce::String& name = "Change property");
     void cancelGesture();
     // The row's red, green and blue as shown (0..1).
-    static MotionColourPicker::Rgb colourOf(const Row& row);
+    static osci::ColourPicker::Rgb colourOf(const Row& row);
     // The picker edits all three channels as one gesture and one undo step.
     void openColourPicker(Row& row);
     void commitValue(const std::string& property, double value);
