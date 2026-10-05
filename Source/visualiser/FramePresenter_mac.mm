@@ -7,6 +7,7 @@
 #import <OpenGL/OpenGL.h>
 #include <array>
 #include <atomic>
+#include <cstring>
 #if JUCE_MODULE_AVAILABLE_jucewright
 #include <jucewright/jucewright.h>
 #endif
@@ -125,12 +126,10 @@ public:
         juce::Image image(juce::Image::ARGB, width, height, false);
         {
             juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
+            // BGRA rows: the same layout as a little-endian ARGB image.
             const auto stride = IOSurfaceGetBytesPerRow(surface);
             for (int y = 0; y < height; ++y) {
-                const auto* row = source + y * stride;
-                for (int x = 0; x < width; ++x) {
-                    pixels.setPixelColour(x, y, juce::Colour(row[x * 4 + 2], row[x * 4 + 1], row[x * 4], row[x * 4 + 3]));
-                }
+                std::memcpy(pixels.getLinePointer(y), source + y * stride, static_cast<std::size_t>(width) * 4);
             }
         }
         g.setColour(backgroundColour);
