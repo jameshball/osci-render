@@ -188,7 +188,7 @@ private:
         asset->name = "Export line";
         std::vector<std::unique_ptr<osci::Shape>> shapes;
         shapes.push_back(std::make_unique<osci::Line>(osci::Point(2, -3, 0, 1, 1, 1), osci::Point(3, -2, 0, 1, 1, 1)));
-        asset->drawing = std::make_shared<motion::PreparedDrawing>(std::move(shapes));
+        asset->source = std::make_shared<motion::PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {std::make_shared<motion::PreparedDrawing>(std::move(shapes))}, 30.0);
         motion::Clip clip;
         clip.id = 2;
         clip.asset = asset->id;

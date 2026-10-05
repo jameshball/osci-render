@@ -752,7 +752,7 @@ private:
             return;
         }
         expectEquals(progress.load(), 1.0);
-        expect(audio->source == nullptr && audio->drawing == nullptr);
+        expect(audio->source == nullptr);
         expectEquals(static_cast<int>(audio->audio->channelCount()), 2);
         expectEquals(static_cast<int>(audio->audio->frameCount()), 4);
         expectWithinAbsoluteError(audio->audio->sample(1.0 / 8000).left, 0.5f, 0.00001f);
@@ -1745,7 +1745,7 @@ private:
         expectEquals(progress.load(), 0.0);
         auto invalid = textAsset(".gpla", json.replace("1,0,0,0,0,1", "1"));
         expect(motion::decodeAsset(invalid).failed());
-        std::vector<std::shared_ptr<const motion::PreparedDrawing>> drawings { asset->drawing, asset->drawing };
+        std::vector<std::shared_ptr<const motion::PreparedDrawing>> drawings { asset->source->firstFrame(), asset->source->firstFrame() };
         motion::PreparedSource extreme(drawings, std::numeric_limits<double>::denorm_min());
         expectEquals(static_cast<int>(extreme.frameIndex(-1)), 0);
 

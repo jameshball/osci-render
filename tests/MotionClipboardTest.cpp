@@ -221,7 +221,6 @@ public:
             auto notes = std::make_shared<motion::Asset>(*square);
             notes->midi = motion::MidiNotes::create({}).source;
             notes->source.reset();
-            notes->drawing.reset();
             expect(f.document.replaceAsset(original->id, notes).failed(), "a visual source cannot become a MIDI file");
             expect(f.undo.undo());
             expect(f.document.project().assets[0] == original);

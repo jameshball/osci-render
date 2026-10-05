@@ -430,7 +430,7 @@ private:
             const auto copy = std::make_shared<motion::Asset>(*original);
             const auto clipId = initial.tracks[0].clips[0].id;
             expect(document.makeSourceUnique(clipId, original, copy).wasOk());
-            expect(copy->id != original->id && copy->drawing == original->drawing);
+            expect(copy->id != original->id && copy->source == original->source);
             expect(copy->data == original->data && copy->name != original->name);
             expect(document.project().tracks[0].clips[0].asset == copy->id);
             expect(document.project().tracks[0].clips[1].asset == original->id);

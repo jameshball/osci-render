@@ -72,7 +72,6 @@ juce::Result prepareBaked(Asset& asset, const juce::String& key, const std::func
     if (!matches(*prepared.source)) { return juce::Result::fail("The source's cache does not have the frames its settings ask for."); }
     if (cancelled(cancel)) { return juce::Result::fail("Source preparation cancelled."); }
     asset.source = std::make_shared<const PreparedSource>(prepared.source);
-    asset.drawing.reset();
     asset.audio.reset();
     if (archive.getSize() > 0) { asset.bakedData = std::move(archive); }
     asset.bakeKey = key;
@@ -123,7 +122,6 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
         return juce::Result::fail("The source contains no drawable geometry.");
     }
     auto prepared = std::make_shared<PreparedSource>(std::move(frames), frameRate);
-    asset.drawing = prepared->firstFrame();
     asset.source = std::move(prepared);
     asset.audio.reset();
     if (progress != nullptr) {
@@ -419,7 +417,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (asset.extension.equalsIgnoreCase(".blender")) {
         if (!asset.blenderSettings.valid() || asset.data.getSize() != 0) { return juce::Result::fail("Invalid Blender source settings."); }
         asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
-        asset.source.reset(); asset.drawing.reset(); asset.audio.reset(); asset.midi.reset();
+        asset.source.reset(); asset.audio.reset(); asset.midi.reset();
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
@@ -443,7 +441,6 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             if (progress != nullptr) { progress->store(static_cast<double>(drawings.size()) / capture.frames.size()); }
         }
         asset.source = std::make_shared<const PreparedSource>(std::move(drawings), std::move(capture.timing));
-        asset.drawing = asset.source->firstFrame();
         asset.liveIdentity.reset(); asset.audio.reset(); asset.midi.reset();
         return juce::Result::ok();
     }
@@ -455,7 +452,6 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         asset.midiTempoChanges = prepared.tempoChanges.empty() ? nullptr : std::make_shared<const std::vector<TempoChange>>(prepared.tempoChanges);
         asset.midiIgnoredEvents = prepared.ignoredEvents;
         asset.source.reset();
-        asset.drawing.reset();
         asset.audio.reset();
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
@@ -472,7 +468,6 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         if (!prepared) { return juce::Result::fail(prepared.error); }
         if (cancelled(cancel)) { return juce::Result::fail("Image preparation cancelled."); }
         asset.source = prepared.source;
-        asset.drawing.reset();
         asset.audio.reset();
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
@@ -514,7 +509,6 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         }
         asset.audio = prepared.audio;
         asset.source.reset();
-        asset.drawing.reset();
         if (progress != nullptr) {
             progress->store(1.0, std::memory_order_relaxed);
         }

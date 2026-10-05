@@ -476,15 +476,12 @@ struct PreparedComposition {
             const auto& clip = *leaf.clip;
             if (leaf.track->kind != TrackKind::visual) { return; }
             const auto asset = findAsset(project.assets, clip.asset);
-            if (asset == nullptr || (asset->source == nullptr && asset->drawing == nullptr && asset->liveIdentity == nullptr)) { return; }
+            if (asset == nullptr || (asset->source == nullptr && asset->liveIdentity == nullptr)) { return; }
             PreparedClip item;
             static_cast<PreparedClipStage&>(item) = prepareStage(leaf, stages.size() == 1, scopeOf(stages, stages.size() - 1));
             item.rootTrack = stages.front().track->id;
             item.liveIdentity = asset->liveIdentity;
             item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : asset->source;
-            if (item.source == nullptr) {
-                item.source = std::make_shared<PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {asset->drawing}, 30.0);
-            }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
             }

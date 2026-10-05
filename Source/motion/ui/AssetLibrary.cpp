@@ -71,7 +71,7 @@ void MotionAssetLibrary::refresh() {
         if (definition != nullptr && (filter.isEmpty() || juce::String(definition->name).containsIgnoreCase(filter))) { definitions.push_back(definition); }
     }
     std::erase_if(thumbnails, [&](const Thumbnail& thumbnail) {
-        return std::none_of(document.project().assets.begin(), document.project().assets.end(), [&](const auto& asset) { return asset != nullptr && asset->source == thumbnail.source && asset->drawing == thumbnail.drawing; });
+        return std::none_of(document.project().assets.begin(), document.project().assets.end(), [&](const auto& asset) { return asset != nullptr && asset->source == thumbnail.source; });
     });
     list.updateContent();
     list.deselectAllRows();
@@ -203,12 +203,11 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
 
 juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
     juce::Path path;
-    const auto source = asset.source;
-    const auto drawing = asset.drawing;
+    const auto& source = asset.source;
     const auto frames = source != nullptr ? source->frameCount() : 0;
-    if (frames == 0 && (drawing == nullptr || drawing->empty())) { return path; }
+    if (frames == 0) { return path; }
     const auto frame = frames / 2;
-    const auto pointFrames = frames > 0 && source->drawingAt(frame) == nullptr;
+    const auto pointFrames = source->drawingAt(frame) == nullptr;
     // Enough samples for text's many small outlines; traced once per source.
     constexpr int steps = 2000;
     std::vector<juce::Point<float>> points;
@@ -216,7 +215,7 @@ juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
     float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
     for (int index = 0; index <= steps; ++index) {
         const auto phase = static_cast<double>(index) / steps;
-        const auto point = frames > 0 ? source->sampleFrame(frame, phase, 0) : drawing->sample(phase, 0);
+        const auto point = source->sampleFrame(frame, phase, 0);
         if (!std::isfinite(point.x) || !std::isfinite(point.y)) { continue; }
         points.emplace_back(point.x, point.y);
         lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
@@ -282,9 +281,9 @@ void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce:
         return;
     }
     // Traced once per source (a unit-square path), then scaled to the row.
-    auto found = std::find_if(thumbnails.begin(), thumbnails.end(), [&](const Thumbnail& thumbnail) { return thumbnail.source == asset.source && thumbnail.drawing == asset.drawing; });
+    auto found = std::find_if(thumbnails.begin(), thumbnails.end(), [&](const Thumbnail& thumbnail) { return thumbnail.source == asset.source; });
     if (found == thumbnails.end()) {
-        thumbnails.push_back({asset.source, asset.drawing, traceThumbnail(asset)});
+        thumbnails.push_back({asset.source, traceThumbnail(asset)});
         found = std::prev(thumbnails.end());
     }
     auto path = found->path;

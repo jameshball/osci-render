@@ -616,7 +616,7 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
     if (found == nullptr) { return juce::Result::fail("The source no longer exists."); }
     if (replacement == nullptr || replacement->id != assetId) { return juce::Result::fail("Invalid replacement source."); }
     const auto audio = [](const Asset& asset) { return asset.audio != nullptr; };
-    const auto midiOnly = [](const Asset& asset) { return asset.midi != nullptr && asset.drawing == nullptr && asset.source == nullptr; };
+    const auto midiOnly = [](const Asset& asset) { return asset.midi != nullptr && asset.source == nullptr; };
     if (audio(*found) != audio(*replacement) || midiOnly(*found) || midiOnly(*replacement)) {
         return juce::Result::fail(audio(*found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
     }

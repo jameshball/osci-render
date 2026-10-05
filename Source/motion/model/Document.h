@@ -31,7 +31,6 @@ struct Asset {
     int fractalDepth = 3;
     juce::MemoryBlock bakedData;
     juce::String bakeKey;
-    std::shared_ptr<const motion::PreparedDrawing> drawing;
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedAudio> audio;
     std::shared_ptr<const MidiNotes> midi;

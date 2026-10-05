@@ -217,7 +217,7 @@ private:
         const auto frameTiming = motion::FrameTiming::create({125, 375});
         auto animated = std::make_shared<motion::Asset>(*project.assets.front());
         animated->source = std::make_shared<motion::PreparedSource>(frames.source, frameTiming.timing);
-        animated->drawing.reset(); project.assets.front() = animated;
+        project.assets.front() = animated;
         std::vector<float> pcm(32000);
         for (std::size_t i = 0; i < pcm.size(); ++i) { pcm[i] = static_cast<float>(std::sin(i * .017) * .3); }
         const std::array<std::span<const float>, 1> channels {pcm};
@@ -465,7 +465,6 @@ private:
         const auto timing = motion::FrameTiming::create({53, 100});
         auto frameAsset = std::make_shared<motion::Asset>(*frameProject.assets.front());
         frameAsset->source = std::make_shared<motion::PreparedSource>(frames.source, timing.timing);
-        frameAsset->drawing.reset();
         frameProject.assets.front() = frameAsset;
         motion::PreparedComposition frameComposition(frameProject);
         for (int sample : {2543, 2544}) {
@@ -613,7 +612,7 @@ private:
         auto asset = std::make_shared<motion::Asset>(); asset->id = 1; asset->name = "Line";
         std::vector<std::unique_ptr<osci::Shape>> shapes;
         shapes.push_back(std::make_unique<osci::Line>(osci::Point(2, 0, 0, 1, 1, 1), osci::Point(3, 1, 0, 1, 1, 1)));
-        asset->drawing = std::make_shared<motion::PreparedDrawing>(std::move(shapes));
+        asset->source = std::make_shared<motion::PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {std::make_shared<motion::PreparedDrawing>(std::move(shapes))}, 30.0);
         motion::Clip clip; clip.id = 2; clip.asset = 1; clip.name = "MIDI line"; clip.duration = 1;
         clip.midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}}).source;
         clip.properties["red"] = motion::Curve(.2); clip.properties["green"] = motion::Curve(.4); clip.properties["blue"] = motion::Curve(.8);
