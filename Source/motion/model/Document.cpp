@@ -1038,14 +1038,9 @@ juce::Result Document::insertComposition(Id definition, double time, Id trackId,
 juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     definitionId = 0;
     auto candidate = project();
-    Clip* target = nullptr;
-    for (auto& track : candidate.tracks) {
-        for (auto& clip : track.clips) {
-            if (clip.id != clipId) { continue; }
-            if (track.locked) { return juce::Result::fail("Unlock the track before making its composition unique."); }
-            target = &clip;
-        }
-    }
+    const auto* track = findClipTrack(candidate, clipId);
+    if (track != nullptr && track->locked) { return juce::Result::fail("Unlock the track before making its composition unique."); }
+    auto* target = findClip(candidate, clipId);
     if (target == nullptr || target->composition == 0) { return juce::Result::fail("Select a composition instance."); }
     const auto found = std::find_if(candidate.definitions.begin(), candidate.definitions.end(), [&](const auto& value) { return value->id == target->composition; });
     if (found == candidate.definitions.end()) { return juce::Result::fail("The referenced composition no longer exists."); }
@@ -1774,13 +1769,13 @@ juce::Result Document::addBlenderSource(juce::String name, BlenderSourceSettings
 }
 
 juce::Result Document::setBlenderSource(Id id, juce::String name, BlenderSourceSettings settings) {
-    const auto found = std::find_if(state.assets.begin(), state.assets.end(), [id](const auto& asset) { return asset->id == id; });
-    if (found == state.assets.end() || !(*found)->extension.equalsIgnoreCase(".blender")) { return juce::Result::fail("The Blender source no longer exists."); }
+    const auto found = findAsset(state.assets, id);
+    if (found == nullptr || !found->extension.equalsIgnoreCase(".blender")) { return juce::Result::fail("The Blender source no longer exists."); }
     if (!settings.valid() || name.trim().isEmpty()) { return juce::Result::fail("Enter a source name and a port from 51600 to 51699."); }
-    if ((*found)->name == name.trim() && (*found)->blenderSettings == settings) { return juce::Result::ok(); }
-    auto replacement = std::make_shared<Asset>(**found);
+    if (found->name == name.trim() && found->blenderSettings == settings) { return juce::Result::ok(); }
+    auto replacement = std::make_shared<Asset>(*found);
     replacement->name = name.trim(); replacement->blenderSettings = settings;
-    if ((*found)->blenderSettings.port != settings.port) { replacement->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
+    if (found->blenderSettings.port != settings.port) { replacement->liveIdentity = std::make_shared<const LiveSourceIdentity>(); }
     edit("Change Blender source", [id, replacement](Project& project) {
         for (auto& asset : project.assets) { if (asset->id == id) { asset = replacement; break; } }
     });

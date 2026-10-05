@@ -565,9 +565,9 @@ juce::String MotionPropertyInspector::sourceKind(motion::Id clip) const {
         for (const auto& item : track.clips) {
             if (item.id != clip) { continue; }
             if (item.composition != 0) { return "Composition"; }
-            const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == item.asset; });
-            if (found == project.assets.end()) { return "Object"; }
-            const auto& asset = **found;
+            const auto found = motion::findAsset(project.assets, item.asset);
+            if (found == nullptr) { return "Object"; }
+            const auto& asset = *found;
             const auto extension = asset.extension.toLowerCase();
             if (asset.liveIdentity != nullptr) { return "Blender"; }
             if (extension == ".txt") { return "Text"; }

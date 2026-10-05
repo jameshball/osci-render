@@ -727,14 +727,9 @@ bool MotionCompositionView::seekMotionKey(juce::Point<float> position) {
 
 bool MotionCompositionView::editable(double time) const {
     const auto& project = processor.document.project();
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) {
-            if (clip.id != selected) { continue; }
-            if (track.locked || !motion::trackIsAudible(project, track) || (!clip.contains(time, project.tempo()) && !atSelectedPathEnd(time))) { return false; }
-            return true;
-        }
-    }
-    return false;
+    const auto* track = motion::findClipTrack(project, selected);
+    if (track == nullptr || track->locked || !motion::trackIsAudible(project, *track)) { return false; }
+    return motion::findClip(project, selected)->contains(time, project.tempo()) || atSelectedPathEnd(time);
 }
 
 MotionCompositionGizmo MotionCompositionView::currentGizmo() const {

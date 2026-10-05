@@ -421,18 +421,18 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
             clip.rate = item->getDoubleAttribute("rate", 1);
             clip.spatialPath = item->getBoolAttribute("spatialPath", false);
             clip.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
-            const auto found = std::find_if(assets.begin(), assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
+            const auto found = findAsset(assets, clip.asset);
             if (clip.id == 0 || !identities.insert(clip.id).second) { return juce::Result::fail("Invalid clip identity."); }
             if (clip.composition != 0) {
                 if (clip.asset != 0 || !compositionIds.contains(clip.composition) || track.kind != TrackKind::visual) {
                     return juce::Result::fail("Invalid reusable composition reference or track kind.");
                 }
             } else {
-                if (found == assets.end()) { return juce::Result::fail("Invalid clip asset."); }
-                if ((track.kind == TrackKind::audio) != ((*found)->audio != nullptr)) {
+                if (found == nullptr) { return juce::Result::fail("Invalid clip asset."); }
+                if ((track.kind == TrackKind::audio) != (found->audio != nullptr)) {
                     return juce::Result::fail("The clip source type does not match its audio or visual track.");
                 }
-                if ((*found)->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
+                if (found->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
             }
             const auto* instrument = item->getChildByName("instrument");
             if (instrument != nullptr) {
@@ -454,8 +454,8 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                     return juce::Result::fail("Invalid MIDI source identity.");
                 }
                 if (clip.midiAsset != 0) {
-                    const auto source = std::find_if(assets.begin(), assets.end(), [&](const auto& asset) { return asset->id == clip.midiAsset; });
-                    if (source == assets.end() || (*source)->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
+                    const auto source = findAsset(assets, clip.midiAsset);
+                    if (source == nullptr || source->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
                 }
                 std::vector<MidiNote> notes;
                 for (auto* event : pattern->getChildWithTagNameIterator("note")) {
@@ -490,7 +490,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
             // Every clip property must be a known, unique schema entry whose
             // values lie inside its declared range.
             const auto specs = track.kind == TrackKind::audio ? std::span<const PropertySpec>(audioPropertySpecs) : objectPropertySpecs;
-            const bool luaClip = clip.composition == 0 && found != assets.end() && (*found)->extension.equalsIgnoreCase(".lua");
+            const bool luaClip = clip.composition == 0 && found != nullptr && found->extension.equalsIgnoreCase(".lua");
             for (auto* property : item->getChildWithTagNameIterator("property")) {
                 const auto name = property->getStringAttribute("name").toStdString();
                 auto* spec = findPropertySpec(specs, name);

@@ -123,7 +123,7 @@ std::vector<motion::Document::CopiedKey> MotionTimelineView::copiedKeys() const 
     double earliest = std::numeric_limits<double>::infinity();
     std::vector<std::pair<double, motion::Document::CopiedKey>> timed;
     for (const auto& key : selectedKeys) {
-        const auto* clip = findClip(key.clip, project);
+        const auto* clip = motion::findClip(project, key.clip);
         if (clip == nullptr) { continue; }
         const auto found = clip->properties.find(key.property);
         if (found == clip->properties.end()) { continue; }
@@ -1706,13 +1706,6 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
     }
 }
 
-const motion::Clip* MotionTimelineView::findClip(motion::Id id, const motion::Project& project) const {
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) { if (clip.id == id) { return &clip; } }
-    }
-    return nullptr;
-}
-
 std::optional<MotionTimelineView::KeyRef> MotionTimelineView::keyAt(juce::Point<int> point) const {
     const auto* lane = laneAtY(point.y);
     if (lane == nullptr || point.x < namesWidth) { return std::nullopt; }
@@ -1786,7 +1779,7 @@ bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<Ke
 void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     if (!keyDrag.has_value()) { return; }
     if (processor.document.revision() != keyDrag->revision) { keyDrag.reset(); return; }
-    const auto* clip = findClip(keyDrag->grabbed.clip, keyDrag->before);
+    const auto* clip = motion::findClip(keyDrag->before, keyDrag->grabbed.clip);
     if (clip == nullptr) { return; }
     const auto timing = clip->timing(keyDrag->before.tempo());
     if (timing.rate == 0) { return; }
@@ -1798,7 +1791,7 @@ void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
     keyDrag->changed = delta != 0;
     selectedKeys = keyDrag->keys;
     for (auto& key : selectedKeys) {
-        const auto* owner = findClip(key.clip, keyDrag->before);
+        const auto* owner = motion::findClip(keyDrag->before, key.clip);
         if (owner != nullptr) { key.time += delta * owner->timing(keyDrag->before.tempo()).rate; }
     }
     processor.document.preview(std::move(updated));
@@ -2889,13 +2882,6 @@ void MotionTimelineView::cancelGesture() {
     }
     changed = false;
     repaint();
-}
-
-bool MotionTimelineView::isClip(motion::Id id) const {
-    for (const auto& track : processor.document.project().tracks) {
-        for (const auto& clip : track.clips) { if (clip.id == id) { return true; } }
-    }
-    return false;
 }
 
 void MotionTimelineView::notifySelection(motion::Id id) {

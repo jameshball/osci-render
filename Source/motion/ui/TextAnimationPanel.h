@@ -144,22 +144,13 @@ private:
     static constexpr int rowHeight = 28;
     const motion::Asset* textAsset() const {
         const auto& project = processor.document.project();
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != selected) { continue; }
-                for (const auto& asset : project.assets) {
-                    if (asset->id == clip.asset && asset->extension.equalsIgnoreCase(".txt")) { return asset.get(); }
-                }
-                return nullptr;
-            }
-        }
-        return nullptr;
+        const auto* clip = motion::findClip(project, selected);
+        const auto asset = clip != nullptr ? motion::findAsset(project.assets, clip->asset) : nullptr;
+        return asset != nullptr && asset->extension.equalsIgnoreCase(".txt") ? asset.get() : nullptr;
     }
     bool isLocked() const {
-        for (const auto& track : processor.document.project().tracks) {
-            for (const auto& clip : track.clips) { if (clip.id == selected) { return track.locked; } }
-        }
-        return false;
+        const auto* track = motion::findClipTrack(processor.document.project(), selected);
+        return track != nullptr && track->locked;
     }
     motion::TextSettings current() const {
         const auto* asset = textAsset();

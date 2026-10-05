@@ -97,6 +97,30 @@ struct CompositionDefinition : Composition {
     Id id = 0;
 };
 
+// Lookups by id across a composition's tracks; null when nothing matches.
+template <typename CompositionType>
+auto findClipTrack(CompositionType& composition, Id clip) -> std::conditional_t<std::is_const_v<CompositionType>, const Track*, Track*> {
+    for (auto& track : composition.tracks) {
+        for (const auto& item : track.clips) {
+            if (item.id == clip) { return &track; }
+        }
+    }
+    return nullptr;
+}
+
+template <typename CompositionType>
+auto findClip(CompositionType& composition, Id id) -> std::conditional_t<std::is_const_v<CompositionType>, const Clip*, Clip*> {
+    auto* track = findClipTrack(composition, id);
+    if (track == nullptr) { return nullptr; }
+    const auto found = std::find_if(track->clips.begin(), track->clips.end(), [id](const auto& clip) { return clip.id == id; });
+    return &*found;
+}
+
+inline std::shared_ptr<const Asset> findAsset(const std::vector<std::shared_ptr<const Asset>>& assets, Id id) {
+    const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
+    return found != assets.end() ? *found : nullptr;
+}
+
 struct Project : Composition {
     // The output display belongs to the whole project, not to one composition.
     ScopeProfile scope;

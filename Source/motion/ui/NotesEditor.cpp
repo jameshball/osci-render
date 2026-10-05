@@ -377,18 +377,13 @@ bool MotionNotesEditor::canAudition() const {
 }
 
 const motion::Clip* MotionNotesEditor::currentClip() const {
-    for (const auto& track : processor.document.project().tracks) {
-        if (track.kind != motion::TrackKind::visual) { continue; }
-        for (const auto& clip : track.clips) { if (clip.id == target) { return &clip; } }
-    }
-    return nullptr;
+    const auto* track = motion::findClipTrack(processor.document.project(), target);
+    return track != nullptr && track->kind == motion::TrackKind::visual ? motion::findClip(processor.document.project(), target) : nullptr;
 }
 
 bool MotionNotesEditor::isLocked() const {
-    for (const auto& track : processor.document.project().tracks) {
-        for (const auto& clip : track.clips) { if (clip.id == target) { return track.locked; } }
-    }
-    return false;
+    const auto* track = motion::findClipTrack(processor.document.project(), target);
+    return track != nullptr && track->locked;
 }
 
 void MotionNotesEditor::commit(std::vector<motion::MidiNote> notes, const juce::String& label) {

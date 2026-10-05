@@ -106,17 +106,10 @@ public:
         return text;
     }
 private:
-    const motion::Clip* findClip() const {
-        for (const auto& track : processor.document.project().tracks) {
-            for (const auto& clip : track.clips) { if (clip.id == selected) { return &clip; } }
-        }
-        return nullptr;
-    }
+    const motion::Clip* findClip() const { return motion::findClip(processor.document.project(), selected); }
     bool isLocked() const {
-        for (const auto& track : processor.document.project().tracks) {
-            for (const auto& clip : track.clips) { if (clip.id == selected) { return track.locked; } }
-        }
-        return false;
+        const auto* track = motion::findClipTrack(processor.document.project(), selected);
+        return track != nullptr && track->locked;
     }
     void discardEditors() {
         for (auto& value : values) { if (value.isBeingEdited()) { value.hideEditor(true); } }

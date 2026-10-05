@@ -401,8 +401,8 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // A change to the characters prepares the text source again in place.
     textAnimation.onApply = [this](motion::Id id, motion::TextSettings settings) {
         const auto& assets = processor.document.project().assets;
-        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-        if (found == assets.end()) { return; }
+        const auto found = motion::findAsset(assets, id);
+        if (found == nullptr) { return; }
         // One preparation at a time: a later change waits for the current one.
         if (!pendingImports.empty()) {
             queuedTextAnimation = QueuedTextAnimation {id, settings, processor.document.generation()};
@@ -410,13 +410,13 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         }
         // Only the animation is this section's; the text and its type stay
         // as the source has them now.
-        auto merged = (*found)->textSettings;
+        auto merged = found->textSettings;
         merged.animation = settings.animation;
         merged.characterDelay = settings.characterDelay;
         merged.characterDuration = settings.characterDuration;
         merged.hold = settings.hold;
         merged.amount = settings.amount;
-        SourceRequest request {{}, processor.position.load(), processor.document.generation(), *found};
+        SourceRequest request {{}, processor.position.load(), processor.document.generation(), found};
         request.textSettings = merged;
         beginSourceImport(request);
     };
@@ -544,28 +544,23 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
             if (asset->id == id && asset->liveIdentity != nullptr) { showBlenderSettings(id); return; }
         }
         const auto& assets = processor.document.project().assets;
-        const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-        if (found == assets.end() || (!(*found)->extension.equalsIgnoreCase(".lua") && !(*found)->extension.equalsIgnoreCase(".txt")
-                && !(*found)->extension.equalsIgnoreCase(".lsystem") && !osci::files::isImage((*found)->extension))) { return; }
-        preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), *found});
+        const auto found = motion::findAsset(assets, id);
+        if (found == nullptr || (!found->extension.equalsIgnoreCase(".lua") && !found->extension.equalsIgnoreCase(".txt")
+                && !found->extension.equalsIgnoreCase(".lsystem") && !osci::files::isImage(found->extension))) { return; }
+        preparationRequests.push_back({{}, processor.position.load(), processor.document.generation(), found});
         showNextPreparationSettings();
     };
     composition.onOpenSource = [this](motion::Id id) {
         const auto& project = processor.document.project();
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != id) { continue; }
-                if (clip.composition != 0) { enterComposition(clip.id); return; }
-                const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
-                if (found == project.assets.end()) { return; }
-                const auto& asset = **found;
-                if (asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())))) {
-                    showDrawingEditor(asset.id);
-                } else if (asset.extension.equalsIgnoreCase(".txt") || asset.extension.equalsIgnoreCase(".lua")) {
-                    assetLibrary.onBake(asset.id);
-                }
-                return;
-            }
+        const auto* clip = motion::findClip(project, id);
+        if (clip == nullptr) { return; }
+        if (clip->composition != 0) { enterComposition(clip->id); return; }
+        const auto asset = motion::findAsset(project.assets, clip->asset);
+        if (asset == nullptr) { return; }
+        if (asset->extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset->data.getData()), static_cast<int>(asset->data.getSize())))) {
+            showDrawingEditor(asset->id);
+        } else if (asset->extension.equalsIgnoreCase(".txt") || asset->extension.equalsIgnoreCase(".lua")) {
+            assetLibrary.onBake(asset->id);
         }
     };
     timeline.onOpenSource = [this](motion::Id id) { composition.onOpenSource(id); };
@@ -573,10 +568,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
         for (const auto& task : pendingImports) { task->cancelled.store(true); }
     };
     notesEditor.onEditInstrument = [this](motion::Id id) {
-        const motion::Clip* clip = nullptr;
-        for (const auto& track : processor.document.project().tracks) {
-            for (const auto& item : track.clips) { if (item.id == id) { clip = &item; } }
-        }
+        const auto* clip = motion::findClip(processor.document.project(), id);
         if (clip == nullptr) { return; }
         auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
         panel->setSize(380, 294);
@@ -627,17 +619,12 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     timeline.onMakeUnique = [this](motion::Id id) {
         libraryTabs.setSelectedIndex(0);
         const auto& project = processor.document.project();
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != id) { continue; }
-                const auto found = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& asset) { return asset->id == clip.asset; });
-                if (found == project.assets.end()) { return; }
-                SourceRequest request {{}, processor.position.load(), processor.document.generation(), *found};
-                request.uniqueClip = id;
-                beginSourceImport(std::move(request));
-                return;
-            }
-        }
+        const auto* clip = motion::findClip(project, id);
+        const auto asset = clip != nullptr ? motion::findAsset(project.assets, clip->asset) : nullptr;
+        if (asset == nullptr) { return; }
+        SourceRequest request {{}, processor.position.load(), processor.document.generation(), asset};
+        request.uniqueClip = id;
+        beginSourceImport(std::move(request));
     };
     timeline.onTimingRequested = [this](motion::Id id) { select(id); };
     timeline.onLoopSelection = [this] { loopSelection(); };
@@ -1172,9 +1159,9 @@ void MotionEditor::chooseSourceFile() {
 void MotionEditor::showBlenderSettings(motion::Id id) {
     auto& document = processor.document;
     const auto& assets = document.mainProject().assets;
-    const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-    if (id != 0 && (found == assets.end() || (*found)->liveIdentity == nullptr)) { return; }
-    const auto original = found != assets.end() ? *found : std::shared_ptr<const motion::Asset>();
+    const auto found = motion::findAsset(assets, id);
+    if (id != 0 && (found == nullptr || found->liveIdentity == nullptr)) { return; }
+    const auto original = found != nullptr ? found : std::shared_ptr<const motion::Asset>();
     auto panel = std::make_unique<MotionBlenderSourcePanel>(original != nullptr ? original->name : "Blender", original != nullptr ? original->blenderSettings : motion::BlenderSourceSettings{}, id != 0);
     auto* controls = panel.get();
     auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, id != 0 ? 254 : 222), true);
@@ -1828,15 +1815,15 @@ void MotionEditor::showTextEditor(SourceRequest request) {
             // animation, an undo): build on what it is now.
             const auto& assets = owner->processor.document.project().assets;
             const auto id = next.replacement->id;
-            const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset->id == id; });
-            if (found == assets.end()) { owner->statusBar.show("The text source was removed while it was being edited."); return; }
-            auto settings = (*found)->textSettings;
+            const auto found = motion::findAsset(assets, id);
+            if (found == nullptr) { owner->statusBar.show("The text source was removed while it was being edited."); return; }
+            auto settings = found->textSettings;
             settings.family = chosen.family;
             settings.style = chosen.style;
             settings.alignment = chosen.alignment;
             settings.lineSpacing = chosen.lineSpacing;
             settings.tracking = chosen.tracking;
-            next.replacement = *found;
+            next.replacement = found;
             next.editedText = text;
             next.textSettings = settings;
             next.preparationError.clear();
@@ -3088,13 +3075,9 @@ motion::Id MotionEditor::soundtrackClip() const {
 void MotionEditor::detectTempo() {
     const auto& project = processor.document.mainProject();
     const auto id = soundtrackClip();
-    std::shared_ptr<const motion::PreparedAudio> audio;
-    for (const auto& track : project.tracks) {
-        for (const auto& clip : track.clips) {
-            if (clip.id != id) { continue; }
-            for (const auto& asset : project.assets) { if (asset != nullptr && asset->id == clip.asset) { audio = asset->audio; } }
-        }
-    }
+    const auto* clip = motion::findClip(project, id);
+    const auto asset = clip != nullptr ? motion::findAsset(project.assets, clip->asset) : nullptr;
+    const auto audio = asset != nullptr ? asset->audio : nullptr;
     if (audio == nullptr || processor.document.editingComposition() != 0) {
         statusBar.show(audio == nullptr ? "Import a soundtrack first." : "Tempo is set on the main composition. Go back to it first.");
         return;

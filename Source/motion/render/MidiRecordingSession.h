@@ -39,20 +39,14 @@ public:
         if (busy() || recorder.state() != MidiRecording::State::idle) { return juce::Result::fail("The previous recording is still finishing."); }
         if (!transport.ready()) { return juce::Result::fail("Start an audio output device and wait for source preparation before recording."); }
         const auto& project = document.project();
-        const Clip* selected = nullptr;
-        int channel = 0;
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (clip.id != id) { continue; }
-                if (track.kind != TrackKind::visual || clip.composition != 0 || track.locked || !trackIsAudible(project, track)) {
-                    return juce::Result::fail("Choose an unlocked, audible visual clip to record notes.");
-                }
-                selected = &clip;
-                // A track listening to one channel records only that channel.
-                channel = track.midiInput == Track::anyMidiChannel ? 0 : track.midiInput;
-            }
+        const auto* track = findClipTrack(project, id);
+        if (track == nullptr) { return juce::Result::fail("Select a visual clip to record notes."); }
+        const auto* selected = findClip(project, id);
+        if (track->kind != TrackKind::visual || selected->composition != 0 || track->locked || !trackIsAudible(project, *track)) {
+            return juce::Result::fail("Choose an unlocked, audible visual clip to record notes.");
         }
-        if (selected == nullptr) { return juce::Result::fail("Select a visual clip to record notes."); }
+        // A track listening to one channel records only that channel.
+        const int channel = track->midiInput == Track::anyMidiChannel ? 0 : track->midiInput;
         const auto timing = selected->timing(project.tempo());
         const auto rate = transport.rate();
         auto first = sampleIndex(timing.start, rate);

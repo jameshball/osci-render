@@ -214,7 +214,6 @@ private:
     bool isKeySelected(motion::Id clip, const std::string& property, double time) const {
         return std::any_of(selectedKeys.begin(), selectedKeys.end(), [&](const auto& key) { return key.clip == clip && key.property == property && sameTime(key.time, time); });
     }
-    const motion::Clip* findClip(motion::Id id, const motion::Project& project) const;
     // Keys whose diamond lies under a point in a lane row.
     std::optional<KeyRef> keyAt(juce::Point<int> point) const;
     std::vector<KeyRef> keysInside(juce::Rectangle<int> area) const;
@@ -364,7 +363,7 @@ private:
 
     void cancelGesture();
 
-    bool isClip(motion::Id id) const;
+    bool isClip(motion::Id id) const { return motion::findClip(processor.document.project(), id) != nullptr; }
     mutable std::set<motion::Id> selectedClips;
     bool notifyingSelection = false;
     void notifySelection(motion::Id id);
