@@ -485,6 +485,20 @@ run_unit_tests() {
     fi
 }
 
+# The visualiser's bundled resampler, checked on its own under ASan/UBSan.
+run_resampling_tests() {
+    echo ""
+    echo "============================================="
+    echo " Running visualiser resampling tests"
+    echo "============================================="
+    if sh "$ROOT/modules/osci_gui/tests/run_visualiser_resampling_tests.sh"; then
+        echo "==> Resampling tests passed."
+    else
+        echo "ERROR: Resampling tests failed"
+        OVERALL_STATUS=1
+    fi
+}
+
 run_standalone() {
     local PLUGIN="$1"
     local BINARY
@@ -580,6 +594,9 @@ fi
 
 if $RUN_TESTS; then
     run_unit_tests
+    if [[ -z "$TEST_CATEGORY" && -z "$SANITIZER" ]]; then
+        run_resampling_tests
+    fi
 fi
 
 if $RUN_STANDALONE; then

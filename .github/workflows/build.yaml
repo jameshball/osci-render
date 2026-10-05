@@ -597,6 +597,12 @@ jobs:
         shell: bash
         run: python3 scripts/test_motion_portable.py
 
+      # The visualiser's bundled resampler under ASan/UBSan; needs clang++.
+      - name: Run visualiser resampling tests
+        if: steps.ci_flags.outputs.skip_validation != 'true' && runner.os != 'Windows'
+        shell: bash
+        run: sh modules/osci_gui/tests/run_visualiser_resampling_tests.sh
+
       - name: Run Motion unit tests
         if: steps.ci_flags.outputs.skip_validation != 'true'
         shell: bash
