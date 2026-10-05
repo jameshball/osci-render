@@ -188,6 +188,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     }
     juce::Graphics::ScopedSaveState sceneState(g);
     const auto time = editingTime();
+    const auto view = camera.view();
     for (const auto& clip : prepared->clips) {
         const auto sampleTime = clip.editorId() == selected && atSelectedPathEnd(time) ? std::nextafter(time, 0.0) : time;
         if (!clip.active(sampleTime)) {
@@ -201,11 +202,11 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         const auto previewSpan = source->previewPhaseSpan();
         const auto firstPoint = clip.sample(sampleTime, 0, previewSpan, 0, liveFrames.get());
         const auto highlighted = clip.editorId() == selected || (dropHover.has_value() && *dropHover != 0 && clip.editorId() == *dropHover);
-        auto previous = projected(firstPoint, time);
+        auto previous = projected(view, firstPoint, time);
         bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
         for (std::size_t i = 1; i <= sampleCount; ++i) {
             const auto point = clip.sample(sampleTime, static_cast<double>(i) / sampleCount, previewSpan, 0, liveFrames.get());
-            const auto next = projected(point, time);
+            const auto next = projected(view, point, time);
             const bool lit = point.r != 0 || point.g != 0 || point.b != 0;
             if (!previous.has_value() || !next.has_value() || !previousLit || !lit) {
                 previous = next;
@@ -467,6 +468,7 @@ motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Ve
     float nearest = 18;
     motion::Id hit = 0;
     const auto time = editingTime();
+    const auto view = camera.view();
     for (const auto& clip : prepared->clips) {
         if (!clip.active(time)) {
             continue;
@@ -474,7 +476,7 @@ motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Ve
         for (int i = 0; i < 256; ++i) {
             const auto sample = clip.sample(time, i / 256.0, 0, 0, liveFrames.get());
             if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
-            const auto point = projected(sample, time);
+            const auto point = projected(view, sample, time);
             if (!point.has_value()) { continue; }
             const auto distance = point->getDistanceFrom(position);
             if (distance < nearest) {
@@ -810,8 +812,9 @@ motion::Vec3 MotionCompositionView::worldPoint(osci::Point point, double time) c
     return { point.x, point.y, point.z };
 }
 
-std::optional<juce::Point<float>> MotionCompositionView::screenPoint(motion::Vec3 point) const {
-    const auto projected = camera.project(point);
+std::optional<juce::Point<float>> MotionCompositionView::screenPoint(const CameraView& view, motion::Vec3 point) const {
+    if (!view.has_value()) { return std::nullopt; }
+    const auto projected = view->project(point);
     if (!projected.has_value() || std::abs(projected->x) > 1000 || std::abs(projected->y) > 1000) { return std::nullopt; }
     const auto frame = outputFrame();
     return juce::Point<float> { static_cast<float>(frame.getCentreX() + projected->x * frame.getWidth() / 2),

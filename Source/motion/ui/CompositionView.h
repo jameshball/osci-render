@@ -127,8 +127,11 @@ private:
     juce::Rectangle<float> outputFrame() const;
     motion::editor::Vec2 normalized(juce::Point<float> point) const;
     motion::Vec3 worldPoint(osci::Point point, double time) const;
-    std::optional<juce::Point<float>> screenPoint(motion::Vec3 point) const;
-    std::optional<juce::Point<float>> projected(osci::Point point, double time) const { return screenPoint(worldPoint(point, time)); }
+    using CameraView = std::optional<motion::editor::Camera::View>;
+    // Loops over many points take the camera's view once.
+    std::optional<juce::Point<float>> screenPoint(const CameraView& view, motion::Vec3 point) const;
+    std::optional<juce::Point<float>> screenPoint(motion::Vec3 point) const { return screenPoint(camera.view(), point); }
+    std::optional<juce::Point<float>> projected(const CameraView& view, osci::Point point, double time) const { return screenPoint(view, worldPoint(point, time)); }
     void drawWorldLine(juce::Graphics& g, motion::Vec3 start, motion::Vec3 end) const;
     struct PathKey {
         motion::Id selection;

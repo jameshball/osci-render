@@ -46,18 +46,33 @@ public:
     Vec3 up() const { return right().cross(forward()); }
     double distance() const { return valid() ? (position - pivot).length() : 0; }
 
+    // The camera's basis and lens, worked out once to project many points.
+    struct View {
+        Vec3 position, forward, right, up;
+        double tangent = 1;
+        std::optional<Vec2> project(Vec3 world, double aspect = 1) const {
+            if (!usable(world) || !validAspect(aspect)) {
+                return std::nullopt;
+            }
+            const auto offset = world - position;
+            const auto depth = offset.dot(forward);
+            if (!std::isfinite(depth) || depth <= nearPlane) {
+                return std::nullopt;
+            }
+            const auto scale = depth * tangent;
+            Vec2 result { offset.dot(right) / scale / aspect, offset.dot(up) / scale };
+            return std::isfinite(result.x) && std::isfinite(result.y) ? std::optional<Vec2>(result) : std::nullopt;
+        }
+    };
+    std::optional<View> view() const {
+        if (!valid()) {
+            return std::nullopt;
+        }
+        return View { position, forward(), right(), up(), tangent() };
+    }
     std::optional<Vec2> project(Vec3 world, double aspect = 1) const {
-        if (!valid() || !usable(world) || !validAspect(aspect)) {
-            return std::nullopt;
-        }
-        const auto offset = world - position;
-        const auto depth = offset.dot(forward());
-        if (!std::isfinite(depth) || depth <= nearPlane) {
-            return std::nullopt;
-        }
-        const auto scale = depth * tangent();
-        Vec2 result { offset.dot(right()) / scale / aspect, offset.dot(up()) / scale };
-        return std::isfinite(result.x) && std::isfinite(result.y) ? std::optional<Vec2>(result) : std::nullopt;
+        const auto current = view();
+        return current.has_value() ? current->project(world, aspect) : std::nullopt;
     }
 
     std::optional<Ray> ray(Vec2 screen, double aspect = 1) const {
