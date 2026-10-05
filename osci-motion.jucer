@@ -413,6 +413,12 @@
             resource="0" file="Source/motion/MotionEditor.cpp"/>
       <FILE id="MotionMotionEditorh" name="MotionEditor.h" compile="0" resource="0"
             file="Source/motion/MotionEditor.h"/>
+      <FILE id="MotMotionEditorCommandscpp" name="MotionEditorCommands.cpp"
+            compile="1" resource="0" file="Source/motion/MotionEditorCommands.cpp"/>
+      <FILE id="MotMotionEditorExportcpp" name="MotionEditorExport.cpp" compile="1"
+            resource="0" file="Source/motion/MotionEditorExport.cpp"/>
+      <FILE id="MotMotionEditorSourcescpp" name="MotionEditorSources.cpp"
+            compile="1" resource="0" file="Source/motion/MotionEditorSources.cpp"/>
       <FILE id="MotionMotionProcessorcpp" name="MotionProcessor.cpp" compile="1"
             resource="0" file="Source/motion/MotionProcessor.cpp"/>
       <FILE id="MotionMotionProcessorh" name="MotionProcessor.h" compile="0"
