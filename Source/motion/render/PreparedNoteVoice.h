@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../../audio/modulation/DahdsrEnvelope.h"
 #include <array>
 #include <atomic>
@@ -37,13 +38,13 @@ public:
         result.dt = 1 / sampleRate;
         const std::array<double, 5> durations {params.delaySeconds, params.attackSeconds, params.holdSeconds, params.decaySeconds, params.releaseSeconds};
         for (std::size_t stage = 0; stage < durations.size(); ++stage) {
-            if (cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return std::nullopt; }
+            if (cancelled(cancel)) { return std::nullopt; }
             if ((stage == 0 || stage == 2) && durations[stage] == 0) { continue; }
             double elapsed = 0;
             do {
                 elapsed += result.dt;
                 ++result.samples[stage];
-                if ((result.samples[stage] & 4095) == 0 && cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return std::nullopt; }
+                if ((result.samples[stage] & 4095) == 0 && cancelled(cancel)) { return std::nullopt; }
             } while (elapsed < durations[stage]);
         }
         return result;

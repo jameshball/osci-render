@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../model/Document.h"
 #include "../model/CompositionGraph.h"
 #include "PreparedEffects.h"
@@ -655,7 +656,7 @@ private:
         constexpr int probes = 24;
         float follower = 0, loudest = 0;
         for (std::size_t bin = 0; bin < bins; ++bin) {
-            if (cancel != nullptr && (bin & 1023) == 0 && cancel->load()) { return nullptr; }
+            if ((bin & 1023) == 0 && cancelled(cancel)) { return nullptr; }
             float peak = 0;
             for (int probe = 0; probe < probes; ++probe) {
                 const auto sample = soundtrack.sample((static_cast<double>(bin) + probe / static_cast<double>(probes)) / envelope->rate);

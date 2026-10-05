@@ -115,11 +115,11 @@ void Document::refreshScope() {
 juce::Result Document::setMarker(Id id, double time, juce::String name) {
     name = name.trim();
     if (!std::isfinite(time) || time < 0 || time > project().duration) { return juce::Result::fail("Place the marker within the composition duration."); }
-    if (name.isEmpty() || name.length() > 120 || name.containsChar('\n') || name.containsChar('\r')) { return juce::Result::fail("Use a marker name of 1-120 characters on one line."); }
+    if (!Marker::validName(name)) { return juce::Result::fail("Use a marker name of 1-120 characters on one line."); }
     const auto& markers = project().markers;
     const auto found = std::find_if(markers.begin(), markers.end(), [id](const auto& marker) { return marker.id == id; });
     const bool adding = id == 0;
-    if (std::any_of(markers.begin(), markers.end(), [id, time](const auto& marker) { return marker.id != id && std::abs(marker.time - time) < 1.0e-9; })) { return juce::Result::fail("A marker already exists at this position."); }
+    if (std::any_of(markers.begin(), markers.end(), [id, time](const auto& marker) { return marker.id != id && std::abs(marker.time - time) < Marker::minimumSpacing; })) { return juce::Result::fail("A marker already exists at this position."); }
     if (!adding && found == markers.end()) { return juce::Result::fail("The marker no longer exists."); }
     if (!adding && found->time == time && found->name == name) { return juce::Result::ok(); }
     if (adding) {
@@ -134,7 +134,7 @@ juce::Result Document::setMarker(Id id, double time, juce::String name) {
         } else {
             for (auto& marker : project.markers) { if (marker.id == id) { marker.time = time; marker.name = name; } }
         }
-        std::sort(project.markers.begin(), project.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+        sortMarkers(project.markers);
     });
     return juce::Result::ok();
 }
@@ -294,20 +294,25 @@ void Document::apply(Project value) {
     sendChangeMessage();
 }
 
+Project Document::finished(Project view) const {
+    pruneReferences(view);
+    clampLoop(view);
+    return mergeScope(std::move(view));
+}
+
+void Document::record(const juce::String& label, Project view, bool joinPrevious) {
+    if (!joinPrevious) { undo.beginNewTransaction(label); }
+    undo.perform(new Change(*this, state, finished(std::move(view))));
+}
+
 void Document::preview(Project project) {
-    pruneReferences(project);
-    clampLoop(project);
-    apply(mergeScope(std::move(project)));
+    apply(finished(std::move(project)));
 }
 
 void Document::edit(juce::String label, std::function<void(Project&)> operation) {
     auto after = project();
     operation(after);
-    pruneReferences(after);
-    clampLoop(after);
-    after = mergeScope(std::move(after));
-    undo.beginNewTransaction(label);
-    undo.perform(new Change(*this, state, std::move(after)));
+    record(label, std::move(after));
 }
 
 void Document::editCoalesced(juce::String label, const juce::String& control, std::function<void(Project&)> operation) {
@@ -315,11 +320,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
     const bool joins = control.isNotEmpty() && control == coalescingControl && revision() == coalescingRevision && now - coalescingTime < 1.0;
     auto after = project();
     operation(after);
-    pruneReferences(after);
-    clampLoop(after);
-    after = mergeScope(std::move(after));
-    if (!joins) { undo.beginNewTransaction(label); }
-    undo.perform(new Change(*this, state, std::move(after)));
+    record(label, std::move(after), joins);
     coalescingControl = control;
     coalescingRevision = revision();
     coalescingTime = now;
@@ -328,11 +329,7 @@ void Document::editCoalesced(juce::String label, const juce::String& control, st
 bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operation) {
     auto after = project();
     if (!operation(after)) { return false; }
-    pruneReferences(after);
-    clampLoop(after);
-    after = mergeScope(std::move(after));
-    undo.beginNewTransaction(label);
-    undo.perform(new Change(*this, state, std::move(after)));
+    record(label, std::move(after));
     return true;
 }
 
@@ -569,42 +566,23 @@ std::size_t Document::assetUses(Id assetId) const {
 }
 
 bool Document::setTrackHeight(Id trackId, int height) {
-    height = height == 0 ? 0 : std::clamp(height, Track::minimumHeight, Track::maximumHeight);
-    bool found = false;
-    const auto update = [&](Composition& composition) {
-        bool changed = false;
-        for (auto& track : composition.tracks) {
-            if (track.id == trackId) { found = true; changed = track.height != height; track.height = height; }
-        }
-        return changed;
-    };
-    auto next = state;
-    bool changed = update(next);
-    for (auto& definition : next.definitions) {
-        const auto owns = definition != nullptr && std::any_of(definition->tracks.begin(), definition->tracks.end(), [trackId](const auto& track) { return track.id == trackId; });
-        if (!owns) { continue; }
-        auto copy = std::make_shared<CompositionDefinition>(*definition);
-        if (update(*copy)) { definition = std::move(copy); changed = true; }
-    }
-    if (!found || !changed) { return found; }
-    // View state: no undo step, no revision bump and no change broadcast (it
-    // affects neither playback nor any other view); the timeline relayouts
-    // itself and the next save writes it.
-    state = std::move(next);
-    refreshScope();
-    return true;
+    return setTrackHeights({{trackId, height}});
 }
 
-// Several heights with one copy of the project.
-void Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
-    if (heights.empty()) { return; }
+bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     std::map<Id, int> wanted;
     for (const auto& [id, height] : heights) { wanted[id] = height == 0 ? 0 : std::clamp(height, Track::minimumHeight, Track::maximumHeight); }
+    std::set<Id> found;
     const auto update = [&](Composition& composition) {
         bool changed = false;
         for (auto& track : composition.tracks) {
-            const auto found = wanted.find(track.id);
-            if (found != wanted.end() && track.height != found->second) { track.height = found->second; changed = true; }
+            const auto height = wanted.find(track.id);
+            if (height == wanted.end()) { continue; }
+            found.insert(track.id);
+            if (track.height != height->second) {
+                track.height = height->second;
+                changed = true;
+            }
         }
         return changed;
     };
@@ -615,11 +593,19 @@ void Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
         const auto owns = std::any_of(definition->tracks.begin(), definition->tracks.end(), [&](const auto& track) { return wanted.contains(track.id); });
         if (!owns) { continue; }
         auto copy = std::make_shared<CompositionDefinition>(*definition);
-        if (update(*copy)) { definition = std::move(copy); changed = true; }
+        if (update(*copy)) {
+            definition = std::move(copy);
+            changed = true;
+        }
     }
-    if (!changed) { return; }
-    state = std::move(next);
-    refreshScope();
+    // View state: no undo step, no revision bump and no change broadcast (it
+    // affects neither playback nor any other view); the timeline relayouts
+    // itself and the next save writes it.
+    if (changed) {
+        state = std::move(next);
+        refreshScope();
+    }
+    return found.size() == wanted.size();
 }
 
 bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
@@ -1659,6 +1645,14 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
     return juce::Result::ok();
 }
 
+static double defaultRouteAmount(const std::string& property) {
+    // A quarter unit keeps a moved or scaled object on the canvas; rotations
+    // swing 45 degrees; colours move halfway.
+    if (property.starts_with("rotation.")) { return 45.0; }
+    if (property == "red" || property == "green" || property == "blue") { return 0.5; }
+    return 0.25;
+}
+
 // A quarter of a Scope property's range; otherwise as defaultRouteAmount.
 double Document::routeAmount(const Project& project, Id target, const std::string& property) {
     const auto found = findPropertyTarget(project, target);
@@ -1666,13 +1660,6 @@ double Document::routeAmount(const Project& project, Id target, const std::strin
     return spec != nullptr ? 0.25 * (spec->maximum - spec->minimum) : defaultRouteAmount(property);
 }
 
-double Document::defaultRouteAmount(const std::string& property) {
-    // A quarter unit keeps a moved or scaled object on the canvas; rotations
-    // swing 45 degrees; colours move halfway.
-    if (property.starts_with("rotation.")) { return 45.0; }
-    if (property == "red" || property == "green" || property == "blue") { return 0.5; }
-    return 0.25;
-}
 
 juce::Result Document::routeModulator(Id modulator, Id target, const std::vector<std::string>& properties) {
     const auto& current = project();

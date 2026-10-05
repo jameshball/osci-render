@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <array>
@@ -20,9 +21,8 @@ struct Prepared {
 
 inline Prepared prepare(const juce::String& source, int depth, const std::atomic<bool>* cancel = nullptr) {
     constexpr std::size_t maxSymbols = 262144, maxSegments = 32768, maxStack = 4096;
-    const auto cancelled = [cancel] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
     const auto fail = [](juce::String message) { return Prepared { {}, std::move(message) }; };
-    if (cancelled()) { return fail("Fractal preparation cancelled."); }
+    if (cancelled(cancel)) { return fail("Fractal preparation cancelled."); }
     if (depth < 0 || depth > 15) { return fail("Choose a fractal depth from 0 to 15."); }
     if (source.getNumBytesAsUTF8() > maxSymbols) { return fail("Fractal source must be no larger than 256 KiB."); }
     // Bound recursion before entering JUCE's recursive JSON parser.
@@ -73,7 +73,7 @@ inline Prepared prepare(const juce::String& source, int depth, const std::atomic
         std::string next;
         next.reserve(std::min(maxSymbols, symbols.size()));
         for (std::size_t index = 0; index < symbols.size(); ++index) {
-            if ((index & 255) == 0 && cancelled()) { return fail("Fractal preparation cancelled."); }
+            if ((index & 255) == 0 && cancelled(cancel)) { return fail("Fractal preparation cancelled."); }
             const auto& replacement = rules[static_cast<unsigned char>(symbols[index])];
             const auto size = replacement.has_value() ? replacement->size() : 1;
             if (size > maxSymbols - next.size()) { return fail("Fractal exceeds 262,144 symbols. Choose a lower depth."); }
@@ -89,7 +89,7 @@ inline Prepared prepare(const juce::String& source, int depth, const std::atomic
     const auto turn = std::remainder(static_cast<double>(angle), 360.0);
     double minX = 0, maxX = 0, minY = 0, maxY = 0;
     for (std::size_t index = 0; index < symbols.size(); ++index) {
-        if ((index & 255) == 0 && cancelled()) { return fail("Fractal preparation cancelled."); }
+        if ((index & 255) == 0 && cancelled(cancel)) { return fail("Fractal preparation cancelled."); }
         const auto symbol = symbols[index];
         const auto draws = symbol >= 'A' && symbol <= 'Z' && symbol != 'X' && symbol != 'Y';
         if (draws || symbol == 'f') {
@@ -119,7 +119,7 @@ inline Prepared prepare(const juce::String& source, int depth, const std::atomic
     const auto span = std::max(maxX - minX, maxY - minY);
     const auto scale = span > 1e-8 ? 2.0 / span : 1.0;
     for (std::size_t index = 0; index < result.segments.size(); ++index) {
-        if ((index & 255) == 0 && cancelled()) { return fail("Fractal preparation cancelled."); }
+        if ((index & 255) == 0 && cancelled(cancel)) { return fail("Fractal preparation cancelled."); }
         auto& segment = result.segments[index];
         for (int point = 0; point < 4; point += 2) {
             segment[point] = (segment[point] - (minX + maxX) * .5) * scale;

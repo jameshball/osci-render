@@ -45,10 +45,19 @@ struct Asset {
 // Composition content is independent of the project-wide media registry.
 // Reusable compositions can share assets without duplicating their payloads.
 struct Marker {
+    // Markers closer than this share a position, which is not allowed.
+    static constexpr double minimumSpacing = 1.0e-9;
     Id id = 0;
     double time = 0;
     juce::String name;
+    static bool validName(const juce::String& name) { return name.trim().isNotEmpty() && name.length() <= 120 && !name.containsAnyOf("\r\n"); }
+    bool valid(double duration) const { return std::isfinite(time) && time >= 0 && time <= duration && validName(name); }
 };
+
+// Markers in time order; ties (which loading refuses) by identity.
+inline void sortMarkers(std::vector<Marker>& markers) {
+    std::sort(markers.begin(), markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+}
 
 struct Composition {
     juce::String name = "Untitled";
@@ -204,8 +213,10 @@ public:
     // clip no longer exists.
     bool setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake);
     // A track's row height (0: default). View state: no undo step, and undo
-    // or redo keep the current heights.
+    // or redo keep the current heights. False when the track is missing.
     bool setTrackHeight(Id trackId, int height);
+    // Several heights with one copy of the project; false when any is missing.
+    bool setTrackHeights(const std::vector<std::pair<Id, int>>& heights);
     // Edits made inside a ViewChange (loop range, snapping, time display)
     // stay undoable but tell listeners nothing that playback depends on
     // changed, so the composition is not prepared again.
@@ -219,7 +230,6 @@ public:
     // Time display, snapping and the loop switch: applied without an undo
     // step, and kept by later undo and redo.
     void changeView(std::function<void(Composition&)> change);
-    void setTrackHeights(const std::vector<std::pair<Id, int>>& heights);
     // Removes the listed sources (or every unused source when empty) that no
     // clip, composition or MIDI assignment references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);
@@ -254,7 +264,6 @@ public:
     // Routes `modulator` to each of `properties` of `target` that it does not
     // drive yet, at a visible but contained default depth. One undo step.
     juce::Result routeModulator(Id modulator, Id target, const std::vector<std::string>& properties);
-    static double defaultRouteAmount(const std::string& property);
     static double routeAmount(const Project& project, Id target, const std::string& property);
     // Creates a modulator already driving one property, as one undo step.
     juce::Result addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId);
@@ -262,10 +271,9 @@ public:
     juce::Result removeRoute(Id id);
     // Links (or unlinks, with nullopt) a property; refuses cycles.
     juce::Result setLink(Id target, const std::string& property, std::optional<PropertyLink> link);
+    // Shows a gesture in progress without an undo step; commit() then records
+    // it from where it began.
     void preview(Project project);
-    juce::String coalescingControl;
-    std::uint64_t coalescingRevision = 0;
-    double coalescingTime = 0;
     void commit(juce::String label, Project before);
     juce::XmlElement save() const;
     juce::Result load(const juce::XmlElement& xml);
@@ -298,6 +306,12 @@ private:
     juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);
     void apply(Project value);
     Project mergeScope(Project view) const;
+    // An edited view, made consistent and merged into the whole project.
+    Project finished(Project view) const;
+    void record(const juce::String& label, Project view, bool joinPrevious = false);
+    juce::String coalescingControl;
+    std::uint64_t coalescingRevision = 0;
+    double coalescingTime = 0;
     void refreshScope();
     struct Change;
     Project state, scopeView;

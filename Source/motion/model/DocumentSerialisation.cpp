@@ -586,15 +586,14 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     for (auto* item : xml.getChildWithTagNameIterator("marker")) {
         const auto id = claimId(*item, identities);
         Marker marker {id.value_or(0), item->getDoubleAttribute("time", -1), item->getStringAttribute("name")};
-        if (!id.has_value() || !std::isfinite(marker.time) || marker.time < 0 || marker.time > project.duration
-            || marker.name.trim().isEmpty() || marker.name.length() > 120 || marker.name.containsChar('\n') || marker.name.containsChar('\r')) {
+        if (!id.has_value() || !marker.valid(project.duration)) {
             return juce::Result::fail("Invalid marker identity, position or name.");
         }
         project.markers.push_back(std::move(marker));
     }
-    std::sort(project.markers.begin(), project.markers.end(), [](const auto& a, const auto& b) { return a.time != b.time ? a.time < b.time : a.id < b.id; });
+    sortMarkers(project.markers);
     for (std::size_t index = 1; index < project.markers.size(); ++index) {
-        if (project.markers[index].time - project.markers[index - 1].time < 1.0e-9) { return juce::Result::fail("Markers must have distinct positions."); }
+        if (project.markers[index].time - project.markers[index - 1].time < Marker::minimumSpacing) { return juce::Result::fail("Markers must have distinct positions."); }
     }
     for (auto* item : xml.getChildWithTagNameIterator("cameraCut")) {
         CameraCut cut;

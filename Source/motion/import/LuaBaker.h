@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../model/BakeSettings.h"
+#include "../model/Cancellation.h"
 #include <osci_scripting/osci_scripting.h>
 #include <atomic>
 #include <numbers>
@@ -17,11 +18,11 @@ public:
     // (content seconds from the start of the bake); absent, sliders stay 0.
     using Sliders = std::function<void(double, double*)>;
     static PreparedPointFrames::Result bake(const juce::String& name, const juce::String& script, const BakeSettings& settings,
-            const std::atomic<bool>* cancelled = nullptr, std::atomic<double>* progress = nullptr, const Sliders& sliders = {}) {
+            const std::atomic<bool>* cancel = nullptr, std::atomic<double>* progress = nullptr, const Sliders& sliders = {}) {
         if (progress != nullptr) { progress->store(0); }
         const auto error = settings.validate();
         if (!error.empty()) { return {nullptr, error}; }
-        if (cancelled != nullptr && cancelled->load()) { return {nullptr, "Bake cancelled."}; }
+        if (cancelled(cancel)) { return {nullptr, "Bake cancelled."}; }
         try {
             juce::String scriptError;
             LuaParser parser(name, script, [&](int, juce::String, juce::String message) {
@@ -29,7 +30,7 @@ public:
             });
             LuaParser::OfflinePolicy policy;
             policy.randomSeed = settings.seed;
-            policy.cancelled = cancelled;
+            policy.cancelled = cancel;
             const auto configured = parser.setOfflinePolicy(policy);
             if (configured.failed()) { return {nullptr, configured.getErrorMessage().toStdString()}; }
             LuaState state;
@@ -45,7 +46,7 @@ public:
             std::vector<PointSample> samples(total);
             for (std::size_t index = 0; index < total; ++index) {
                 if ((index & 255) == 0) {
-                    if (cancelled != nullptr && cancelled->load()) { return {nullptr, "Bake cancelled."}; }
+                    if (cancelled(cancel)) { return {nullptr, "Bake cancelled."}; }
                     if (progress != nullptr) { progress->store(static_cast<double>(index) / static_cast<double>(total)); }
                 }
                 vars.step = static_cast<double>(index) + 1;
@@ -68,7 +69,7 @@ public:
                     return {nullptr, "Lua returned invalid coordinates or RGB outside [0,1] (or all -1 for inherited color) at sample " + std::to_string(index + 1) + "."};
                 }
             }
-            if (cancelled != nullptr && cancelled->load()) { return {nullptr, "Bake cancelled."}; }
+            if (cancelled(cancel)) { return {nullptr, "Bake cancelled."}; }
             auto result = PreparedPointFrames::create(settings.frameRate, frames, settings.pointsPerFrame, std::move(samples));
             if (result && progress != nullptr) { progress->store(1); }
             return result;

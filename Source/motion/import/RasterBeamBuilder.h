@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../model/Cancellation.h"
 #include "../model/PreparedPointFrames.h"
 #include <array>
 #include <atomic>
@@ -30,7 +31,7 @@ public:
     // are always blank. Output uses linear interpolation safely, including the
     // last-to-first seam: travel endpoints have RGB=0 and unchanged geometry.
     static Result build(const std::uint8_t* rgba, std::size_t bytes, int width, int height, const Settings& settings,
-            const std::atomic<bool>* cancelled = nullptr) {
+            const std::atomic<bool>* cancel = nullptr) {
         if (width < 1 || height < 1 || width > 512 || height > 512 || rgba == nullptr
             || bytes != static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4) {
             return {{}, "Raster must be tightly packed RGBA8, with dimensions between 1 and 512."};
@@ -40,8 +41,7 @@ public:
             || (settings.mode != Mode::contours && settings.mode != Mode::scanlines)) {
             return {{}, "Invalid raster trace settings or point budget (16-16384)."};
         }
-        const auto stopped = [&] { return cancelled != nullptr && cancelled->load(std::memory_order_relaxed); };
-        if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+        if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
         try {
             const auto colour = [&](int x, int y) {
                 x = std::clamp(x, 0, width - 1);
@@ -57,7 +57,7 @@ public:
             };
             std::vector<std::uint8_t> mask(static_cast<std::size_t>(width) * height);
             for (int y = 0; y < height; ++y) {
-                if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+                if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                 for (int x = 0; x < width; ++x) {
                     const auto rgb = colour(x, y);
                     const auto luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -79,7 +79,7 @@ public:
             };
             if (settings.mode == Mode::scanlines) {
                 for (int y = 0; y < height; ++y) {
-                    if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+                    if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                     const int direction = (y & 1) == 0 ? 1 : -1;
                     int x = direction == 1 ? 0 : width - 1;
                     while (x >= 0 && x < width) {
@@ -100,7 +100,7 @@ public:
                 std::vector<std::uint8_t> edges(static_cast<std::size_t>(stride) * (height + 1));
                 const auto edge = [&](int x, int y, int direction) { edges[static_cast<std::size_t>(y) * stride + x] |= static_cast<std::uint8_t>(1u << direction); };
                 for (int y = 0; y < height; ++y) {
-                    if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+                    if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                     for (int x = 0; x < width; ++x) {
                         if (!lit(x, y)) { continue; }
                         if (!lit(x, y - 1)) { edge(x, y, 0); }
@@ -111,7 +111,7 @@ public:
                 }
                 constexpr std::array<int, 4> dx {1, 0, -1, 0}, dy {0, 1, 0, -1};
                 for (int startY = 0; startY <= height; ++startY) {
-                    if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+                    if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                     for (int startX = 0; startX <= width; ++startX) {
                         auto& available = edges[static_cast<std::size_t>(startY) * stride + startX];
                         while (available != 0) {
@@ -127,7 +127,7 @@ public:
                                 edges[static_cast<std::size_t>(y) * stride + x] &= static_cast<std::uint8_t>(~(1u << direction));
                                 x += dx[static_cast<std::size_t>(direction)];
                                 y += dy[static_cast<std::size_t>(direction)];
-                                if ((++steps & 255) == 0 && stopped()) { return {{}, "Raster preparation cancelled."}; }
+                                if ((++steps & 255) == 0 && cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                                 if (x == startX && y == startY) { break; }
                                 const auto nextEdges = edges[static_cast<std::size_t>(y) * stride + x];
                                 int nextDirection = -1;
@@ -192,7 +192,7 @@ public:
             };
             std::size_t segmentIndex = 0;
             for (const auto& path : paths) {
-                if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+                if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
                 emit(path.vertices.front(), {0, 0, 0});
                 if (path.vertices.size() == 1) {
                     const auto point = path.vertices.front();
@@ -219,7 +219,7 @@ public:
                 }
                 emit(path.vertices.back(), {0, 0, 0});
             }
-            if (stopped()) { return {{}, "Raster preparation cancelled."}; }
+            if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
             return {std::move(output), {}};
         } catch (const std::bad_alloc&) {
             return {{}, "Not enough memory to prepare raster geometry."};
