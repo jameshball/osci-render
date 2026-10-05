@@ -238,8 +238,13 @@ juce::Result validateGplaFrame(const juce::var& frame, std::size_t& totalVertice
     return juce::Result::ok();
 }
 
+void addLines(const std::vector<osci::Line>& lines, ImportShapes& shapes) {
+    shapes.reserve(shapes.size() + lines.size());
+    for (const auto& line : lines) { shapes.push_back(std::make_unique<osci::Line>(line)); }
+}
+
 // Structural preflight protects the shared binary parser's unchecked matrix
-// and stroke assumptions. Geometry decoding remains in LineArtParser.
+// and stroke assumptions, and finds each frame for LineArtParser to decode.
 struct GplaBinaryLayout {
     explicit GplaBinaryLayout(const juce::MemoryBlock& data) : bytes(static_cast<const char*>(data.getData())), size(data.getSize()) {}
 
@@ -377,23 +382,8 @@ juce::Result decodeGpla(Asset& asset, const std::atomic<bool>* cancel, std::atom
         }
         return prepareSourceFrames(asset, static_cast<int>(layout.frames.size()), layout.frameRate,
             [&](int frame, ImportShapes& shapes) {
-                // Feed one validated frame to the shared parser, bounding its
-                // temporary ownership and allowing cancellation between frames.
-                juce::MemoryOutputStream single;
-                single.write("GPLA    ", 8);
-                single.writeInt64(1);
-                single.writeInt64(0);
-                single.writeInt64(0);
-                single.write("FILE    fCount  ", 16);
-                single.writeInt64(1);
-                single.write("fRate   ", 8);
-                single.writeInt64(static_cast<juce::int64>(layout.frameRate));
-                single.write("DONE    ", 8);
-                const auto range = layout.frames[static_cast<std::size_t>(frame)];
-                single.write(layout.bytes + range.first, range.second);
-                single.write("END GPLA", 8);
-                LineArtParser parser(static_cast<const char*>(single.getData()), static_cast<int>(single.getDataSize()));
-                shapes = parser.draw();
+                const auto [start, length] = layout.frames[static_cast<std::size_t>(frame)];
+                addLines(LineArtParser::parseBinaryFrame(layout.bytes + start, static_cast<int>(length)), shapes);
                 return juce::Result::ok();
             }, cancel, progress);
     }
@@ -413,11 +403,7 @@ juce::Result decodeGpla(Asset& asset, const std::atomic<bool>* cancel, std::atom
                 return validated;
             }
             const auto objects = item.getProperty("objects", {});
-            auto lines = LineArtParser::generateFrame(*objects.getArray(), static_cast<double>(item.getProperty("focalLength", {})));
-            shapes.reserve(lines.size());
-            for (auto& line : lines) {
-                shapes.push_back(line.clone());
-            }
+            addLines(LineArtParser::generateFrame(*objects.getArray(), static_cast<double>(item.getProperty("focalLength", {}))), shapes);
             return juce::Result::ok();
         }, cancel, progress);
 }

@@ -1789,6 +1789,21 @@ private:
             expectEquals(static_cast<int>(binaryAsset.source->frameCount()), 2);
             expect(std::abs(binaryAsset.source->sample(0, 0.3).x - binaryAsset.source->sample(1.5 / 24, 0.3).x) > 0.01f);
         }
+        // Frame by frame, the shared parser matches its whole-file result.
+        const auto* bytes = static_cast<const char*>(binary.getData());
+        int rate = 0;
+        const auto whole = LineArtParser::parseBinaryFrames(bytes, static_cast<int>(binary.getDataSize()), rate);
+        expect(whole.size() == 2 && rate == 24);
+        constexpr int headerBytes = 80, frameBytes = 312;
+        for (std::size_t frameIndex = 0; frameIndex < whole.size(); ++frameIndex) {
+            const auto single = LineArtParser::parseBinaryFrame(bytes + headerBytes + static_cast<int>(frameIndex) * frameBytes, frameBytes);
+            expect(!single.empty() && single.size() == whole[frameIndex].size());
+            for (std::size_t line = 0; line < std::min(single.size(), whole[frameIndex].size()); ++line) {
+                const auto& a = single[line];
+                const auto& b = whole[frameIndex][line];
+                expect(a.x1 == b.x1 && a.y1 == b.y1 && a.x2 == b.x2 && a.y2 == b.y2);
+            }
+        }
 #if OSCI_PREMIUM
         beginTest("Lottie JSON and dotLottie prepare identical animated geometry");
         const juce::String lottie = R"json({"v":"5.7.4","fr":30,"ip":0,"op":3,"w":100,"h":100,"nm":"Motion test","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Line","sr":1,"ks":{"o":{"a":0,"k":100},"r":{"a":0,"k":0},"p":{"a":1,"k":[{"t":0,"s":[0,0,0],"e":[20,0,0],"i":{"x":[0.833],"y":[0.833]},"o":{"x":[0.167],"y":[0.167]}},{"t":2,"s":[20,0,0]}]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}},"ao":0,"shapes":[{"ty":"sh","nm":"Line","ks":{"a":0,"k":{"i":[[0,0],[0,0]],"o":[[0,0],[0,0]],"v":[[10,50],[50,50]],"c":false}}},{"ty":"st","nm":"Stroke","c":{"a":0,"k":[0,0,1,1]},"o":{"a":0,"k":100},"w":{"a":0,"k":2},"lc":1,"lj":1,"ml":4,"bm":0}],"ip":0,"op":3,"st":0,"bm":0}]})json";
