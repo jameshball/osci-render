@@ -78,7 +78,7 @@ try:
     assert tree.find("track/clip/midi/control") is not None, "controller data survives save"
     step("armed", "screenshot", "--file", session.artifact_dir / "armed.png")
     # A controller modulator following the clip's mod wheel.
-    step("modulators", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
+    step("modulators", "click", "--name", "Modulators", "--class", "osci::TabBar::Tab", "--exact")
     step("add modulator", "click", "--name", "Add modulator", "--exact")
     wait_undo("Add modulator")
     step("add cc", "click", "--name", "Shape MIDI controller", "--exact")

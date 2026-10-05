@@ -73,7 +73,7 @@ def edit(name, value):
 
 
 def tab(name):
-    step("inspect " + name, "click", "--name", name, "--class", "MotionTabs::Tab", "--exact")
+    step("inspect " + name, "click", "--name", name, "--class", "osci::TabBar::Tab", "--exact")
 
 
 def seek(time):
@@ -164,8 +164,8 @@ try:
     group, _ = header("Orbital rig")
     group_id = group["componentName"].split()[-1]
     tree = snapshot()
-    library = find(tree, lambda n: n.get("class") == "MotionTabs" and n.get("name") == "Library tabs")
-    effect_tab = find(library, lambda n: n.get("class") == "MotionTabs::Tab" and n.get("name") == "Effects")
+    library = find(tree, lambda n: n.get("class") == "osci::TabBar" and n.get("name") == "Library tabs")
+    effect_tab = find(library, lambda n: n.get("class") == "osci::TabBar::Tab" and n.get("name") == "Effects")
     step("open effects library", "click", effect_tab["ref"])
     tree = snapshot()
     effect = find(tree, lambda n: n.get("role") == "listItem" and n.get("name") == "Swirl")["bounds"]

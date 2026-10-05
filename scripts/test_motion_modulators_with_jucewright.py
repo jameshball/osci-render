@@ -76,7 +76,7 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Modulator study", "--timeout-ms", 60000)
     step("workspace", "resize-window", "--w", 1440, "--h", 900)
     # A shared LFO, edited in the library.
-    step("modulator tab", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
+    step("modulator tab", "click", "--name", "Modulators", "--class", "osci::TabBar::Tab", "--exact")
     step("add modulator", "click", "--name", "Add modulator", "--exact")
     wait_undo("Add modulator")
     step("saw", "click", "--name", "Shape Saw", "--exact")
@@ -85,7 +85,7 @@ try:
     step("library", "screenshot", "--file", session.artifact_dir / "library.png")
     # Route it into the leader's position y from the graph column.
     step("select leader", "click", "--class", "MotionTimelineView", "--position", "350,64")
-    step("graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
+    step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("taller graph", "drag", "--name", "Resize timeline", "--class", "MotionDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -220)
     step("all channels", "click", "--name", "Animated channels only", "--exact")
     step("choose position y", "click", "--name", "Curve Position Y", "--exact")
@@ -109,9 +109,9 @@ try:
     step("route amount", "set-value", "--name", "Route amount LFO 1", "0.4")
     wait_undo("Change route")
     # Link the follower's position x to the leader's, delayed by half a second.
-    step("timeline for follower", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    step("timeline for follower", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("select follower", "click", "--class", "MotionTimelineView", "--position", "350,96")
-    step("graph for follower", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
+    step("graph for follower", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("choose position x", "click", "--name", "Curve Position X", "--exact")
     step("link menu", "click", "--name", "Link property", "--exact")
     step("leader submenu", "click", "--name", "Leader", "--role", "menuItem", "--exact")
@@ -128,7 +128,7 @@ try:
     link = linked.find("link")
     assert link is not None and link.get("source") == "3" and link.get("property") == "position.x" and float(link.get("delay")) == 0.5, ET.tostring(linked)
     # A spatial path for the leader, from the inspector's Position row.
-    step("timeline for leader", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    step("timeline for leader", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     step("select leader again", "click", "--class", "MotionTimelineView", "--position", "350,64")
     step("spatial path", "click", "--name", "Spatial path", "--exact")
     wait_undo("Use spatial path")
@@ -142,7 +142,7 @@ try:
     command("wait-for-locator", "--name", "Route amount LFO 1", "--exact", "--timeout-ms", 5000)
     step("modulate screenshot", "screenshot", "--file", session.artifact_dir / "modulate.png")
     # Deleting the modulator removes its route; undo restores both.
-    step("modulator tab again", "click", "--name", "Modulators", "--class", "MotionTabs::Tab", "--exact")
+    step("modulator tab again", "click", "--name", "Modulators", "--class", "osci::TabBar::Tab", "--exact")
     step("delete modulator", "click", "--name", "Delete modulator", "--exact")
     wait_undo("Delete modulator")
     tree = saved()

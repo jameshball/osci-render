@@ -106,7 +106,7 @@ try:
     step("enable virtual MIDI input", "press", "Return", "--class", device_list, "--exact")
     step("close input settings", "click", "--name", "Close icon", "--exact")
     step("select clip", "click", "--class", "MotionTimelineView", "--position", "240,77")
-    step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
+    step("open notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
 
     # Take 1: two notes, the second held by sustain past its note-off.
     step("start recording", "click", "--name", "Record notes", "--class", "juce::TextButton", "--exact")

@@ -352,8 +352,15 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addChildComponent(effectLibrary);
     libraryHeader.setVisible(false);
     libraryTabs.setName("Library tabs");
-    libraryTabs.setTabPadding(8);
-    timelineTabs.setTabPadding(8);
+    // Panel tabs at their natural width, in the panel title style.
+    for (auto* tabs : {&libraryTabs, &timelineTabs}) {
+        tabs->setTabSpacing(1, 8);
+        tabs->setFont(motion::style::title());
+        tabs->setColour(osci::TabBar::backgroundColourId, motion::style::background());
+        tabs->setColour(osci::TabBar::textColourId, motion::style::muted());
+        tabs->setColour(osci::TabBar::selectedTextColourId, motion::style::text());
+        tabs->setColour(osci::TabBar::indicatorColourId, motion::style::accent());
+    }
     libraryTabs.addTab("Assets");
     libraryTabs.addTab("Effects");
     libraryTabs.addTab("Modulators");

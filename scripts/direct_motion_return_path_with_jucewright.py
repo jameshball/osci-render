@@ -73,7 +73,7 @@ def edit(name, value):
 
 
 def tab(name):
-    step("inspect " + name, "click", "--name", name, "--class", "MotionTabs::Tab", "--exact")
+    step("inspect " + name, "click", "--name", name, "--class", "osci::TabBar::Tab", "--exact")
 
 
 def seek(time):
@@ -149,7 +149,7 @@ def camera(name, start, properties, animation=None):
 
 def add_effect(name,parameter,values):
     library=named(snapshot(),"Library tabs")
-    target=find(library,lambda n:n.get("class")=="MotionTabs::Tab" and n.get("name")=="Effects")
+    target=find(library,lambda n:n.get("class")=="osci::TabBar::Tab" and n.get("name")=="Effects")
     step("open effects library","click",target["ref"])
     step("add narrative effect","click","--name",name,"--role","listItem","--click-count",2)
     command("wait-for-locator","--name","Effect "+parameter,"--role","slider","--exact")

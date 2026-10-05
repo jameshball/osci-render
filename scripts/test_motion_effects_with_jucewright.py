@@ -54,8 +54,8 @@ try:
     step("resize workspace", "resize-window", "--w", session.window_width or 1100, "--h", session.window_height or 800)
     step("import object", "drop-files", "--file", session.root_dir / "Resources/models/cube.obj", "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "cube.obj", "--role", "label", "--exact")
-    library = find(snapshot(), lambda node: node.get("class") == "MotionTabs" and node.get("name") == "Library tabs")
-    effectTab = find(library, lambda node: node.get("class") == "MotionTabs::Tab" and node.get("name") == "Effects")
+    library = find(snapshot(), lambda node: node.get("class") == "osci::TabBar" and node.get("name") == "Library tabs")
+    effectTab = find(library, lambda node: node.get("class") == "osci::TabBar::Tab" and node.get("name") == "Effects")
     step("open effects library", "click", effectTab["ref"])
 
     def tile(name):
@@ -72,7 +72,7 @@ try:
     wait_undo("Change effect parameter")
     step("key effect amount", "click", "--name", "Key effect swirl", "--exact")
     wait_undo("Key effect parameter")
-    step("open effect graph", "click", "--name", "Graph", "--class", "MotionTabs::Tab", "--exact")
+    step("open effect graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
     step("effect graph screenshot", "screenshot", "--file", session.artifact_dir / "effect-graph.png")
     step("add graph effect key", "click", "--class", "MotionCurveEditor", "--position", "560,60", "--click-count", 2)
     wait_undo("Add animation key")
@@ -85,7 +85,7 @@ try:
     step("reorder effects by their header", "drag-xy", translate["x"] + 60, translate["y"] + 14, translate["x"] + 60, translate["y"] - 60, "--steps", 16)
     wait_undo("Move effect")
     # A track's own effects: select it by its name.
-    step("show timeline", "click", "--name", "Timeline", "--class", "MotionTabs::Tab", "--exact")
+    step("show timeline", "click", "--name", "Timeline", "--class", "osci::TabBar::Tab", "--exact")
     header = find(snapshot(), lambda node: str(node.get("componentName", "")).startswith("Track name ") and node.get("value") == "cube.obj")
     step("select track", "click", header["ref"])
     command("wait-for-value", "--component-name", "Inspector title", "--value", "cube.obj")

@@ -80,7 +80,7 @@ try:
     library = find(json.loads(command("snapshot", "--json", "--full")), "Library tabs")
     def effect_tab(tree):
         if isinstance(tree, dict):
-            if tree.get("class") == "MotionTabs::Tab" and tree.get("name") == "Effects": return tree
+            if tree.get("class") == "osci::TabBar::Tab" and tree.get("name") == "Effects": return tree
             for value in tree.values():
                 found = effect_tab(value)
                 if found: return found

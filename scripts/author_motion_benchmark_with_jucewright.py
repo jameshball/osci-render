@@ -63,7 +63,7 @@ def edit(name, value):
 
 
 def tab(name):
-    step("inspect " + name, "click", "--name", name, "--class", "MotionTabs::Tab", "--exact")
+    step("inspect " + name, "click", "--name", name, "--class", "osci::TabBar::Tab", "--exact")
 
 
 def seek(seconds):

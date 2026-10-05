@@ -21,7 +21,6 @@
 #include "ui/PropertyInspector.h"
 #include "ui/StatusBar.h"
 #include "ui/ShortcutsOverlay.h"
-#include "ui/MotionTabs.h"
 #include "ui/MotionIcons.h"
 #include "ui/DrawingEditor.h"
 #include "ui/TextSourceEditor.h"
@@ -214,9 +213,9 @@ private:
     juce::Component graphSide;
     void layoutGraphSide();
     MotionModulatorLibrary modulatorLibrary;
-    MotionTabs libraryTabs;
+    osci::TabBar libraryTabs;
     juce::Label inspectorTitle;
-    MotionTabs timelineTabs;
+    osci::TabBar timelineTabs;
     MotionCurveList curveList;
     std::set<std::string> shownCurves, hiddenCurves;
     void refreshCurveList();

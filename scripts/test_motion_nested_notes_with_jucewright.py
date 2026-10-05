@@ -59,7 +59,7 @@ try:
     step("open composition", "click", "--class", "MotionTimelineView", "--position", "300,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("select child", "click", "--class", "MotionTimelineView", "--position", "300,68")
-    step("open notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
+    step("open notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
     # Give the piano roll the room it used to take for itself.
     step("taller notes", "drag", "--name", "Resize timeline", "--class", "MotionDivider", "--exact", "--position", "20,3", "--dx", 0, "--dy", -64)
     step("create child pattern", "click", "--name", "Create notes", "--exact")
@@ -91,7 +91,7 @@ try:
     step("reopen musical composition", "click", "--class", "MotionTimelineView", "--position", "300,68", "--click-count", 2)
     command("wait-for-locator", "--name", "Back to Main", "--exact")
     step("select reopened child", "click", "--class", "MotionTimelineView", "--position", "300,68")
-    step("show reopened notes", "click", "--name", "Notes", "--class", "MotionTabs::Tab", "--exact")
+    step("show reopened notes", "click", "--name", "Notes", "--class", "osci::TabBar::Tab", "--exact")
     command("wait-for-locator", "--name", "Remove MIDI", "--exact")
     step("select child notes", "press", "command + a", "--class", "MotionNotesEditor")
     step("nudge shared pattern", "press", "Right", "--class", "MotionNotesEditor")
