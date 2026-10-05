@@ -95,8 +95,9 @@ struct MotionCompositionGizmo {
                 g.drawText(juce::String::charToString("XYZ"[axis]), juce::Rectangle<float>(20, 18).withCentre(points.front() + offset * (14 / std::max(1.0f, offset.getDistanceFromOrigin()))), juce::Justification::centred);
             } else {
                 const juce::Line<float> line(origin, points.back());
-                if (tool == MotionTransformTool::move) { g.drawArrow(line, 2.0f, 8.0f, 8.0f); }
-                else {
+                if (tool == MotionTransformTool::move) {
+                    g.drawArrow(line, 2.0f, 8.0f, 8.0f);
+                } else {
                     g.drawLine(line, 2.0f);
                     g.fillRect(juce::Rectangle<float>(8, 8).withCentre(points.back()));
                 }

@@ -16,6 +16,11 @@ public:
         setSize(margin * 2 + width, margin * 2 + squareHeight + gap + stripHeight);
     }
     std::function<void()> onBegin, onEnd;
+    // Closed mid-drag (Escape dismisses its popover), it still ends the
+    // gesture it began.
+    ~MotionColourPicker() override {
+        if (part != Part::none && onEnd) { onEnd(); }
+    }
     std::function<void(Rgb)> onChange;
 
     void setRgb(Rgb rgb) {

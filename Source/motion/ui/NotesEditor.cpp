@@ -11,8 +11,11 @@ MotionNotesEditor::MotionNotesEditor(MotionProcessor& owner) : processor(owner) 
     record.onClick = [this] {
         cancelDrag();
         auto& session = processor.midiRecordingSession();
-        if (session.busy()) { session.stop(); }
-        else { report(session.start(target)); }
+        if (session.busy()) {
+            session.stop();
+        } else {
+            report(session.start(target));
+        }
         refresh();
     };
     cancelRecording.onClick = [this] { processor.midiRecordingSession().cancel(); refresh(); };
@@ -87,8 +90,13 @@ void MotionNotesEditor::refresh() {
         int commonVelocity = -1;
         for (const auto& note : pattern->notes()) {
             if (!selected.contains(note.id)) { continue; }
-            if (commonVelocity < 0) { commonVelocity = note.velocity; value = juce::String(commonVelocity); }
-            else if (commonVelocity != note.velocity) { value = "Mixed"; break; }
+            if (commonVelocity < 0) {
+                commonVelocity = note.velocity;
+                value = juce::String(commonVelocity);
+            } else if (commonVelocity != note.velocity) {
+                value = "Mixed";
+                break;
+            }
         }
     }
     if (!velocity.isBeingEdited()) { velocity.setText(value, juce::dontSendNotification); }
@@ -109,8 +117,13 @@ void MotionNotesEditor::refresh() {
 }
 
 void MotionNotesEditor::visibilityChanged() {
-    if (isVisible()) { fit(); refresh(); }
-    else { processor.midiRecordingSession().cancel(); processor.setMidiAudition(0); }
+    if (isVisible()) {
+        fit();
+        refresh();
+    } else {
+        processor.midiRecordingSession().cancel();
+        processor.setMidiAudition(0);
+    }
 }
 
 void MotionNotesEditor::resized() {
@@ -258,8 +271,16 @@ void MotionNotesEditor::mouseDown(const juce::MouseEvent& event) {
         additiveMarquee = event.mods.isShiftDown();
         marquee = gridBounds().contains(event.getPosition()); anchor = event.getPosition(); selectionBox = {}; refresh(); return;
     }
-    if (event.mods.isShiftDown()) { if (selected.contains(id)) { selected.erase(id); refresh(); return; } selected.insert(id); }
-    else if (!selected.contains(id)) { selected = {id}; }
+    if (event.mods.isShiftDown()) {
+        if (selected.contains(id)) {
+            selected.erase(id);
+            refresh();
+            return;
+        }
+        selected.insert(id);
+    } else if (!selected.contains(id)) {
+        selected = {id};
+    }
     if (isLocked()) { refresh(); return; }
     dragging = true; dragRevision = processor.document.revision(); original = clip->midi; preview = original; anchor = event.getPosition();
     dragMode = velocityBounds().contains(event.getPosition()) ? 2 : 0;
@@ -289,9 +310,14 @@ void MotionNotesEditor::mouseDrag(const juce::MouseEvent& event) {
     if (dragMode == 0) { delta = std::max(delta, -earliest); }
     for (auto& note : notes) {
         if (!selected.contains(note.id)) { continue; }
-        if (dragMode == 2) { note.velocity = std::clamp(note.velocity + anchor.y - event.y, 1, 127); }
-        else if (dragMode == 1) { note.duration = std::max(std::min(.001, note.duration), note.duration + delta); }
-        else { note.start += delta; note.pitch += pitchDelta; }
+        if (dragMode == 2) {
+            note.velocity = std::clamp(note.velocity + anchor.y - event.y, 1, 127);
+        } else if (dragMode == 1) {
+            note.duration = std::max(std::min(.001, note.duration), note.duration + delta);
+        } else {
+            note.start += delta;
+            note.pitch += pitchDelta;
+        }
     }
     if (notes == original->notes()) { preview = original; repaint(); return; }
     const auto result = motion::MidiNotes::create(std::move(notes));

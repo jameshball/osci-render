@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "DocumentMenu.h"
 #include "../model/KeyEdit.h"
 #include "../model/KeyEasing.h"
 #include "../render/PreparedDrivers.h"

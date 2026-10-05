@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
+#include "DocumentMenu.h"
 #include "../model/ModulationGraph.h"
 #include "MotionIcons.h"
 #include "ScrubField.h"

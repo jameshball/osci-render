@@ -11,6 +11,7 @@
 #include "../model/KeyEasing.h"
 #include "MotionIcons.h"
 #include "PlayheadStrip.h"
+#include "DocumentMenu.h"
 
 class MotionTimelineView : public juce::Component, public juce::DragAndDropTarget, public juce::SettableTooltipClient {
     struct Row : motion::TrackRow {

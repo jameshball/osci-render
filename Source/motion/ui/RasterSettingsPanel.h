@@ -34,8 +34,11 @@ public:
         invert.setToggleState(initial.invert, juce::dontSendNotification);
         mode.addItem("Outlines", 1);
         mode.addItem("Scanlines", 2);
-        if (initial.mode == motion::RasterSettings::Mode::contours) { mode.setSelectedId(1, juce::dontSendNotification); }
-        else if (initial.mode == motion::RasterSettings::Mode::scanlines) { mode.setSelectedId(2, juce::dontSendNotification); }
+        if (initial.mode == motion::RasterSettings::Mode::contours) {
+            mode.setSelectedId(1, juce::dontSendNotification);
+        } else if (initial.mode == motion::RasterSettings::Mode::scanlines) {
+            mode.setSelectedId(2, juce::dontSendNotification);
+        }
         resolutions = {64, 128, 256, 512};
         strides = {512, 1024, 2048, 4096, 8192, 16384};
         if (std::find(resolutions.begin(), resolutions.end(), initial.resolution) == resolutions.end()) { resolutions.push_back(initial.resolution); }

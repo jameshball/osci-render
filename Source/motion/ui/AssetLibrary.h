@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "DocumentMenu.h"
 
 #include "../model/Document.h"
 #include "../model/Drawing.h"

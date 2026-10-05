@@ -151,8 +151,11 @@ private:
     void refresh() {
         auto next = settings;
         juce::String message;
-        if (durationEdited && !number(duration.getText(), next.duration)) { message = "Enter a finite duration in seconds."; }
-        else if (tempoEdited && !number(bpm.getText(), next.bpm)) { message = "Enter a tempo between 1 and 1000 BPM."; }
+        if (durationEdited && !number(duration.getText(), next.duration)) {
+            message = "Enter a finite duration in seconds.";
+        } else if (tempoEdited && !number(bpm.getText(), next.bpm)) {
+            message = "Enter a tempo between 1 and 1000 BPM.";
+        }
         const auto seedText = seed.getText().trim();
         if (message.isEmpty()) {
             if (seedText.isEmpty() || seedText.length() > 10 || !seedText.containsOnly("0123456789") || seedText.getLargeIntValue() > 0xffffffffLL) {

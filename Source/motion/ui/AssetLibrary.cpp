@@ -18,8 +18,11 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     bakeSettings.setButtonText("Bake settings...");
     bakeSettings.onClick = [this] {
         const auto row = list.getSelectedRow();
-        if (definitionRow(row)) { if (onOpenComposition) { onOpenComposition(assetId(row)); } }
-        else if (validAssetRow(row) && onBake) { onBake(assetId(row)); }
+        if (definitionRow(row)) {
+            if (onOpenComposition) { onOpenComposition(assetId(row)); }
+        } else if (validAssetRow(row) && onBake) {
+            onBake(assetId(row));
+        }
     };
     addChildComponent(bakeSettings);
     assignMidi.setButtonText("Assign to selected clip");
@@ -293,7 +296,6 @@ void MotionAssetLibrary::listBoxItemClicked(int row, const juce::MouseEvent& eve
     if (event.mods.isPopupMenu() && validAssetRow(row)) { showSourceMenu(row); return; }
     if (!event.mods.isPopupMenu() || !definitionRow(row)) { return; }
     const auto id = assetId(row);
-    const auto generation = document.generation();
     const auto references = document.compositionReferenceCount(id);
     const bool open = id == document.editingComposition();
     juce::PopupMenu menu;
@@ -301,13 +303,10 @@ void MotionAssetLibrary::listBoxItemClicked(int row, const juce::MouseEvent& eve
     menu.addItem(2, "Insert instance", document.canReferenceComposition(id));
     menu.addSeparator();
     menu.addItem(3, references != 0 ? "Remove composition (in use)" : open ? "Remove composition (open)" : "Remove unused composition", references == 0 && !open);
-    const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
-        if (owner == nullptr || owner->document.generation() != generation) { return; }
-        if (result == 1 && owner->onOpenComposition) { owner->onOpenComposition(id); }
-        if (result == 2 && owner->onInsert) { owner->onInsert(id); }
-        if (result == 3 && owner->onRemoveComposition) { owner->onRemoveComposition(id); }
+    motion::ui::showDocumentMenu(menu, *this, document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
+        if (result == 1 && onOpenComposition) { onOpenComposition(id); }
+        if (result == 2 && onInsert) { onInsert(id); }
+        if (result == 3 && onRemoveComposition) { onRemoveComposition(id); }
     });
 }
 
@@ -315,7 +314,6 @@ void MotionAssetLibrary::showSourceMenu(int row) {
     list.selectRow(row);
     const auto id = assetId(row);
     const auto uses = document.assetUses(id);
-    const auto generation = document.generation();
     juce::PopupMenu menu;
     menu.addItem(1, "Insert at playhead");
     menu.addItem(2, "Rename...");
@@ -334,21 +332,18 @@ void MotionAssetLibrary::showSourceMenu(int row) {
     menu.addSeparator();
     menu.addItem(4, uses == 0 ? "Remove source" : "Remove source (in use)", uses == 0);
     menu.addItem(5, "Remove all unused sources");
-    const juce::Component::SafePointer<MotionAssetLibrary> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
-        if (owner == nullptr || result == 0 || owner->document.generation() != generation) { return; }
-        if (result == 1 && owner->onInsert) { owner->onInsert(id); }
-        if (result == 2) { owner->beginRename(id); }
-        if (result == 6 && owner->onReplace) { owner->onReplace(id); }
-        if (result == 8 && owner->onEditDrawing) { owner->onEditDrawing(id); }
-        if (result == 3 && owner->onSelectUses) { owner->onSelectUses(id); }
-        if (result == 7) { owner->adoptMidiTempo(id); }
+    motion::ui::showDocumentMenu(menu, *this, document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
+        if (result == 1 && onInsert) { onInsert(id); }
+        if (result == 2) { beginRename(id); }
+        if (result == 6 && onReplace) { onReplace(id); }
+        if (result == 8 && onEditDrawing) { onEditDrawing(id); }
+        if (result == 3 && onSelectUses) { onSelectUses(id); }
+        if (result == 7) { adoptMidiTempo(id); }
         if (result == 4 || result == 5) {
             int removed = 0;
-            const auto outcome = owner->document.removeUnusedAssets(result == 4 ? std::vector<motion::Id>{id} : std::vector<motion::Id>{}, removed);
-            if (owner->onMessage) {
-                owner->onMessage(outcome.failed() ? outcome.getErrorMessage() : "Removed " + juce::String(removed) + (removed == 1 ? " unused source." : " unused sources."));
+            const auto outcome = document.removeUnusedAssets(result == 4 ? std::vector<motion::Id>{id} : std::vector<motion::Id>{}, removed);
+            if (onMessage) {
+                onMessage(outcome.failed() ? outcome.getErrorMessage() : "Removed " + juce::String(removed) + (removed == 1 ? " unused source." : " unused sources."));
             }
         }
     });

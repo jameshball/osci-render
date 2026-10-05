@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "DocumentMenu.h"
 #include "MotionIcons.h"
 #include "ScrubField.h"
 

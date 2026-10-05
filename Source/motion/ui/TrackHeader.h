@@ -14,8 +14,11 @@ public:
         name.setMinimumHorizontalScale(1.0f);
         name.addMouseListener(this, false);
         disclosure.onClick = [this] {
-            if (isGroup) { if (onCollapse) { onCollapse(id); } }
-            else if (onLanes) { onLanes(id); }
+            if (isGroup) {
+                if (onCollapse) { onCollapse(id); }
+            } else if (onLanes) {
+                onLanes(id);
+            }
         };
         addChildComponent(disclosure);
         name.onTextChange = [this] { if (onRename) { onRename(id, name.getText().trim().toStdString()); } };

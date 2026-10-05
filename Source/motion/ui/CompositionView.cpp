@@ -355,8 +355,11 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
     if (navigationDrag) {
         const auto delta = event.position - down;
         camera = cameraAtDown;
-        if (panDrag) { camera.pan(delta.x, delta.y, outputFrame().getHeight()); }
-        else { camera.orbit(-delta.x * 0.006, delta.y * 0.006); }
+        if (panDrag) {
+            camera.pan(delta.x, delta.y, outputFrame().getHeight());
+        } else {
+            camera.orbit(-delta.x * 0.006, delta.y * 0.006);
+        }
         repaint();
         return;
     }
@@ -422,8 +425,11 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
         const auto value = scaling ? (base == 0 ? scaleFactor - 1 : base * scaleFactor) : base + offsets[axis];
         if (!std::isfinite(value)) { return; }
         if (std::abs(value - base) <= 1e-10) { continue; }
-        if (curve->animated()) { curve->setKeyValue(localTime, value); }
-        else { curve->base = value; }
+        if (curve->animated()) {
+            curve->setKeyValue(localTime, value);
+        } else {
+            curve->base = value;
+        }
         if (!anyChange) { editedProperty = property; }
         anyChange = true;
     }

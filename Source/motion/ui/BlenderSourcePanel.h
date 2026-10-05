@@ -31,8 +31,11 @@ public:
         save.onClick = [this] { submit(false); };
         listen.setButtonText(existing ? "Start listening" : "Add & listen");
         listen.onClick = [this] {
-            if (this->existing && isListening && isListening()) { if (onStop) { onStop(); error.clear(); } }
-            else { submit(true); }
+            if (this->existing && isListening && isListening()) {
+                if (onStop) { onStop(); error.clear(); }
+            } else {
+                submit(true);
+            }
             timerCallback();
         };
         for (auto* component : std::initializer_list<juce::Component*>{&name, &port, &policy, &nameLabel, &portLabel, &policyLabel, &status, &note, &save, &listen}) { addAndMakeVisible(component); }

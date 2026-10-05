@@ -367,13 +367,10 @@ void MotionEffectStack::showMenu(motion::Id id) {
     menu.addItem(3, "Move down", index + 1 < static_cast<int>(listed.size()));
     menu.addSeparator();
     menu.addItem(4, "Remove");
-    const juce::Component::SafePointer<MotionEffectStack> safe(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [safe, id, index](int result) {
-        if (safe == nullptr || result == 0) { return; }
-        if (result == 2) { safe->move(id, index - 1); }
-        if (result == 3) { safe->move(id, index + 2); }
-        if (result == 4) { safe->remove(id); }
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, index](int result) {
+        if (result == 2) { move(id, index - 1); }
+        if (result == 3) { move(id, index + 2); }
+        if (result == 4) { remove(id); }
     });
 }
 

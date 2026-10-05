@@ -524,8 +524,11 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
         const auto* under = x >= namesWidth ? clipAt({x, y}, row) : nullptr;
         const auto target = x < 0 ? selected : (under != nullptr ? under->id : 0);
         const auto result = processor.document.assignMidi(target, assetId);
-        if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } }
-        else if (onMidiAssigned) { onMidiAssigned(target); }
+        if (result.failed()) {
+            if (onError) { onError(result.getErrorMessage()); }
+        } else if (onMidiAssigned) {
+            onMidiAssigned(target);
+        }
         return;
     }
     const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
@@ -793,8 +796,11 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         if (key.has_value()) {
             const bool chosen = isKeySelected(key->clip, key->property, key->time);
             if (event.mods.isShiftDown()) {
-                if (chosen) { std::erase_if(selectedKeys, [&](const auto& item) { return item.clip == key->clip && item.property == key->property && sameTime(item.time, key->time); }); }
-                else { selectedKeys.push_back(*key); }
+                if (chosen) {
+                    std::erase_if(selectedKeys, [&](const auto& item) { return item.clip == key->clip && item.property == key->property && sameTime(item.time, key->time); });
+                } else {
+                    selectedKeys.push_back(*key);
+                }
             } else if (!chosen) {
                 selectedKeys = {*key};
             }
@@ -842,8 +848,11 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     if (event.mods.isShiftDown() || event.mods.isCommandDown()) {
-        if (selectedClips.contains(clip->id)) { selectedClips.erase(clip->id); }
-        else { selectedClips.insert(clip->id); }
+        if (selectedClips.contains(clip->id)) {
+            selectedClips.erase(clip->id);
+        } else {
+            selectedClips.insert(clip->id);
+        }
         notifySelection(selectedClips.contains(clip->id) ? clip->id : (selectedClips.empty() ? 0 : *selectedClips.begin()));
         return;
     }
@@ -862,8 +871,11 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
     before = processor.document.project();
     expectedRevision = processor.document.revision();
     changed = false;
-    if (!selectedClips.contains(original.id) || mode != Mode::move) { selectClip(original.id); }
-    else { notifySelection(original.id); }
+    if (!selectedClips.contains(original.id) || mode != Mode::move) {
+        selectClip(original.id);
+    } else {
+        notifySelection(original.id);
+    }
 }
 
 void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
@@ -1889,15 +1901,11 @@ void MotionTimelineView::showKeyMenu() {
     menu.addItem(4, "Bezier");
     menu.addSeparator();
     menu.addItem(10, "Delete");
-    const auto revision = processor.document.revision();
-    const juce::Component::SafePointer<MotionTimelineView> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, revision](int result) {
-        if (owner == nullptr || result == 0 || owner->processor.document.revision() != revision) { return; }
-        if (result == 10) { owner->deleteSelectedKeys(); return; }
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
+        if (result == 10) { deleteSelectedKeys(); return; }
         const auto shape = static_cast<motion::Interpolation>(result - 1);
-        const auto keys = owner->selectedKeys;
-        owner->processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
+        const auto keys = selectedKeys;
+        processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
             bool any = false;
             for (auto& track : project.tracks) {
                 for (auto& clip : track.clips) {
@@ -2187,45 +2195,44 @@ void MotionTimelineView::cameraBandDrag(const juce::MouseEvent& event) {
 void MotionTimelineView::showCutMenu(motion::Id cut, double time) {
     const auto& project = processor.document.project();
     juce::PopupMenu menu, cutTo, show;
-    menu.setLookAndFeel(&getLookAndFeel());
-    for (std::size_t index = 0; index < project.cameras.size(); ++index) {
-        cutTo.addItem(100 + static_cast<int>(index), juce::String(project.cameras[index].name));
-        show.addItem(200 + static_cast<int>(index), juce::String(project.cameras[index].name));
+    std::vector<motion::Id> cameras;
+    for (const auto& camera : project.cameras) {
+        cameras.push_back(camera.id);
+        cutTo.addItem(100 + static_cast<int>(cameras.size()) - 1, juce::String(camera.name));
+        show.addItem(200 + static_cast<int>(cameras.size()) - 1, juce::String(camera.name));
     }
     menu.addItem(3, "Add camera here");
-    menu.addSubMenu("Cut to camera here", cutTo, !project.cameras.empty());
+    menu.addSubMenu("Cut to camera here", cutTo, !cameras.empty());
     if (cut != 0) {
         menu.addSubMenu("Show camera", show);
         menu.addItem(1, "Delete cut");
     }
     const auto* cutValue = findCut(cut);
-    const auto camera = cutValue != nullptr ? cutValue->camera : project.cameras.empty() ? motion::Id(0) : project.cameras.front().id;
+    const auto camera = cutValue != nullptr ? cutValue->camera : cameras.empty() ? motion::Id(0) : cameras.front();
     if (camera != 0) {
         menu.addSeparator();
         menu.addItem(2, "Delete " + cameraName(camera));
     }
-    juce::Component::SafePointer<MotionTimelineView> safe(this);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [safe, cut, time, camera](int result) {
-        if (safe == nullptr || result == 0) { return; }
-        auto& document = safe->processor.document;
-        const auto& cameras = document.project().cameras;
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, cut, time, camera, cameras](int result) {
+        auto& document = processor.document;
+        const auto chosen = [&](int base) { return cameras[static_cast<std::size_t>(result - base)]; };
         if (result == 3) {
-            if (safe->onAddCamera) { safe->onAddCamera(time); }
+            if (onAddCamera) { onAddCamera(time); }
         } else if (result == 2) {
-            safe->report(document.removeCamera(camera));
-            safe->selectedCut = 0;
-            if (safe->onSelection) { safe->onSelection(0); }
+            report(document.removeCamera(camera));
+            selectedCut = 0;
+            if (onSelection) { onSelection(0); }
         } else if (result == 1) {
-            safe->report(document.removeCut(cut));
-            safe->selectedCut = 0;
-        } else if (result >= 200 && result - 200 < static_cast<int>(cameras.size())) {
-            safe->report(document.setCutCamera(cut, cameras[static_cast<std::size_t>(result - 200)].id));
-        } else if (result >= 100 && result - 100 < static_cast<int>(cameras.size())) {
+            report(document.removeCut(cut));
+            selectedCut = 0;
+        } else if (result >= 200) {
+            report(document.setCutCamera(cut, chosen(200)));
+        } else if (result >= 100) {
             motion::Id created = 0;
-            safe->report(document.cutToCamera(cameras[static_cast<std::size_t>(result - 100)].id, time, created));
-            safe->selectedCut = created;
+            report(document.cutToCamera(chosen(100), time, created));
+            selectedCut = created;
         }
-        safe->repaint();
+        repaint();
     });
 }
 
@@ -2365,28 +2372,23 @@ void MotionTimelineView::showMarkerMenu(motion::Id id, double time) {
     } else {
         menu.addItem(6, "Add tempo change here...", beat > 0);
     }
-    const auto generation = processor.document.generation();
-    const auto revision = processor.document.revision();
-    const juce::Component::SafePointer<MotionTimelineView> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, time, generation, revision](int result) {
-        if (owner == nullptr || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
-        if ((result == 1 || result == 3) && owner->onEditMarker) { owner->onEditMarker(result == 1 ? id : 0, time); }
-        if (result == 2) { const auto removed = owner->processor.document.removeMarker(id); if (removed.failed() && owner->onError) { owner->onError(removed.getErrorMessage()); } }
-        if (result == 4 || result == 5) { owner->jumpMarker(result == 5); }
-        if (result == 6 || result == 7) { owner->editTempoChange(time); }
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, time](int result) {
+        if ((result == 1 || result == 3) && onEditMarker) { onEditMarker(result == 1 ? id : 0, time); }
+        if (result == 2) { const auto removed = processor.document.removeMarker(id); if (removed.failed() && onError) { onError(removed.getErrorMessage()); } }
+        if (result == 4 || result == 5) { jumpMarker(result == 5); }
+        if (result == 6 || result == 7) { editTempoChange(time); }
         if (result == 9) {
-            const auto* existing = owner->tempoChangeNear(time);
+            const auto* existing = tempoChangeNear(time);
             if (existing != nullptr) {
-                const auto changed = owner->processor.document.setTempoChange(existing->beat, existing->bpm, existing->beat, !existing->ramp);
-                if (changed.failed() && owner->onError) { owner->onError(changed.getErrorMessage()); }
+                const auto changed = processor.document.setTempoChange(existing->beat, existing->bpm, existing->beat, !existing->ramp);
+                if (changed.failed() && onError) { onError(changed.getErrorMessage()); }
             }
         }
         if (result == 8) {
-            const auto* existing = owner->tempoChangeNear(time);
+            const auto* existing = tempoChangeNear(time);
             if (existing != nullptr) {
-                const auto removed = owner->processor.document.removeTempoChange(existing->beat);
-                if (removed.failed() && owner->onError) { owner->onError(removed.getErrorMessage()); }
+                const auto removed = processor.document.removeTempoChange(existing->beat);
+                if (removed.failed() && onError) { onError(removed.getErrorMessage()); }
             }
         }
     });
@@ -2436,44 +2438,39 @@ void MotionTimelineView::showClipMenu(motion::Id id) {
     menu.addSeparator();
     menu.addItem(4, "Create composition from selection", !locked && !selectedClips.empty());
     if (definition != 0) { menu.addItem(5, "Open composition"); menu.addItem(6, "Make composition unique", !locked); }
-    const auto generation = processor.document.generation();
-    const auto revision = processor.document.revision();
-    const juce::Component::SafePointer<MotionTimelineView> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, revision](int result) {
-        if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) { return; }
-        if (result >= 20 && result < 24 && owner->onCommand) {
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
+        if (result >= 20 && result < 24 && onCommand) {
             const std::array<const char*, 4> names {"Cut", "Copy", "Paste", "Split at playhead"};
-            owner->onCommand(names[static_cast<std::size_t>(result - 20)]);
+            onCommand(names[static_cast<std::size_t>(result - 20)]);
         } else if (result == 1) {
-            owner->duplicateClip(id);
-        } else if (result == 2 && owner->onTimingRequested) {
-            owner->onTimingRequested(id);
-        } else if (result == 3 && owner->onMakeUnique) {
-            owner->onMakeUnique(id);
+            duplicateClip(id);
+        } else if (result == 2 && onTimingRequested) {
+            onTimingRequested(id);
+        } else if (result == 3 && onMakeUnique) {
+            onMakeUnique(id);
         } else if (result == 4) {
             motion::Id instance = 0;
-            auto& document = owner->processor.document;
+            auto& document = processor.document;
             const auto name = "Composition " + juce::String(document.mainProject().definitions.size() + 1);
-            const auto created = document.createComposition({owner->selectedClips.begin(), owner->selectedClips.end()}, name, instance);
-            if (created.failed()) { if (owner->onError) { owner->onError(created.getErrorMessage()); } return; }
-            owner->selectClip(instance);
-            owner->refreshTracks();
-        } else if (result == 5 && owner->onEnterComposition) {
-            owner->onEnterComposition(id);
+            const auto created = document.createComposition({selectedClips.begin(), selectedClips.end()}, name, instance);
+            if (created.failed()) { if (onError) { onError(created.getErrorMessage()); } return; }
+            selectClip(instance);
+            refreshTracks();
+        } else if (result == 5 && onEnterComposition) {
+            onEnterComposition(id);
         } else if (result == 7 || result == 8) {
-            owner->deleteSelectedClips(result == 8);
-        } else if (result == 9 && owner->onLoopSelection) {
-            owner->onLoopSelection();
-        } else if (result == 10 && owner->onRevealSource) {
-            for (const auto& track : owner->processor.document.project().tracks) {
-                for (const auto& clip : track.clips) { if (clip.id == id) { owner->onRevealSource(clip.asset); } }
+            deleteSelectedClips(result == 8);
+        } else if (result == 9 && onLoopSelection) {
+            onLoopSelection();
+        } else if (result == 10 && onRevealSource) {
+            for (const auto& track : processor.document.project().tracks) {
+                for (const auto& clip : track.clips) { if (clip.id == id) { onRevealSource(clip.asset); } }
             }
         } else if (result == 6) {
             motion::Id definitionId = 0;
-            const auto copied = owner->processor.document.makeCompositionUnique(id, definitionId);
-            if (copied.failed() && owner->onError) { owner->onError(copied.getErrorMessage()); }
-            owner->refreshTracks();
+            const auto copied = processor.document.makeCompositionUnique(id, definitionId);
+            if (copied.failed() && onError) { onError(copied.getErrorMessage()); }
+            refreshTracks();
         }
     });
 }
@@ -2503,20 +2500,19 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
     menu.addItem(3, "Add nested group");
     menu.addSeparator();
     menu.addItem(4, "Delete group and its tracks");
-    const auto generation = processor.document.generation();
-    const juce::Component::SafePointer<MotionTimelineView> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation](int result) {
-        if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation || motion::findGroup(owner->processor.document.project(), id) == nullptr) { return; }
-        owner->cancelGesture();
-        if (result == 1) { owner->selectClip(id); return; }
-        if (result == 3) { owner->createGroup(0, id); return; }
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id](int result) {
+        if (motion::findGroup(processor.document.project(), id) == nullptr) { return; }
+        cancelGesture();
+        if (result == 1) { selectClip(id); return; }
+        if (result == 3) { createGroup(0, id); return; }
         if (result == 2) {
             motion::Track track;
-            track.id = owner->processor.document.newId(); track.group = id; track.name = "New track";
-            owner->processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
+            track.id = processor.document.newId();
+            track.group = id;
+            track.name = "New track";
+            processor.document.edit("Add track", [track](motion::Project& project) { project.tracks.push_back(track); });
         } else if (result == 4) {
-            owner->processor.document.edit("Delete group", [id](motion::Project& project) {
+            processor.document.edit("Delete group", [id](motion::Project& project) {
                 std::set<motion::Id> removed { id };
                 for (std::size_t depth = 0; depth < motion::maximumGroupDepth; ++depth) {
                     for (const auto& group : project.groups) { if (removed.contains(group.parent)) { removed.insert(group.id); } }
@@ -2525,7 +2521,7 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
                 std::erase_if(project.groups, [&](const auto& group) { return removed.contains(group.id); });
             });
         }
-        owner->refreshTracks();
+        refreshTracks();
     });
 }
 
@@ -2562,21 +2558,17 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
     }
     menu.addSeparator();
     menu.addItem(3, "Delete track");
-    const auto generation = processor.document.generation();
-    const juce::Component::SafePointer<MotionTimelineView> owner(this);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, id, generation, groups](int result) {
-        if (owner == nullptr || result == 0 || owner->processor.document.generation() != generation) { return; }
-        owner->cancelGesture();
-        const auto& current = owner->processor.document.project().tracks;
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, groups](int result) {
+        cancelGesture();
+        const auto& current = processor.document.project().tracks;
         const auto track = std::find_if(current.begin(), current.end(), [id](const auto& item) { return item.id == id; });
         if (track == current.end()) { return; }
         const auto index = static_cast<int>(track - current.begin());
-        if (result == 4) { owner->createGroup(id, track->group); return; }
-        if (result >= 200 && result <= 200 + motion::Track::anyMidiChannel) { owner->setMidiInput(id, result - 200); return; }
+        if (result == 4) { createGroup(id, track->group); return; }
+        if (result >= 200 && result <= 200 + motion::Track::anyMidiChannel) { setMidiInput(id, result - 200); return; }
         if (result >= 300 && result < 300 + static_cast<int>(motion::style::trackLabels().size())) {
             const auto label = result - 300;
-            owner->processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {
+            processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {
                 for (auto& item : project.tracks) {
                     if (item.id == id && item.label != label) { item.label = label; return true; }
                 }
@@ -2585,17 +2577,17 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
             return;
         }
         if (result >= 100 && result - 100 < static_cast<int>(groups.size())) {
-            owner->placeTrack(id, index, groups[result - 100]);
+            placeTrack(id, index, groups[result - 100]);
         } else if (result == 3) {
-            owner->processor.document.edit("Delete track", [id](motion::Project& project) {
+            processor.document.edit("Delete track", [id](motion::Project& project) {
                 std::erase_if(project.tracks, [id](const auto& item) { return item.id == id; });
             });
-            owner->refreshTracks();
+            refreshTracks();
         } else {
             const auto direction = result == 1 ? -1 : 1;
             for (int candidate = index + direction; candidate >= 0 && candidate < static_cast<int>(current.size()); candidate += direction) {
                 if (current[candidate].group == track->group) {
-                    owner->placeTrack(id, candidate + (direction > 0 ? 1 : 0), track->group);
+                    placeTrack(id, candidate + (direction > 0 ? 1 : 0), track->group);
                     break;
                 }
             }
@@ -2827,16 +2819,13 @@ void MotionTimelineView::showSpaceMenu() {
     menu.addItem(motion::style::menuItem("Paste", 1, "Cmd+V"));
     menu.addItem(2, "Add track");
     menu.addItem(3, "Add camera here");
-    const juce::Component::SafePointer<MotionTimelineView> owner(this);
     const auto time = std::clamp(scrollTime + (getMouseXYRelative().x - namesWidth) / pixelsPerSecond, 0.0, processor.document.project().duration);
-    menu.setLookAndFeel(&getLookAndFeel());
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [owner, time](int result) {
-        if (owner == nullptr || result == 0) { return; }
-        owner->cancelGesture();
-        if (result == 1 && owner->onCommand) { owner->onCommand("Paste"); }
-        if (result == 2) { owner->addTrack.triggerClick(); }
-        if (result == 3 && owner->onAddCamera) {
-            owner->onAddCamera(time);
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, time](int result) {
+        cancelGesture();
+        if (result == 1 && onCommand) { onCommand("Paste"); }
+        if (result == 2) { addTrack.triggerClick(); }
+        if (result == 3 && onAddCamera) {
+            onAddCamera(time);
         }
     });
 }

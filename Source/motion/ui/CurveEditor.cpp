@@ -1202,7 +1202,6 @@ void MotionCurveEditor::showKeyMenu() {
     }
     const auto editable = !clip->locked;
     juce::PopupMenu menu;
-    menu.setLookAndFeel(&getLookAndFeel());
     const char* labels[] = { "Hold", "Linear", "Auto", "Bezier" };
     for (int i = 0; i < 4; ++i) {
         menu.addItem(i + 1, labels[i], editable, static_cast<int>(key->interpolation) == i);
@@ -1212,16 +1211,15 @@ void MotionCurveEditor::showKeyMenu() {
     menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9").setEnabled(editable));
     menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9").setEnabled(editable));
     const auto id = targetId;
-    juce::Component::SafePointer<MotionCurveEditor> safe(this);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe, id, keys](int result) {
-        if (safe != nullptr && result >= 11 && result <= 13) {
-            safe->easeSelected(result != 13, result != 12);
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this), [this, id, keys](int result) {
+        if (result >= 11 && result <= 13) {
+            easeSelected(result != 13, result != 12);
             return;
         }
-        if (safe == nullptr || result < 1 || result > 4) {
+        if (result > 4) {
             return;
         }
-        const auto current = motion::findPropertyTarget(safe->processor.document.project(), id);
+        const auto current = motion::findPropertyTarget(processor.document.project(), id);
         const auto next = static_cast<motion::Interpolation>(result - 1);
         // No undo step when every selected key already uses the choice.
         const auto needed = std::any_of(keys.begin(), keys.end(), [&current, next](const KeyRef& ref) {
@@ -1232,7 +1230,7 @@ void MotionCurveEditor::showKeyMenu() {
         if (!needed) {
             return;
         }
-        safe->processor.document.edit(keys.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, keys, next](motion::Project& project) {
+        processor.document.edit(keys.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, keys, next](motion::Project& project) {
             for (const auto& ref : keys) {
                 auto* target = mutableCurve(project, id, ref.property);
                 const auto* found = target != nullptr ? findKey(*target, ref.time) : nullptr;
@@ -1255,6 +1253,6 @@ void MotionCurveEditor::showKeyMenu() {
                 target->setKey(updated);
             }
         });
-        safe->refresh();
+        refresh();
     });
 }

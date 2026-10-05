@@ -596,7 +596,6 @@ void MotionRoutingPanel::paint(juce::Graphics& g) {
 void MotionRoutingPanel::showLinkMenu() {
     const auto& project = processor.document.project();
     juce::PopupMenu menu;
-    menu.setLookAndFeel(&getLookAndFeel());
     choices.clear();
     const auto addOwner = [&](motion::Id owner, const juce::String& title, const motion::PropertyMap& properties) {
         juce::PopupMenu sub;
@@ -612,13 +611,12 @@ void MotionRoutingPanel::showLinkMenu() {
     }
     for (const auto& group : project.groups) { addOwner(group.id, "Group: " + juce::String(group.name), group.properties); }
     for (const auto& camera : project.cameras) { addOwner(camera.id, "Camera: " + juce::String(camera.name), camera.properties); }
-    juce::Component::SafePointer<MotionRoutingPanel> safe(this);
     const auto id = targetId;
     const auto property = propertyName;
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&link), [safe, id, property](int result) {
-        if (safe == nullptr || result <= 0 || result > static_cast<int>(safe->choices.size())) { return; }
-        const auto& choice = safe->choices[static_cast<std::size_t>(result - 1)];
-        safe->report(safe->processor.document.setLink(id, property, motion::PropertyLink {choice.first, choice.second, 1, 0, 0}));
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(&link), [this, id, property](int result) {
+        if (result <= 0 || result > static_cast<int>(choices.size())) { return; }
+        const auto& choice = choices[static_cast<std::size_t>(result - 1)];
+        report(processor.document.setLink(id, property, motion::PropertyLink {choice.first, choice.second, 1, 0, 0}));
     });
 }
 

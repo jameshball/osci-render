@@ -138,10 +138,15 @@ private:
             return;
         }
         const auto value = *parsed;
-        if (index == 0) { timing.moveTo(value); }
-        else if (index == 1) { timing.setDuration(value); }
-        else if (index == 2) { timing.offset = value; }
-        else { timing.rate = value; }
+        if (index == 0) {
+            timing.moveTo(value);
+        } else if (index == 1) {
+            timing.setDuration(value);
+        } else if (index == 2) {
+            timing.offset = value;
+        } else {
+            timing.rate = value;
+        }
         const auto result = processor.document.setClipTiming(selected, timing);
         error = result.failed() ? result.getErrorMessage() : juce::String();
         refresh();

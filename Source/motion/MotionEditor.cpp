@@ -1097,10 +1097,14 @@ void MotionEditor::timerCallback() {
 
 void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
     // The audio device decides whether the 5-channel output can be chosen.
-    if (source != &processor.document) {
+    if (source == &processor.document) {
+        refreshFromDocument();
+    } else {
         refreshOutputChoices();
-        return;
     }
+}
+
+void MotionEditor::refreshFromDocument() {
     // A drawing belongs to the project it was started in.
     if (drawingEditor != nullptr && processor.document.generation() != drawingGeneration) { closeDrawingEditor(); }
     if (textEditor != nullptr && processor.document.generation() != textGeneration) { closeTextEditor(); }
@@ -1198,7 +1202,7 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     composition.restoreView({});
     select(0); timeline.scrollY = 0; timeline.scrollTime = 0; timeline.revealTime(time);
     timelineTabs.setSelectedIndex(0);
-    changeListenerCallback(nullptr);
+    refreshFromDocument();
 }
 
 void MotionEditor::leaveComposition() {
@@ -1217,7 +1221,7 @@ void MotionEditor::leaveComposition() {
     composition.restoreView(previous.preview);
     curveEditor.restoreView(previous.graph);
     notesEditor.restoreView(previous.notes);
-    changeListenerCallback(nullptr);
+    refreshFromDocument();
 }
 
 void MotionEditor::select(motion::Id id) {

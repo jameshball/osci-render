@@ -94,6 +94,8 @@ private:
     juce::Component::SafePointer<osci::OverlayComponent> projectLoadOverlay;
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
+    // Brings every view up to date with the document after an edit.
+    void refreshFromDocument();
     void select(motion::Id id);
     void enterComposition(motion::Id clip, bool fromLibrary = false);
     void leaveComposition();
