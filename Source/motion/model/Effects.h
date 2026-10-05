@@ -15,28 +15,32 @@ struct EffectParameterDefinition {
     double defaultValue, min, max;
 };
 
+// What an effect does to each point; prepared effects switch on it.
+enum class EffectKind { rotate, scale, translate, skew, swirl, bulge, ripple, vortex, colour, bitCrush, twist, polygon, spiralCrush, perspective, wobble };
+
 struct EffectDefinition {
+    EffectKind kind;
     std::string id, name;
     std::vector<EffectParameterDefinition> parameters;
 };
 
 inline const std::vector<EffectDefinition>& effectCatalog() {
     static const std::vector<EffectDefinition> catalog {
-        { "rotate", "Rotate", {{"strength", "Strength", 1, 0, 1}, {"rotateX", "Rotate X", 0, -1, 1}, {"rotateY", "Rotate Y", 0, -1, 1}, {"rotateZ", "Rotate Z", 0, -1, 1}} },
-        { "scale", "Scale", {{"strength", "Strength", 1, 0, 1}, {"scaleX", "Scale X", 1.2, -3, 3}, {"scaleY", "Scale Y", 1.2, -3, 3}, {"scaleZ", "Scale Z", 1.2, -3, 3}} },
-        { "translate", "Translate", {{"strength", "Strength", 1, 0, 1}, {"translateX", "Translate X", 0.3, -1, 1}, {"translateY", "Translate Y", 0, -1, 1}, {"translateZ", "Translate Z", 0, -1, 1}} },
-        { "skew", "Skew", {{"strength", "Strength", 1, 0, 1}, {"skewX", "Skew X", 0, -1, 1}, {"skewY", "Skew Y", 0, -1, 1}, {"skewZ", "Skew Z", 0, -1, 1}} },
-        { "swirl", "Swirl", {{"strength", "Strength", 1, 0, 1}, {"swirl", "Swirl", 0.4, -1, 1}} },
-        { "bulge", "Bulge", {{"strength", "Strength", 1, 0, 1}, {"bulge", "Bulge", 0.5, 0, 1}} },
-        { "ripple", "Ripple", {{"strength", "Strength", 1, 0, 1}, {"rippleDepth", "Depth", 0.2, 0, 1}, {"ripplePhase", "Phase", 0, -1, 1}, {"rippleAmount", "Amount", 0.1, 0, 1}} },
-        { "vortex", "Vortex", {{"strength", "Strength", 1, 0, 1}, {"vortexStrength", "Vortex strength", 0.6, 0, 1}, {"vortexAmount", "Amount", 2, 2, 6}, {"vortexRotation", "Rotation", 0.25, 0, 1}} },
-        { "colour", "Colour", {{"strength", "Strength", 1, 0, 1}, {"hue", "Hue (degrees)", 0, -180, 180}, {"saturation", "Saturation", 1, 0, 2}, {"brightness", "Brightness", 1, 0, 2}} },
-        { "bitCrush", "Bit crush", {{"strength", "Strength", 1, 0, 1}, {"crush", "Crush", 0.7, 0, 1}} },
-        { "twist", "Twist", {{"strength", "Strength", 1, 0, 1}, {"twist", "Twist", 0.5, -1, 1}} },
-        { "polygon", "Polygon", {{"strength", "Strength", 1, 0, 1}, {"sides", "Sides", 5, 2, 12}, {"stripes", "Stripe size", 0.5, 0, 1}, {"turn", "Rotation", 0, 0, 1}, {"stripePhase", "Stripe phase", 0, 0, 1}} },
-        { "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
-        { "perspective", "Perspective", {{"strength", "Strength", 1, 0, 1}, {"fov", "Field of view", 50, 5, 130}} },
-        { "wobble", "Wobble", {{"strength", "Strength", 1, 0, 1}, {"amount", "Amount", 0.3, 0, 1}, {"rate", "Rate (Hz)", 2, 0, 20}, {"phase", "Phase", 0, 0, 1}} }
+        { EffectKind::rotate, "rotate", "Rotate", {{"strength", "Strength", 1, 0, 1}, {"rotateX", "Rotate X", 0, -1, 1}, {"rotateY", "Rotate Y", 0, -1, 1}, {"rotateZ", "Rotate Z", 0, -1, 1}} },
+        { EffectKind::scale, "scale", "Scale", {{"strength", "Strength", 1, 0, 1}, {"scaleX", "Scale X", 1.2, -3, 3}, {"scaleY", "Scale Y", 1.2, -3, 3}, {"scaleZ", "Scale Z", 1.2, -3, 3}} },
+        { EffectKind::translate, "translate", "Translate", {{"strength", "Strength", 1, 0, 1}, {"translateX", "Translate X", 0.3, -1, 1}, {"translateY", "Translate Y", 0, -1, 1}, {"translateZ", "Translate Z", 0, -1, 1}} },
+        { EffectKind::skew, "skew", "Skew", {{"strength", "Strength", 1, 0, 1}, {"skewX", "Skew X", 0, -1, 1}, {"skewY", "Skew Y", 0, -1, 1}, {"skewZ", "Skew Z", 0, -1, 1}} },
+        { EffectKind::swirl, "swirl", "Swirl", {{"strength", "Strength", 1, 0, 1}, {"swirl", "Swirl", 0.4, -1, 1}} },
+        { EffectKind::bulge, "bulge", "Bulge", {{"strength", "Strength", 1, 0, 1}, {"bulge", "Bulge", 0.5, 0, 1}} },
+        { EffectKind::ripple, "ripple", "Ripple", {{"strength", "Strength", 1, 0, 1}, {"rippleDepth", "Depth", 0.2, 0, 1}, {"ripplePhase", "Phase", 0, -1, 1}, {"rippleAmount", "Amount", 0.1, 0, 1}} },
+        { EffectKind::vortex, "vortex", "Vortex", {{"strength", "Strength", 1, 0, 1}, {"vortexStrength", "Vortex strength", 0.6, 0, 1}, {"vortexAmount", "Amount", 2, 2, 6}, {"vortexRotation", "Rotation", 0.25, 0, 1}} },
+        { EffectKind::colour, "colour", "Colour", {{"strength", "Strength", 1, 0, 1}, {"hue", "Hue (degrees)", 0, -180, 180}, {"saturation", "Saturation", 1, 0, 2}, {"brightness", "Brightness", 1, 0, 2}} },
+        { EffectKind::bitCrush, "bitCrush", "Bit crush", {{"strength", "Strength", 1, 0, 1}, {"crush", "Crush", 0.7, 0, 1}} },
+        { EffectKind::twist, "twist", "Twist", {{"strength", "Strength", 1, 0, 1}, {"twist", "Twist", 0.5, -1, 1}} },
+        { EffectKind::polygon, "polygon", "Polygon", {{"strength", "Strength", 1, 0, 1}, {"sides", "Sides", 5, 2, 12}, {"stripes", "Stripe size", 0.5, 0, 1}, {"turn", "Rotation", 0, 0, 1}, {"stripePhase", "Stripe phase", 0, 0, 1}} },
+        { EffectKind::spiralCrush, "spiralCrush", "Spiral crush", {{"strength", "Strength", 1, 0, 1}, {"density", "Density", 13, 3, 30}, {"spiralTwist", "Twist", 0.6, -1, 1}, {"zoom", "Zoom", 0, 0, 1}, {"turn", "Rotation", 0, 0, 1}} },
+        { EffectKind::perspective, "perspective", "Perspective", {{"strength", "Strength", 1, 0, 1}, {"fov", "Field of view", 50, 5, 130}} },
+        { EffectKind::wobble, "wobble", "Wobble", {{"strength", "Strength", 1, 0, 1}, {"amount", "Amount", 0.3, 0, 1}, {"rate", "Rate (Hz)", 2, 0, 20}, {"phase", "Phase", 0, 0, 1}} }
     };
     return catalog;
 }
