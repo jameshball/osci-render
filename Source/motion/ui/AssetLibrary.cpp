@@ -191,7 +191,7 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
         detail = "Composition" + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(clip.duration, 1) + " s";
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
-        const auto drawn = asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())));
+        const auto drawn = asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString());
         detail = asset.liveIdentity != nullptr ? "Live Blender" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing" : asset.extension.trimCharactersAtStart(".").toUpperCase();
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
@@ -317,7 +317,7 @@ void MotionAssetLibrary::showSourceMenu(int row) {
     menu.addItem(1, "Insert at playhead");
     menu.addItem(2, "Rename...");
     const auto& drawn = *assets[static_cast<std::size_t>(row)];
-    if (drawn.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(drawn.data.getData()), static_cast<int>(drawn.data.getSize())))) {
+    if (drawn.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(drawn.data.toString())) {
         menu.addItem(8, "Edit drawing...");
     }
     menu.addItem(6, "Replace with file...");

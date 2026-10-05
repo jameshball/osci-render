@@ -385,7 +385,7 @@ juce::Result decodeGpla(Asset& asset, const std::atomic<bool>* cancel, std::atom
                 return juce::Result::ok();
             }, cancel, progress);
     }
-    const auto text = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+    const auto text = asset.data.toString();
     const auto parsed = juce::JSON::parse(text);
     const auto framesValue = parsed.getProperty("frames", {});
     const auto* frames = framesValue.getArray();
@@ -476,7 +476,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         const auto settingsError = asset.bakeSettings.validate();
         if (!settingsError.empty()) { return juce::Result::fail(settingsError); }
         const auto& settings = asset.bakeSettings;
-        const auto script = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+        const auto script = asset.data.toString();
         return prepareBaked(asset, sourceBakeKey(asset), [&] { return LuaBaker::bake(asset.name, script, settings, cancel, progress); },
             [&settings](const PreparedPointFrames& frames) {
                 return frames.frameCount() == settings.frameCount() && frames.frameRate() == settings.frameRate && frames.pointsPerFrame() == settings.pointsPerFrame;
@@ -520,7 +520,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (osci::files::isLottie(extension)) {
 #if OSCI_PREMIUM
         const auto content = extension == ".lottie" ? osci::lottie::extractAnimationJsonFromDotLottie(asset.data)
-            : juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+            : asset.data.toString();
         if (content.isEmpty() || static_cast<std::size_t>(content.getNumBytesAsUTF8()) > maximumSourceBytes) {
             return juce::Result::fail("The Lottie source must contain an animation JSON no larger than 64 MiB.");
         }
@@ -555,7 +555,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
 #endif
     }
     ImportShapes shapes;
-    const auto content = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+    const auto content = asset.data.toString();
     if (extension == ".lsystem") {
         const auto prepared = motion::fractal::prepare(content, asset.fractalDepth, cancel);
         if (!prepared) { return juce::Result::fail(prepared.error); }

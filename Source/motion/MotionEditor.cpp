@@ -194,7 +194,7 @@ void MotionEditor::setUpScene() {
         if (clip->composition != 0) { enterComposition(clip->id); return; }
         const auto asset = motion::findAsset(project.assets, clip->asset);
         if (asset == nullptr) { return; }
-        if (asset->extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset->data.getData()), static_cast<int>(asset->data.getSize())))) {
+        if (asset->extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset->data.toString())) {
             showDrawingEditor(asset->id);
         } else if (asset->extension.equalsIgnoreCase(".txt") || asset->extension.equalsIgnoreCase(".lua")) {
             assetLibrary.onBake(asset->id);

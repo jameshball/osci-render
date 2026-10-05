@@ -564,7 +564,7 @@ juce::String MotionPropertyInspector::sourceKind(motion::Id clip) const {
             if (extension == ".lsystem") { return "Fractal"; }
             if (osci::files::isVideo(extension)) { return "Video"; }
             if (osci::files::isImage(extension)) { return "Image"; }
-            if (extension == ".svg") { return motion::drawing::isDrawing(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()))) ? "Drawing" : "Vector"; }
+            if (extension == ".svg") { return motion::drawing::isDrawing(asset.data.toString()) ? "Drawing" : "Vector"; }
             if (extension == ".json" || extension == ".lottie") { return "Lottie"; }
             if (extension == ".obj") { return "3D object"; }
             return "Object";
@@ -581,7 +581,7 @@ std::vector<motion::PropertySpec> MotionPropertyInspector::luaSliders() const {
             if (clip.id != target || clip.composition != 0) { continue; }
             const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
             if (asset == project.assets.end() || !(*asset)->extension.equalsIgnoreCase(".lua")) { return result; }
-            const auto script = juce::String::fromUTF8(static_cast<const char*>((*asset)->data.getData()), static_cast<int>((*asset)->data.getSize()));
+            const auto script = (*asset)->data.toString();
             for (const auto& spec : motion::luaSliderSpecs) {
                 const auto name = juce::String("slider_") + juce::String::charToString(static_cast<juce::juce_wchar>(spec.id.back()));
                 if (script.contains(name) || clip.properties.contains(std::string(spec.id))) { result.push_back(spec); }

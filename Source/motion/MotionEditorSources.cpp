@@ -534,7 +534,7 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
         // Only an existing drawing opens; anything else would relink to nothing.
         const auto found = std::find_if(assets.begin(), assets.end(), [asset](const auto& item) { return item->id == asset; });
         if (found == assets.end()) { return; }
-        const auto parsed = motion::drawing::fromSvg(juce::String::fromUTF8(static_cast<const char*>((*found)->data.getData()), static_cast<int>((*found)->data.getSize())));
+        const auto parsed = motion::drawing::fromSvg((*found)->data.toString());
         if (!parsed.has_value()) { return; }
         initial = *parsed;
         name = (*found)->name.upToLastOccurrenceOf(".", false, false);
@@ -568,7 +568,7 @@ void MotionEditor::showDrawingEditor(motion::Id asset) {
 void MotionEditor::showTextEditor(SourceRequest request) {
     if (request.replacement == nullptr || sceneEditor != nullptr) { return; }
     const auto& asset = *request.replacement;
-    const auto draft = request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize())));
+    const auto draft = request.editedText.value_or(asset.data.toString());
     const auto settings = request.textSettings.value_or(asset.textSettings);
     textRequest = request;
     // Other queued sources wait until the text is saved or cancelled.
@@ -609,7 +609,7 @@ void MotionEditor::showTextEditor(SourceRequest request) {
 void MotionEditor::showLuaEditor(SourceRequest request) {
     if (sceneEditor != nullptr) { return; }
     const auto editing = request.replacement != nullptr;
-    const auto code = editing ? request.editedText.value_or(juce::String::fromUTF8(static_cast<const char*>(request.replacement->data.getData()), static_cast<int>(request.replacement->data.getSize())))
+    const auto code = editing ? request.editedText.value_or(request.replacement->data.toString())
                               : request.file.loadFileAsString();
     motion::BakeSettings initial;
     initial.bpm = processor.document.project().bpm;

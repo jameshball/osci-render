@@ -91,7 +91,7 @@ public:
         expect(target.has_value());
         if (target) {
             expectWithinAbsoluteError(target->localTime(.55), 1.1, 1e-12);
-            expectEquals(target->curveBpm(fastProject.bpm), 170.0);
+            expectEquals(motion::findClip(fastProject, authored.id)->curveBpm(fastProject.tempo()), 170.0);
         }
 
         beginTest("Undo shares original pattern without touching sibling instances");

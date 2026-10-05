@@ -30,7 +30,6 @@ struct LuaSliderPlan {
     PropertyMap sliders;
     // Sliders driven by modulator routes or property links.
     std::vector<std::string> driven;
-    double bpm = 120;
 };
 
 inline void writeCurveKey(juce::MemoryOutputStream& key, const Curve& curve) {
@@ -57,9 +56,8 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
     if (plan.sliders.empty()) { return std::nullopt; }
     plan.clip = clip.id;
     plan.name = asset.name;
-    plan.script = juce::String::fromUTF8(static_cast<const char*>(asset.data.getData()), static_cast<int>(asset.data.getSize()));
+    plan.script = asset.data.toString();
     plan.settings = asset.bakeSettings;
-    plan.bpm = clip.curveBpm(tempo);
     // Cover the clip's content, within the source frame budget.
     const auto timing = clip.timing(tempo);
     const auto contentEnd = timing.localTime(timing.end());
@@ -69,7 +67,6 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
     juce::MemoryOutputStream key;
     key.writeString(asset.bakeKey);
     key.writeDouble(plan.settings.duration);
-    key.writeDouble(plan.bpm);
     for (const auto& [name, curve] : plan.sliders) {
         key.writeString(juce::String(name));
         writeCurveKey(key, curve);

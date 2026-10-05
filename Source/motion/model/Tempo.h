@@ -40,7 +40,6 @@ public:
         }
         return true;
     }
-    const std::vector<TempoChange>* tempoChanges() const { return changes.get(); }
 
     double seconds(double beat) const {
         if (changes == nullptr || !std::isfinite(beat)) { return beat * 60 / bpm; }
@@ -91,7 +90,6 @@ public:
         return std::isfinite(average) && average > 0 ? average : bpmAtBeat(firstBeat);
     }
     // The same map at another initial tempo, change beats and tempos intact.
-    Tempo withInitial(double initial) const { return Tempo(initial, changes); }
 
 private:
     // Seconds from `from` to `beat` inside a ramp that starts at `start` BPM

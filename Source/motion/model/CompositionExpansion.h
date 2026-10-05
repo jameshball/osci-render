@@ -15,7 +15,6 @@ struct CompositionStage {
     const Clip* clip = nullptr;
     ClipTiming scopeClock;
     ClipTiming clipClock;
-    double bpm = 120;
     const std::vector<Group>* groups = nullptr;
     const std::vector<EffectInstance>* effects = nullptr;
     Tempo tempo;
@@ -23,7 +22,6 @@ struct CompositionStage {
 
 struct CompositionExpansionResult {
     std::string error;
-    std::size_t leaves = 0;
     explicit operator bool() const { return error.empty(); }
 };
 
@@ -33,7 +31,7 @@ struct CompositionExpansionResult {
 template <typename ProjectType, typename Visitor>
 CompositionExpansionResult expandComposition(const ProjectType& project, Visitor&& visitor, const std::atomic<bool>* cancel = nullptr) {
     const auto graph = validateCompositionGraph(project);
-    if (!graph) { return {graph.error, 0}; }
+    if (!graph) { return {graph.error}; }
     CompositionExpansionResult result;
     using Definition = typename decltype(project.definitions)::value_type::element_type;
     std::map<Id, const Definition*> definitions;
@@ -78,7 +76,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
                 }
                 const auto mapped = timing.nestedIn(*visible);
                 if (!mapped.has_value()) { continue; }
-                stages.push_back({&track, &clip, *visible, *mapped, scope.bpm, &scope.groups, &scope.effects, scope.tempo()});
+                stages.push_back({&track, &clip, *visible, *mapped, &scope.groups, &scope.effects, scope.tempo()});
                 if (clip.composition != 0) {
                     if (clip.midi != nullptr) {
                         result.error = "MIDI patterns must be assigned to media clips inside a reusable composition.";
@@ -91,7 +89,6 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
                     if (!self(self, *definitions.at(clip.composition), *mapped)) { return false; }
                 } else {
                     visitor(scope, stages);
-                    ++result.leaves;
                 }
                 stages.pop_back();
             }
@@ -99,7 +96,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
         return true;
     };
     const ClipTiming mainClock(0, project.duration);
-    if (!mainClock.valid()) { return {"Invalid main composition duration.", 0}; }
+    if (!mainClock.valid()) { return {"Invalid main composition duration."}; }
     visit(visit, project, mainClock);
     return result;
 }

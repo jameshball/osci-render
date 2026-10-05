@@ -23,14 +23,12 @@ struct BasicPropertyTarget {
     bool isEffect = false;
     bool isGroup = false;
     bool isAudio = false;
-    double contentBpm = 0;
     // A musical clip under a tempo map follows the beats exactly.
     std::optional<ClipTiming::BeatWarp> warp;
     // The Scope's picture (Project only), in project time like a camera.
     bool beam = false;
     // On a locked track: shown, but not edited.
     bool locked = false;
-    double curveBpm(double projectBpm) const { return contentBpm > 0 ? contentBpm : projectBpm; }
 
     double end() const { return start + duration; }
     ClipTiming clock() const {
@@ -90,7 +88,7 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
             const auto owner = effect != clip.effects.end();
             return Target { .id = owner ? effect->id : clip.id, .name = owner ? std::string_view(effect->name) : std::string_view(clip.name), .start = timing.start, .duration = timing.duration(),
                             .offset = timing.offset, .rate = timing.rate, .properties = owner ? &effect->properties : &clip.properties, .isEffect = owner, .isAudio = !owner && track.kind == TrackKind::audio,
-                            .contentBpm = clip.curveBpm(project.tempo()), .warp = timing.warp, .locked = track.locked };
+                            .warp = timing.warp, .locked = track.locked };
         }
     }
     for (auto& camera : project.cameras) {
