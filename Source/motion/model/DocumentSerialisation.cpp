@@ -62,8 +62,9 @@ void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& 
         point->setAttribute("time", exactNumber(key.time));
         point->setAttribute("value", exactNumber(key.value));
         point->setAttribute("interpolation", static_cast<int>(key.interpolation));
-        point->setAttribute("in", exactNumber(key.incomingSlope));
-        point->setAttribute("out", exactNumber(key.outgoingSlope));
+        // Absent slopes and influences read back as their defaults.
+        if (key.incomingSlope != 0) { point->setAttribute("in", exactNumber(key.incomingSlope)); }
+        if (key.outgoingSlope != 0) { point->setAttribute("out", exactNumber(key.outgoingSlope)); }
         if (key.incomingInfluence != Keyframe::defaultInfluence) { point->setAttribute("inInfluence", exactNumber(key.incomingInfluence)); }
         if (key.outgoingInfluence != Keyframe::defaultInfluence) { point->setAttribute("outInfluence", exactNumber(key.outgoingInfluence)); }
     }
