@@ -40,7 +40,7 @@ struct Clip {
     double duration = 5.0;
     double offset = 0.0;
     double rate = 1.0;
-    std::map<std::string, Curve> properties;
+    PropertyMap properties;
     std::vector<EffectInstance> effects;
     // Optional performance for this visual source. Immutable patterns are shared
     // by duplication/undo; an edit replaces only the selected clip's pattern.

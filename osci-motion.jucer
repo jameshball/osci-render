@@ -512,6 +512,8 @@
               file="Source/motion/model/PreparedSource.h"/>
         <FILE id="MotmodelPropertySchemah" name="PropertySchema.h" compile="0"
               resource="0" file="Source/motion/model/PropertySchema.h"/>
+        <FILE id="MotmodelPropertySpecsh" name="PropertySpecs.h" compile="0"
+              resource="0" file="Source/motion/model/PropertySpecs.h"/>
         <FILE id="MotPropTarget" name="PropertyTarget.h" compile="0" resource="0"
               file="Source/motion/model/PropertyTarget.h"/>
         <FILE id="MotmodelRasterSettingsh" name="RasterSettings.h" compile="0"

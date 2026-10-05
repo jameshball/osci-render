@@ -527,7 +527,7 @@ juce::Result loadEffects(const juce::XmlElement& owner, std::vector<EffectInstan
 static std::size_t curveBytes(const Curve& curve) {
     return sizeof(Curve) + curve.keyframes().size() * (sizeof(Keyframe) + sizeof(double));
 }
-static std::size_t propertyBytes(const std::map<std::string, Curve>& properties) {
+static std::size_t propertyBytes(const PropertyMap& properties) {
     std::size_t bytes = 0;
     for (const auto& [name, curve] : properties) { bytes += name.size() + curveBytes(curve); }
     return bytes;
@@ -1509,7 +1509,7 @@ Clip Document::makeCompositionClip(Id id, const CompositionDefinition& definitio
     }
     if (last <= first) { first = 0; last = definition.duration; }
     clip.start = time; clip.offset = first; clip.duration = last - first;
-    for (std::size_t index = 0; index < propertyNames.size(); ++index) { clip.properties.emplace(propertyNames[index], Curve(index >= 6 ? 1 : 0)); }
+    clip.properties = defaultProperties(objectPropertySpecs);
     return clip;
 }
 
@@ -1767,9 +1767,7 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     Clip instance;
     instance.id = ++highest; instance.composition = definition->id; instance.name = name.toStdString();
     instance.start = first; instance.duration = last - first; instance.offset = first;
-    for (std::size_t index = 0; index < propertyNames.size(); ++index) {
-        instance.properties.emplace(propertyNames[index], Curve(index >= 6 ? 1 : 0));
-    }
+    instance.properties = defaultProperties(objectPropertySpecs);
     Track replacement; replacement.id = ++highest; replacement.name = name.toStdString(); replacement.clips = {instance};
     replacement.solo = std::any_of(state.tracks.begin(), state.tracks.end(), [](const auto& track) { return track.solo; })
         || std::any_of(state.groups.begin(), state.groups.end(), [](const auto& group) { return group.solo; });
@@ -2182,7 +2180,7 @@ juce::Result Document::addRoute(ModulationRoute route, Id& id) {
 // A quarter of a Scope property's range; otherwise as defaultRouteAmount.
 double Document::routeAmount(const Project& project, Id target, const std::string& property) {
     const auto found = findPropertyTarget(project, target);
-    const auto* spec = found.has_value() && found->beam ? findPropertySpec(beamPropertySpecs(), property) : nullptr;
+    const auto* spec = found.has_value() && found->beam ? findPropertySpec(beamPropertySpecs, property) : nullptr;
     return spec != nullptr ? 0.25 * (spec->maximum - spec->minimum) : defaultRouteAmount(property);
 }
 
@@ -3017,12 +3015,12 @@ static juce::Result loadCompositionContent(const juce::XmlElement& xml, Composit
             }
             // Every clip property must be a known, unique schema entry whose
             // values lie inside its declared range.
-            const auto specs = track.kind == TrackKind::audio ? audioPropertySpecs() : objectPropertySpecs();
+            const auto specs = track.kind == TrackKind::audio ? std::span<const PropertySpec>(audioPropertySpecs) : objectPropertySpecs;
             const bool luaClip = clip.composition == 0 && found != assets.end() && (*found)->extension.equalsIgnoreCase(".lua");
             for (auto* property : item->getChildWithTagNameIterator("property")) {
                 const auto name = property->getStringAttribute("name").toStdString();
                 auto* spec = findPropertySpec(specs, name);
-                if (spec == nullptr && luaClip) { spec = findPropertySpec(luaSliderSpecs(), name); }
+                if (spec == nullptr && luaClip) { spec = findPropertySpec(luaSliderSpecs, name); }
                 if (spec == nullptr || clip.properties.contains(name)) {
                     return juce::Result::fail("Unknown or duplicate clip property \"" + juce::String(name) + "\".");
                 }

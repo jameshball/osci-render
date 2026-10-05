@@ -1,53 +1,23 @@
 #pragma once
 
 #include "Timeline.h"
-#include <array>
+#include "PropertySpecs.h"
 #include <set>
 
 namespace motion {
-inline constexpr std::array<const char*, 13> propertyNames {
-    "position.x", "position.y", "position.z", "rotation.x", "rotation.y", "rotation.z",
-    "scale.x", "scale.y", "scale.z", "red", "green", "blue", "weight"
-};
 inline constexpr std::size_t maximumGroupDepth = 32;
 
 struct Group {
-    Group() {
-        for (std::size_t index = 0; index < propertyNames.size(); ++index) {
-            properties.emplace(propertyNames[index], Curve(index >= 6 ? 1 : 0));
-        }
-    }
+    Group() : properties(defaultProperties(objectPropertySpecs)) {}
     Id id = 0;
     std::string name = "Group";
     Id parent = 0;
-    std::map<std::string, Curve> properties;
+    PropertyMap properties;
     std::vector<EffectInstance> effects;
     bool muted = false, solo = false;
     bool spatialPath = false, quaternionRotation = false;
 
-    bool valid() const {
-        if (id == 0 || parent == id || properties.size() != propertyNames.size()) {
-            return false;
-        }
-        for (std::size_t index = 0; index < propertyNames.size(); ++index) {
-            const auto found = properties.find(propertyNames[index]);
-            if (found == properties.end() || !found->second.valid()) {
-                return false;
-            }
-            const auto validValue = [index](double value) {
-                return std::isfinite(value) && (index < 9 || (value >= 0 && value <= (index == 12 ? 1000000 : 1)));
-            };
-            if (!validValue(found->second.base)) {
-                return false;
-            }
-            for (const auto& key : found->second.keyframes()) {
-                if (!key.valid() || !validValue(key.value)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
+    bool valid() const { return id != 0 && parent != id && validProperties(properties, objectPropertySpecs); }
 };
 
 template <typename ProjectType>

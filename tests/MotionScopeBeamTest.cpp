@@ -31,14 +31,13 @@ public:
             expect(f.beam() == motion::beamIdentity);
             const auto target = motion::findPropertyTarget(f.document.project(), f.beam());
             expect(target.has_value() && target->beam && !target->camera);
-            expect(motion::propertySpecs(*target).size() == motion::beamPropertyNames.size());
+            expect(motion::propertySpecs(*target).size() == motion::beamPropertySpecs.size());
             // Owns the parameters, which a processor normally does.
             OfflineVisualiserParameters offline;
             auto& parameters = offline.params;
-            const auto specs = motion::beamPropertySpecs();
-            for (std::size_t index = 0; index < motion::beamPropertyNames.size(); ++index) {
-                const juce::String id(motion::beamPropertyNames[index]);
-                expect(specs[index].id == motion::beamPropertyNames[index]);
+            // The Scope's specs mirror the visualiser's own parameters.
+            for (const auto& spec : motion::beamPropertySpecs) {
+                const juce::String id(spec.id.data(), spec.id.size());
                 const osci::EffectParameter* found = nullptr;
                 for (const auto* list : {&parameters.effects, &parameters.audioEffects}) {
                     for (const auto& effect : *list) {
@@ -49,10 +48,9 @@ public:
                 }
                 expect(found != nullptr, id);
                 if (found == nullptr) { continue; }
-                expectWithinAbsoluteError(specs[index].minimum, static_cast<double>(found->min.load()), 1.0e-6, id);
-                expectWithinAbsoluteError(specs[index].maximum, static_cast<double>(found->max.load()), 1.0e-6, id);
-                expectWithinAbsoluteError(specs[index].fallback, static_cast<double>(found->defaultValue.load()), 1.0e-6, id);
-                expectWithinAbsoluteError(motion::Beam::defaults[index], static_cast<double>(found->defaultValue.load()), 1.0e-6, id);
+                expectWithinAbsoluteError(spec.minimum, static_cast<double>(found->min.load()), 1.0e-6, id);
+                expectWithinAbsoluteError(spec.maximum, static_cast<double>(found->max.load()), 1.0e-6, id);
+                expectWithinAbsoluteError(spec.defaultValue, static_cast<double>(found->defaultValue.load()), 1.0e-6, id);
             }
         }
 

@@ -126,9 +126,9 @@ struct PreparedGroup {
     std::shared_ptr<const PreparedSpatial> spatial;
 
     explicit PreparedGroup(const Group& group) : id(group.id), effects(prepareEffects(group.effects)) {
-        for (std::size_t index = 0; index < propertyNames.size(); ++index) {
-            const auto found = group.properties.find(propertyNames[index]);
-            curves[index] = found == group.properties.end() ? Curve(index >= 6 ? 1 : 0) : found->second;
+        for (std::size_t index = 0; index < objectPropertySpecs.size(); ++index) {
+            const auto found = group.properties.find(objectPropertySpecs[index].id);
+            curves[index] = found == group.properties.end() ? Curve(objectPropertySpecs[index].defaultValue) : found->second;
         }
         spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
@@ -369,15 +369,15 @@ inline double beamCycleRate(double frameRate) {
 // overshoot). Allocation-free, for the audio and offline render threads.
 struct PreparedBeam {
     PreparedBeam() {
-        for (std::size_t index = 0; index < curves.size(); ++index) { curves[index] = Curve(Beam::defaults[index]); }
+        for (std::size_t index = 0; index < curves.size(); ++index) { curves[index] = Curve(beamPropertySpecs[index].defaultValue); }
     }
-    std::array<Curve, beamPropertyNames.size()> curves;
+    std::array<Curve, beamPropertySpecs.size()> curves;
     double bpm = 120;
     float value(std::size_t property, double time) const {
-        return static_cast<float>(beamPropertySpecs()[property].clamp(curves[property].evaluate(time, bpm)));
+        return static_cast<float>(beamPropertySpecs[property].clamp(curves[property].evaluate(time, bpm)));
     }
-    std::array<float, beamPropertyNames.size()> at(double time) const {
-        std::array<float, beamPropertyNames.size()> values {};
+    std::array<float, beamPropertySpecs.size()> at(double time) const {
+        std::array<float, beamPropertySpecs.size()> values {};
         for (std::size_t index = 0; index < curves.size(); ++index) { values[index] = value(index, time); }
         return values;
     }
@@ -394,11 +394,11 @@ struct PreparedComposition {
         const auto chainFor = [&](Id id, bool groupsOnly) {
             PreparedChain chain;
             Id groupId = 0;
-            const auto load = [&](PreparedChain::Link& link, const std::map<std::string, Curve>& properties, Id owner) {
-                for (std::size_t index = 0; index < propertyNames.size(); ++index) {
-                    const auto found = properties.find(propertyNames[index]);
-                    link.curves[index] = found != properties.end() ? found->second : Curve(index >= 6 ? 1.0 : 0.0);
-                    drivers.drive(link.curves[index], project, mainClock, owner, propertyNames[index]);
+            const auto load = [&](PreparedChain::Link& link, const PropertyMap& properties, Id owner) {
+                for (std::size_t index = 0; index < objectPropertySpecs.size(); ++index) {
+                    const auto found = properties.find(objectPropertySpecs[index].id);
+                    link.curves[index] = found != properties.end() ? found->second : Curve(objectPropertySpecs[index].defaultValue);
+                    drivers.drive(link.curves[index], project, mainClock, owner, objectPropertySpecs[index].id);
                 }
             };
             for (const auto& track : project.tracks) {
@@ -436,20 +436,18 @@ struct PreparedComposition {
             PreparedCamera item { camera.id, {} };
             if (camera.target != 0) { item.target = chainFor(camera.target, false); }
             if (camera.parent != 0) { item.parent = chainFor(camera.parent, true); }
-            const Camera defaults;
-            for (std::size_t index = 0; index < cameraPropertyNames.size(); ++index) {
-                const auto found = camera.properties.find(cameraPropertyNames[index]);
-                item.curves[index] = found != camera.properties.end() ? found->second : defaults.properties.at(cameraPropertyNames[index]);
-                drivers.drive(item.curves[index], project, mainClock, camera.id, cameraPropertyNames[index]);
+            for (std::size_t index = 0; index < cameraPropertySpecs.size(); ++index) {
+                const auto found = camera.properties.find(cameraPropertySpecs[index].id);
+                item.curves[index] = found != camera.properties.end() ? found->second : Curve(cameraPropertySpecs[index].defaultValue);
+                drivers.drive(item.curves[index], project, mainClock, camera.id, cameraPropertySpecs[index].id);
             }
             item.bpm = project.bpm;
             cameras.push_back(std::move(item));
         }
-        const Beam beamDefaults;
-        for (std::size_t index = 0; index < beamPropertyNames.size(); ++index) {
-            const auto found = project.beam.properties.find(beamPropertyNames[index]);
-            beam.curves[index] = found != project.beam.properties.end() ? found->second : beamDefaults.properties.at(beamPropertyNames[index]);
-            drivers.driveBeam(beam.curves[index], project, mainClock, beamPropertyNames[index]);
+        for (std::size_t index = 0; index < beamPropertySpecs.size(); ++index) {
+            const auto found = project.beam.properties.find(beamPropertySpecs[index].id);
+            beam.curves[index] = found != project.beam.properties.end() ? found->second : Curve(beamPropertySpecs[index].defaultValue);
+            drivers.driveBeam(beam.curves[index], project, mainClock, beamPropertySpecs[index].id);
         }
         beam.bpm = project.bpm;
         for (const auto& cut : project.cameraCuts) {
@@ -470,10 +468,10 @@ struct PreparedComposition {
             item.scopeClock = stage.scopeClock;
             item.bpm = stage.bpm;
             item.contentBpm = clip.curveBpm(stage.tempo);
-            for (std::size_t i = 0; i < propertyNames.size(); ++i) {
-                const auto curve = clip.properties.find(propertyNames[i]);
+            for (std::size_t i = 0; i < objectPropertySpecs.size(); ++i) {
+                const auto curve = clip.properties.find(objectPropertySpecs[i].id);
                 item.curves[i] = curve != clip.properties.end() ? curve->second : Curve(i >= 6 ? 1.0 : 0.0);
-                drivers.drive(item.curves[i], scope, stage.scopeClock, clip.id, propertyNames[i]);
+                drivers.drive(item.curves[i], scope, stage.scopeClock, clip.id, objectPropertySpecs[i].id);
             }
             item.spatial = prepareSpatial(clip.spatialPath, clip.quaternionRotation, item.curves);
             item.effects = prepareEffects(clip.effects);
@@ -490,7 +488,7 @@ struct PreparedComposition {
                 if (group == stage.groups->end()) { break; }
                 item.groups.emplace_back(*group);
                 auto& prepared = item.groups.back();
-                for (std::size_t i = 0; i < propertyNames.size(); ++i) { drivers.drive(prepared.curves[i], scope, stage.scopeClock, group->id, propertyNames[i]); }
+                for (std::size_t i = 0; i < objectPropertySpecs.size(); ++i) { drivers.drive(prepared.curves[i], scope, stage.scopeClock, group->id, objectPropertySpecs[i].id); }
                 drivers.driveEffects(prepared.effects, group->effects, scope, stage.scopeClock);
                 groupId = group->parent;
             }

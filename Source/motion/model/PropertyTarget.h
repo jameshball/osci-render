@@ -7,7 +7,6 @@
 #include <type_traits>
 
 namespace motion {
-using PropertyMap = std::map<std::string, Curve>;
 
 // A borrowed view, valid until its project's tracks/cameras/properties change.
 // Resolve again for each mutation; neither names nor property maps are copied.
@@ -42,7 +41,7 @@ struct BasicPropertyTarget {
     double localTime(double projectTime) const { return clock().localTime(projectTime); }
     // Scope time of a content-local time (the inverse of localTime).
     double projectTime(double local) const { return clock().projectTime(local); }
-    auto curve(const std::string& property) const -> std::conditional_t<std::is_const_v<Map>, const Curve*, Curve*> {
+    auto curve(std::string_view property) const -> std::conditional_t<std::is_const_v<Map>, const Curve*, Curve*> {
         if (properties == nullptr) {
             return nullptr;
         }
@@ -113,7 +112,7 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
 }
 
 template <typename ProjectType>
-auto findPropertyCurve(ProjectType& project, Id id, const std::string& property) -> std::conditional_t<std::is_const_v<ProjectType>, const Curve*, Curve*> {
+auto findPropertyCurve(ProjectType& project, Id id, std::string_view property) -> std::conditional_t<std::is_const_v<ProjectType>, const Curve*, Curve*> {
     const auto target = findPropertyTarget(project, id);
     return target.has_value() ? target->curve(property) : nullptr;
 }

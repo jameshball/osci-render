@@ -133,8 +133,8 @@ public:
         const auto found = std::find_if(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; });
         if (found == cameras.end()) { return false; }
         const auto time = cameraTime();
-        return std::all_of(motion::cameraPropertyNames.begin(), motion::cameraPropertyNames.end(), [&](const auto& name) {
-            const auto curve = found->properties.find(std::string(name));
+        return std::all_of(motion::cameraPropertySpecs.begin(), motion::cameraPropertySpecs.end(), [&](const auto& spec) {
+            const auto curve = found->properties.find(spec.id);
             return curve != found->properties.end() && (curve->second.link.has_value() || curve->second.hasKeyAt(time));
         });
     }
@@ -148,8 +148,8 @@ public:
         processor.document.edit(keyed ? "Remove camera key" : "Key camera", [id, time, keyed](motion::Project& project) {
             for (auto& item : project.cameras) {
                 if (item.id != id) { continue; }
-                for (const auto& name : motion::cameraPropertyNames) {
-                    auto& curve = item.properties[std::string(name)];
+                for (const auto& spec : motion::cameraPropertySpecs) {
+                    auto& curve = item.properties[std::string(spec.id)];
                     if (curve.link.has_value()) { continue; }
                     const auto value = curve.evaluateBase(time);
                     if (!keyed) {

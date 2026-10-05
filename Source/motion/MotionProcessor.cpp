@@ -10,7 +10,7 @@ MotionProcessor::MotionProcessor()
     // The document drives the Scope's beam and display properties: the audio
     // thread publishes their values each block and the visualiser applies
     // them to its animated values every frame.
-    for (std::size_t index = 0; index < scopeBeam.size(); ++index) { scopeBeam[index].store(static_cast<float>(motion::Beam::defaults[index])); }
+    for (std::size_t index = 0; index < scopeBeam.size(); ++index) { scopeBeam[index].store(static_cast<float>(motion::beamPropertySpecs[index].defaultValue)); }
     scopeBeamSlots = std::make_unique<motion::ScopeBeamSlots>(visualiserParameters);
     visualiserParameters.applyExternalModulation = [this](int samples) {
         for (std::size_t index = 0; index < scopeBeam.size(); ++index) {

@@ -1731,7 +1731,7 @@ private:
         const auto& project = processor.document.project();
         const auto& track = project.tracks[static_cast<std::size_t>(row.track)];
         fillCard(g, y, height - bandGap, motion::style::sunken(), motion::style::sunken());
-        const auto specs = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
+        const auto specs = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
         const auto* spec = motion::findPropertySpec(specs, row.lane);
         g.setFont(motion::style::caption());
         g.setColour(motion::style::muted());
@@ -3091,9 +3091,9 @@ private:
     static std::vector<std::string> animatedProperties(const motion::Track& track) {
         std::vector<std::string> result;
         std::vector<motion::PropertySpec> specs;
-        const auto base = track.kind == motion::TrackKind::audio ? motion::audioPropertySpecs() : motion::objectPropertySpecs();
+        const auto base = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
         specs.assign(base.begin(), base.end());
-        if (track.kind == motion::TrackKind::visual) { specs.insert(specs.end(), motion::luaSliderSpecs().begin(), motion::luaSliderSpecs().end()); }
+        if (track.kind == motion::TrackKind::visual) { specs.insert(specs.end(), motion::luaSliderSpecs.begin(), motion::luaSliderSpecs.end()); }
         for (const auto& spec : specs) {
             const std::string id(spec.id);
             const bool animated = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {

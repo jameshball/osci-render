@@ -49,7 +49,7 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
     std::size_t keyCount = 0;
     const auto collect = [&](const auto& properties, int axes, bool own) {
         for (int axis = 0; axis < axes; ++axis) {
-            const auto found = properties.find(propertyNames[static_cast<std::size_t>(axis)]);
+            const auto found = properties.find(objectPropertySpecs[static_cast<std::size_t>(axis)].id);
             if (found == properties.end()) { continue; }
             const Keyframe* previous = nullptr;
             for (const auto& key : found->second.keyframes()) {
@@ -74,8 +74,8 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
         if (!collect(group->properties, 9, false)) { return {{}, true}; }
     }
     const auto value = [](const auto& properties, int index, double time, double bpm) {
-        const auto found = properties.find(propertyNames[static_cast<std::size_t>(index)]);
-        return found == properties.end() ? (index >= 6 ? 1.0 : 0.0) : found->second.evaluate(time, bpm);
+        const auto found = properties.find(objectPropertySpecs[static_cast<std::size_t>(index)].id);
+        return found == properties.end() ? objectPropertySpecs[static_cast<std::size_t>(index)].defaultValue : found->second.evaluate(time, bpm);
     };
     MotionPath path;
     path.points.reserve(times.size());

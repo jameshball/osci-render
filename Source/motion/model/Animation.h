@@ -3,6 +3,7 @@
 #include "ClipTiming.h"
 #include "Modulators.h"
 #include "Tempo.h"
+#include <map>
 #include <memory>
 #include <algorithm>
 #include <cmath>
@@ -274,5 +275,8 @@ private:
     std::vector<Keyframe> keys;
     std::vector<double> autoSlopes;
 };
+
+// A target's curves by property name. Lookups also take string views.
+using PropertyMap = std::map<std::string, Curve, std::less<>>;
 
 }

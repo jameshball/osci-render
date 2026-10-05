@@ -60,7 +60,7 @@ struct EffectInstance {
     std::uint64_t id = 0;
     std::string type, name;
     bool enabled = true;
-    std::map<std::string, Curve> properties;
+    PropertyMap properties;
     std::optional<EffectRange> range;
 
     bool valid() const {

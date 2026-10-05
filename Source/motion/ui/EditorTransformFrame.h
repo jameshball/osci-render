@@ -33,7 +33,7 @@ template <typename PropertyMap>
 std::optional<Affine> evaluate(const PropertyMap& properties, double time, double bpm) {
     std::array<double, 9> values;
     for (std::size_t i = 0; i < values.size(); ++i) {
-        const auto found = properties.find(propertyNames[i]);
+        const auto found = properties.find(objectPropertySpecs[i].id);
         if (found != properties.end() && !found->second.valid()) { return std::nullopt; }
         values[i] = found == properties.end() ? (i >= 6 ? 1.0 : 0.0) : found->second.evaluate(time, bpm);
         if (!std::isfinite(values[i])) { return std::nullopt; }

@@ -439,7 +439,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     curveEditor.setVisible(false);
     notesEditor.setVisible(false);
     addChildComponent(curveList);
-    for (const auto& name : motion::propertyNames) { curveProperties.emplace_back(name); }
+    for (const auto& spec : motion::objectPropertySpecs) { curveProperties.emplace_back(spec.id); }
     curveList.onChoose = [this](const std::string& property) { selectCurveTarget(curveTarget, property, cameraCurve, true); };
     curveList.onShow = [this](const std::string& property, bool show) {
         // Siblings of the edited channel are shown by default, so their eye hides them.
@@ -2705,7 +2705,7 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
                     if (picture != nullptr) {
                         auto slots = std::make_shared<motion::ScopeBeamSlots>(beamSnapshot->params);
                         beamSnapshot->params.applyExternalModulation = [picture, slots, rate = state->sampleRate, cursor = std::make_shared<juce::int64>(0)](int samples) {
-                            for (std::size_t index = 0; index < motion::beamPropertyNames.size(); ++index) {
+                            for (std::size_t index = 0; index < motion::beamPropertySpecs.size(); ++index) {
                                 slots->write(index, samples, [&](int sample) { return picture->value(index, static_cast<double>(*cursor + sample) / rate); });
                             }
                             *cursor += samples;
@@ -2866,22 +2866,18 @@ void MotionEditor::selectCurveTarget(motion::Id id, const std::string& property,
     }
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
     const auto target = motion::findPropertyTarget(processor.document.project(), id);
-    const bool audio = target.has_value() && target->isAudio;
-    const bool beam = target.has_value() && target->beam;
-    const auto count = audio ? 2 : definition != nullptr ? definition->parameters.size() : beam ? motion::beamPropertyNames.size() : (camera ? motion::cameraPropertyNames.size() : motion::propertyNames.size());
     std::size_t selectedIndex = 0;
-    for (std::size_t index = 0; index < count; ++index) {
-        const std::string name = audio ? (index == 0 ? "gain" : "pan") : definition != nullptr ? definition->parameters[index].id : beam ? motion::beamPropertyNames[index] : (camera ? motion::cameraPropertyNames[index] : motion::propertyNames[index]);
-        curveProperties.push_back(name);
-        if (property == name) { selectedIndex = index; }
-    }
-    // A Lua clip's slider curves are graphable once they exist.
-    if (!audio && !camera && !beam && definition == nullptr && target.has_value() && target->properties != nullptr) {
-        for (const auto& spec : motion::luaSliderSpecs()) {
-            const std::string name(spec.id);
-            if (!target->properties->contains(name)) { continue; }
-            curveProperties.push_back(name);
-            if (property == name) { selectedIndex = curveProperties.size() - 1; }
+    const auto add = [&](std::string_view name) {
+        if (property == name) { selectedIndex = curveProperties.size(); }
+        curveProperties.emplace_back(name);
+    };
+    if (definition != nullptr) {
+        for (const auto& parameter : definition->parameters) { add(parameter.id); }
+    } else {
+        for (const auto& spec : motion::propertySpecs(*target)) { add(spec.id); }
+        // A Lua clip's slider curves are graphable once they exist.
+        for (const auto& spec : motion::luaSliderSpecs) {
+            if (target->properties != nullptr && target->properties->contains(spec.id)) { add(spec.id); }
         }
     }
     const auto previousTarget = curveEditor.viewState().target;
@@ -2922,7 +2918,7 @@ void MotionEditor::refreshCurveList() {
         MotionCurveList::Channel channel;
         channel.id = name;
         const auto* spec = target.has_value() && definition == nullptr ? motion::findPropertySpec(motion::propertySpecs(*target), name) : nullptr;
-        if (spec == nullptr && target.has_value() && name.rfind("slider.", 0) == 0) { spec = motion::findPropertySpec(motion::luaSliderSpecs(), name); }
+        if (spec == nullptr && target.has_value() && name.rfind("slider.", 0) == 0) { spec = motion::findPropertySpec(motion::luaSliderSpecs, name); }
         if (definition != nullptr) {
             for (const auto& parameter : definition->parameters) { if (parameter.id == name) { channel.label = juce::String(parameter.name); } }
             channel.group = "Effect";

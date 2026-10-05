@@ -26,7 +26,7 @@ struct LuaSliderPlan {
     std::string key;
     juce::String name, script;
     BakeSettings settings;
-    std::map<std::string, Curve> sliders;
+    PropertyMap sliders;
     // Sliders driven by modulator routes or property links.
     std::vector<std::string> driven;
     double bpm = 120;
@@ -49,7 +49,7 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
     if (!asset.extension.equalsIgnoreCase(".lua") || asset.bakeKey.isEmpty()) { return std::nullopt; }
     const auto tempo = composition.tempo();
     LuaSliderPlan plan;
-    for (const auto& spec : luaSliderSpecs()) {
+    for (const auto& spec : luaSliderSpecs) {
         const auto found = clip.properties.find(std::string(spec.id));
         if (found != clip.properties.end()) { plan.sliders.emplace(found->first, found->second); }
     }

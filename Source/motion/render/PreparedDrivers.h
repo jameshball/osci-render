@@ -16,12 +16,12 @@ public:
     explicit PreparedDrivers(Loudness loudness) : loudness(std::move(loudness)) {}
 
     // `scopeClock` maps project seconds to the scope's own seconds.
-    void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const std::string& property) {
+    void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, std::string_view property) {
         drive(curve, scope, scopeClock, owner, property, 0);
     }
     // The Scope's picture: the main composition's routes and links, on
     // project-time curves the composition scope cannot look up itself.
-    void driveBeam(Curve& curve, const Project& project, const ClipTiming& projectClock, const std::string& property) {
+    void driveBeam(Curve& curve, const Project& project, const ClipTiming& projectClock, std::string_view property) {
         attach(curve, project, projectClock, project.beam.id, ClipTiming(0.0, project.duration), property, 0);
     }
     void driveEffects(std::vector<PreparedEffect>& prepared, const std::vector<EffectInstance>& effects, const Composition& scope, const ClipTiming& scopeClock) {
@@ -46,12 +46,12 @@ private:
         return scopes[ScopeKey {&scope, clock.start, clock.offset, clock.rate}];
     }
 
-    void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const std::string& property, int depth) {
+    void drive(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, std::string_view property, int depth) {
         const auto target = findPropertyTarget(scope, owner);
         if (!target.has_value()) { return; }
         attach(curve, scope, scopeClock, owner, target->clock(), property, depth);
     }
-    void attach(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const ClipTiming& ownerClock, const std::string& property, int depth) {
+    void attach(Curve& curve, const Composition& scope, const ClipTiming& scopeClock, Id owner, const ClipTiming& ownerClock, std::string_view property, int depth) {
         auto drivers = std::make_shared<CurveDrivers>();
         drivers->clock = ownerClock;
         drivers->projectClock = scopeClock;
@@ -74,9 +74,9 @@ private:
         curve.drivers = std::move(drivers);
     }
 
-    std::shared_ptr<const Curve> linkedSource(const Composition& scope, const ClipTiming& scopeClock, Id owner, const std::string& property, int depth) {
+    std::shared_ptr<const Curve> linkedSource(const Composition& scope, const ClipTiming& scopeClock, Id owner, std::string_view property, int depth) {
         auto& cache = state(scope, scopeClock).sources;
-        const auto key = std::make_pair(owner, property);
+        const auto key = std::make_pair(owner, std::string(property));
         const auto found = cache.find(key);
         if (found != cache.end()) { return found->second; }
         const auto* authored = findPropertyCurve(scope, owner, property);

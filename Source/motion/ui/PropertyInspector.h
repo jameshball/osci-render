@@ -647,7 +647,7 @@ private:
                 const auto asset = std::find_if(project.assets.begin(), project.assets.end(), [&](const auto& item) { return item != nullptr && item->id == clip.asset; });
                 if (asset == project.assets.end() || !(*asset)->extension.equalsIgnoreCase(".lua")) { return result; }
                 const auto script = juce::String::fromUTF8(static_cast<const char*>((*asset)->data.getData()), static_cast<int>((*asset)->data.getSize()));
-                for (const auto& spec : motion::luaSliderSpecs()) {
+                for (const auto& spec : motion::luaSliderSpecs) {
                     const auto name = juce::String("slider_") + juce::String::charToString(static_cast<juce::juce_wchar>(spec.id.back()));
                     if (script.contains(name) || clip.properties.contains(std::string(spec.id))) { result.push_back(spec); }
                 }

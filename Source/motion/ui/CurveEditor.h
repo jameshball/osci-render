@@ -907,7 +907,7 @@ private:
             return juce::String(propertyName);
         }
         const auto* spec = motion::findPropertySpec(motion::propertySpecs(target), propertyName);
-        if (spec == nullptr && propertyName.starts_with("slider.")) { spec = motion::findPropertySpec(motion::luaSliderSpecs(), propertyName); }
+        if (spec == nullptr && propertyName.starts_with("slider.")) { spec = motion::findPropertySpec(motion::luaSliderSpecs, propertyName); }
         return spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(propertyName);
     }
     static const motion::Curve* findCurve(const std::optional<motion::PropertyTarget>& target, const std::string& property) {
@@ -1068,7 +1068,7 @@ private:
     double constrainedValue(const motion::PropertyTarget& target, double value, const std::string& property) const {
         if (target.isAudio) { return property == "pan" ? std::clamp(value, -1.0, 1.0) : std::clamp(value, 0.0, 4.0); }
         if (target.beam) {
-            const auto* spec = motion::findPropertySpec(motion::beamPropertySpecs(), property);
+            const auto* spec = motion::findPropertySpec(motion::beamPropertySpecs, property);
             return spec != nullptr ? spec->clamp(value) : value;
         }
         if (target.isEffect) {

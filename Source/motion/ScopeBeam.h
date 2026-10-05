@@ -12,8 +12,9 @@ namespace motion {
 class ScopeBeamSlots {
 public:
     explicit ScopeBeamSlots(VisualiserParameters& parameters) {
-        for (std::size_t property = 0; property < beamPropertyNames.size(); ++property) {
-            const juce::String id(beamPropertyNames[property]);
+        for (std::size_t property = 0; property < beamPropertySpecs.size(); ++property) {
+            const auto& spec = beamPropertySpecs[property];
+            const juce::String id(spec.id.data(), spec.id.size());
             for (const auto* list : {&parameters.effects, &parameters.audioEffects}) {
                 for (const auto& effect : *list) {
                     for (std::size_t index = 0; index < effect->parameters.size(); ++index) {
@@ -40,6 +41,6 @@ private:
         osci::Effect* effect = nullptr;
         std::size_t index = 0;
     };
-    std::array<Slot, beamPropertyNames.size()> slots {};
+    std::array<Slot, beamPropertySpecs.size()> slots {};
 };
 }

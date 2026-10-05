@@ -114,7 +114,7 @@ private:
     std::atomic<motion::Id> midiAuditionTarget {0};
     // The Scope's picture at the last audio block, applied by the visualiser
     // through its external modulation hook (see ScopeBeam.h).
-    std::array<std::atomic<float>, motion::beamPropertyNames.size()> scopeBeam;
+    std::array<std::atomic<float>, motion::beamPropertySpecs.size()> scopeBeam;
     std::unique_ptr<motion::ScopeBeamSlots> scopeBeamSlots;
     motion::Id previousAuditionTarget = 0;
     std::uint64_t liveMidiSample = 0;
