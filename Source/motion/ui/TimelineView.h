@@ -43,7 +43,6 @@ public:
     // the visible lanes.
     juce::Rectangle<int> rulerAnchor(double seconds) const;
     std::function<void(motion::Id, motion::Id)> onEffectAdded;
-    mutable motion::Id selected = 0;
     void setSelection(motion::Id id);
     struct ViewState {
         double zoom = 70, scroll = 0;
@@ -53,27 +52,7 @@ public:
     };
     ViewState viewState() const;
     void restoreView(const ViewState& state);
-    double pixelsPerSecond = 70;
-    double scrollTime = 0;
-    // Vertical scroll in pixels of row content below the ruler.
-    mutable int scrollY = 0;
-    // Rows without their own height use this; Alt+wheel scales it.
-    int defaultTrackHeight = 32;
     std::function<void(int)> onDefaultTrackHeight;
-    // Track names column; drag its edge to resize (140-420 px).
-    int namesWidth = 220;
-    bool resizingNames = false;
-    // The resize handle is the strip just inside the names column, so clicks
-    // on keys and clips at the start of the timeline are never taken.
-    bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
-    // The track whose bottom edge (in the names column) is under the pointer.
-    int trackEdgeAt(juce::Point<int> point) const;
-    struct HeightDrag { motion::Id track; int startHeight, downY, original; };
-    std::optional<HeightDrag> heightDrag;
-    mutable int rulerHeight = 26;
-    static constexpr int laneHeight = 22;
-    // The bottom strip of each track row resizes it.
-    static constexpr int resizeStrip = 4;
 
     // Selection may originate in the preview, library or an import, not only
     // from a row already on screen. Keep its layer reachable in a dense project.
@@ -93,6 +72,92 @@ public:
     void selectAll();
     void toggleLanesForSelection();
     void zoomBy(double factor);
+    // Zooms and scrolls so the whole composition fits.
+    void fitProject();
+
+    void revealTime(double seconds);
+
+    void refreshTracks();
+    void resized() override;
+    // The lifted block floats over every row and header: an opaque card with
+    // a shadow all round, its own rows, and its header drawn in place.
+    void paintOverChildren(juce::Graphics& g) override;
+    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
+    bool isInterestedInDragSource(const SourceDetails& details) override;
+
+    void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
+    void itemDragMove(const SourceDetails& details) override;
+    void itemDragExit(const SourceDetails&) override;
+    // An effect dragged over a clip, track or group is heard and seen before
+    // it is dropped.
+    std::function<void(const motion::Project*)> onPreview;
+    void setEffectDragActive(bool active);
+
+    void itemDropped(const SourceDetails& details) override;
+
+    void insertAsset(motion::Id assetId, int x, int y);
+
+    void paint(juce::Graphics& g) override;
+
+    void mouseDown(const juce::MouseEvent& event) override;
+
+    void mouseMove(const juce::MouseEvent& event) override;
+
+    void mouseExit(const juce::MouseEvent&) override;
+    // Project times of every clip start and end (edit points), sorted.
+    std::vector<double> editPoints() const;
+    void mouseDrag(const juce::MouseEvent& event) override;
+
+    void mouseUp(const juce::MouseEvent&) override;
+
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
+    std::function<void(motion::Id)> onOpenSource;
+
+    // One convention across the timeline, graph and notes: the wheel and
+    // trackpad pan (Shift makes the wheel horizontal), Cmd/Ctrl+wheel or a
+    // pinch zooms time around the pointer, Alt+wheel changes track height.
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
+    void mouseMagnify(const juce::MouseEvent& event, float scale) override;
+    void setDefaultTrackHeight(int height);
+
+    // Page-follows the playhead during playback, like Premiere and Ableton. A
+    // manual scroll while playing pauses following until the playhead is back
+    // in view (or playback restarts).
+    void followPlayhead(double time, bool playing);
+
+    bool keyPressed(const juce::KeyPress& key) override;
+    // The layout the editor keeps between sessions.
+    struct Layout {
+        int namesWidth = 220, trackHeight = 32;
+        bool follow = true; // Page-follow the playhead during playback.
+    };
+    Layout layout() const { return {namesWidth, defaultTrackHeight, followEnabled}; }
+    void setLayout(const Layout& next);
+    // Back to the composition's start and the top row.
+    void scrollToStart() {
+        scrollTime = 0;
+        scrollY = 0;
+    }
+    bool easeSelectedKeys(bool in, bool out);
+
+private:
+    double pixelsPerSecond = 70;
+    double scrollTime = 0;
+    // Rows without their own height use this; Alt+wheel scales it.
+    int defaultTrackHeight = 32;
+    // Track names column; drag its edge to resize (140-420 px).
+    int namesWidth = 220;
+    bool resizingNames = false;
+    // The resize handle is the strip just inside the names column, so clicks
+    // on keys and clips at the start of the timeline are never taken.
+    bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
+    // The track whose bottom edge (in the names column) is under the pointer.
+    int trackEdgeAt(juce::Point<int> point) const;
+    struct HeightDrag { motion::Id track; int startHeight, downY, original; };
+    std::optional<HeightDrag> heightDrag;
+    static constexpr int laneHeight = 22;
+    // The bottom strip of each track row resizes it.
+    static constexpr int resizeStrip = 4;
     // Keyboard zoom and Fit glide to their view (about 140 ms, eased) rather
     // than jumping; wheel and pinch zoom stay immediate.
     void animateView(double zoom, double scroll);
@@ -108,45 +173,14 @@ public:
     }};
     std::pair<double, double> animationFrom, animationTo;
     double animationStart = 0;
-    // Zooms and scrolls so the whole composition fits.
-    void fitProject();
-
-    void revealTime(double seconds);
-
-    void refreshTracks();
-    void resized() override;
     // What a dragged source or effect would do where it is.
     void paintDropPreview(juce::Graphics& g);
-    // The lifted block floats over every row and header: an opaque card with
-    // a shadow all round, its own rows, and its header drawn in place.
-    void paintOverChildren(juce::Graphics& g) override;
     std::optional<int> playheadX() const;
-    void repaintPlayhead() { playheadStrip.moveTo(*this, playheadX()); }
     void paintPlayhead(juce::Graphics& g);
-    bool isInterestedInDragSource(const SourceDetails& details) override;
-
-    void itemDragEnter(const SourceDetails& details) override { itemDragMove(details); }
-    void itemDragMove(const SourceDetails& details) override;
-    void itemDragExit(const SourceDetails&) override;
-    // An effect dragged over a clip, track or group is heard and seen before
-    // it is dropped.
-    std::function<void(const motion::Project*)> onPreview;
     void previewEffect(motion::Id owner);
     motion::Id previewedOwner = 0;
     bool effectDragActive = false;
-    void setEffectDragActive(bool active);
     std::uint64_t previewedRevision = 0;
-
-    void itemDropped(const SourceDetails& details) override;
-
-    void insertAsset(motion::Id assetId, int x, int y);
-
-    void paint(juce::Graphics& g) override;
-
-    void mouseDown(const juce::MouseEvent& event) override;
-
-    void mouseMove(const juce::MouseEvent& event) override;
-
     // Overlay scroll bars: vertical for rows, horizontal for time (Premiere
     // style: drag the thumb to scroll, its ends to zoom).
     static constexpr int barSize = 8, scrollStrip = barSize + 4;
@@ -173,39 +207,15 @@ public:
     std::optional<LoopDrag> loopDrag;
     bool loopDown(const juce::MouseEvent& event);
     void loopDragged(const juce::MouseEvent& event);
-    void mouseExit(const juce::MouseEvent&) override;
-    // Project times of every clip start and end (edit points), sorted.
-    std::vector<double> editPoints() const;
-    void mouseDrag(const juce::MouseEvent& event) override;
     std::optional<juce::Rectangle<int>> blocked;
-
-    void mouseUp(const juce::MouseEvent&) override;
-
-    void mouseDoubleClick(const juce::MouseEvent& event) override;
-    std::function<void(motion::Id)> onOpenSource;
-
-    // One convention across the timeline, graph and notes: the wheel and
-    // trackpad pan (Shift makes the wheel horizontal), Cmd/Ctrl+wheel or a
-    // pinch zooms time around the pointer, Alt+wheel changes track height.
-    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
-    void mouseMagnify(const juce::MouseEvent& event, float scale) override;
     // Keeps the time under `x` fixed while zooming.
     void zoomAround(int x, double factor);
     void userScrolled();
     // Vertical zoom: every row without its own height, keeping the row under
     // the pointer in place.
     void scaleTrackHeights(int y, double factor);
-    void setDefaultTrackHeight(int height);
-
-    // Page-follows the playhead during playback, like Premiere and Ableton. A
-    // manual scroll while playing pauses following until the playhead is back
-    // in view (or playback restarts).
     bool followEnabled = true;
-    void followPlayhead(double time, bool playing);
 
-    bool keyPressed(const juce::KeyPress& key) override;
-
-private:
     static std::optional<juce::Colour> labelColour(const motion::Track& track);
     juce::Colour clipColour(const motion::Clip& clip, const motion::Track& track) const;
     // Project times of every key on a clip, restricted to its visible interval.
@@ -228,9 +238,6 @@ private:
     void dragKeys(int x, juce::ModifierKeys modifiers);
     void endKeyDrag();
     void cancelKeyDrag();
-public:
-    bool easeSelectedKeys(bool in, bool out);
-private:
     void deleteSelectedKeys();
     void addKeyAt(const Row& lane, int x, juce::ModifierKeys modifiers);
     void showKeyMenu();
@@ -365,7 +372,6 @@ private:
     void cancelGesture();
 
     bool isClip(motion::Id id) const { return motion::findClip(processor.document.project(), id) != nullptr; }
-    mutable std::set<motion::Id> selectedClips;
     bool notifyingSelection = false;
     void notifySelection(motion::Id id);
     void selectClip(motion::Id id);
@@ -418,10 +424,20 @@ private:
     motion::icons::Button selectTool {"Select tool", motion::icons::Icon::select}, slipTool {"Slip tool", motion::icons::Icon::slip};
     motion::icons::Button stretchTool {"Stretch tool", motion::icons::Icon::stretch}, rippleTool {"Ripple trim tool", motion::icons::Icon::ripple};
     std::vector<std::unique_ptr<MotionTrackHeader>> headers;
+    juce::Component headerArea;
+    // View state kept in step with the document. Undo or a load can replace
+    // the document before its change message arrives, so every row lookup,
+    // const ones included, first calls ensureTrackRows(): it rebuilds the rows
+    // and drops selections of things that no longer exist.
+    mutable motion::Id selected = 0;
+    mutable std::set<motion::Id> selectedClips;
+    mutable motion::Id selectedMarker = 0;
+    // Vertical scroll in pixels of row content below the ruler.
+    mutable int scrollY = 0;
+    mutable int rulerHeight = 26;
     mutable std::vector<Row> rows;
     mutable std::vector<int> rowTops;
     mutable int contentHeight = 0;
-    juce::Component headerArea;
     mutable std::set<motion::Id> expandedTracks;
     mutable std::set<motion::Id> collapsedGroups;
     mutable std::uint64_t layoutGeneration = 0;
@@ -436,7 +452,6 @@ private:
     void updateToolButtons();
     Mode mode = Mode::move;
     std::uint64_t expectedRevision = 0;
-    mutable motion::Id selectedMarker = 0;
     motion::Id markerDragging = 0;
     double markerOriginalTime = 0;
     bool scrubbing = false;

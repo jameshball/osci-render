@@ -133,9 +133,14 @@ void MotionEditor::registerCommands() {
     addCommand(5, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
     addCommand(5, "Zoom out", juce::KeyPress('-', command, 0), "Cmd+-", [zoom] { zoom(1 / 1.5); });
     addCommand(5, "Fit timeline to project", juce::KeyPress(), "F", [this] { timeline.fitProject(); });
-    addCommand(5, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight + 8); });
-    addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.defaultTrackHeight - 8); });
-    menus.addToggleMenuItem(5, "Follow playhead", [this] { timeline.followEnabled = !timeline.followEnabled; saveLayout(); }, [this] { return timeline.followEnabled; });
+    addCommand(5, "Taller tracks", juce::KeyPress('=', command | shift, 0), "Cmd+Shift+=", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight + 8); });
+    addCommand(5, "Shorter tracks", juce::KeyPress('-', command | shift, 0), "Cmd+Shift+-", [this] { timeline.setDefaultTrackHeight(timeline.layout().trackHeight - 8); });
+    menus.addToggleMenuItem(5, "Follow playhead", [this] {
+        auto layout = timeline.layout();
+        layout.follow = !layout.follow;
+        timeline.setLayout(layout);
+        saveLayout();
+    }, [this] { return timeline.layout().follow; });
     menus.addMenuSeparator(5);
    #if JUCE_MAC
     const juce::String fullScreenKeys = "Ctrl+Cmd+F";

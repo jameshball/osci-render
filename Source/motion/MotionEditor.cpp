@@ -638,9 +638,8 @@ void MotionEditor::loadLayout() {
     auto& settings = processor.globalSettings;
     timelineFraction = std::clamp(settings.getDouble("motion.layout.timeline", timelineFraction), 0.25, 0.65);
     previewFraction = std::clamp(settings.getDouble("motion.layout.preview", previewFraction), 0.25, 0.75);
-    timeline.namesWidth = std::clamp(settings.getInt("motion.layout.names", timeline.namesWidth), 140, 420);
-    timeline.defaultTrackHeight = std::clamp(settings.getInt("motion.layout.trackHeight", timeline.defaultTrackHeight), motion::Track::minimumHeight, 120);
-    timeline.followEnabled = settings.getBool("motion.layout.follow", true);
+    const MotionTimelineView::Layout defaults;
+    timeline.setLayout({settings.getInt("motion.layout.names", defaults.namesWidth), settings.getInt("motion.layout.trackHeight", defaults.trackHeight), settings.getBool("motion.layout.follow", defaults.follow)});
     timeline.onDefaultTrackHeight = [this](int) { saveLayout(); };
     timeline.refreshTracks();
 }
@@ -649,9 +648,10 @@ void MotionEditor::saveLayout() {
     auto& settings = processor.globalSettings;
     settings.set("motion.layout.timeline", timelineFraction);
     settings.set("motion.layout.preview", previewFraction);
-    settings.set("motion.layout.names", timeline.namesWidth);
-    settings.set("motion.layout.trackHeight", timeline.defaultTrackHeight);
-    settings.set("motion.layout.follow", timeline.followEnabled);
+    const auto layout = timeline.layout();
+    settings.set("motion.layout.names", layout.namesWidth);
+    settings.set("motion.layout.trackHeight", layout.trackHeight);
+    settings.set("motion.layout.follow", layout.follow);
     settings.save();
 }
 
@@ -1064,7 +1064,7 @@ void MotionEditor::timerCallback() {
     const auto moved = position != lastPaintedPosition || playing;
     lastPaintedPosition = position;
     timeline.followPlayhead(position, playing);
-    if (curveEditor.isVisible() && timeline.followEnabled) { curveEditor.followPlayhead(position, playing); }
+    if (curveEditor.isVisible() && timeline.layout().follow) { curveEditor.followPlayhead(position, playing); }
     if (slowTick) {
         timeline.repaint();
         if (notesEditor.isVisible()) { notesEditor.repaint(); }
@@ -1192,7 +1192,9 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     processor.playing.store(false);
     processor.seek(std::clamp(time, 0.0, processor.document.project().duration));
     composition.restoreView({});
-    select(0); timeline.scrollY = 0; timeline.scrollTime = 0; timeline.revealTime(time);
+    select(0);
+    timeline.scrollToStart();
+    timeline.revealTime(time);
     timelineTabs.setSelectedIndex(0);
     refreshFromDocument();
 }

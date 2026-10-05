@@ -1461,6 +1461,15 @@ void MotionTimelineView::scaleTrackHeights(int y, double factor) {
     if (row >= 0 && row < static_cast<int>(rows.size())) { scrollY = std::clamp(scrollY + rowY(row) - offset, 0, maximumScrollY()); }
 }
 
+void MotionTimelineView::setLayout(const Layout& next) {
+    namesWidth = std::clamp(next.namesWidth, 140, 420);
+    defaultTrackHeight = std::clamp(next.trackHeight, motion::Track::minimumHeight, 120);
+    followEnabled = next.follow;
+    layoutRows();
+    resized();
+    repaint();
+}
+
 void MotionTimelineView::setDefaultTrackHeight(int height) {
     defaultTrackHeight = std::clamp(height, motion::Track::minimumHeight, 120);
     layoutRows();
