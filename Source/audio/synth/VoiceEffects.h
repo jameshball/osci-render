@@ -1,9 +1,9 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <unordered_map>
+#include "VoiceContext.h"
 
-inline std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>> cloneVoiceEffects(
+inline VoiceEffectMap cloneVoiceEffects(
     const std::vector<std::shared_ptr<osci::Effect>>& sourceEffects, juce::SpinLock& effectsLock, double sampleRate) {
     // Project restore can reorder effects while a background voice is being built.
     // Snapshot the list under its lock; expensive cloning must happen outside it.

@@ -104,7 +104,7 @@ private:
 
 	// Per-voice effect instances (cloned from global toggleableEffects)
 	// Mapped by effect ID so we can use global ordering from toggleableEffects
-	std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>> voiceEffectsMap;
+	VoiceEffectMap voiceEffectsMap;
 	std::shared_ptr<osci::SimpleEffect> voicePreviewEffect;
 	
 	// Working buffers for per-voice effect processing

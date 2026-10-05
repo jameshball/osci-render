@@ -1,6 +1,5 @@
 #include "ShapeVoice.h"
 #include "VoiceManager.h"
-#include "VoiceEffects.h"
 #include "../AudioThreadGuard.h"
 
 ShapeVoice::ShapeVoice(VoiceContext& context, juce::AudioSampleBuffer& externalAudio, int voiceIndex)
