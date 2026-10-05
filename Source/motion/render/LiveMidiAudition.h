@@ -55,8 +55,8 @@ inline osci::Point sampleLiveMidiAudition(const PreparedComposition& composition
     const auto phaseAt = [rate, cycleRate = composition.beamRate](std::uint64_t index) { return std::fmod(static_cast<double>(index) * cycleRate / rate, 1.0); };
     const auto current = performance.select(clock, phaseAt(clock));
     if (current.note == 0) { return {0, 0, 0, 0, 0, 0}; }
-    const auto previous = clock == 0 ? LiveMidiPerformance::Selection{} : performance.select(clock - 1, phaseAt(clock - 1));
-    const auto next = clock == std::numeric_limits<std::uint64_t>::max() ? LiveMidiPerformance::Selection{}
+    const auto previous = clock == 0 ? MidiSelection{} : performance.select(clock - 1, phaseAt(clock - 1));
+    const auto next = clock == std::numeric_limits<std::uint64_t>::max() ? MidiSelection{}
         : performance.select(clock + 1, phaseAt(clock + 1));
     // A clip can be auditioned outside its timeline interval. Its nearest
     // content position supplies geometry/transforms while note age stays live.

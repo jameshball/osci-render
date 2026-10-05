@@ -74,9 +74,13 @@ public:
             motion::Clip clip;
             clip.id = 1; clip.duration = 4; clip.instrument.bendRange = 12;
             clip.midi = pattern({{1, 1, motion::MidiControl::pitchBend, 8191}});
-            const auto bent = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, motion::Tempo(120), 48000);
+            const auto prepared = motion::PreparedMidiInstrument::prepare(clip.instrument, 48000);
+            expect(prepared.has_value());
+            if (!prepared) { return; }
+            const auto instrument = std::make_shared<const motion::PreparedMidiInstrument>(*prepared);
+            const auto bent = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, instrument, motion::Tempo(120));
             clip.midi = pattern({});
-            const auto plain = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, motion::Tempo(120), 48000);
+            const auto plain = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, instrument, motion::Tempo(120));
             expect(bent && plain);
             // Before the bend (beat 1 = 0.5 s) they match; after it the span doubles.
             const auto early = bent.performance->select(0.25, 0.1, 0.25), earlyPlain = plain.performance->select(0.25, 0.1, 0.25);
@@ -87,7 +91,7 @@ public:
             const auto cycles = 440 * 0.5 + 440 * std::exp2(8191 / 8192.0) * 0.5;
             expectWithinAbsoluteError(late.phase, cycles - std::floor(cycles), 1.0e-6);
             clip.midi = pattern({{0, 1, 11, 0}});
-            const auto silent = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, motion::Tempo(120), 48000);
+            const auto silent = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, instrument, motion::Tempo(120));
             expect(silent && silent.performance->select(1.0, 0.1, 1.0).note == 0, "expression 0 leaves the voice undrawn");
         }
         beginTest("Live pitch bend and expression follow incoming messages");

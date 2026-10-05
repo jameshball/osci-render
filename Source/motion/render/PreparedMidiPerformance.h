@@ -7,21 +7,21 @@
 namespace motion {
 class PreparedMidiPerformance {
 public:
-    struct Selection {
-        Id note = 0;
-        double phase = 0, phaseSpan = 0;
-    };
     struct Result {
         std::shared_ptr<const PreparedMidiPerformance> performance;
         std::string error;
         explicit operator bool() const { return performance != nullptr; }
     };
-    static Result prepare(const MidiNotes& notes, const Clip& clip, const Tempo& tempo, double sampleRate, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) {
-        const auto envelope = PreparedMidiInstrument::prepareEnvelope(clip.instrument, sampleRate, cancel);
-        if (!envelope) { return {nullptr, "Could not prepare the MIDI voice envelope."}; }
-        const auto schedule = PreparedMidiSchedule::prepare(notes, clip, tempo, sampleRate, envelope->releaseSamples(), cancel, resolvedTiming);
+    // `instrument` is the clip's, prepared at the output rate.
+    static Result prepare(const MidiNotes& notes, const Clip& clip, std::shared_ptr<const PreparedMidiInstrument> instrument, const Tempo& tempo, const std::atomic<bool>* cancel = nullptr, const ClipTiming* resolvedTiming = nullptr) {
+        if (instrument == nullptr || !instrument->envelope) { return {nullptr, "Could not prepare the MIDI voice envelope."}; }
+        const auto sampleRate = instrument->sampleRate;
+        const auto schedule = PreparedMidiSchedule::prepare(notes, clip, tempo, sampleRate, instrument->envelope->releaseSamples(), cancel, resolvedTiming);
         if (!schedule) { return {nullptr, schedule.error}; }
-        auto result = std::shared_ptr<PreparedMidiPerformance>(new PreparedMidiPerformance(*envelope, schedule.schedule, sampleRate));
+        for (std::uint32_t index = 0; index < schedule.schedule->voiceCount(); ++index) {
+            if (!instrument->pitches[static_cast<std::size_t>(schedule.schedule->voice(index).pitch)]) { return {nullptr, "A MIDI pitch exceeds the output sample rate's Nyquist limit."}; }
+        }
+        auto result = std::shared_ptr<PreparedMidiPerformance>(new PreparedMidiPerformance(std::move(instrument), schedule.schedule));
         // Controller changes as sample-indexed steps on the clip's own clock.
         const auto timing = resolvedTiming != nullptr ? *resolvedTiming : clip.timing(tempo);
         const auto secondsPerBeat = 60 / clip.curveBpm(tempo);
@@ -32,47 +32,34 @@ public:
         for (const auto& control : notes.controls()) {
             const auto channel = static_cast<std::size_t>(control.channel - 1);
             if (control.number == MidiControl::pitchBend) {
-                result->bends[channel].add(sampleAt(control.beat), std::exp2(clip.instrument.bendRange * control.normalised() / 12));
+                result->bends[channel].add(sampleAt(control.beat), result->instrument->bendFactor(control.normalised()));
             } else if (control.number == 11) {
                 result->expression[channel].push_back({sampleAt(control.beat), control.normalised()});
             }
-        }
-        for (std::uint32_t index = 0; index < schedule.schedule->voiceCount(); ++index) {
-            const auto pitch = schedule.schedule->voice(index).pitch;
-            if (result->pitches[static_cast<std::size_t>(pitch)]) { continue; }
-            const auto frequency = 440 * std::exp2((pitch - 69) / 12.0);
-            auto voice = motion::PreparedNoteVoice::prepare(*envelope, frequency, 1, 1);
-            if (!voice) { return {nullptr, "A MIDI pitch exceeds the output sample rate's Nyquist limit."}; }
-            result->pitches[static_cast<std::size_t>(pitch)] = std::move(voice);
         }
         return {std::move(result), {}};
     }
 
     std::size_t activeCount(double time) const {
-        const auto sample = sampleIndex(time, sampleRate);
+        const auto sample = sampleIndex(time, instrument->sampleRate);
         return sample ? schedule->activeAt(*sample).size() : 0;
     }
 
-    Selection select(double time, double allocationPhase, double oscillatorTime) const {
-        const auto sample = sampleIndex(time, sampleRate), oscillatorSample = sampleIndex(oscillatorTime, sampleRate);
+    MidiSelection select(double time, double allocationPhase, double oscillatorTime) const {
+        const auto sample = sampleIndex(time, instrument->sampleRate), oscillatorSample = sampleIndex(oscillatorTime, instrument->sampleRate);
         if (!sample || !oscillatorSample || !std::isfinite(allocationPhase) || allocationPhase < 0 || allocationPhase >= 1) { return {}; }
         const auto active = schedule->activeAt(*sample);
         auto cursor = allocationPhase * active.size();
         for (const auto index : active) {
             const auto& note = schedule->voice(index);
             const auto channel = static_cast<std::size_t>(std::clamp(note.channel, 1, 16) - 1);
-            const auto gain = envelope.at(note.age(*sample), note.heldSamples()).gain * (note.velocity / 127.0) * expressionAt(channel, *sample);
+            const auto gain = instrument->envelope->at(note.age(*sample), note.heldSamples()).gain * (note.velocity / 127.0) * expressionAt(channel, *sample);
             if (cursor < gain) {
-                const auto& voice = *pitches[static_cast<std::size_t>(note.pitch)];
-                const auto value = voice.at(note.age(*oscillatorSample), note.heldSamples());
-                if (bends[channel].empty()) { return {note.id, value.phase, value.phaseSpan}; }
-                // Pitch bend: the phase integrates the bent frequency over the
-                // note's life, so bends glide instead of jumping phase.
+                const auto age = note.age(*oscillatorSample);
+                const auto& bend = bends[channel];
+                if (bend.empty()) { return instrument->voice(note.id, note.pitch, age, note.heldSamples()); }
                 const auto now = static_cast<double>(*oscillatorSample);
-                const auto started = now - static_cast<double>(note.age(*oscillatorSample));
-                const auto step = value.frequency / sampleRate;
-                const auto cycles = step * (bends[channel].integral(now) - bends[channel].integral(started));
-                return {note.id, cycles - std::floor(cycles), step * bends[channel].factorAt(now)};
+                return instrument->bentVoice(note.id, note.pitch, bend.integral(now) - bend.integral(now - static_cast<double>(age)), bend.factorAt(now));
             }
             cursor -= gain;
         }
@@ -106,11 +93,9 @@ private:
     }
     std::array<BendTable, 16> bends;
     std::array<std::vector<Step>, 16> expression;
-    PreparedMidiPerformance(motion::PreparedVoiceEnvelope envelope, std::shared_ptr<const PreparedMidiSchedule> schedule, double sampleRate)
-        : envelope(std::move(envelope)), schedule(std::move(schedule)), sampleRate(sampleRate) {}
-    motion::PreparedVoiceEnvelope envelope;
+    PreparedMidiPerformance(std::shared_ptr<const PreparedMidiInstrument> instrument, std::shared_ptr<const PreparedMidiSchedule> schedule)
+        : instrument(std::move(instrument)), schedule(std::move(schedule)) {}
+    std::shared_ptr<const PreparedMidiInstrument> instrument;
     std::shared_ptr<const PreparedMidiSchedule> schedule;
-    std::array<std::optional<motion::PreparedNoteVoice>, 128> pitches;
-    double sampleRate;
 };
 }

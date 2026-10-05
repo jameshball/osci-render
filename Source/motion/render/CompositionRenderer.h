@@ -498,6 +498,7 @@ struct PreparedComposition {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
             }
             if (purpose == CompositionPurpose::signal) {
+                // One instrument serves live input and the clip's own notes.
                 const auto key = clip.instrument.key();
                 auto found = instruments.find(key);
                 if (found == instruments.end()) {
@@ -508,7 +509,7 @@ struct PreparedComposition {
                 item.liveInstrument = found->second;
             }
             if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
-                const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, leaf.tempo, sampleRate, cancel, &leaf.clipClock);
+                const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, item.liveInstrument, leaf.tempo, cancel, &leaf.clipClock);
                 if (!performance) {
                     preparationError = "MIDI clip \"" + juce::String(clip.name) + "\": " + juce::String(performance.error);
                     return;

@@ -145,7 +145,10 @@ private:
             clip.start = 0; clip.duration = 2; clip.offset = 0; clip.rate = 1;
             clip.instrument = {.05, .1, .35, .2};
             clip.midi = motion::MidiNotes::create({{1, 0, .8, 69, 127, 1}}).source;
-            const auto prepared = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, motion::Tempo(120), rate);
+            const auto instrument = motion::PreparedMidiInstrument::prepare(clip.instrument, rate);
+            expect(instrument.has_value());
+            if (!instrument) { continue; }
+            const auto prepared = motion::PreparedMidiPerformance::prepare(*clip.midi, clip, std::make_shared<const motion::PreparedMidiInstrument>(*instrument), motion::Tempo(120));
             expect(static_cast<bool>(prepared), juce::String(prepared.error));
             motion::LiveMidiPerformance live;
             expect(live.prepare(rate, clip.instrument));

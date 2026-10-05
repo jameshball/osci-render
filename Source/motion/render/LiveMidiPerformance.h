@@ -14,10 +14,6 @@ namespace motion {
 // nondecreasing device samples; transport position never enters this class.
 class LiveMidiPerformance {
 public:
-    struct Selection {
-        std::uint64_t note = 0;
-        double phase = 0, phaseSpan = 0;
-    };
     bool prepare(double rate, MidiInstrument settings = {}) {
         const auto prepared = PreparedMidiInstrument::prepare(settings, rate);
         if (!prepared) { reset(); instrument = {}; return false; }
@@ -89,7 +85,7 @@ public:
         auto& bend = bends[static_cast<std::size_t>(channel - 1)];
         bend.anchor = bend.integral(sample);
         bend.anchorSample = sample;
-        bend.factor = std::exp2(instrument.settings.bendRange * (value / 8192.0) / 12);
+        bend.factor = instrument.bendFactor(value / 8192.0);
         bend.bent = true;
         return true;
     }
@@ -132,23 +128,17 @@ public:
         }
         return changed;
     }
-    Selection select(std::uint64_t sample, double allocationPhase) const {
+    MidiSelection select(std::uint64_t sample, double allocationPhase) const {
         if (!instrument.envelope || !std::isfinite(allocationPhase) || allocationPhase < 0 || allocationPhase >= 1) { return {}; }
-        std::size_t count = 0;
-        for (const auto& voice : voices) { if (active(voice, sample)) { ++count; } }
-        auto cursor = allocationPhase * static_cast<double>(count);
+        auto cursor = allocationPhase * static_cast<double>(activeCount(sample));
         for (const auto& voice : voices) {
             if (!active(voice, sample)) { continue; }
             const auto channel = static_cast<std::size_t>(voice.channel - 1);
             const auto gain = envelopeValue(voice, sample).gain * (voice.velocity / 127.0) * expression[channel];
             if (cursor < gain) {
-                const auto value = instrument.pitches[static_cast<std::size_t>(voice.pitch)]->at(sample - voice.start,
-                    voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max());
                 const auto& bend = bends[channel];
-                if (!bend.bent) { return {voice.id, value.phase, value.phaseSpan}; }
-                const auto step = value.frequency / instrument.sampleRate;
-                const auto cycles = step * (bend.integral(sample) - voice.integralStart);
-                return {voice.id, cycles - std::floor(cycles), step * bend.factor};
+                if (!bend.bent) { return instrument.voice(voice.id, voice.pitch, sample - voice.start, voice.released ? voice.heldSamples : std::numeric_limits<std::uint64_t>::max()); }
+                return instrument.bentVoice(voice.id, voice.pitch, bend.integral(sample) - voice.integralStart, bend.factor);
             }
             cursor -= gain;
         }

@@ -486,37 +486,35 @@ private:
                 return composition.projectVisible(segment->clip->processPoint(raw, planTime), planTime).value_or(dark(segment->from));
             }
             case Kind::live: {
-                const auto n = segment->count;
-                const auto offset = liveInputs != nullptr ? liveInputs->clockOffset : 0;
-                const auto at = [&](std::int64_t k) {
-                    const auto clock = static_cast<std::uint64_t>(std::max<std::int64_t>(0, segment->first + k + offset));
-                    return segment->live->select(clock, (static_cast<double>(k) + 0.5) / static_cast<double>(n));
-                };
                 if (liveInputs == nullptr) { return dark(segment->from); }
-                const auto current = at(j);
-                if (current.note == 0) { return dark(segment->from); }
-                auto raw = segment->source->sampleFrame(segment->frame, current.phase, current.phaseSpan);
-                const bool edge = j == 0 || j == n - 1 || at(j - 1).note != current.note || at(j + 1).note != current.note;
-                const auto projected = composition.projectVisible(segment->clip->processPoint(raw, planTime), planTime);
-                if (!projected.has_value()) { return dark(segment->from); }
-                return edge ? dark(*projected) : *projected;
+                const auto offset = liveInputs->clockOffset;
+                return voiced(composition, *segment, j, [&](std::int64_t k) {
+                    const auto clock = static_cast<std::uint64_t>(std::max<std::int64_t>(0, segment->first + k + offset));
+                    return segment->live->select(clock, (static_cast<double>(k) + 0.5) / static_cast<double>(segment->count));
+                });
             }
             case Kind::midi: {
-                const auto n = segment->count;
-                const auto at = [&](std::int64_t k) {
+                return voiced(composition, *segment, j, [&](std::int64_t k) {
                     const auto sampleTime = advancing ? planTime + static_cast<double>(segment->first + k - planFirst) / rate : time;
-                    return segment->clip->midi->select(sampleTime, (static_cast<double>(k) + 0.5) / static_cast<double>(n), static_cast<double>(segment->first + k) / rate);
-                };
-                const auto current = at(j);
-                if (current.note == 0) { return dark(segment->from); }
-                auto raw = segment->source->sampleFrame(segment->frame, current.phase, current.phaseSpan);
-                const bool edge = j == 0 || j == n - 1 || at(j - 1).note != current.note || at(j + 1).note != current.note;
-                const auto projected = composition.projectVisible(segment->clip->processPoint(raw, planTime), planTime);
-                if (!projected.has_value()) { return dark(segment->from); }
-                return edge ? dark(*projected) : *projected;
+                    return segment->clip->midi->select(sampleTime, (static_cast<double>(k) + 0.5) / static_cast<double>(segment->count), static_cast<double>(segment->first + k) / rate);
+                });
             }
         }
         return {0, 0, 0, 0, 0, 0};
+    }
+
+    // Sample j of a segment shared among notes: `at(k)` is the note at sample
+    // k. The beam is dark where no note sounds and at each note's ends, so it
+    // blanks between voices.
+    template <typename NoteAt>
+    osci::Point voiced(const PreparedComposition& composition, const Segment& segment, std::int64_t j, const NoteAt& at) const {
+        const auto current = at(j);
+        if (current.note == 0) { return dark(segment.from); }
+        const auto raw = segment.source->sampleFrame(segment.frame, current.phase, current.phaseSpan);
+        const bool edge = j == 0 || j == segment.count - 1 || at(j - 1).note != current.note || at(j + 1).note != current.note;
+        const auto projected = composition.projectVisible(segment.clip->processPoint(raw, planTime), planTime);
+        if (!projected.has_value()) { return dark(segment.from); }
+        return edge ? dark(*projected) : *projected;
     }
 
     std::unique_ptr<std::array<Segment, maximumSegments>> segments;
