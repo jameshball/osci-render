@@ -7,6 +7,7 @@
 #include "../import/BakedSourceArchive.h"
 #include "../import/MidiSourcePreparer.h"
 #include "../import/SourceDecoding.h"
+#include <charconv>
 #include <iomanip>
 #include <locale>
 #include <set>
@@ -20,6 +21,29 @@ juce::String exactNumber(double value) {
     stream.imbue(std::locale::classic());
     stream << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
     return juce::String(stream.str());
+}
+
+// An identity attribute: absent reads as 0 (none), and anything but a whole
+// non-negative number as nothing, so the file is refused.
+std::optional<Id> readId(const juce::XmlElement& item, const char* name) {
+    if (!item.hasAttribute(name)) { return Id(0); }
+    const auto text = item.getStringAttribute(name).toStdString();
+    Id value = 0;
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (parsed.ec != std::errc() || parsed.ptr != text.data() + text.size()) { return std::nullopt; }
+    return value;
+}
+
+// `item`'s own identity: positive and not yet used in the project.
+std::optional<Id> claimId(const juce::XmlElement& item, std::set<Id>& identities) {
+    const auto id = readId(item, "id");
+    if (!id.has_value() || *id == 0 || !identities.insert(*id).second) { return std::nullopt; }
+    return id;
+}
+
+// Embedded binary, refused before decoding when it would exceed `maximumBytes`.
+bool readBase64(const juce::String& encoded, juce::MemoryBlock& data, std::size_t maximumBytes) {
+    return static_cast<std::size_t>(encoded.length()) <= (maximumBytes / 3 + 1) * 4 && data.fromBase64Encoding(encoded);
 }
 
 void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& curve) {
@@ -46,6 +70,10 @@ void saveProperty(juce::XmlElement& item, const std::string& name, const Curve& 
     }
 }
 
+void saveProperties(juce::XmlElement& item, const PropertyMap& properties) {
+    for (const auto& [name, curve] : properties) { saveProperty(item, name, curve); }
+}
+
 juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
     curve = Curve(property.getDoubleAttribute("base"));
     if (!std::isfinite(curve.base)) {
@@ -53,8 +81,7 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
     }
     for (auto* item : property.getChildWithTagNameIterator("link")) {
         PropertyLink link;
-        const auto source = item->getStringAttribute("source").getLargeIntValue();
-        link.source = source > 0 ? static_cast<Id>(source) : 0;
+        link.source = readId(*item, "source").value_or(0);
         link.property = item->getStringAttribute("property").toStdString();
         link.scale = item->getDoubleAttribute("scale", 1);
         link.offset = item->getDoubleAttribute("offset", 0);
@@ -78,6 +105,21 @@ juce::Result loadProperty(const juce::XmlElement& property, Curve& curve) {
     return juce::Result::ok();
 }
 
+// Properties whose names are fixed by their owner: each must be one of
+// `properties`, at most once. `loaded` counts those read.
+juce::Result loadKnownProperties(const juce::XmlElement& owner, PropertyMap& properties, const char* unknown, std::size_t* loaded = nullptr) {
+    std::set<std::string> names;
+    for (auto* property : owner.getChildWithTagNameIterator("property")) {
+        const auto name = property->getStringAttribute("name").toStdString();
+        const auto found = properties.find(name);
+        if (found == properties.end() || !names.insert(name).second) { return juce::Result::fail(unknown); }
+        const auto result = loadProperty(*property, found->second);
+        if (result.failed()) { return result; }
+    }
+    if (loaded != nullptr) { *loaded = names.size(); }
+    return juce::Result::ok();
+}
+
 void saveEffects(juce::XmlElement& owner, const std::vector<EffectInstance>& effects) {
     for (const auto& effect : effects) {
         auto* item = owner.createNewChildElement("effect");
@@ -89,23 +131,21 @@ void saveEffects(juce::XmlElement& owner, const std::vector<EffectInstance>& eff
             item->setAttribute("start", exactNumber(effect.range->start));
             item->setAttribute("duration", exactNumber(effect.range->duration));
         }
-        for (const auto& [name, curve] : effect.properties) {
-            saveProperty(*item, name, curve);
-        }
+        saveProperties(*item, effect.properties);
     }
 }
 
 juce::Result loadEffects(const juce::XmlElement& owner, std::vector<EffectInstance>& effects, std::set<Id>& identities) {
     for (auto* item : owner.getChildWithTagNameIterator("effect")) {
-        const auto identity = item->getStringAttribute("id").getLargeIntValue();
         const auto* definition = effectDefinition(item->getStringAttribute("type").toStdString());
-        if (identity <= 0 || definition == nullptr || !identities.insert(static_cast<Id>(identity)).second) {
+        const auto identity = definition != nullptr ? claimId(*item, identities) : std::nullopt;
+        if (!identity.has_value()) {
             return juce::Result::fail("Unknown effect type or invalid / duplicate effect identity.");
         }
         if (effects.size() >= maximumEffectsPerOwner) {
             return juce::Result::fail("Each clip, track or composition supports at most 64 effects.");
         }
-        auto effect = makeEffect(static_cast<Id>(identity), *definition);
+        auto effect = makeEffect(*identity, *definition);
         effect.name = item->getStringAttribute("name", juce::String(definition->name)).toStdString();
         effect.enabled = item->getBoolAttribute("enabled", true);
         if (item->hasAttribute("start") || item->hasAttribute("duration")) {
@@ -114,19 +154,12 @@ juce::Result loadEffects(const juce::XmlElement& owner, std::vector<EffectInstan
             }
             effect.range = EffectRange { item->getDoubleAttribute("start"), item->getDoubleAttribute("duration") };
         }
-        std::set<std::string> properties;
-        for (auto* property : item->getChildWithTagNameIterator("property")) {
-            const auto name = property->getStringAttribute("name").toStdString();
-            const auto found = effect.properties.find(name);
-            if (found == effect.properties.end() || !properties.insert(name).second) {
-                return juce::Result::fail("Unknown or duplicate effect parameter.");
-            }
-            const auto result = loadProperty(*property, found->second);
-            if (result.failed()) {
-                return result;
-            }
+        std::size_t loaded = 0;
+        const auto properties = loadKnownProperties(*item, effect.properties, "Unknown or duplicate effect parameter.", &loaded);
+        if (properties.failed()) {
+            return properties;
         }
-        if (properties.size() != effect.properties.size() || !effect.valid()) {
+        if (loaded != effect.properties.size() || !effect.valid()) {
             return juce::Result::fail("Invalid effect range or parameter value.");
         }
         effects.push_back(std::move(effect));
@@ -168,9 +201,7 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         if (group.spatialPath) { item->setAttribute("spatialPath", true); }
         if (group.quaternionRotation) { item->setAttribute("quaternionRotation", true); }
         saveEffects(*item, group.effects);
-        for (const auto& [name, curve] : group.properties) {
-            saveProperty(*item, name, curve);
-        }
+        saveProperties(*item, group.properties);
     }
     for (const auto& track : state.tracks) {
         auto* row = xml.createNewChildElement("track");
@@ -231,9 +262,7 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
                 }
             }
             saveEffects(*item, clip.effects);
-            for (const auto& [name, curve] : clip.properties) {
-                saveProperty(*item, name, curve);
-            }
+            saveProperties(*item, clip.properties);
             if (clip.luaBake != nullptr && clip.luaBake->archive.getSize() > 0) {
                 auto* bake = item->createNewChildElement("luaBake");
                 bake->setAttribute("key", juce::String(clip.luaBake->key));
@@ -247,9 +276,7 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         item->setAttribute("name", juce::String(camera.name));
         if (camera.target != 0) { item->setAttribute("target", juce::String(camera.target)); }
         if (camera.parent != 0) { item->setAttribute("parent", juce::String(camera.parent)); }
-        for (const auto& [name, curve] : camera.properties) {
-            saveProperty(*item, name, curve);
-        }
+        saveProperties(*item, camera.properties);
     }
     for (const auto& marker : state.markers) {
         auto* item = xml.createNewChildElement("marker");
@@ -338,13 +365,13 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     }
     for (auto* item : xml.getChildWithTagNameIterator("group")) {
         Group group;
-        const auto identity = item->getStringAttribute("id").getLargeIntValue();
-        const auto parent = item->getStringAttribute("parent", "0").getLargeIntValue();
-        if (identity <= 0 || parent < 0 || !identities.insert(static_cast<Id>(identity)).second) {
+        const auto parent = readId(*item, "parent");
+        const auto identity = parent.has_value() ? claimId(*item, identities) : std::nullopt;
+        if (!identity.has_value()) {
             return juce::Result::fail("Invalid or duplicate group identity.");
         }
-        group.id = static_cast<Id>(identity);
-        group.parent = static_cast<Id>(parent);
+        group.id = *identity;
+        group.parent = *parent;
         group.name = item->getStringAttribute("name", "Group").toStdString();
         group.muted = item->getBoolAttribute("muted", false);
         group.solo = item->getBoolAttribute("solo", false);
@@ -354,17 +381,9 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         if (effects.failed()) {
             return effects;
         }
-        std::set<std::string> properties;
-        for (auto* property : item->getChildWithTagNameIterator("property")) {
-            const auto name = property->getStringAttribute("name").toStdString();
-            const auto found = group.properties.find(name);
-            if (found == group.properties.end() || !properties.insert(name).second) {
-                return juce::Result::fail("Unknown or duplicate group property.");
-            }
-            const auto result = loadProperty(*property, found->second);
-            if (result.failed()) {
-                return result;
-            }
+        const auto properties = loadKnownProperties(*item, group.properties, "Unknown or duplicate group property.");
+        if (properties.failed()) {
+            return properties;
         }
         if (!group.valid()) {
             return juce::Result::fail("Invalid group transform, tint or drawing weight.");
@@ -373,7 +392,11 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     }
     for (auto* row : xml.getChildWithTagNameIterator("track")) {
         Track track;
-        track.id = static_cast<Id>(row->getStringAttribute("id").getLargeIntValue());
+        const auto trackIdentity = claimId(*row, identities);
+        if (!trackIdentity.has_value()) {
+            return juce::Result::fail("Invalid track identity.");
+        }
+        track.id = *trackIdentity;
         track.name = row->getStringAttribute("name").toStdString();
         const auto kind = row->getStringAttribute("kind");
         if (kind != "visual" && kind != "audio") {
@@ -390,14 +413,11 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         if (track.midiInput < 0 || track.midiInput > Track::anyMidiChannel || (track.midiInput != 0 && track.kind != TrackKind::visual)) {
             return juce::Result::fail("MIDI input needs a visual track and a channel 1-16 (or any).");
         }
-        const auto groupIdentity = row->getStringAttribute("group", "0").getLargeIntValue();
-        if (groupIdentity < 0) {
+        const auto groupIdentity = readId(*row, "group");
+        if (!groupIdentity.has_value()) {
             return juce::Result::fail("Invalid track group identity.");
         }
-        track.group = static_cast<Id>(groupIdentity);
-        if (track.id == 0 || !identities.insert(track.id).second) {
-            return juce::Result::fail("Invalid track identity.");
-        }
+        track.group = *groupIdentity;
         const auto trackEffects = loadEffects(*row, track.effects, identities);
         if (trackEffects.failed()) {
             return trackEffects;
@@ -407,9 +427,12 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         }
         for (auto* item : row->getChildWithTagNameIterator("clip")) {
             Clip clip;
-            clip.id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
-            clip.asset = static_cast<Id>(item->getStringAttribute("asset").getLargeIntValue());
-            clip.composition = static_cast<Id>(item->getStringAttribute("composition").getLargeIntValue());
+            const auto clipIdentity = claimId(*item, identities);
+            const auto asset = readId(*item, "asset"), composition = readId(*item, "composition");
+            if (!clipIdentity.has_value() || !asset.has_value() || !composition.has_value()) { return juce::Result::fail("Invalid clip identity."); }
+            clip.id = *clipIdentity;
+            clip.asset = *asset;
+            clip.composition = *composition;
             clip.name = item->getStringAttribute("name").toStdString();
             const auto timeBase = item->getStringAttribute("timeBase");
             if (timeBase != "seconds" && timeBase != "beats") { return juce::Result::fail("Clip timing must be seconds or beats."); }
@@ -422,7 +445,6 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
             clip.spatialPath = item->getBoolAttribute("spatialPath", false);
             clip.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
             const auto found = findAsset(assets, clip.asset);
-            if (clip.id == 0 || !identities.insert(clip.id).second) { return juce::Result::fail("Invalid clip identity."); }
             if (clip.composition != 0) {
                 if (clip.asset != 0 || !compositionIds.contains(clip.composition) || track.kind != TrackKind::visual) {
                     return juce::Result::fail("Invalid reusable composition reference or track kind.");
@@ -448,11 +470,11 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 if (track.kind != TrackKind::visual || pattern->getNextElementWithTagName("midi") != nullptr) {
                     return juce::Result::fail("MIDI performances require a single pattern on a visual clip.");
                 }
-                const auto assetText = pattern->getStringAttribute("asset").toStdString();
-                const auto parsedAsset = std::from_chars(assetText.data(), assetText.data() + assetText.size(), clip.midiAsset);
-                if (parsedAsset.ec != std::errc() || parsedAsset.ptr != assetText.data() + assetText.size()) {
+                const auto midiAsset = readId(*pattern, "asset");
+                if (!midiAsset.has_value()) {
                     return juce::Result::fail("Invalid MIDI source identity.");
                 }
+                clip.midiAsset = *midiAsset;
                 if (clip.midiAsset != 0) {
                     const auto source = findAsset(assets, clip.midiAsset);
                     if (source == nullptr || source->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
@@ -460,10 +482,8 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 std::vector<MidiNote> notes;
                 for (auto* event : pattern->getChildWithTagNameIterator("note")) {
                     if (notes.size() >= MidiNotes::maximumNotes) { return juce::Result::fail("MIDI content exceeds 100000 notes."); }
-                    const auto idText = event->getStringAttribute("id").toStdString();
-                    Id id = 0;
-                    const auto parsedId = std::from_chars(idText.data(), idText.data() + idText.size(), id);
-                    if (id == 0 || parsedId.ec != std::errc() || parsedId.ptr != idText.data() + idText.size()) { return juce::Result::fail("Invalid MIDI note identity."); }
+                    const auto id = readId(*event, "id");
+                    if (id.value_or(0) == 0) { return juce::Result::fail("Invalid MIDI note identity."); }
                     const auto readNumber = [&](const char* name, auto& value) {
                         std::istringstream stream(event->getStringAttribute(name).toStdString());
                         stream.imbue(std::locale::classic());
@@ -471,7 +491,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                         return !stream.fail() && stream.peek() == std::char_traits<char>::eof();
                     };
                     MidiNote note;
-                    note.id = id;
+                    note.id = *id;
                     if (!readNumber("start", note.start) || !readNumber("duration", note.duration)
                         || !readNumber("pitch", note.pitch) || !readNumber("velocity", note.velocity) || !readNumber("channel", note.channel)) {
                         return juce::Result::fail("MIDI note fields must contain valid numbers.");
@@ -515,8 +535,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 auto bake = std::make_shared<LuaClipBake>();
                 bake->key = luaBake->getStringAttribute("key").toStdString();
                 const auto encoded = luaBake->getAllSubText();
-                if (!luaClip || bake->key.empty() || static_cast<std::size_t>(encoded.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
-                    || !bake->archive.fromBase64Encoding(encoded) || bake->archive.getSize() == 0) {
+                if (!luaClip || bake->key.empty() || !readBase64(encoded, bake->archive, BakedSourceArchive::maximumCompressedBytes) || bake->archive.getSize() == 0) {
                     return juce::Result::fail("Invalid or oversized Lua slider bake.");
                 }
                 const auto frames = BakedSourceArchive::decode(bake->archive);
@@ -542,31 +561,22 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     }
     for (auto* item : xml.getChildWithTagNameIterator("camera")) {
         Camera camera;
-        const auto identity = item->getStringAttribute("id").getLargeIntValue();
-        camera.id = static_cast<Id>(identity);
-        camera.name = item->getStringAttribute("name", "Camera").toStdString();
-        if (identity <= 0 || !identities.insert(camera.id).second) {
+        const auto identity = claimId(*item, identities);
+        if (!identity.has_value()) {
             return juce::Result::fail("Invalid camera identity.");
         }
-        const auto target = item->getStringAttribute("target", "0").getLargeIntValue();
-        const auto parent = item->getStringAttribute("parent", "0").getLargeIntValue();
-        camera.target = target > 0 ? static_cast<Id>(target) : 0;
-        camera.parent = parent > 0 ? static_cast<Id>(parent) : 0;
-        if (target < 0 || parent < 0 || (camera.parent != 0 && findGroup(project, camera.parent) == nullptr)
+        camera.id = *identity;
+        camera.name = item->getStringAttribute("name", "Camera").toStdString();
+        const auto target = readId(*item, "target"), parent = readId(*item, "parent");
+        camera.target = target.value_or(0);
+        camera.parent = parent.value_or(0);
+        if (!target.has_value() || !parent.has_value() || (camera.parent != 0 && findGroup(project, camera.parent) == nullptr)
             || (camera.target != 0 && findGroup(project, camera.target) == nullptr && !hasVisualClip(project, camera.target))) {
             return juce::Result::fail("A camera aims at or is parented to a missing object.");
         }
-        std::set<std::string> properties;
-        for (auto* property : item->getChildWithTagNameIterator("property")) {
-            const auto name = property->getStringAttribute("name").toStdString();
-            const auto found = camera.properties.find(name);
-            if (found == camera.properties.end() || !properties.insert(name).second) {
-                return juce::Result::fail("Unknown or duplicate camera property.");
-            }
-            const auto result = loadProperty(*property, found->second);
-            if (result.failed()) {
-                return result;
-            }
+        const auto properties = loadKnownProperties(*item, camera.properties, "Unknown or duplicate camera property.");
+        if (properties.failed()) {
+            return properties;
         }
         if (!camera.valid()) {
             return juce::Result::fail("Invalid camera transform or field of view.");
@@ -574,9 +584,9 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         project.cameras.push_back(std::move(camera));
     }
     for (auto* item : xml.getChildWithTagNameIterator("marker")) {
-        const auto id = item->getStringAttribute("id").getLargeIntValue();
-        Marker marker {static_cast<Id>(id), item->getDoubleAttribute("time", -1), item->getStringAttribute("name")};
-        if (id <= 0 || !identities.insert(marker.id).second || !std::isfinite(marker.time) || marker.time < 0 || marker.time > project.duration
+        const auto id = claimId(*item, identities);
+        Marker marker {id.value_or(0), item->getDoubleAttribute("time", -1), item->getStringAttribute("name")};
+        if (!id.has_value() || !std::isfinite(marker.time) || marker.time < 0 || marker.time > project.duration
             || marker.name.trim().isEmpty() || marker.name.length() > 120 || marker.name.containsChar('\n') || marker.name.containsChar('\r')) {
             return juce::Result::fail("Invalid marker identity, position or name.");
         }
@@ -588,14 +598,13 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     }
     for (auto* item : xml.getChildWithTagNameIterator("cameraCut")) {
         CameraCut cut;
-        const auto identity = item->getStringAttribute("id").getLargeIntValue();
-        const auto cameraIdentity = item->getStringAttribute("camera").getLargeIntValue();
-        cut.id = static_cast<Id>(identity);
-        cut.camera = static_cast<Id>(cameraIdentity);
+        const auto identity = claimId(*item, identities);
+        cut.id = identity.value_or(0);
+        cut.camera = readId(*item, "camera").value_or(0);
         cut.start = item->getDoubleAttribute("start");
         cut.duration = item->getDoubleAttribute("duration");
         const auto camera = std::find_if(project.cameras.begin(), project.cameras.end(), [&](const auto& value) { return value.id == cut.camera; });
-        if (identity <= 0 || cameraIdentity <= 0 || !cut.valid() || !identities.insert(cut.id).second || camera == project.cameras.end()) {
+        if (!identity.has_value() || !cut.valid() || camera == project.cameras.end()) {
             return juce::Result::fail("Invalid camera cut range, reference or identity.");
         }
         project.cameraCuts.push_back(cut);
@@ -609,13 +618,10 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     if (!validGroupHierarchy(project)) {
         return juce::Result::fail("Groups require existing parents and track references, no cycles, and at most 32 nesting levels.");
     }
-    const auto identity = [](const juce::XmlElement& item, const char* name) {
-        const auto value = item.getStringAttribute(name).getLargeIntValue();
-        return value > 0 ? static_cast<Id>(value) : Id(0);
-    };
     for (auto* item : xml.getChildWithTagNameIterator("modulator")) {
         Modulator modulator;
-        modulator.id = identity(*item, "id");
+        const auto identity = claimId(*item, identities);
+        modulator.id = identity.value_or(0);
         modulator.name = item->getStringAttribute("name").toStdString();
         const auto kind = item->getStringAttribute("kind");
         const auto tempoSync = item->getIntAttribute("tempoSync", -1);
@@ -634,7 +640,8 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         modulator.shape.tempoSync = tempoSync != 0;
         modulator.shape.beatsPerCycle = item->getDoubleAttribute("beatsPerCycle", 1);
         modulator.shape.seed = static_cast<std::uint32_t>(seed);
-        modulator.source = identity(*item, "source");
+        const auto source = readId(*item, "source");
+        modulator.source = source.value_or(0);
         modulator.attack = item->getDoubleAttribute("attack", -1);
         modulator.decay = item->getDoubleAttribute("decay", -1);
         modulator.sustain = item->getDoubleAttribute("sustain", -1);
@@ -642,19 +649,20 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         modulator.velocity = item->getDoubleAttribute("velocity", -1);
         modulator.lowestPitch = item->getIntAttribute("lowestPitch", -1);
         modulator.highestPitch = item->getIntAttribute("highestPitch", -1);
-        if (!modulator.valid() || !identities.insert(modulator.id).second) { return juce::Result::fail("Invalid modulator settings or identity."); }
+        if (!identity.has_value() || !source.has_value() || !modulator.valid()) { return juce::Result::fail("Invalid modulator settings or identity."); }
         project.modulators.push_back(std::move(modulator));
     }
     for (auto* item : xml.getChildWithTagNameIterator("route")) {
         ModulationRoute route;
-        route.id = identity(*item, "id");
-        route.modulator = identity(*item, "modulator");
-        route.target = identity(*item, "target");
+        const auto identity = claimId(*item, identities);
+        route.id = identity.value_or(0);
+        route.modulator = readId(*item, "modulator").value_or(0);
+        route.target = readId(*item, "target").value_or(0);
         route.property = item->getStringAttribute("property").toStdString();
         route.amount = item->getDoubleAttribute("amount", 1);
         const auto mode = item->getIntAttribute("mode", -1);
         route.mode = static_cast<ModulationMode>(mode);
-        if (mode < 0 || mode > 1 || !route.valid() || !identities.insert(route.id).second) { return juce::Result::fail("Invalid modulation route settings or identity."); }
+        if (!identity.has_value() || mode < 0 || mode > 1 || !route.valid()) { return juce::Result::fail("Invalid modulation route settings or identity."); }
         project.routes.push_back(std::move(route));
     }
     const auto modulation = validateModulation(project);
@@ -681,7 +689,7 @@ juce::XmlElement Document::save() const {
     xml.setAttribute("scopeTravel", exactNumber(state.scope.travelMicrosPerUnit));
     xml.setAttribute("scopeSettle", exactNumber(state.scope.settleMicros));
     auto* beam = xml.createNewChildElement("scopeBeam");
-    for (const auto& [name, curve] : state.beam.properties) { saveProperty(*beam, name, curve); }
+    saveProperties(*beam, state.beam.properties);
     for (const auto& asset : state.assets) {
         auto* item = xml.createNewChildElement("asset");
         item->setAttribute("id", juce::String(asset->id));
@@ -770,19 +778,21 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     // The Scope's identity is reserved before anything else claims one.
     std::set<Id> identities {beamIdentity}, compositionIds;
     for (auto* item : xml.getChildWithTagNameIterator("definition")) {
-        const auto identity = item->getStringAttribute("id").getLargeIntValue();
-        if (identity <= 0 || !identities.insert(static_cast<Id>(identity)).second) { return juce::Result::fail("Invalid reusable composition identity."); }
-        compositionIds.insert(static_cast<Id>(identity));
+        const auto identity = claimId(*item, identities);
+        if (!identity.has_value()) { return juce::Result::fail("Invalid reusable composition identity."); }
+        compositionIds.insert(*identity);
     }
     for (auto* item : xml.getChildWithTagNameIterator("asset")) {
         if (cancelled(cancel)) { return juce::Result::fail("Project loading cancelled."); }
         auto asset = std::make_shared<Asset>();
-        asset->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
+        const auto identity = claimId(*item, identities);
+        if (!identity.has_value()) { return juce::Result::fail("Invalid asset identity."); }
+        asset->id = *identity;
         asset->name = item->getStringAttribute("name");
         asset->extension = item->getStringAttribute("extension");
         if (asset->extension.equalsIgnoreCase(".blender")) {
             const auto* live = item->getChildByName("blender");
-            if (live == nullptr || live->getNextElement() != nullptr || item->getNumChildElements() != 1 || asset->name.trim().isEmpty() || asset->id == 0 || !identities.insert(asset->id).second) { return juce::Result::fail("Invalid Blender source identity or settings."); }
+            if (live == nullptr || live->getNextElement() != nullptr || item->getNumChildElements() != 1 || asset->name.trim().isEmpty()) { return juce::Result::fail("Invalid Blender source identity or settings."); }
             asset->blenderSettings.port = live->getIntAttribute("port", 0);
             const auto policy = live->getStringAttribute("disconnect");
             if (policy != "freeze" && policy != "blank") { return juce::Result::fail("Invalid Blender disconnect policy."); }
@@ -814,12 +824,8 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
         const bool videoSource = osci::files::isVideo(asset->extension);
         auto* source = luaSource || videoSource ? item->getChildByName("source") : item;
         if (source == nullptr) { return juce::Result::fail("Baked asset is missing its source."); }
-        const auto encoded = source->getAllSubText();
-        if (static_cast<std::size_t>(encoded.length()) > (maximumSourceBytes / 3 + 1) * 4) {
-            return juce::Result::fail("Embedded source exceeds the 64 MiB import limit.");
-        }
-        if (asset->id == 0 || !identities.insert(asset->id).second || !asset->data.fromBase64Encoding(encoded)) {
-            return juce::Result::fail("Invalid asset data or identity.");
+        if (!readBase64(source->getAllSubText(), asset->data, maximumSourceBytes)) {
+            return juce::Result::fail("Invalid embedded source, or larger than the 64 MiB import limit.");
         }
         if (osci::files::isImage(asset->extension)) {
             const auto* raster = item->getChildByName("raster");
@@ -839,9 +845,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             const auto* cache = item->getChildByName("video-cache");
             if (cache == nullptr) { return juce::Result::fail("Video asset is missing its prepared cache. Project loading never launches a decoder."); }
             asset->bakeKey = cache->getStringAttribute("key");
-            const auto encodedCache = cache->getAllSubText();
-            if (static_cast<std::size_t>(encodedCache.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
-                || !asset->bakedData.fromBase64Encoding(encodedCache) || asset->bakedData.getSize() == 0) {
+            if (!readBase64(cache->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
                 return juce::Result::fail("Invalid or oversized video source cache.");
             }
         }
@@ -859,9 +863,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             asset->bakeSettings.pointsPerFrame = static_cast<std::size_t>(points);
             asset->bakeSettings.seed = static_cast<std::uint32_t>(seed);
             asset->bakeKey = bake->getStringAttribute("key");
-            const auto cache = bake->getAllSubText();
-            if (static_cast<std::size_t>(cache.length()) > (64 * 1024 * 1024 / 3 + 1) * 4
-                || !asset->bakedData.fromBase64Encoding(cache) || asset->bakedData.getSize() == 0) {
+            if (!readBase64(bake->getAllSubText(), asset->bakedData, BakedSourceArchive::maximumCompressedBytes) || asset->bakedData.getSize() == 0) {
                 return juce::Result::fail("Invalid or oversized Lua source cache.");
             }
         }
@@ -875,14 +877,8 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
     const auto* beam = xml.getChildByName("scopeBeam");
     if (beam != nullptr) {
         if (beam->getNextElementWithTagName("scopeBeam") != nullptr) { return juce::Result::fail("A project has one Scope."); }
-        std::set<std::string> properties;
-        for (auto* property : beam->getChildWithTagNameIterator("property")) {
-            const auto name = property->getStringAttribute("name").toStdString();
-            const auto found = project.beam.properties.find(name);
-            if (found == project.beam.properties.end() || !properties.insert(name).second) { return juce::Result::fail("Unknown or duplicate Scope property."); }
-            const auto result = loadProperty(*property, found->second);
-            if (result.failed()) { return result; }
-        }
+        const auto properties = loadKnownProperties(*beam, project.beam.properties, "Unknown or duplicate Scope property.");
+        if (properties.failed()) { return properties; }
         if (!project.beam.valid()) { return juce::Result::fail("Invalid Scope property."); }
     }
     const auto main = loadCompositionContent(xml, project, project.assets, identities, compositionIds);
@@ -896,7 +892,7 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             return juce::Result::fail("Reusable definitions share the project media and definition registries.");
         }
         auto definition = std::make_shared<CompositionDefinition>();
-        definition->id = static_cast<Id>(item->getStringAttribute("id").getLargeIntValue());
+        definition->id = readId(*item, "id").value_or(0);
         const auto result = loadCompositionContent(*content, *definition, project.assets, identities, compositionIds);
         if (result.failed()) { return result; }
         project.definitions.push_back(std::move(definition));
