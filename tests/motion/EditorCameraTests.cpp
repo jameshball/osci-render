@@ -11,11 +11,12 @@ void check(bool condition, const char* message) {
     }
 }
 bool near(double left, double right, double tolerance = 1.0e-9) { return std::abs(left - right) < tolerance; }
-bool near(motion::editor::Vec3 left, motion::editor::Vec3 right, double tolerance = 1.0e-9) { return (left - right).length() < tolerance; }
+bool near(motion::Vec3 left, motion::Vec3 right, double tolerance = 1.0e-9) { return (left - right).length() < tolerance; }
 }
 
 int main() {
     using namespace motion::editor;
+    using motion::Vec3;
     Camera camera;
     const auto projected = camera.project({ 0.5, -0.25, 0 });
     check(projected.has_value() && near(projected->x, 0.5) && near(projected->y, -0.25), "default editor framing matches fixed output camera");

@@ -7,6 +7,7 @@
 #include "PreparedMidiPerformance.h"
 #include "PreparedDrivers.h"
 #include "../model/SpatialMotion.h"
+#include "../model/Vec3.h"
 #include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"
@@ -242,8 +243,8 @@ struct PreparedChain {
     };
     std::vector<Link> links; // inner to outer
     bool empty() const { return links.empty(); }
-    std::array<double, 3> apply(std::array<double, 3> position, double time) const {
-        osci::Point point(static_cast<float>(position[0]), static_cast<float>(position[1]), static_cast<float>(position[2]));
+    Vec3 apply(Vec3 position, double time) const {
+        osci::Point point(static_cast<float>(position.x), static_cast<float>(position.y), static_cast<float>(position.z));
         for (const auto& link : links) {
             const auto local = link.clip ? link.clock.localTime(time) : time;
             point = applyTransform(point, link.curves, local, false, link.spatial.get());
@@ -258,7 +259,7 @@ struct PreparedCamera {
     PreparedChain target, parent;
 
     struct Frame {
-        std::array<double, 3> position, right, up, forward;
+        Vec3 position, right, up, forward;
         double focalLength = 1;
     };
     // The camera's world position and orthonormal basis at `time`: authored
@@ -276,7 +277,7 @@ struct PreparedCamera {
         const auto axis = [&](float x, float y, float z) {
             osci::Point point(x, y, z);
             point.rotate(static_cast<float>(values[3] * radians), static_cast<float>(values[4] * radians), static_cast<float>(values[5] * radians));
-            return std::array<double, 3> {point.x, point.y, point.z};
+            return Vec3 {point.x, point.y, point.z};
         };
         Frame result;
         result.position = {values[0], values[1], values[2]};
@@ -286,62 +287,51 @@ struct PreparedCamera {
         result.focalLength = 1.0 / std::tan(values[6] * radians * 0.5);
         if (!parent.empty()) {
             const auto origin = parent.apply(result.position, time);
-            const auto ahead = parent.apply(add(result.position, result.forward), time);
-            const auto above = parent.apply(add(result.position, result.up), time);
-            const auto forward = normalise(subtract(ahead, origin));
+            const auto ahead = parent.apply(result.position + result.forward, time);
+            const auto above = parent.apply(result.position + result.up, time);
+            const auto forward = (ahead - origin).normalized(minimumAxis);
             if (!forward.has_value()) { return std::nullopt; }
-            const auto right = normalise(cross(*forward, subtract(above, origin)));
+            const auto right = forward->cross(above - origin).normalized(minimumAxis);
             if (!right.has_value()) { return std::nullopt; }
             result.position = origin;
             result.forward = *forward;
             result.right = *right;
-            result.up = cross(*right, *forward);
+            result.up = right->cross(*forward);
         }
         if (!target.empty()) {
-            const auto aim = normalise(subtract(target.apply({0, 0, 0}, time), result.position));
+            const auto aim = (target.apply({0, 0, 0}, time) - result.position).normalized(minimumAxis);
             if (aim.has_value()) {
                 // Level to world up unless looking straight up or down.
-                auto right = normalise(cross(*aim, {0, 1, 0}));
-                if (!right.has_value()) { right = normalise(cross(*aim, result.up)); }
+                auto right = aim->cross({0, 1, 0}).normalized(minimumAxis);
+                if (!right.has_value()) { right = aim->cross(result.up).normalized(minimumAxis); }
                 if (right.has_value()) {
-                    const auto up = cross(*right, *aim);
+                    const auto up = right->cross(*aim);
                     const auto roll = values[5] * radians;
                     const auto c = std::cos(roll), s = std::sin(roll);
                     result.forward = *aim;
-                    result.right = add(scale(*right, c), scale(up, s));
-                    result.up = add(scale(up, c), scale(*right, -s));
+                    result.right = *right * c + up * s;
+                    result.up = up * c - *right * s;
                 }
             }
         }
         return result;
     }
+    // Shorter axes are degenerate: a parent scaled flat, or a target at the camera.
+    static constexpr double minimumAxis = 1.0e-9;
     // Points nearer than this to a camera are not drawn.
     static constexpr double nearPlane = 0.05;
     static double depthOf(const Frame& frame, const osci::Point& point) {
-        return dot(subtract({point.x, point.y, point.z}, frame.position), frame.forward);
+        return (Vec3 {point.x, point.y, point.z} - frame.position).dot(frame.forward);
     }
     static osci::Point project(const Frame& frame, osci::Point point) {
-        const auto offset = subtract({point.x, point.y, point.z}, frame.position);
-        const auto depth = dot(offset, frame.forward);
+        const auto offset = Vec3 {point.x, point.y, point.z} - frame.position;
+        const auto depth = offset.dot(frame.forward);
         if (!std::isfinite(depth) || depth <= nearPlane) { return { 0, 0, 0, 0, 0, 0 }; }
-        point.x = static_cast<float>(dot(offset, frame.right) * frame.focalLength / depth);
-        point.y = static_cast<float>(dot(offset, frame.up) * frame.focalLength / depth);
+        point.x = static_cast<float>(offset.dot(frame.right) * frame.focalLength / depth);
+        point.y = static_cast<float>(offset.dot(frame.up) * frame.focalLength / depth);
         point.z = 1.0f;
         if (!std::isfinite(point.x) || !std::isfinite(point.y)) { return { 0, 0, 0, 0, 0, 0 }; }
         return point;
-    }
-
-private:
-    using Vector = std::array<double, 3>;
-    static Vector add(const Vector& a, const Vector& b) { return {a[0] + b[0], a[1] + b[1], a[2] + b[2]}; }
-    static Vector subtract(const Vector& a, const Vector& b) { return {a[0] - b[0], a[1] - b[1], a[2] - b[2]}; }
-    static Vector scale(const Vector& a, double factor) { return {a[0] * factor, a[1] * factor, a[2] * factor}; }
-    static double dot(const Vector& a, const Vector& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
-    static Vector cross(const Vector& a, const Vector& b) { return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}; }
-    static std::optional<Vector> normalise(const Vector& a) {
-        const auto length = std::sqrt(dot(a, a));
-        if (!std::isfinite(length) || length < 1.0e-9) { return std::nullopt; }
-        return scale(a, 1.0 / length);
     }
 };
 

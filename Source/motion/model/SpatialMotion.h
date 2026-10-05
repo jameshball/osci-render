@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Animation.h"
+#include "Vec3.h"
 #include <array>
 #include <cmath>
 #include <numbers>
@@ -46,13 +47,13 @@ public:
         const auto& ky = y.keyframes();
         const auto& kz = z.keyframes();
         const auto count = kx.size();
-        std::vector<Vec> points(count);
+        std::vector<Vec3> points(count);
         for (std::size_t index = 0; index < count; ++index) {
             points[index] = {kx[index].value, ky[index].value, kz[index].value};
             path->times.push_back(kx[index].time);
             path->interpolation.push_back(kx[index].interpolation);
         }
-        std::vector<Vec> tangents(count);
+        std::vector<Vec3> tangents(count);
         for (std::size_t index = 0; index < count; ++index) {
             const auto& before = points[index == 0 ? 0 : index - 1];
             const auto& after = points[index + 1 == count ? index : index + 1];
@@ -74,30 +75,22 @@ public:
         return path;
     }
 
-    std::array<double, 3> at(double time) const {
-        if (!std::isfinite(time) || time <= times.front()) { return segments.front().control[0].array(); }
-        if (time >= times.back()) { return segments.back().control[3].array(); }
+    Vec3 at(double time) const {
+        if (!std::isfinite(time) || time <= times.front()) { return segments.front().control[0]; }
+        if (time >= times.back()) { return segments.back().control[3]; }
         const auto right = std::upper_bound(times.begin(), times.end(), time);
         const auto index = static_cast<std::size_t>(right - times.begin()) - 1;
         const auto t = (time - times[index]) / (times[index + 1] - times[index]);
         const auto& segment = segments[index];
-        return segment.at(segment.parameterAt(segmentProgress(interpolation[index], t))).array();
+        return segment.at(segment.parameterAt(segmentProgress(interpolation[index], t)));
     }
 
 private:
-    struct Vec {
-        double x = 0, y = 0, z = 0;
-        Vec operator+(const Vec& other) const { return {x + other.x, y + other.y, z + other.z}; }
-        Vec operator-(const Vec& other) const { return {x - other.x, y - other.y, z - other.z}; }
-        Vec operator*(double scale) const { return {x * scale, y * scale, z * scale}; }
-        double length() const { return std::sqrt(x * x + y * y + z * z); }
-        std::array<double, 3> array() const { return {x, y, z}; }
-    };
     struct Segment {
         static constexpr std::size_t samples = 25;
-        std::array<Vec, 4> control;
+        std::array<Vec3, 4> control;
         std::array<double, samples> lengths {};
-        Vec at(double u) const {
+        Vec3 at(double u) const {
             const auto v = 1.0 - u;
             return control[0] * (v * v * v) + control[1] * (3 * v * v * u) + control[2] * (3 * v * u * u) + control[3] * (u * u * u);
         }
@@ -151,7 +144,7 @@ struct Quaternion {
         const auto wa = std::sin((1 - t) * angle) / sine, wb = std::sin(t * angle) / sine;
         return {a.w * wa + b.w * wb, a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb};
     }
-    std::array<double, 3> rotate(double px, double py, double pz) const {
+    Vec3 rotate(double px, double py, double pz) const {
         // v' = v + 2w(q x v) + 2 q x (q x v)
         const auto cx = y * pz - z * py, cy = z * px - x * pz, cz = x * py - y * px;
         const auto ccx = y * cz - z * cy, ccy = z * cx - x * cz, ccz = x * cy - y * cx;

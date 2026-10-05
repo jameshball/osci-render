@@ -68,7 +68,7 @@ void MotionCompositionView::frameSelection() {
     if (prepared == nullptr) { return; }
     const auto time = editingTime();
     const auto hasSelection = std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.editorId() == selected && clip.active(time); });
-    motion::editor::Vec3 minimum { 1e12, 1e12, 1e12 }, maximum { -1e12, -1e12, -1e12 };
+    motion::Vec3 minimum { 1e12, 1e12, 1e12 }, maximum { -1e12, -1e12, -1e12 };
     bool found = false;
     for (const auto& clip : prepared->clips) {
         if (!clip.active(time) || (hasSelection && clip.editorId() != selected)) { continue; }
@@ -234,12 +234,11 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
         if (camera.id == lockedCamera) { continue; }
         const auto frame = camera.frame(time);
         if (!frame.has_value()) { continue; }
-        const auto vector = [](const std::array<double, 3>& value) { return motion::editor::Vec3 {value[0], value[1], value[2]}; };
-        const auto position = vector(frame->position), right = vector(frame->right), up = vector(frame->up), forward = vector(frame->forward);
+        const auto& [position, right, up, forward, focalLength] = *frame;
         const auto rectangle = [&](double depth) {
-            const auto half = depth / frame->focalLength;
+            const auto half = depth / focalLength;
             const auto centre = position + forward * depth;
-            return std::array<motion::editor::Vec3, 4> {centre - right * half + up * half, centre + right * half + up * half, centre + right * half - up * half, centre - right * half - up * half};
+            return std::array<motion::Vec3, 4> {centre - right * half + up * half, centre + right * half + up * half, centre + right * half - up * half, centre - right * half - up * half};
         };
         const bool isActive = &camera == active, isSelected = camera.id == selected;
         const auto colour = isSelected ? motion::style::selection() : isActive ? osci::Colours::text() : osci::Colours::textMuted();
@@ -268,7 +267,7 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
             drawWorldLine(g, top + width, top + up * .12);
         }
         if (!isActive) { continue; }
-        const auto depth = (motion::editor::Vec3 {} - position).dot(forward);
+        const auto depth = (motion::Vec3 {} - position).dot(forward);
         if (depth <= .5) { continue; }
         const auto shot = rectangle(depth);
         g.setColour(colour.withAlpha(isSelected ? .5f : .22f));
@@ -373,7 +372,7 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
     std::array<double, 3> offsets { 0, 0, 0 };
     double scaleFactor = 1;
     if (gesture == Gesture::plane || gesture == Gesture::moveAxis) {
-        std::optional<motion::editor::Vec3> worldDelta;
+        std::optional<motion::Vec3> worldDelta;
         if (gesture == Gesture::plane) {
             worldDelta = cameraAtDown.translationOnFacingPlane(normalized(down), normalized(event.position), dragAnchor);
         } else {
@@ -394,7 +393,7 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
         if (!first.has_value() || !last.has_value()) { return; }
         const auto firstLocal = gizmoAtDown->rotationRay(*first, dragAxis), lastLocal = gizmoAtDown->rotationRay(*last, dragAxis);
         if (!firstLocal.has_value() || !lastLocal.has_value()) { return; }
-        const std::array<motion::editor::Vec3, 3> axes { motion::editor::Vec3 { 1, 0, 0 }, motion::editor::Vec3 { 0, 1, 0 }, motion::editor::Vec3 { 0, 0, 1 } };
+        const std::array<motion::Vec3, 3> axes { motion::Vec3 { 1, 0, 0 }, motion::Vec3 { 0, 1, 0 }, motion::Vec3 { 0, 0, 1 } };
         const auto delta = motion::editor::gizmo::rotationDragAngle(*firstLocal, *lastLocal, {}, axes[dragAxis]);
         if (!delta.has_value()) { return; }
         rotationDelta += *delta;
@@ -470,7 +469,7 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
     }
 }
 
-motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::editor::Vec3* anchor) const {
+motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Vec3* anchor) const {
     const auto liveFrames = processor.liveSourcePreview();
     float nearest = 18;
     motion::Id hit = 0;
@@ -743,7 +742,7 @@ MotionCompositionGizmo MotionCompositionView::currentGizmo() const {
     gizmoFrame = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
     if (navigating || !editable(time) || !gizmoFrame.has_value() || gizmoFrame->parent.hasPostTransformEffects) { return {}; }
     return MotionCompositionGizmo::layout(*gizmoFrame, camera, tool, std::clamp(getWidth() * 0.2, 35.0, 72.0), outputFrame().getHeight(),
-        [this](motion::editor::Vec3 point) { return screenPoint(point); });
+        [this](motion::Vec3 point) { return screenPoint(point); });
 }
 
 bool MotionCompositionView::beginGesture(double time) {
@@ -778,7 +777,7 @@ void MotionCompositionView::timerCallback() {
     const auto seconds = std::clamp((now - lastTick) / 1000.0, 0.0, 0.05);
     lastTick = now;
     const auto down = [](int letter, int arrow = 0) { return juce::KeyPress::isKeyCurrentlyDown(letter) || (arrow != 0 && juce::KeyPress::isKeyCurrentlyDown(arrow)); };
-    const motion::editor::Vec3 direction { static_cast<double>(down('D', juce::KeyPress::rightKey) - down('A', juce::KeyPress::leftKey)),
+    const motion::Vec3 direction { static_cast<double>(down('D', juce::KeyPress::rightKey) - down('A', juce::KeyPress::leftKey)),
         static_cast<double>(down('E') - down('Q')), static_cast<double>(down('W', juce::KeyPress::upKey) - down('S', juce::KeyPress::downKey)) };
     const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();
     if (modifiers.isCommandDown() || modifiers.isCtrlDown() || modifiers.isAltDown()) { return; }
@@ -818,12 +817,12 @@ motion::editor::Vec2 MotionCompositionView::normalized(juce::Point<float> point)
     return { (point.x - frame.getCentreX()) * 2 / frame.getWidth(), (frame.getCentreY() - point.y) * 2 / frame.getHeight() };
 }
 
-motion::editor::Vec3 MotionCompositionView::worldPoint(osci::Point point, double time) const {
+motion::Vec3 MotionCompositionView::worldPoint(osci::Point point, double time) const {
     if (prepared != nullptr) { point = prepared->applyCompositionEffects(point, time); }
     return { point.x, point.y, point.z };
 }
 
-std::optional<juce::Point<float>> MotionCompositionView::screenPoint(motion::editor::Vec3 point) const {
+std::optional<juce::Point<float>> MotionCompositionView::screenPoint(motion::Vec3 point) const {
     const auto projected = camera.project(point);
     if (!projected.has_value() || std::abs(projected->x) > 1000 || std::abs(projected->y) > 1000) { return std::nullopt; }
     const auto frame = outputFrame();
@@ -831,7 +830,7 @@ std::optional<juce::Point<float>> MotionCompositionView::screenPoint(motion::edi
         static_cast<float>(frame.getCentreY() - projected->y * frame.getHeight() / 2) };
 }
 
-void MotionCompositionView::drawWorldLine(juce::Graphics& g, motion::editor::Vec3 start, motion::editor::Vec3 end) const {
+void MotionCompositionView::drawWorldLine(juce::Graphics& g, motion::Vec3 start, motion::Vec3 end) const {
     const auto first = screenPoint(start), last = screenPoint(end);
     if (first.has_value() && last.has_value()) { g.drawLine({ *first, *last }, 1); }
 }

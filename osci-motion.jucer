@@ -480,6 +480,7 @@
         <FILE id="MotmodelTextSettingsh" name="TextSettings.h" compile="0" resource="0" file="Source/motion/model/TextSettings.h"/>
         <FILE id="mottimegrid" name="TimeGrid.h" compile="0" resource="0" file="Source/motion/model/TimeGrid.h"/>
         <FILE id="MotTimeline" name="Timeline.h" compile="0" resource="0" file="Source/motion/model/Timeline.h"/>
+        <FILE id="MotmodelVec3h" name="Vec3.h" compile="0" resource="0" file="Source/motion/model/Vec3.h"/>
       </GROUP>
       <GROUP id="MotionSrcRender" name="render">
         <FILE id="MotrenderBeamRendererh" name="BeamRenderer.h" compile="0" resource="0" file="Source/motion/render/BeamRenderer.h"/>

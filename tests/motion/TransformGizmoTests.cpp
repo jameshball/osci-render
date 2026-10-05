@@ -5,6 +5,7 @@
 
 namespace {
 using namespace motion::editor;
+using motion::Vec3;
 void check(bool condition, const char* message) {
     if (!condition) { std::cerr << "FAIL: " << message << '\n'; std::exit(1); }
 }

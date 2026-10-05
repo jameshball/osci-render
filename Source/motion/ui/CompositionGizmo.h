@@ -10,7 +10,7 @@ enum class MotionTransformTool { move, rotate, scale };
 struct MotionCompositionGizmo {
     struct Handle {
         std::vector<juce::Point<float>> points;
-        motion::editor::Vec3 direction;
+        motion::Vec3 direction;
     };
     MotionTransformTool tool = MotionTransformTool::move;
     juce::Point<float> origin;

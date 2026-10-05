@@ -79,7 +79,7 @@ public:
 
     // The visible clip drawn nearest the point (within 18 px), and the world
     // point there.
-    motion::Id pickAt(juce::Point<float> position, motion::editor::Vec3* anchor) const;
+    motion::Id pickAt(juce::Point<float> position, motion::Vec3* anchor) const;
 
     // Context hints only while flying or dragging (the tool strip's tooltips
     // cover the rest), like Blender's status hints, drawn over the scene.
@@ -125,10 +125,10 @@ private:
     bool validGesture();
     juce::Rectangle<float> outputFrame() const;
     motion::editor::Vec2 normalized(juce::Point<float> point) const;
-    motion::editor::Vec3 worldPoint(osci::Point point, double time) const;
-    std::optional<juce::Point<float>> screenPoint(motion::editor::Vec3 point) const;
+    motion::Vec3 worldPoint(osci::Point point, double time) const;
+    std::optional<juce::Point<float>> screenPoint(motion::Vec3 point) const;
     std::optional<juce::Point<float>> projected(osci::Point point, double time) const { return screenPoint(worldPoint(point, time)); }
-    void drawWorldLine(juce::Graphics& g, motion::editor::Vec3 start, motion::editor::Vec3 end) const;
+    void drawWorldLine(juce::Graphics& g, motion::Vec3 start, motion::Vec3 end) const;
     struct PathKey {
         motion::Id selection;
         std::uint64_t generation;
@@ -172,14 +172,14 @@ private:
     // The view moved: write it to the camera. The document moved (playback,
     // undo, the inspector): move the view.
     void syncCamera();
-    motion::editor::Vec3 dragAnchor;
+    motion::Vec3 dragAnchor;
     std::string editedProperty;
     mutable std::optional<motion::editor::EulerGizmoFrame> gizmoFrame;
     std::optional<motion::editor::EulerGizmoFrame> gizmoAtDown;
     MotionTransformTool tool = MotionTransformTool::move;
     Gesture gesture = Gesture::plane;
     int dragAxis = 3, hoverHandle = -1;
-    motion::editor::Vec3 dragDirection;
+    motion::Vec3 dragDirection;
     motion::editor::Vec2 lastRotationPointer;
     juce::Point<float> scaleScreenAxis;
     double rotationDelta = 0;
