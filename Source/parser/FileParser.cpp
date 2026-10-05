@@ -175,9 +175,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			if (extension == ".lottie") {
 				jsonContent = osci::lottie::extractAnimationJsonFromDotLottie(*buffer);
 				if (jsonContent.isEmpty()) {
-					services->showError(
-						"Error Loading Lottie",
-						"The .lottie archive did not contain a Lottie animation JSON.");
+					services->showError("Error Loading Lottie", "The .lottie archive did not contain a Lottie animation JSON.");
 					return;
 				}
 			} else {
@@ -186,9 +184,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			}
 
 			if (!looksLikeLottieJson(jsonContent)) {
-				services->showError(
-					"Unsupported JSON",
-					"The selected JSON file does not look like a Lottie animation.");
+				services->showError("Unsupported JSON", "The selected JSON file does not look like a Lottie animation.");
 				return;
 			}
 

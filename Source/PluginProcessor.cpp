@@ -1597,10 +1597,6 @@ double OscirenderAudioProcessor::noteToFrequency(int note, int channel) {
 #endif
 }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
-    return new OscirenderAudioProcessor();
-}
-
 VoiceParameters OscirenderAudioProcessor::getVoiceParameters() {
     return { midiEnabled, frequencyEffect.get(), velocityTracking
 #if OSCI_PREMIUM
@@ -1617,4 +1613,8 @@ void OscirenderAudioProcessor::processVoiceEffects(juce::AudioBuffer<float>& buf
     juce::AudioBuffer<float>& frequency, juce::AudioBuffer<float>& frameSync,
     const VoiceEffectMap& effects, const std::shared_ptr<osci::SimpleEffect>& preview) {
     applyToggleableEffectsToBuffer(buffer, &inputBuffer, &envelope, &frequency, &frameSync, &effects, preview);
+}
+
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {
+    return new OscirenderAudioProcessor();
 }

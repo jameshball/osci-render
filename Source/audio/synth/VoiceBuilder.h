@@ -3,7 +3,6 @@
 #include <JuceHeader.h>
 #include "ShapeVoice.h"
 
-
 // Builds ShapeVoice objects on a background thread so the message/audio
 // threads are never blocked by heavy allocations (e.g. DelayEffect buffers).
 class VoiceBuilder : public juce::Thread {

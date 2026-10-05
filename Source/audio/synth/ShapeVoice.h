@@ -52,8 +52,8 @@ private:
 	const double MIN_LENGTH_INCREMENT = 0.000001;
 
 	VoiceContext& context;
-    VoiceParameters parameters;
-    VoiceTelemetry& telemetry;
+	VoiceParameters parameters;
+	VoiceTelemetry& telemetry;
 	const int voiceIndex = 0;
 	std::vector<std::unique_ptr<osci::Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
