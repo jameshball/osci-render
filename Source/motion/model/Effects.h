@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Animation.h"
+#include "Id.h"
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -61,7 +62,7 @@ struct EffectRange {
 };
 
 struct EffectInstance {
-    std::uint64_t id = 0;
+    Id id = 0;
     std::string type, name;
     bool enabled = true;
     PropertyMap properties;
@@ -91,7 +92,7 @@ struct EffectInstance {
     }
 };
 
-inline EffectInstance makeEffect(std::uint64_t id, const EffectDefinition& definition) {
+inline EffectInstance makeEffect(Id id, const EffectDefinition& definition) {
     EffectInstance effect;
     effect.id = id;
     effect.type = definition.id;
@@ -103,7 +104,7 @@ inline EffectInstance makeEffect(std::uint64_t id, const EffectDefinition& defin
 }
 
 template <typename ProjectType>
-auto findEffectOwner(ProjectType& project, std::uint64_t ownerId) -> std::conditional_t<std::is_const_v<ProjectType>, const std::vector<EffectInstance>*, std::vector<EffectInstance>*> {
+auto findEffectOwner(ProjectType& project, Id ownerId) -> std::conditional_t<std::is_const_v<ProjectType>, const std::vector<EffectInstance>*, std::vector<EffectInstance>*> {
     if (ownerId == 0) {
         return &project.effects;
     }
@@ -127,7 +128,7 @@ auto findEffectOwner(ProjectType& project, std::uint64_t ownerId) -> std::condit
 }
 
 template <typename ProjectType>
-auto findEffect(ProjectType& project, std::uint64_t id) -> std::conditional_t<std::is_const_v<ProjectType>, const EffectInstance*, EffectInstance*> {
+auto findEffect(ProjectType& project, Id id) -> std::conditional_t<std::is_const_v<ProjectType>, const EffectInstance*, EffectInstance*> {
     for (auto& effect : project.effects) {
         if (effect.id == id) {
             return &effect;

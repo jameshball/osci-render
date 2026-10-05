@@ -15,7 +15,7 @@ inline bool isEased(const Keyframe& key) {
 // still holds. Easing out of a hold key makes it a Bezier, as in After Effects.
 // Returns false when the key is missing or already eased that way.
 inline bool easeKey(Curve& curve, double time, bool in, bool out) {
-    const auto* found = keyedit::findKey(curve, time);
+    const auto* found = curve.findKey(time);
     if (found == nullptr) {
         return false;
     }

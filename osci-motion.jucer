@@ -502,6 +502,7 @@
         <FILE id="MotmodelFrameTimingh" name="FrameTiming.h" compile="0" resource="0"
               file="Source/motion/model/FrameTiming.h"/>
         <FILE id="motgroupmodel" name="Group.h" compile="0" resource="0" file="Source/motion/model/Group.h"/>
+        <FILE id="MotmodelIdh" name="Id.h" compile="0" resource="0" file="Source/motion/model/Id.h"/>
         <FILE id="MotmodelKeyEasingh" name="KeyEasing.h" compile="0" resource="0"
               file="Source/motion/model/KeyEasing.h"/>
         <FILE id="MotKeyEdit" name="KeyEdit.h" compile="0" resource="0" file="Source/motion/model/KeyEdit.h"/>

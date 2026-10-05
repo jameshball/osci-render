@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <numbers>
 #include <optional>
 #include <span>
 #include <vector>
@@ -77,7 +78,7 @@ private:
     // One-pole low-passes split the signal at 150 Hz and 2 kHz.
     static Flux onsets(std::span<const float> mono, double sampleRate, const std::atomic<bool>* cancel) {
         const auto hop = std::max<std::size_t>(1, static_cast<std::size_t>(std::round(sampleRate / frameRate)));
-        const auto coefficient = [sampleRate](double hertz) { return 1 - std::exp(-2 * 3.141592653589793 * hertz / sampleRate); };
+        const auto coefficient = [sampleRate](double hertz) { return 1 - std::exp(-2 * std::numbers::pi * hertz / sampleRate); };
         const auto lowCut = coefficient(150), midCut = coefficient(2000);
         double low1 = 0, low2 = 0, mid1 = 0, mid2 = 0;
         const auto frames = mono.size() / hop;

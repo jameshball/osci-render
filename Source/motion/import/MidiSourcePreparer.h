@@ -219,9 +219,13 @@ public:
             });
             result.tempoChanges = std::move(changes);
             return result;
-        } catch (const std::bad_alloc&) { return failure("Not enough memory to import MIDI notes."); }
-        catch (const std::exception& error) { return failure(error.what()); }
-        catch (...) { return failure("MIDI import failed."); }
+        } catch (const std::bad_alloc&) {
+            return failure("Not enough memory to import MIDI notes.");
+        } catch (const std::exception& error) {
+            return failure(error.what());
+        } catch (...) {
+            return failure("MIDI import failed.");
+        }
     }
 private:
     static Result failure(std::string message) {

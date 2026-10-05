@@ -37,7 +37,7 @@ public:
 private:
     using ScopeKey = std::tuple<const Composition*, double, double, double>;
     struct ScopeState {
-        std::map<ModulatorId, std::shared_ptr<const PreparedModulator>> modulators;
+        std::map<Id, std::shared_ptr<const PreparedModulator>> modulators;
         std::map<std::pair<Id, std::string>, std::shared_ptr<const Curve>> sources;
     };
     // A scope's routes by the property they drive.
@@ -103,7 +103,7 @@ private:
         return result;
     }
 
-    std::shared_ptr<const PreparedModulator> prepare(const Composition& scope, const ClipTiming& scopeClock, ModulatorId id) {
+    std::shared_ptr<const PreparedModulator> prepare(const Composition& scope, const ClipTiming& scopeClock, Id id) {
         auto& cache = state(scope, scopeClock).modulators;
         const auto found = cache.find(id);
         if (found != cache.end()) { return found->second; }

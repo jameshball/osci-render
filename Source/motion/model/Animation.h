@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ClipTiming.h"
+#include "Id.h"
 #include "Modulators.h"
 #include "Tempo.h"
 #include <map>
@@ -14,6 +15,15 @@
 #include <vector>
 
 namespace motion {
+
+// Decimal persistence and project-to-source subtraction can differ by a few
+// ULPs, so times this close are one instant: the authored time is kept, not
+// snapped to a frame. `scale` widens the tolerance for a difference left by
+// adding or subtracting a value that large.
+inline double timeTolerance(double a, double b, double scale = 0) {
+    return 32 * std::numeric_limits<double>::epsilon() * std::max({1.0, std::abs(a), std::abs(b), std::abs(scale)});
+}
+inline bool sameTime(double a, double b) { return std::abs(a - b) <= timeTolerance(a, b); }
 
 // The left key's interpolation shapes each segment. smooth: automatic clamped
 // tangents at both ends (continuous velocity, never overshooting an extreme).
@@ -43,9 +53,9 @@ struct Keyframe {
 
 // Drives a property from another property in the same composition:
 // value = source(time - delay) * scale + offset, replacing this property's
-// keys. Its own oscillator and routed modulators still apply afterwards.
+// keys. Routed modulators still apply afterwards.
 struct PropertyLink {
-    std::uint64_t source = 0;
+    Id source = 0;
     std::string property;
     double scale = 1, offset = 0, delay = 0;
     bool operator==(const PropertyLink&) const = default;
@@ -182,8 +192,12 @@ public:
         return std::all_of(keys.begin(), keys.end(), [](const Keyframe& key) { return key.valid(); });
     }
     bool animated() const { return !keys.empty(); }
-    // A key at this time, matched as removeKey and setKeyValue match it.
-    bool hasKeyAt(double time) const { return matchingIndex(time) >= 0; }
+    // The key at this time, matched as removeKey and setKeyValue match it.
+    const Keyframe* findKey(double time) const {
+        const auto index = matchingIndex(time);
+        return index < 0 ? nullptr : &keys[static_cast<std::size_t>(index)];
+    }
+    bool hasKeyAt(double time) const { return findKey(time) != nullptr; }
     const std::vector<Keyframe>& keyframes() const { return keys; }
     double base = 0.0;
     std::optional<PropertyLink> link;
@@ -248,17 +262,10 @@ private:
     }
     std::ptrdiff_t matchingIndex(double time) const {
         if (!std::isfinite(time)) { return -1; }
-        const auto sameTime = [time](const Keyframe& key) {
-            // Decimal persistence and project-to-source subtraction can differ
-            // by a few ULPs. Preserve the authored time, not a frame-sized snap.
-            const auto tolerance = 32 * std::numeric_limits<double>::epsilon()
-                * std::max({1.0, std::abs(time), std::abs(key.time)});
-            return std::abs(key.time - time) <= tolerance;
-        };
         const auto next = std::lower_bound(keys.begin(), keys.end(), time,
             [](const Keyframe& key, double value) { return key.time < value; });
-        if (next != keys.end() && sameTime(*next)) { return next - keys.begin(); }
-        if (next != keys.begin() && sameTime(*(next - 1))) { return next - 1 - keys.begin(); }
+        if (next != keys.end() && sameTime(next->time, time)) { return next - keys.begin(); }
+        if (next != keys.begin() && sameTime((next - 1)->time, time)) { return next - 1 - keys.begin(); }
         return -1;
     }
     std::vector<Keyframe> keys;

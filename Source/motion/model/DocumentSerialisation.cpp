@@ -344,8 +344,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     project.loopStart = xml.getDoubleAttribute("loopStart", 0);
     project.loopEnd = xml.getDoubleAttribute("loopEnd", 0);
     project.looping = xml.getBoolAttribute("looping", false);
-    project.loopEnd = std::min(project.loopEnd, project.duration);
-    if (!project.hasLoop()) { project.loopStart = project.loopEnd = 0; project.looping = false; }
+    project.clampLoop();
     if (!std::isfinite(project.duration) || project.duration <= 0 || !std::isfinite(project.frameRate)
         || project.frameRate < 0.001 || project.frameRate > 1000 || !std::isfinite(project.bpm) || project.bpm < 1 || project.bpm > 1000
         || display < 0 || display > 2 || snap < 0 || snap > 1 || project.beatsPerBar < 1 || project.beatsPerBar > 32
@@ -523,8 +522,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 if (result.failed()) {
                     return result;
                 }
-                const auto inRange = [spec](double value) { return std::isfinite(value) && value >= spec->minimum && value <= spec->maximum; };
-                if (!inRange(curve.base) || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [&](const auto& key) { return !inRange(key.value); })) {
+                if (!spec->contains(curve.base) || std::any_of(curve.keyframes().begin(), curve.keyframes().end(), [spec](const auto& key) { return !spec->contains(key.value); })) {
                     return juce::Result::fail(juce::String(spec->label.data(), spec->label.size()) + " is outside its allowed range.");
                 }
                 clip.properties[name] = std::move(curve);

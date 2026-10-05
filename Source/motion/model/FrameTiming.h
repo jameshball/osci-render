@@ -10,6 +10,12 @@
 #include <vector>
 
 namespace motion {
+// A source's time looped into [0, length): negative times wrap into its end.
+inline double wrapTime(double seconds, double length) {
+    const auto wrapped = std::fmod(seconds, length);
+    return wrapped < 0 ? wrapped + length : wrapped;
+}
+
 // Immutable presentation timing for sources with unequal frame durations.
 // GIF delays retain their authored millisecond boundaries; live captures may
 // provide more precise cumulative-second boundaries without quantisation.
@@ -57,9 +63,7 @@ public:
     double averageFrameRate() const { return static_cast<double>(ends.size()) / duration(); }
     std::size_t frameIndex(double seconds) const {
         if (!std::isfinite(seconds)) { return 0; }
-        auto wrapped = std::fmod(seconds, duration());
-        if (wrapped < 0) { wrapped += duration(); }
-        const auto found = std::upper_bound(ends.begin(), ends.end(), wrapped);
+        const auto found = std::upper_bound(ends.begin(), ends.end(), wrapTime(seconds, duration()));
         return std::min(static_cast<std::size_t>(found - ends.begin()), ends.size() - 1);
     }
 private:

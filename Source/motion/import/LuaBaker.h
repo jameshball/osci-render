@@ -63,9 +63,7 @@ public:
                 auto& point = samples[index];
                 point = {result.values[0], result.values[1], result.count >= 3 ? result.values[2] : 0,
                     result.count == 6 ? result.values[3] : -1, result.count == 6 ? result.values[4] : -1, result.count == 6 ? result.values[5] : -1};
-                const auto validColour = [](float value) { return std::isfinite(value) && value >= 0 && value <= 1; };
-                const bool inheritedColour = point.r == -1 && point.g == -1 && point.b == -1;
-                if (!point.hasFinitePosition() || (result.count == 6 && !inheritedColour && !(validColour(point.r) && validColour(point.g) && validColour(point.b)))) {
+                if (!point.hasFinitePosition() || !PreparedPointFrames::validColour(point)) {
                     return {nullptr, "Lua returned invalid coordinates or RGB outside [0,1] (or all -1 for inherited color) at sample " + std::to_string(index + 1) + "."};
                 }
             }

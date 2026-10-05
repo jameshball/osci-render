@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FrameTiming.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -98,9 +99,7 @@ public:
     // Negative local times wrap into the final source frame, matching PreparedSource.
     std::size_t frameIndex(double seconds) const {
         if (frames == 1 || !std::isfinite(seconds)) { return 0; }
-        auto wrapped = std::fmod(seconds, duration());
-        if (wrapped < 0) { wrapped += duration(); }
-        const auto index = std::floor(wrapped * rate);
+        const auto index = std::floor(wrapTime(seconds, duration()) * rate);
         return index >= static_cast<double>(frames) ? frames - 1 : static_cast<std::size_t>(index);
     }
 
@@ -139,13 +138,14 @@ public:
         return result;
     }
 
-private:
-    PreparedPointFrames(double rate, std::size_t frames, std::size_t stride, bool explicitColour) : rate(rate), frames(frames), stride(stride), explicitColour(explicitColour) {}
+    // RGB in [0,1], or all -1 to inherit the line colour.
     static bool validColour(const PointSample& point) {
         if (point.r == -1 && point.g == -1 && point.b == -1) { return true; }
         const auto valid = [](float value) { return std::isfinite(value) && value >= 0 && value <= 1; };
         return valid(point.r) && valid(point.g) && valid(point.b);
     }
+private:
+    PreparedPointFrames(double rate, std::size_t frames, std::size_t stride, bool explicitColour) : rate(rate), frames(frames), stride(stride), explicitColour(explicitColour) {}
     static bool dark(const PointSample& point) { return point.r == 0 && point.g == 0 && point.b == 0; }
     bool hasDarkInSpan(std::size_t frame, double position, double phaseSpan) const {
         if (darkPrefix.empty()) { return false; }

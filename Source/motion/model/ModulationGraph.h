@@ -85,7 +85,7 @@ bool linkCreatesCycle(const CompositionType& composition, Id target, const std::
 // the project is checked by the loader's identity set.
 template <typename CompositionType>
 std::string validateModulation(const CompositionType& composition) {
-    std::set<ModulatorId> modulators;
+    std::set<Id> modulators;
     for (const auto& modulator : composition.modulators) {
         if (!modulator.valid() || !modulators.insert(modulator.id).second) { return "Invalid or duplicate modulator settings."; }
         if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) {
@@ -142,7 +142,7 @@ void cloneDrivers(CompositionType& composition, const std::map<Id, Id>& owners, 
 // unloadable.
 template <typename CompositionType>
 void pruneReferences(CompositionType& composition) {
-    std::set<ModulatorId> modulators;
+    std::set<Id> modulators;
     for (auto& modulator : composition.modulators) {
         modulators.insert(modulator.id);
         if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) { modulator.source = 0; }

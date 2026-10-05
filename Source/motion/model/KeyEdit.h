@@ -22,18 +22,6 @@ struct KeyEditResult {
 
 namespace keyedit {
 
-// Matches Curve's own tolerance, so a moved key never silently merges with another.
-inline bool sameTime(double a, double b) {
-    return std::abs(a - b) <= 32 * std::numeric_limits<double>::epsilon() * std::max({ 1.0, std::abs(a), std::abs(b) });
-}
-
-inline const Keyframe* findKey(const Curve& curve, double time) {
-    const auto& keys = curve.keyframes();
-    const auto found = std::find_if(keys.begin(), keys.end(), [time](const Keyframe& key) { return sameTime(key.time, time); });
-    return found != keys.end() ? &*found : nullptr;
-}
-inline bool hasKey(const Curve& curve, double time) { return findKey(curve, time) != nullptr; }
-
 // A typed or dragged value: keyed at `time` on an animated curve, otherwise
 // the curve's constant value.
 inline void setValue(Curve& curve, double time, double value) {
@@ -50,7 +38,7 @@ inline void setValue(Curve& curve, double time, double value) {
 inline bool setKeyed(Curve& curve, double time, bool keyed) {
     const auto value = curve.evaluateBase(time);
     if (keyed) {
-        if (hasKey(curve, time)) { return false; }
+        if (curve.hasKeyAt(time)) { return false; }
         curve.setKeyValue(time, value);
         return true;
     }
@@ -76,7 +64,7 @@ inline double segmentSlope(const Curve& curve, std::size_t from, std::size_t at)
 // such key or it already has it. Switching to Bezier keeps the segment's
 // shape (see segmentSlope).
 inline bool setInterpolation(Curve& curve, double time, Interpolation next) {
-    const auto* found = findKey(curve, time);
+    const auto* found = curve.findKey(time);
     if (found == nullptr || found->interpolation == next) { return false; }
     auto updated = *found;
     const auto& keys = curve.keyframes();
@@ -105,7 +93,7 @@ inline std::optional<KeyEditResult> transformKeys(const PropertyMap& curves, con
     std::vector<std::pair<std::string, Keyframe>> moved;
     for (const auto& ref : selection) {
         const auto found = curves.find(ref.property);
-        const auto* original = found != curves.end() ? findKey(found->second, ref.time) : nullptr;
+        const auto* original = found != curves.end() ? found->second.findKey(ref.time) : nullptr;
         if (original == nullptr) {
             return std::nullopt;
         }
@@ -124,7 +112,7 @@ inline std::optional<KeyEditResult> transformKeys(const PropertyMap& curves, con
     }
     for (const auto& [property, key] : moved) {
         auto& curve = result.curves[property];
-        if (findKey(curve, key.time) != nullptr) {
+        if (curve.findKey(key.time) != nullptr) {
             return std::nullopt;
         }
         curve.setKey(key);

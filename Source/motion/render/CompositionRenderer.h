@@ -428,8 +428,7 @@ struct PreparedComposition {
             }
         }
         std::sort(cameraCuts.begin(), cameraCuts.end(), [](const auto& left, const auto& right) { return left.start < right.start; });
-        std::map<Id, const Composition*> definitions;
-        for (const auto& definition : project.definitions) { definitions.emplace(definition->id, definition.get()); }
+        const auto definitions = definitionsById(project);
         const auto prepareStage = [&](const CompositionStage& stage, bool root, const Composition& scope) {
             const auto& clip = *stage.clip;
             const auto& timing = stage.clipClock;

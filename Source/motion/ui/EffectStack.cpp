@@ -429,7 +429,7 @@ void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {
     const auto* curve = target.has_value() ? target->curve(property) : nullptr;
     if (curve == nullptr) { return; }
     const auto local = target->localTime(frameTime());
-    const bool keyed = motion::keyedit::hasKey(*curve, local);
+    const bool keyed = curve->hasKeyAt(local);
     processor.document.edit(keyed ? "Remove keyframe" : "Key effect parameter", [id, property, local, keyed](motion::Project& project) {
         auto* changed = motion::findPropertyCurve(project, id, property);
         if (changed != nullptr) { motion::keyedit::setKeyed(*changed, local, !keyed); }

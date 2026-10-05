@@ -29,11 +29,8 @@ public:
             || bytes != static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4) {
             return {{}, "Raster must be tightly packed RGBA8, with dimensions between 1 and 512."};
         }
-        if (!std::isfinite(settings.threshold) || settings.threshold < 0 || settings.threshold > 1
-            || settings.pointsPerFrame < 16 || settings.pointsPerFrame > 16384
-            || (settings.mode != RasterSettings::Mode::contours && settings.mode != RasterSettings::Mode::scanlines)) {
-            return {{}, "Invalid raster trace settings or point budget (16-16384)."};
-        }
+        const auto invalid = settings.validate();
+        if (!invalid.empty()) { return {{}, invalid}; }
         if (cancelled(cancel)) { return {{}, "Raster preparation cancelled."}; }
         try {
             const auto colour = [&](int x, int y) {

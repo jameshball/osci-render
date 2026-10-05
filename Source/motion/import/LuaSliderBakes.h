@@ -13,7 +13,7 @@
 namespace motion {
 // Message-thread owner of background slider bakes. A Lua clip with slider
 // properties gets its own frames: the script runs off the audio thread with
-// the clip's slider curves (keys and their own oscillators) sampled per frame,
+// the clip's slider curves (keys, routes and links) sampled per frame,
 // over the clip's content. Results install as a cache (no undo step); stale
 // results are discarded. Playback and export only ever read baked frames.
 class LuaSliderBakes : private juce::Timer {
@@ -43,23 +43,15 @@ public:
     // Starts bakes for clips whose frames are missing or stale, and clears
     // bakes from clips that no longer have sliders.
     void update() {
-        const auto& project = document.mainProject();
         std::map<Id, Plan> wanted;
         std::vector<Id> clear;
-        const auto scan = [&](const Composition& composition) {
-            for (const auto& track : composition.tracks) {
-                for (const auto& clip : track.clips) {
-                    const auto asset = findAsset(project.assets, clip.asset);
-                    auto plan = asset == nullptr || clip.composition != 0 ? std::nullopt : planFor(*asset, clip, composition);
-                    if (!plan.has_value()) {
-                        if (clip.luaBake != nullptr) { clear.push_back(clip.id); }
-                        continue;
-                    }
-                    if (clip.luaBake == nullptr || clip.luaBake->key != plan->key) { wanted.emplace(clip.id, std::move(*plan)); }
-                }
+        forEachPlan([&](const Clip& clip, std::optional<Plan> plan) {
+            if (!plan.has_value()) {
+                if (clip.luaBake != nullptr) { clear.push_back(clip.id); }
+            } else if (clip.luaBake == nullptr || clip.luaBake->key != plan->key) {
+                wanted.emplace(clip.id, std::move(*plan));
             }
-        };
-        forEachComposition(project, scan);
+        });
         for (const auto id : clear) { document.setLuaBake(id, nullptr); }
         // Jobs whose clip no longer wants them (deleted, sliders removed)
         // stop, so they do not hold up the single worker.
@@ -90,8 +82,7 @@ private:
         const auto id = job->plan.clip;
         jobs[id] = job;
         if (onStatus) { onStatus("Baking Lua sliders for " + job->plan.name + " (" + juce::String(static_cast<int>(job->plan.settings.frameCount())) + " frames)...", false); }
-        auto alive = aliveToken;
-        worker.addJob([this, job, alive] {
+        worker.addJob([this, job, alive = std::weak_ptr<int>(alive)] {
             auto frames = LuaBaker::bake(job->plan.name, job->plan.script, job->plan.settings, &job->cancelled, nullptr, [&job](double seconds, double* values) {
                 for (const auto& spec : luaSliderSpecs) {
                     const auto found = job->plan.sliders.find(std::string(spec.id));
@@ -133,20 +124,25 @@ private:
             });
         });
     }
-    bool stillWanted(const Job& job) const {
+    // Calls visit(clip, plan) for every clip; the plan is empty for a clip
+    // without Lua sliders.
+    template <typename Visit>
+    void forEachPlan(Visit&& visit) const {
         const auto& project = document.mainProject();
-        bool wanted = false;
-        const auto scan = [&](const Composition& composition) {
+        forEachComposition(project, [&](const Composition& composition) {
             for (const auto& track : composition.tracks) {
                 for (const auto& clip : track.clips) {
-                    if (clip.id != job.plan.clip || clip.composition != 0) { continue; }
-                    const auto asset = findAsset(project.assets, clip.asset);
-                    const auto plan = asset == nullptr ? std::nullopt : planFor(*asset, clip, composition);
-                    wanted = plan.has_value() && plan->key == job.plan.key;
+                    const auto asset = clip.composition == 0 ? findAsset(project.assets, clip.asset) : nullptr;
+                    visit(clip, asset != nullptr ? planFor(*asset, clip, composition) : std::nullopt);
                 }
             }
-        };
-        forEachComposition(project, scan);
+        });
+    }
+    bool stillWanted(const Job& job) const {
+        bool wanted = false;
+        forEachPlan([&](const Clip& clip, const std::optional<Plan>& plan) {
+            if (clip.id == job.plan.clip) { wanted = plan.has_value() && plan->key == job.plan.key; }
+        });
         return wanted;
     }
 
@@ -160,6 +156,5 @@ private:
     juce::ThreadPool worker {1};
     std::map<Id, std::shared_ptr<Job>> jobs;
     std::shared_ptr<int> alive = std::make_shared<int>(0);
-    std::weak_ptr<int> aliveToken = alive;
 };
 }

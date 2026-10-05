@@ -35,6 +35,18 @@ inline double segmentProgress(Interpolation interpolation, double t) {
     return t;
 }
 
+// The key segment holding `time`, strictly between the first and last key
+// times, and the progress through it.
+struct KeySegment {
+    std::size_t index;
+    double progress;
+};
+inline KeySegment keySegmentAt(const std::vector<double>& times, const std::vector<Interpolation>& interpolation, double time) {
+    const auto right = std::upper_bound(times.begin(), times.end(), time);
+    const auto index = static_cast<std::size_t>(right - times.begin()) - 1;
+    return {index, segmentProgress(interpolation[index], (time - times[index]) / (times[index + 1] - times[index]))};
+}
+
 // Position keys as one curve through space: a Catmull-Rom spline through the
 // keyed points, reparameterised by arc length so each segment's progress
 // maps to distance travelled rather than to separate per-axis timing.
@@ -78,11 +90,8 @@ public:
     Vec3 at(double time) const {
         if (!std::isfinite(time) || time <= times.front()) { return segments.front().control[0]; }
         if (time >= times.back()) { return segments.back().control[3]; }
-        const auto right = std::upper_bound(times.begin(), times.end(), time);
-        const auto index = static_cast<std::size_t>(right - times.begin()) - 1;
-        const auto t = (time - times[index]) / (times[index + 1] - times[index]);
-        const auto& segment = segments[index];
-        return segment.at(segment.parameterAt(segmentProgress(interpolation[index], t)));
+        const auto [index, progress] = keySegmentAt(times, interpolation, time);
+        return segments[index].at(segments[index].parameterAt(progress));
     }
 
 private:
@@ -170,10 +179,8 @@ public:
     Quaternion at(double time) const {
         if (!std::isfinite(time) || time <= times.front()) { return keys.front(); }
         if (time >= times.back()) { return keys.back(); }
-        const auto right = std::upper_bound(times.begin(), times.end(), time);
-        const auto index = static_cast<std::size_t>(right - times.begin()) - 1;
-        const auto t = (time - times[index]) / (times[index + 1] - times[index]);
-        return Quaternion::slerp(keys[index], keys[index + 1], segmentProgress(interpolation[index], t));
+        const auto [index, progress] = keySegmentAt(times, interpolation, time);
+        return Quaternion::slerp(keys[index], keys[index + 1], progress);
     }
 
 private:

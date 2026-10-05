@@ -53,11 +53,7 @@ public:
         if (seconds <= 0.0) {
             return 0;
         }
-        auto wrapped = std::fmod(localSeconds, seconds);
-        if (wrapped < 0.0) {
-            wrapped += seconds;
-        }
-        const auto index = std::floor(wrapped * framesPerSecond);
+        const auto index = std::floor(wrapTime(localSeconds, seconds) * framesPerSecond);
         if (!std::isfinite(index) || index < 0.0) {
             return 0;
         }
@@ -101,8 +97,7 @@ private:
         if (span == 0 || frameCount() <= 1) { return false; }
         const auto length = duration();
         if (!(length > 0) || span >= length) { return true; }
-        auto wrapped = std::fmod(seconds, length);
-        if (wrapped < 0) { wrapped += length; }
+        const auto wrapped = wrapTime(seconds, length);
         const auto index = frameIndex(seconds);
         const auto start = timing != nullptr ? timing->frameStart(index) : static_cast<double>(index) / framesPerSecond;
         const auto end = timing != nullptr ? timing->frameEnd(index) : static_cast<double>(index + 1) / framesPerSecond;

@@ -28,8 +28,8 @@ struct TimeGrid {
         const auto subdivision = std::isfinite(snapBeats) && snapBeats > 0 ? snapBeats : 0.25;
         if (display == TimeDisplay::beats && tempoChanges != nullptr && validTempo()) {
             // Snap in beats so the grid follows every tempo change.
-            const auto clock = Tempo(bpm, tempoChanges);
-            const auto result = clock.seconds(std::round(clock.beats(seconds) / subdivision) * subdivision);
+            const auto tempo = clock();
+            const auto result = tempo.seconds(std::round(tempo.beats(seconds) / subdivision) * subdivision);
             return std::isfinite(result) ? (result == 0 ? 0.0 : result) : seconds;
         }
         const auto step = display == TimeDisplay::beats ? positiveProduct(beatSeconds(), subdivision) : frameSeconds();
@@ -68,14 +68,14 @@ struct TimeGrid {
     template <typename Visit>
     void forEachTick(double from, double to, double stride, Visit&& visit) const {
         const auto musical = display == TimeDisplay::beats && tempoChanges != nullptr && validTempo();
-        const Tempo clock(bpm, musical ? tempoChanges : nullptr);
+        const auto tempo = clock();
         const auto unit = musical ? stride / beatSeconds() : stride;
-        const auto start = musical ? clock.beats(from) : from;
+        const auto start = musical ? tempo.beats(from) : from;
         if (!std::isfinite(unit) || unit <= 0 || !std::isfinite(start)) { return; }
         const auto first = std::ceil(start / unit);
         for (int index = 0; index < maximumTicks; ++index) {
             const auto position = (first + index) * unit;
-            const auto time = musical ? clock.seconds(position) : position;
+            const auto time = musical ? tempo.seconds(position) : position;
             if (!std::isfinite(time) || time > to) { return; }
             visit(time);
         }
@@ -106,14 +106,11 @@ struct TimeGrid {
         if (!std::isfinite(start) || !std::isfinite(end)) { return "\xE2\x80\x94"; }
         if (display == TimeDisplay::frames) { return number(std::round((end - start) / frameSeconds()), 0) + "f"; }
         if (display != TimeDisplay::beats) { return number(end - start, 3, std::abs(end - start) >= 1.0e12) + "s"; }
-        const auto tempo = validTempo() ? Tempo(bpm, tempoChanges) : Tempo(120);
+        const auto tempo = clock();
         const auto beats = tempo.beats(end) - tempo.beats(start);
         if (!std::isfinite(beats)) { return "\xE2\x80\x94"; }
-        auto whole = std::floor(beats);
-        auto ticks = std::round((beats - whole) * 960.0);
-        if (ticks >= 960) { whole += 1; ticks = 0; }
-        const auto fraction = number(ticks, 0);
-        return number(std::floor(whole / meter()), 0) + "." + number(std::fmod(whole, static_cast<double>(meter())), 0) + "." + std::string(3 - fraction.size(), '0') + fraction;
+        const auto parts = beatParts(beats);
+        return number(parts.bars, 0) + "." + number(parts.beats, 0) + "." + tickText(parts.ticks);
     }
 
     // Parsing is an authoring operation. Invalid clock settings reject input;
@@ -232,7 +229,7 @@ struct TimeGrid {
         if (parts.size() > 3 || (parts.size() == 3 && parts[2] > 959)) { return std::nullopt; }
         const auto beats = parts[0] * meter() + (parts.size() > 1 ? parts[1] : 0) + (parts.size() > 2 ? parts[2] / 960 : 0);
         if (!(beats > 0)) { return std::nullopt; }
-        const Tempo tempo(bpm, tempoChanges);
+        const auto tempo = clock();
         const auto length = tempo.seconds(tempo.beats(start) + beats) - start;
         return std::isfinite(length) && length > 0 ? std::optional<double>(length) : std::nullopt;
     }
@@ -280,22 +277,32 @@ private:
         return std::isfinite(frames) ? number(std::round(frames), 0) + "f" : "\xE2\x80\x94";
     }
     bool validTempo() const { return std::isfinite(bpm) && bpm > 0; }
-    std::string beatLabel(double seconds, bool showTicks) const {
-        const auto beats = tempoChanges != nullptr && validTempo() ? Tempo(bpm, tempoChanges).beats(seconds) : seconds / beatSeconds();
-        if (!std::isfinite(beats)) { return "\xE2\x80\x94"; }
-        // Round the fractional beat before decomposition, allowing a carry at
-        // the next beat/bar without converting unbounded time to an integer.
+    // The tempo map, or 120 BPM while the tempo is invalid.
+    Tempo clock() const { return validTempo() ? Tempo(bpm, tempoChanges) : Tempo(120); }
+    // Whole bars, beats and 960ths of a beat. The fraction rounds before the
+    // breakdown, so a carry lands on the next beat or bar without converting
+    // unbounded time to an integer.
+    struct BeatParts {
+        double bars, beats, ticks;
+    };
+    BeatParts beatParts(double beats) const {
         auto whole = std::floor(beats);
         auto ticks = std::round((beats - whole) * 960.0);
         if (ticks >= 960) { whole += 1; ticks = 0; }
-        const auto bar = std::floor(whole / meter());
         auto beat = std::fmod(whole, static_cast<double>(meter()));
         if (beat < 0) { beat += meter(); }
-        auto text = number(bar + 1, 0) + "." + number(beat + 1, 0);
-        if (showTicks || ticks != 0) {
-            auto fraction = number(ticks, 0);
-            text += "." + std::string(3 - fraction.size(), '0') + fraction;
-        }
+        return {std::floor(whole / meter()), beat, ticks};
+    }
+    static std::string tickText(double ticks) {
+        const auto digits = number(ticks, 0);
+        return std::string(3 - digits.size(), '0') + digits;
+    }
+    std::string beatLabel(double seconds, bool showTicks) const {
+        const auto beats = clock().beats(seconds);
+        if (!std::isfinite(beats)) { return "\xE2\x80\x94"; }
+        const auto parts = beatParts(beats);
+        auto text = number(parts.bars + 1, 0) + "." + number(parts.beats + 1, 0);
+        if (showTicks || parts.ticks != 0) { text += "." + tickText(parts.ticks); }
         return text;
     }
 };

@@ -141,7 +141,7 @@ void MotionPropertyInspector::refreshValues() {
             if (curve == nullptr) { continue; }
             field->editor.setValue(curve->evaluateBase(time));
             anyAnimated = anyAnimated || curve->animated();
-            allKeyed = allKeyed && motion::keyedit::hasKey(*curve, time);
+            allKeyed = allKeyed && curve->hasKeyAt(time);
         }
         // A locked track's values show but do not edit.
         for (auto& field : row->fields) { field->editor.setEnabled(!found->locked); }
@@ -512,7 +512,7 @@ void MotionPropertyInspector::toggleKeys(Row& row) {
     bool allKeyed = true;
     for (auto& field : row.fields) {
         const auto* curve = found->curve(std::string(field->spec.id));
-        allKeyed = allKeyed && curve != nullptr && motion::keyedit::hasKey(*curve, time);
+        allKeyed = allKeyed && curve != nullptr && curve->hasKeyAt(time);
     }
     processor.document.edit(allKeyed ? "Remove keyframe" : "Set keyframe", [&](motion::Project& project) {
         for (auto& field : row.fields) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Id.h"
 #include "Modulation.h"
 #include "Tempo.h"
 #include "../../audio/modulation/DahdsrSegments.h"
@@ -9,8 +10,6 @@
 #include <string>
 
 namespace motion {
-using ModulatorId = std::uint64_t;
-
 // Reusable modulation sources owned by a composition. One modulator can drive
 // any number of properties through routes, so several objects share a single
 // clock (an LFO, a random walk, the soundtrack, or an envelope that follows
@@ -18,7 +17,7 @@ using ModulatorId = std::uint64_t;
 enum class ModulatorKind { oscillator, envelope, controller };
 
 struct Modulator {
-    ModulatorId id = 0;
+    Id id = 0;
     std::string name = "Modulator";
     ModulatorKind kind = ModulatorKind::oscillator;
     // Oscillator: the waveform, clock and seed of `shape`; its amount, mode
@@ -26,7 +25,7 @@ struct Modulator {
     Modulation shape;
     // Envelope: ADSR in seconds, triggered by the notes of `source` (a clip
     // with a MIDI pattern in the same composition) within a pitch range.
-    std::uint64_t source = 0;
+    Id source = 0;
     double attack = 0.005, decay = 0.25, sustain = 0.0, release = 0.2;
     // 0 ignores velocity; 1 scales each note's envelope by velocity / 127.
     double velocity = 1.0;
@@ -53,12 +52,11 @@ struct Modulator {
 };
 
 // A modulator driving one property: value += amount * m (add) or
-// value *= 1 + amount * m (multiply), after keys and the property's own
-// oscillator.
+// value *= 1 + amount * m (multiply), after keys and any link.
 struct ModulationRoute {
-    std::uint64_t id = 0;
-    ModulatorId modulator = 0;
-    std::uint64_t target = 0;
+    Id id = 0;
+    Id modulator = 0;
+    Id target = 0;
     std::string property;
     double amount = 1;
     ModulationMode mode = ModulationMode::add;

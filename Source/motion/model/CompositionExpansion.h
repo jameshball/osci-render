@@ -33,9 +33,7 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
     const auto graph = validateCompositionGraph(project);
     if (!graph) { return {graph.error}; }
     CompositionExpansionResult result;
-    using Definition = typename decltype(project.definitions)::value_type::element_type;
-    std::map<Id, const Definition*> definitions;
-    for (const auto& definition : project.definitions) { definitions.emplace(definition->id, definition.get()); }
+    const auto definitions = definitionsById(project);
     std::vector<CompositionStage> stages;
     stages.reserve(maximumCompositionDepth + 1);
     const auto visit = [&](auto&& self, const auto& scope, const ClipTiming& clock) -> bool {

@@ -139,7 +139,6 @@ private:
         return motion::findPropertyCurve(project, id, property);
     }
 
-    static const motion::Keyframe* findKey(const motion::Curve& curve, double time);
 
     static bool sameCurve(const motion::Curve& a, const motion::Curve& b) { return a.sameAuthoring(b); }
 

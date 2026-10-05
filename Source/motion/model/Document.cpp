@@ -197,11 +197,17 @@ static void carryLuaBakes(Project& next, const Project& current) {
     changeEachComposition(next, needsCarry, carry);
 }
 
-// A loop never reaches past the composition; one that no longer fits is dropped.
-static void clampLoop(Project& project) {
-    if (!project.hasLoop()) { return; }
-    project.loopEnd = std::min(project.loopEnd, project.duration);
-    if (!project.hasLoop()) { project.loopStart = project.loopEnd = 0; project.looping = false; }
+// Gives each item the next identity and records old -> new, so the routes and
+// links of a copy can follow it.
+template <typename Item>
+static void renumber(Item& item, Id& highest, std::map<Id, Id>& owners) {
+    const auto old = item.id;
+    item.id = ++highest;
+    owners.emplace(old, item.id);
+}
+template <typename Item>
+static void renumber(std::vector<Item>& items, Id& highest, std::map<Id, Id>& owners) {
+    for (auto& item : items) { renumber(item, highest, owners); }
 }
 
 // Time display, snapping and the loop switch are view options: undo and redo
@@ -281,7 +287,7 @@ void Document::apply(Project value) {
 
 Project Document::finished(Project view) const {
     pruneReferences(view);
-    clampLoop(view);
+    view.clampLoop();
     return mergeScope(std::move(view));
 }
 
@@ -321,7 +327,7 @@ bool Document::tryEdit(juce::String label, std::function<bool(Project&)> operati
 void Document::changeView(std::function<void(Composition&)> change) {
     auto next = project();
     change(next);
-    clampLoop(next);
+    next.clampLoop();
     const ViewChange view(*this);
     apply(mergeScope(std::move(next)));
 }
@@ -533,15 +539,9 @@ juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
 }
 
 std::size_t Document::assetUses(Id assetId) const {
-    const auto& whole = mainProject();
-    auto count = sourceReferenceCount(whole, assetId);
-    const auto midi = [&](const auto& composition) {
-        for (const auto& track : composition.tracks) {
-            for (const auto& clip : track.clips) { if (clip.midiAsset == assetId && assetId != 0) { ++count; } }
-        }
-    };
-    forEachComposition(whole, midi);
-    return count;
+    if (assetId == 0) { return 0; }
+    return countClips(mainProject(), [assetId](const auto& clip) { return clip.asset == assetId; })
+        + countClips(mainProject(), [assetId](const auto& clip) { return clip.midiAsset == assetId; });
 }
 
 bool Document::setTrackHeight(Id trackId, int height) {
@@ -584,22 +584,11 @@ bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
     // A cache, not an edit: no undo step and no revision-guarded gesture is
     // disturbed beyond a normal state refresh.
     bool found = false;
-    const auto update = [&](auto& composition) {
-        for (auto& track : composition.tracks) {
-            for (auto& clip : track.clips) {
-                if (clip.id == clipId) { clip.luaBake = bake; found = true; }
-            }
-        }
-    };
     auto next = state;
-    update(next);
-    for (auto& definition : next.definitions) {
-        if (definition == nullptr) { continue; }
-        auto copy = std::make_shared<CompositionDefinition>(*definition);
-        const auto before = found;
-        update(*copy);
-        if (found != before) { definition = std::move(copy); }
-    }
+    changeEachComposition(next, [clipId](const Composition& composition) { return findClip(composition, clipId) != nullptr; }, [&](Composition& composition) {
+        findClip(composition, clipId)->luaBake = bake;
+        found = true;
+    });
     if (!found) { return false; }
     // A cache: publish the new frames without an edit's revision, so open
     // gestures, coalescing and change guards are undisturbed.
@@ -672,8 +661,7 @@ juce::Result Document::removeUnusedAssets(std::vector<Id> assetIds, int& removed
     }
     std::set<Id> unused;
     for (const auto id : assetIds) {
-        if (std::none_of(assets.begin(), assets.end(), [id](const auto& asset) { return asset != nullptr && asset->id == id; })) { continue; }
-        if (assetUses(id) == 0) { unused.insert(id); }
+        if (findAsset(assets, id) != nullptr && assetUses(id) == 0) { unused.insert(id); }
     }
     if (unused.empty()) { return juce::Result::fail("Only sources that no clip uses can be removed."); }
     removed = static_cast<int>(unused.size());
@@ -691,7 +679,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
     double first = std::numeric_limits<double>::infinity();
     for (const auto& copied : clips) {
         if (!copied.clip.valid()) { return juce::Result::fail("A copied clip is no longer valid."); }
-        if (copied.clip.asset != 0 && std::none_of(state.assets.begin(), state.assets.end(), [&](const auto& asset) { return asset != nullptr && asset->id == copied.clip.asset; })) {
+        if (copied.clip.asset != 0 && findAsset(state.assets, copied.clip.asset) == nullptr) {
             return juce::Result::fail("A copied clip's source is not in this composition.");
         }
         if (copied.clip.composition != 0 && !canReferenceComposition(copied.clip.composition)) {
@@ -708,12 +696,8 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
         auto timing = clip.timing(state.tempo());
         timing.moveTo(timing.start - first + time);
         if (!clip.setTiming(timing, state.tempo())) { return juce::Result::fail("The pasted selection has invalid timing."); }
-        owners.emplace(clip.id, highest + 1);
-        clip.id = ++highest;
-        for (auto& effect : clip.effects) {
-            owners.emplace(effect.id, highest + 1);
-            effect.id = ++highest;
-        }
+        renumber(clip, highest, owners);
+        renumber(clip.effects, highest, owners);
         const auto original = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [&](const auto& track) { return track.id == copied.track; });
         const bool fits = original != candidate.tracks.end() && !original->locked && original->kind == copied.kind && original->canPlace(clip, 0, state.tempo());
         if (fits) {
@@ -797,7 +781,6 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
     for (auto& [index, copy] : copies) {
         const auto required = static_cast<Id>(copy.effects.size() + state.routes.size()) + 1;
         if (required > maximumId - highest) { return juce::Result::fail("There are no remaining identities for duplicated clips."); }
-        const auto original = copy.id;
         auto timing = copy.timing(state.tempo());
         timing.moveTo(timing.start + (last - first));
         if (copies.size() == 1) {
@@ -805,13 +788,8 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
         } else if (!copy.setTiming(timing, state.tempo())) {
             return juce::Result::fail("The duplicated selection has invalid timing.");
         }
-        copy.id = ++highest;
-        owners.emplace(original, copy.id);
-        for (auto& effect : copy.effects) {
-            const auto old = effect.id;
-            effect.id = ++highest;
-            owners.emplace(old, effect.id);
-        }
+        renumber(copy, highest, owners);
+        renumber(copy.effects, highest, owners);
         if (!candidate.tracks[index].insert(copy, state.tempo())) {
             return juce::Result::fail("There is not enough free space after the selection. Move the following clips first.");
         }
@@ -873,13 +851,10 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
                 if (!track.clips.empty()) {
                     const auto previousEnd = track.clips.back().timing(candidate.tempo()).end();
                     const auto first = clip.timing(candidate.tempo()).start;
-                    const auto tolerance = 32 * std::numeric_limits<double>::epsilon() * std::max({1.0, std::abs(first), std::abs(previousEnd), displacement});
-                    if (first < previousEnd && previousEnd - first <= tolerance) {
+                    if (first < previousEnd && previousEnd - first <= timeTolerance(first, previousEnd, displacement)) {
                         auto aligned = clip.timing(candidate.tempo()); aligned.moveTo(previousEnd);
                         if (!clip.setTiming(aligned, candidate.tempo())) { return juce::Result::fail("Ripple delete produced invalid clip timing."); }
-                        for (int step = 0; step < 4 && clip.timing(candidate.tempo()).start < previousEnd; ++step) {
-                            clip.start = std::nextafter(clip.start, std::numeric_limits<double>::infinity());
-                        }
+                        clip.nudgeStartPast(previousEnd, candidate.tempo());
                     }
                 }
             }
@@ -893,16 +868,7 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
 }
 
 std::size_t Document::compositionReferenceCount(Id definition) const {
-    if (definition == 0) { return 0; }
-    std::size_t count = 0;
-    const auto scope = [&](const auto& value) {
-        for (const auto& track : value.tracks) {
-            for (const auto& clip : track.clips) { if (clip.composition == definition) { ++count; } }
-        }
-    };
-    scope(state);
-    for (const auto& value : state.definitions) { scope(*value); }
-    return count;
+    return definition == 0 ? 0 : countClips(state, [definition](const auto& clip) { return clip.composition == definition; });
 }
 
 juce::Result Document::removeComposition(Id definition) {
@@ -1003,18 +969,14 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     if (required > maximumId - highest) { return juce::Result::fail("There are no remaining composition identities."); }
     // Every renumbered property owner, so routes and links can follow.
     std::map<Id, Id> owners;
-    const auto effects = [&](auto& values) {
-        for (auto& value : values) {
-            const auto old = value.id;
-            value.id = ++highest;
-            owners.emplace(old, value.id);
-        }
-    };
     copy->id = ++highest;
     copy->name += " copy";
     std::map<Id, Id> groups, cameras;
     for (auto& group : copy->groups) {
-        const auto old = group.id; group.id = ++highest; groups.emplace(old, group.id); owners.emplace(old, group.id); effects(group.effects);
+        const auto old = group.id;
+        renumber(group, highest, owners);
+        groups.emplace(old, group.id);
+        renumber(group.effects, highest, owners);
     }
     for (auto& group : copy->groups) {
         if (group.parent != 0) {
@@ -1023,25 +985,28 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
         }
     }
     for (auto& track : copy->tracks) {
-        track.id = ++highest; effects(track.effects);
+        track.id = ++highest;
+        renumber(track.effects, highest, owners);
         if (track.group != 0) {
             if (!groups.contains(track.group)) { return juce::Result::fail("Invalid composition group reference."); }
             track.group = groups.at(track.group);
         }
         for (auto& clip : track.clips) {
-            const auto old = clip.id;
-            clip.id = ++highest;
-            owners.emplace(old, clip.id);
-            effects(clip.effects);
+            renumber(clip, highest, owners);
+            renumber(clip.effects, highest, owners);
         }
     }
-    for (auto& camera : copy->cameras) { const auto old = camera.id; camera.id = ++highest; cameras.emplace(old, camera.id); owners.emplace(old, camera.id); }
+    for (auto& camera : copy->cameras) {
+        const auto old = camera.id;
+        renumber(camera, highest, owners);
+        cameras.emplace(old, camera.id);
+    }
     for (auto& cut : copy->cameraCuts) {
         if (!cameras.contains(cut.camera)) { return juce::Result::fail("Invalid composition camera reference."); }
         cut.id = ++highest; cut.camera = cameras.at(cut.camera);
     }
     for (auto& marker : copy->markers) { marker.id = ++highest; }
-    effects(copy->effects);
+    renumber(copy->effects, highest, owners);
     const auto remap = [&](Id id) { const auto found = owners.find(id); return found != owners.end() ? found->second : Id(0); };
     std::map<Id, Id> modulators;
     for (auto& modulator : copy->modulators) {
@@ -1135,26 +1100,20 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     definition->id = ++highest;
     // copies: every root owner copied (not moved) into the definition.
     std::map<Id, Id> groupIds, copies;
-    const auto renumber = [&](std::vector<EffectInstance>& effects) {
-        for (auto& effect : effects) {
-            const auto old = effect.id;
-            effect.id = ++highest;
-            copies.emplace(old, effect.id);
-        }
-    };
     for (const auto& group : state.groups) {
         if (!requiredGroups.contains(group.id)) { continue; }
-        auto copy = group; copy.id = ++highest; copy.solo = false;
+        auto copy = group;
+        copy.solo = false;
+        renumber(copy, highest, copies);
         groupIds.emplace(group.id, copy.id);
-        copies.emplace(group.id, copy.id);
-        renumber(copy.effects);
+        renumber(copy.effects, highest, copies);
         definition->groups.push_back(std::move(copy));
     }
     for (auto& group : definition->groups) { if (group.parent != 0) { group.parent = groupIds.at(group.parent); } }
     for (auto& track : definition->tracks) {
         track.id = ++highest;
         if (track.group != 0) { track.group = groupIds.at(track.group); }
-        renumber(track.effects);
+        renumber(track.effects, highest, copies);
     }
     // Routes follow their targets: clip (and clip effect) routes move into the
     // definition; routes on copied groups are copied. Each modulator they use
@@ -1250,7 +1209,7 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
                 if (track.locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
                 auto next = clip;
                 if (!next.setTiming(timing, tempo)) { return juce::Result::fail("The requested timing is invalid."); }
-                changed = changed || next.start != clip.start || next.duration != clip.duration || next.offset != clip.offset || next.rate != clip.rate;
+                changed = changed || !next.sameTiming(clip);
                 clip = std::move(next);
                 found = true;
             }
@@ -1287,8 +1246,7 @@ juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
             if (!changed.setTiming(resolvedSeconds, state.tempo()) || !track.canPlace(changed, clipId, state.tempo())) {
                 return juce::Result::fail("The requested timing is invalid or overlaps another clip on this track.");
             }
-            if (changed.start == original.start && changed.duration == original.duration
-                && changed.offset == original.offset && changed.rate == original.rate) {
+            if (changed.sameTiming(original)) {
                 return juce::Result::ok();
             }
             edit("Change clip timing", [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
@@ -1320,9 +1278,7 @@ juce::Result Document::editMidi(Id clipId, juce::String label, const std::functi
                 return juce::Result::fail("MIDI assignment would produce invalid or overlapping clip timing.");
             }
             if (changed.instrument == original.instrument && changed.midi == original.midi && changed.midiAsset == original.midiAsset
-                && changed.timeBase == original.timeBase && changed.contentBpm == original.contentBpm
-                && changed.start == original.start && changed.duration == original.duration
-                && changed.offset == original.offset && changed.rate == original.rate) {
+                && changed.timeBase == original.timeBase && changed.contentBpm == original.contentBpm && changed.sameTiming(original)) {
                 return juce::Result::ok();
             }
             edit(label, [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
@@ -1350,12 +1306,8 @@ juce::Result Document::assignMidi(Id clipId, Id assetId) {
         if (!empty) { return juce::Result::fail(empty.error); }
         notes = empty.source;
     } else {
-        for (const auto& asset : state.assets) {
-            if (asset != nullptr && asset->id == assetId && isMidiSource(asset->extension)) {
-                notes = asset->midi;
-                break;
-            }
-        }
+        const auto asset = findAsset(state.assets, assetId);
+        if (asset != nullptr && isMidiSource(asset->extension)) { notes = asset->midi; }
         if (notes == nullptr) { return juce::Result::fail("Choose an imported MIDI source that has been decoded successfully."); }
     }
     return editMidi(clipId, "Assign MIDI performance", [&](Clip& clip) {
@@ -1381,11 +1333,11 @@ juce::Result Document::recordMidiNotes(Id clipId, std::shared_ptr<const MidiNote
     if (generation() != expectedGeneration) {
         return juce::Result::fail("The recording target changed before the take was saved.");
     }
-    const auto bpm = project().tempo();
-    return editMidi(clipId, "Record MIDI notes", [expected = std::move(expected), merged = std::move(merged), bpm](Clip& clip) {
+    const auto tempo = project().tempo();
+    return editMidi(clipId, "Record MIDI notes", [expected = std::move(expected), merged = std::move(merged), tempo](Clip& clip) {
         if (clip.midi != expected) { return juce::Result::fail("The recording target changed before the take was saved."); }
         if (expected != nullptr && expected->sameContent(*merged)) { return juce::Result::ok(); }
-        if (clip.timeBase != ClipTimeBase::beats && !clip.anchorToBeats(bpm)) {
+        if (clip.timeBase != ClipTimeBase::beats && !clip.anchorToBeats(tempo)) {
             return juce::Result::fail("Cannot anchor this clip to the project tempo.");
         }
         clip.midi = merged;
@@ -1538,7 +1490,7 @@ juce::Result Document::setCameraRig(Id camera, Id target, Id parent) {
     const auto& current = project();
     if (!hasCamera(current, camera)) { return juce::Result::fail("The camera no longer exists."); }
     if (!isVisualClipOrGroup(current, target, false) || !isVisualClipOrGroup(current, parent, true)) { return juce::Result::fail("Aim at an object or group, and parent to a group."); }
-    const auto changed = tryEdit("Change camera rig", [camera, target, parent](Project& updated) {
+    tryEdit("Change camera rig", [camera, target, parent](Project& updated) {
         for (auto& item : updated.cameras) {
             if (item.id == camera && (item.target != target || item.parent != parent)) {
                 item.target = target;
@@ -1548,7 +1500,6 @@ juce::Result Document::setCameraRig(Id camera, Id target, Id parent) {
         }
         return false;
     });
-    juce::ignoreUnused(changed);
     return juce::Result::ok();
 }
 

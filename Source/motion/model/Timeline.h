@@ -25,8 +25,6 @@ inline double spanUntil(double start, double end) {
     return duration;
 }
 
-using Id = std::uint64_t;
-
 enum class ClipTimeBase { seconds, beats };
 
 struct LuaClipBake;
@@ -72,6 +70,13 @@ struct Clip {
         return resolved;
     }
     double curveBpm(const Tempo& tempo) const { return timeBase == ClipTimeBase::beats ? contentBpm : tempo.initialBpm(); }
+    // The same authored placement: start, duration, offset and rate.
+    bool sameTiming(const Clip& other) const { return start == other.start && duration == other.duration && offset == other.offset && rate == other.rate; }
+    // Arithmetic can leave a start a few ULPs before `boundary`; step it past
+    // without moving the content.
+    void nudgeStartPast(double boundary, const Tempo& tempo) {
+        for (int step = 0; step < 4 && timing(tempo).start < boundary; ++step) { start = std::nextafter(start, std::numeric_limits<double>::infinity()); }
+    }
     // A beat of the clip's MIDI in content seconds, and in project seconds on
     // its resolved timing.
     double contentSeconds(double beat, const Tempo& tempo) const { return beat * 60 / curveBpm(tempo); }
@@ -114,9 +119,7 @@ struct Clip {
         // Reciprocal conversion can expand a touching interval by one ULP.
         // Move only inward, and check the actual start + duration endpoint:
         // accepting an overlap tolerance would also permit real overlaps.
-        for (int step = 0; step < 4 && tempo.seconds(next.start) < before.start; ++step) {
-            next.start = std::nextafter(next.start, std::numeric_limits<double>::infinity());
-        }
+        next.nudgeStartPast(before.start, tempo);
         for (int step = 0; step < 4 && tempo.seconds(next.end()) > before.end(); ++step) {
             const auto inwardEnd = std::nextafter(next.end(), 0.0);
             next.duration = inwardEnd - next.start;
@@ -275,45 +278,24 @@ struct Track {
 // Editor-thread operation: trim one clip and ripple only clips after its
 // original end. All displacement is resolved project seconds, so musical and
 // time-anchored clips retain their own authoring domains and source clocks.
-inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSeconds, const Tempo& bpm) {
-    if (track.locked || clipId == 0 || !std::isfinite(deltaSeconds) || !bpm.valid()) {
+inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSeconds, const Tempo& tempo) {
+    if (track.locked || clipId == 0 || !std::isfinite(deltaSeconds) || !tempo.valid()) {
         return false;
     }
     auto candidate = track;
     std::vector<Id> identities;
     identities.reserve(candidate.clips.size());
-    for (const auto& clip : candidate.clips) {
-        if (!clip.valid() || !clip.timing(bpm).valid()) {
-            return false;
-        }
-        identities.push_back(clip.id);
-    }
+    for (const auto& clip : candidate.clips) { identities.push_back(clip.id); }
     std::sort(identities.begin(), identities.end());
-    if (std::adjacent_find(identities.begin(), identities.end()) != identities.end()) {
+    if (std::adjacent_find(identities.begin(), identities.end()) != identities.end() || !candidate.sortClips(tempo).has_value()) {
         return false;
     }
-    candidate.sortClips(bpm);
-    double previousEnd = 0;
-    ClipTiming original;
-    std::size_t selected = candidate.clips.size();
-    for (std::size_t index = 0; index < candidate.clips.size(); ++index) {
-        const auto& clip = candidate.clips[index];
-        const auto timing = clip.timing(bpm);
-        if (timing.start < previousEnd) {
-            return false;
-        }
-        if (clip.id == clipId) {
-            if (selected != candidate.clips.size()) {
-                return false;
-            }
-            selected = index;
-            original = timing;
-        }
-        previousEnd = timing.end();
-    }
-    if (selected == candidate.clips.size()) {
+    const auto found = std::find_if(candidate.clips.begin(), candidate.clips.end(), [clipId](const auto& clip) { return clip.id == clipId; });
+    if (found == candidate.clips.end()) {
         return false;
     }
+    const auto selected = static_cast<std::size_t>(found - candidate.clips.begin());
+    const auto original = found->timing(tempo);
     auto edited = original;
     if (leadingEdge) {
         edited.setDuration(original.duration() - deltaSeconds);
@@ -321,38 +303,33 @@ inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSe
     } else {
         edited.setDuration(original.duration() + deltaSeconds);
     }
-    if (!edited.valid() || !candidate.clips[selected].setTiming(edited, bpm)) {
+    if (!edited.valid() || !candidate.clips[selected].setTiming(edited, tempo)) {
         return false;
     }
     const auto displacement = leadingEdge ? -deltaSeconds : deltaSeconds;
     for (std::size_t index = selected + 1; index < candidate.clips.size(); ++index) {
-        auto timing = candidate.clips[index].timing(bpm);
+        auto timing = candidate.clips[index].timing(tempo);
         timing.moveTo(timing.start + displacement);
-        if (!timing.valid() || !candidate.clips[index].setTiming(timing, bpm)) {
+        if (!timing.valid() || !candidate.clips[index].setTiming(timing, tempo)) {
             return false;
         }
     }
     for (std::size_t index = 1; index < candidate.clips.size(); ++index) {
         auto& clip = candidate.clips[index];
-        const auto previous = candidate.clips[index - 1].timing(bpm);
-        auto timing = clip.timing(bpm);
+        const auto previous = candidate.clips[index - 1].timing(tempo);
+        auto timing = clip.timing(tempo);
         if (timing.start >= previous.end()) {
             continue;
         }
-        const auto overlap = previous.end() - timing.start;
-        const auto tolerance = 32 * std::numeric_limits<double>::epsilon()
-            * std::max({1.0, std::abs(timing.start), std::abs(previous.end()), std::abs(displacement)});
-        if (overlap > tolerance) {
+        if (previous.end() - timing.start > timeTolerance(timing.start, previous.end(), displacement)) {
             return false;
         }
         timing.moveTo(previous.end());
-        if (!clip.setTiming(timing, bpm)) {
+        if (!clip.setTiming(timing, tempo)) {
             return false;
         }
-        for (int step = 0; step < 4 && clip.timing(bpm).start < previous.end(); ++step) {
-            clip.start = std::nextafter(clip.start, std::numeric_limits<double>::infinity());
-        }
-        if (!clip.valid() || clip.timing(bpm).start < previous.end()) {
+        clip.nudgeStartPast(previous.end(), tempo);
+        if (!clip.valid() || clip.timing(tempo).start < previous.end()) {
             return false;
         }
     }
@@ -363,8 +340,8 @@ inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSe
 // Editor-thread operation: apply a shared project-time displacement atomically.
 // Track displacement is in model rows; callers with collapsed groups translate
 // their visible-row gesture before invoking this operation.
-inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, const Tempo& bpm) {
-    if (ids.empty() || !std::isfinite(seconds) || !bpm.valid()) { return false; }
+inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, const Tempo& tempo) {
+    if (ids.empty() || !std::isfinite(seconds) || !tempo.valid()) { return false; }
     auto unique = ids;
     std::sort(unique.begin(), unique.end());
     if (unique.front() == 0 || std::adjacent_find(unique.begin(), unique.end()) != unique.end()) { return false; }
@@ -379,9 +356,9 @@ inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, do
             const auto target = static_cast<std::size_t>(destination);
             if (tracks[target].locked || tracks[target].kind != tracks[row].kind) { return false; }
             auto candidate = clip;
-            auto timing = candidate.timing(bpm);
+            auto timing = candidate.timing(tempo);
             timing.moveTo(timing.start + seconds);
-            if (!candidate.setTiming(timing, bpm)) { return false; }
+            if (!candidate.setTiming(timing, tempo)) { return false; }
             moving.push_back({target, std::move(candidate)});
         }
     }
@@ -391,7 +368,7 @@ inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, do
         std::erase_if(track.clips, [&](const auto& clip) { return std::binary_search(unique.begin(), unique.end(), clip.id); });
     }
     for (auto& placement : moving) {
-        if (!updated[placement.row].insert(std::move(placement.clip), bpm)) { return false; }
+        if (!updated[placement.row].insert(std::move(placement.clip), tempo)) { return false; }
     }
     tracks = std::move(updated);
     return true;

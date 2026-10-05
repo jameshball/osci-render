@@ -79,12 +79,12 @@ void MotionCurveEditor::refresh() {
         companions.clear();
     }
     if (!drag.has_value()) {
-        if (curve != nullptr && selectedTime.has_value() && findKey(*curve, *selectedTime) == nullptr) {
+        if (curve != nullptr && selectedTime.has_value() && curve->findKey(*selectedTime) == nullptr) {
             selectedTime.reset();
         }
         std::erase_if(companions, [&clip](const KeyRef& key) {
             const auto* owner = findCurve(clip, key.property);
-            return owner == nullptr || findKey(*owner, key.time) == nullptr;
+            return owner == nullptr || owner->findKey(key.time) == nullptr;
         });
         if (!userView) {
             fit();
@@ -218,7 +218,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
             g.strokePath(result, juce::PathStrokeType(1.4f));
         }
         if (selectedTime.has_value()) {
-            const auto* selected = findKey(curve, *selectedTime);
+            const auto* selected = curve.findKey(*selectedTime);
             if (selected != nullptr) {
                 for (const auto mode : { DragMode::incoming, DragMode::outgoing }) {
                     const auto handle = tangentPoint(*clip, curve, *selected, mode);
@@ -293,7 +293,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     if (left && selectedTime.has_value()) {
-        const auto* selected = findKey(*curve, *selectedTime);
+        const auto* selected = curve->findKey(*selectedTime);
         if (selected != nullptr) {
             for (const auto mode : { DragMode::incoming, DragMode::outgoing }) {
                 const auto handle = tangentPoint(*clip, *curve, *selected, mode);
@@ -372,7 +372,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         // The primary may have switched curves: resolve it again.
         const auto current = motion::findPropertyTarget(processor.document.project(), targetId);
         const auto* primary = findCurve(current, propertyName);
-        const auto* key = primary != nullptr ? findKey(*primary, *selectedTime) : nullptr;
+        const auto* key = primary != nullptr ? primary->findKey(*selectedTime) : nullptr;
         if (key != nullptr) {
             beginDrag(*current, DragMode::key, event.position);
             drag->original = *key;
@@ -829,12 +829,6 @@ bool MotionCurveEditor::targetLocked() const {
     return target.has_value() && target->locked;
 }
 
-const motion::Keyframe* MotionCurveEditor::findKey(const motion::Curve& curve, double time) {
-    const auto& keys = curve.keyframes();
-    const auto found = std::lower_bound(keys.begin(), keys.end(), time, [](const auto& key, double value) { return key.time < value; });
-    return found != keys.end() && found->time == time ? &*found : nullptr;
-}
-
 bool MotionCurveEditor::dragMatches(const motion::PropertyTarget& clip) const {
     if (clip.start != drag->start || clip.duration != drag->duration || clip.offset != drag->offset || clip.rate != drag->rate) {
         return false;
@@ -866,7 +860,7 @@ std::optional<MotionCurveEditor::SelectionBox> MotionCurveEditor::selectionBox(c
     auto top = std::numeric_limits<float>::infinity(), bottom = -top;
     for (const auto& ref : keys) {
         const auto* curve = displayed(clip, ref.property);
-        const auto* key = curve != nullptr ? findKey(*curve, ref.time) : nullptr;
+        const auto* key = curve != nullptr ? curve->findKey(ref.time) : nullptr;
         if (key == nullptr) {
             continue;
         }
@@ -1145,7 +1139,7 @@ bool MotionCurveEditor::deleteSelected() {
     auto keys = selection();
     std::erase_if(keys, [&clip](const KeyRef& key) {
         const auto* curve = findCurve(clip, key.property);
-        return curve == nullptr || findKey(*curve, key.time) == nullptr;
+        return curve == nullptr || curve->findKey(key.time) == nullptr;
     });
     if (keys.empty()) {
         return false;
@@ -1170,7 +1164,7 @@ void MotionCurveEditor::showKeyMenu() {
     const auto keys = selection();
     const auto reference = selectedTime.has_value() ? keys.back() : keys.front();
     const auto* curve = findCurve(clip, reference.property);
-    const auto* key = curve != nullptr ? findKey(*curve, reference.time) : nullptr;
+    const auto* key = curve != nullptr ? curve->findKey(reference.time) : nullptr;
     if (key == nullptr) {
         return;
     }
@@ -1198,7 +1192,7 @@ void MotionCurveEditor::showKeyMenu() {
         // No undo step when every selected key already uses the choice.
         const auto needed = std::any_of(keys.begin(), keys.end(), [&current, next](const KeyRef& ref) {
             const auto* owner = findCurve(current, ref.property);
-            const auto* found = owner != nullptr ? findKey(*owner, ref.time) : nullptr;
+            const auto* found = owner != nullptr ? owner->findKey(ref.time) : nullptr;
             return found != nullptr && found->interpolation != next;
         });
         if (!needed) {

@@ -63,7 +63,7 @@ struct Composition {
     double duration = 180.0;
     double frameRate = 30.0;
     double bpm = 120.0; // initial tempo, from beat 0
-    // Stepped tempo changes after the initial tempo, by beat (immutable, shared).
+    // Tempo changes after the initial tempo, stepped or ramped, by beat (immutable, shared).
     std::shared_ptr<const std::vector<TempoChange>> tempoChanges;
     Tempo tempo() const { return Tempo(bpm, tempoChanges); }
     TimeDisplay timeDisplay = TimeDisplay::seconds;
@@ -75,6 +75,11 @@ struct Composition {
     double loopStart = 0, loopEnd = 0;
     bool looping = false;
     bool hasLoop() const { return std::isfinite(loopStart) && std::isfinite(loopEnd) && loopStart >= 0 && loopEnd > loopStart; }
+    // A loop never reaches past the composition; one that no longer fits is dropped.
+    void clampLoop() {
+        loopEnd = std::min(loopEnd, duration);
+        if (!hasLoop()) { loopStart = loopEnd = 0; looping = false; }
+    }
     // A time within the composition on its frame grid, where keys are set.
     double frameTime(double time) const {
         const auto inside = std::clamp(std::isfinite(time) ? time : 0.0, 0.0, duration);
@@ -175,7 +180,7 @@ public:
     // A steady tempo from audio analysis, and the soundtrack clip moved so its
     // first downbeat (content seconds) lands on a bar line. One undo step.
     juce::Result setTempoFromAudio(Id soundtrackClip, double bpm, double downbeat, double& moved);
-    // Stepped tempo changes by beat; musical clips follow, seconds content stays.
+    // Tempo changes by beat, stepped or ramped; musical clips follow, seconds content stays.
     juce::Result setTempoChange(double beat, double bpm, std::optional<double> replacing = std::nullopt, std::optional<bool> ramp = std::nullopt);
     juce::Result removeTempoChange(double beat);
     juce::Result addBlenderSource(juce::String name, BlenderSourceSettings settings, Id& id);

@@ -34,6 +34,17 @@ void changeEachComposition(ProjectType& project, Needs&& needs, Change&& change)
     }
 }
 
+// The project's reusable definitions by identity.
+template <typename ProjectType>
+auto definitionsById(const ProjectType& project) {
+    using Definition = typename std::remove_cvref_t<decltype(project.definitions)>::value_type::element_type;
+    std::map<Id, const Definition*> result;
+    for (const auto& definition : project.definitions) {
+        if (definition != nullptr) { result.emplace(definition->id, definition.get()); }
+    }
+    return result;
+}
+
 struct CompositionGraphResult {
     std::string error;
     std::size_t expandedClips = 0, depth = 0;
@@ -121,19 +132,19 @@ CompositionGraphResult validateCompositionGraph(const ProjectType& project) {
 
 template <typename ProjectType>
 Id highestProjectIdentity(const ProjectType& project, Id highest = 0) {
-    const auto effects = [&](const auto& values) { for (const auto& value : values) { highest = std::max(highest, value.id); } };
+    const auto all = [&](const auto& values) { for (const auto& value : values) { highest = std::max(highest, value.id); } };
     const auto scope = [&](const auto& composition) {
-        effects(composition.effects);
-        for (const auto& group : composition.groups) { highest = std::max(highest, group.id); effects(group.effects); }
+        all(composition.effects);
+        for (const auto& group : composition.groups) { highest = std::max(highest, group.id); all(group.effects); }
         for (const auto& track : composition.tracks) {
-            highest = std::max(highest, track.id); effects(track.effects);
-            for (const auto& clip : track.clips) { highest = std::max(highest, clip.id); effects(clip.effects); }
+            highest = std::max(highest, track.id); all(track.effects);
+            for (const auto& clip : track.clips) { highest = std::max(highest, clip.id); all(clip.effects); }
         }
-        for (const auto& camera : composition.cameras) { highest = std::max(highest, camera.id); }
-        for (const auto& marker : composition.markers) { highest = std::max(highest, marker.id); }
-        for (const auto& cut : composition.cameraCuts) { highest = std::max(highest, cut.id); }
-        effects(composition.modulators);
-        effects(composition.routes);
+        all(composition.cameras);
+        all(composition.markers);
+        all(composition.cameraCuts);
+        all(composition.modulators);
+        all(composition.routes);
     };
     scope(project);
     for (const auto& asset : project.assets) { if (asset != nullptr) { highest = std::max(highest, asset->id); } }
@@ -144,16 +155,19 @@ Id highestProjectIdentity(const ProjectType& project, Id highest = 0) {
 }
 
 
+// Clips in every composition that `matches` picks.
+template <typename ProjectType, typename Matches>
+std::size_t countClips(const ProjectType& project, Matches&& matches) {
+    std::size_t count = 0;
+    forEachComposition(project, [&](const auto& composition) {
+        for (const auto& track : composition.tracks) { count += static_cast<std::size_t>(std::count_if(track.clips.begin(), track.clips.end(), matches)); }
+    });
+    return count;
+}
+
 template <typename ProjectType>
 std::size_t sourceReferenceCount(const ProjectType& project, Id asset) {
-    std::size_t count = 0;
-    const auto scope = [&](const auto& composition) {
-        for (const auto& track : composition.tracks) {
-            for (const auto& clip : track.clips) { if (clip.asset == asset && asset != 0) { ++count; } }
-        }
-    };
-    forEachComposition(project, scope);
-    return count;
+    return asset == 0 ? 0 : countClips(project, [asset](const auto& clip) { return clip.asset == asset; });
 }
 
 }
