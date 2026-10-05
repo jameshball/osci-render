@@ -223,11 +223,9 @@ void MotionPropertyInspector::paint(juce::Graphics& g) {
 
 void MotionPropertyInspector::resized() {
     auto area = getLocalBounds();
-    if (showsHeader) {
-        auto header = area.removeFromTop(34).reduced(motion::style::padding, 0);
-        kind.setBounds(header.removeFromRight(selectionCount > 1 ? 110 : 60));
-        title.setBounds(header);
-    }
+    auto header = area.removeFromTop(34).reduced(motion::style::padding, 0);
+    kind.setBounds(header.removeFromRight(selectionCount > 1 ? 110 : 60));
+    title.setBounds(header);
     viewport.setBounds(area);
     layoutContent();
 }
@@ -320,7 +318,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size())) {
             auto row = std::make_unique<Row>();
             row->group = juce::String(spec.group.data(), spec.group.size());
-            row->key.setName("Key " + namePrefix + row->group.toLowerCase());
+            row->key.setName("Key " + row->group.toLowerCase());
             row->key.setTitle(row->key.getName());
             row->key.setTooltip("Add or remove keys for " + row->group.toLowerCase() + " at the playhead");
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
@@ -331,7 +329,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->addAndMakeVisible(row->next);
             row->modulate.setClickingTogglesState(false);
             row->modulate.quiet = true;
-            row->modulate.setName("Modulate " + namePrefix + row->group.toLowerCase());
+            row->modulate.setName("Modulate " + row->group.toLowerCase());
             row->modulate.setTitle(row->modulate.getName());
             row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph with its oscillator, modulator routes and link. Lit when something drives it.");
             row->addAndMakeVisible(row->modulate);
@@ -352,10 +350,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             if (motionModes && (row->group == "Position" || row->group == "Rotation")) {
                 const bool path = row->group == "Position";
                 row->mode = std::make_unique<motion::ui::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
-                row->mode->setName(namePrefix + (path ? "Spatial path" : "Quaternion rotation"));
+                row->mode->setName(path ? "Spatial path" : "Quaternion rotation");
                 row->mode->setTitle(row->mode->getName());
-                row->mode->setTooltip(path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out). Keys all three axes together."
-                                           : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock. Keys all three axes together.");
                 // A misaligned mode stays on and realigns its keys.
                 row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState() || raw->misaligned); };
                 row->addAndMakeVisible(*row->mode);
@@ -374,9 +370,9 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         auto field = std::make_unique<Field>(spec);
         auto& editor = field->editor;
         editor.setSpec(spec);
-        editor.setName(namePrefix + juce::String(spec.id.data(), spec.id.size()));
+        editor.setName(juce::String(spec.id.data(), spec.id.size()));
         editor.setTitle(juce::String(spec.label.data(), spec.label.size()));
-        editor.setComponentID("motion." + namePrefix.replace(" ", ".") + juce::String(spec.id.data(), spec.id.size()));
+        editor.setComponentID("motion." + juce::String(spec.id.data(), spec.id.size()));
         editor.setTooltip(juce::String(spec.label.data(), spec.label.size()) + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
         if (spec.axis.size() == 1) {
             editor.setPrefix(juce::String(spec.axis.data(), spec.axis.size()));

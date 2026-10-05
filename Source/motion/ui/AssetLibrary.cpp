@@ -31,15 +31,14 @@ MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(do
     search.setName("Search sources");
     search.setTextToShowWhenEmpty("Search sources", osci::Colours::textMuted());
     search.setFont(motion::style::body());
-    search.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
-    search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
-    search.setIndents(8, 5);
+    search.setIndents(0, 5);
+    motion::style::styleField(search);
     search.onTextChange = [this] { refresh(); };
     search.onEscapeKey = [this] { search.clear(); refresh(); };
     addAndMakeVisible(search);
     rename.setName("Rename source");
     rename.setFont(motion::style::body());
-    rename.setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+    motion::style::styleField(rename);
     rename.onReturnKey = [this] { finishRename(true); };
     rename.onEscapeKey = [this] { finishRename(false); };
     rename.onFocusLost = [this] { finishRename(true); };
@@ -169,7 +168,7 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(4, 2);
     if (selected) {
         graphics.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), 0.08f));
-        graphics.fillRoundedRectangle(bounds.toFloat(), 3.0f);
+        graphics.fillRoundedRectangle(bounds.toFloat(), motion::style::radius);
         graphics.setColour(osci::Colours::accentColor().withAlpha(0.65f));
         graphics.fillRect(bounds.withWidth(2).reduced(0, 5));
     }
@@ -242,7 +241,7 @@ juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
 
 void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const {
     graphics.setColour(juce::Colours::black.withAlpha(.35f));
-    graphics.fillRoundedRectangle(box.toFloat(), 3.0f);
+    graphics.fillRoundedRectangle(box.toFloat(), motion::style::radius);
     const auto area = box.toFloat().reduced(4);
     graphics.setColour(motion::style::key().withAlpha(.85f));
     if (definitionRow(row)) {

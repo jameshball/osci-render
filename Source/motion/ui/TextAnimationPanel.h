@@ -7,35 +7,6 @@
 #include <array>
 #include <functional>
 
-// Sections stacked top to bottom, each as tall as it asks (0 hides it).
-class MotionSectionStack final : public juce::Component {
-public:
-    void add(juce::Component& section, std::function<int()> height) {
-        sections.push_back({&section, std::move(height)});
-        addChildComponent(section);
-    }
-    int preferredHeight() const {
-        int total = 0;
-        for (const auto& section : sections) { total += section.height(); }
-        return total;
-    }
-    void resized() override {
-        int y = 0;
-        for (const auto& section : sections) {
-            const auto height = section.height();
-            section.component->setVisible(height > 0);
-            section.component->setBounds(0, y, getWidth(), height);
-            y += height;
-        }
-    }
-private:
-    struct Section {
-        juce::Component* component;
-        std::function<int()> height;
-    };
-    std::vector<Section> sections;
-};
-
 // A text clip's per-character animation, under its timing in Properties.
 // The settings belong to the text source, so every clip of it follows; a
 // change prepares the source again.
@@ -48,12 +19,12 @@ public:
         title.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         title.setBorderSize({0, 2, 0, 0});
         addAndMakeVisible(title);
-        const std::array<const char*, 6> tips {"Every character shows at once", "Characters appear one by one", "Characters rise into place", "Characters pop in with a small overshoot", "Characters bob in a looping wave", "Characters fly in from all around"};
+        const std::array<const char*, 6> chipTips {"Every character shows at once", "Characters appear one by one", "Characters rise into place", "Characters pop in with a small overshoot", "Characters bob in a looping wave", "Characters fly in from all around"};
         for (std::size_t index = 0; index < kinds.size(); ++index) {
             auto& chip = *kinds[index];
             chip.setName("Text animation " + chip.getButtonText());
             chip.setTitle(chip.getName());
-            chip.setTooltip(tips[index]);
+            chip.setTooltip(chipTips[index]);
             chip.setClickingTogglesState(false);
             chip.onClick = [this, index] {
                 auto next = current();
@@ -63,7 +34,7 @@ public:
             addAndMakeVisible(chip);
         }
         const std::array<const char*, 4> labels {"Stagger", "Each", "Hold", "Amount"};
-        const std::array<const char*, 4> tips2 {"Seconds between one character starting and the next", "Seconds each character takes to arrive", "Seconds the finished text holds before the source loops", "How far characters travel (1 is one character height)"};
+        const std::array<const char*, 4> fieldTips {"Seconds between one character starting and the next", "Seconds each character takes to arrive", "Seconds the finished text holds before the source loops", "How far characters travel (1 is one character height)"};
         for (std::size_t index = 0; index < fields.size(); ++index) {
             captions[index].setText(labels[index], juce::dontSendNotification);
             captions[index].setFont(motion::style::caption());
@@ -73,7 +44,7 @@ public:
             field.setName(juce::String("Text animation ") + labels[index]);
             field.setTitle(field.getName());
             field.setSpec(specs[index]);
-            field.setTooltip(tips2[index]);
+            field.setTooltip(fieldTips[index]);
             // A drag previews its number; the source prepares once, on release.
             field.onCommit = [this](double) { applyFields(); };
             field.onEnd = [this] { applyFields(); };

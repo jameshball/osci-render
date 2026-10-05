@@ -31,7 +31,6 @@ public:
 
     // Embedded inspectors (e.g. in the camera panel) supply their own title.
     // Distinguishes controls of several inspectors for automation and access.
-    void setNamePrefix(juce::String prefix) { namePrefix = std::move(prefix); layoutSignature = "none"; refresh(); }
     // A section above the property rows (the clip's timing), sized by
     // `height`; 0 hides it.
     void setLead(juce::Component* component, std::function<int()> height);
@@ -43,9 +42,7 @@ public:
     void relayout() { layoutContent(); }
     // Scrolls so `component` (inside the inspector) is fully in view.
     void reveal(juce::Component& component);
-    void setShowsHeader(bool shows) { showsHeader = shows; title.setVisible(shows); kind.setVisible(shows); resized(); }
     void setTarget(motion::Id id);
-    motion::Id getTarget() const { return target; }
     void setSelectionCount(std::size_t count);
 
     // Rebuilds rows only when the target's property set changes, updates the
@@ -151,9 +148,9 @@ private:
     std::function<int()> leadHeight;
     std::vector<motion::PropertySpec> specList;
     motion::Id target = 0;
-    juce::String layoutSignature = "none", namePrefix;
+    juce::String layoutSignature = "none";
     motion::ui::PreviewGesture gesture {processor.document};
     motion::Id gestureTarget = 0;
     double gestureTime = 0;
-    bool empty = true, showsHeader = true, motionModes = false;
+    bool empty = true, motionModes = false;
 };

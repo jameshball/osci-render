@@ -46,8 +46,7 @@ public:
         meter.setTooltip("Beats in a bar");
         for (const auto beats : {2, 3, 4, 5, 6, 7}) { meter.addItem(juce::String(beats) + "/4", 400 + beats); }
         for (auto* combo : {&frameRate, &meter}) {
-            combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
-            combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+            motion::style::styleField(*combo);
             combo->onChange = [this, combo] { if (!updating && onTiming) { onTiming(combo->getSelectedId()); } };
             addAndMakeVisible(*combo);
         }
@@ -114,7 +113,7 @@ private:
         refresh();
     }
     void applyTempo() {
-        const auto value = motion::ui::parseNumber(tempo.getText(), "s");
+        const auto value = motion::ui::parseNumber(tempo.getText());
         if (!value.has_value() || *value < 1 || *value > 1000) {
             if (onError) { onError("Enter a tempo between 1 and 1000 BPM."); }
         } else if (*value != processor.document.project().bpm) {

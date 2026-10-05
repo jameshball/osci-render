@@ -32,9 +32,9 @@ public:
         lock.onClick = [this] { if (onLock) { onLock(id); } };
         arm.onClick = [this] { if (onArm) { onArm(id); } };
         arm.setOnColour(motion::style::record().darker(.5f));
-        mute.setOnColour(juce::Colour(0xff8b6434));
-        solo.setOnColour(juce::Colour(0xff347b52));
-        lock.setOnColour(juce::Colour(0xff5c5f6b));
+        mute.setOnColour(motion::style::trackMute());
+        solo.setOnColour(motion::style::trackSolo());
+        lock.setOnColour(motion::style::trackLock());
         // The glyph matches the M and S letters' height.
         lock.iconSize = 10.0f;
         // A click opens the menu; a drag moves the track instead. The open
@@ -152,7 +152,7 @@ public:
 private:
     bool isGroup = false, grabbing = false;
     int gripTravel = 0;
-    class Disclosure : public juce::TextButton {
+    class FoldButton : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {
             g.setColour(osci::Colours::text().withAlpha(over ? 1.0f : 0.65f));
             const auto x = getWidth() * 0.5f;

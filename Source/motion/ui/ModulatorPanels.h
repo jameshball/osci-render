@@ -126,7 +126,6 @@ public:
     ~MotionModulatorLibrary() override { processor.document.removeChangeListener(this); }
 
     std::function<void(const juce::String&)> onError;
-    motion::Id selectedModulator() const { return selected; }
     void select(motion::Id id) { selected = id; refresh(); }
 
     void refresh();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DocumentMenu.h"
 #include "MotionStyle.h"
 #include "PreviewGesture.h"
 
@@ -223,11 +224,8 @@ private:
             const auto& preset = motion::scopeProfilePresets[index];
             menu.addItem(static_cast<int>(index + 1), juce::String(preset.name.data(), preset.name.size()), true, preset.profile == current);
         }
-        juce::Component::SafePointer<MotionScopePanel> safe(this);
-        menu.setLookAndFeel(&getLookAndFeel());
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presets), [safe](int result) {
-            if (safe == nullptr || result <= 0 || result > static_cast<int>(motion::scopeProfilePresets.size())) { return; }
-            safe->applyPreset(motion::scopeProfilePresets[static_cast<std::size_t>(result - 1)]);
+        motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(&presets), [this](int result) {
+            applyPreset(motion::scopeProfilePresets[static_cast<std::size_t>(result - 1)]);
         });
     }
     void applyPreset(const motion::ScopeProfilePreset& preset) {

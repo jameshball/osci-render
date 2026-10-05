@@ -29,7 +29,6 @@ public:
     std::function<void(double)> onCommit;
 
     void setSpec(const motion::PropertySpec& value) { spec = value; repaint(); }
-    const motion::PropertySpec& getSpec() const { return spec; }
     void setAxisColour(std::optional<juce::Colour> colour) { axisColour = colour; repaint(); }
     void setPrefix(juce::String text) { prefix = std::move(text); repaint(); }
     void setValue(double next) {
@@ -38,7 +37,6 @@ public:
     }
     double getValue() const { return value; }
     bool isEditing() const { return dragging || editor.isVisible(); }
-    void setMixed(bool mixed) { if (showMixed != mixed) { showMixed = mixed; repaint(); } }
 
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
@@ -56,7 +54,7 @@ public:
         }
         g.setFont(motion::style::body());
         g.setColour(osci::Colours::text().withAlpha(isEnabled() ? 1.0f : .4f));
-        g.drawText(showMixed ? juce::String("-") : format(value), text, juce::Justification::centredRight);
+        g.drawText(format(value), text, juce::Justification::centredRight);
     }
     void resized() override { editor.setBounds(getLocalBounds()); }
 
@@ -69,9 +67,10 @@ public:
         lastX = event.position.x;
         accumulated = 0;
         moved = false;
+        dragCancelled = false;
     }
     void mouseDrag(const juce::MouseEvent& event) override {
-        if (!isEnabled() || !event.mods.isLeftButtonDown()) { return; }
+        if (!isEnabled() || !event.mods.isLeftButtonDown() || dragCancelled) { return; }
         const auto dx = event.position.x - lastX;
         lastX = event.position.x;
         if (!moved && std::abs(event.getDistanceFromDragStartX()) < 3) { return; }
@@ -98,6 +97,15 @@ public:
     void mouseDoubleClick(const juce::MouseEvent&) override { beginTyping(); }
     bool keyPressed(const juce::KeyPress& key) override {
         if (key == juce::KeyPress::returnKey) { beginTyping(); return true; }
+        if (key == juce::KeyPress::escapeKey && dragging) {
+            // Escape mid-drag puts the value back; the rest of the drag is ignored.
+            dragging = false;
+            dragCancelled = true;
+            value = startValue;
+            repaint();
+            if (onCancel) { onCancel(); }
+            return true;
+        }
         if (key.getKeyCode() == juce::KeyPress::upKey || key.getKeyCode() == juce::KeyPress::downKey) {
             const auto direction = key.getKeyCode() == juce::KeyPress::upKey ? 1.0 : -1.0;
             const auto scale = stepScale(key.getModifiers());
@@ -165,6 +173,6 @@ private:
     juce::String prefix;
     double value = 0, startValue = 0, accumulated = 0;
     float lastX = 0;
-    bool hovered = false, dragging = false, moved = false, showMixed = false;
+    bool hovered = false, dragging = false, moved = false, dragCancelled = false;
 };
 }

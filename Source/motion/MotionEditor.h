@@ -115,7 +115,6 @@ private:
     juce::Label scopeLabel, scopeShared;
     std::uint64_t scopeNameGeneration = 0;
     void refreshInspector();
-    bool audioSelected() const;
     bool selectionExists() const;
     bool selectionIsCamera() const;
     motion::Id toolCamera() const;
@@ -241,7 +240,7 @@ private:
     MotionSceneToolbar sceneTools;
     MotionScopeToolbar scopeTools;
     // Properties lead: a clip's timing, then a text clip's character animation.
-    MotionSectionStack inspectorLead;
+    osci::SectionStack inspectorLead;
     MotionTextAnimationPanel textAnimation { processor };
     MotionCompositionPanel compositionSettings { processor };
     struct QueuedTextAnimation {

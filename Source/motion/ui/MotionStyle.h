@@ -9,9 +9,6 @@ namespace motion::style {
 inline constexpr int gap = 4;
 inline constexpr int padding = 8;
 inline constexpr int controlHeight = 24;
-inline constexpr int rowHeight = 26;
-inline constexpr int headerHeight = 28;
-inline constexpr int transportHeight = 36;
 inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
 
@@ -88,6 +85,10 @@ inline juce::Colour visualClip() { return juce::Colour(0xff34524a); }
 inline juce::Colour audioClip() { return juce::Colour(0xff2f4657); }
 inline juce::Colour compositionClip() { return juce::Colour(0xff4a4260); }
 inline juce::Colour midiClip() { return juce::Colour(0xff55503a); }
+// A track's mute, solo and lock switches when on.
+inline juce::Colour trackMute() { return juce::Colour(0xff8b6434); }
+inline juce::Colour trackSolo() { return juce::Colour(0xff347b52); }
+inline juce::Colour trackLock() { return juce::Colour(0xff5c5f6b); }
 // Track label colours (After Effects / Premiere style), muted for clip fills.
 // Index 0 means "automatic" (by clip kind).
 struct TrackLabel { const char* name; std::uint32_t argb; };
@@ -284,8 +285,6 @@ public:
     static constexpr int fieldIndent = 8;
 };
 
-// One form layout for every dialog: captions beside or above fields, and
-// the action buttons right-aligned on the last line.
 // The one action a panel exists for (Save, Add, Bake) stands out in the accent.
 inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f)); }
 
@@ -313,6 +312,8 @@ inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds) {
 }
 }
 
+// One form layout for every dialog: captions beside or above fields, and
+// the action buttons right-aligned on the last line.
 namespace dialog {
 inline constexpr int margin = 12;
 inline constexpr int row = 28;

@@ -30,7 +30,6 @@ public:
     // `value` is a clip, track or group id, or 0 for the composition;
     // `clip` is the selection whose other stages are listed.
     void setOwner(std::optional<motion::Id> value, motion::Id clip);
-    std::optional<motion::Id> getOwner() const { return owner; }
     void setDragActive(bool active);
 
     int preferredHeight() const;

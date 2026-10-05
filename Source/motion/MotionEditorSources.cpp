@@ -154,14 +154,13 @@ void MotionEditor::openProject(const juce::File& file) {
 }
 
 void MotionEditor::chooseSourceFile() {
-        chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), motion::importWildcard());
-        const juce::Component::SafePointer<MotionEditor> owner(this);
-        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [owner](const juce::FileChooser& chosen) {
-                if (owner != nullptr && chosen.getResult().existsAsFile()) {
-                    owner->openSourceFile(chosen.getResult());
-                }
-            });
+    chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), motion::importWildcard());
+    const juce::Component::SafePointer<MotionEditor> owner(this);
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner](const juce::FileChooser& chosen) {
+        if (owner != nullptr && chosen.getResult().existsAsFile()) {
+            owner->openSourceFile(chosen.getResult());
+        }
+    });
 }
 
 void MotionEditor::showBlenderSettings(motion::Id id) {
@@ -189,7 +188,7 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
         if (result.failed()) { return result; }
         owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(sourceId);
         id = sourceId;
-        for (const auto& asset : document.mainProject().assets) { if (asset->id == sourceId) { expected = asset; break; } }
+        expected = motion::findAsset(document.mainProject().assets, sourceId);
         *panelIdentity = expected->liveIdentity;
         const auto listening = start ? owner->processor.blenderInputs().listen(sourceId, true) : juce::Result::ok();
         if (listening.failed()) { owner->statusBar.show(listening.getErrorMessage()); }

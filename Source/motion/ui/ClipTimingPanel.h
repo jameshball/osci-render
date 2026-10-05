@@ -4,7 +4,6 @@
 #include "TypedNumber.h"
 #include "MotionStyle.h"
 #include <array>
-#include <cstdlib>
 #include <functional>
 
 // A clip's timing, shown as the first section of the Properties inspector.

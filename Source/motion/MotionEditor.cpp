@@ -867,11 +867,10 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
         graphics.fillPath(corners);
     }
     if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
-    graphics.setColour(osci::Colours::outlineSubtle());
     const auto panel = focusedPanel();
     if (!panel.isEmpty()) {
         graphics.setColour(osci::Colours::accentColor().withAlpha(.45f));
-        graphics.drawRoundedRectangle(panel.toFloat().reduced(.5f), 5.0f, 1.0f);
+        graphics.drawRoundedRectangle(panel.toFloat().reduced(.5f), motion::style::panelRadius, 1.0f);
     }
 }
 
@@ -888,9 +887,8 @@ juce::Rectangle<int> MotionEditor::focusedPanel() const {
 
 void MotionEditor::paint(juce::Graphics& graphics) {
     graphics.fillAll(osci::Colours::veryDark());
-    graphics.setColour(osci::Colours::surface());
-    for (const auto& panel : { libraryBounds, viewportBounds, inspectorBounds, timelineBounds }) {
-        graphics.fillRoundedRectangle(panel.toFloat(), 5.0f);
+    for (const auto& panel : {libraryBounds, viewportBounds, inspectorBounds, timelineBounds}) {
+        motion::style::fillPanel(graphics, panel);
     }
 }
 
@@ -1296,11 +1294,6 @@ bool MotionEditor::selectionExists() const {
 bool MotionEditor::selectionIsCamera() const {
     const auto& cameras = processor.document.project().cameras;
     return selection != 0 && std::any_of(cameras.begin(), cameras.end(), [this](const auto& camera) { return camera.id == selection; });
-}
-
-bool MotionEditor::audioSelected() const {
-    const auto target = motion::findPropertyTarget(processor.document.project(), selection);
-    return target.has_value() && target->isAudio;
 }
 
 void MotionEditor::refreshInspector() {

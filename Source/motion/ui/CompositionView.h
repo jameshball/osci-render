@@ -32,7 +32,6 @@ public:
     void retainSelectedKeyAfterEdit() {
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
     }
-    bool isMotionPathVisible() const { return showMotionPath; }
     std::function<void(bool)> onMotionPathChanged;
     void setMotionPathVisible(bool visible);
     struct ViewState { motion::editor::Camera camera; MotionTransformTool tool = MotionTransformTool::move; bool motionPath = false; };

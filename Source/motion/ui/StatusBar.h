@@ -11,7 +11,7 @@ public:
 
     MotionStatusBar() {
         setName("Status bar");
-        dismiss.setName("Dismiss message");
+        dismiss.setIconPadding(2);
         dismiss.setTooltip("Dismiss");
         dismiss.onClick = [this] { clear(); };
         addChildComponent(dismiss);
@@ -61,19 +61,9 @@ public:
     }
 
 private:
-    class Close final : public juce::Button {
-    public:
-        Close() : juce::Button("Dismiss") {}
-        void paintButton(juce::Graphics& g, bool highlighted, bool) override {
-            const auto b = getLocalBounds().toFloat().reduced(4.5f);
-            g.setColour(osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .6f));
-            g.drawLine(b.getX(), b.getY(), b.getRight(), b.getBottom(), 1.3f);
-            g.drawLine(b.getRight(), b.getY(), b.getX(), b.getBottom(), 1.3f);
-        }
-    };
     void timerCallback() override { clear(); }
 
     juce::Label message, stats;
-    Close dismiss;
+    osci::CloseButton dismiss {"Dismiss message"};
     Kind current = Kind::notice;
 };

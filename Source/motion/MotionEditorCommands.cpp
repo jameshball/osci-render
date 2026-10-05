@@ -195,43 +195,44 @@ void MotionEditor::stepFrames(int frames) {
 // The Views button's menu; right-clicking the Scene adds keying for the
 // selection.
 void MotionEditor::showSceneViewMenu(bool atMouse) {
+    const std::array<std::pair<const char*, const char*>, 6> views {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"}, {"Bottom", "Ctrl+7"}}};
+    const auto addViews = [&views](juce::PopupMenu& target) {
+        for (std::size_t index = 0; index < views.size(); ++index) { target.addItem(motion::style::menuItem(views[index].first, static_cast<int>(index) + 1, views[index].second)); }
+    };
+    const auto addFraming = [](juce::PopupMenu& target) {
+        target.addItem(motion::style::menuItem("Frame selection", 7, "F"));
+        target.addItem(motion::style::menuItem("Reset view", 8, "0"));
+    };
+    const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key drawing weight", "Alt+Shift+T"}}};
     juce::PopupMenu menu;
-    menu.setLookAndFeel(&getLookAndFeel());
-    const std::array<std::pair<const char*, const char*>, 8> items {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"},
-        {"Bottom", "Ctrl+7"}, {"Frame selection", "F"}, {"Reset view", "0"}}};
-    juce::PopupMenu views;
-    for (int index = 0; index < 6; ++index) { views.addItem(motion::style::menuItem(items[static_cast<std::size_t>(index)].first, index + 1, items[static_cast<std::size_t>(index)].second)); }
     if (atMouse) {
-        menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
-        menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
-        menu.addSubMenu("View from", views);
+        addFraming(menu);
+        juce::PopupMenu from;
+        addViews(from);
+        menu.addSubMenu("View from", from);
         if (selection != 0) {
             menu.addSeparator();
-            const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key drawing weight", "Alt+Shift+T"}}};
-            for (int index = 0; index < 5; ++index) { menu.addItem(motion::style::menuItem(keys[static_cast<std::size_t>(index)].first, 20 + index, keys[static_cast<std::size_t>(index)].second)); }
+            for (std::size_t index = 0; index < keys.size(); ++index) { menu.addItem(motion::style::menuItem(keys[index].first, 20 + static_cast<int>(index), keys[index].second)); }
             menu.addSeparator();
             menu.addItem(motion::style::menuItem("Show in timeline", 30, {}));
         }
     } else {
-        for (int index = 0; index < 6; ++index) { menu.addItem(motion::style::menuItem(items[static_cast<std::size_t>(index)].first, index + 1, items[static_cast<std::size_t>(index)].second)); }
+        addViews(menu);
         menu.addSeparator();
-        menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
-        menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
+        addFraming(menu);
     }
-    const juce::Component::SafePointer<MotionEditor> owner(this);
     const auto options = atMouse ? juce::PopupMenu::Options().withTargetComponent(composition).withMousePosition() : juce::PopupMenu::Options().withTargetComponent(sceneView);
-    menu.showMenuAsync(options, [owner](int result) {
-        if (owner == nullptr || result == 0) { return; }
+    motion::ui::showDocumentMenu(menu, *this, processor.document, options, [this](int result) {
         using Preset = MotionCompositionView::ViewPreset;
         const std::array<Preset, 6> presets {Preset::front, Preset::right, Preset::top, Preset::back, Preset::left, Preset::bottom};
-        if (result >= 1 && result <= 6) { owner->composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
-        if (result == 7) { owner->composition.frameSelection(); }
-        if (result == 8) { owner->composition.resetView(); }
+        if (result >= 1 && result <= 6) { composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
+        if (result == 7) { composition.frameSelection(); }
+        if (result == 8) { composition.resetView(); }
         const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Drawing"};
-        if (result >= 20 && result < 25 && !owner->propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
-            owner->statusBar.show("The selection has no such property to key.");
+        if (result >= 20 && result < 25 && !propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
+            statusBar.show("The selection has no such property to key.");
         }
-        if (result == 30) { owner->timelineTabs.setSelectedIndex(0); owner->timeline.revealSelection(); }
+        if (result == 30) { timelineTabs.setSelectedIndex(0); timeline.revealSelection(); }
     });
 }
 
