@@ -90,7 +90,6 @@ private:
     void remove(motion::Id id);
     // Moves an effect to insertion point `index` here, possibly from another stage.
     void move(motion::Id id, int index);
-    static std::vector<std::vector<motion::EffectInstance>*> allOwners(motion::Project& project);
     void toggleKey(motion::Id id, const std::string& property);
     void beginGesture(motion::Id id, const std::string& property);
     void setValue(motion::Id id, const std::string& property, double value);

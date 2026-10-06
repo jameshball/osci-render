@@ -2,6 +2,7 @@
 
 #include "Animation.h"
 #include "Id.h"
+#include "SharedList.h"
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -113,15 +114,37 @@ auto findEffectOwner(ProjectType& project, Id ownerId) -> std::conditional_t<std
             return &group.effects;
         }
     }
-    for (auto& track : project.tracks) {
-        if (track.kind == decltype(track.kind)::audio) { continue; }
-        if (track.id == ownerId) {
-            return &track.effects;
+    for (std::size_t index = 0; index < project.tracks.size(); ++index) {
+        const auto& candidate = project.tracks[index];
+        if (candidate.kind == decltype(candidate.kind)::audio) { continue; }
+        const auto clip = std::find_if(candidate.clips.begin(), candidate.clips.end(), [ownerId](const auto& item) { return item.id == ownerId; });
+        if (candidate.id != ownerId && clip == candidate.clips.end()) { continue; }
+        auto& track = itemAt(project.tracks, index);
+        return candidate.id == ownerId ? &track.effects : &track.clips[static_cast<std::size_t>(clip - candidate.clips.begin())].effects;
+    }
+    return nullptr;
+}
+
+// The effect list holding effect `id`; null when none does.
+template <typename ProjectType>
+auto findEffectList(ProjectType& project, Id id) -> std::conditional_t<std::is_const_v<ProjectType>, const std::vector<EffectInstance>*, std::vector<EffectInstance>*> {
+    const auto holds = [id](const auto& effects) { return std::any_of(effects.begin(), effects.end(), [id](const auto& effect) { return effect.id == id; }); };
+    if (holds(project.effects)) {
+        return &project.effects;
+    }
+    for (auto& group : project.groups) {
+        if (holds(group.effects)) {
+            return &group.effects;
         }
-        for (auto& clip : track.clips) {
-            if (clip.id == ownerId) {
-                return &clip.effects;
-            }
+    }
+    for (std::size_t index = 0; index < project.tracks.size(); ++index) {
+        const auto& candidate = project.tracks[index];
+        if (holds(candidate.effects)) {
+            return &itemAt(project.tracks, index).effects;
+        }
+        const auto clip = std::find_if(candidate.clips.begin(), candidate.clips.end(), [&](const auto& item) { return holds(item.effects); });
+        if (clip != candidate.clips.end()) {
+            return &itemAt(project.tracks, index).clips[static_cast<std::size_t>(clip - candidate.clips.begin())].effects;
         }
     }
     return nullptr;
@@ -129,32 +152,10 @@ auto findEffectOwner(ProjectType& project, Id ownerId) -> std::conditional_t<std
 
 template <typename ProjectType>
 auto findEffect(ProjectType& project, Id id) -> std::conditional_t<std::is_const_v<ProjectType>, const EffectInstance*, EffectInstance*> {
-    for (auto& effect : project.effects) {
-        if (effect.id == id) {
-            return &effect;
-        }
+    auto* list = findEffectList(project, id);
+    if (list == nullptr) {
+        return nullptr;
     }
-    for (auto& group : project.groups) {
-        for (auto& effect : group.effects) {
-            if (effect.id == id) {
-                return &effect;
-            }
-        }
-    }
-    for (auto& track : project.tracks) {
-        for (auto& effect : track.effects) {
-            if (effect.id == id) {
-                return &effect;
-            }
-        }
-        for (auto& clip : track.clips) {
-            for (auto& effect : clip.effects) {
-                if (effect.id == id) {
-                    return &effect;
-                }
-            }
-        }
-    }
-    return nullptr;
+    return &*std::find_if(list->begin(), list->end(), [id](const auto& effect) { return effect.id == id; });
 }
 }

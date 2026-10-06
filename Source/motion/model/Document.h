@@ -96,7 +96,8 @@ struct Composition {
         grid.snapping = gridSnap;
         return grid;
     }
-    std::vector<Track> tracks;
+    // Shared between project copies until changed (see SharedList).
+    SharedList<Track> tracks;
     std::vector<Camera> cameras;
     std::vector<CameraCut> cameraCuts;
     std::vector<Marker> markers;
@@ -111,22 +112,27 @@ struct CompositionDefinition : Composition {
 };
 
 // Lookups by id across a composition's tracks; null when nothing matches.
-template <typename CompositionType>
-auto findClipTrack(CompositionType& composition, Id clip) -> std::conditional_t<std::is_const_v<CompositionType>, const Track*, Track*> {
-    for (auto& track : composition.tracks) {
-        for (const auto& item : track.clips) {
-            if (item.id == clip) { return &track; }
-        }
-    }
-    return nullptr;
+inline bool holdsClip(const Track& track, Id clip) {
+    return std::any_of(track.clips.begin(), track.clips.end(), [clip](const auto& item) { return item.id == clip; });
 }
-
-template <typename CompositionType>
-auto findClip(CompositionType& composition, Id id) -> std::conditional_t<std::is_const_v<CompositionType>, const Clip*, Clip*> {
-    auto* track = findClipTrack(composition, id);
+inline const Track* findClipTrack(const Composition& composition, Id clip) {
+    const auto found = std::find_if(composition.tracks.begin(), composition.tracks.end(), [clip](const auto& track) { return holdsClip(track, clip); });
+    return found != composition.tracks.end() ? &*found : nullptr;
+}
+inline const Clip* findClip(const Composition& composition, Id id) {
+    const auto* track = findClipTrack(composition, id);
     if (track == nullptr) { return nullptr; }
-    const auto found = std::find_if(track->clips.begin(), track->clips.end(), [id](const auto& clip) { return clip.id == id; });
-    return &*found;
+    return &*std::find_if(track->clips.begin(), track->clips.end(), [id](const auto& clip) { return clip.id == id; });
+}
+// The same lookups, ready to write: the track is copied first if shared.
+inline Track* changeClipTrack(Composition& composition, Id clip) {
+    const auto found = std::find_if(composition.tracks.begin(), composition.tracks.end(), [clip](const auto& track) { return holdsClip(track, clip); });
+    return found != composition.tracks.end() ? &composition.tracks.change(found) : nullptr;
+}
+inline Clip* changeClip(Composition& composition, Id id) {
+    auto* track = changeClipTrack(composition, id);
+    if (track == nullptr) { return nullptr; }
+    return &*std::find_if(track->clips.begin(), track->clips.end(), [id](const auto& clip) { return clip.id == id; });
 }
 
 inline std::shared_ptr<const Asset> findAsset(const std::vector<std::shared_ptr<const Asset>>& assets, Id id) {
@@ -148,8 +154,9 @@ inline std::shared_ptr<const CompositionDefinition> findDefinition(const Project
     return found != project.definitions.end() ? *found : nullptr;
 }
 
-// Editable state belongs to the message thread. Undo copies clip/curve values
-// but shares immutable asset payloads, so a drag never copies imported media.
+// Editable state belongs to the message thread. Project copies (undo steps,
+// previews, preparation) share media, definitions and every track an edit did
+// not change; an edit copies only the tracks it changes.
 class Document : public juce::ChangeBroadcaster {
 public:
     explicit Document(juce::UndoManager& undo) : undo(undo) {}

@@ -167,7 +167,7 @@ public:
                 "A take based on replaced notes cannot overwrite them");
 
             auto lockedProject = initial;
-            lockedProject.tracks[0].locked = true;
+            lockedProject.tracks.change(0).locked = true;
             recordedDocument.reset(lockedProject);
             const auto lockedRevision = recordedDocument.revision();
             expect(recordedDocument.recordMidiNotes(clip.id, nullptr, firstTake.source, recordedDocument.generation()).failed());
@@ -178,8 +178,8 @@ public:
         beginTest("Locked and audio tracks reject every authoring command atomically");
         for (const bool audio : {false, true}) {
             auto blocked = document.project();
-            blocked.tracks[0].locked = !audio;
-            blocked.tracks[0].kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+            blocked.tracks.change(0).locked = !audio;
+            blocked.tracks.change(0).kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
             document.reset(blocked);
             revision = document.revision();
             expect(document.assignMidi(clip.id, midi->id).failed());
@@ -203,10 +203,10 @@ public:
         for (const double bpm : {150.0, 170.0}) {
             auto adjacent = initial;
             adjacent.bpm = bpm;
-            auto& first = adjacent.tracks[0].clips[0];
+            auto& first = adjacent.tracks.change(0).clips[0];
             first.start = bpm == 150 ? .3 : .1; first.duration = first.start;
             const auto before = first.timing(motion::Tempo(bpm));
-            adjacent.tracks[0].clips[1].start = before.end();
+            adjacent.tracks.change(0).clips[1].start = before.end();
             document.reset(adjacent);
             expect(document.assignMidi(clip.id, midi->id).wasOk());
             expect(current().timing(motion::Tempo(bpm)).start >= before.start && current().timing(motion::Tempo(bpm)).end() <= before.end());
@@ -220,8 +220,8 @@ public:
             for (const bool audio : {false, true}) {
                 auto timingProject = initial;
                 timingProject.duration = 12;
-                timingProject.tracks[0].kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
-                auto& authored = timingProject.tracks[0].clips[0];
+                timingProject.tracks.change(0).kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+                auto& authored = timingProject.tracks.change(0).clips[0];
                 authored.midi = audio ? nullptr : midi->midi;
                 authored.midiAsset = audio ? 0 : midi->id;
                 if (beats) { expect(authored.anchorToBeats(timingProject.tempo())); }
@@ -284,7 +284,7 @@ public:
                 expect(document.setClipTiming(clip.id, invalidTiming).failed());
                 expect(document.setClipTiming(999999, stable).failed());
                 expect(document.revision() == revision && undo.getUndoDescription() == undoName);
-                auto locked = document.project(); locked.tracks[0].locked = true; document.reset(locked);
+                auto locked = document.project(); locked.tracks.change(0).locked = true; document.reset(locked);
                 revision = document.revision();
                 expect(document.setClipTiming(clip.id, originalTiming).failed());
                 expect(document.revision() == revision && !undo.canUndo());
@@ -292,8 +292,8 @@ public:
         }
         beginTest("Beat timing converts resolved speed and offset at a different project tempo");
         auto slower = initial;
-        expect(slower.tracks[0].clips[0].anchorToBeats(motion::Tempo(150)));
-        slower.bpm = 75; slower.tracks[0].clips[1].start = 20;
+        expect(slower.tracks.change(0).clips[0].anchorToBeats(motion::Tempo(150)));
+        slower.bpm = 75; slower.tracks.change(0).clips[1].start = 20;
         document.reset(slower);
         auto slowTiming = current().timing(motion::Tempo(75));
         slowTiming.moveTo(12); slowTiming.offset = 2; slowTiming.rate = .75;
@@ -316,9 +316,9 @@ private:
                 juce::UndoManager undo;
                 motion::Document document(undo);
                 auto project = initial;
-                project.tracks[0].clips.resize(1);
-                project.tracks[0].kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
-                auto& clip = project.tracks[0].clips[0];
+                project.tracks.change(0).clips.resize(1);
+                project.tracks.change(0).kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
+                auto& clip = project.tracks.change(0).clips[0];
                 const auto pattern = motion::MidiNotes::create({{1, 0, 1, 60, 100, 1}}).source;
                 if (!audio) {
                     clip.midi = pattern;
@@ -364,9 +364,9 @@ private:
             motion::Document document(undo);
             auto project = initial;
             const auto source = project.tracks[0].clips[0].id;
-            if (reason == 0) { project.tracks[0].clips[1].start = project.tracks[0].clips[0].end(); }
-            if (reason == 1) { project.tracks[0].locked = true; }
-            if (reason == 2) { project.tracks[0].clips[0].duration = std::numeric_limits<double>::infinity(); }
+            if (reason == 0) { project.tracks.change(0).clips[1].start = project.tracks.change(0).clips[0].end(); }
+            if (reason == 1) { project.tracks.change(0).locked = true; }
+            if (reason == 2) { project.tracks.change(0).clips[0].duration = std::numeric_limits<double>::infinity(); }
             document.reset(project);
             const auto marker = document.newId();
             const auto revision = document.revision();
@@ -381,9 +381,9 @@ private:
             juce::UndoManager undo;
             motion::Document document(undo);
             auto project = initial;
-            project.tracks[0].clips.resize(1);
-            project.tracks[0].clips[0].start = 1;
-            project.tracks[0].clips[0].duration = 2;
+            project.tracks.change(0).clips.resize(1);
+            project.tracks.change(0).clips[0].start = 1;
+            project.tracks.change(0).clips[0].duration = 2;
             auto second = project.tracks[0];
             second.id = 300;
             second.clips[0].id = 301;
@@ -410,9 +410,9 @@ private:
             // A collision on the second track must not publish the first copy,
             // consume IDs, or create an undo action.
             undo.clearUndoHistory();
-            project.tracks[1].clips.push_back(second.clips[0]);
-            project.tracks[1].clips.back().id = 303;
-            project.tracks[1].clips.back().start += project.tracks[1].clips.back().duration;
+            project.tracks.change(1).clips.push_back(second.clips[0]);
+            project.tracks.change(1).clips.back().id = 303;
+            project.tracks.change(1).clips.back().start += project.tracks.change(1).clips.back().duration;
             document.reset(project);
             const auto revision = document.revision();
             const auto marker = document.newId();
@@ -454,8 +454,8 @@ private:
         juce::UndoManager undo;
         motion::Document document(undo);
         auto project = initial;
-        project.tracks[0].clips.resize(1);
-        auto& clip = project.tracks[0].clips[0];
+        project.tracks.change(0).clips.resize(1);
+        auto& clip = project.tracks.change(0).clips[0];
         clip.effects.push_back(motion::makeEffect(motion::Document::maximumId - 1, *motion::effectDefinition("rotate")));
         document.reset(project);
         const auto revision = document.revision();

@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "Beam.h"
 #include "Group.h"
+#include "SharedList.h"
 #include <string_view>
 #include <type_traits>
 
@@ -74,7 +75,14 @@ auto findPropertyTarget(ProjectType& project, Id id) -> std::optional<BasicPrope
             }
         }
     }
-    for (auto& track : project.tracks) {
+    for (std::size_t index = 0; index < project.tracks.size(); ++index) {
+        const auto& candidate = project.tracks[index];
+        const auto ownsId = [id](const auto& owner) { return owner.id == id || std::any_of(owner.effects.begin(), owner.effects.end(), [id](const auto& effect) { return effect.id == id; }); };
+        if (std::none_of(candidate.effects.begin(), candidate.effects.end(), [id](const auto& effect) { return effect.id == id; })
+            && std::none_of(candidate.clips.begin(), candidate.clips.end(), ownsId)) {
+            continue;
+        }
+        auto& track = itemAt(project.tracks, index);
         for (auto& effect : track.effects) {
             if (effect.id == id) {
                 return Target { .id = effect.id, .name = effect.name, .duration = project.duration, .properties = &effect.properties, .isEffect = true, .locked = track.locked };

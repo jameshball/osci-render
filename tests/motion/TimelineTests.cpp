@@ -76,8 +76,8 @@ int main() {
         check(second.anchorToBeats(motion::Tempo(120)), "selection fixture includes beat-based clip");
         motion::Track track; track.id = 1;
         check(track.insert(first, motion::Tempo(120)) && track.insert(second, motion::Tempo(120)), "selection fixture placement");
-        std::vector<motion::Track> tracks {track, motion::Track{}};
-        tracks[1].id = 2;
+        motion::SharedList<motion::Track> tracks {track, motion::Track{}};
+        tracks.change(1).id = 2;
         check(motion::moveClips(tracks, {101, 102}, 3, 1, motion::Tempo(120)), "selection moves across tracks atomically");
         check(tracks[0].clips.empty() && tracks[1].clips.size() == 2, "every selected clip moves");
         check(near(tracks[1].clips[0].timing(motion::Tempo(120)).start, 5) && near(tracks[1].clips[1].timing(motion::Tempo(120)).start, 8), "mixed time bases preserve shared second displacement");
@@ -94,18 +94,18 @@ int main() {
         reject({101, 101}, 1, 0);
         reject({101}, 3, 0); // collides with the unselected second clip
         reject({101}, std::numeric_limits<double>::infinity(), 0);
-        tracks[0].locked = true;
+        tracks.change(0).locked = true;
         reject({101, 102}, 0, -1);
-        tracks[0].locked = false;
-        tracks[1].locked = true;
+        tracks.change(0).locked = false;
+        tracks.change(1).locked = true;
         reject({101, 102}, 1, 0);
-        tracks[1].locked = false;
-        tracks[0].kind = motion::TrackKind::audio;
+        tracks.change(1).locked = false;
+        tracks.change(0).kind = motion::TrackKind::audio;
         reject({101, 102}, 0, -1);
         auto adjacent = first; adjacent.id = 103; adjacent.start = first.end();
         motion::Track touching; touching.id = 3;
         check(touching.insert(first, motion::Tempo(120)) && touching.insert(adjacent, motion::Tempo(120)), "adjacent selection fixture");
-        std::vector<motion::Track> pair {touching};
+        motion::SharedList<motion::Track> pair {touching};
         check(motion::moveClips(pair, {103, 101}, 1, 0, motion::Tempo(120)), "adjacent selected clips do not collide with their old positions");
         check(pair[0].clips[0].id == 101 && pair[0].clips[1].id == 103
             && pair[0].clips[0].end() == pair[0].clips[1].start, "batch insertion remains ordered and exactly adjacent");

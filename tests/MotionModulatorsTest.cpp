@@ -196,7 +196,7 @@ public:
             motion::Modulator lfo;
             expect(f.document.addModulator(lfo, id).wasOk());
             f.document.edit("Self link", [&](motion::Project& project) {
-                project.tracks[0].clips[0].properties["position.y"].link = motion::PropertyLink {f.first, "position.x", 1, 0, 0};
+                project.tracks.change(0).clips[0].properties["position.y"].link = motion::PropertyLink {f.first, "position.x", 1, 0, 0};
             });
             std::vector<motion::Id> duplicates;
             expect(f.document.duplicateClips({f.first}, duplicates).wasOk());

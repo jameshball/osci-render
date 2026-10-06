@@ -632,9 +632,8 @@ void MotionPropertyInspector::setMotionMode(bool path, bool enabled) {
             }
         };
         for (auto& group : project.groups) { if (group.id == id) { apply(group); } }
-        for (auto& track : project.tracks) {
-            for (auto& clip : track.clips) { if (clip.id == id) { apply(clip); } }
-        }
+        auto* clip = motion::changeClip(project, id);
+        if (clip != nullptr) { apply(*clip); }
     });
 }
 

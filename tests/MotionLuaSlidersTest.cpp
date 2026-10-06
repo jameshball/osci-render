@@ -32,7 +32,7 @@ public:
 
         beginTest("Animated sliders bake per clip over its content and install as a cache");
         document.edit("Animate slider", [&](motion::Project& updated) {
-            auto& curve = updated.tracks[0].clips[0].properties["slider.a"];
+            auto& curve = updated.tracks.change(0).clips[0].properties["slider.a"];
             curve.setKey({0, 0, motion::Interpolation::linear});
             curve.setKey({2, 1, motion::Interpolation::linear});
         });
@@ -86,17 +86,17 @@ public:
             expect(stale.tracks[0].clips[0].luaBake == nullptr);
         }
         beginTest("Editing a slider makes the bake stale; removing the sliders clears it");
-        document.edit("Change slider", [&](motion::Project& updated) { updated.tracks[0].clips[0].properties["slider.a"].setKeyValue(2, 0.5); });
+        document.edit("Change slider", [&](motion::Project& updated) { updated.tracks.change(0).clips[0].properties["slider.a"].setKeyValue(2, 0.5); });
         const auto changed = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], motion::Composition {});
         expect(changed.has_value() && changed->key != plan->key);
-        document.edit("Remove slider", [&](motion::Project& updated) { updated.tracks[0].clips[0].properties.erase("slider.a"); });
+        document.edit("Remove slider", [&](motion::Project& updated) { updated.tracks.change(0).clips[0].properties.erase("slider.a"); });
         bakes.update();
         expect(document.project().tracks[0].clips[0].luaBake == nullptr);
 
         beginTest("Routed modulators and links reach slider bakes and their key");
         {
             document.edit("Route an LFO", [&](motion::Project& updated) {
-                updated.tracks[0].clips[0].properties["slider.a"].base = 0.25;
+                updated.tracks.change(0).clips[0].properties["slider.a"].base = 0.25;
                 motion::Modulator lfo;
                 lfo.id = 7001; lfo.name = "LFO"; lfo.shape.waveform = motion::ModulationWaveform::square; lfo.shape.rateHz = 1;
                 updated.modulators.push_back(lfo);
@@ -130,7 +130,7 @@ public:
             motion::Project withBake;
             expect(motion::Document::prepareLoad(document.save(), withBake).wasOk());
             expect(withBake.tracks[0].clips[0].luaBake != nullptr && deeper.has_value() && withBake.tracks[0].clips[0].luaBake->key == deeper->key, "a routed slider bake survives saving and loading");
-            document.edit("Move clip", [](motion::Project& updated) { updated.tracks[0].clips[0].start = 1; });
+            document.edit("Move clip", [](motion::Project& updated) { updated.tracks.change(0).clips[0].start = 1; });
             const auto moved = motion::LuaSliderBakes::planFor(*asset, document.project().tracks[0].clips[0], document.project());
             expect(moved.has_value() && deeper.has_value() && moved->key != deeper->key, "moving a routed clip re-bakes");
             expect(document.changeTempo(90).wasOk());
@@ -138,7 +138,7 @@ public:
             expect(retimed.has_value() && moved.has_value() && retimed->key != moved->key, "a tempo change re-bakes routed sliders");
         }
         beginTest("Replacing a Lua source with another kind removes its sliders");
-        document.edit("Slider again", [&](motion::Project& updated) { updated.tracks[0].clips[0].properties["slider.b"].base = 0.5; });
+        document.edit("Slider again", [&](motion::Project& updated) { updated.tracks.change(0).clips[0].properties["slider.b"].base = 0.5; });
         auto shape = std::make_shared<motion::Asset>();
         shape->id = asset->id; shape->name = "tri.obj"; shape->extension = ".obj";
         const juce::String obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");

@@ -17,9 +17,9 @@ MotionProcessor::MotionProcessor()
             scopeBeamSlots->fill(index, samples, [value](int) { return value; });
         }
     };
-    // Undo keeps whole-project snapshots (shared media is not copied); bound
-    // the history to about 256 MiB while always keeping the last 20 steps.
-    getUndoManager().setMaxNumberOfStoredUnits(256 * 1024, 20);
+    // Undo snapshots share media and every track a step did not change. Bound
+    // the history to about 256 MiB, always keeping the last 5 steps.
+    getUndoManager().setMaxNumberOfStoredUnits(256 * 1024, 5);
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
     blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
     midiSession = std::make_unique<motion::MidiRecordingSession>(document, midiRecording, motion::MidiRecordingSession::Transport{

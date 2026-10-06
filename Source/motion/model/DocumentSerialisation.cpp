@@ -666,16 +666,18 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     if (!modulation.empty()) { return juce::Result::fail(juce::String(modulation)); }
     // Only a slider bake matching its clip's sliders and what drives them is
     // kept; a stale one is dropped and the editor bakes again.
-    for (auto& track : project.tracks) {
+    const auto stale = [&](const Clip& clip) {
+        if (clip.luaBake == nullptr) { return false; }
+        const auto asset = findAsset(assets, clip.asset);
+        const auto plan = asset == nullptr ? std::nullopt : luaSliderPlan(*asset, clip, project);
+        const auto& source = *clip.luaBake->source;
+        return !(plan.has_value() && plan->key == clip.luaBake->key && source.frameCount() == plan->settings.frameCount() && source.frameRate() == plan->settings.frameRate);
+    };
+    project.tracks.changeEach([&](const Track& track) { return std::any_of(track.clips.begin(), track.clips.end(), stale); }, [&](Track& track) {
         for (auto& clip : track.clips) {
-            if (clip.luaBake == nullptr) { continue; }
-            const auto asset = findAsset(assets, clip.asset);
-            const auto plan = asset == nullptr ? std::nullopt : luaSliderPlan(*asset, clip, project);
-            const auto& source = *clip.luaBake->source;
-            const auto current = plan.has_value() && plan->key == clip.luaBake->key && source.frameCount() == plan->settings.frameCount() && source.frameRate() == plan->settings.frameRate;
-            if (!current) { clip.luaBake.reset(); }
+            if (stale(clip)) { clip.luaBake.reset(); }
         }
-    }
+    });
     return juce::Result::ok();
 }
 }

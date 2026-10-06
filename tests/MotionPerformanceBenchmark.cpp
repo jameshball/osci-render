@@ -129,7 +129,7 @@ public:
 
         const auto edits = milliseconds([&] {
             for (int edit = 0; edit < 50; ++edit) {
-                document.edit("Move", [edit](motion::Project& project) { project.tracks.front().clips.front().properties["position.x"].base = edit; });
+                document.edit("Move", [edit](motion::Project& project) { project.tracks.change(0).clips.front().properties["position.x"].base = edit; });
             }
         });
         const auto undos = milliseconds([&] { for (int edit = 0; edit < 50; ++edit) { undo.undo(); } });

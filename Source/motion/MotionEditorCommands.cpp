@@ -429,26 +429,21 @@ void MotionEditor::splitAtPlayhead() {
     }
     const auto id = processor.document.newId();
     processor.document.tryEdit("Split clip", [&](motion::Project& project) {
-        for (auto& track : project.tracks) {
-            for (std::size_t index = 0; index < track.clips.size(); ++index) {
-                if (track.clips[index].id != selection) { continue; }
-                if (track.locked) { return false; }
-                auto parts = track.clips[index].split(time, id, project.tempo());
-                if (!parts.has_value()) { return false; }
-                // The right half keeps the left's routes and internal links.
-                std::map<motion::Id, motion::Id> owners {{parts->first.id, id}};
-                for (auto& effect : parts->second.effects) {
-                    const auto clone = processor.document.newId();
-                    owners.emplace(effect.id, clone);
-                    effect.id = clone;
-                }
-                track.clips[index] = std::move(parts->first);
-                if (!track.insert(std::move(parts->second), project.tempo())) { return false; }
-                motion::cloneDrivers(project, owners, [this] { return processor.document.newId(); });
-                return true;
-            }
+        const auto* original = motion::findClipTrack(project, selection);
+        if (original == nullptr || original->locked) { return false; }
+        auto parts = motion::findClip(project, selection)->split(time, id, project.tempo());
+        if (!parts.has_value()) { return false; }
+        // The right half keeps the left's routes and internal links.
+        std::map<motion::Id, motion::Id> owners {{parts->first.id, id}};
+        for (auto& effect : parts->second.effects) {
+            const auto clone = processor.document.newId();
+            owners.emplace(effect.id, clone);
+            effect.id = clone;
         }
-        return false;
+        *motion::changeClip(project, selection) = std::move(parts->first);
+        if (!motion::changeClipTrack(project, selection)->insert(std::move(parts->second), project.tempo())) { return false; }
+        motion::cloneDrivers(project, owners, [this] { return processor.document.newId(); });
+        return true;
     });
 }
 

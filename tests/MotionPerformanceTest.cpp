@@ -169,7 +169,7 @@ private:
     // Sixteen-note chords on every sixteenth for the whole render.
     static motion::Project midiProject() {
         auto project = stressProject({1, 1, 2, 0, 0});
-        auto& clip = project.tracks[0].clips[0];
+        auto& clip = project.tracks.change(0).clips[0];
         clip.duration = renderSeconds;
         std::vector<motion::MidiNote> notes;
         motion::Id id = 1;
@@ -210,6 +210,16 @@ private:
         }), "ms");
         const auto clip = document.project().tracks.empty() || document.project().tracks[0].clips.empty() ? motion::Id(0) : document.project().tracks[0].clips[0].id;
         int step = 0;
+        {
+            const auto before = heapMebibytes();
+            for (int edit = 0; edit < 20; ++edit) {
+                document.edit("Benchmark", [&](motion::Project& edited) {
+                    auto* curve = motion::findPropertyCurve(edited, clip, "position.x");
+                    if (curve != nullptr) { curve->base = 0.01 * ++step; }
+                });
+            }
+            report(name + ": memory, 20 undo steps (one key each)", heapMebibytes() - before, "MiB");
+        }
         report(name + ": edit (one key, with undo)", milliseconds([&] {
             document.edit("Benchmark", [&](motion::Project& edited) {
                 auto* curve = motion::findPropertyCurve(edited, clip, "position.x");

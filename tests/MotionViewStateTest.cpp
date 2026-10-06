@@ -29,7 +29,7 @@ public:
             expectEquals(document.project().tracks[0].height, 64);
             expect(!undo.canUndo(), "resizing a row is not an edit");
             expectEquals(document.revision(), revision, "no revision bump disturbs open gestures");
-            document.edit("Rename", [](motion::Project& project) { project.tracks[1].name = "Renamed"; });
+            document.edit("Rename", [](motion::Project& project) { project.tracks.change(1).name = "Renamed"; });
             expect(document.setTrackHeight(first, 90));
             expect(undo.undo());
             expectEquals(juce::String(document.project().tracks[1].name), juce::String("Two"));
@@ -51,7 +51,7 @@ public:
             document.reset(twoTracks(document));
             const auto id = document.project().tracks[0].id;
             document.setTrackHeight(id, 48);
-            document.edit("Label", [](motion::Project& project) { project.tracks[0].label = 3; });
+            document.edit("Label", [](motion::Project& project) { project.tracks.change(0).label = 3; });
             motion::Project loaded;
             expect(motion::Document::prepareLoad(document.save(), loaded).wasOk());
             expectEquals(loaded.tracks[0].height, 48);
@@ -62,7 +62,7 @@ public:
             other.reset(twoTracks(other));
             other.setTrackHeight(other.project().tracks[0].id, 120);
             auto fresh = twoTracks(other);
-            fresh.tracks[0].id = other.project().tracks[0].id;
+            fresh.tracks.change(0).id = other.project().tracks[0].id;
             other.reset(fresh);
             expectEquals(other.project().tracks[0].height, 0, "reset does not inherit view state");
         }
@@ -94,7 +94,7 @@ public:
             document.reset(twoTracks(document));
             document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::beats; state.gridSnap = false; });
             expect(!undo.canUndo(), "a view option is not an edit");
-            document.edit("Rename", [](motion::Project& project) { project.tracks[0].name = "Renamed"; });
+            document.edit("Rename", [](motion::Project& project) { project.tracks.change(0).name = "Renamed"; });
             document.changeView([](motion::Composition& state) { state.timeDisplay = motion::TimeDisplay::frames; });
             expect(undo.undo());
             expect(document.project().timeDisplay == motion::TimeDisplay::frames && !document.project().gridSnap, "undo keeps the current view options");

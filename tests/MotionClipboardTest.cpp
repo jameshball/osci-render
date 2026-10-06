@@ -179,7 +179,7 @@ public:
         beginTest("Locked tracks reject pasted keys without an undo step");
         {
             Fixture f; f.initialise();
-            f.document.edit("Lock", [](motion::Project& project) { project.tracks[0].locked = true; });
+            f.document.edit("Lock", [](motion::Project& project) { project.tracks.change(0).locked = true; });
             const auto description = f.undo.getUndoDescription();
             const auto& keys = f.clip(f.first)->properties.at("position.x").keyframes();
             expect(f.document.pasteKeys(f.second, {{"position.x", 0, keys[0]}}, 4).failed());

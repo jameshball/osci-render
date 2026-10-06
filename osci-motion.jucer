@@ -542,6 +542,8 @@
               resource="0" file="Source/motion/model/RasterSettings.h"/>
         <FILE id="MotmodelScopeProfileh" name="ScopeProfile.h" compile="0"
               resource="0" file="Source/motion/model/ScopeProfile.h"/>
+        <FILE id="MotmodelSharedListh" name="SharedList.h" compile="0" resource="0"
+              file="Source/motion/model/SharedList.h"/>
         <FILE id="MotmodelSpatialMotionh" name="SpatialMotion.h" compile="0"
               resource="0" file="Source/motion/model/SpatialMotion.h"/>
         <FILE id="MotmodelTapTempoh" name="TapTempo.h" compile="0" resource="0"

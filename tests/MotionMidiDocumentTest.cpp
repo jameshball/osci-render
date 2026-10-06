@@ -79,7 +79,7 @@ public:
 
         beginTest("Rendering and curve editing share the musical content clock");
         auto slowProject = document.project(); slowProject.bpm = 170;
-        auto& authored = slowProject.tracks[0].clips[0];
+        auto& authored = slowProject.tracks.change(0).clips[0];
         authored.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
         authored.properties["position.x"].setKey({5, 2, motion::Interpolation::linear});
         auto fastProject = slowProject; fastProject.bpm = 340;
@@ -99,7 +99,7 @@ public:
         auto revisedNote = note; revisedNote.velocity = 43;
         const auto revised = before->withNote(revisedNote);
         expect(static_cast<bool>(revised));
-        document.edit("Change note velocity", [&](motion::Project& project) { project.tracks[0].clips[0].midi = revised.source; });
+        document.edit("Change note velocity", [&](motion::Project& project) { project.tracks.change(0).clips[0].midi = revised.source; });
         expect(document.project().tracks[0].clips[1].midi == midi->midi);
         expect(undo.undo()); expect(document.project().tracks[0].clips[0].midi == before);
         expect(undo.redo()); expect(document.project().tracks[0].clips[0].midi == revised.source);
@@ -126,7 +126,7 @@ public:
 
         beginTest("New empty editable patterns need no imported MIDI asset");
         document.edit("Empty pattern", [&](motion::Project& project) {
-            auto& target = project.tracks[0].clips[0]; target.midiAsset = 0; target.midi = motion::MidiNotes::create({}).source;
+            auto& target = project.tracks.change(0).clips[0]; target.midiAsset = 0; target.midi = motion::MidiNotes::create({}).source;
         });
         expect(restored.load(document.save()).wasOk());
         expect(restored.project().tracks[0].clips[0].midi->notes().empty());

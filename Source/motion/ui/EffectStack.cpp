@@ -379,12 +379,10 @@ void MotionEffectStack::showMenu(motion::Id id) {
 void MotionEffectStack::remove(motion::Id id) {
     cancelGesture();
     processor.document.tryEdit("Remove effect", [id](motion::Project& project) {
-        for (auto* list : allOwners(project)) {
-            const auto before = list->size();
-            std::erase_if(*list, [id](const auto& effect) { return effect.id == id; });
-            if (list->size() != before) { return true; }
-        }
-        return false;
+        auto* list = motion::findEffectList(project, id);
+        if (list == nullptr) { return false; }
+        std::erase_if(*list, [id](const auto& effect) { return effect.id == id; });
+        return true;
     });
     refresh();
 }
@@ -396,31 +394,21 @@ void MotionEffectStack::move(motion::Id id, int index) {
     processor.document.tryEdit("Move effect", [id, target, index](motion::Project& project) {
         auto* destination = motion::findEffectOwner(project, target);
         if (destination == nullptr) { return false; }
-        for (auto* list : allOwners(project)) {
-            const auto found = std::find_if(list->begin(), list->end(), [id](const auto& item) { return item.id == id; });
-            if (found == list->end()) { continue; }
-            const auto source = static_cast<int>(found - list->begin());
-            if (list == destination && (index == source || index == source + 1)) { return false; }
-            auto effect = std::move(*found);
-            list->erase(found);
-            // Removing it first shifts later positions in its own stage.
-            const auto at = std::clamp(list == destination && index > source ? index - 1 : index, 0, static_cast<int>(destination->size()));
-            destination->insert(destination->begin() + at, std::move(effect));
-            return true;
-        }
-        return false;
+        // Both lookups copy at most their own track, and a track copied by
+        // the first is changed in place by the second, so both stay valid.
+        auto* list = motion::findEffectList(project, id);
+        if (list == nullptr) { return false; }
+        const auto found = std::find_if(list->begin(), list->end(), [id](const auto& item) { return item.id == id; });
+        const auto source = static_cast<int>(found - list->begin());
+        if (list == destination && (index == source || index == source + 1)) { return false; }
+        auto effect = std::move(*found);
+        list->erase(found);
+        // Removing it first shifts later positions in its own stage.
+        const auto at = std::clamp(list == destination && index > source ? index - 1 : index, 0, static_cast<int>(destination->size()));
+        destination->insert(destination->begin() + at, std::move(effect));
+        return true;
     });
     refresh();
-}
-
-std::vector<std::vector<motion::EffectInstance>*> MotionEffectStack::allOwners(motion::Project& project) {
-    std::vector<std::vector<motion::EffectInstance>*> owners {&project.effects};
-    for (auto& group : project.groups) { owners.push_back(&group.effects); }
-    for (auto& track : project.tracks) {
-        owners.push_back(&track.effects);
-        for (auto& clip : track.clips) { owners.push_back(&clip.effects); }
-    }
-    return owners;
 }
 
 void MotionEffectStack::toggleKey(motion::Id id, const std::string& property) {

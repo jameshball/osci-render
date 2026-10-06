@@ -487,8 +487,8 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             const auto trackId = onTrack ? request.track : 0;
             document.edit(asset->audio != nullptr ? "Import soundtrack" : "Import object", [&](motion::Project& project) {
                 project.assets.push_back(asset);
-                const auto existing = std::find_if(project.tracks.begin(), project.tracks.end(), [&](const auto& item) { return item.id == trackId; });
-                if (trackId != 0 && existing != project.tracks.end()) { existing->insert(clip, project.tempo()); } else { project.tracks.push_back(track); }
+                auto* existing = trackId != 0 ? project.tracks.changeById(trackId) : nullptr;
+                if (existing != nullptr) { existing->insert(clip, project.tempo()); } else { project.tracks.push_back(track); }
                 project.duration = std::max(project.duration, clip.timing(project.tempo()).end());
             });
             owner->assetLibrary.refresh();

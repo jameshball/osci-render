@@ -21,17 +21,24 @@ static std::size_t propertyBytes(const PropertyMap& properties) {
     return bytes;
 }
 
-static std::size_t compositionBytes(const Composition& composition) {
-    std::size_t bytes = sizeof(Composition);
-    const auto effects = [&](const std::vector<EffectInstance>& list) {
-        for (const auto& effect : list) { bytes += sizeof(EffectInstance) + propertyBytes(effect.properties); }
-    };
-    effects(composition.effects);
-    for (const auto& group : composition.groups) { bytes += sizeof(Group) + propertyBytes(group.properties); effects(group.effects); }
-    for (const auto& track : composition.tracks) {
-        bytes += sizeof(Track);
-        effects(track.effects);
-        for (const auto& clip : track.clips) { bytes += sizeof(Clip) + clip.name.size() + propertyBytes(clip.properties); effects(clip.effects); }
+static std::size_t effectBytes(const std::vector<EffectInstance>& effects) {
+    std::size_t bytes = 0;
+    for (const auto& effect : effects) { bytes += sizeof(EffectInstance) + propertyBytes(effect.properties); }
+    return bytes;
+}
+
+static std::size_t trackBytes(const Track& track) {
+    auto bytes = sizeof(Track) + effectBytes(track.effects);
+    for (const auto& clip : track.clips) { bytes += sizeof(Clip) + clip.name.size() + propertyBytes(clip.properties) + effectBytes(clip.effects); }
+    return bytes;
+}
+
+// Tracks also held by `sharedWith` belong to both snapshots and are not counted.
+static std::size_t compositionBytes(const Composition& composition, const SharedList<Track>* sharedWith = nullptr) {
+    std::size_t bytes = sizeof(Composition) + effectBytes(composition.effects);
+    for (const auto& group : composition.groups) { bytes += sizeof(Group) + propertyBytes(group.properties) + effectBytes(group.effects); }
+    for (std::size_t index = 0; index < composition.tracks.size(); ++index) {
+        if (sharedWith == nullptr || !composition.tracks.shares(index, *sharedWith)) { bytes += trackBytes(composition.tracks[index]); }
     }
     for (const auto& camera : composition.cameras) { bytes += sizeof(Camera) + propertyBytes(camera.properties); }
     bytes += composition.markers.size() * sizeof(Marker) + composition.cameraCuts.size() * sizeof(CameraCut);
@@ -61,7 +68,7 @@ struct Document::Change : juce::UndoableAction {
     bool performed = false;
     // KiB, so the undo manager can bound history by memory as well as count.
     int getSizeInUnits() override {
-        auto bytes = compositionBytes(before) + compositionBytes(after) + propertyBytes(before.beam.properties) + propertyBytes(after.beam.properties);
+        auto bytes = compositionBytes(before, &after.tracks) + compositionBytes(after, &before.tracks) + propertyBytes(before.beam.properties) + propertyBytes(after.beam.properties);
         const auto unique = [&](const auto& mine, const auto& theirs, const auto& size) {
             for (const auto& item : mine) {
                 if (item != nullptr && std::find(theirs.begin(), theirs.end(), item) == theirs.end()) { bytes += size(*item); }
@@ -181,18 +188,19 @@ static void carryLuaBakes(Project& next, const Project& current) {
         const auto same = clip.luaBake == nullptr && found != installed.end() && found->second.second == sourceOf(next, clip.asset);
         return same ? found->second.first : nullptr;
     };
+    const auto trackNeedsCarry = [&](const Track& track) {
+        return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return carried(clip) != nullptr; });
+    };
     const auto needsCarry = [&](const Composition& composition) {
-        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
-            return std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) { return carried(clip) != nullptr; });
-        });
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackNeedsCarry);
     };
     const auto carry = [&](Composition& composition) {
-        for (auto& track : composition.tracks) {
+        composition.tracks.changeEach(trackNeedsCarry, [&](Track& track) {
             for (auto& clip : track.clips) {
                 auto bake = carried(clip);
                 if (bake != nullptr) { clip.luaBake = std::move(bake); }
             }
-        }
+        });
     };
     changeEachComposition(next, needsCarry, carry);
 }
@@ -255,17 +263,15 @@ static void carryTrackHeights(Project& next, const Project& current) {
     std::map<Id, int> heights;
     const auto collect = [&](const Composition& composition) { for (const auto& track : composition.tracks) { heights[track.id] = track.height; } };
     forEachComposition(current, collect);
+    const auto trackDiffers = [&](const Track& track) {
+        const auto found = heights.find(track.id);
+        return found != heights.end() && found->second != track.height;
+    };
     const auto differs = [&](const Composition& composition) {
-        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
-            const auto found = heights.find(track.id);
-            return found != heights.end() && found->second != track.height;
-        });
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackDiffers);
     };
     const auto carry = [&](Composition& composition) {
-        for (auto& track : composition.tracks) {
-            const auto found = heights.find(track.id);
-            if (found != heights.end()) { track.height = found->second; }
-        }
+        composition.tracks.changeEach(trackDiffers, [&](Track& track) { track.height = heights.at(track.id); });
     };
     changeEachComposition(next, differs, carry);
 }
@@ -389,7 +395,7 @@ static void keepBeats(Project& next, const Tempo& before, const Tempo& after) {
         for (auto& [name, curve] : group.properties) { scaleCurve(curve); }
         scaleEffects(group.effects);
     }
-    for (auto& track : next.tracks) { scaleEffects(track.effects); }
+    next.tracks.changeEach([](const Track& track) { return !track.effects.empty(); }, [&](Track& track) { scaleEffects(track.effects); });
     scaleEffects(next.effects);
 }
 
@@ -443,10 +449,10 @@ static juce::Result retimed(const Project& state, double initialBpm, std::shared
     // In musical time, everything placed in project time keeps its bar
     // position, like beat-anchored clips. Seconds projects keep seconds.
     if (state.timeDisplay == TimeDisplay::beats) { keepBeats(next, before, after); }
-    for (auto& track : next.tracks) {
-        const auto end = track.sortClips(after);
+    for (std::size_t index = 0; index < next.tracks.size(); ++index) {
+        const auto end = next.tracks.change(index).sortClips(after);
         if (!end.has_value()) {
-            return juce::Result::fail("That tempo would overlap clips on " + juce::String(track.name) + ". Move them apart or onto separate tracks first.");
+            return juce::Result::fail("That tempo would overlap clips on " + juce::String(next.tracks[index].name) + ". Move them apart or onto separate tracks first.");
         }
         next.duration = std::max(next.duration, *end);
     }
@@ -468,32 +474,28 @@ juce::Result Document::setTempoFromAudio(Id clipId, double bpm, double downbeat,
     const auto result = retimed(project(), bpm, nullptr, next);
     if (result.failed()) { return result; }
     const auto tempo = next.tempo();
-    for (auto& track : next.tracks) {
-        for (auto& clip : track.clips) {
-            if (clip.id != clipId) { continue; }
-            if (track.locked) { return juce::Result::fail("Unlock the soundtrack's track first."); }
-            // Move the clip later (never cutting audio) until its first
-            // downbeat sits on a bar line; a pickup lands in the bar before.
-            auto timing = clip.timing(tempo);
-            const auto bar = 60 / bpm * std::max(1, next.beatsPerBar);
-            const auto shift = std::fmod(timing.projectTime(downbeat), bar);
-            if (shift > 0.005 && bar - shift > 0.005) {
-                moved = bar - shift;
-                timing.moveTo(timing.start + moved);
-                auto placed = clip;
-                if (!placed.setTiming(timing, tempo) || !track.canPlace(placed, clip.id, tempo)) {
-                    return juce::Result::fail("There is no room to move the soundtrack onto the bar grid.");
-                }
-                clip = placed;
-                next.duration = std::max(next.duration, timing.end());
-            }
-            // A tempo taken from the music is for working in bars.
-            next.timeDisplay = TimeDisplay::beats;
-            edit("Set tempo from soundtrack", [next = std::move(next)](Project& project) { project = next; });
-            return juce::Result::ok();
+    const auto* track = findClipTrack(next, clipId);
+    if (track == nullptr) { return juce::Result::fail("The soundtrack clip no longer exists."); }
+    if (track->locked) { return juce::Result::fail("Unlock the soundtrack's track first."); }
+    auto clip = *findClip(next, clipId);
+    // Move the clip later (never cutting audio) until its first downbeat sits
+    // on a bar line; a pickup lands in the bar before.
+    auto timing = clip.timing(tempo);
+    const auto bar = 60 / bpm * std::max(1, next.beatsPerBar);
+    const auto shift = std::fmod(timing.projectTime(downbeat), bar);
+    if (shift > 0.005 && bar - shift > 0.005) {
+        moved = bar - shift;
+        timing.moveTo(timing.start + moved);
+        if (!clip.setTiming(timing, tempo) || !track->canPlace(clip, clip.id, tempo)) {
+            return juce::Result::fail("There is no room to move the soundtrack onto the bar grid.");
         }
+        *changeClip(next, clipId) = clip;
+        next.duration = std::max(next.duration, timing.end());
     }
-    return juce::Result::fail("The soundtrack clip no longer exists.");
+    // A tempo taken from the music is for working in bars.
+    next.timeDisplay = TimeDisplay::beats;
+    edit("Set tempo from soundtrack", [next = std::move(next)](Project& project) { project = next; });
+    return juce::Result::ok();
 }
 
 Id Document::highestId() const {
@@ -522,7 +524,7 @@ juce::Result Document::makeSourceUnique(Id clipId, const std::shared_ptr<const A
             lastId = copy->id;
             edit("Make source unique", [trackIndex, clipIndex, copy](Project& project) {
                 project.assets.push_back(copy);
-                project.tracks[trackIndex].clips[clipIndex].asset = copy->id;
+                project.tracks.change(trackIndex).clips[clipIndex].asset = copy->id;
             });
             return juce::Result::ok();
         }
@@ -555,11 +557,12 @@ bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     forEachComposition(state, [&](const Composition& composition) {
         for (const auto& track : composition.tracks) { if (wanted.contains(track.id)) { found.insert(track.id); } }
     });
+    const auto trackDiffers = [&](const Track& track) {
+        const auto height = wanted.find(track.id);
+        return height != wanted.end() && track.height != height->second;
+    };
     const auto differs = [&](const Composition& composition) {
-        return std::any_of(composition.tracks.begin(), composition.tracks.end(), [&](const auto& track) {
-            const auto height = wanted.find(track.id);
-            return height != wanted.end() && track.height != height->second;
-        });
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackDiffers);
     };
     // View state: no undo step, no revision bump and no change broadcast (it
     // affects neither playback nor any other view); the timeline relayouts
@@ -568,10 +571,7 @@ bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     auto next = state;
     changeEachComposition(next, differs, [&](Composition& composition) {
         changed = true;
-        for (auto& track : composition.tracks) {
-            const auto height = wanted.find(track.id);
-            if (height != wanted.end()) { track.height = height->second; }
-        }
+        composition.tracks.changeEach(trackDiffers, [&](Track& track) { track.height = wanted.at(track.id); });
     });
     if (changed) {
         state = std::move(next);
@@ -586,7 +586,7 @@ bool Document::setLuaBake(Id clipId, std::shared_ptr<const LuaClipBake> bake) {
     bool found = false;
     auto next = state;
     changeEachComposition(next, [clipId](const Composition& composition) { return findClip(composition, clipId) != nullptr; }, [&](Composition& composition) {
-        findClip(composition, clipId)->luaBake = bake;
+        changeClip(composition, clipId)->luaBake = bake;
         found = true;
     });
     if (!found) { return false; }
@@ -615,19 +615,20 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
             if (asset != nullptr && asset->id == assetId) { asset = replacement; }
         }
         // Slider curves and their bake belong to the old script.
+        const auto trackUses = [assetId](const Track& track) {
+            return std::any_of(track.clips.begin(), track.clips.end(), [assetId](const auto& clip) { return clip.asset == assetId; });
+        };
         const auto clear = [&](Composition& composition) {
-            for (auto& track : composition.tracks) {
+            composition.tracks.changeEach(trackUses, [&](Track& track) {
                 for (auto& clip : track.clips) {
                     if (clip.asset != assetId) { continue; }
                     clip.luaBake.reset();
                     if (!lua) { std::erase_if(clip.properties, [](const auto& item) { return item.first.starts_with("slider."); }); }
                 }
-            }
-        };
-        const auto uses = [assetId](const Composition& composition) {
-            return std::any_of(composition.tracks.begin(), composition.tracks.end(), [assetId](const auto& track) {
-                return std::any_of(track.clips.begin(), track.clips.end(), [assetId](const auto& clip) { return clip.asset == assetId; });
             });
+        };
+        const auto uses = [&](const Composition& composition) {
+            return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackUses);
         };
         changeEachComposition(project, uses, clear);
     });
@@ -701,7 +702,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
         const auto original = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [&](const auto& track) { return track.id == copied.track; });
         const bool fits = original != candidate.tracks.end() && !original->locked && original->kind == copied.kind && original->canPlace(clip, 0, state.tempo());
         if (fits) {
-            original->insert(clip, state.tempo());
+            candidate.tracks.change(original).insert(clip, state.tempo());
         } else {
             auto existing = overflowTracks.find(copied.track);
             auto overflow = existing != overflowTracks.end() ? std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [&](const auto& track) { return track.id == existing->second; }) : candidate.tracks.end();
@@ -715,7 +716,7 @@ juce::Result Document::pasteClips(const std::vector<CopiedClip>& clips, double t
                 overflow = candidate.tracks.insert(position, std::move(track));
                 overflowTracks[copied.track] = overflow->id;
             }
-            overflow->insert(clip, state.tempo());
+            candidate.tracks.change(overflow).insert(clip, state.tempo());
         }
         candidate.duration = std::max(candidate.duration, clip.timing(state.tempo()).end());
         pastedIds.push_back(clip.id);
@@ -790,7 +791,7 @@ juce::Result Document::duplicateClips(const std::vector<Id>& sourceIds, std::vec
         }
         renumber(copy, highest, owners);
         renumber(copy.effects, highest, owners);
-        if (!candidate.tracks[index].insert(copy, state.tempo())) {
+        if (!candidate.tracks.change(index).insert(copy, state.tempo())) {
             return juce::Result::fail("There is not enough free space after the selection. Move the following clips first.");
         }
         candidate.duration = std::max(candidate.duration, copy.timing(state.tempo()).end());
@@ -811,17 +812,18 @@ juce::Result Document::removeClips(const std::vector<Id>& clipIds, bool ripple) 
     }
     auto candidate = project();
     std::size_t found = 0;
-    for (auto& track : candidate.tracks) {
+    for (std::size_t index = 0; index < candidate.tracks.size(); ++index) {
         std::vector<ClipTiming> removed;
-        for (const auto& clip : track.clips) {
+        for (const auto& clip : candidate.tracks[index].clips) {
             if (!requested.contains(clip.id)) { continue; }
-            if (track.locked) { return juce::Result::fail("Unlock selected tracks before deleting clips."); }
+            if (candidate.tracks[index].locked) { return juce::Result::fail("Unlock selected tracks before deleting clips."); }
             const auto timing = clip.timing(candidate.tempo());
             if (!timing.valid()) { return juce::Result::fail("A selected clip has invalid timing."); }
             removed.push_back(timing);
             ++found;
         }
         if (removed.empty()) { continue; }
+        auto& track = candidate.tracks.change(index);
         if (ripple && !track.sortClips(candidate.tempo()).has_value()) {
             return juce::Result::fail("Ripple delete requires non-overlapping clip intervals.");
         }
@@ -931,7 +933,7 @@ juce::Result Document::insertComposition(Id definition, double time, Id trackId,
     if (!clip.valid() || !clip.timing(candidate.tempo()).valid()) { return juce::Result::fail("The composition has invalid timing."); }
     if (trackId != 0) {
         const auto track = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [trackId](const auto& value) { return value.id == trackId; });
-        if (track == candidate.tracks.end() || track->locked || track->kind != TrackKind::visual || !track->insert(clip, candidate.tempo())) {
+        if (track == candidate.tracks.end() || track->locked || track->kind != TrackKind::visual || !candidate.tracks.change(track).insert(clip, candidate.tempo())) {
             return juce::Result::fail("Use an unlocked visual track with room for the composition.");
         }
     } else {
@@ -953,7 +955,7 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
     auto candidate = project();
     const auto* track = findClipTrack(candidate, clipId);
     if (track != nullptr && track->locked) { return juce::Result::fail("Unlock the track before making its composition unique."); }
-    auto* target = findClip(candidate, clipId);
+    auto* target = changeClip(candidate, clipId);
     if (target == nullptr || target->composition == 0) { return juce::Result::fail("Select a composition instance."); }
     const auto found = findDefinition(candidate, target->composition);
     if (found == nullptr) { return juce::Result::fail("The referenced composition no longer exists."); }
@@ -984,18 +986,18 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
             group.parent = groups.at(group.parent);
         }
     }
-    for (auto& track : copy->tracks) {
+    for (const auto& track : copy->tracks) {
+        if (track.group != 0 && !groups.contains(track.group)) { return juce::Result::fail("Invalid composition group reference."); }
+    }
+    copy->tracks.changeAll([&](Track& track) {
         track.id = ++highest;
         renumber(track.effects, highest, owners);
-        if (track.group != 0) {
-            if (!groups.contains(track.group)) { return juce::Result::fail("Invalid composition group reference."); }
-            track.group = groups.at(track.group);
-        }
+        if (track.group != 0) { track.group = groups.at(track.group); }
         for (auto& clip : track.clips) {
             renumber(clip, highest, owners);
             renumber(clip.effects, highest, owners);
         }
-    }
+    });
     for (auto& camera : copy->cameras) {
         const auto old = camera.id;
         renumber(camera, highest, owners);
@@ -1110,11 +1112,11 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         definition->groups.push_back(std::move(copy));
     }
     for (auto& group : definition->groups) { if (group.parent != 0) { group.parent = groupIds.at(group.parent); } }
-    for (auto& track : definition->tracks) {
+    definition->tracks.changeAll([&](Track& track) {
         track.id = ++highest;
         if (track.group != 0) { track.group = groupIds.at(track.group); }
         renumber(track.effects, highest, copies);
-    }
+    });
     // Routes follow their targets: clip (and clip effect) routes move into the
     // definition; routes on copied groups are copied. Each modulator they use
     // is copied once, so the definition owns its own clocks.
@@ -1162,12 +1164,13 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
     Track replacement; replacement.id = ++highest; replacement.name = name.toStdString(); replacement.clips = {instance};
     replacement.solo = std::any_of(state.tracks.begin(), state.tracks.end(), [](const auto& track) { return track.solo; })
         || std::any_of(state.groups.begin(), state.groups.end(), [](const auto& group) { return group.solo; });
+    const auto isSelected = [&](const Clip& clip) { return selected.contains(clip.id); };
     std::set<Id> emptiedTracks;
-    for (auto& track : candidate.tracks) {
-        const auto removed = std::erase_if(track.clips, [&](const auto& clip) { return selected.contains(clip.id); });
-        if (removed != 0 && track.clips.empty()) { emptiedTracks.insert(track.id); }
-    }
-    std::erase_if(candidate.tracks, [&](const auto& track) { return emptiedTracks.contains(track.id); });
+    candidate.tracks.changeEach([&](const Track& track) { return std::any_of(track.clips.begin(), track.clips.end(), isSelected); }, [&](Track& track) {
+        std::erase_if(track.clips, isSelected);
+        if (track.clips.empty()) { emptiedTracks.insert(track.id); }
+    });
+    candidate.tracks.eraseIf([&](const Track& track) { return emptiedTracks.contains(track.id); });
     // Prune only ancestors emptied by this operation, retaining unrelated empty
     // tracks/groups and any partial group still containing unselected material.
     for (;;) {
@@ -1200,21 +1203,19 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
     const auto tempo = state.tempo();
     auto tracks = state.tracks;
     bool changed = false;
+    std::set<std::size_t> touched;
     for (const auto& [clipId, timing] : timings) {
         if (!timing.valid()) { return juce::Result::fail("Clip timing needs a finite non-negative start, positive duration and speed, and finite source offset."); }
-        bool found = false;
-        for (auto& track : tracks) {
-            for (auto& clip : track.clips) {
-                if (clip.id != clipId) { continue; }
-                if (track.locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
-                auto next = clip;
-                if (!next.setTiming(timing, tempo)) { return juce::Result::fail("The requested timing is invalid."); }
-                changed = changed || !next.sameTiming(clip);
-                clip = std::move(next);
-                found = true;
-            }
-        }
-        if (!found) { return juce::Result::fail("A selected clip no longer exists."); }
+        const auto track = std::find_if(tracks.begin(), tracks.end(), [clipId](const Track& item) { return holdsClip(item, clipId); });
+        if (track == tracks.end()) { return juce::Result::fail("A selected clip no longer exists."); }
+        if (track->locked) { return juce::Result::fail("Unlock the track before changing clip timing."); }
+        const auto clip = std::find_if(track->clips.begin(), track->clips.end(), [clipId](const Clip& item) { return item.id == clipId; });
+        auto next = *clip;
+        if (!next.setTiming(timing, tempo)) { return juce::Result::fail("The requested timing is invalid."); }
+        changed = changed || !next.sameTiming(*clip);
+        const auto position = clip - track->clips.begin();
+        touched.insert(static_cast<std::size_t>(track - tracks.begin()));
+        tracks.change(track).clips[static_cast<std::size_t>(position)] = std::move(next);
     }
     for (const auto& track : tracks) {
         for (const auto& clip : track.clips) {
@@ -1222,9 +1223,10 @@ juce::Result Document::setClipTimings(const std::vector<std::pair<Id, ClipTiming
         }
     }
     if (!changed) { return juce::Result::ok(); }
-    edit("Change clip timing", [tracks = std::move(tracks)](Project& project) mutable {
+    edit("Change clip timing", [tracks = std::move(tracks), touched = std::move(touched)](Project& project) mutable {
         const auto tempo = project.tempo();
-        for (auto& track : tracks) {
+        for (const auto index : touched) {
+            auto& track = tracks.change(index);
             for (const auto& clip : track.clips) { project.duration = std::max(project.duration, clip.timing(tempo).end()); }
             track.sortClips(tempo);
         }
@@ -1250,7 +1252,7 @@ juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
                 return juce::Result::ok();
             }
             edit("Change clip timing", [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
-                auto& track = project.tracks[trackIndex];
+                auto& track = project.tracks.change(trackIndex);
                 project.duration = std::max(project.duration, changed.timing(project.tempo()).end());
                 track.clips[clipIndex] = changed;
                 track.sortClips(project.tempo());
@@ -1282,7 +1284,7 @@ juce::Result Document::editMidi(Id clipId, juce::String label, const std::functi
                 return juce::Result::ok();
             }
             edit(label, [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
-                project.tracks[trackIndex].clips[clipIndex] = changed;
+                project.tracks.change(trackIndex).clips[clipIndex] = changed;
             });
             return juce::Result::ok();
         }

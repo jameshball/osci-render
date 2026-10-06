@@ -28,13 +28,13 @@ public:
             expectWithinAbsoluteError(point.r, .2f, .00001f);
         }
         expectEquals(composition.sample(.5, .2).r, 0.0f, "Released notes leave the clip silent");
-        auto heavier = project; heavier.tracks[0].clips[0].properties["weight"] = motion::Curve(10);
+        auto heavier = project; heavier.tracks.change(0).clips[0].properties["weight"] = motion::Curve(10);
         motion::PreparedComposition weighted(heavier, 48000);
         expectWithinAbsoluteError(weighted.sample(.123, .2).x, composition.sample(.123, .2).x, 1e-6f);
 
         beginTest("Velocity changes drawing budget rather than object size or RGB amplitude");
         auto quiet = project;
-        quiet.tracks[0].clips[0].midi = motion::MidiNotes::create({{1, 0, 1, 69, 32, 1}}).source;
+        quiet.tracks.change(0).clips[0].midi = motion::MidiNotes::create({{1, 0, 1, 69, 32, 1}}).source;
         motion::PreparedComposition reduced(quiet, 48000);
         int lit = 0;
         for (int index = 0; index < 1000; ++index) {
@@ -45,7 +45,7 @@ public:
 
         beginTest("Note ownership transitions blank RGB without changing geometry");
         auto chord = project;
-        chord.tracks[0].clips[0].midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}, {2, 0, 1, 81, 127, 1}}).source;
+        chord.tracks.change(0).clips[0].midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}, {2, 0, 1, 81, 127, 1}}).source;
         motion::PreparedComposition voices(chord, 48000);
         const auto a = voices.selectBeam(.123, .49), b = voices.selectBeam(.123, .51);
         expect(a.note == 1 && b.note == 2);
@@ -100,7 +100,7 @@ public:
         beginTest("Invalid polyphony fails explicitly and never falls back to continuous source playback");
         std::vector<motion::MidiNote> dense;
         for (motion::Id id = 1; id <= 33; ++id) { dense.push_back({id, 0, 1, 69, 127, 1}); }
-        auto invalid = project; invalid.tracks[0].clips[0].midi = motion::MidiNotes::create(dense).source;
+        auto invalid = project; invalid.tracks.change(0).clips[0].midi = motion::MidiNotes::create(dense).source;
         motion::PreparedComposition rejected(invalid, 48000);
         expect(rejected.preparationError.contains("32")); expect(rejected.preparationError.contains("MIDI line"));
         expectEquals(rejected.sample(.1, .2).r, 0.0f);
@@ -141,7 +141,7 @@ private:
         beginTest("Authored ADSR matches live and seekable MIDI allocation through attack, sustain and release");
         for (const double rate : {44100.0, 48000.0}) {
             auto project = makeProject();
-            auto& clip = project.tracks[0].clips[0];
+            auto& clip = project.tracks.change(0).clips[0];
             clip.start = 0; clip.duration = 2; clip.offset = 0; clip.rate = 1;
             clip.instrument = {.05, .1, .35, .2};
             clip.midi = motion::MidiNotes::create({{1, 0, .8, 69, 127, 1}}).source;
@@ -203,7 +203,7 @@ private:
         beginTest("Precomposing animated MIDI and soundtrack together preserves both signal clocks");
         auto project = makeProject();
         project.duration = 8; project.bpm = 96;
-        auto& visual = project.tracks.front().clips.front();
+        auto& visual = project.tracks.change(0).clips.front();
         visual.start = 1; visual.duration = 2; visual.offset = .125; visual.rate = 1.25;
         visual.midi = motion::MidiNotes::create({{1, 0, 1, 69, 127, 1}, {2, 1, 2, 72, 96, 1}, {3, 2, 2, 76, 127, 2}}).source;
         visual.properties["position.y"].setKey({0, -.2, motion::Interpolation::linear});
@@ -267,14 +267,14 @@ private:
         auto repeated = document.mainProject();
         auto copy = repeated.tracks.front().clips.front();
         copy.id = document.newId(); copy.start = 4; copy.duration = 1.5; copy.offset = 1; copy.rate = 1.5;
-        repeated.tracks.front().clips.push_back(copy);
+        repeated.tracks.change(0).clips.push_back(copy);
         auto flat = project;
         auto flatVisual = flat.tracks[0].clips.front();
         flatVisual.id = copy.id + 1; flatVisual.start = 4; flatVisual.duration = 2.0 / 1.5; flatVisual.rate = 1.875;
-        flat.tracks[0].clips.push_back(flatVisual);
+        flat.tracks.change(0).clips.push_back(flatVisual);
         auto flatAudio = flat.tracks[1].clips.front();
         flatAudio.id = copy.id + 2; flatAudio.start = 4; flatAudio.duration = 1.5; flatAudio.offset = .4; flatAudio.rate = 1.2;
-        flat.tracks[1].clips.push_back(flatAudio);
+        flat.tracks.change(1).clips.push_back(flatAudio);
         constexpr double exportRate = 44100;
         const motion::PreparedComposition directExport(flat, exportRate);
         const motion::PreparedSoundtrack flatSoundtrack(flat);

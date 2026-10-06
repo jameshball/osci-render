@@ -1,6 +1,32 @@
 #include "TimelineView.h"
 #include "../model/KeyEdit.h"
 
+namespace {
+template <typename Keys>
+bool holdsKey(const motion::Clip& clip, const Keys& keys) {
+    return std::any_of(keys.begin(), keys.end(), [&clip](const auto& key) { return key.clip == clip.id; });
+}
+template <typename Keys>
+bool holdsKey(const motion::Track& track, const Keys& keys) {
+    return std::any_of(track.clips.begin(), track.clips.end(), [&keys](const auto& clip) { return holdsKey(clip, keys); });
+}
+// True when one of `keys` is on a locked track.
+template <typename Keys>
+bool keysLocked(const motion::Project& project, const Keys& keys) {
+    return std::any_of(project.tracks.begin(), project.tracks.end(), [&keys](const auto& track) { return track.locked && holdsKey(track, keys); });
+}
+// Calls change(clip) for each clip on an unlocked track that holds one of
+// `keys`; tracks without them stay shared.
+template <typename Keys, typename Change>
+void changeKeyedClips(motion::Project& project, const Keys& keys, Change&& change) {
+    project.tracks.changeEach([&keys](const motion::Track& track) { return !track.locked && holdsKey(track, keys); }, [&](motion::Track& track) {
+        for (auto& clip : track.clips) {
+            if (holdsKey(clip, keys)) { change(clip); }
+        }
+    });
+}
+}
+
 MotionTimelineView::MotionTimelineView(MotionProcessor& ownerProcessor) : processor(ownerProcessor) {
     setName("Composition timeline");
     addTrack.onClick = [this] {
@@ -257,7 +283,8 @@ void MotionTimelineView::refreshTracks() {
                 processor.document.edit("Rename track", [id, name](motion::Project& project) {
                     auto* group = motion::findGroup(project, id);
                     if (group != nullptr) { group->name = name; }
-                    for (auto& item : project.tracks) { if (item.id == id) { item.name = name; } }
+                    auto* track = project.tracks.changeById(id);
+                    if (track != nullptr) { track->name = name; }
                 });
             };
             header->onMenu = [this](motion::Id id) { showTrackMenu(id); };
@@ -563,7 +590,7 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
     processor.document.edit(kind == motion::TrackKind::audio ? "Add audio clip" : "Add object clip", [&](motion::Project& updated) {
         updated.duration = std::max(updated.duration, clip.timing(updated.tempo()).end());
         if (row >= 0 && row < static_cast<int>(updated.tracks.size())) {
-            updated.tracks[row].insert(std::move(clip), updated.tempo());
+            updated.tracks.change(static_cast<std::size_t>(row)).insert(std::move(clip), updated.tempo());
         } else {
             motion::Track track;
             track.id = trackId;
@@ -1218,7 +1245,7 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
     }
     if (mode == Mode::rippleLeft || mode == Mode::rippleRight) {
         auto updated = *before;
-        if (!motion::rippleTrim(updated.tracks[originalRow], original.id, mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
+        if (!motion::rippleTrim(updated.tracks.change(originalRow), original.id, mode == Mode::rippleLeft, delta, updated.tempo())) { return; }
         for (const auto& item : updated.tracks[originalRow].clips) { updated.duration = std::max(updated.duration, item.timing(updated.tempo()).end()); }
         changed = delta != 0;
         processor.document.preview(std::move(updated));
@@ -1288,9 +1315,8 @@ void MotionTimelineView::mouseDrag(const juce::MouseEvent& event) {
         return;
     }
     auto updated = *before;
-    auto& source = updated.tracks[originalRow].clips;
-    source.erase(std::remove_if(source.begin(), source.end(), [&](const auto& clip) { return clip.id == original.id; }), source.end());
-    if (updated.tracks[target].insert(candidate, updated.tempo())) {
+    std::erase_if(updated.tracks.change(originalRow).clips, [&](const auto& clip) { return clip.id == original.id; });
+    if (updated.tracks.change(target).insert(candidate, updated.tempo())) {
         updated.duration = std::max(updated.duration, candidate.timing(updated.tempo()).end());
         changed = true;
         blocked.reset();
@@ -1745,34 +1771,31 @@ std::vector<MotionTimelineView::KeyRef> MotionTimelineView::keysInside(juce::Rec
 }
 
 bool MotionTimelineView::moveKeys(motion::Project& project, const std::vector<KeyRef>& keys, double delta) {
-    for (auto& track : project.tracks) {
-        if (track.locked) {
-            const bool touched = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {
-                return std::any_of(keys.begin(), keys.end(), [&](const auto& key) { return key.clip == clip.id; });
-            });
-            if (touched) { return false; }
-            continue;
-        }
-        for (auto& clip : track.clips) {
-            const auto timing = clip.timing(project.tempo());
-            for (auto& [name, curve] : clip.properties) {
-                std::vector<motion::Keyframe> moving;
-                for (const auto& key : curve.keyframes()) {
-                    const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == clip.id && item.property == name && sameTime(item.time, key.time); });
-                    if (chosen) { moving.push_back(key); }
+    if (keysLocked(project, keys)) { return false; }
+    bool collided = false;
+    const auto tempo = project.tempo();
+    changeKeyedClips(project, keys, [&](motion::Clip& clip) {
+        const auto timing = clip.timing(tempo);
+        for (auto& [name, curve] : clip.properties) {
+            std::vector<motion::Keyframe> moving;
+            for (const auto& key : curve.keyframes()) {
+                const bool chosen = std::any_of(keys.begin(), keys.end(), [&](const auto& item) { return item.clip == clip.id && item.property == name && sameTime(item.time, key.time); });
+                if (chosen) { moving.push_back(key); }
+            }
+            if (moving.empty()) { continue; }
+            for (const auto& key : moving) { curve.removeKey(key.time); }
+            for (auto key : moving) {
+                key.time = timing.localTime(timing.projectTime(key.time) + delta);
+                const auto& remaining = curve.keyframes();
+                if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return sameTime(other.time, key.time); })) {
+                    collided = true;
+                    continue;
                 }
-                if (moving.empty()) { continue; }
-                for (const auto& key : moving) { curve.removeKey(key.time); }
-                for (auto key : moving) {
-                    key.time = timing.localTime(timing.projectTime(key.time) + delta);
-                    const auto& remaining = curve.keyframes();
-                    if (std::any_of(remaining.begin(), remaining.end(), [&](const auto& other) { return sameTime(other.time, key.time); })) { return false; }
-                    curve.setKey(key);
-                }
+                curve.setKey(key);
             }
         }
-    }
-    return true;
+    });
+    return !collided;
 }
 
 void MotionTimelineView::dragKeys(int x, juce::ModifierKeys modifiers) {
@@ -1819,17 +1842,15 @@ bool MotionTimelineView::easeSelectedKeys(bool in, bool out) {
     if (selectedKeys.empty()) { return false; }
     const auto keys = selectedKeys;
     const auto eased = processor.document.tryEdit(in && out ? "Easy ease" : (in ? "Easy ease in" : "Easy ease out"), [&keys, in, out](motion::Project& project) {
+        if (keysLocked(project, keys)) { return false; }
         bool any = false;
-        for (auto& track : project.tracks) {
-            for (auto& clip : track.clips) {
-                for (const auto& key : keys) {
-                    if (key.clip != clip.id) { continue; }
-                    if (track.locked) { return false; }
-                    const auto found = clip.properties.find(key.property);
-                    any = (found != clip.properties.end() && motion::easeKey(found->second, key.time, in, out)) || any;
-                }
+        changeKeyedClips(project, keys, [&](motion::Clip& clip) {
+            for (const auto& key : keys) {
+                if (key.clip != clip.id) { continue; }
+                const auto found = clip.properties.find(key.property);
+                any = (found != clip.properties.end() && motion::easeKey(found->second, key.time, in, out)) || any;
             }
-        }
+        });
         return any;
     });
     repaint();
@@ -1839,17 +1860,15 @@ bool MotionTimelineView::easeSelectedKeys(bool in, bool out) {
 void MotionTimelineView::deleteSelectedKeys() {
     const auto keys = selectedKeys;
     const auto removed = processor.document.tryEdit(keys.size() > 1 ? "Delete keyframes" : "Delete keyframe", [&keys](motion::Project& project) {
+        if (keysLocked(project, keys)) { return false; }
         bool any = false;
-        for (auto& track : project.tracks) {
-            for (auto& clip : track.clips) {
-                for (const auto& key : keys) {
-                    if (key.clip != clip.id) { continue; }
-                    if (track.locked) { return false; }
-                    const auto found = clip.properties.find(key.property);
-                    if (found != clip.properties.end()) { any = found->second.removeKey(key.time) || any; }
-                }
+        changeKeyedClips(project, keys, [&](motion::Clip& clip) {
+            for (const auto& key : keys) {
+                if (key.clip != clip.id) { continue; }
+                const auto found = clip.properties.find(key.property);
+                if (found != clip.properties.end()) { any = found->second.removeKey(key.time) || any; }
             }
-        }
+        });
         return any;
     });
     if (removed) { selectedKeys.clear(); }
@@ -1894,16 +1913,13 @@ void MotionTimelineView::showKeyMenu() {
         const auto keys = selectedKeys;
         processor.document.tryEdit("Change key interpolation", [&](motion::Project& project) {
             bool any = false;
-            for (auto& track : project.tracks) {
-                for (auto& clip : track.clips) {
-                    for (const auto& key : keys) {
-                        if (key.clip != clip.id || track.locked) { continue; }
-                        const auto found = clip.properties.find(key.property);
-                        if (found == clip.properties.end()) { continue; }
-                        any = motion::keyedit::setInterpolation(found->second, key.time, shape) || any;
-                    }
+            changeKeyedClips(project, keys, [&](motion::Clip& clip) {
+                for (const auto& key : keys) {
+                    if (key.clip != clip.id) { continue; }
+                    const auto found = clip.properties.find(key.property);
+                    if (found != clip.properties.end()) { any = motion::keyedit::setInterpolation(found->second, key.time, shape) || any; }
                 }
-            }
+            });
             return any;
         });
     });
@@ -2454,7 +2470,8 @@ void MotionTimelineView::createGroup(motion::Id trackId, motion::Id parent) {
     if (!motion::validGroupHierarchy(candidate)) { return; }
     processor.document.edit("Create group", [group, trackId](motion::Project& project) {
         project.groups.push_back(group);
-        for (auto& track : project.tracks) { if (track.id == trackId) { track.group = group.id; } }
+        auto* track = project.tracks.changeById(trackId);
+        if (track != nullptr) { track->group = group.id; }
     });
     refreshTracks();
     selectClip(group.id);
@@ -2486,7 +2503,7 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
                 for (std::size_t depth = 0; depth < motion::maximumGroupDepth; ++depth) {
                     for (const auto& group : project.groups) { if (removed.contains(group.parent)) { removed.insert(group.id); } }
                 }
-                std::erase_if(project.tracks, [&](const auto& track) { return removed.contains(track.group); });
+                project.tracks.eraseIf([&](const auto& track) { return removed.contains(track.group); });
                 std::erase_if(project.groups, [&](const auto& group) { return removed.contains(group.id); });
             });
         }
@@ -2538,10 +2555,10 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
         if (result >= 300 && result < 300 + static_cast<int>(motion::style::trackLabels().size())) {
             const auto label = result - 300;
             processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {
-                for (auto& item : project.tracks) {
-                    if (item.id == id && item.label != label) { item.label = label; return true; }
-                }
-                return false;
+                auto* track = project.tracks.changeById(id);
+                if (track == nullptr || track->label == label) { return false; }
+                track->label = label;
+                return true;
             });
             return;
         }
@@ -2549,7 +2566,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
             placeTrack(id, index, groups[result - 100]);
         } else if (result == 3) {
             processor.document.edit("Delete track", [id](motion::Project& project) {
-                std::erase_if(project.tracks, [id](const auto& item) { return item.id == id; });
+                project.tracks.eraseIf([id](const auto& item) { return item.id == id; });
             });
             refreshTracks();
         } else {
@@ -2567,20 +2584,18 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
 void MotionTimelineView::setMidiInput(motion::Id id, int input) {
     cancelGesture();
     processor.document.tryEdit(input == 0 ? "Disarm MIDI input" : "Arm MIDI input", [id, input](motion::Project& project) {
-        for (auto& track : project.tracks) {
-            if (track.id == id && track.kind == motion::TrackKind::visual && track.midiInput != input) {
-                track.midiInput = input;
-                return true;
-            }
-        }
-        return false;
+        auto* track = project.tracks.changeById(id);
+        if (track == nullptr || track->kind != motion::TrackKind::visual || track->midiInput == input) { return false; }
+        track->midiInput = input;
+        return true;
     });
 }
 
 void MotionTimelineView::toggleLock(motion::Id id) {
     cancelGesture();
     processor.document.edit("Toggle track lock", [id](motion::Project& project) {
-        for (auto& track : project.tracks) { if (track.id == id) { track.locked = !track.locked; } }
+        auto* track = project.tracks.changeById(id);
+        if (track != nullptr) { track->locked = !track->locked; }
     });
 }
 
@@ -2591,10 +2606,9 @@ void MotionTimelineView::toggleTrack(motion::Id id, bool solo) {
         if (group != nullptr) {
             if (solo) { group->solo = !group->solo; } else { group->muted = !group->muted; }
         }
-        for (auto& track : project.tracks) {
-            if (track.id == id) {
-                if (solo) { track.solo = !track.solo; } else { track.muted = !track.muted; }
-            }
+        auto* track = project.tracks.changeById(id);
+        if (track != nullptr) {
+            if (solo) { track->solo = !track->solo; } else { track->muted = !track->muted; }
         }
     });
 }

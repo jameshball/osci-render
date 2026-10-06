@@ -14,7 +14,8 @@ void forEachPropertyMap(CompositionType& composition, Visitor&& visit) {
     const auto effects = [&](auto& list) { for (auto& effect : list) { visit(effect.id, effect.properties); } };
     effects(composition.effects);
     for (auto& group : composition.groups) { visit(group.id, group.properties); effects(group.effects); }
-    for (auto& track : composition.tracks) {
+    for (std::size_t index = 0; index < composition.tracks.size(); ++index) {
+        auto& track = itemAt(composition.tracks, index);
         effects(track.effects);
         for (auto& clip : track.clips) { visit(clip.id, clip.properties); effects(clip.effects); }
     }
@@ -152,7 +153,8 @@ void pruneReferences(CompositionType& composition) {
         return !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);
     });
     std::vector<std::pair<Id, std::string>> broken;
-    forEachPropertyMap(composition, [&](Id owner, const auto& properties) {
+    // Read-only walk: a mutable one would copy every shared track.
+    forEachPropertyMap(std::as_const(composition), [&](Id owner, const auto& properties) {
         for (const auto& [name, curve] : properties) {
             if (curve.link.has_value() && !hasPropertyCurve(composition, curve.link->source, curve.link->property)) { broken.emplace_back(owner, name); }
         }

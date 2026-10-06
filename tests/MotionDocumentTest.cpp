@@ -18,19 +18,19 @@ public:
         beginTest("Ripple deletion closes selected intervals per track and preserves source clocks, keys and cues");
         auto project = source;
         project.tracks.resize(2, project.tracks.front());
-        project.tracks[0].id = 100; project.tracks[1].id = 101;
+        project.tracks.change(0).id = 100; project.tracks.change(1).id = 101;
         const auto base = project.tracks[0].clips.front();
-        project.tracks[0].clips.clear(); project.tracks[1].clips.clear();
+        project.tracks.change(0).clips.clear(); project.tracks.change(1).clips.clear();
         for (int index = 0; index < 5; ++index) {
             auto clip = base;
             clip.id = 200 + index; clip.start = index * 3; clip.duration = 2;
             clip.offset = .75; clip.rate = 1.25;
             clip.properties["position.x"].setKey({1, .5, motion::Interpolation::linear});
             if (index == 4) { expect(clip.anchorToBeats(project.tempo())); }
-            project.tracks[0].clips.push_back(clip);
+            project.tracks.change(0).clips.push_back(clip);
         }
         auto independent = base; independent.id = 300; independent.start = 9; independent.duration = 2;
-        project.tracks[1].clips.push_back(independent);
+        project.tracks.change(1).clips.push_back(independent);
         juce::UndoManager undo; motion::Document document(undo); document.reset(project);
         expect(document.setMarker(0, 8, "Fixed cue").wasOk());
         const auto original = document.save().toString();
@@ -61,26 +61,26 @@ public:
         expect(document.removeClips({201, 203}, false).wasOk());
         expectEquals(document.project().tracks[0].clips[1].start, 6.0);
         expect(undo.undo());
-        document.edit("Lock second track", [](motion::Project& value) { value.tracks[1].locked = true; });
+        document.edit("Lock second track", [](motion::Project& value) { value.tracks.change(1).locked = true; });
         const auto locked = document.save().toString();
         expect(document.removeClips({201, 300}, true).failed()); expectEquals(document.save().toString(), locked);
         expect(document.removeClips({201}, true).wasOk());
 
         beginTest("Ripple retains touching mixed-timebase boundaries at non-round tempo");
         project.bpm = 137;
-        project.tracks.resize(1); project.tracks[0].clips.clear();
+        project.tracks.resize(1); project.tracks.change(0).clips.clear();
         for (int index = 0; index < 5; ++index) {
             auto clip = base; clip.id = 400 + index; clip.start = index * .7; clip.duration = .7;
             if (index % 2 == 1) { expect(clip.anchorToBeats(project.tempo())); }
-            project.tracks[0].clips.push_back(clip);
+            project.tracks.change(0).clips.push_back(clip);
         }
         document.reset(project);
         expect(document.removeClips({401, 403}, true).wasOk());
         expectWithinAbsoluteError(document.project().tracks[0].clips.back().timing(motion::Tempo(137)).start, 1.4, 1e-12);
-        project.tracks[0].clips.clear();
+        project.tracks.change(0).clips.clear();
         for (const auto [start, duration] : {std::pair{0.0, .3}, std::pair{.3, .4}, std::pair{.7, .1}}) {
             auto clip = base; clip.id = 500 + project.tracks[0].clips.size(); clip.start = start; clip.duration = duration;
-            project.tracks[0].clips.push_back(clip);
+            project.tracks.change(0).clips.push_back(clip);
         }
         document.reset(project);
         expect(document.removeClips({500}, true).wasOk());
@@ -115,7 +115,7 @@ public:
         auto invalid = document.save();
         invalid.getChildByName("track")->getChildByName("clip")->getChildByName("instrument")->setAttribute("attack", "nan");
         expect(loaded.load(invalid).failed()); expectEquals(loaded.save().toString(), saved);
-        document.edit("Lock", [](motion::Project& value) { value.tracks[0].locked = true; });
+        document.edit("Lock", [](motion::Project& value) { value.tracks.change(0).locked = true; });
         expect(document.setMidiInstrument(2, {}).failed());
     }
 
@@ -286,14 +286,14 @@ public:
 
         beginTest("Motion paths reject non-finite transformed positions and bound excessive authored keys");
         auto nonFinite = project;
-        nonFinite.tracks[0].clips[0].properties["position.x"] = motion::Curve(2);
+        nonFinite.tracks.change(0).clips[0].properties["position.x"] = motion::Curve(2);
         nonFinite.groups[0].properties["scale.x"] = motion::Curve(std::numeric_limits<double>::max());
         const auto finitePath = motion::editor::buildMotionPath(nonFinite, clip.id);
         expect(finitePath.points.empty());
         expect(!finitePath.tooComplex);
 
         auto excessive = project;
-        auto& curve = excessive.tracks[0].clips[0].properties["position.x"];
+        auto& curve = excessive.tracks.change(0).clips[0].properties["position.x"];
         for (int index = 0; index < 2049; ++index) {
             curve.setKey({20.0 + index, static_cast<double>(index), motion::Interpolation::linear});
         }
@@ -456,7 +456,7 @@ public:
 
         beginTest("RGB is carried by the sampled signal and a single-object budget fade remains effective");
         auto project = document.project();
-        auto& properties = project.tracks[0].clips[0].properties;
+        auto& properties = project.tracks.change(0).clips[0].properties;
         properties["red"] = motion::Curve(0.8);
         properties["green"] = motion::Curve(0.2);
         properties["blue"] = motion::Curve(0.4);
@@ -677,7 +677,7 @@ private:
         expect(original == repeated);
 
         beginTest("Projects without audio tracks export stereo silence for the whole duration");
-        project.tracks.pop_back();
+        project.tracks.erase(project.tracks.end() - 1);
         const auto silentFile = directory.getFile().getChildFile("silent.wav");
         expect(motion::SoundtrackExporter::write(project, silentFile, rate, cancel).wasOk());
         reader = read(silentFile);
@@ -846,12 +846,12 @@ private:
         }
         reject(badGain);
         document.edit("Invalid audio effect", [](motion::Project& value) {
-            value.tracks.back().effects.push_back(motion::makeEffect(9010, *motion::effectDefinition("bulge")));
+            value.tracks.change(value.tracks.size() - 1).effects.push_back(motion::makeEffect(9010, *motion::effectDefinition("bulge")));
         });
         reject(document.save());
         document.edit("Invalid clip effect", [](motion::Project& value) {
-            value.tracks.back().effects.clear();
-            value.tracks.back().clips[0].effects.push_back(motion::makeEffect(9011, *motion::effectDefinition("bulge")));
+            value.tracks.change(value.tracks.size() - 1).effects.clear();
+            value.tracks.change(value.tracks.size() - 1).clips[0].effects.push_back(motion::makeEffect(9011, *motion::effectDefinition("bulge")));
         });
         reject(document.save());
     }
@@ -860,7 +860,7 @@ private:
         beginTest("A shared modulator drives every kind of owner on the composition clock");
         auto project = sourceProject;
         project.bpm = 60;
-        auto& clip = project.tracks[0].clips[0];
+        auto& clip = project.tracks.change(0).clips[0];
         clip.start = 2;
         clip.duration = 10;
         clip.offset = 0.125;
@@ -881,14 +881,14 @@ private:
         clip.effects.push_back(clipEffect);
         auto trackEffect = clipEffect;
         trackEffect.id = 901;
-        project.tracks[0].effects.push_back(trackEffect);
+        project.tracks.change(0).effects.push_back(trackEffect);
         motion::Group group;
         group.id = 902;
         auto groupEffect = clipEffect;
         groupEffect.id = 903;
         group.effects.push_back(groupEffect);
         project.groups.push_back(group);
-        project.tracks[0].group = group.id;
+        project.tracks.change(0).group = group.id;
         auto compositionEffect = clipEffect;
         compositionEffect.id = 904;
         project.effects.push_back(compositionEffect);
@@ -918,7 +918,7 @@ private:
 
         beginTest("Modulated drawing weight, colour and effect parameters remain bounded");
         auto bounded = project;
-        auto& boundedClip = bounded.tracks[0].clips[0];
+        auto& boundedClip = bounded.tracks.change(0).clips[0];
         boundedClip.properties["weight"] = motion::Curve(0.5);
         boundedClip.properties["red"] = motion::Curve(0.5);
         for (const auto* property : {"weight", "red"}) {
@@ -937,7 +937,7 @@ private:
     void testGroups(const motion::Project& sourceProject) {
         beginTest("Nested groups apply inner-to-outer in project time after track effects");
         auto project = sourceProject;
-        auto& clip = project.tracks[0].clips[0];
+        auto& clip = project.tracks.change(0).clips[0];
         clip.start = 2;
         clip.duration = 10;
         clip.offset = 4;
@@ -962,9 +962,9 @@ private:
         inner.effects.push_back(innerEffect);
         auto trackEffect = motion::makeEffect(703, *motion::effectDefinition("translate"));
         trackEffect.properties["translateX"] = motion::Curve(0.2);
-        project.tracks[0].effects.push_back(trackEffect);
+        project.tracks.change(0).effects.push_back(trackEffect);
         project.groups = { outer, inner };
-        project.tracks[0].group = inner.id;
+        project.tracks.change(0).group = inner.id;
         expect(motion::validGroupHierarchy(project));
         motion::PreparedComposition nested(project);
         const auto raw = sourceProject.assets[0]->source->sample(clip.localTime(3, motion::Tempo(120)), 0.2);
@@ -973,11 +973,11 @@ private:
         expectWithinAbsoluteError(world.r, 0.25f, 0.000001f);
         expectEquals(nested.clips[0].weight(3), 0.25);
         auto amplified = project;
-        amplified.tracks[0].clips[0].properties["weight"] = motion::Curve(1000000);
+        amplified.tracks.change(0).clips[0].properties["weight"] = motion::Curve(1000000);
         amplified.groups[1].properties["weight"] = motion::Curve(2);
         amplified.groups[0].properties["weight"] = motion::Curve(0.5);
         expectEquals(motion::PreparedComposition(amplified).clips[0].weight(3), 1000000.0);
-        amplified.tracks[0].clips[0].properties["weight"] = motion::Curve(1);
+        amplified.tracks.change(0).clips[0].properties["weight"] = motion::Curve(1);
         amplified.groups[1].properties["weight"] = motion::Curve(1000000);
         amplified.groups[0].properties["weight"] = motion::Curve(1000000);
         motion::Group attenuator;
@@ -1014,12 +1014,12 @@ private:
         expect(!motion::trackIsAudible(project, project.tracks[1]));
         expectEquals(static_cast<int>(motion::PreparedComposition(project).clips.size()), 1);
         project.groups[0].muted = true;
-        project.tracks[0].solo = true;
+        project.tracks.change(0).solo = true;
         expect(!motion::trackIsAudible(project, project.tracks[0]));
         expect(motion::PreparedComposition(project).clips.empty());
         project.groups[0].muted = false;
         project.groups[0].solo = false;
-        project.tracks[0].solo = false;
+        project.tracks.change(0).solo = false;
         project.groups[1].solo = true;
         expect(motion::trackIsAudible(project, project.tracks[0]));
         expect(!motion::trackIsAudible(project, project.tracks[1]));
@@ -1076,11 +1076,11 @@ private:
             group.parent = index == 1 ? 0 : group.id - 1;
             deep.groups.push_back(group);
         }
-        deep.tracks[0].group = deep.groups.back().id;
+        deep.tracks.change(0).group = deep.groups.back().id;
         expect(!motion::validGroupHierarchy(deep));
         expect(motion::PreparedComposition(deep).clips.empty());
         deep.groups.pop_back();
-        deep.tracks[0].group = deep.groups.back().id;
+        deep.tracks.change(0).group = deep.groups.back().id;
         expect(motion::validGroupHierarchy(deep));
         expectEquals(static_cast<int>(motion::PreparedComposition(deep).clips.size()), 1);
     }
@@ -1088,7 +1088,7 @@ private:
     void testTrackStates(const motion::Project& sourceProject) {
         beginTest("Mute and solo exclude tracks from signal and drawing allocation");
         auto project = sourceProject;
-        auto& original = project.tracks[0].clips[0];
+        auto& original = project.tracks.change(0).clips[0];
         original.properties["red"] = motion::Curve(1);
         original.properties["green"] = motion::Curve(0);
         original.properties["blue"] = motion::Curve(0);
@@ -1103,43 +1103,43 @@ private:
         expectEquals(static_cast<int>(both.clips.size()), 2);
         expectEquals(both.sample(1, 0.25).r, 1.0f);
         expectEquals(both.sample(1, 0.75).g, 1.0f);
-        project.tracks[1].muted = true;
+        project.tracks.change(1).muted = true;
         const motion::PreparedComposition muted(project);
         expectEquals(static_cast<int>(muted.clips.size()), 1);
         expectEquals(muted.sample(1, 0.75).r, 1.0f);
         expectEquals(muted.sample(1, 0.75).g, 0.0f);
         expectEquals(both.sample(1, 0.75).g, 1.0f);
 
-        project.tracks[1].muted = false;
-        project.tracks[1].solo = true;
+        project.tracks.change(1).muted = false;
+        project.tracks.change(1).solo = true;
         const motion::PreparedComposition solo(project);
         expectEquals(static_cast<int>(solo.clips.size()), 1);
         expectEquals(solo.sample(1, 0.25).g, 1.0f);
-        project.tracks[1].muted = true;
+        project.tracks.change(1).muted = true;
         const motion::PreparedComposition mutedSolo(project);
         expect(mutedSolo.clips.empty());
         const auto dark = mutedSolo.sample(1, 0.25);
         expectEquals(dark.r + dark.g + dark.b, 0.0f);
-        project.tracks[0].solo = true;
+        project.tracks.change(0).solo = true;
         const motion::PreparedComposition multipleSolo(project);
         expectEquals(static_cast<int>(multipleSolo.clips.size()), 1);
         expectEquals(multipleSolo.sample(1, 0.75).r, 1.0f);
 
         beginTest("Lock leaves playback unchanged and excluded tracks consume no fade budget");
-        project.tracks[0].locked = true;
-        project.tracks[0].clips[0].properties["weight"] = motion::Curve(0.25);
+        project.tracks.change(0).locked = true;
+        project.tracks.change(0).clips[0].properties["weight"] = motion::Curve(0.25);
         const motion::PreparedComposition locked(project);
         int litSamples = 0;
         for (int index = 0; index < 1000; ++index) {
             litSamples += locked.sample(1, index / 1000.0).r > 0 ? 1 : 0;
         }
         expectEquals(litSamples, 250);
-        project.tracks[1].muted = false;
+        project.tracks.change(1).muted = false;
         const motion::PreparedComposition bothSolo(project);
         expectEquals(static_cast<int>(bothSolo.clips.size()), 2);
 
         beginTest("Track state survives save, load, undo and redo without copying assets");
-        project.tracks[1].muted = true;
+        project.tracks.change(1).muted = true;
         const motion::PreparedComposition savedSignal(project);
         juce::UndoManager undo;
         motion::Document document(undo);
@@ -1178,7 +1178,7 @@ private:
             const auto loaded = document.load(saved);
             expect(loaded.wasOk(), loaded.getErrorMessage());
             document.edit("Edit restored key", [pass](motion::Project& value) {
-                auto& clip = value.tracks.front().clips.front();
+                auto& clip = value.tracks.change(0).clips.front();
                 clip.properties.at("rotation.y").setKeyValue(clip.localTime(166.4, motion::Tempo(120)), 90 + pass);
             });
             const auto& curve = document.project().tracks.front().clips.front().properties.at("rotation.y");
@@ -1269,7 +1269,7 @@ private:
             expect(uniqueUndo.undo()); expect(unique.mainProject().definitions.size() == 1);
             expect(uniqueUndo.redo()); expect(unique.mainProject().definitions.size() == 2);
             expect(unique.enterComposition(copyId).wasOk());
-            unique.edit("Edit isolated child", [](motion::Project& value) { value.tracks.front().clips.front().properties["position.z"] = motion::Curve(0.4); });
+            unique.edit("Edit isolated child", [](motion::Project& value) { value.tracks.change(0).clips.front().properties["position.z"] = motion::Curve(0.4); });
             expectWithinAbsoluteError(unique.mainProject().definitions.front()->tracks.front().clips.front().properties.at("position.z").base, 0.0, 0.00001);
             expect(unique.mainProject().assets.front() == project.assets.front());
             const auto isolatedSaved = loaded.load(unique.save()); expect(isolatedSaved.wasOk(), isolatedSaved.getErrorMessage());
@@ -1282,7 +1282,7 @@ private:
             expectEquals(unique.project().tracks.back().clips.front().duration, 4.0);
             expect(uniqueUndo.undo()); expect(uniqueUndo.redo());
             const auto insertedSaved = loaded.load(unique.save()); expect(insertedSaved.wasOk(), insertedSaved.getErrorMessage());
-            unique.edit("Lock insertion track", [](motion::Project& value) { value.tracks.back().locked = true; });
+            unique.edit("Lock insertion track", [](motion::Project& value) { value.tracks.change(value.tracks.size() - 1).locked = true; });
             const auto revision = unique.revision();
             const auto highest = motion::highestProjectIdentity(unique.mainProject());
             expect(unique.insertComposition(originalDefinition->id, 30, unique.project().tracks.back().id, 0, inserted).failed());
@@ -1301,7 +1301,7 @@ private:
         expect(cleanup.removeComposition(referenced).failed());
         expect(cleanup.revision() == beforeRejected && !cleanupUndo.canUndo());
         cleanup.edit("Remove independent instances", [copyId](motion::Project& value) {
-            for (auto& track : value.tracks) { std::erase_if(track.clips, [copyId](const auto& clip) { return clip.composition == copyId; }); }
+            value.tracks.changeAll([copyId](motion::Track& track) { std::erase_if(track.clips, [copyId](const auto& clip) { return clip.composition == copyId; }); });
         });
         expectEquals(static_cast<int>(cleanup.compositionReferenceCount(copyId)), 0);
         expect(cleanup.enterComposition(copyId).wasOk());
@@ -1332,7 +1332,7 @@ private:
         expect(undo.undo()); expect(document.project().name == "Motif");
         expect(undo.redo()); expect(document.project().name == "Shared edited motif");
         auto beforeDrag = document.project();
-        auto preview = beforeDrag; preview.tracks.front().clips.front().properties["position.z"] = motion::Curve(0.3);
+        auto preview = beforeDrag; preview.tracks.change(0).clips.front().properties["position.z"] = motion::Curve(0.3);
         document.preview(std::move(preview)); document.commit("Move child", beforeDrag);
         expectWithinAbsoluteError(document.mainProject().definitions.front()->tracks.front().clips.front().properties.at("position.z").base, 0.3, 0.00001);
         expect(undo.undo());
@@ -1359,7 +1359,7 @@ private:
         expect(document.enterComposition(999999).failed());
         beginTest("Invalid precomposition leaves identity allocation and undo untouched");
         for (int reason = 0; reason < 4; ++reason) {
-            auto invalid = project; if (reason == 0) { invalid.tracks[0].locked = true; }
+            auto invalid = project; if (reason == 0) { invalid.tracks.change(0).locked = true; }
             juce::UndoManager rejectedUndo; motion::Document rejected(rejectedUndo); rejected.reset(invalid);
             const auto revision = rejected.revision(); motion::Id output = 999;
             const auto ids = reason == 1 ? std::vector<motion::Id>{999999} : reason == 2 ? std::vector<motion::Id>{clip.id, clip.id} : std::vector<motion::Id>{clip.id};
@@ -1368,7 +1368,7 @@ private:
             expect(rejected.newId() == 70007);
         }
         beginTest("Precomposition preserves solo-filtered visibility across scopes");
-        project.tracks[0].solo = true;
+        project.tracks.change(0).solo = true;
         auto hidden = project.tracks[0]; hidden.id = 70010; hidden.solo = false; hidden.group = 0; hidden.effects.clear();
         hidden.clips = {clip}; hidden.clips[0].id = 70011;
         project.tracks.push_back(hidden);
@@ -1392,7 +1392,7 @@ private:
         project.definitions = {definition};
         const auto sharedCount = motion::sourceReferenceCount(project, childTrack.clips[0].asset);
         expect(sharedCount > motion::sourceReferenceCount(sourceProject, childTrack.clips[0].asset));
-        auto& instance = project.tracks[0].clips[0];
+        auto& instance = project.tracks.change(0).clips[0];
         instance.asset = 0; instance.composition = definition->id;
         juce::UndoManager undo, loadedUndo;
         motion::Document document(undo), loaded(loadedUndo);
@@ -1450,7 +1450,7 @@ private:
             expectEquals(first.x, again.x); expectEquals(first.r, again.r);
         }
         auto repeat = placement; repeat.id = 61008; repeat.start = 10; repeat.rate = 1;
-        visual.tracks[0].clips.push_back(repeat);
+        visual.tracks.change(0).clips.push_back(repeat);
         const motion::PreparedComposition repeatedVisual(visual);
         expect(repeatedVisual.preparationError.isEmpty(), repeatedVisual.preparationError);
         expectEquals(static_cast<int>(repeatedVisual.clips.size()), 2);
@@ -1459,11 +1459,11 @@ private:
             expectWithinAbsoluteError(repeatedVisual.clips[1].processPoint({0, 0, 0, 1, 1, 1}, 11).x, 16.0f, 0.0001f);
         }
         beginTest("Repeated definitions stay visible across instance cuts");
-        visual.tracks[0].clips[0].duration = 2;
-        visual.tracks[0].clips[0].properties["weight"] = motion::Curve(1);
-        visual.tracks[0].clips[1].start = 6;
-        visual.tracks[0].clips[1].properties["weight"] = motion::Curve(1);
-        motif->tracks[0].clips[0].properties["weight"] = motion::Curve(1);
+        visual.tracks.change(0).clips[0].duration = 2;
+        visual.tracks.change(0).clips[0].properties["weight"] = motion::Curve(1);
+        visual.tracks.change(0).clips[1].start = 6;
+        visual.tracks.change(0).clips[1].properties["weight"] = motion::Curve(1);
+        motif->tracks.change(0).clips[0].properties["weight"] = motion::Curve(1);
         const motion::PreparedComposition cuts(visual);
         expect(cuts.preparationError.isEmpty(), cuts.preparationError);
         const auto after = std::find_if(cuts.clips.begin(), cuts.clips.end(), [](const auto& clip) { return clip.active(6.1); });
@@ -1532,7 +1532,7 @@ private:
         expectWithinAbsoluteError(yellow.r, 1.0f, 1e-6f); expectWithinAbsoluteError(yellow.g, 1.0f, 1e-6f);
         beginTest("Clip colour is resolved before colour effects and saved animated stacks reopen");
         auto colouredProject = sourceProject;
-        auto& colouredClip = colouredProject.tracks[0].clips[0];
+        auto& colouredClip = colouredProject.tracks.change(0).clips[0];
         colouredClip.start = 0; colouredClip.offset = 0; colouredClip.rate = 1;
         colouredClip.properties["red"] = motion::Curve(1);
         colouredClip.properties["green"] = motion::Curve(0);
@@ -1572,7 +1572,7 @@ private:
 
         beginTest("Clip, track and composition stacks run in scope order with owner clocks");
         auto project = sourceProject;
-        auto& clip = project.tracks[0].clips[0];
+        auto& clip = project.tracks.change(0).clips[0];
         clip.start = 2;
         clip.duration = 8;
         clip.offset = 0.5;
@@ -1585,7 +1585,7 @@ private:
         translate.properties["translateX"].setKey({10, 1});
         clip.effects = { translate };
         scale.id = 104;
-        project.tracks[0].effects = { scale };
+        project.tracks.change(0).effects = { scale };
         auto global = motion::makeEffect(105, *motion::effectDefinition("translate"));
         global.properties["translateX"] = motion::Curve(0.1);
         project.effects = { global };
@@ -1703,12 +1703,12 @@ private:
         independent.start = 3;
         independent.offset = 0;
         expect(independent.stretch(4, motion::Tempo(120)));
-        project.tracks[0].clips.push_back(independent);
+        project.tracks.change(0).clips.push_back(independent);
         motion::PreparedComposition instances(project);
         expect(instances.clips[0].source == instances.clips[1].source);
         expectEquals(instances.clips[1].sample(3, 0.3).x, first.x);
         const auto beforeTrim = instances.clips[1].sample(3.05, 0.3).x;
-        expect(project.tracks[0].clips[1].trim(3.05, 7, motion::Tempo(120)));
+        expect(project.tracks.change(0).clips[1].trim(3.05, 7, motion::Tempo(120)));
         motion::PreparedComposition trimmed(project);
         expectWithinAbsoluteError(trimmed.clips[1].sample(3.05, 0.3).x, beforeTrim, 0.000001f);
 

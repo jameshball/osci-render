@@ -109,8 +109,8 @@ public:
         for (int change = 0; change < 3; ++change) {
             Fixture f; expect(f.initialise().wasOk()); expect(f.session->start(f.clipId).wasOk());
             expect(f.block()); f.session->stop(); f.acknowledge(); f.session->poll();
-            if (change == 0) { f.document.edit("Move clip", [](motion::Project& p) { p.tracks[0].clips[0].start += .5; }); }
-            else if (change == 1) { f.document.edit("Remove target", [](motion::Project& p) { p.tracks[0].clips.clear(); }); }
+            if (change == 0) { f.document.edit("Move clip", [](motion::Project& p) { p.tracks.change(0).clips[0].start += .5; }); }
+            else if (change == 1) { f.document.edit("Remove target", [](motion::Project& p) { p.tracks.change(0).clips.clear(); }); }
             else { auto project = f.document.mainProject(); f.document.reset(std::move(project)); }
             const auto revision = f.document.revision(); const auto description = f.undo.getUndoDescription();
             expect(f.drain()); expect(f.document.revision() == revision && f.undo.getUndoDescription() == description);

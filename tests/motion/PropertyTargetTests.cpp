@@ -7,7 +7,7 @@ struct Project {
     double duration = 120.0;
     double bpm = 120.0;
     motion::Tempo tempo() const { return motion::Tempo(bpm); }
-    std::vector<motion::Track> tracks;
+    motion::SharedList<motion::Track> tracks;
     std::vector<motion::Camera> cameras;
     std::vector<motion::EffectInstance> effects;
     std::vector<motion::Group> groups;
@@ -56,9 +56,9 @@ int main() {
     check(motion::findPropertyCurve(project, 20, "position.x") == nullptr, "lookup after deletion does not retain a stale map");
     auto localEffect = motion::makeEffect(30, *motion::effectDefinition("ripple"));
     check(localEffect.valid(), "factory populates every bounded parameter");
-    project.tracks[0].clips[0].effects.push_back(localEffect);
+    project.tracks.change(0).clips[0].effects.push_back(localEffect);
     auto trackEffect = motion::makeEffect(31, *motion::effectDefinition("bulge"));
-    project.tracks[0].effects.push_back(trackEffect);
+    project.tracks.change(0).effects.push_back(trackEffect);
     project.effects.push_back(motion::makeEffect(32, *motion::effectDefinition("swirl")));
     const auto localTarget = motion::findPropertyTarget(readOnly, 30);
     const auto trackTarget = motion::findPropertyTarget(readOnly, 31);
@@ -91,7 +91,7 @@ int main() {
     inner.parent = 50;
     inner.effects.push_back(motion::makeEffect(52, *motion::effectDefinition("scale")));
     project.groups = { outer, inner };
-    project.tracks[0].group = 51;
+    project.tracks.change(0).group = 51;
     check(motion::validGroupHierarchy(project), "nested group references are valid");
     const auto groupTarget = motion::findPropertyTarget(readOnly, 51);
     check(groupTarget->isGroup && !groupTarget->isEffect && groupTarget->localTime(10) == 10, "group curves use project time");
@@ -100,7 +100,7 @@ int main() {
     project.groups[0].solo = true;
     check(motion::trackIsAudible(project, project.tracks[0]), "ancestor solo includes descendants");
     project.groups[0].muted = true;
-    project.tracks[0].solo = true;
+    project.tracks.change(0).solo = true;
     check(!motion::trackIsAudible(project, project.tracks[0]), "ancestor mute wins over track solo");
     project.groups[0].parent = 51;
     check(!motion::validGroupHierarchy(project), "group cycles are rejected");

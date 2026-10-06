@@ -197,7 +197,7 @@ public:
             const motion::PreparedComposition probe(layers, rate);
             const auto start = static_cast<double>(motion::BeamRenderer::cycleStart(2, rate, probe.beamRate) + motion::BeamRenderer::cycleStart(3, rate, probe.beamRate)) / 2 / rate;
             for (std::size_t track = 1; track < layers.tracks.size(); ++track) {
-                auto& clip = layers.tracks[track].clips[0];
+                auto& clip = layers.tracks.change(track).clips[0];
                 clip.start = start;
                 clip.duration = layers.duration - start;
             }
@@ -215,8 +215,8 @@ public:
             auto layers = project({{shape, -.4}, {strokes(2, 12), .2, .3}, {shape, .5, -.4, .7}, {strokes(3, 5), -.6, -.5}, {shape, .1, .6}});
             layers.frameRate = 24;
             layers.scope = profile;
-            layers.tracks[0].clips[0].properties["position.x"].setKey({0, -.4, motion::Interpolation::linear});
-            layers.tracks[0].clips[0].properties["position.x"].setKey({2, .4, motion::Interpolation::linear});
+            layers.tracks.change(0).clips[0].properties["position.x"].setKey({0, -.4, motion::Interpolation::linear});
+            layers.tracks.change(0).clips[0].properties["position.x"].setKey({2, .4, motion::Interpolation::linear});
             const double rate = 44100;
             const motion::PreparedComposition composition(layers, rate);
             const auto label = "profile " + juce::String(profile.dwellMicros) + "/" + juce::String(profile.travelMicrosPerUnit) + "/" + juce::String(profile.settleMicros);
@@ -434,7 +434,7 @@ public:
         beginTest("Soundtrack loudness modulation follows project time through clip clocks");
         {
             auto layers = project({{square(1, .1f)}}, 3);
-            auto& clip = layers.tracks[0].clips[0];
+            auto& clip = layers.tracks.change(0).clips[0];
             clip.start = .2; clip.duration = 2.5; clip.offset = 1; clip.rate = 2;
             clip.properties["position.x"].base = 0;
             motion::Modulator follower;
@@ -471,10 +471,10 @@ public:
             std::vector<Layer> layers;
             for (int i = 0; i < 20; ++i) { layers.push_back({square(static_cast<motion::Id>(i + 1), .05f), i * .08 - .8, 0, 1}); }
             auto animated = project(layers);
-            for (auto& track : animated.tracks) {
+            animated.tracks.changeAll([](motion::Track& track) {
                 track.clips[0].properties["rotation.z"].setKey({0, 0, motion::Interpolation::linear});
                 track.clips[0].properties["rotation.z"].setKey({2, 360, motion::Interpolation::linear});
-            }
+            });
             const double rate = 192000;
             const motion::PreparedComposition composition(animated, rate);
             motion::BeamRenderer beam;

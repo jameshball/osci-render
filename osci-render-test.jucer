@@ -34,6 +34,8 @@
             resource="0" file="tests/MotionTempoToolsTest.cpp"/>
       <FILE id="MotionViewState" name="MotionViewStateTest.cpp" compile="1"
             resource="0" file="tests/MotionViewStateTest.cpp"/>
+      <FILE id="MotionTrackSharing" name="MotionTrackSharingTest.cpp" compile="1"
+            resource="0" file="tests/MotionTrackSharingTest.cpp"/>
       <FILE id="MotionKeyEasing" name="MotionKeyEasingTest.cpp" compile="1"
             resource="0" file="tests/MotionKeyEasingTest.cpp"/>
       <FILE id="MotionDrawing" name="MotionDrawingTest.cpp" compile="1" resource="0"

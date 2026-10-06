@@ -5,6 +5,7 @@
 #include "MidiNotes.h"
 #include "MidiInstrument.h"
 #include "ClipTiming.h"
+#include "SharedList.h"
 #include "Tempo.h"
 #include <algorithm>
 #include <cmath>
@@ -340,7 +341,7 @@ inline bool rippleTrim(Track& track, Id clipId, bool leadingEdge, double deltaSe
 // Editor-thread operation: apply a shared project-time displacement atomically.
 // Track displacement is in model rows; callers with collapsed groups translate
 // their visible-row gesture before invoking this operation.
-inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, const Tempo& tempo) {
+inline bool moveClips(SharedList<Track>& tracks, const std::vector<Id>& ids, double seconds, int trackDelta, const Tempo& tempo) {
     if (ids.empty() || !std::isfinite(seconds) || !tempo.valid()) { return false; }
     auto unique = ids;
     std::sort(unique.begin(), unique.end());
@@ -363,12 +364,13 @@ inline bool moveClips(std::vector<Track>& tracks, const std::vector<Id>& ids, do
         }
     }
     if (moving.size() != ids.size()) { return false; }
+    const auto moved = [&](const Clip& clip) { return std::binary_search(unique.begin(), unique.end(), clip.id); };
     auto updated = tracks;
-    for (auto& track : updated) {
-        std::erase_if(track.clips, [&](const auto& clip) { return std::binary_search(unique.begin(), unique.end(), clip.id); });
+    for (std::size_t row = 0; row < updated.size(); ++row) {
+        if (std::any_of(updated[row].clips.begin(), updated[row].clips.end(), moved)) { std::erase_if(updated.change(row).clips, moved); }
     }
     for (auto& placement : moving) {
-        if (!updated[placement.row].insert(std::move(placement.clip), tempo)) { return false; }
+        if (!updated.change(placement.row).insert(std::move(placement.clip), tempo)) { return false; }
     }
     tracks = std::move(updated);
     return true;

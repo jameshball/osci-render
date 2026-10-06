@@ -190,7 +190,7 @@ public:
             crowded.tempoChanges.reset();
             auto pinned = motion::Document::makeClip(document.newId(), *asset, 0);
             pinned.start = 6.5; pinned.duration = 0.5;
-            expect(crowded.tracks[0].insert(pinned, crowded.tempo()));
+            expect(crowded.tracks.change(0).insert(pinned, crowded.tempo()));
             document.reset(crowded);
             expect(document.setTempoChange(8, 60).failed());
             expect(document.project().tempoChanges == nullptr);
