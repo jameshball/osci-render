@@ -12,11 +12,11 @@ inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1
 inline constexpr PropertySpec beatsSpec {"beats", "Beats", "", "", 0.0625, 64, 1, .25, 3, " beats"};
 inline constexpr PropertySpec phaseSpec {"phase", "Phase", "", "", 0, 360, 0, 1, 1, "\xc2\xb0"};
 inline constexpr PropertySpec seedSpec {"seed", "Seed", "", "", 0, 4294967295.0, 0, 1, 0, ""};
-inline constexpr PropertySpec secondsSpec {"seconds", "Seconds", "", "", 0, 60, 0, .01, 3, " s"};
+inline constexpr PropertySpec secondsSpec {"seconds", "Seconds", "", "", 0, 60, 0, .01, 3, "s"};
 inline constexpr PropertySpec unitSpec {"unit", "Level", "", "", 0, 1, 0, .01, 2, ""};
 inline constexpr PropertySpec pitchSpec {"pitch", "Pitch", "", "", 0, 127, 0, 1, 0, ""};
 inline constexpr PropertySpec amountSpec {"amount", "Amount", "", "", -unbounded, unbounded, 1, .01, 3, ""};
-inline constexpr PropertySpec delaySpec {"delay", "Delay", "", "", -3600, 3600, 0, .01, 3, " s"};
+inline constexpr PropertySpec delaySpec {"delay", "Delay", "", "", -3600, 3600, 0, .01, 3, "s"};
 
 // A labelled scrub row; owners set the spec and callbacks.
 struct LabelledScrub {

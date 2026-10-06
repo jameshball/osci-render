@@ -607,6 +607,8 @@ void MotionEditor::setUpGraph() {
     graphSide.addChildComponent(keyPanel);
     keyPanel.onTime = [this](double time) { curveEditor.setActiveKeyTime(time); };
     keyPanel.onValue = [this](double value) { curveEditor.setActiveKeyValue(value); };
+    keyPanel.onInterpolation = [this](motion::Interpolation interpolation) { curveEditor.setSelectedInterpolation(interpolation); };
+    keyPanel.onEase = [this] { curveEditor.easeSelected(true, true); };
     curveEditor.onSelectionChanged = [this] { refreshKeyPanel(); };
     graphSideViewport.setViewedComponent(&graphSide, false);
     graphSideViewport.setScrollBarsShown(true, false);
@@ -766,18 +768,14 @@ void MotionEditor::resized() {
     this->timeline.setBounds(timeline.withTrimmedTop(3));
     notesEditor.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
-    // The channel list and routing need a target; without one the graph takes the room.
-    curveList.setVisible(timelineTabs.getCurrentTabIndex() == 1 && curveTarget != 0);
-    if (curveTarget != 0) {
-        curveList.setBounds(graph.removeFromLeft(std::clamp(graph.getWidth() / 7, 150, 210)));
-        graph.removeFromLeft(2);
-    }
-    graphSideViewport.setVisible(timelineTabs.getCurrentTabIndex() == 1 && curveTarget != 0);
-    if (curveTarget != 0) {
-        graphSideViewport.setBounds(graph.removeFromRight(std::clamp(graph.getWidth() / 4, 230, 285)));
-        layoutGraphSide();
-        graph.removeFromRight(3);
-    }
+    // The three columns stay put with or without a target, so the frame never jumps.
+    curveList.setVisible(timelineTabs.getCurrentTabIndex() == 1);
+    curveList.setBounds(graph.removeFromLeft(std::clamp(graph.getWidth() / 7, 150, 210)));
+    graph.removeFromLeft(2);
+    graphSideViewport.setVisible(timelineTabs.getCurrentTabIndex() == 1);
+    graphSideViewport.setBounds(graph.removeFromRight(std::clamp(graph.getWidth() / 4, 230, 285)));
+    layoutGraphSide();
+    graph.removeFromRight(2);
     curveEditor.setBounds(graph);
     timelineDivider.setBounds(area.removeFromBottom(7));
     // Side panels widen on large windows; the preview keeps the rest.
@@ -1463,7 +1461,7 @@ void MotionEditor::refreshCurveList() {
 // The column fills the side, the selected key above Routing; it scrolls
 // only when its content is taller.
 void MotionEditor::layoutGraphSide() {
-    const auto keyHeight = keyPanel.isVisible() ? MotionKeyPanel::preferredHeight() + 1 : 0;
+    const auto keyHeight = keyPanel.isVisible() ? keyPanel.preferredHeight() + 1 : 0;
     const auto scrolls = keyHeight + routingPanel.preferredHeight() > graphSideViewport.getHeight();
     const auto width = graphSideViewport.getWidth() - (scrolls ? graphSideViewport.getScrollBarThickness() : 0);
     keyPanel.setBounds(0, 0, width, std::max(0, keyHeight - 1));
@@ -1472,13 +1470,15 @@ void MotionEditor::layoutGraphSide() {
 }
 
 void MotionEditor::refreshKeyPanel() {
+    const auto selection = curveEditor.keySelection();
     const auto key = curveEditor.activeKey();
-    if (key.has_value()) {
-        const auto spec = motion::specFor(processor.document.project(), curveTarget, key->property);
-        keyPanel.show(key->time, key->value, spec.value_or(motion::ui::amountSpec), key->editable);
+    const auto height = keyPanel.preferredHeight();
+    if (selection.count > 0) {
+        const auto spec = key.has_value() ? motion::specFor(processor.document.project(), curveTarget, key->property) : std::nullopt;
+        keyPanel.show(selection.count, selection.present, selection.editable, key.has_value() ? std::optional<std::pair<double, double>>({key->time, key->value}) : std::nullopt, spec.value_or(motion::ui::amountSpec));
     }
-    if (keyPanel.isVisible() != key.has_value()) {
-        keyPanel.setVisible(key.has_value());
+    if (keyPanel.isVisible() != (selection.count > 0) || keyPanel.preferredHeight() != height) {
+        keyPanel.setVisible(selection.count > 0);
         layoutGraphSide();
     }
 }

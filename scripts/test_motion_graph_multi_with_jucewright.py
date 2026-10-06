@@ -118,7 +118,7 @@ def view(model):
 
 def mapper(model):
     start, end, low, high = view(model)
-    plot_x, plot_y, plot_w, plot_h = 56, 38, max(1, graph["w"] - 70), max(1, graph["h"] - 52)
+    plot_x, plot_y, plot_w, plot_h = 56, 32, max(1, graph["w"] - 66), max(1, graph["h"] - 40)
     x_of = lambda t: plot_x + (t - start) / (end - start) * plot_w
     y_of = lambda v: plot_y + plot_h - (v - low) / (high - low) * plot_h
     return x_of, y_of, plot_w / (end - start)

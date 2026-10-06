@@ -27,7 +27,8 @@ public:
         animatedOnly.setTitle(animatedOnly.getName());
         animatedOnly.setTooltip("Show only keyed or modulated channels, like After Effects' U");
         animatedOnly.setToggleState(true, juce::dontSendNotification);
-        animatedOnly.setOnColour(osci::Colours::accentColor().withAlpha(.3f));
+        // A filter, not a status: on reads as pressed, not green.
+        animatedOnly.setOnColour(juce::Colours::white.withAlpha(.14f));
         animatedOnly.onClick = [this] { layout(); };
         addAndMakeVisible(animatedOnly);
     }
@@ -51,6 +52,7 @@ public:
         visible = shown;
         const auto anyAnimated = std::any_of(channels.begin(), channels.end(), [](const auto& channel) { return channel.keyed || channel.driven; });
         animatedOnly.setEnabled(anyAnimated);
+        animatedOnly.setVisible(!channels.empty());
         if (!same) { rebuild(); } else { layout(); }
         for (auto& row : rows) {
             row->selected = row->channel.id == selected;
@@ -63,7 +65,8 @@ public:
         repaint();
     }
     void paint(juce::Graphics& g) override {
-        g.fillAll(osci::Colours::surfaceSunken());
+        // A panel like Properties beside the Graph's darker plot.
+        g.fillAll(osci::Colours::surface());
         // The header lines up with the Graph's ruler band beside it.
         auto header = getLocalBounds().removeFromTop(headerHeight);
         g.setColour(osci::Colours::surfaceRaised());
@@ -78,6 +81,10 @@ public:
             g.setColour(osci::Colours::text());
             g.setFont(motion::style::title());
             g.drawText(ownerName, header, juce::Justification::centredLeft, true);
+        } else {
+            g.setColour(osci::Colours::textMuted());
+            g.setFont(motion::style::body());
+            g.drawText("Nothing selected", header, juce::Justification::centredLeft, true);
         }
         // Group captions above their rows.
         g.setFont(motion::style::caption());
@@ -127,10 +134,11 @@ private:
         void paint(juce::Graphics& g) override {
             auto bounds = getLocalBounds();
             const auto animated = channel.keyed || channel.driven;
+            // Selection is neutral, marked by a bar in the channel's colour.
             if (selected) {
-                g.setColour(osci::Colours::accentColor().withAlpha(.16f));
+                g.setColour(juce::Colours::white.withAlpha(.07f));
                 g.fillRect(bounds);
-                g.setColour(osci::Colours::accentColor());
+                g.setColour(channel.colour);
                 g.fillRect(bounds.removeFromLeft(2));
             } else if (hovered) {
                 g.setColour(juce::Colours::white.withAlpha(.04f));
@@ -143,11 +151,14 @@ private:
             bounds.removeFromRight(26);
             auto marks = bounds.removeFromRight(26);
             if (channel.keyed) {
-                g.setColour(selected ? juce::Colours::white.withAlpha(.85f) : osci::Colours::text().withAlpha(.55f));
-                motion::style::drawDiamond(g, {static_cast<float>(marks.getX() + 6), static_cast<float>(marks.getCentreY())}, 3.5f, true);
+                g.setColour(selected ? juce::Colours::white.withAlpha(.9f) : osci::Colours::text().withAlpha(.5f));
+                motion::style::drawDiamond(g, {static_cast<float>(marks.getX() + 6), static_cast<float>(marks.getCentreY())}, 4.0f, true);
             }
-            if (channel.driven) { motion::icons::draw(g, motion::icons::Icon::wave, marks.withTrimmedLeft(12).toFloat(), osci::Colours::accentColor(), 12.0f); }
-            g.setColour(selected ? juce::Colours::white : osci::Colours::text().withAlpha(animated ? .9f : .5f));
+            // Lilac like the Result line that a modulator or link adds.
+            if (channel.driven) { motion::icons::draw(g, motion::icons::Icon::wave, marks.withTrimmedLeft(12).toFloat(), motion::style::result(), 12.0f); }
+            // A curve not drawn reads quieter until it is edited.
+            const auto drawn = selected || eye.getToggleState();
+            g.setColour(selected ? juce::Colours::white : osci::Colours::text().withAlpha(!animated ? .5f : drawn ? .9f : .5f));
             g.setFont(selected ? motion::style::title() : motion::style::body());
             g.drawText(shortLabel, bounds, juce::Justification::centredLeft, true);
         }

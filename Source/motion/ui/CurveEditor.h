@@ -10,7 +10,7 @@
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
 #include "Chip.h"
-#include "KeyBar.h"
+#include <array>
 #include <optional>
 #include <set>
 #include <limits>
@@ -160,12 +160,14 @@ private:
     };
     std::optional<SelectionBox> selectionBox(const motion::PropertyTarget& clip) const;
     static juce::Rectangle<float> scaleHandle(const SelectionBox& box, bool right);
+    // A box too narrow for grips is still moved by its keys.
+    static bool hasGrips(const SelectionBox& box) { return box.area.getWidth() >= 40.0f; }
 
     // The ruler band on top (as in the Timeline), value labels in the gutter
     // to the left of the plot.
     static constexpr int bandHeight = 26, gutter = 56;
     juce::Rectangle<float> plot() const {
-        return { static_cast<float>(gutter), bandHeight + 12.0f, std::max(1.0f, getWidth() - gutter - 14.0f), std::max(1.0f, getHeight() - bandHeight - 26.0f) };
+        return { static_cast<float>(gutter), bandHeight + 6.0f, std::max(1.0f, getWidth() - gutter - 10.0f), std::max(1.0f, getHeight() - bandHeight - 14.0f) };
     }
     void paintRuler(juce::Graphics& g, double step, double minorStep);
     void paintGrid(juce::Graphics& g, double step, double minorStep);
@@ -187,8 +189,7 @@ private:
     juce::Point<float> pointer; // Where the ghost key on a hovered curve sits.
     bool nudgeSelected(int frames, double values);
     void setHover(Hover next);
-    void updateKeyBar();
-    void setSelectedInterpolation(motion::Interpolation interpolation);
+    void selectionChanged();
     // Reserve enough headroom for subtracting both viewport endpoints. This
     // bounds only the displayed window, never the authored project or keys.
     static constexpr double viewLimit = std::numeric_limits<double>::max() / 2;
@@ -230,6 +231,15 @@ public:
     // one undo step.
     bool easeSelected(bool in, bool out);
 
+    // The selected keys for the Key panel: how many, which interpolations
+    // they use, and whether they can be edited.
+    struct KeySelection {
+        std::size_t count = 0;
+        std::array<bool, 4> present {};
+        bool editable = false;
+    };
+    KeySelection keySelection() const;
+    void setSelectedInterpolation(motion::Interpolation interpolation);
     // The one selected key, for typing its time and value: its property,
     // project time and value.
     struct ActiveKey {
@@ -251,7 +261,6 @@ private:
     void showKeyMenu();
 
     MotionProcessor& processor;
-    MotionKeyBar keyBar;
     motion::ui::Chip frameButton {"Frame curves", motion::icons::Icon::frame};
     Hover hover;
     motion::Id targetId = 0;

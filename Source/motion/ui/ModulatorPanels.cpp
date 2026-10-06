@@ -28,7 +28,9 @@ RouteRow::RouteRow(Document& document, std::function<void(const juce::Result&)> 
     mode.setTooltip("Add to the value, or multiply it by 1 + amount x modulator");
     mode.onClick = [this] { apply(amount.getValue(), route.mode == ModulationMode::add ? ModulationMode::multiply : ModulationMode::add); };
     remove.setTooltip("Stop driving this property");
-    remove.setIconPadding(5);
+    // A quiet mark beside the mode toggle, not the heaviest thing in the column.
+    remove.setIconPadding(7);
+    remove.setColours(osci::Colours::textMuted().withAlpha(.8f), osci::Colours::text());
     remove.onClick = [this] { this->report(this->document.removeRoute(route.id)); };
     for (auto* component : std::initializer_list<juce::Component*> {&label, &amount, &mode, &remove}) { addAndMakeVisible(component); }
 }
@@ -538,6 +540,7 @@ void MotionRoutingPanel::refresh() {
     motion::ui::RouteRow::showAll(rows, *this, shown, processor.document, [this](const juce::Result& result) { report(result); });
     const auto drivable = motion::drivableProperty(project, targetId, propertyName);
     link.setEnabled(drivable);
+    link.setVisible(targetId != 0);
     const auto linked = curve != nullptr && curve->link.has_value();
     unlink.setVisible(linked);
     linkSource.setVisible(linked);
@@ -583,7 +586,7 @@ void MotionRoutingPanel::resized() {
 
 // A column beside the Graph, headed like the channel list and the ruler.
 void MotionRoutingPanel::paint(juce::Graphics& g) {
-    g.fillAll(osci::Colours::surfaceSunken());
+    g.fillAll(osci::Colours::surface());
     auto header = getLocalBounds().removeFromTop(headerHeight);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(header);
@@ -591,7 +594,7 @@ void MotionRoutingPanel::paint(juce::Graphics& g) {
     g.setFont(motion::style::title());
     g.drawText("Routing", header.reduced(10, 0), juce::Justification::centredLeft);
     // Nothing drives the property yet: say how to, rather than leave a gap.
-    if (rows.empty() && !linkSource.isVisible()) {
+    if (targetId != 0 && rows.empty() && !linkSource.isVisible()) {
         g.setColour(osci::Colours::textMuted());
         g.setFont(motion::style::caption());
         g.drawFittedText("Drag a modulator onto this property in Properties to drive it, or link it to another property.",

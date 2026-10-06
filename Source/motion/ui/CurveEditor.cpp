@@ -3,9 +3,6 @@
 MotionCurveEditor::MotionCurveEditor(MotionProcessor& processor) : processor(processor) {
     setName("Animation curve editor");
     setWantsKeyboardFocus(true);
-    keyBar.onInterpolation = [this](motion::Interpolation interpolation) { setSelectedInterpolation(interpolation); };
-    keyBar.onEase = [this] { easeSelected(true, true); };
-    addChildComponent(keyBar);
     frameButton.setClickingTogglesState(false);
     frameButton.quiet = true;
     frameButton.setTooltip("Frame every curve (F). Shift+F frames only the edited curve.");
@@ -79,7 +76,7 @@ void MotionCurveEditor::setSelection(motion::Id id, std::string property) {
     propertyName = std::move(property);
     userView = false;
     fit();
-    updateKeyBar();
+    selectionChanged();
     repaint();
 }
 
@@ -103,7 +100,7 @@ void MotionCurveEditor::refresh() {
             fit();
         }
     }
-    updateKeyBar();
+    selectionChanged();
     repaint();
 }
 
@@ -161,7 +158,6 @@ void MotionCurveEditor::paintRuler(juce::Graphics& g, double step, double minorS
     const auto grid = processor.document.project().timeGrid();
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(juce::Rectangle<int>(gutter, 0, getWidth() - gutter, bandHeight));
-    if (keyBar.isVisible()) { g.excludeClipRegion(keyBar.getBounds().expanded(6, 0)); }
     grid.forEachTick(viewStart, viewEnd, minorStep, [&](double time) {
         g.setColour(juce::Colours::white.withAlpha(.16f));
         g.fillRect(std::round(timeX(time)), bandHeight - 4.0f, 1.0f, 4.0f);
@@ -223,12 +219,15 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     const auto grid = processor.document.project().timeGrid();
     const auto step = grid.tickStep(area.getWidth() / (viewEnd - viewStart));
     const auto minorStep = step / 2;
-    paintGrid(g, step, minorStep);
-    // The clip's playing span is the stage; time it never plays is shaded.
+    // The clip's playing span is the stage, lit; time it never plays is shaded.
     const auto clipStart = clip->start, clipEnd = clip->end();
+    const auto stageLeft = std::clamp(timeX(clipStart), area.getX(), area.getRight());
+    const auto stageRight = std::clamp(timeX(clipEnd), area.getX(), area.getRight());
+    g.setColour(juce::Colours::white.withAlpha(.025f));
+    g.fillRect(area.withLeft(stageLeft).withRight(stageRight));
+    paintGrid(g, step, minorStep);
     {
-        const auto left = std::clamp(timeX(clipStart), area.getX(), area.getRight());
-        const auto right = std::clamp(timeX(clipEnd), area.getX(), area.getRight());
+        const auto left = stageLeft, right = stageRight;
         g.setColour(juce::Colours::black.withAlpha(.26f));
         g.fillRect(area.withRight(left));
         g.fillRect(area.withLeft(right));
@@ -266,11 +265,17 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
         if (to > from) {
             auto fill = modulated ? curvePath(from, to, 1.0f, keyTimes, result) : curvePath(from, to, 1.0f, keyTimes, baseOf(curve));
+            // The fade follows the curve, from its highest point on screen to a
+            // little under its lowest, so a curve above the view leaves only a
+            // hint at the top edge rather than tinting the whole plot.
+            const auto extent = fill.getBounds();
+            const auto top = std::clamp(extent.getY(), area.getY(), area.getBottom());
+            const auto bottom = std::min(area.getBottom(), std::clamp(extent.getBottom(), area.getY(), area.getBottom()) + 90.0f);
             fill.lineTo(timeX(to), area.getBottom());
             fill.lineTo(timeX(from), area.getBottom());
             fill.closeSubPath();
             const auto tint = modulated ? motion::style::result() : colour;
-            g.setGradientFill(juce::ColourGradient(tint.withAlpha(.15f), 0.0f, area.getY(), tint.withAlpha(0.0f), 0.0f, area.getBottom(), false));
+            g.setGradientFill(juce::ColourGradient(tint.withAlpha(.15f), 0.0f, top, tint.withAlpha(0.0f), 0.0f, std::max(top + 1.0f, bottom), false));
             g.fillPath(fill);
         }
     }
@@ -285,7 +290,16 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         strokeAcrossStage(baseOf(*displayed(*clip, name)), colour.withAlpha(.6f), 1.5f, .4f, 1.0f);
     }
     const auto emphasis = hover.curve && !drag.has_value() ? .6f : 0.0f;
-    if (modulated) {
+    const auto linked = storedCurve->link.has_value();
+    if (linked) {
+        // A link replaces the keys: they are drawn dashed, as ignored.
+        juce::Path dashed;
+        const float dashes[] {5.0f, 4.0f};
+        juce::PathStrokeType(1.5f).createDashedStroke(dashed, curvePath(viewStart, viewEnd, 1.0f, keyTimes, baseOf(curve)), dashes, 2);
+        g.setColour(colour.withAlpha(.4f));
+        g.fillPath(dashed);
+        strokeAcrossStage(result, motion::style::result(), 2.0f, .4f, 2.0f);
+    } else if (modulated) {
         // The keys are what you edit; the Result is what plays.
         strokeAcrossStage(baseOf(curve), colour.withAlpha(.55f), 1.5f + emphasis, .5f, 2.0f);
         strokeAcrossStage(result, motion::style::result(), 2.0f, .4f, 2.0f);
@@ -305,13 +319,14 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
             for (const auto mode : {DragMode::incoming, DragMode::outgoing}) {
                 const auto handle = tangentPoint(*clip, curve, *selected, mode);
                 if (!handle.has_value()) { continue; }
+                // Arms and rings in the curve's colour; a ring fills white under the pointer.
                 const auto active = hover.handle == mode || (drag.has_value() && drag->mode == mode);
-                g.setColour(motion::style::tangent().withAlpha(.85f));
-                g.drawLine(keyPosition.x, keyPosition.y, handle->x, handle->y, 1.0f);
+                g.setColour(colour.withAlpha(.6f));
+                g.drawLine(keyPosition.x, keyPosition.y, handle->x, handle->y, 1.25f);
                 const auto ring = juce::Rectangle<float>(8.0f, 8.0f).withCentre(*handle);
-                g.setColour(active ? motion::style::tangent() : osci::Colours::veryDark());
+                g.setColour(active ? juce::Colours::white : osci::Colours::veryDark());
                 g.fillEllipse(ring);
-                g.setColour(motion::style::tangent());
+                g.setColour(colour);
                 g.drawEllipse(ring.reduced(.75f), 1.5f);
             }
         }
@@ -327,18 +342,19 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     }
     const auto box = selectionBox(*clip);
     if (box.has_value()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.045f));
+        g.setColour(osci::Colours::accentColor().withAlpha(.03f));
         g.fillRoundedRectangle(box->area, 4.0f);
-        g.setColour(osci::Colours::accentColor().withAlpha(.4f));
+        g.setColour(osci::Colours::accentColor().withAlpha(.5f));
         g.drawRoundedRectangle(box->area.reduced(.5f), 4.0f, 1.0f);
         for (const auto right : {false, true}) {
+            if (!hasGrips(*box)) { break; }
             const auto grip = scaleHandle(*box, right);
             const auto active = hover.grip == right || (drag.has_value() && drag->mode == (right ? DragMode::scaleRight : DragMode::scaleLeft));
-            // Light pills with an accent edge; an active grip fills with the accent.
-            g.setColour(active ? osci::Colours::accentColor() : juce::Colours::white.withAlpha(.92f));
-            g.fillRoundedRectangle(grip, 2.0f);
-            g.setColour(osci::Colours::accentColor().darker(.2f));
-            g.drawRoundedRectangle(grip.expanded(.5f), 2.5f, 1.0f);
+            // Slim accent pills on the box's edges, white while grabbed or hovered.
+            g.setColour(osci::Colours::veryDark());
+            g.fillRoundedRectangle(grip.expanded(1.0f), 2.5f);
+            g.setColour(active ? juce::Colours::white : osci::Colours::accentColor().brighter(.15f));
+            g.fillRoundedRectangle(grip, 1.5f);
         }
     }
     if (marquee.has_value()) {
@@ -358,15 +374,24 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         g.fillPath(head);
     }
     if (modulated) {
-        // A legend for the two lines, quiet in the corner.
-        auto legend = area.toNearestInt().reduced(10, 8).removeFromTop(16).removeFromLeft(120);
+        // A legend for the two lines on a quiet chip in the corner; a link
+        // says its keys are ignored (Routing names its source).
+        const std::array<std::pair<juce::String, juce::Colour>, 2> entries {{{linked ? "Keys, ignored while linked" : "Keys", colour.withAlpha(linked ? .4f : .55f)}, {"Result", motion::style::result()}}};
+        auto width = 10;
+        for (const auto& entry : entries) { width += 12 + juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), entry.first) + 12; }
+        auto legend = juce::Rectangle<int>(area.toNearestInt().getX() + 8, area.toNearestInt().getY() + 6, width, 20);
+        g.setColour(osci::Colours::veryDark().withAlpha(.92f));
+        g.fillRoundedRectangle(legend.toFloat(), 10.0f);
+        g.setColour(juce::Colours::white.withAlpha(.07f));
+        g.drawRoundedRectangle(legend.toFloat().reduced(.5f), 10.0f, 1.0f);
+        legend.removeFromLeft(10);
         g.setFont(motion::style::caption());
-        for (const auto& [label, tint] : {std::pair<const char*, juce::Colour> {"Keys", colour}, {"Result", motion::style::result()}}) {
+        for (const auto& [label, tint] : entries) {
             g.setColour(tint);
             g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre({legend.getX() + 3.0f, legend.getCentreY() + .5f}));
-            g.setColour(osci::Colours::text().withAlpha(.75f));
-            g.drawText(label, legend.withTrimmedLeft(10), juce::Justification::centredLeft, false);
-            legend.removeFromLeft(juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), label) + 24);
+            g.setColour(osci::Colours::text().withAlpha(.8f));
+            g.drawText(label, legend.withTrimmedLeft(12), juce::Justification::centredLeft, false);
+            legend.removeFromLeft(12 + juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), label) + 12);
         }
     }
     // What the pointer is on, or what is being dragged: its time and value.
@@ -406,49 +431,31 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         }
         if (readout.has_value() && area.expanded(4).contains(readout->first)) { paintReadout(g, readout->first, readout->second); }
     }
-    // A linked property ignores its keys; say so rather than let edits
-    // appear to do nothing.
-    if (storedCurve->link.has_value()) {
-        const auto source = motion::findPropertyTarget(processor.document.project(), storedCurve->link->source);
-        const auto name = source.has_value() ? juce::String(source->name.data(), source->name.size()) : juce::String("?");
-        const auto text = "Linked to " + name + " (" + juce::String(storedCurve->link->property) + "): keys here are ignored. Unlink in Routing.";
-        auto banner = juce::Rectangle<float>(static_cast<float>(juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), text) + 24), 22.0f);
-        banner.setCentre(area.getCentreX(), area.getY() + 16.0f);
-        g.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::warning(), .16f));
-        g.fillRoundedRectangle(banner, 11.0f);
-        g.setColour(osci::Colours::warning().withAlpha(.4f));
-        g.drawRoundedRectangle(banner.reduced(.5f), 11.0f, 1.0f);
-        g.setColour(osci::Colours::warning());
-        g.setFont(motion::style::caption());
-        g.drawText(text, banner, juce::Justification::centred, false);
-    }
 }
 
 void MotionCurveEditor::resized() {
     frameButton.setBounds(juce::Rectangle<int>(0, 0, gutter, bandHeight).withSizeKeepingCentre(26, 20));
-    updateKeyBar();
+    selectionChanged();
 }
 
-// The selection's interpolation for the key bar: lit only when every
-// selected key shares it.
-void MotionCurveEditor::updateKeyBar() {
+void MotionCurveEditor::selectionChanged() {
+    frameButton.setVisible(findCurve(motion::findPropertyTarget(processor.document.project(), targetId), propertyName) != nullptr);
+    if (onSelectionChanged) { onSelectionChanged(); }
+}
+
+MotionCurveEditor::KeySelection MotionCurveEditor::keySelection() const {
+    KeySelection result;
     const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
-    frameButton.setVisible(findCurve(clip, propertyName) != nullptr);
-    const auto keys = selection();
-    std::optional<motion::Interpolation> common;
-    bool mixed = false;
-    for (const auto& ref : keys) {
-        const auto* curve = clip.has_value() ? displayed(*clip, ref.property) : nullptr;
+    if (!clip.has_value()) { return result; }
+    result.editable = !clip->locked;
+    for (const auto& ref : selection()) {
+        const auto* curve = displayed(*clip, ref.property);
         const auto* key = curve != nullptr ? curve->findKey(ref.time) : nullptr;
         if (key == nullptr) { continue; }
-        mixed = mixed || (common.has_value() && *common != key->interpolation);
-        common = key->interpolation;
+        ++result.count;
+        result.present[static_cast<std::size_t>(key->interpolation)] = true;
     }
-    keyBar.setVisible(clip.has_value() && !keys.empty());
-    if (onSelectionChanged) { onSelectionChanged(); }
-    if (!keyBar.isVisible()) { return; }
-    keyBar.show(keys.size(), mixed ? std::nullopt : common, !clip->locked);
-    keyBar.setTopRightPosition(getWidth() - 6, (bandHeight - MotionKeyBar::height) / 2);
+    return result;
 }
 
 MotionCurveEditor::Hover MotionCurveEditor::hoverAt(juce::Point<float> point) const {
@@ -468,7 +475,7 @@ MotionCurveEditor::Hover MotionCurveEditor::hoverAt(juce::Point<float> point) co
     }
     const auto box = selectionBox(*clip);
     for (const auto right : {false, true}) {
-        if (box.has_value() && scaleHandle(*box, right).expanded(3.0f, 2.0f).contains(point)) {
+        if (box.has_value() && hasGrips(*box) && scaleHandle(*box, right).expanded(3.0f, 2.0f).contains(point)) {
             next.grip = right;
             return next;
         }
@@ -537,7 +544,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         // The selection box's edge handles scale key times about the opposite edge.
         const auto box = selectionBox(*clip);
         for (const auto right : { false, true }) {
-            if (!box.has_value()) {
+            if (!box.has_value() || !hasGrips(*box)) {
                 break;
             }
             const auto handle = scaleHandle(*box, right);
@@ -554,7 +561,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
     if (hit.has_value() && event.mods.isShiftDown() && event.mods.isLeftButtonDown()) {
         // Shift toggles a key in the selection without dragging.
         toggleKey(*hit);
-        updateKeyBar();
+        selectionChanged();
         repaint();
         return;
     }
@@ -604,7 +611,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         }
     }
     setHover(hoverAt(event.position));
-    updateKeyBar();
+    selectionChanged();
     repaint();
 }
 
@@ -688,7 +695,7 @@ void MotionCurveEditor::mouseDrag(const juce::MouseEvent& event) {
                 }
             }
         }
-        updateKeyBar();
+        selectionChanged();
         repaint();
         return;
     }
@@ -753,6 +760,8 @@ void MotionCurveEditor::mouseDrag(const juce::MouseEvent& event) {
     }
     drag->previews = std::move(result->curves);
     adoptSelection(std::move(result->selection), drag->primary.has_value());
+    // The Key panel follows the drag.
+    selectionChanged();
     repaint();
     if (onPreview) {
         onPreview(&drag->previews);
@@ -764,7 +773,7 @@ void MotionCurveEditor::mouseUp(const juce::MouseEvent&) {
     snapGuide.reset();
     if (marquee.has_value()) {
         marquee.reset();
-        updateKeyBar();
+        selectionChanged();
         repaint();
         return;
     }
@@ -830,7 +839,7 @@ bool MotionCurveEditor::keyPressed(const juce::KeyPress& key) {
     if (key == juce::KeyPress::escapeKey && hasSelectedKeys()) {
         selectedTime.reset();
         companions.clear();
-        updateKeyBar();
+        selectionChanged();
         repaint();
         return true;
     }
@@ -1114,7 +1123,7 @@ std::optional<MotionCurveEditor::SelectionBox> MotionCurveEditor::selectionBox(c
 
 juce::Rectangle<float> MotionCurveEditor::scaleHandle(const SelectionBox& box, bool right) {
     const auto x = right ? box.area.getRight() : box.area.getX();
-    return { x - 2.0f, box.area.getCentreY() - 9.0f, 4.0f, 18.0f };
+    return { x - 1.5f, box.area.getCentreY() - 8.0f, 3.0f, 16.0f };
 }
 
 void MotionCurveEditor::setView(double start, double end) {
@@ -1350,7 +1359,7 @@ void MotionCurveEditor::selectAllKeys() {
             }
         }
     }
-    updateKeyBar();
+    selectionChanged();
     repaint();
 }
 
