@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Graph editor: cross-curve box select, group drag, magnets, key scaling and delete."""
+"""Graph editor: cross-curve box select, group drag, magnets, key scaling, delete, key fields and key bar."""
 import json
 import struct
 import subprocess
@@ -118,7 +118,7 @@ def view(model):
 
 def mapper(model):
     start, end, low, high = view(model)
-    plot_x, plot_y, plot_w, plot_h = 62, 34, max(1, graph["w"] - 82), max(1, graph["h"] - 78)
+    plot_x, plot_y, plot_w, plot_h = 56, 38, max(1, graph["w"] - 70), max(1, graph["h"] - 52)
     x_of = lambda t: plot_x + (t - start) / (end - start) * plot_w
     y_of = lambda v: plot_y + plot_h - (v - low) / (high - low) * plot_h
     return x_of, y_of, plot_w / (end - start)
@@ -200,7 +200,21 @@ try:
     restored["position.x"] = [(1.5, -1)] + model["position.x"]
     restored["position.y"] = [(1.5, 0.5)] + model["position.y"]
     expect(keys(saved()), restored, "undo delete")
+
+    # 6. The Key panel types the one selected key's value; the key bar sets
+    # its interpolation.
+    click("select one key", 1.5, -1, restored)
+    step("type key value", "set-value", "--component-name", "Key value", "--exact", "-0.75")
+    wait_undo("Change animation key")
+    restored["position.x"] = [(1.5, -0.75)] + restored["position.x"][1:]
+    expect(keys(saved()), restored, "typed key value")
+    step("hold interpolation", "click", "--name", "Hold interpolation", "--exact")
+    wait_undo("Change key interpolation")
+    clip = next(c for c in saved().iter("clip") if c.get("id") == "3")
+    first = clip.find("property[@name='position.x']").findall("key")[0]
+    if first.get("interpolation") != "0":
+        raise RuntimeError(f"key bar: interpolation is {first.get('interpolation')}, expected hold (0)")
     step("final", "screenshot", "--file", session.artifact_dir / "graph-final.png")
-    print("Graph cross-curve selection, group drag, magnets, scaling and delete passed.", flush=True)
+    print("Graph cross-curve selection, group drag, magnets, scaling, delete, key fields and key bar passed.", flush=True)
 finally:
     session.stop_app()

@@ -653,6 +653,9 @@
               file="Source/motion/ui/GrabCursor.h"/>
         <FILE id="MotGrabCursorM" name="GrabCursor_mac.mm" compile="1" resource="0"
               file="Source/motion/ui/GrabCursor_mac.mm"/>
+        <FILE id="MotuiKeyBarh" name="KeyBar.h" compile="0" resource="0" file="Source/motion/ui/KeyBar.h"/>
+        <FILE id="MotuiKeyPanelh" name="KeyPanel.h" compile="0" resource="0"
+              file="Source/motion/ui/KeyPanel.h"/>
         <FILE id="MotuiLuaSourceEditorh" name="LuaSourceEditor.h" compile="0"
               resource="0" file="Source/motion/ui/LuaSourceEditor.h"/>
         <FILE id="MotuiMarkerPanelh" name="MarkerPanel.h" compile="0" resource="0"

@@ -555,15 +555,16 @@ void MotionRoutingPanel::refresh() {
 }
 
 int MotionRoutingPanel::preferredHeight() const {
-    auto height = 30 + static_cast<int>(rows.size()) * (motion::ui::RouteRow::height + motion::style::gap);
+    auto height = headerHeight + motion::style::gap + static_cast<int>(rows.size()) * (motion::ui::RouteRow::height + motion::style::gap);
     height += motion::style::controlHeight + motion::style::gap;
     if (linkSource.isVisible()) { height += 20 + 3 * (motion::style::controlHeight + motion::style::gap); }
+    if (rows.empty() && !linkSource.isVisible()) { height += 48; }
     return height + motion::style::padding;
 }
 
 void MotionRoutingPanel::resized() {
-    auto area = getLocalBounds().reduced(7, 0);
-    area.removeFromTop(30);
+    auto area = getLocalBounds().reduced(8, 0);
+    area.removeFromTop(headerHeight + motion::style::gap);
     for (auto& row : rows) {
         row->setBounds(area.removeFromTop(motion::ui::RouteRow::height));
         area.removeFromTop(motion::style::gap);
@@ -580,13 +581,22 @@ void MotionRoutingPanel::resized() {
     }
 }
 
+// A column beside the Graph, headed like the channel list and the ruler.
 void MotionRoutingPanel::paint(juce::Graphics& g) {
-    g.setColour(osci::Colours::surface());
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 5);
-    osci::PanelHeader::paintBackground(g, getLocalBounds().removeFromTop(30).toFloat(), osci::Colours::veryDark());
+    g.fillAll(osci::Colours::surfaceSunken());
+    auto header = getLocalBounds().removeFromTop(headerHeight);
+    g.setColour(osci::Colours::surfaceRaised());
+    g.fillRect(header);
     g.setColour(osci::Colours::text());
-    g.setFont(motion::style::body());
-    g.drawText("Routing", 10, 0, getWidth() - 20, 30, juce::Justification::centredLeft);
+    g.setFont(motion::style::title());
+    g.drawText("Routing", header.reduced(10, 0), juce::Justification::centredLeft);
+    // Nothing drives the property yet: say how to, rather than leave a gap.
+    if (rows.empty() && !linkSource.isVisible()) {
+        g.setColour(osci::Colours::textMuted());
+        g.setFont(motion::style::caption());
+        g.drawFittedText("Drag a modulator onto this property in Properties to drive it, or link it to another property.",
+            getLocalBounds().withTrimmedTop(link.getBottom() + motion::style::gap).reduced(10, 0).removeFromTop(48), juce::Justification::topLeft, 3);
+    }
 }
 
 void MotionRoutingPanel::showLinkMenu() {

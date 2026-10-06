@@ -4,10 +4,11 @@
 #include "MotionIcons.h"
 #include "Chip.h"
 
-// The Graph's channel list (like Blender's or After Effects' graph editor):
-// every animatable property of the target, with its axis colour, whether it
-// is keyed or driven, and an eye that shows it as a context curve. Clicking a
-// row edits that property.
+// The Graph's channel list (like Blender's or After Effects' graph editor).
+// A header names what is being edited; its animatable properties follow,
+// grouped under captions ("Position") with each axis in its colour, whether
+// it is keyed or driven, and an eye that shows it as a context curve.
+// Clicking a row edits that property.
 class MotionCurveList final : public juce::Component {
 public:
     struct Channel {
@@ -33,6 +34,14 @@ public:
     std::function<void(const std::string&)> onChoose;
     std::function<void(const std::string&, bool)> onShow;
 
+    // What the channels belong to: its kind ("Clip", "Camera") and name.
+    void setOwner(juce::String kind, juce::String name) {
+        if (kind == ownerKind && name == ownerName) { return; }
+        ownerKind = std::move(kind);
+        ownerName = std::move(name);
+        repaint();
+    }
+
     void setChannels(std::vector<Channel> next, const std::string& selectedId, const std::set<std::string>& shown) {
         const bool same = next.size() == channels.size() && std::equal(next.begin(), next.end(), channels.begin(), [](const auto& a, const auto& b) {
             return a.id == b.id && a.label == b.label && a.keyed == b.keyed && a.driven == b.driven && a.colour == b.colour;
@@ -51,13 +60,40 @@ public:
             row->repaint();
         }
         if (!same) { revealSelected(); }
+        repaint();
     }
-    void paint(juce::Graphics& g) override { g.fillAll(osci::Colours::surfaceSunken()); }
+    void paint(juce::Graphics& g) override {
+        g.fillAll(osci::Colours::surfaceSunken());
+        // The header lines up with the Graph's ruler band beside it.
+        auto header = getLocalBounds().removeFromTop(headerHeight);
+        g.setColour(osci::Colours::surfaceRaised());
+        g.fillRect(header);
+        header.removeFromLeft(10);
+        header.removeFromRight(animatedOnly.getWidth() + 10);
+        if (ownerName.isNotEmpty()) {
+            g.setColour(osci::Colours::textMuted());
+            g.setFont(motion::style::caption());
+            const auto kindWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), ownerKind) + 6;
+            g.drawText(ownerKind, header.removeFromLeft(kindWidth), juce::Justification::centredLeft, false);
+            g.setColour(osci::Colours::text());
+            g.setFont(motion::style::title());
+            g.drawText(ownerName, header, juce::Justification::centredLeft, true);
+        }
+        // Group captions above their rows.
+        g.setFont(motion::style::caption());
+        for (const auto& caption : captions) {
+            const auto bounds = caption.bounds.translated(viewport.getX(), viewport.getY() - viewport.getViewPositionY());
+            if (bounds.getBottom() <= viewport.getY() || bounds.getY() >= viewport.getBottom()) { continue; }
+            g.setColour(osci::Colours::textMuted().withAlpha(.85f));
+            g.drawText(caption.text, bounds.withTrimmedLeft(10), juce::Justification::centredLeft, false);
+        }
+    }
     void resized() override {
         auto area = getLocalBounds();
-        // A filter chip sized to its words, not a full-width button.
-        const auto chipWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), animatedOnly.getButtonText()) + 20;
-        animatedOnly.setBounds(area.removeFromTop(26).reduced(6, 4).withWidth(chipWidth));
+        auto header = area.removeFromTop(headerHeight);
+        // A filter chip sized to its words, at the header's right.
+        const auto chipWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), animatedOnly.getButtonText()) + 18;
+        animatedOnly.setBounds(header.removeFromRight(chipWidth + 6).withTrimmedRight(6).reduced(0, 4));
         viewport.setBounds(area);
         layout();
     }
@@ -65,14 +101,15 @@ public:
 private:
     struct Row final : juce::Component, juce::SettableTooltipClient {
         Channel channel;
+        juce::String shortLabel;
         bool selected = false, hovered = false;
         struct Eye final : juce::Button {
             Eye() : juce::Button("Show curve") { setClickingTogglesState(false); }
             void paintButton(juce::Graphics& g, bool over, bool) override {
                 // Material's eye: open when the curve is drawn, struck through when not.
                 const auto shown = getToggleState();
-                const auto alpha = isEnabled() ? (over ? 1.0f : shown ? .8f : .35f) : .3f;
-                motion::icons::draw(g, shown ? motion::icons::Icon::visibility : motion::icons::Icon::visibilityOff, getLocalBounds().toFloat(), osci::Colours::text().withAlpha(alpha), 14.0f);
+                const auto alpha = isEnabled() ? (over ? 1.0f : shown ? .7f : .3f) : .3f;
+                motion::icons::draw(g, shown ? motion::icons::Icon::visibility : motion::icons::Icon::visibilityOff, getLocalBounds().toFloat(), osci::Colours::text().withAlpha(alpha), 13.0f);
             }
         } eye;
         std::function<void()> onClick;
@@ -80,6 +117,8 @@ private:
             setName("Curve " + channel.label);
             setTitle(getName());
             setTooltip(channel.label + (channel.keyed ? " - keyed" : "") + (channel.driven ? " - modulated" : "") + ". Click to edit its curve.");
+            // Under its group's caption, "Position X" reads as "X".
+            shortLabel = channel.group.isNotEmpty() && channel.label.startsWith(channel.group + " ") ? channel.label.substring(channel.group.length() + 1) : channel.label;
             eye.setName("Show curve " + channel.label);
             eye.setTitle(eye.getName());
             eye.setTooltip("Show this curve behind the one being edited");
@@ -87,30 +126,32 @@ private:
         }
         void paint(juce::Graphics& g) override {
             auto bounds = getLocalBounds();
+            const auto animated = channel.keyed || channel.driven;
             if (selected) {
-                g.setColour(osci::Colours::accentColor().withAlpha(.22f));
-                g.fillRoundedRectangle(bounds.toFloat().reduced(2, 1), 3.0f);
-            } else if (hovered) {
-                g.setColour(juce::Colours::white.withAlpha(.05f));
-                g.fillRoundedRectangle(bounds.toFloat().reduced(2, 1), 3.0f);
-            }
-            bounds.removeFromLeft(8);
-            g.setColour(channel.colour.withAlpha(channel.keyed || channel.driven ? 1.0f : .45f));
-            g.fillRoundedRectangle(bounds.removeFromLeft(4).withSizeKeepingCentre(4, 12).toFloat(), 1.5f);
-            bounds.removeFromLeft(7);
-            bounds.removeFromRight(24);
-            auto marks = bounds.removeFromRight(26);
-            if (channel.keyed) { motion::style::drawDiamond(g, {static_cast<float>(marks.getX() + 6), static_cast<float>(marks.getCentreY())}, 3.5f, true); }
-            if (channel.driven) {
+                g.setColour(osci::Colours::accentColor().withAlpha(.16f));
+                g.fillRect(bounds);
                 g.setColour(osci::Colours::accentColor());
-                g.setFont(motion::style::caption());
-                g.drawText("~", marks.withTrimmedLeft(12), juce::Justification::centred);
+                g.fillRect(bounds.removeFromLeft(2));
+            } else if (hovered) {
+                g.setColour(juce::Colours::white.withAlpha(.04f));
+                g.fillRect(bounds);
             }
-            g.setColour(selected ? juce::Colours::white : osci::Colours::text().withAlpha(channel.keyed || channel.driven ? .95f : .6f));
+            bounds = getLocalBounds().withTrimmedLeft(indent);
+            g.setColour(channel.colour.withAlpha(animated ? 1.0f : .4f));
+            g.fillEllipse(bounds.removeFromLeft(7).withSizeKeepingCentre(7, 7).toFloat());
+            bounds.removeFromLeft(8);
+            bounds.removeFromRight(26);
+            auto marks = bounds.removeFromRight(26);
+            if (channel.keyed) {
+                g.setColour(selected ? juce::Colours::white.withAlpha(.85f) : osci::Colours::text().withAlpha(.55f));
+                motion::style::drawDiamond(g, {static_cast<float>(marks.getX() + 6), static_cast<float>(marks.getCentreY())}, 3.5f, true);
+            }
+            if (channel.driven) { motion::icons::draw(g, motion::icons::Icon::wave, marks.withTrimmedLeft(12).toFloat(), osci::Colours::accentColor(), 12.0f); }
+            g.setColour(selected ? juce::Colours::white : osci::Colours::text().withAlpha(animated ? .9f : .5f));
             g.setFont(selected ? motion::style::title() : motion::style::body());
-            g.drawText(channel.label, bounds, juce::Justification::centredLeft, true);
+            g.drawText(shortLabel, bounds, juce::Justification::centredLeft, true);
         }
-        void resized() override { eye.setBounds(getLocalBounds().removeFromRight(24).withSizeKeepingCentre(18, 14)); }
+        void resized() override { eye.setBounds(getLocalBounds().removeFromRight(28).withSizeKeepingCentre(20, 16)); }
         void mouseEnter(const juce::MouseEvent&) override { hovered = true; repaint(); }
         void mouseExit(const juce::MouseEvent&) override { hovered = false; repaint(); }
         void mouseUp(const juce::MouseEvent& event) override { if (!event.mouseWasDraggedSinceMouseDown() && onClick) { onClick(); } }
@@ -127,6 +168,11 @@ private:
             };
             return std::make_unique<Handler>(*this);
         }
+        int indent = 10;
+    };
+    struct Caption {
+        juce::String text;
+        juce::Rectangle<int> bounds; // In the content's coordinates.
     };
     void rebuild() {
         rows.clear();
@@ -146,20 +192,33 @@ private:
         layout();
     }
     void layout() {
-        const auto width = viewport.getWidth() - (viewport.isVerticalScrollBarShown() ? 6 : 0);
+        // Rows run edge to edge unless a scroll bar is actually showing.
+        const auto width = viewport.getWidth() - (viewport.getVerticalScrollBar().isVisible() ? viewport.getScrollBarThickness() : 0);
         int y = 4;
-        juce::String group;
+        captions.clear();
         const auto filtered = animatedOnly.getToggleState() && animatedOnly.isEnabled();
-        for (auto& row : rows) {
-            const auto shown = !filtered || row->channel.keyed || row->channel.driven || row->channel.id == selected;
-            row->setVisible(shown);
-            if (!shown) { continue; }
-            if (row->channel.group != group && !group.isEmpty()) { y += 6; }
-            group = row->channel.group;
-            row->setBounds(0, y, std::max(0, width), rowHeight);
+        const auto shown = [&](const Row& row) { return !filtered || row.channel.keyed || row.channel.driven || row.channel.id == selected; };
+        for (std::size_t index = 0; index < rows.size(); ++index) {
+            auto& row = *rows[index];
+            row.setVisible(shown(row));
+            if (!row.isVisible()) { continue; }
+            // A caption opens each group with more than its own name ("Position", not "Drawing").
+            const auto& group = row.channel.group;
+            const auto startsGroup = std::none_of(rows.begin(), rows.begin() + static_cast<std::ptrdiff_t>(index), [&](const auto& other) { return other->isVisible() && other->channel.group == group; });
+            const auto grouped = group.isNotEmpty() && row.shortLabel != row.channel.label;
+            if (startsGroup) {
+                y += index == 0 ? 0 : 4;
+                if (grouped) {
+                    captions.push_back({group, {0, y, std::max(0, width), captionHeight}});
+                    y += captionHeight;
+                }
+            }
+            row.indent = grouped ? 20 : 10;
+            row.setBounds(0, y, std::max(0, width), rowHeight);
             y += rowHeight;
         }
         content.setSize(std::max(0, width), y + 4);
+        repaint();
     }
     void revealSelected() {
         for (auto& row : rows) {
@@ -169,12 +228,14 @@ private:
             if (top < view) { viewport.setViewPosition(0, top); } else if (bottom > view + height) { viewport.setViewPosition(0, bottom - height); }
         }
     }
-    static constexpr int rowHeight = 22;
-    motion::ui::Chip animatedOnly {"Animated only"};
+    static constexpr int headerHeight = 26, rowHeight = 22, captionHeight = 18;
+    motion::ui::Chip animatedOnly {"Animated"};
     std::vector<Channel> channels;
     std::vector<std::unique_ptr<Row>> rows;
+    std::vector<Caption> captions;
     std::string selected;
     std::set<std::string> visible;
+    juce::String ownerKind, ownerName;
     juce::Viewport viewport;
     juce::Component content;
 };

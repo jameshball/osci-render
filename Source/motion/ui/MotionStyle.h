@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../../LookAndFeel.h"
+#include "../model/KeyEasing.h"
 #include <array>
 
 // One place for osci-motion's visual language: a restrained dark palette built
@@ -60,8 +61,9 @@ inline juce::Colour marker() { return juce::Colour(0xffcfb779); }
 inline juce::Colour tempo() { return juce::Colour(0xff8fb6e8); }
 // The selected stroke or point, brighter than the key green.
 inline juce::Colour selection() { return juce::Colour(0xff9affb3); }
-// A modulated property's value after its drivers, beside its keys.
-inline juce::Colour result() { return juce::Colour(0xff80baff); }
+// A modulated property's value after its drivers, beside its keys: a hue
+// no axis uses, so a channel's keys and its result never look alike.
+inline juce::Colour result() { return juce::Colour(0xffbfa6ff); }
 inline juce::Colour tangent() { return juce::Colour(0xffe7bc6c); }
 inline juce::Colour motionPath() { return juce::Colour(0xffb8d4ea); }
 inline juce::Colour waveform() { return juce::Colour(0xff97c7df); }
@@ -207,21 +209,44 @@ inline void addDiamond(juce::Path& path, juce::Point<float> centre, float radius
 // After Effects' key glyphs: square hold, diamond linear, hourglass eased,
 // circle smooth or Bezier.
 enum class KeyShape { hold, linear, eased, smooth };
-inline void drawKeyShape(juce::Graphics& g, juce::Point<float> centre, float radius, KeyShape shape) {
+inline juce::Path keyShapePath(juce::Point<float> centre, float radius, KeyShape shape) {
+    juce::Path path;
     if (shape == KeyShape::hold) {
-        g.fillRect(juce::Rectangle<float>(radius * 1.6f, radius * 1.6f).withCentre(centre));
+        path.addRoundedRectangle(juce::Rectangle<float>(radius * 1.6f, radius * 1.6f).withCentre(centre), radius * .2f);
     } else if (shape == KeyShape::smooth) {
-        g.fillEllipse(juce::Rectangle<float>(radius * 1.8f, radius * 1.8f).withCentre(centre));
+        path.addEllipse(juce::Rectangle<float>(radius * 1.8f, radius * 1.8f).withCentre(centre));
     } else if (shape == KeyShape::eased) {
-        juce::Path hourglass;
-        hourglass.addTriangle(centre.x - radius, centre.y - radius, centre.x + radius, centre.y - radius, centre.x, centre.y);
-        hourglass.addTriangle(centre.x - radius, centre.y + radius, centre.x + radius, centre.y + radius, centre.x, centre.y);
-        g.fillPath(hourglass);
+        path.addTriangle(centre.x - radius, centre.y - radius, centre.x + radius, centre.y - radius, centre.x, centre.y);
+        path.addTriangle(centre.x - radius, centre.y + radius, centre.x + radius, centre.y + radius, centre.x, centre.y);
     } else {
-        juce::Path diamond;
-        addDiamond(diamond, centre, radius);
-        g.fillPath(diamond);
+        addDiamond(path, centre, radius);
     }
+    return path;
+}
+inline void drawKeyShape(juce::Graphics& g, juce::Point<float> centre, float radius, KeyShape shape) { g.fillPath(keyShapePath(centre, radius, shape)); }
+inline void strokeKeyShape(juce::Graphics& g, juce::Point<float> centre, float radius, KeyShape shape, float thickness) {
+    g.strokePath(keyShapePath(centre, radius, shape), juce::PathStrokeType(thickness, juce::PathStrokeType::mitered));
+}
+// The shape names the key's outgoing interpolation.
+inline KeyShape keyShapeOf(const motion::Keyframe& key) {
+    if (key.interpolation == motion::Interpolation::hold) { return KeyShape::hold; }
+    if (key.interpolation == motion::Interpolation::linear) { return KeyShape::linear; }
+    return motion::isEased(key) ? KeyShape::eased : KeyShape::smooth;
+}
+// A key as the Graph and the Timeline draw it: cut out of what is behind it
+// so it never merges with a line, grown a little on hover, and white with a
+// ring in its colour when selected.
+inline void drawKey(juce::Graphics& g, juce::Point<float> centre, float radius, const motion::Keyframe& key, juce::Colour colour, bool selected, bool hovered, juce::Colour behind) {
+    const auto shape = keyShapeOf(key);
+    const auto size = hovered ? radius + 1.0f : radius;
+    g.setColour(behind);
+    drawKeyShape(g, centre, size + 1.75f, shape);
+    if (selected) {
+        g.setColour(colour);
+        strokeKeyShape(g, centre, size + 3.25f, shape, 1.5f);
+    }
+    g.setColour(selected ? juce::Colours::white : hovered ? colour.brighter(.3f) : colour);
+    drawKeyShape(g, centre, size, shape);
 }
 inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radius, bool filled, float stroke = 1.2f) {
     juce::Path diamond;

@@ -1705,22 +1705,13 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
                 g.strokePath(shape, juce::PathStrokeType(1.0f));
             }
         }
-        // Key shape encodes its outgoing interpolation: square hold,
-        // diamond linear, hourglass eased, circle auto/Bezier.
+        // Key shape encodes its outgoing interpolation, as in the Graph.
+        const auto behind = osci::Colours::surfaceSunken().interpolatedWith(clipColour(clip, track), .18f);
         for (std::size_t k = 0; k < keys.size(); ++k) {
             const auto time = timing.projectTime(keys[k].time);
             // A key at the very start stays clear of the name column.
             const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
-            const bool chosen = isKeySelected(clip.id, row.lane, keys[k].time);
-            g.setColour(chosen ? juce::Colours::white : motion::style::key());
-            const auto shape = keys[k].interpolation == motion::Interpolation::hold ? motion::style::KeyShape::hold
-                : keys[k].interpolation == motion::Interpolation::linear ? motion::style::KeyShape::linear
-                : motion::isEased(keys[k]) ? motion::style::KeyShape::eased : motion::style::KeyShape::smooth;
-            motion::style::drawKeyShape(g, {x, centre}, 4.5f, shape);
-            if (chosen) {
-                g.setColour(motion::style::key());
-                g.drawEllipse(x - 6, centre - 6, 12, 12, 1.0f);
-            }
+            motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], motion::style::key(), isKeySelected(clip.id, row.lane, keys[k].time), false, behind);
         }
     }
     if (marquee.has_value()) {

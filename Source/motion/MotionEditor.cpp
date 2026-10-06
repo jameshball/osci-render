@@ -604,6 +604,10 @@ void MotionEditor::setUpTimeline() {
 
 void MotionEditor::setUpGraph() {
     graphSide.addAndMakeVisible(routingPanel);
+    graphSide.addChildComponent(keyPanel);
+    keyPanel.onTime = [this](double time) { curveEditor.setActiveKeyTime(time); };
+    keyPanel.onValue = [this](double value) { curveEditor.setActiveKeyValue(value); };
+    curveEditor.onSelectionChanged = [this] { refreshKeyPanel(); };
     graphSideViewport.setViewedComponent(&graphSide, false);
     graphSideViewport.setScrollBarsShown(true, false);
     graphSideViewport.setScrollBarThickness(6);
@@ -1415,10 +1419,13 @@ void MotionEditor::refreshCurveList() {
     const auto target = motion::findPropertyTarget(project, curveTarget);
     if (!target.has_value()) {
         // Nothing selected: an empty list, like the graph beside it.
+        curveList.setOwner({}, {});
         curveList.setChannels({}, {}, shownCurves);
         curveEditor.setContextCurves({});
         return;
     }
+    const auto kind = target->camera ? "Camera" : target->isEffect ? "Effect" : target->isGroup ? "Group" : target->beam ? "Scope" : target->isAudio ? "Audio" : "Clip";
+    curveList.setOwner(kind, juce::String(target->name.data(), target->name.size()));
     std::vector<MotionCurveList::Channel> channels;
     std::map<std::string, juce::Colour> colours;
     for (const auto& name : curveProperties) {
@@ -1453,10 +1460,27 @@ void MotionEditor::refreshCurveList() {
     curveEditor.setContextCurves(std::move(context));
 }
 
+// The column fills the side, the selected key above Routing; it scrolls
+// only when its content is taller.
 void MotionEditor::layoutGraphSide() {
-    const auto width = graphSideViewport.getWidth() - 8;
-    routingPanel.setBounds(0, 0, width, routingPanel.preferredHeight());
+    const auto keyHeight = keyPanel.isVisible() ? MotionKeyPanel::preferredHeight() + 1 : 0;
+    const auto scrolls = keyHeight + routingPanel.preferredHeight() > graphSideViewport.getHeight();
+    const auto width = graphSideViewport.getWidth() - (scrolls ? graphSideViewport.getScrollBarThickness() : 0);
+    keyPanel.setBounds(0, 0, width, std::max(0, keyHeight - 1));
+    routingPanel.setBounds(0, keyHeight, width, std::max(routingPanel.preferredHeight(), graphSideViewport.getHeight() - keyHeight));
     graphSide.setSize(width, routingPanel.getBottom());
+}
+
+void MotionEditor::refreshKeyPanel() {
+    const auto key = curveEditor.activeKey();
+    if (key.has_value()) {
+        const auto spec = motion::specFor(processor.document.project(), curveTarget, key->property);
+        keyPanel.show(key->time, key->value, spec.value_or(motion::ui::amountSpec), key->editable);
+    }
+    if (keyPanel.isVisible() != key.has_value()) {
+        keyPanel.setVisible(key.has_value());
+        layoutGraphSide();
+    }
 }
 
 

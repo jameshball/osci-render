@@ -3,6 +3,18 @@
 MotionCurveEditor::MotionCurveEditor(MotionProcessor& processor) : processor(processor) {
     setName("Animation curve editor");
     setWantsKeyboardFocus(true);
+    keyBar.onInterpolation = [this](motion::Interpolation interpolation) { setSelectedInterpolation(interpolation); };
+    keyBar.onEase = [this] { easeSelected(true, true); };
+    addChildComponent(keyBar);
+    frameButton.setClickingTogglesState(false);
+    frameButton.quiet = true;
+    frameButton.setTooltip("Frame every curve (F). Shift+F frames only the edited curve.");
+    frameButton.onClick = [this] {
+        userView = false;
+        fit();
+        repaint();
+    };
+    addChildComponent(frameButton);
 }
 
 void MotionCurveEditor::setHiddenCurves(std::set<std::string> curves) {
@@ -67,6 +79,7 @@ void MotionCurveEditor::setSelection(motion::Id id, std::string property) {
     propertyName = std::move(property);
     userView = false;
     fit();
+    updateKeyBar();
     repaint();
 }
 
@@ -90,7 +103,88 @@ void MotionCurveEditor::refresh() {
             fit();
         }
     }
+    updateKeyBar();
     repaint();
+}
+
+template <typename Evaluate>
+juce::Path MotionCurveEditor::curvePath(double from, double to, float perPixel, Evaluate&& evaluate) const {
+    juce::Path path;
+    const auto steps = std::max(2, juce::roundToInt(std::abs(timeX(to) - timeX(from)) * perPixel));
+    for (int i = 0; i <= steps; ++i) {
+        const auto time = std::lerp(from, to, static_cast<double>(i) / steps);
+        const juce::Point<float> point(timeX(time), valueY(evaluate(time)));
+        if (i == 0) { path.startNewSubPath(point); } else { path.lineTo(point); }
+    }
+    return path;
+}
+
+void MotionCurveEditor::paintGrid(juce::Graphics& g, double step, double minorStep) {
+    const auto area = plot();
+    const auto grid = processor.document.project().timeGrid();
+    // Whole-pixel hairlines stay crisp; minor lines sit at half strength.
+    const auto vertical = [&](double time, float alpha) {
+        g.setColour(juce::Colours::white.withAlpha(alpha));
+        g.fillRect(std::round(timeX(time)), area.getY(), 1.0f, area.getHeight());
+    };
+    grid.forEachTick(viewStart, viewEnd, minorStep, [&](double time) { vertical(time, .022f); });
+    grid.forEachTick(viewStart, viewEnd, step, [&](double time) { vertical(time, .05f); });
+    const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
+    const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
+    g.setFont(motion::style::caption());
+    // An integer index (capped) so extreme values can never stall the loop.
+    const auto first = std::ceil(low / (valueTick / 2));
+    for (int index = 0; index < 400 && (first + index) * valueTick / 2 <= high + valueTick * 1e-6; ++index) {
+        const auto value = (first + index) * valueTick / 2;
+        const auto y = std::round(valueY(value));
+        const auto major = static_cast<long long>(first + index) % 2 == 0;
+        const auto zero = std::abs(value) < valueTick * 1e-6;
+        g.setColour(juce::Colours::white.withAlpha(zero ? .12f : major ? .05f : .022f));
+        g.fillRect(area.getX(), y, area.getWidth(), 1.0f);
+        if (!major || y < area.getY() - 1 || y > area.getBottom() + 1) { continue; }
+        g.setColour(osci::Colours::text().withAlpha(zero ? .75f : .5f));
+        g.drawText(juce::String(zero ? 0.0 : value, decimals), 0, juce::roundToInt(y) - 8, gutter - 9, 16, juce::Justification::centredRight);
+    }
+}
+
+// The Timeline's ruler: labels left-aligned on major ticks, short marks
+// between them, scrubbed by dragging.
+void MotionCurveEditor::paintRuler(juce::Graphics& g, double step, double minorStep) {
+    const auto grid = processor.document.project().timeGrid();
+    juce::Graphics::ScopedSaveState state(g);
+    g.reduceClipRegion(juce::Rectangle<int>(gutter, 0, getWidth() - gutter, bandHeight));
+    if (keyBar.isVisible()) { g.excludeClipRegion(keyBar.getBounds().expanded(6, 0)); }
+    grid.forEachTick(viewStart, viewEnd, minorStep, [&](double time) {
+        g.setColour(juce::Colours::white.withAlpha(.16f));
+        g.fillRect(std::round(timeX(time)), bandHeight - 4.0f, 1.0f, 4.0f);
+    });
+    g.setFont(motion::style::body());
+    grid.forEachTick(viewStart, viewEnd, step, [&](double time) {
+        const auto x = std::round(timeX(time));
+        g.setColour(juce::Colours::white.withAlpha(.3f));
+        g.fillRect(x, bandHeight - 8.0f, 1.0f, 8.0f);
+        g.setColour(osci::Colours::text().withAlpha(.7f));
+        g.drawText(juce::String(grid.label(time, step)), juce::roundToInt(x) + 5, 0, 70, bandHeight - 4, juce::Justification::centredLeft);
+    });
+}
+
+// A readout beside a key, above it or below when there is no room: the
+// muted label (a time, "Influence") before "|", then the value.
+void MotionCurveEditor::paintReadout(juce::Graphics& g, juce::Point<float> anchor, const juce::String& text) {
+    const auto label = text.upToFirstOccurrenceOf("|", false, false), value = text.fromFirstOccurrenceOf("|", false, false);
+    const auto labelWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), label);
+    const auto valueWidth = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), value);
+    juce::Rectangle<float> chip(static_cast<float>(labelWidth + valueWidth + 26), 20.0f);
+    chip.setCentre(anchor.x, anchor.y - 21.0f);
+    if (chip.getY() < plot().getY()) { chip.setY(anchor.y + 11.0f); }
+    chip.setX(std::clamp(chip.getX(), plot().getX(), std::max(plot().getX(), plot().getRight() - chip.getWidth())));
+    motion::style::fillFloatingPanel(g, chip, osci::Colours::surfaceRaised());
+    g.setFont(motion::style::caption());
+    auto row = chip.reduced(9.0f, 0.0f);
+    g.setColour(osci::Colours::textMuted());
+    g.drawText(label, row.removeFromLeft(static_cast<float>(labelWidth)), juce::Justification::centredLeft, false);
+    g.setColour(osci::Colours::text());
+    g.drawText(value, row, juce::Justification::centredRight, false);
 }
 
 void MotionCurveEditor::paint(juce::Graphics& g) {
@@ -98,182 +192,285 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
     playheadStrip.drawn(std::nullopt);
     const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
     const auto* storedCurve = findCurve(clip, propertyName);
-    g.setColour(osci::Colours::text());
-    g.setFont(motion::style::body());
     if (storedCurve == nullptr) {
+        // No ruler without a curve: just what to do next.
+        const auto centre = getLocalBounds().getCentre();
+        motion::icons::draw(g, motion::icons::Icon::bezier, juce::Rectangle<float>(32.0f, 32.0f).withCentre(centre.toFloat().translated(0.0f, -30.0f)), osci::Colours::textMuted().withAlpha(.5f), 28.0f);
+        g.setColour(osci::Colours::text().withAlpha(.85f));
+        g.setFont(motion::style::title());
+        g.drawText("No curve to edit", juce::Rectangle<int>(getWidth(), 20).withCentre(centre.translated(0, 0)), juce::Justification::centred);
         g.setColour(osci::Colours::textMuted());
-        g.drawText("Select a property", getLocalBounds(), juce::Justification::centred);
+        g.setFont(motion::style::body());
+        g.drawText("Select a clip, then pick a property in the list or key one in Properties.", juce::Rectangle<int>(getWidth(), 20).withCentre(centre.translated(0, 20)), juce::Justification::centred);
         return;
     }
+    g.setColour(osci::Colours::surfaceRaised());
+    g.fillRect(0, 0, getWidth(), bandHeight);
     const auto& curve = *displayed(*clip, propertyName);
     // Routed modulators and links count as modulation too: the Result
     // curve shows what the property actually does.
     const auto drivers = resultDrivers(curve);
     const auto modulated = drivers != nullptr;
     const auto area = plot();
-    g.setFont(motion::style::title());
-    g.drawText(motion::propertyLabel(processor.document.project(), targetId, propertyName), 12, 3, 160, 22, juce::Justification::centredLeft);
-    g.setFont(motion::style::body());
-    g.setColour(osci::Colours::textMuted());
-    // Name the owner's kind when it isn't a clip, so a camera or effect
-    // curve is never mistaken for the selected clip's.
-    const juce::String owner(clip->name.data(), clip->name.size());
-    g.drawText(clip->camera ? "Camera: " + owner : clip->isEffect ? "Effect: " + owner : clip->isGroup ? "Group: " + owner : owner, 150, 3, getWidth() - 330, 22, juce::Justification::centredLeft);
-    g.setFont(motion::style::body());
-    if (modulated) {
-        g.setColour(primaryColour(*clip));
-        g.drawText("Keys", getWidth() - 150, 3, 48, 22, juce::Justification::centredLeft);
-        g.setColour(motion::style::result());
-        g.drawText("Result", getWidth() - 90, 3, 65, 22, juce::Justification::centredLeft);
-    }
-    g.setFont(motion::style::caption());
-    {
-        const auto valueTick = valueStep(high - low, std::max(3, juce::roundToInt(area.getHeight() / 30)));
-        const auto decimals = std::clamp(static_cast<int>(-std::floor(std::log10(valueTick))), 0, 6);
-        // An integer index (capped) so extreme values can never stall the loop.
-        const auto first = std::ceil(low / valueTick);
-        for (int index = 0; index < 200 && (first + index) * valueTick <= high + valueTick * 1e-6; ++index) {
-            const auto value = (first + index) * valueTick;
-            const auto y = valueY(value);
-            g.setColour(juce::Colours::white.withAlpha(std::abs(value) < valueTick * 1e-6 ? 0.14f : 0.07f));
-            g.drawLine(area.getX(), y, area.getRight(), y);
-            g.setColour(osci::Colours::text().withAlpha(0.65f));
-            g.drawText(juce::String(std::abs(value) < valueTick * 1e-6 ? 0.0 : value, decimals), 2, juce::roundToInt(y) - 8, 53, 16, juce::Justification::centredRight);
-        }
-    }
     const auto grid = processor.document.project().timeGrid();
     const auto step = grid.tickStep(area.getWidth() / (viewEnd - viewStart));
-    grid.forEachTick(viewStart, viewEnd, step, [&](double time) {
-        const auto x = timeX(time);
-        g.setColour(juce::Colours::white.withAlpha(0.07f));
-        g.drawLine(x, area.getY(), x, area.getBottom());
-        g.setColour(osci::Colours::text().withAlpha(0.65f));
-        g.drawText(juce::String(grid.label(time, step)), juce::roundToInt(x) - 34, juce::roundToInt(area.getBottom()) + 3, 68, 17, juce::Justification::centred);
-    });
+    const auto minorStep = step / 2;
+    paintGrid(g, step, minorStep);
+    // The clip's playing span is the stage; time it never plays is shaded.
+    const auto clipStart = clip->start, clipEnd = clip->end();
     {
-        // Channels shown from the list, faint and not editable.
-        juce::Graphics::ScopedSaveState context(g);
-        g.reduceClipRegion(area.toNearestInt().expanded(5));
-        const auto steps = std::max(2, juce::roundToInt(area.getWidth() / 3));
-        for (const auto& [name, colour] : contextCurves) {
-            const auto* other = clip->curve(name);
-            if (other == nullptr || name == propertyName || isSibling(*clip, name)) { continue; }
-            juce::Path shape;
-            for (int i = 0; i <= steps; ++i) {
-                const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-                const auto y = valueY(other->evaluateBase(clip->localTime(time)));
-                if (i == 0) { shape.startNewSubPath(timeX(time), y); } else { shape.lineTo(timeX(time), y); }
-            }
-            g.setColour(colour.withAlpha(.3f));
-            g.strokePath(shape, juce::PathStrokeType(1.0f));
+        const auto left = std::clamp(timeX(clipStart), area.getX(), area.getRight());
+        const auto right = std::clamp(timeX(clipEnd), area.getX(), area.getRight());
+        g.setColour(juce::Colours::black.withAlpha(.26f));
+        g.fillRect(area.withRight(left));
+        g.fillRect(area.withLeft(right));
+        g.setColour(juce::Colours::white.withAlpha(.1f));
+        for (const auto edge : {timeX(clipStart), timeX(clipEnd)}) {
+            if (edge >= area.getX() && edge <= area.getRight()) { g.fillRect(std::round(edge), area.getY(), 1.0f, area.getHeight()); }
         }
     }
-    {
-        // Sibling axes are editable too, drawn in their axis colour under the primary curve.
-        juce::Graphics::ScopedSaveState ghosts(g);
-        g.reduceClipRegion(area.toNearestInt().expanded(5));
-        const auto steps = std::max(2, juce::roundToInt(area.getWidth() / 2));
-        for (const auto& [name, colour] : siblings(*clip)) {
-            const auto* other = displayed(*clip, name);
-            juce::Path ghost;
-            for (int i = 0; i <= steps; ++i) {
-                const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-                const auto y = valueY(other->evaluateBase(clip->localTime(time)));
-                if (i == 0) { ghost.startNewSubPath(timeX(time), y); } else { ghost.lineTo(timeX(time), y); }
-            }
-            g.setColour(colour.withAlpha(.5f));
-            g.strokePath(ghost, juce::PathStrokeType(1.2f));
-            for (const auto& key : other->keyframes()) {
-                drawKey(g, keyPoint(*clip, key), 4.0f, isSelected(name, key.time) ? juce::Colours::white : colour, key);
-            }
-        }
-    }
-    {
-        juce::Graphics::ScopedSaveState scope(g);
-        g.reduceClipRegion(area.toNearestInt().expanded(5));
-        juce::Path path;
-        const auto steps = std::max(2, juce::roundToInt(area.getWidth()));
-        for (int i = 0; i <= steps; ++i) {
-            const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-            const auto y = valueY(curve.evaluateBase(clip->localTime(time)));
-            if (i == 0) {
-                path.startNewSubPath(timeX(time), y);
-            } else {
-                path.lineTo(timeX(time), y);
-            }
-        }
-        const auto colour = primaryColour(*clip);
+    paintRuler(g, step, minorStep);
+    // Faded where the clip never plays, full strength where it does.
+    const auto strokeAcrossStage = [&](const auto& evaluate, juce::Colour colour, float width, float outside, float perPixel) {
+        const juce::PathStrokeType stroke(width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        g.setColour(colour.withMultipliedAlpha(outside));
+        if (viewStart < clipStart) { g.strokePath(curvePath(viewStart, std::min(clipStart, viewEnd), perPixel, evaluate), stroke); }
+        if (viewEnd > clipEnd) { g.strokePath(curvePath(std::max(clipEnd, viewStart), viewEnd, perPixel, evaluate), stroke); }
+        const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
         g.setColour(colour);
-        g.strokePath(path, juce::PathStrokeType(2.0f));
-        if (modulated) {
-            auto withDrivers = curve;
-            withDrivers.drivers = drivers;
-            juce::Path result;
-            for (int i = 0; i <= steps; ++i) {
-                const auto time = std::lerp(viewStart, viewEnd, static_cast<double>(i) / steps);
-                const auto value = constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time)), propertyName);
-                if (i == 0) { result.startNewSubPath(timeX(time), valueY(value)); } else { result.lineTo(timeX(time), valueY(value)); }
+        if (to > from) { g.strokePath(curvePath(from, to, perPixel, evaluate), stroke); }
+    };
+    const auto baseOf = [&clip](const motion::Curve& source) { return [&clip, &source](double time) { return source.evaluateBase(clip->localTime(time)); }; };
+    g.saveState();
+    g.reduceClipRegion(area.toNearestInt().expanded(6).withTop(bandHeight));
+    const auto colour = primaryColour(*clip);
+    auto withDrivers = curve;
+    withDrivers.drivers = drivers;
+    const auto result = [&](double time) { return constrainedValue(*clip, withDrivers.evaluate(clip->localTime(time)), propertyName); };
+    {
+        // A soft fill under what plays, inside the stage, gives the curve
+        // weight. It goes first so it never tints the other curves.
+        const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
+        if (to > from) {
+            auto fill = modulated ? curvePath(from, to, 1.0f, result) : curvePath(from, to, 1.0f, baseOf(curve));
+            fill.lineTo(timeX(to), area.getBottom());
+            fill.lineTo(timeX(from), area.getBottom());
+            fill.closeSubPath();
+            const auto tint = modulated ? motion::style::result() : colour;
+            g.setGradientFill(juce::ColourGradient(tint.withAlpha(.15f), 0.0f, area.getY(), tint.withAlpha(0.0f), 0.0f, area.getBottom(), false));
+            g.fillPath(fill);
+        }
+    }
+    // Channels shown from the list, faint and not editable.
+    for (const auto& [name, colour] : contextCurves) {
+        const auto* other = clip->curve(name);
+        if (other == nullptr || name == propertyName || isSibling(*clip, name)) { continue; }
+        strokeAcrossStage(baseOf(*other), colour.withAlpha(.32f), 1.0f, .45f, 0.5f);
+    }
+    // Sibling axes are editable too, in their axis colour under the edited curve.
+    for (const auto& [name, colour] : siblings(*clip)) {
+        strokeAcrossStage(baseOf(*displayed(*clip, name)), colour.withAlpha(.6f), 1.5f, .4f, 1.0f);
+    }
+    const auto emphasis = hover.curve && !drag.has_value() ? .6f : 0.0f;
+    if (modulated) {
+        // The keys are what you edit; the Result is what plays.
+        strokeAcrossStage(baseOf(curve), colour.withAlpha(.55f), 1.5f + emphasis, .5f, 2.0f);
+        strokeAcrossStage(result, motion::style::result(), 2.0f, .4f, 2.0f);
+    } else {
+        strokeAcrossStage(baseOf(curve), colour, 2.0f + emphasis, .35f, 2.0f);
+    }
+    for (const auto& [name, siblingColour] : siblings(*clip)) {
+        const auto* other = displayed(*clip, name);
+        for (const auto& key : other->keyframes()) {
+            motion::style::drawKey(g, keyPoint(*clip, key), 4.0f, key, siblingColour, isSelected(name, key.time), hover.key == KeyRef {name, key.time}, osci::Colours::veryDark());
+        }
+    }
+    if (selectedTime.has_value()) {
+        const auto* selected = curve.findKey(*selectedTime);
+        if (selected != nullptr) {
+            const auto keyPosition = keyPoint(*clip, *selected);
+            for (const auto mode : {DragMode::incoming, DragMode::outgoing}) {
+                const auto handle = tangentPoint(*clip, curve, *selected, mode);
+                if (!handle.has_value()) { continue; }
+                const auto active = hover.handle == mode || (drag.has_value() && drag->mode == mode);
+                g.setColour(motion::style::tangent().withAlpha(.85f));
+                g.drawLine(keyPosition.x, keyPosition.y, handle->x, handle->y, 1.0f);
+                const auto ring = juce::Rectangle<float>(8.0f, 8.0f).withCentre(*handle);
+                g.setColour(active ? motion::style::tangent() : osci::Colours::veryDark());
+                g.fillEllipse(ring);
+                g.setColour(motion::style::tangent());
+                g.drawEllipse(ring.reduced(.75f), 1.5f);
             }
-            g.setColour(motion::style::result());
-            g.strokePath(result, juce::PathStrokeType(1.4f));
         }
-        if (selectedTime.has_value()) {
-            const auto* selected = curve.findKey(*selectedTime);
-            if (selected != nullptr) {
-                for (const auto mode : { DragMode::incoming, DragMode::outgoing }) {
-                    const auto handle = tangentPoint(*clip, curve, *selected, mode);
-                    if (handle.has_value()) {
-                        const auto keyPosition = keyPoint(*clip, *selected);
-                        g.setColour(motion::style::tangent().withAlpha(0.75f));
-                        g.drawLine(keyPosition.x, keyPosition.y, handle->x, handle->y, 1.0f);
-                        g.fillEllipse(handle->x - 4, handle->y - 4, 8, 8);
-                    }
-                }
-            }
-        }
-        for (const auto& key : curve.keyframes()) {
-            drawKey(g, keyPoint(*clip, key), 5.0f, isSelected(propertyName, key.time) ? juce::Colours::white : colour, key);
-        }
-        const auto x = playheadX();
-        if (x.has_value()) {
-            playheadStrip.drawn(x);
-            g.setColour(motion::style::playhead());
-            g.drawVerticalLine(*x, area.getY(), area.getBottom());
-        }
-        if (snapGuide.has_value()) {
-            const auto guide = timeX(*snapGuide);
-            g.setColour(osci::Colours::accentColor().withAlpha(.75f));
-            const float dashes[] {4.0f, 3.0f};
-            g.drawDashedLine(juce::Line<float>(guide, area.getY(), guide, area.getBottom()), dashes, 2, 1.0f);
-        }
+    }
+    for (const auto& key : curve.keyframes()) {
+        motion::style::drawKey(g, keyPoint(*clip, key), 5.0f, key, colour, isSelected(propertyName, key.time), hover.key == KeyRef {propertyName, key.time}, osci::Colours::veryDark());
+    }
+    if (snapGuide.has_value()) {
+        const auto guide = std::round(timeX(*snapGuide)) + .5f;
+        g.setColour(osci::Colours::accentColor().withAlpha(.75f));
+        const float dashes[] {4.0f, 3.0f};
+        g.drawDashedLine(juce::Line<float>(guide, area.getY(), guide, area.getBottom()), dashes, 2, 1.0f);
     }
     const auto box = selectionBox(*clip);
     if (box.has_value()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.3f));
-        g.drawRect(box->area, 1.0f);
-        g.setColour(osci::Colours::accentColor().withAlpha(.85f));
-        for (const auto right : { false, true }) {
-            g.fillRoundedRectangle(scaleHandle(*box, right), 2.0f);
+        g.setColour(osci::Colours::accentColor().withAlpha(.045f));
+        g.fillRoundedRectangle(box->area, 4.0f);
+        g.setColour(osci::Colours::accentColor().withAlpha(.4f));
+        g.drawRoundedRectangle(box->area.reduced(.5f), 4.0f, 1.0f);
+        for (const auto right : {false, true}) {
+            const auto grip = scaleHandle(*box, right);
+            const auto active = hover.grip == right || (drag.has_value() && drag->mode == (right ? DragMode::scaleRight : DragMode::scaleLeft));
+            // Light pills with an accent edge; an active grip fills with the accent.
+            g.setColour(active ? osci::Colours::accentColor() : juce::Colours::white.withAlpha(.92f));
+            g.fillRoundedRectangle(grip, 2.0f);
+            g.setColour(osci::Colours::accentColor().darker(.2f));
+            g.drawRoundedRectangle(grip.expanded(.5f), 2.5f, 1.0f);
         }
     }
     if (marquee.has_value()) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.12f));
-        g.fillRect(*marquee);
-        g.setColour(osci::Colours::accentColor().withAlpha(.6f));
-        g.drawRect(*marquee);
+        g.setColour(osci::Colours::accentColor().withAlpha(.07f));
+        g.fillRoundedRectangle(*marquee, 2.0f);
+        g.setColour(osci::Colours::accentColor().withAlpha(.5f));
+        g.drawRoundedRectangle(marquee->reduced(.5f), 2.0f, 1.0f);
+    }
+    g.restoreState();
+    const auto x = playheadX();
+    if (x.has_value()) {
+        playheadStrip.drawn(x);
+        g.setColour(motion::style::playhead());
+        g.drawVerticalLine(*x, 0.0f, area.getBottom());
+        juce::Path head;
+        head.addTriangle(*x - 5.0f, 0.0f, *x + 5.0f, 0.0f, static_cast<float>(*x), 8.0f);
+        g.fillPath(head);
+    }
+    if (modulated) {
+        // A legend for the two lines, quiet in the corner.
+        auto legend = area.toNearestInt().reduced(10, 8).removeFromTop(16).removeFromLeft(120);
+        g.setFont(motion::style::caption());
+        for (const auto& [label, tint] : {std::pair<const char*, juce::Colour> {"Keys", colour}, {"Result", motion::style::result()}}) {
+            g.setColour(tint);
+            g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre({legend.getX() + 3.0f, legend.getCentreY() + .5f}));
+            g.setColour(osci::Colours::text().withAlpha(.75f));
+            g.drawText(label, legend.withTrimmedLeft(10), juce::Justification::centredLeft, false);
+            legend.removeFromLeft(juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), label) + 24);
+        }
+    }
+    // What the pointer is on, or what is being dragged: its time and value.
+    {
+        const auto valueText = [this](double value) {
+            const auto tick = valueStep(high - low, std::max(3, juce::roundToInt(plot().getHeight() / 30)));
+            return juce::String(value, std::clamp(static_cast<int>(-std::floor(std::log10(tick))) + 1, 0, 6));
+        };
+        const auto describe = [&](const std::string& name, double time) -> std::optional<std::pair<juce::Point<float>, juce::String>> {
+            const auto* owner = displayed(*clip, name);
+            const auto* key = owner != nullptr ? owner->findKey(time) : nullptr;
+            if (key == nullptr) { return std::nullopt; }
+            return std::make_pair(keyPoint(*clip, *key), juce::String(grid.positionLabel(clip->projectTime(key->time))) + "|" + valueText(key->value));
+        };
+        std::optional<std::pair<juce::Point<float>, juce::String>> readout;
+        if (drag.has_value() && selectedTime.has_value() && drag->mode == DragMode::key) {
+            readout = describe(propertyName, *selectedTime);
+        } else if (drag.has_value() && selectedTime.has_value() && (drag->mode == DragMode::incoming || drag->mode == DragMode::outgoing)) {
+            const auto* key = curve.findKey(*selectedTime);
+            if (key != nullptr) {
+                const auto influence = drag->mode == DragMode::incoming ? key->incomingInfluence : key->outgoingInfluence;
+                readout = std::make_pair(keyPoint(*clip, *key), "Influence|" + juce::String(juce::roundToInt(influence * 100)) + "%");
+            }
+        } else if (!drag.has_value() && hover.key.has_value()) {
+            readout = describe(hover.key->property, hover.key->time);
+        }
+        if (readout.has_value() && area.expanded(4).contains(readout->first)) { paintReadout(g, readout->first, readout->second); }
     }
     // A linked property ignores its keys; say so rather than let edits
     // appear to do nothing.
     if (storedCurve->link.has_value()) {
         const auto source = motion::findPropertyTarget(processor.document.project(), storedCurve->link->source);
         const auto name = source.has_value() ? juce::String(source->name.data(), source->name.size()) : juce::String("?");
-        auto banner = area.withHeight(22).reduced(40, 0).translated(0, 4);
-        g.setColour(osci::Colours::warning().withAlpha(.18f));
-        g.fillRoundedRectangle(banner.toFloat(), 3.0f);
+        const auto text = "Linked to " + name + " (" + juce::String(storedCurve->link->property) + "): keys here are ignored. Unlink in Routing.";
+        auto banner = juce::Rectangle<float>(static_cast<float>(juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), text) + 24), 22.0f);
+        banner.setCentre(area.getCentreX(), area.getY() + 16.0f);
+        g.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::warning(), .16f));
+        g.fillRoundedRectangle(banner, 11.0f);
+        g.setColour(osci::Colours::warning().withAlpha(.4f));
+        g.drawRoundedRectangle(banner.reduced(.5f), 11.0f, 1.0f);
         g.setColour(osci::Colours::warning());
         g.setFont(motion::style::caption());
-        g.drawText("Linked to " + name + " (" + juce::String(storedCurve->link->property) + "): keys here are ignored. Unlink in Routing.", banner.reduced(8, 0), juce::Justification::centred, true);
+        g.drawText(text, banner, juce::Justification::centred, false);
     }
+}
+
+void MotionCurveEditor::resized() {
+    frameButton.setBounds(juce::Rectangle<int>(0, 0, gutter, bandHeight).withSizeKeepingCentre(26, 20));
+    updateKeyBar();
+}
+
+// The selection's interpolation for the key bar: lit only when every
+// selected key shares it.
+void MotionCurveEditor::updateKeyBar() {
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    frameButton.setVisible(findCurve(clip, propertyName) != nullptr);
+    const auto keys = selection();
+    std::optional<motion::Interpolation> common;
+    bool mixed = false;
+    for (const auto& ref : keys) {
+        const auto* curve = clip.has_value() ? displayed(*clip, ref.property) : nullptr;
+        const auto* key = curve != nullptr ? curve->findKey(ref.time) : nullptr;
+        if (key == nullptr) { continue; }
+        mixed = mixed || (common.has_value() && *common != key->interpolation);
+        common = key->interpolation;
+    }
+    keyBar.setVisible(clip.has_value() && !keys.empty());
+    if (onSelectionChanged) { onSelectionChanged(); }
+    if (!keyBar.isVisible()) { return; }
+    keyBar.show(keys.size(), mixed ? std::nullopt : common, !clip->locked);
+    keyBar.setTopRightPosition(getWidth() - 6, (bandHeight - MotionKeyBar::height) / 2);
+}
+
+MotionCurveEditor::Hover MotionCurveEditor::hoverAt(juce::Point<float> point) const {
+    Hover next;
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    const auto* curve = findCurve(clip, propertyName);
+    if (curve == nullptr || point.y < bandHeight) { return next; }
+    const auto* selected = selectedTime.has_value() ? curve->findKey(*selectedTime) : nullptr;
+    if (selected != nullptr) {
+        for (const auto mode : {DragMode::incoming, DragMode::outgoing}) {
+            const auto handle = tangentPoint(*clip, *curve, *selected, mode);
+            if (handle.has_value() && handle->getDistanceFrom(point) <= 8.0f && keyPoint(*clip, *selected).getDistanceFrom(point) > 7.0f) {
+                next.handle = mode;
+                return next;
+            }
+        }
+    }
+    const auto box = selectionBox(*clip);
+    for (const auto right : {false, true}) {
+        if (box.has_value() && scaleHandle(*box, right).expanded(3.0f, 2.0f).contains(point)) {
+            next.grip = right;
+            return next;
+        }
+    }
+    next.key = hitKey(*clip, point);
+    if (!next.key.has_value() && plot().contains(point)) {
+        const auto value = curve->evaluateBase(clip->localTime(projectTime(point.x)));
+        next.curve = std::abs(valueY(value) - point.y) < 6.0f;
+    }
+    return next;
+}
+
+void MotionCurveEditor::setHover(Hover next) {
+    if (next == hover) { return; }
+    hover = std::move(next);
+    setMouseCursor(hover.grip.has_value() ? juce::MouseCursor::LeftRightResizeCursor
+        : hover.handle.has_value() || hover.key.has_value() ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    repaint();
+}
+
+void MotionCurveEditor::mouseMove(const juce::MouseEvent& event) {
+    setHover(hoverAt(event.position));
+}
+
+void MotionCurveEditor::mouseExit(const juce::MouseEvent&) {
+    setHover({});
 }
 
 void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
@@ -286,8 +483,8 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     const auto left = !event.mods.isPopupMenu() && event.mods.isLeftButtonDown();
-    // The time axis under the plot scrubs the playhead.
-    if (left && event.position.y > plot().getBottom() + 2) {
+    // The ruler scrubs the playhead, as in the Timeline.
+    if (left && event.position.y < bandHeight && event.position.x >= gutter) {
         scrubbing = true;
         scrubTo(event.position.x, event.mods);
         return;
@@ -330,6 +527,7 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
     if (hit.has_value() && event.mods.isShiftDown() && event.mods.isLeftButtonDown()) {
         // Shift toggles a key in the selection without dragging.
         toggleKey(*hit);
+        updateKeyBar();
         repaint();
         return;
     }
@@ -378,6 +576,8 @@ void MotionCurveEditor::mouseDown(const juce::MouseEvent& event) {
             drag->original = *key;
         }
     }
+    setHover(hoverAt(event.position));
+    updateKeyBar();
     repaint();
 }
 
@@ -403,6 +603,9 @@ void MotionCurveEditor::mouseDoubleClick(const juce::MouseEvent& event) {
     motion::Keyframe key;
     key.time = clip->localTime(snappedTime(*clip, projectTime(event.position.x), event.mods));
     key.value = constrainedValue(*clip, valueAt(event.position.y), propertyName);
+    // On (or near) the curve the key lands on it, so the shape doesn't change.
+    const auto onCurve = curve->evaluateBase(key.time);
+    if (std::isfinite(onCurve) && std::abs(valueY(onCurve) - event.position.y) < 8.0f) { key.value = onCurve; }
     if (!std::isfinite(key.time) || !std::isfinite(key.value)) { return; }
     const auto id = targetId;
     const auto property = propertyName;
@@ -458,6 +661,7 @@ void MotionCurveEditor::mouseDrag(const juce::MouseEvent& event) {
                 }
             }
         }
+        updateKeyBar();
         repaint();
         return;
     }
@@ -533,6 +737,7 @@ void MotionCurveEditor::mouseUp(const juce::MouseEvent&) {
     snapGuide.reset();
     if (marquee.has_value()) {
         marquee.reset();
+        updateKeyBar();
         repaint();
         return;
     }
@@ -839,18 +1044,6 @@ bool MotionCurveEditor::dragMatches(const motion::PropertyTarget& clip) const {
     });
 }
 
-void MotionCurveEditor::drawKey(juce::Graphics& g, juce::Point<float> point, float radius, juce::Colour colour, const motion::Keyframe& key) {
-    g.setColour(colour);
-    motion::style::drawKeyShape(g, point, radius, keyShape(key));
-}
-
-motion::style::KeyShape MotionCurveEditor::keyShape(const motion::Keyframe& key) {
-    using Shape = motion::style::KeyShape;
-    if (key.interpolation == motion::Interpolation::hold) { return Shape::hold; }
-    if (key.interpolation == motion::Interpolation::linear) { return Shape::linear; }
-    return motion::isEased(key) ? Shape::eased : Shape::smooth;
-}
-
 std::optional<MotionCurveEditor::SelectionBox> MotionCurveEditor::selectionBox(const motion::PropertyTarget& clip) const {
     const auto keys = selection();
     if (keys.size() < 2) {
@@ -879,7 +1072,7 @@ std::optional<MotionCurveEditor::SelectionBox> MotionCurveEditor::selectionBox(c
 
 juce::Rectangle<float> MotionCurveEditor::scaleHandle(const SelectionBox& box, bool right) {
     const auto x = right ? box.area.getRight() : box.area.getX();
-    return { x - 3.0f, box.area.getCentreY() - 8.0f, 6.0f, 16.0f };
+    return { x - 2.0f, box.area.getCentreY() - 9.0f, 4.0f, 18.0f };
 }
 
 void MotionCurveEditor::setView(double start, double end) {
@@ -1069,12 +1262,15 @@ void MotionCurveEditor::fit(bool primaryOnly) {
     const auto padding = (last - first) * 0.04;
     setView(first - padding, last + padding);
     low = high = curve->evaluateBase(clip->localTime(first));
+    // Frame what plays too: routed modulators and links drive the result.
+    auto withDrivers = *curve;
+    withDrivers.drivers = resultDrivers(*curve);
     // Include sampled extrema of cubic segments as well as exact key values.
     for (int i = 0; i <= 256; ++i) {
         const auto local = clip->localTime(std::lerp(first, last, i / 256.0));
         const auto base = curve->evaluateBase(local);
         low = std::min(low, base); high = std::max(high, base);
-        const auto value = constrainedValue(*clip, curve->evaluate(local), propertyName);
+        const auto value = constrainedValue(*clip, withDrivers.evaluate(local), propertyName);
         low = std::min(low, value);
         high = std::max(high, value);
     }
@@ -1112,6 +1308,7 @@ void MotionCurveEditor::selectAllKeys() {
             }
         }
     }
+    updateKeyBar();
     repaint();
 }
 
@@ -1178,32 +1375,89 @@ void MotionCurveEditor::showKeyMenu() {
     menu.addItem(motion::style::menuItem("Easy ease", 11, "F9").setEnabled(editable));
     menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9").setEnabled(editable));
     menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9").setEnabled(editable));
-    const auto id = targetId;
-    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this), [this, id, keys](int result) {
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this), [this](int result) {
         if (result >= 11 && result <= 13) {
             easeSelected(result != 13, result != 12);
-            return;
+        } else if (result >= 1 && result <= 4) {
+            setSelectedInterpolation(static_cast<motion::Interpolation>(result - 1));
         }
-        if (result > 4) {
-            return;
-        }
-        const auto current = motion::findPropertyTarget(processor.document.project(), id);
-        const auto next = static_cast<motion::Interpolation>(result - 1);
-        // No undo step when every selected key already uses the choice.
-        const auto needed = std::any_of(keys.begin(), keys.end(), [&current, next](const KeyRef& ref) {
-            const auto* owner = findCurve(current, ref.property);
-            const auto* found = owner != nullptr ? owner->findKey(ref.time) : nullptr;
-            return found != nullptr && found->interpolation != next;
-        });
-        if (!needed) {
-            return;
-        }
-        processor.document.edit(keys.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, keys, next](motion::Project& project) {
-            for (const auto& ref : keys) {
-                auto* target = mutableCurve(project, id, ref.property);
-                if (target != nullptr) { motion::keyedit::setInterpolation(*target, ref.time, next); }
-            }
-        });
-        refresh();
     });
+}
+
+void MotionCurveEditor::setSelectedInterpolation(motion::Interpolation next) {
+    const auto keys = selection();
+    const auto id = targetId;
+    const auto current = motion::findPropertyTarget(processor.document.project(), id);
+    if (!current.has_value() || current->locked) {
+        return;
+    }
+    // No undo step when every selected key already uses the choice.
+    const auto needed = std::any_of(keys.begin(), keys.end(), [&current, next](const KeyRef& ref) {
+        const auto* owner = findCurve(current, ref.property);
+        const auto* found = owner != nullptr ? owner->findKey(ref.time) : nullptr;
+        return found != nullptr && found->interpolation != next;
+    });
+    if (!needed) {
+        return;
+    }
+    processor.document.edit(keys.size() > 1 ? "Change keys interpolation" : "Change key interpolation", [id, keys, next](motion::Project& project) {
+        for (const auto& ref : keys) {
+            auto* target = mutableCurve(project, id, ref.property);
+            if (target != nullptr) { motion::keyedit::setInterpolation(*target, ref.time, next); }
+        }
+    });
+    refresh();
+}
+
+std::optional<MotionCurveEditor::ActiveKey> MotionCurveEditor::activeKey() const {
+    const auto keys = selection();
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    if (keys.size() != 1 || !clip.has_value()) { return std::nullopt; }
+    const auto* curve = displayed(*clip, keys.front().property);
+    const auto* key = curve != nullptr ? curve->findKey(keys.front().time) : nullptr;
+    if (key == nullptr) { return std::nullopt; }
+    return ActiveKey {keys.front().property, clip->projectTime(key->time), key->value, !clip->locked};
+}
+
+void MotionCurveEditor::setActiveKeyTime(double projectTime) {
+    const auto keys = selection();
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    if (keys.size() != 1 || !clip.has_value() || clip->locked || drag.has_value() || !std::isfinite(projectTime)) { return; }
+    const auto time = clip->localTime(std::clamp(projectTime, clip->start, clip->end()));
+    const auto originals = groupCurves(*clip);
+    auto result = motion::keyedit::transformKeys(originals, keys, [time](double) { return time; }, 0.0, clip->offset, clip->localTime(clip->end()),
+        [this, &clip](const std::string& property, double value) { return constrainedValue(*clip, value, property); });
+    if (!result.has_value()) { return; }
+    motion::PropertyMap changed;
+    for (auto& [name, curve] : result->curves) {
+        if (!sameCurve(curve, originals.at(name))) { changed.emplace(name, std::move(curve)); }
+    }
+    adoptSelection(std::move(result->selection), selectedTime.has_value());
+    if (changed.empty()) { return; }
+    const auto id = targetId;
+    processor.document.editCoalesced("Move animation key", "graph.key.time", [id, changed = std::move(changed)](motion::Project& project) {
+        for (const auto& [name, curve] : changed) {
+            auto* target = mutableCurve(project, id, name);
+            if (target != nullptr) { *target = curve; }
+        }
+    });
+    refresh();
+}
+
+void MotionCurveEditor::setActiveKeyValue(double value) {
+    const auto keys = selection();
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    if (keys.size() != 1 || !clip.has_value() || clip->locked || drag.has_value() || !std::isfinite(value)) { return; }
+    const auto ref = keys.front();
+    const auto constrained = constrainedValue(*clip, value, ref.property);
+    const auto id = targetId;
+    processor.document.editCoalesced("Change animation key", "graph.key.value", [id, ref, constrained](motion::Project& project) {
+        auto* curve = mutableCurve(project, id, ref.property);
+        const auto* key = curve != nullptr ? curve->findKey(ref.time) : nullptr;
+        if (key == nullptr) { return; }
+        auto changed = *key;
+        changed.value = constrained;
+        curve->setKey(changed);
+    });
+    refresh();
 }

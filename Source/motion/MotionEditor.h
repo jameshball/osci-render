@@ -15,6 +15,7 @@
 #include "ui/EffectLibrary.h"
 #include "ui/EffectStack.h"
 #include "ui/ModulatorPanels.h"
+#include "ui/KeyPanel.h"
 #include "import/LuaSliderBakes.h"
 #include "model/TapTempo.h"
 #include "model/TempoDetection.h"
@@ -221,10 +222,12 @@ private:
     MotionEffectLibrary effectLibrary;
     MotionEffectStack effectStack;
     MotionRoutingPanel routingPanel;
+    MotionKeyPanel keyPanel;
     // The graph's side column scrolls: oscillator settings, then routing.
     juce::Viewport graphSideViewport;
     juce::Component graphSide;
     void layoutGraphSide();
+    void refreshKeyPanel();
     MotionModulatorLibrary modulatorLibrary;
     osci::TabBar libraryTabs;
     juce::Label inspectorTitle;

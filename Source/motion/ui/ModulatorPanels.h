@@ -238,4 +238,5 @@ private:
     motion::ui::LabelledScrub scale, offset, delay;
     std::vector<std::unique_ptr<motion::ui::RouteRow>> rows;
     std::vector<std::pair<motion::Id, std::string>> choices;
+    static constexpr int headerHeight = 26;
 };

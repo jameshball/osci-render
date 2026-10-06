@@ -9,6 +9,8 @@
 #include "../model/PropertyTarget.h"
 #include "../model/PropertySchema.h"
 #include "MotionStyle.h"
+#include "Chip.h"
+#include "KeyBar.h"
 #include <optional>
 #include <set>
 #include <limits>
@@ -52,7 +54,10 @@ public:
     void refresh();
 
     void paint(juce::Graphics& g) override;
+    void resized() override;
 
+    void mouseMove(const juce::MouseEvent& event) override;
+    void mouseExit(const juce::MouseEvent& event) override;
     void mouseDown(const juce::MouseEvent& event) override;
 
     void mouseDoubleClick(const juce::MouseEvent& event) override;
@@ -144,8 +149,6 @@ private:
 
     bool dragMatches(const motion::PropertyTarget& clip) const;
 
-    static void drawKey(juce::Graphics& g, juce::Point<float> point, float radius, juce::Colour colour, const motion::Keyframe& key);
-    static motion::style::KeyShape keyShape(const motion::Keyframe& key);
 
     // The time span of a selection of 2+ keys at different times, with the
     // content times of its earliest and latest keys.
@@ -156,9 +159,30 @@ private:
     std::optional<SelectionBox> selectionBox(const motion::PropertyTarget& clip) const;
     static juce::Rectangle<float> scaleHandle(const SelectionBox& box, bool right);
 
+    // The ruler band on top (as in the Timeline), value labels in the gutter
+    // to the left of the plot.
+    static constexpr int bandHeight = 26, gutter = 56;
     juce::Rectangle<float> plot() const {
-        return { 62.0f, 34.0f, std::max(1.0f, getWidth() - 82.0f), std::max(1.0f, getHeight() - 78.0f) };
+        return { static_cast<float>(gutter), bandHeight + 12.0f, std::max(1.0f, getWidth() - gutter - 14.0f), std::max(1.0f, getHeight() - bandHeight - 26.0f) };
     }
+    void paintRuler(juce::Graphics& g, double step, double minorStep);
+    void paintGrid(juce::Graphics& g, double step, double minorStep);
+    void paintReadout(juce::Graphics& g, juce::Point<float> anchor, const juce::String& text);
+    // The curve between project times `from` and `to`, sampled `perPixel` times a pixel.
+    template <typename Evaluate>
+    juce::Path curvePath(double from, double to, float perPixel, Evaluate&& evaluate) const;
+    // What the pointer is over, for hover feedback and the cursor.
+    struct Hover {
+        std::optional<KeyRef> key;
+        std::optional<DragMode> handle;
+        std::optional<bool> grip; // The selection box's right (true) or left grip.
+        bool curve = false;
+        bool operator==(const Hover&) const = default;
+    };
+    Hover hoverAt(juce::Point<float> point) const;
+    void setHover(Hover next);
+    void updateKeyBar();
+    void setSelectedInterpolation(motion::Interpolation interpolation);
     // Reserve enough headroom for subtracting both viewport endpoints. This
     // bounds only the displayed window, never the authored project or keys.
     static constexpr double viewLimit = std::numeric_limits<double>::max() / 2;
@@ -200,12 +224,30 @@ public:
     // one undo step.
     bool easeSelected(bool in, bool out);
 
+    // The one selected key, for typing its time and value: its property,
+    // project time and value.
+    struct ActiveKey {
+        std::string property;
+        double time = 0, value = 0;
+        bool editable = false;
+    };
+    std::optional<ActiveKey> activeKey() const;
+    // Moves the active key or sets its value; a field's edits within a
+    // second merge into one undo step. A move onto another key is refused.
+    void setActiveKeyTime(double projectTime);
+    void setActiveKeyValue(double value);
+    // The selection changed (or the keys it holds were edited).
+    std::function<void()> onSelectionChanged;
+
 private:
     bool deleteSelected();
 
     void showKeyMenu();
 
     MotionProcessor& processor;
+    MotionKeyBar keyBar;
+    motion::ui::Chip frameButton {"Frame curves", motion::icons::Icon::frame};
+    Hover hover;
     motion::Id targetId = 0;
     std::string propertyName;
     std::optional<double> selectedTime;  // The primary key, on propertyName (content time).
