@@ -108,14 +108,22 @@ void MotionCurveEditor::refresh() {
 }
 
 template <typename Evaluate>
-juce::Path MotionCurveEditor::curvePath(double from, double to, float perPixel, Evaluate&& evaluate) const {
-    juce::Path path;
+juce::Path MotionCurveEditor::curvePath(double from, double to, float perPixel, const std::vector<double>& keys, Evaluate&& evaluate) const {
     const auto steps = std::max(2, juce::roundToInt(std::abs(timeX(to) - timeX(from)) * perPixel));
-    for (int i = 0; i <= steps; ++i) {
-        const auto time = std::lerp(from, to, static_cast<double>(i) / steps);
-        const juce::Point<float> point(timeX(time), valueY(evaluate(time)));
-        if (i == 0) { path.startNewSubPath(point); } else { path.lineTo(point); }
+    std::vector<double> times;
+    times.reserve(static_cast<std::size_t>(steps) + 1 + 2 * keys.size());
+    for (int i = 0; i <= steps; ++i) { times.push_back(std::lerp(from, to, static_cast<double>(i) / steps)); }
+    const auto before = (to - from) * 1.0e-7;
+    for (const auto time : keys) {
+        if (time > from && time < to) {
+            times.push_back(time - before);
+            times.push_back(time);
+        }
     }
+    std::sort(times.begin(), times.end());
+    juce::Path path;
+    path.startNewSubPath(timeX(times.front()), valueY(evaluate(times.front())));
+    for (std::size_t i = 1; i < times.size(); ++i) { path.lineTo(timeX(times[i]), valueY(evaluate(times[i]))); }
     return path;
 }
 
@@ -230,15 +238,20 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         }
     }
     paintRuler(g, step, minorStep);
+    // Every key time of the group, where sampling must land exactly.
+    std::vector<double> keyTimes;
+    for (const auto& name : groupNames(*clip)) {
+        for (const auto& key : displayed(*clip, name)->keyframes()) { keyTimes.push_back(clip->projectTime(key.time)); }
+    }
     // Faded where the clip never plays, full strength where it does.
     const auto strokeAcrossStage = [&](const auto& evaluate, juce::Colour colour, float width, float outside, float perPixel) {
         const juce::PathStrokeType stroke(width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
         g.setColour(colour.withMultipliedAlpha(outside));
-        if (viewStart < clipStart) { g.strokePath(curvePath(viewStart, std::min(clipStart, viewEnd), perPixel, evaluate), stroke); }
-        if (viewEnd > clipEnd) { g.strokePath(curvePath(std::max(clipEnd, viewStart), viewEnd, perPixel, evaluate), stroke); }
+        if (viewStart < clipStart) { g.strokePath(curvePath(viewStart, std::min(clipStart, viewEnd), perPixel, keyTimes, evaluate), stroke); }
+        if (viewEnd > clipEnd) { g.strokePath(curvePath(std::max(clipEnd, viewStart), viewEnd, perPixel, keyTimes, evaluate), stroke); }
         const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
         g.setColour(colour);
-        if (to > from) { g.strokePath(curvePath(from, to, perPixel, evaluate), stroke); }
+        if (to > from) { g.strokePath(curvePath(from, to, perPixel, keyTimes, evaluate), stroke); }
     };
     const auto baseOf = [&clip](const motion::Curve& source) { return [&clip, &source](double time) { return source.evaluateBase(clip->localTime(time)); }; };
     g.saveState();
@@ -252,7 +265,7 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
         // weight. It goes first so it never tints the other curves.
         const auto from = std::max(viewStart, clipStart), to = std::min(viewEnd, clipEnd);
         if (to > from) {
-            auto fill = modulated ? curvePath(from, to, 1.0f, result) : curvePath(from, to, 1.0f, baseOf(curve));
+            auto fill = modulated ? curvePath(from, to, 1.0f, keyTimes, result) : curvePath(from, to, 1.0f, keyTimes, baseOf(curve));
             fill.lineTo(timeX(to), area.getBottom());
             fill.lineTo(timeX(from), area.getBottom());
             fill.closeSubPath();
@@ -379,6 +392,17 @@ void MotionCurveEditor::paint(juce::Graphics& g) {
             }
         } else if (!drag.has_value() && hover.key.has_value()) {
             readout = describe(hover.key->property, hover.key->time);
+        } else if (!drag.has_value() && hover.curve) {
+            // A ghost key where a double-click would add one (snapped the same
+            // way), with the curve's value there.
+            const auto time = snappedTime(*clip, projectTime(pointer.x), juce::ModifierKeys::currentModifiers);
+            const auto value = curve.evaluateBase(clip->localTime(time));
+            const juce::Point<float> ghost(timeX(time), valueY(value));
+            g.setColour(osci::Colours::veryDark());
+            g.fillEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre(ghost));
+            g.setColour(colour);
+            g.drawEllipse(juce::Rectangle<float>(7.0f, 7.0f).withCentre(ghost), 1.5f);
+            readout = std::make_pair(ghost, juce::String(grid.positionLabel(time)) + "|" + valueText(value));
         }
         if (readout.has_value() && area.expanded(4).contains(readout->first)) { paintReadout(g, readout->first, readout->second); }
     }
@@ -466,7 +490,10 @@ void MotionCurveEditor::setHover(Hover next) {
 }
 
 void MotionCurveEditor::mouseMove(const juce::MouseEvent& event) {
+    pointer = event.position;
     setHover(hoverAt(event.position));
+    // The ghost key follows the pointer along a hovered curve.
+    if (hover.curve) { repaint(); }
 }
 
 void MotionCurveEditor::mouseExit(const juce::MouseEvent&) {
@@ -799,6 +826,21 @@ bool MotionCurveEditor::keyPressed(const juce::KeyPress& key) {
         cancelDrag();
         refresh();
         return true;
+    }
+    if (key == juce::KeyPress::escapeKey && hasSelectedKeys()) {
+        selectedTime.reset();
+        companions.clear();
+        updateKeyBar();
+        repaint();
+        return true;
+    }
+    if (!drag.has_value() && key.getModifiers().isAltDown() && !key.getModifiers().isCommandDown()) {
+        const auto big = key.getModifiers().isShiftDown();
+        const auto tick = valueStep(high - low, std::max(3, juce::roundToInt(plot().getHeight() / 30))) / (big ? 1.0 : 10.0);
+        if (key.getKeyCode() == juce::KeyPress::leftKey) { return nudgeSelected(big ? -10 : -1, 0); }
+        if (key.getKeyCode() == juce::KeyPress::rightKey) { return nudgeSelected(big ? 10 : 1, 0); }
+        if (key.getKeyCode() == juce::KeyPress::upKey) { return nudgeSelected(0, tick); }
+        if (key.getKeyCode() == juce::KeyPress::downKey) { return nudgeSelected(0, -tick); }
     }
     if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey) {
         if (drag.has_value()) {
@@ -1460,4 +1502,33 @@ void MotionCurveEditor::setActiveKeyValue(double value) {
         curve->setKey(changed);
     });
     refresh();
+}
+
+bool MotionCurveEditor::nudgeSelected(int frames, double values) {
+    const auto keys = selection();
+    const auto clip = motion::findPropertyTarget(processor.document.project(), targetId);
+    if (keys.empty() || !clip.has_value() || clip->locked) { return !keys.empty(); }
+    const auto& project = processor.document.project();
+    const auto seconds = frames / (project.frameRate > 0 ? project.frameRate : 30.0);
+    const auto originals = groupCurves(*clip);
+    auto result = motion::keyedit::transformKeys(originals, keys, [&clip, seconds](double time) { return clip->localTime(clip->projectTime(time) + seconds); }, values,
+        clip->offset, clip->localTime(clip->end()), [this, &clip](const std::string& property, double value) { return constrainedValue(*clip, value, property); });
+    // Nothing moves past the clip or onto another key.
+    if (!result.has_value()) { return true; }
+    motion::PropertyMap changed;
+    for (auto& [name, curve] : result->curves) {
+        if (!sameCurve(curve, originals.at(name))) { changed.emplace(name, std::move(curve)); }
+    }
+    adoptSelection(std::move(result->selection), selectedTime.has_value());
+    if (!changed.empty()) {
+        const auto id = targetId;
+        processor.document.editCoalesced(keys.size() > 1 ? "Nudge animation keys" : "Nudge animation key", frames != 0 ? "graph.nudge.time" : "graph.nudge.value", [id, changed = std::move(changed)](motion::Project& updated) {
+            for (const auto& [name, curve] : changed) {
+                auto* target = mutableCurve(updated, id, name);
+                if (target != nullptr) { *target = curve; }
+            }
+        });
+    }
+    refresh();
+    return true;
 }

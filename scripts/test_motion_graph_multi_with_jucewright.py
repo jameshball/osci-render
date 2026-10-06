@@ -214,7 +214,15 @@ try:
     first = clip.find("property[@name='position.x']").findall("key")[0]
     if first.get("interpolation") != "0":
         raise RuntimeError(f"key bar: interpolation is {first.get('interpolation')}, expected hold (0)")
+    # Alt+Right nudges the selected key one frame; Escape then deselects.
+    step("nudge key", "press", "alt + right", "--class", "MotionCurveEditor")
+    wait_undo("Nudge animation key")
+    restored["position.x"] = [(1.5 + 1 / FPS, -0.75)] + restored["position.x"][1:]
+    expect(keys(saved()), restored, "nudge")
+    step("deselect", "press", "Escape", "--class", "MotionCurveEditor")
+    if find(lambda n: n.get("name") == "Key interpolation" and n.get("visible")):
+        raise RuntimeError("Escape left the key bar showing")
     step("final", "screenshot", "--file", session.artifact_dir / "graph-final.png")
-    print("Graph cross-curve selection, group drag, magnets, scaling, delete, key fields and key bar passed.", flush=True)
+    print("Graph cross-curve selection, group drag, magnets, scaling, delete, key fields, key bar and nudging passed.", flush=True)
 finally:
     session.stop_app()

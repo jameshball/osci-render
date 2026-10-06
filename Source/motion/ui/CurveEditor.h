@@ -69,7 +69,9 @@ public:
 
     // F frames every curve of the group (the clip plus all key times and values);
     // Shift+F frames only the primary curve. Escape or Cmd+Z during a drag
-    // restores the keys and selection; Delete removes the selection on every curve.
+    // restores the keys and selection, and otherwise Escape deselects; Delete
+    // removes the selection on every curve. Alt+Left/Right nudges the selected
+    // keys a frame (Shift: ten), Alt+Up/Down a tenth of a value tick (Shift: a tick).
     bool keyPressed(const juce::KeyPress& key) override;
 
     // The same wheel convention as the timeline: wheel and trackpad pan
@@ -168,9 +170,11 @@ private:
     void paintRuler(juce::Graphics& g, double step, double minorStep);
     void paintGrid(juce::Graphics& g, double step, double minorStep);
     void paintReadout(juce::Graphics& g, juce::Point<float> anchor, const juce::String& text);
-    // The curve between project times `from` and `to`, sampled `perPixel` times a pixel.
+    // The curve between project times `from` and `to`, sampled `perPixel` times
+    // a pixel and exactly at each of `keys` (and just before), so holds jump
+    // and corners turn on their keys.
     template <typename Evaluate>
-    juce::Path curvePath(double from, double to, float perPixel, Evaluate&& evaluate) const;
+    juce::Path curvePath(double from, double to, float perPixel, const std::vector<double>& keys, Evaluate&& evaluate) const;
     // What the pointer is over, for hover feedback and the cursor.
     struct Hover {
         std::optional<KeyRef> key;
@@ -180,6 +184,8 @@ private:
         bool operator==(const Hover&) const = default;
     };
     Hover hoverAt(juce::Point<float> point) const;
+    juce::Point<float> pointer; // Where the ghost key on a hovered curve sits.
+    bool nudgeSelected(int frames, double values);
     void setHover(Hover next);
     void updateKeyBar();
     void setSelectedInterpolation(motion::Interpolation interpolation);
