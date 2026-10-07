@@ -1,5 +1,4 @@
 #include "MotionEditor.h"
-#include "../components/OverlayDialogHelpers.h"
 
 namespace {
 bool canSplitClip(const motion::Clip* clip, double time, const motion::Tempo& bpm) {
@@ -80,7 +79,7 @@ void MotionEditor::registerCommands() {
         for (const auto& copied : clips) { ids.push_back(copied.clip.id); }
         if (ids.empty()) { return; }
         const auto result = processor.document.duplicateClips(ids, duplicates);
-        if (result.failed()) { osci::showOverlayMessage(*this, "Cannot duplicate", result.getErrorMessage()); return; }
+        if (result.failed()) { statusBar.show("Cannot duplicate: " + result.getErrorMessage()); return; }
         timeline.selectClips(duplicates);
     });
     menus.addMenuSeparator(2);
@@ -168,13 +167,13 @@ void MotionEditor::pasteClipboard() {
     const auto time = processor.position.load();
     if (const auto* keys = std::get_if<std::vector<motion::Document::CopiedKey>>(&clipboard)) {
         const auto result = processor.document.pasteKeys(selection, *keys, time);
-        if (result.failed()) { osci::showOverlayMessage(*this, "Cannot paste keyframes", result.getErrorMessage()); }
+        if (result.failed()) { statusBar.show("Cannot paste keys: " + result.getErrorMessage()); }
         return;
     }
     if (const auto* clips = std::get_if<std::vector<motion::Document::CopiedClip>>(&clipboard)) {
         std::vector<motion::Id> pasted;
         const auto result = processor.document.pasteClips(*clips, time, pasted);
-        if (result.failed()) { osci::showOverlayMessage(*this, "Cannot paste clips", result.getErrorMessage()); return; }
+        if (result.failed()) { statusBar.show("Cannot paste clips: " + result.getErrorMessage()); return; }
         timeline.refreshTracks();
         timeline.selectClips(pasted);
     }
@@ -446,7 +445,7 @@ void MotionEditor::showShortcuts() {
     sections.push_back({"Scene", {{"G / R / S", "Move, rotate and scale tools"}, {"F", "Frame the selection"}, {"0", "Reset the view"},
         {"1 / 3 / 7", "Front, right and top views (Ctrl: opposite side)"}, {"N", "Fly through the scene"}, {"P", "Show the motion path"},
         {"Two fingers / wheel", "Orbit / zoom"}, {"Shift + two fingers", "Pan"}, {"Alt+drag", "Orbit with the mouse"}}});
-    showOverlay(std::make_unique<Overlay>(std::move(sections)));
+    Overlay::show(*this, std::move(sections));
 }
 
 void MotionEditor::refreshTiming() {

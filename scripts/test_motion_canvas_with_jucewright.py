@@ -33,7 +33,7 @@ def command(*args):
 
 
 def canvas_value(name, value):
-    step('set ' + name, 'fill', '--name', name, '--class', 'juce::TextEditor', '--exact', str(value))
+    step('set ' + name, 'set-value', '--name', name, '--exact', str(value))
 
 
 def check_saved():
@@ -53,13 +53,13 @@ try:
     step('compact workspace', 'resize-window', '--w', 1200, '--h', 800)
     step('canvas entry', 'click', '--name', 'Output canvas', '--exact')
     step('portrait preset', 'select-option', '--name', 'Canvas preset', '--exact', '--index', 3)
-    step('portrait width', 'wait-for-value', '--name', 'Video width', '--class', 'juce::TextEditor', '--exact', '--value', '1080')
-    step('portrait height', 'wait-for-value', '--name', 'Video height', '--class', 'juce::TextEditor', '--exact', '--value', '1920')
+    step('portrait width', 'wait-for-value', '--name', 'Video width', '--exact', '--value', '1080')
+    step('portrait height', 'wait-for-value', '--name', 'Video height', '--exact', '--value', '1920')
     step('landscape preset', 'select-option', '--name', 'Canvas preset', '--exact', '--index', 2)
-    step('landscape width', 'wait-for-value', '--name', 'Video width', '--class', 'juce::TextEditor', '--exact', '--value', '1920')
+    step('landscape width', 'wait-for-value', '--name', 'Video width', '--exact', '--value', '1920')
     canvas_value('Video width', 127)
     step('reject invalid canvas', 'click', '--name', 'Apply canvas', '--exact')
-    step('validation message', 'wait-for-text', 'Use even dimensions from 128 to 4096 pixels.')
+    step('validation message', 'wait-for-text', 'Even sizes, 128-4096 px')
     canvas_value('Video width', 1280)
     canvas_value('Video height', 720)
     step('canvas dialog', 'screenshot', '--file', session.artifact_dir / 'canvas-dialog.png')
@@ -69,10 +69,10 @@ try:
     step('output header', 'screenshot', '--file', session.artifact_dir / 'canvas-workspace.png')
     step('open file menu', 'click', '--name', 'File', '--exact')
     step('open export', 'click', '--name', 'Export video...', '--exact')
-    step('export uses canvas width', 'wait-for-value', '--name', 'Video width', '--class', 'juce::TextEditor', '--exact', '--value', '1280')
-    step('export uses canvas height', 'wait-for-value', '--name', 'Video height', '--class', 'juce::TextEditor', '--exact', '--value', '720')
+    step('export uses canvas width', 'wait-for-value', '--name', 'Video width', '--exact', '--value', '1280')
+    step('export uses canvas height', 'wait-for-value', '--name', 'Video height', '--exact', '--value', '720')
     step('export shared preset', 'select-option', '--name', 'Canvas preset', '--exact', '--index', 1)
-    step('export square width', 'wait-for-value', '--name', 'Video width', '--class', 'juce::TextEditor', '--exact', '--value', '1024')
+    step('export square width', 'wait-for-value', '--name', 'Video width', '--exact', '--value', '1024')
     step('export dialog', 'screenshot', '--file', session.artifact_dir / 'export-canvas.png')
     step('cancel export changes', 'press', 'Escape')
     step('save after cancelled export', 'press', 'command + s', '--class', 'MotionEditor')

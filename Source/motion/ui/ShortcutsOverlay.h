@@ -1,38 +1,45 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "MotionStyle.h"
+#include "Sheet.h"
 
-// The keyboard and gesture reference: grouped two-column rows (keys right-
-// aligned, actions left-aligned) under a filter field.
-class MotionShortcutsOverlay final : public osci::OverlayComponent {
+// The keyboard and gesture reference: sections of actions, each with its
+// keys as caps on the right, under a search field.
+class MotionShortcutsOverlay final : public motion::ui::Sheet {
 public:
     struct Entry { juce::String keys, action; };
     struct Section { juce::String title; std::vector<Entry> entries; };
 
-    explicit MotionShortcutsOverlay(std::vector<Section> content) : sections(std::move(content)) {
-        setOverlayTitle("Keyboard shortcuts");
+    explicit MotionShortcutsOverlay(std::vector<Section> content) : Sheet("Keyboard shortcuts", {}, {}), sections(std::move(content)) {
+        removeFooter();
         filter.setName("Filter shortcuts");
         filter.setTitle("Filter shortcuts");
-        filter.setTextToShowWhenEmpty("Filter: type an action or a key", osci::Colours::textMuted());
+        filter.setTextToShowWhenEmpty("Search actions or keys", osci::Colours::textMuted().withAlpha(.6f));
+        filter.setFont(motion::style::body());
         filter.onTextChange = [this] { list.setFilter(filter.getText()); resized(); };
-        filter.onEscapeKey = [this] { if (filter.isEmpty()) { dismiss(); } else { filter.clear(); } };
+        filter.onEscapeKey = [this] { if (filter.isEmpty()) { close(); } else { filter.clear(); } };
         list.sections = &sections;
         viewport.setViewedComponent(&list, false);
         viewport.setScrollBarsShown(true, false);
-        viewport.setScrollBarThickness(8);
-        addPanelContentAndMakeVisible(filter);
-        addPanelContentAndMakeVisible(viewport);
+        viewport.setScrollBarThickness(6);
+        addAndMakeVisible(filter);
+        addAndMakeVisible(viewport);
+        setSize(560, 600);
+    }
+    // Show the reference in a sheet over `owner`.
+    static void show(juce::Component& owner, std::vector<Section> content) {
+        auto sheet = std::make_unique<MotionShortcutsOverlay>(std::move(content));
+        const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
+        osci::OverlayComponent::show(owner, std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false));
     }
     void visibilityChanged() override {
         if (isShowing()) { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<juce::TextEditor>(&filter)] { if (safe != nullptr) { safe->grabKeyboardFocus(); } }); }
     }
 
 protected:
-    juce::Point<int> getPreferredPanelSize() const override { return {640, 620}; }
-    void resizeContent(juce::Rectangle<int> area) override {
-        filter.setBounds(area.removeFromTop(30));
-        area.removeFromTop(10);
+    void layoutBody(juce::Rectangle<int> area) override {
+        filter.setBounds(area.removeFromTop(row));
+        area.removeFromTop(8);
         viewport.setBounds(area);
         list.setSize(area.getWidth() - 10, list.contentHeight());
         viewport.setViewPosition(0, 0);
@@ -42,7 +49,7 @@ private:
     struct List final : juce::Component {
         const std::vector<Section>* sections = nullptr;
         juce::String query;
-        static constexpr int rowHeight = 22, headingHeight = 34, keyWidth = 190;
+        static constexpr int rowHeight = 24, headingHeight = 32;
         void setFilter(const juce::String& text) { query = text.trim(); repaint(); }
         bool matches(const Entry& entry) const {
             return query.isEmpty() || entry.action.containsIgnoreCase(query) || entry.keys.containsIgnoreCase(query) || motion::style::shortcutText(entry.keys).containsIgnoreCase(query);
@@ -55,6 +62,24 @@ private:
             }
             return std::max(height, 60);
         }
+        // Keys as caps, right-aligned: a shortcut's glyphs share one cap,
+        // a gesture's words sit in plain text.
+        static void paintKeys(juce::Graphics& g, const juce::String& keys, juce::Rectangle<int> area) {
+            // Arrow keys read as arrows, like the other glyphs.
+            auto text = motion::style::shortcutText(keys);
+            for (const auto& [word, arrow] : std::initializer_list<std::pair<const char*, const char*>> {{"Left", "\u2190"}, {"Right", "\u2192"}, {"Up", "\u2191"}, {"Down", "\u2193"}}) {
+                if (text.endsWith(word) && !text.contains(" ")) { text = text.dropLastCharacters(juce::String(word).length()) + juce::String::fromUTF8(arrow); }
+            }
+            g.setFont(motion::style::body());
+            const auto width = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::body(), text)) + 12;
+            const auto cap = area.removeFromRight(width).withSizeKeepingCentre(width, 18).toFloat();
+            g.setColour(osci::Colours::surfaceRaised().brighter(.08f));
+            g.fillRoundedRectangle(cap, motion::style::radius);
+            g.setColour(juce::Colours::white.withAlpha(.06f));
+            g.drawRoundedRectangle(cap.reduced(.5f), motion::style::radius, 1.0f);
+            g.setColour(osci::Colours::text());
+            g.drawText(text, cap, juce::Justification::centred, false);
+        }
         void paint(juce::Graphics& g) override {
             int y = 0;
             bool any = false;
@@ -65,18 +90,17 @@ private:
                 }
                 if (shown.empty()) { continue; }
                 any = true;
-                g.setColour(osci::Colours::accentColor());
-                g.setFont(motion::style::title());
-                g.drawText(section.title, 0, y + 10, getWidth(), 20, juce::Justification::centredLeft);
-                g.setColour(juce::Colours::white.withAlpha(.08f));
-                g.fillRect(0, y + headingHeight - 3, getWidth(), 1);
+                g.setColour(osci::Colours::textMuted());
+                g.setFont(motion::style::heading());
+                g.drawText(section.title, 0, y + 12, getWidth(), 16, juce::Justification::centredLeft);
                 y += headingHeight;
                 for (const auto* entry : shown) {
                     g.setFont(motion::style::body());
-                    g.setColour(osci::Colours::text());
-                    g.drawText(motion::style::shortcutText(entry->keys), 0, y, keyWidth - 16, rowHeight, juce::Justification::centredRight);
-                    g.setColour(osci::Colours::text().withAlpha(.78f));
-                    g.drawText(entry->action, keyWidth, y, getWidth() - keyWidth, rowHeight, juce::Justification::centredLeft);
+                    g.setColour(osci::Colours::text().withAlpha(.85f));
+                    g.drawText(entry->action, 0, y, getWidth() - 160, rowHeight, juce::Justification::centredLeft, true);
+                    paintKeys(g, entry->keys, juce::Rectangle<int>(0, y, getWidth(), rowHeight));
+                    g.setColour(juce::Colours::white.withAlpha(.04f));
+                    g.fillRect(0, y + rowHeight - 1, getWidth(), 1);
                     y += rowHeight;
                 }
             }

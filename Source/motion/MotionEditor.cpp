@@ -1,7 +1,6 @@
 #include "MotionEditor.h"
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
-#include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
 namespace {
@@ -218,9 +217,8 @@ void MotionEditor::setUpScope() {
         setScopeFullScreen(next);
     });
     scopeTools.canvas.onClick = [this] {
-        auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize(), processor.document.mainProject().frameRate);
+        auto panel = std::make_unique<MotionCanvasSettings>(processor.recordingParameters.getCanvasSize());
         auto* controls = panel.get();
-        panel->setSize(360, 150);
         const juce::Component::SafePointer<MotionEditor> owner(this);
         const juce::Component::SafePointer<juce::Component> popover(controls);
         controls->onApply = [owner, popover](VisualiserRenderSize size) {
@@ -292,8 +290,8 @@ void MotionEditor::setUpTransport() {
         timeLabel.setText(juce::String(project.timeGrid().positionLabel(processor.position.load())), juce::dontSendNotification);
         if (!current) { return; }
         if (!requested.has_value() || *requested > project.duration) {
-            osci::showOverlayMessage(*this, "Cannot go to position", "Enter a position from 0 to " + juce::String(project.duration, 3)
-                + " seconds. Use seconds (90s or 1:30s), frames (240f), or bar.beat.tick in the musical display.");
+            statusBar.show("Enter a position from 0 to " + juce::String(project.duration, 3)
+                + " seconds: seconds (90s or 1:30s), frames (240f), or bar.beat.tick in the musical display.");
             return;
         }
         seekAndReveal(*requested);
@@ -318,7 +316,7 @@ void MotionEditor::setUpTransport() {
             const auto result = processor.document.changeTempo(value);
             if (result.failed()) {
                 tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification);
-                osci::showOverlayMessage(*this, "Cannot change tempo", result.getErrorMessage());
+                statusBar.show("Cannot change tempo: " + result.getErrorMessage());
             }
         }
     };
@@ -382,9 +380,9 @@ void MotionEditor::setUpLibrary() {
         const auto expected = *found;
         const auto generation = processor.document.generation();
         const juce::Component::SafePointer<MotionEditor> owner(this);
-        osci::showOverlayConfirmationOrAlert(this, "Remove unused composition?",
+        motion::ui::MessageSheet::show(*this, "Remove unused composition?",
             "Remove \"" + expected->name + "\" from the library? Shared media and child compositions remain available. You can undo this.",
-            "Remove composition", "Cancel", [owner, id, generation, expected] {
+            "Remove", [owner, id, generation, expected] {
                 if (owner == nullptr || owner->processor.document.generation() != generation) { return; }
                 const auto& current = owner->processor.document.mainProject().definitions;
                 if (std::find(current.begin(), current.end(), expected) == current.end()) { return; }
@@ -524,7 +522,6 @@ void MotionEditor::setUpTimeline() {
         const auto existing = changes != nullptr && replacing.has_value() ? std::find_if(changes->begin(), changes->end(), [&](const auto& change) { return change.beat == *replacing; }) : std::vector<motion::TempoChange>::const_iterator();
         const auto ramped = changes != nullptr && replacing.has_value() && existing != changes->end() && existing->ramp;
         auto panel = std::make_unique<MotionTempoPanel>(beat, bpm, processor.document.project().beatsPerBar, ramped);
-        panel->setSize(300, 160);
         const juce::Component::SafePointer<MotionTempoPanel> tempoPanel(panel.get());
         const auto apply = popoverEdit(panel.get(), [tempoPanel](const juce::String& error) { if (tempoPanel != nullptr) { tempoPanel->setError(error); } });
         panel->onApply = [apply, beat, replacing](double value, bool glide) {
@@ -545,7 +542,6 @@ void MotionEditor::setUpTimeline() {
             name = found->name; time = found->time;
         }
         auto panel = std::make_unique<MotionMarkerPanel>(name, time, project.timeGrid(), project.duration);
-        panel->setSize(300, 140);
         const juce::Component::SafePointer<MotionMarkerPanel> markerPanel(panel.get());
         const auto apply = popoverEdit(panel.get(), [markerPanel](const juce::String& error) { if (markerPanel != nullptr) { markerPanel->setError(error); } });
         panel->onApply = [apply, id](juce::String name, double time) {
@@ -578,7 +574,7 @@ void MotionEditor::setUpTimeline() {
         assetLibrary.refresh();
         assetLibrary.selectAsset(asset);
     };
-    timeline.onError = [this](const juce::String& message) { osci::showOverlayMessage(*this, "Cannot edit timeline", message); };
+    timeline.onError = [this](const juce::String& message) { statusBar.show(message); };
     timeline.onPreview = [this](const motion::Project* project) {
         processor.prepareComposition(project != nullptr ? *project : processor.document.project());
         if (project != nullptr) { composition.preview(*project); } else { composition.refresh(); }

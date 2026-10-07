@@ -113,7 +113,6 @@ try:
     command("wait-for-locator", "--name", "Shared motif", "--class", "juce::Label", "--exact")
     before_rejected = ET.tostring(saved.find(f"./composition/definition[@id='{original_id}']/composition"))
     step("reject self insertion", "click", "--name", "Shared motif", "--role", "listItem", "--exact")
-    step("dismiss recursive insertion error", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
     step("save after rejected insertion", "press", "command + s", "--class", "MotionEditor")
     assert ET.tostring(read_project(seed).find(f"./composition/definition[@id='{original_id}']/composition")) == before_rejected
     step("return from library editor", "click", "--name", "Back to Main", "--exact")

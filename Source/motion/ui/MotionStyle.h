@@ -19,12 +19,14 @@ inline constexpr float panelRadius = 5.0f;
 // title: panel and tab names, the inspector heading, group names.
 // body: values, names, menus, buttons, pickers and editors.
 // caption: field labels, hints, secondary details and the ruler.
+// heading: section headings in Properties, popovers and forms.
 // mono: the position readout and code.
 // The separator between short facts, as in the status bar.
 inline juce::String dot() { return juce::String::fromUTF8(" \xc2\xb7 "); }
 inline juce::Font title() { return juce::Font(juce::FontOptions(13.0f, juce::Font::bold)); }
 inline juce::Font body() { return juce::Font(juce::FontOptions(13.0f)); }
 inline juce::Font caption() { return juce::Font(juce::FontOptions(11.0f)); }
+inline juce::Font heading() { return juce::Font(juce::FontOptions(11.0f, juce::Font::bold)); }
 inline juce::Font mono() { return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), 13.0f, juce::Font::plain)); }
 // A shortcut written "Cmd+Shift+F9" as the platform shows it: ⇧⌘F9 on macOS,
 // Ctrl+Shift+F9 elsewhere. Mouse gestures ("Alt+wheel") keep their words.
@@ -252,6 +254,26 @@ inline void drawDiamond(juce::Graphics& g, juce::Point<float> centre, float radi
     addDiamond(diamond, centre, radius);
     if (filled) { g.fillPath(diamond); } else { g.strokePath(diamond, juce::PathStrokeType(stroke)); }
 }
+// A dropdown: the field fill with a small stroked chevron, quiet until
+// hovered, like the rest of the field-style controls.
+inline void paintComboBox(juce::Graphics& g, int width, int height, juce::ComboBox& box) {
+    const auto bounds = juce::Rectangle<float>(0, 0, static_cast<float>(width), static_cast<float>(height));
+    g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
+    g.fillRoundedRectangle(bounds, radius);
+    const auto hover = box.isEnabled() && box.isMouseOver(true);
+    if (hover || box.hasKeyboardFocus(true)) {
+        g.setColour(box.hasKeyboardFocus(true) ? osci::Colours::accentColor().withAlpha(.8f) : osci::Colours::outlineSubtle().withAlpha(.8f));
+        g.drawRoundedRectangle(bounds.reduced(.5f), radius, 1.0f);
+    }
+    const auto centre = juce::Point<float>(static_cast<float>(width) - 12.0f, static_cast<float>(height) * .5f);
+    juce::Path chevron;
+    chevron.startNewSubPath(centre.x - 3.5f, centre.y - 1.75f);
+    chevron.lineTo(centre.x, centre.y + 1.75f);
+    chevron.lineTo(centre.x + 3.5f, centre.y - 1.75f);
+    g.setColour(osci::Colours::text().withAlpha(!box.isEnabled() ? .25f : hover ? .85f : .55f));
+    g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
 // Routes the editor's menus, buttons and pickers through the type styles.
 class LookAndFeel final : public PluginLookAndFeel {
 public:
@@ -281,6 +303,7 @@ public:
     }
     int getCallOutBoxBorderSize(const juce::CallOutBox&) override { return 16; }
     float getCallOutBoxCornerSize(const juce::CallOutBox&) override { return panelRadius + 1.0f; }
+    void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override { paintComboBox(g, width, height, box); }
     // Combo text keeps the field inset and clears the arrow.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
         PluginLookAndFeel::positionComboBoxText(box, label);
@@ -316,6 +339,7 @@ public:
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
+    void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override { paintComboBox(g, width, height, box); }
     // Combo text starts where a dialog field's text does.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
         osci::OverlayLookAndFeel::positionComboBoxText(box, label);
@@ -412,6 +436,15 @@ inline void formRow(juce::Rectangle<int>& area, juce::Label& label, juce::Compon
 }
 }
 
+// Fields recess into the panel they sit on. Sheets (marked with this
+// property) sit on a darker panel than the editor's, so theirs go darker.
+inline constexpr const char* sheetProperty = "motionSheet";
+inline juce::Colour fieldFill(const juce::Component& component) {
+    for (auto* parent = &component; parent != nullptr; parent = parent->getParentComponent()) {
+        if (parent->getProperties().contains(sheetProperty)) { return osci::Colours::surfaceSunken(); }
+    }
+    return osci::Colours::veryDark();
+}
 // One field look for dialogs and popovers: dark, borderless, text 8 px in.
 inline void styleField(juce::Component& component) {
     auto* editor = dynamic_cast<juce::TextEditor*>(&component);
@@ -421,11 +454,11 @@ inline void styleField(juce::Component& component) {
         // indent would push single lines low.
         const auto centred = (editor->getJustificationType().getFlags() & juce::Justification::verticallyCentred) != 0;
         editor->setIndents(DialogLookAndFeel::fieldIndent - editor->getBorder().getLeft(), centred ? 0 : editor->getTopIndent());
-        editor->setColour(juce::TextEditor::backgroundColourId, osci::Colours::veryDark());
+        editor->setColour(juce::TextEditor::backgroundColourId, fieldFill(component));
         editor->setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     }
     if (combo != nullptr) {
-        combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
+        combo->setColour(juce::ComboBox::backgroundColourId, fieldFill(component));
         combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
     }
 }

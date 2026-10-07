@@ -159,8 +159,7 @@ try:
     first_x = 220 + round(6 * pps)
     step("select occupied repeat target", "click", "--class", "MotionTimelineView", "--position", f"{first_x},68")
     step("reject overlapping duplicate", "press", "command + d", "--class", "MotionTimelineView")
-    command("wait-for-locator", "--name", "Cannot edit timeline", "--exact")
-    step("dismiss duplicate collision", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
+    command("wait-for-locator", "--text", "not enough free space")
     _, unchanged = saved()
     assert [c.attrib for c in clips.values()] == [c.attrib for c in unchanged.values()]
     step("open timing shortcut menu", "click", "--class", "MotionTimelineView", "--position", f"{first_x},68", "--button", "right")

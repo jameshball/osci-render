@@ -72,11 +72,11 @@ try:
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Video study", "--timeout-ms", "10000")
     step("size workspace", "resize-window", "--w", "1440", "--h", "900")
     step("drop MP4", "drop-files", "--file", fixtures / "motion.mp4", "--class", "MotionEditor", "--exact")
-    step("cancel initial settings", "click", "--name", "Close icon", "--exact")
+    step("cancel initial settings", "click", "--name", "Cancel", "--exact")
     assert not save().findall("asset")
     for name in ("motion.mp4", "motion.mov"):
         step("drop " + name, "drop-files", "--file", fixtures / name, "--class", "MotionEditor", "--exact")
-        step("set video bake rate", "set-value", "--name", "Video bake frame rate", "--role", "slider", "24")
+        step("set video bake rate", "set-value", "--name", "Video bake frame rate", "--exact", "24")
         step("choose tracing detail", "select-option", "--name", "Image detail", "--class", "juce::ComboBox", "--exact", "--text", "64 px")
         step("choose sample count", "select-option", "--name", "Image samples per frame", "--class", "juce::ComboBox", "--exact", "--text", "1024")
         step("video settings", "screenshot", "--file", session.artifact_dir / (name + "-settings.png"))
@@ -94,7 +94,7 @@ try:
     command("wait", "--ms", "500")
     step("late frame screenshot", "screenshot", "--file", session.artifact_dir / "late-video.png")
     step("edit video source", "click", "--name", "Video settings...", "--exact")
-    step("change bake rate", "set-value", "--name", "Video bake frame rate", "--role", "slider", "12")
+    step("change bake rate", "set-value", "--name", "Video bake frame rate", "--exact", "12")
     step("rebuild video source", "click", "--name", "Prepare video", "--exact")
     wait_undo("Rebuild source cache")
     state = save()
@@ -117,7 +117,7 @@ try:
     assert ET.tostring(save()) == saved
     step("video failure message", "screenshot", "--file", session.artifact_dir / "video-failure.png")
     step("import single frame", "drop-files", "--file", fixtures / "single-frame.mp4", "--class", "MotionEditor", "--exact")
-    step("match single frame rate", "set-value", "--name", "Video bake frame rate", "--role", "slider", "24")
+    step("match single frame rate", "set-value", "--name", "Video bake frame rate", "--exact", "24")
     step("prepare single frame", "click", "--name", "Prepare video", "--exact")
     command("wait-for-locator", "--name", "single-frame.mp4", "--role", "label", "--exact", "--timeout-ms", "30000")
     assert abs(float(save().findall("track/clip")[-1].get("duration")) - 1 / 24) < 1e-12

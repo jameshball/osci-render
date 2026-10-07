@@ -1,5 +1,6 @@
 #include "AssetLibrary.h"
 #include "../../parser/FileFormatRegistry.h"
+#include "SourcePreview.h"
 
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
@@ -189,42 +190,9 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
 }
 
 juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
-    juce::Path path;
-    const auto& source = asset.source;
-    const auto frames = source != nullptr ? source->frameCount() : 0;
-    if (frames == 0) { return path; }
-    const auto frame = frames / 2;
-    const auto pointFrames = source->drawingAt(frame) == nullptr;
     // Enough samples for text's many small outlines; traced once per source.
-    constexpr int steps = 2000;
-    std::vector<juce::Point<float>> points;
-    std::vector<bool> lit;
-    float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
-    for (int index = 0; index <= steps; ++index) {
-        const auto phase = static_cast<double>(index) / steps;
-        const auto point = source->sampleFrame(frame, phase, 0);
-        if (!std::isfinite(point.x) || !std::isfinite(point.y)) { continue; }
-        points.emplace_back(point.x, point.y);
-        lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
-        left = std::min(left, point.x); right = std::max(right, point.x);
-        top = std::min(top, point.y); bottom = std::max(bottom, point.y);
-    }
-    if (points.empty()) { return path; }
-    // A script that never sets a colour leaves every point unlit; draw it all.
-    const auto anyLit = std::find(lit.begin(), lit.end(), true) != lit.end();
-    const auto size = std::max({right - left, bottom - top, 1e-6f});
-    const auto jump = size * .2f;
-    const auto map = [&](juce::Point<float> point) {
-        return juce::Point<float>(.5f + (point.x - (left + right) * .5f) / size, .5f - (point.y - (top + bottom) * .5f) / size);
-    };
-    bool open = false;
-    for (std::size_t index = 0; index < points.size(); ++index) {
-        const auto dark = pointFrames && anyLit && !lit[index];
-        const auto jumped = index > 0 && points[index].getDistanceFrom(points[index - 1]) > jump;
-        if (dark) { open = false; continue; }
-        if (open && !jumped) { path.lineTo(map(points[index])); } else { path.startNewSubPath(map(points[index])); open = true; }
-    }
-    return path;
+    if (asset.source == nullptr || asset.source->frameCount() == 0) { return {}; }
+    return motion::ui::traceSource(*asset.source, asset.source->frameCount() / 2, 2000);
 }
 
 void MotionAssetLibrary::paintThumbnail(juce::Graphics& graphics, int row, juce::Rectangle<int> box) const {

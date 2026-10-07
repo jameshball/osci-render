@@ -1,99 +1,131 @@
 #pragma once
 
-#include <JuceHeader.h>
-#include "MotionStyle.h"
-#include <osci_gui/osci_gui.h>
+#include "Sheet.h"
 #include "../model/BlenderSourceSettings.h"
 
-class MotionBlenderSourcePanel final : public juce::Component, private juce::Timer {
+// A live source fed by Blender's add-on: its name, the local port it listens
+// on and what it shows when Blender goes away, then the connection's state
+// with a switch to listen, and capture to a portable recording.
+class MotionBlenderSourcePanel final : public motion::ui::Sheet, private juce::Timer {
 public:
-    MotionBlenderSourcePanel(juce::String initialName, motion::BlenderSourceSettings settings, bool existing) : existing(existing) {
+    MotionBlenderSourcePanel(juce::String initialName, motion::BlenderSourceSettings settings, bool existing)
+        : Sheet(existing ? "Blender source" : "Add Blender source", {}, existing ? "Apply" : "Add & listen"), existing(existing) {
         setName("Blender source settings");
-        name.setName("Blender source name"); name.setText(initialName);
-        port.setName("Blender port"); port.setInputRestrictions(5, "0123456789"); port.setText(juce::String(settings.port));
-        policy.setName("Blender disconnect policy");
-        policy.addItem("Freeze last frame", 1); policy.addItem("Blank output", 2);
-        policy.setSelectedId(settings.freezeOnDisconnect ? 1 : 2, juce::dontSendNotification);
+        nameAction(existing ? "Apply settings" : "Add & listen");
+        name.setName("Blender source name");
+        name.setText(initialName);
+        port.setName("Blender port");
+        port.setInputRestrictions(5, "0123456789");
+        port.setText(juce::String(settings.port));
+        port.setJustification(juce::Justification::centredRight);
+        policy.setSelected(settings.freezeOnDisconnect ? 0 : 1);
+        policy.setTooltip("What the source shows while Blender is disconnected");
+        policy.fill = fieldFill();
         for (auto* editor : {&name, &port}) {
             editor->setFont(motion::style::body());
             editor->setColour(juce::TextEditor::textColourId, osci::Colours::text());
+            editor->setSelectAllWhenFocused(true);
         }
-        for (auto* label : {&nameLabel, &portLabel, &policyLabel, &status, &note}) {
-            label->setFont(motion::style::body()); label->setBorderSize({});
-            label->setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        }
-        status.setName("Blender connection status"); status.setJustificationType(juce::Justification::centredLeft);
-        note.setFont(motion::style::body()); note.setJustificationType(juce::Justification::topLeft);
-        note.setText("Use the same port in Blender's osci-render add-on.", juce::dontSendNotification);
-        save.setButtonText(existing ? "Apply settings" : "Add source");
-        save.onClick = [this] { submit(false); };
-        listen.setButtonText(existing ? "Start listening" : "Add & listen");
+        for (auto* label : {&nameLabel, &portLabel, &policyLabel, &connectionLabel}) { styleCaption(*label); }
+        status.setName("Blender connection status");
+        status.setFont(motion::style::body());
+        status.setBorderSize({});
+        status.setJustificationType(juce::Justification::centredLeft);
+        status.setTooltip("Use the same port in Blender's osci-render add-on.");
+        primary.onClick = [this] { submit(!this->existing); };
+        listen.setButtonText("Start listening");
         listen.onClick = [this] {
-            if (this->existing && isListening && isListening()) {
+            if (isListening && isListening()) {
                 if (onStop) { onStop(); error.clear(); }
             } else {
                 submit(true);
             }
             timerCallback();
         };
-        for (auto* component : std::initializer_list<juce::Component*>{&name, &port, &policy, &nameLabel, &portLabel, &policyLabel, &status, &note, &save, &listen}) { addAndMakeVisible(component); }
-        record.setButtonText("Record capture"); record.setName("Record Blender capture");
-        cancel.setButtonText("Cancel capture");
+        record.setButtonText("Record capture");
+        record.setName("Record Blender capture");
+        record.setTitle("Record Blender capture");
+        cancelCapture.setButtonText("Discard");
+        cancelCapture.setName("Cancel capture");
+        cancelCapture.setTitle("Cancel capture");
         record.onClick = [this] { if (onRecord) { error = onRecord().getErrorMessage(); } timerCallback(); };
-        cancel.onClick = [this] { if (onCancelCapture) { onCancelCapture(); } error.clear(); timerCallback(); };
-        addAndMakeVisible(record); addAndMakeVisible(cancel);
-        record.setVisible(existing); cancel.setVisible(false);
-        setSize(460, existing ? 254 : 222);
+        cancelCapture.onClick = [this] { if (onCancelCapture) { onCancelCapture(); } error.clear(); timerCallback(); };
+        for (auto* component : std::initializer_list<juce::Component*>{&name, &port, &policy, &nameLabel, &portLabel, &policyLabel, &connectionLabel, &status}) { addAndMakeVisible(component); }
+        addChildComponent(listen);
+        addChildComponent(record);
+        addChildComponent(cancelCapture);
+        listen.setVisible(existing);
+        record.setVisible(existing);
+        setSize(widthFor() + 80, heightFor(4));
         startTimerHz(5);
+        timerCallback();
     }
-    std::function<juce::Result(juce::String, motion::BlenderSourceSettings, bool)> onApply;
     ~MotionBlenderSourcePanel() override { if (onCancelCapture) { onCancelCapture(); } }
+    std::function<juce::Result(juce::String, motion::BlenderSourceSettings, bool)> onApply;
     std::function<void()> onStop, onCancelCapture;
     std::function<juce::Result()> onRecord;
     std::function<bool()> isCapturing;
     std::function<bool()> isListening;
     std::function<juce::String()> connectionStatus;
-    void resized() override {
-        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
-        for (auto pair : {std::pair<juce::Label*, juce::Component*>{&nameLabel, &name}, {&portLabel, &port}, {&policyLabel, &policy}}) {
-            motion::style::dialog::formRow(area, *pair.first, *pair.second, 116);
-        }
-        motion::style::dialog::footer(area, {&listen, &save}, 128);
-        if (existing) {
-            // Capturing sits on its own line, apart from the connection buttons.
-            auto capture = area.removeFromBottom(motion::style::dialog::buttonHeight);
-            area.removeFromBottom(motion::style::dialog::rowGap);
-            record.setBounds(capture.removeFromLeft(150)); capture.removeFromLeft(8);
-            cancel.setBounds(capture.removeFromLeft(128));
-        }
-        status.setBounds(area.removeFromTop(20)); area.removeFromTop(4);
-        note.setBounds(area);
+
+    void paint(juce::Graphics& g) override {
+        Sheet::paint(g);
+        // The connection's state as a dot: green connected, amber waiting,
+        // grey offline, red on a problem.
+        const auto text = status.getText();
+        const auto colour = error.isNotEmpty() ? motion::style::error()
+            : text.startsWith("Connected") ? osci::Colours::accentColor()
+            : text.startsWith("Listening") ? motion::style::marker()
+            : osci::Colours::textMuted().withAlpha(.5f);
+        g.setColour(colour);
+        g.fillEllipse(juce::Rectangle<float>(7, 7).withCentre(dot.toFloat()));
     }
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        formRow(area, nameLabel, name, 0);
+        formRow(area, portLabel, port, number);
+        formRow(area, policyLabel, policy);
+        auto line = area.removeFromTop(row);
+        connectionLabel.setBounds(line.removeFromLeft(caption));
+        if (listen.isVisible()) { listen.setBounds(line.removeFromRight(listen.getBestWidthForHeight(row) + 16).reduced(0, 1)); }
+        dot = {line.getX() + 4, line.getCentreY()};
+        status.setBounds(line.withTrimmedLeft(14));
+        // Capturing sits on the footer's left, apart from the settings.
+        auto capture = footerLeft;
+        record.setBounds(capture.removeFromLeft(record.getBestWidthForHeight(capture.getHeight()) + 20));
+        capture.removeFromLeft(8);
+        cancelCapture.setBounds(capture.removeFromLeft(cancelCapture.getBestWidthForHeight(capture.getHeight()) + 20));
+    }
+
 private:
     void submit(bool start) {
-        const motion::BlenderSourceSettings settings{port.getText().getIntValue(), policy.getSelectedId() == 1};
+        const motion::BlenderSourceSettings settings{port.getText().getIntValue(), policy.getSelected() == 0};
         if (!settings.valid() || name.getText().trim().isEmpty()) { error = "Enter a name and a port from 51600 to 51699."; timerCallback(); return; }
         if (onApply) { const auto result = onApply(name.getText(), settings, start); error = result.getErrorMessage(); }
         timerCallback();
     }
     void timerCallback() override {
-        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
-        status.setText(error.isNotEmpty() ? error : connectionStatus ? connectionStatus() : "Not connected", juce::dontSendNotification);
+        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::text());
+        const auto state = !existing ? juce::String("Listens once added") : connectionStatus ? connectionStatus() : "Not connected";
+        status.setText(error.isNotEmpty() ? error : state, juce::dontSendNotification);
         if (existing) {
             const bool recording = isCapturing && isCapturing();
-            listen.setButtonText(isListening && isListening() ? "Stop listening" : "Start listening");
+            const bool listening = isListening && isListening();
+            listen.setButtonText(listening ? "Stop listening" : "Start listening");
             record.setButtonText(recording ? "Stop & save capture" : "Record capture");
-            record.setEnabled(recording || (isListening && isListening()));
-            cancel.setVisible(recording);
-            for (auto* control : std::initializer_list<juce::Component*>{&name, &port, &policy, &save, &listen}) { control->setEnabled(!recording); }
-            note.setColour(juce::Label::textColourId, recording ? osci::Colours::text() : osci::Colours::textMuted());
-            note.setText(recording ? "Closing this panel cancels the capture." : "Use the same port in Blender's osci-render add-on.", juce::dontSendNotification);
+            record.setEnabled(recording || listening);
+            cancelCapture.setVisible(recording);
+            for (auto* control : std::initializer_list<juce::Component*>{&name, &port, &policy, &primary, &listen}) { control->setEnabled(!recording); }
+            resized();
         }
+        repaint();
     }
     bool existing;
+    juce::Point<int> dot;
     juce::TextEditor name, port;
-    juce::ComboBox policy;
-    juce::Label nameLabel{"", "Name"}, portLabel{"", "Local port"}, policyLabel{"", "On disconnect"}, status, note;
-    juce::TextButton save, listen, record, cancel;
+    motion::ui::SegmentedControl policy {"Blender disconnect policy", {"Freeze", "Blank"}};
+    juce::Label nameLabel{"", "Name"}, portLabel{"", "Port"}, policyLabel{"", "On disconnect"}, connectionLabel{"", "Connection"}, status;
+    juce::TextButton listen, record, cancelCapture;
     juce::String error;
 };

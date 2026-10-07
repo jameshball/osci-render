@@ -43,11 +43,13 @@ public:
         if (value != next) { value = next; repaint(); }
     }
     double getValue() const { return value; }
+    // Fields recess into the panel they sit on; sheets sit on a darker one.
+    void setFill(juce::Colour colour) { fill = colour; editor.setColour(juce::TextEditor::backgroundColourId, colour); repaint(); }
     bool isEditing() const { return dragging || editor.isVisible(); }
 
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(osci::Colours::veryDark());
+        g.setColour(fill);
         g.fillRoundedRectangle(bounds, motion::style::radius);
         if (hovered || dragging || hasKeyboardFocus(false)) {
             g.setColour((hasKeyboardFocus(false) ? osci::Colours::accentColor() : osci::Colours::outlineSubtle()).withAlpha(.8f));
@@ -181,6 +183,7 @@ private:
     std::optional<juce::Colour> axisColour;
     juce::String prefix;
     Notation notation;
+    juce::Colour fill = osci::Colours::veryDark();
     double value = 0, startValue = 0, accumulated = 0;
     float lastX = 0;
     bool hovered = false, dragging = false, moved = false, dragCancelled = false;

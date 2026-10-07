@@ -42,7 +42,7 @@ def wait_undo(label):
 
 def combo_value(name):
     tree = json.loads(command("snapshot", "--json", "--full"))
-    return next(node["value"] for node in nodes(tree) if node.get("componentName") == name and node.get("class") == "juce::ComboBox")
+    return next(node["value"] for node in nodes(tree) if node.get("componentName") == name and "value" in node)
 
 
 png = session.artifact_dir / "Signal.png"
@@ -73,12 +73,12 @@ try:
     command("wait", "--ms", 500)
     step("colored outlines screenshot", "screenshot", "--file", session.artifact_dir / "outlines.png")
     step("open image settings", "click", "--name", "Image settings...", "--exact")
-    step("choose scanlines", "select-option", "--name", "Image trace mode", "--class", "juce::ComboBox", "--exact", "--text", "Scanlines")
+    step("choose scanlines", "set-value", "--name", "Image trace mode", "--exact", "Scanlines")
     assert combo_value("Image trace mode") == "Scanlines"
     assert combo_value("Image detail") == "64 px"
     step("choose explicit image detail", "select-option", "--name", "Image detail", "--class", "juce::ComboBox", "--exact", "--text", "128 px")
-    command("select-option", "--name", "Image trace mode", "--class", "juce::ComboBox", "--exact", "--text", "Outlines")
-    command("select-option", "--name", "Image trace mode", "--class", "juce::ComboBox", "--exact", "--text", "Scanlines")
+    command("set-value", "--name", "Image trace mode", "--exact", "Outlines")
+    command("set-value", "--name", "Image trace mode", "--exact", "Scanlines")
     assert combo_value("Image detail") == "128 px"
     step("restore scanline detail", "select-option", "--name", "Image detail", "--class", "juce::ComboBox", "--exact", "--text", "64 px")
     step("prepare scanlines", "click", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")

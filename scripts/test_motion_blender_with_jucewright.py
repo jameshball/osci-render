@@ -113,7 +113,7 @@ try:
     sender.sendall(b"CLOSE\n"); sender.close(); sender = None
     step("open source settings", "click", "--name", "Blender settings...", "--exact")
     command("wait-for-value", "--component-name", "Blender connection status", "--value", "Listening on port " + str(port) + " | Waiting for Blender", "--timeout-ms", "10000")
-    step("choose blank on disconnect", "select-option", "--name", "Blender disconnect policy", "--text", "Blank output")
+    step("choose blank on disconnect", "set-value", "--name", "Blender disconnect policy", "--exact", "Blank")
     step("apply disconnect policy", "click", "--name", "Apply settings", "--exact")
     sender = socket.create_connection(("127.0.0.1", port), timeout=5)
     sender.sendall(frame())

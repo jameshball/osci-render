@@ -81,7 +81,7 @@ try:
     open_file(baseline)
     command("wait-for-value", "--component-name", "Composition name", "--hidden", "--value", "Keep this project", "--timeout-ms", 10000)
     open_file(broken)
-    command("wait-for-locator", "--name", "Open Project Failed", "--exact")
+    command("wait-for-locator", "--name", "Couldn't open the project", "--exact")
     step("rejected project screenshot", "screenshot", "--file", session.artifact_dir / "failed-load.png")
     step("dismiss failed load", "click", "--name", "OK", "--role", "button", "--exact")
     assert current_name() == "Keep this project"

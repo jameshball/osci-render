@@ -6,42 +6,6 @@
 #include <iostream>
 
 namespace {
-class MotionVideoPreparation final : public juce::Component, private juce::Timer {
-public:
-    MotionVideoPreparation(std::function<double()> readProgress, std::function<void()> cancel, bool includeAudio)
-        : readProgress(std::move(readProgress)), cancelWork(std::move(cancel)) {
-        addAndMakeVisible(status);
-        addAndMakeVisible(bar);
-        addAndMakeVisible(cancelButton);
-        status.setText(includeAudio ? "Preparing beam signal and soundtrack..." : "Preparing beam signal...", juce::dontSendNotification);
-        status.setJustificationType(juce::Justification::centred);
-        bar.setName("Preparing video media");
-        cancelButton.setName("Cancel video preparation");
-        cancelButton.onClick = [this] {
-            cancelWork();
-            cancelButton.setEnabled(false);
-            status.setText("Cancelling...", juce::dontSendNotification);
-        };
-        startTimerHz(20);
-    }
-    void resized() override {
-        auto area = getLocalBounds().reduced(12);
-        status.setBounds(area.removeFromTop(28));
-        area.removeFromTop(8);
-        bar.setBounds(area.removeFromTop(24));
-        area.removeFromTop(16);
-        cancelButton.setBounds(area.removeFromTop(30).withSizeKeepingCentre(100, 30));
-    }
-private:
-    void timerCallback() override { progress = readProgress(); }
-    std::function<double()> readProgress;
-    std::function<void()> cancelWork;
-    double progress = 0;
-    juce::ProgressBar bar { progress };
-    juce::Label status;
-    juce::TextButton cancelButton { "Cancel" };
-};
-
 struct MotionVideoTemporaryFiles {
     const juce::File directory = juce::File::getSpecialLocation(juce::File::tempDirectory)
         .getChildFile("osci-motion-video-" + juce::Uuid().toString());
@@ -72,7 +36,8 @@ void MotionEditor::exportVideo() {
     const juce::Component::SafePointer<MotionEditor> owner(this);
     auto settings = std::make_unique<MotionVideoExportSettings>(config);
     auto* settingsPointer = settings.get();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), "Export video", juce::Point<int>(440, 330), true);
+    const auto size = juce::Point<int>(settings->getWidth(), settings->getHeight());
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), juce::String(), size, false);
     const juce::Component::SafePointer<osci::ComponentOverlay> settingsOverlay(overlay.get());
     auto accepted = std::make_shared<bool>(false);
     overlay->onDismissRequested = [owner, state, accepted] {
@@ -122,11 +87,11 @@ void MotionEditor::startVideoExport(std::shared_ptr<ExportState> state, motion::
     juce::MessageManager::callAsync([owner, state, project, beamSnapshot, renderMode, config, destination, finished] {
         if (owner == nullptr) { return; }
         state->videoWithAudio = config.includeAudio;
-        auto content = std::make_unique<MotionVideoPreparation>([state] {
+        auto content = std::make_unique<motion::ui::ProgressSheet>("Exporting video", destination.getFileName(), config.includeAudio ? "Preparing the beam signal and soundtrack..." : "Preparing the beam signal...", [state] {
             return state->videoWithAudio ? (state->progress.load() + state->soundtrackProgress.load()) * 0.5 : state->progress.load();
-        }, [state] { state->cancelled.store(true); }, config.includeAudio);
-        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Preparing video", juce::Point<int>(440, 130), true);
-        overlay->setDismissible(false);
+        }, [state] { state->cancelled.store(true); }, "Cancel video preparation");
+        const auto size = juce::Point<int>(content->getWidth(), content->getHeight());
+        auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), juce::String(), size, false);
         const juce::Component::SafePointer<osci::ComponentOverlay> preparationOverlay(overlay.get());
         owner->showOverlay(std::move(overlay));
         // The worker owns one immutable prepared snapshot for both WAVs.

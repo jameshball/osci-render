@@ -39,7 +39,7 @@ def nodes(value):
 
 def fractal_depth():
     snapshot = json.loads(command("snapshot", "--json", "--full"))
-    field = next(node for node in nodes(snapshot) if node.get("role") == "slider" and node.get("componentName") == "Fractal depth")
+    field = next(node for node in nodes(snapshot) if node.get("componentName") == "Fractal depth" and "value" in node)
     return round(float(field["value"]))
 
 
@@ -54,7 +54,7 @@ try:
     step("import Koch snowflake", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
     command("wait-for-locator", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact", "--timeout-ms", "10000")
     assert fractal_depth() == 3
-    step("choose initial fractal depth", "set-value", "--name", "Fractal depth", "--role", "slider", "--exact", "4")
+    step("choose initial fractal depth", "set-value", "--name", "Fractal depth", "--exact", "4")
     assert fractal_depth() == 4
     step("fractal preparation dialog", "screenshot", "--file", session.artifact_dir / "fractal-settings.png")
     step("prepare Koch snowflake", "click", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
@@ -64,7 +64,7 @@ try:
     step("open fractal settings", "click", "--name", "Fractal settings...", "--exact")
     command("wait-for-locator", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
     assert fractal_depth() == 4
-    step("increase fractal depth", "set-value", "--name", "Fractal depth", "--role", "slider", "--exact", "5")
+    step("increase fractal depth", "set-value", "--name", "Fractal depth", "--exact", "5")
     step("reprepare Koch snowflake", "click", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
     wait_undo("Rebuild source cache")
 

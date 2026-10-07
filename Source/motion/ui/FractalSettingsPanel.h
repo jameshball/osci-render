@@ -1,61 +1,87 @@
 #pragma once
 
-#include <JuceHeader.h>
-#include "MotionStyle.h"
-#include <osci_gui/osci_gui.h>
+#include "../import/FractalPreparation.h"
+#include "Sheet.h"
+#include "ScrubField.h"
+#include "SourcePreview.h"
 #include <algorithm>
 #include <functional>
 
-class MotionFractalSettingsPanel final : public juce::Component {
+// How deep an L-system is grown, with the result drawn beside the setting.
+class MotionFractalSettingsPanel final : public motion::ui::Sheet {
 public:
-    explicit MotionFractalSettingsPanel(int initialDepth) {
+    MotionFractalSettingsPanel(int initialDepth, const juce::String& fileName, juce::String sourceText = {})
+        : Sheet("Prepare fractal", fileName, "Prepare"), source(std::move(sourceText)) {
         setName("Fractal preparation settings");
+        nameAction("Prepare fractal");
         depth.setName("Fractal depth");
-        depth.setSliderStyle(juce::Slider::LinearHorizontal);
-        depth.setTextBoxStyle(juce::Slider::TextBoxRight, false, 58, 26);
-        depth.setRange(0, 15, 1);
-        depth.setValue(std::clamp(initialDepth, 0, 15), juce::dontSendNotification);
+        depth.setSpec(depthSpec);
+        depth.setValue(std::clamp(initialDepth, 0, 15));
+        depth.setFill(fieldFill());
         depth.setTooltip("Higher values add L-system detail and increase preparation time.");
-        depth.setColour(juce::Slider::textBoxBackgroundColourId, osci::Colours::veryDark());
-        depth.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        depth.setColour(juce::Slider::textBoxTextColourId, osci::Colours::text());
-
-        depthLabel.setFont(motion::style::body());
-        depthLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        depthLabel.setBorderSize({});
-
-        note.setFont(motion::style::body());
-        note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        note.setBorderSize({});
-        note.setJustificationType(juce::Justification::topLeft);
-
-
-        prepare.setName("Prepare fractal");
-        prepare.setButtonText("Prepare fractal");
-        prepare.onClick = [this] {
-            if (onPrepare) {
-                onPrepare(juce::roundToInt(depth.getValue()));
-            }
+        depth.onChange = [this](double) { refresh(); };
+        depth.onCommit = depth.onChange;
+        styleCaption(depthLabel);
+        primary.onClick = [this] {
+            if (onPrepare) { onPrepare(juce::roundToInt(depth.getValue())); }
         };
-
-        for (auto* component : {static_cast<juce::Component*>(&depthLabel), static_cast<juce::Component*>(&depth),
-                static_cast<juce::Component*>(&note), static_cast<juce::Component*>(&prepare)}) {
-            addAndMakeVisible(component);
-        }
-        setSize(440, 150);
+        addAndMakeVisible(depthLabel);
+        addAndMakeVisible(depth);
+        if (source.isNotEmpty()) { addAndMakeVisible(preview); }
+        // One row beside a preview as tall as the image sheet's.
+        setSize(widthFor(source.isNotEmpty() ? previewSize : 0), source.isNotEmpty() ? heightFor(1, previewSize - row) : heightFor(1));
+        refresh();
     }
 
     std::function<void(int)> onPrepare;
 
-    void resized() override {
-        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
-        motion::style::dialog::footer(area, {&prepare});
-        motion::style::dialog::formRow(area, depthLabel, depth, 112);
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        if (source.isNotEmpty()) {
+            preview.setBounds(area.removeFromLeft(previewSize).withHeight(previewSize));
+            area.removeFromLeft(24);
+        }
+        formRow(area, depthLabel, depth, number);
     }
 
 private:
-    juce::Slider depth;
-    juce::Label depthLabel {"Fractal depth caption", "Fractal depth"};
-    juce::Label note;
-    juce::TextButton prepare;
+    static constexpr int previewSize = 172;
+    static constexpr motion::PropertySpec depthSpec {"depth", "Depth", "", "", 0, 15, 3, 1, 0, ""};
+    void refresh() {
+        if (source.isEmpty()) { return; }
+        preview.request([text = source, level = juce::roundToInt(depth.getValue())](const std::atomic<bool>& cancel) {
+            motion::ui::SourcePreview::Result result;
+            const auto prepared = motion::fractal::prepare(text, level, &cancel);
+            if (!prepared) {
+                result.error = prepared.error;
+                return result;
+            }
+            float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
+            for (const auto& segment : prepared.segments) {
+                for (const auto [x, y] : {std::pair {segment[0], segment[1]}, std::pair {segment[2], segment[3]}}) {
+                    left = std::min(left, static_cast<float>(x)); right = std::max(right, static_cast<float>(x));
+                    top = std::min(top, static_cast<float>(y)); bottom = std::max(bottom, static_cast<float>(y));
+                }
+            }
+            const auto size = std::max({right - left, bottom - top, 1e-6f});
+            const auto map = [&](double x, double y) {
+                return juce::Point<float>(.5f + (static_cast<float>(x) - (left + right) * .5f) / size, .5f - (static_cast<float>(y) - (top + bottom) * .5f) / size);
+            };
+            juce::Point<float> last {-1e9f, -1e9f};
+            for (const auto& segment : prepared.segments) {
+                const auto from = map(segment[0], segment[1]), to = map(segment[2], segment[3]);
+                if (from.getDistanceFrom(last) > 1e-5f) { result.path.startNewSubPath(from); }
+                result.path.lineTo(to);
+                last = to;
+            }
+            const auto count = static_cast<int>(prepared.segments.size());
+            result.caption = juce::String(count) + (count == 1 ? " segment" : " segments");
+            return result;
+        });
+    }
+
+    juce::String source;
+    motion::ui::ScrubField depth;
+    motion::ui::SourcePreview preview;
+    juce::Label depthLabel {"Fractal depth caption", "Depth"};
 };

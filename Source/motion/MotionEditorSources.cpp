@@ -4,27 +4,8 @@
 #include "ui/BlenderSourcePanel.h"
 #include "ui/FractalSettingsPanel.h"
 #include "ui/RasterSettingsPanel.h"
-#include "../components/OverlayDialogHelpers.h"
 
 namespace {
-class MotionProjectLoading final : public juce::Component {
-public:
-    explicit MotionProjectLoading(std::function<void()> cancel) {
-        status.setText("Preparing sources. Your current project stays open until loading succeeds.", juce::dontSendNotification);
-        status.setJustificationType(juce::Justification::centred);
-        cancelButton.onClick = std::move(cancel);
-        addAndMakeVisible(status);
-        addAndMakeVisible(cancelButton);
-    }
-    void resized() override {
-        auto bounds = getLocalBounds().reduced(12);
-        cancelButton.setBounds(bounds.removeFromBottom(30).withSizeKeepingCentre(100, 30));
-        status.setBounds(bounds);
-    }
-private:
-    juce::Label status;
-    juce::TextButton cancelButton {"Cancel loading"};
-};
 }
 
 // Files dropped on the timeline land where they were dropped (time and
@@ -95,7 +76,9 @@ void MotionEditor::openProject(const juce::File& file) {
             if (overlay != nullptr) { editor->dismissOverlay(overlay); }
         }
     };
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::make_unique<MotionProjectLoading>(cancel), "Opening " + file.getFileName(), juce::Point<int>(420, 130), true);
+    auto sheet = std::make_unique<motion::ui::ProgressSheet>("Opening project", file.getFileName(), "Preparing sources. Your current project stays open until loading succeeds.", nullptr, cancel, "Cancel loading");
+    const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false);
     overlay->onDismissRequested = [owner, task] {
         task->cancelled.store(true);
         if (owner != nullptr && owner->projectLoad == task) {
@@ -133,11 +116,11 @@ void MotionEditor::openProject(const juce::File& file) {
             if (overlay != nullptr) { owner->dismissOverlay(overlay); }
             if (result.failed()) {
                 owner->projectLoadFailed = true;
-                osci::showOverlayMessage(*owner, "Open Project Failed", result.getErrorMessage());
+                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", result.getErrorMessage());
                 return;
             }
             if (owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) {
-                osci::showOverlayMessage(*owner, "Project Changed", "The current project changed while loading. Open the file again to replace it.");
+                motion::ui::MessageSheet::show(*owner, "Project changed", "The current project changed while loading. Open the file again to replace it.");
                 return;
             }
             owner->processor.applyPreparedProject(std::move(task->prepared), *task->xml);
@@ -167,7 +150,8 @@ void MotionEditor::showBlenderSettings(motion::Id id) {
     const auto original = found != nullptr ? found : std::shared_ptr<const motion::Asset>();
     auto panel = std::make_unique<MotionBlenderSourcePanel>(original != nullptr ? original->name : "Blender", original != nullptr ? original->blenderSettings : motion::BlenderSourceSettings{}, id != 0);
     auto* controls = panel.get();
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), id == 0 ? "Add Blender source" : "Blender source", juce::Point<int>(460, id != 0 ? 254 : 222), true);
+    const auto size = juce::Point<int>(panel->getWidth(), panel->getHeight());
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(panel), juce::String(), size, false);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> dialog(overlay.get());
     const auto generation = document.generation();
@@ -288,17 +272,25 @@ void MotionEditor::showNextPreparationSettings() {
         showLuaEditor(std::move(request));
         return;
     }
+    // The source's bytes, for the preview beside the settings.
+    juce::MemoryBlock data;
+    if (request.replacement != nullptr) {
+        data = request.replacement->data;
+    } else if (!video) {
+        request.file.loadFileAsData(data);
+    }
     if (raster) {
-        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video);
+        auto panel = std::make_unique<MotionRasterSettingsPanel>(request.replacement != nullptr ? request.replacement->rasterSettings : motion::RasterSettings(), video, name, video ? juce::MemoryBlock() : std::move(data));
         imagePanel = panel.get();
         content = std::move(panel);
     } else if (fractal) {
         const auto initialDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
-        auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth);
+        auto panel = std::make_unique<MotionFractalSettingsPanel>(initialDepth, name, data.toString());
         fractalPanel = panel.get();
         content = std::move(panel);
     }
-    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), "Prepare " + name, juce::Point<int>(440, fractal ? 102 : video ? 328 : 270), true);
+    const auto size = juce::Point<int>(content->getWidth(), content->getHeight());
+    auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(content), juce::String(), size, false);
     const juce::Component::SafePointer<MotionEditor> owner(this);
     const juce::Component::SafePointer<osci::OverlayComponent> overlayPointer(overlay.get());
     preparationSettingsOpen = true;

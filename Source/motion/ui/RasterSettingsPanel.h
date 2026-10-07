@@ -1,150 +1,128 @@
 #pragma once
 
 #include "../model/RasterSettings.h"
-#include <JuceHeader.h>
-#include "MotionStyle.h"
-#include <osci_gui/osci_gui.h>
+#include "../import/RasterSourcePreparer.h"
+#include "Sheet.h"
+#include "ScrubField.h"
+#include "SourcePreview.h"
 #include <functional>
 
-class MotionRasterSettingsPanel final : public juce::Component {
+// How an image or video is traced into beam strokes. Images show the traced
+// first frame beside the settings, updated as they change.
+class MotionRasterSettingsPanel final : public motion::ui::Sheet {
 public:
-    explicit MotionRasterSettingsPanel(motion::RasterSettings initial, bool video = false) : settings(initial), isVideo(video) {
-        if (isVideo) {
-            frameRate.setName("Video bake frame rate");
-            frameRate.setSliderStyle(juce::Slider::LinearHorizontal);
-            frameRate.setTextBoxStyle(juce::Slider::TextBoxRight, false, 66, 26);
-            frameRate.setRange(1, 120, .001);
-            frameRate.setValue(initial.videoFrameRate, juce::dontSendNotification);
-            frameRate.setTextValueSuffix(" fps");
-            frameRate.onValueChange = [this] { settings.videoFrameRate = frameRate.getValue(); refresh(); };
-            frameRate.setTooltip("Resample video timing at this rate for deterministic seeking and export.");
-            frameRateLabel.setFont(motion::style::body());
-            frameRateLabel.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-            frameRateLabel.setBorderSize({});
-            addAndMakeVisible(frameRate); addAndMakeVisible(frameRateLabel);
-        }
-        detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
+    MotionRasterSettingsPanel(motion::RasterSettings initial, bool video, const juce::String& fileName, juce::MemoryBlock image = {})
+        : Sheet(video ? "Prepare video" : "Prepare image", fileName, "Prepare"), settings(initial), isVideo(video), data(std::move(image)) {
         setName("Image preparation settings");
-        mode.setName("Image trace mode");
+        nameAction(isVideo ? "Prepare video" : "Prepare image");
+        detailEdited = initial.resolution != motion::RasterSettings().resolution || initial.mode == motion::RasterSettings::Mode::scanlines;
+        mode.setSelected(initial.mode == motion::RasterSettings::Mode::scanlines ? 1 : 0);
+        mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes.");
+        mode.onChange = [this](int index) {
+            if (!detailEdited) { selectResolution(index == 1 ? 64 : motion::RasterSettings().resolution); }
+            refresh();
+        };
         threshold.setName("Image threshold");
-        detail.setName("Image detail");
-        samples.setName("Image samples per frame");
-        invert.setName("Invert image");
-        invert.setButtonText("Invert image");
-        invert.setToggleState(initial.invert, juce::dontSendNotification);
-        mode.addItem("Outlines", 1);
-        mode.addItem("Scanlines", 2);
-        if (initial.mode == motion::RasterSettings::Mode::contours) {
-            mode.setSelectedId(1, juce::dontSendNotification);
-        } else if (initial.mode == motion::RasterSettings::Mode::scanlines) {
-            mode.setSelectedId(2, juce::dontSendNotification);
-        }
+        threshold.setSpec(thresholdSpec);
+        threshold.setValue(std::isfinite(initial.threshold) ? std::clamp(initial.threshold * 100, 0.0, 100.0) : 0);
+        threshold.setTooltip("Pixels below this brightness are blanked. Transparency also reduces brightness.");
+        threshold.onChange = [this](double) { thresholdEdited = true; refresh(); };
+        threshold.onCommit = threshold.onChange;
         resolutions = {64, 128, 256, 512};
         strides = {512, 1024, 2048, 4096, 8192, 16384};
         if (std::find(resolutions.begin(), resolutions.end(), initial.resolution) == resolutions.end()) { resolutions.push_back(initial.resolution); }
         if (std::find(strides.begin(), strides.end(), initial.pointsPerFrame) == strides.end()) { strides.push_back(initial.pointsPerFrame); }
-        for (std::size_t i = 0; i < resolutions.size(); ++i) {
-            detail.addItem(juce::String(resolutions[i]) + " px", static_cast<int>(i + 1));
-            if (resolutions[i] == initial.resolution) { detail.setSelectedId(static_cast<int>(i + 1), juce::dontSendNotification); }
-        }
+        detail.setName("Image detail");
+        for (std::size_t i = 0; i < resolutions.size(); ++i) { detail.addItem(juce::String(resolutions[i]) + " px", static_cast<int>(i + 1)); }
+        selectResolution(initial.resolution);
+        detail.setTooltip("Maximum tracing dimension. Lower detail simplifies outlines and reduces preparation work.");
+        detail.onChange = [this] { detailEdited = true; refresh(); };
+        samples.setName("Image samples per frame");
         for (std::size_t i = 0; i < strides.size(); ++i) {
             samples.addItem(juce::String(static_cast<juce::int64>(strides[i])), static_cast<int>(i + 1));
             if (strides[i] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(i + 1), juce::dontSendNotification); }
         }
-        threshold.setSliderStyle(juce::Slider::LinearHorizontal);
-        threshold.setTextBoxStyle(juce::Slider::TextBoxRight, false, 66, 26);
-        threshold.setRange(0, 100, 0);
-        threshold.setNumDecimalPlacesToDisplay(2);
-        threshold.setTextValueSuffix(" %");
-        threshold.setValue(std::isfinite(initial.threshold) ? std::clamp(initial.threshold * 100, 0.0, 100.0) : 0, juce::dontSendNotification);
-        threshold.setColour(juce::Slider::textBoxBackgroundColourId, osci::Colours::veryDark());
-        threshold.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        threshold.setColour(juce::Slider::textBoxTextColourId, osci::Colours::text());
-        mode.setTooltip("Outlines follow image edges. Scanlines fill the visible image with horizontal beam passes.");
-        threshold.setTooltip("Pixels below this brightness are blanked. Transparency also reduces brightness.");
-        detail.setTooltip("Maximum tracing dimension. Lower detail simplifies outlines and reduces preparation work.");
-        samples.setTooltip("Beam samples stored per image frame. Increase this if the image is too complex.");
+        samples.setTooltip("Beam samples stored per frame. Increase this if the image is too complex.");
+        samples.onChange = [this] { refresh(); };
+        invert.setToggleState(initial.invert, juce::dontSendNotification);
         invert.setTooltip("Invert image colours before tracing, for dark artwork on a light background. Transparency stays unchanged.");
-        for (auto* combo : {&mode, &detail, &samples}) {
-            combo->setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
-            combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
-            combo->onChange = [this] { refresh(); };
-        }
-        detail.onChange = [this] { detailEdited = true; refresh(); };
-        mode.onChange = [this] {
-            if (!detailEdited) {
-                const auto suggested = mode.getSelectedId() == 2 ? 64 : motion::RasterSettings().resolution;
-                const auto found = std::find(resolutions.begin(), resolutions.end(), suggested);
-                detail.setSelectedId(static_cast<int>(std::distance(resolutions.begin(), found) + 1), juce::dontSendNotification);
-            }
-            refresh();
-        };
-        threshold.onValueChange = [this] { thresholdEdited = true; refresh(); };
         invert.onClick = [this] { refresh(); };
-        for (auto* caption : {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel}) {
-            caption->setFont(motion::style::body());
-            caption->setColour(juce::Label::textColourId, osci::Colours::textMuted());
-            caption->setBorderSize({});
+        frameRate.setName("Video bake frame rate");
+        frameRate.setSpec(frameRateSpec);
+        frameRate.setValue(initial.videoFrameRate);
+        frameRate.setTooltip("Resample video timing at this rate for deterministic seeking and export.");
+        frameRate.onChange = [this](double value) { settings.videoFrameRate = value; refresh(); };
+        frameRate.onCommit = frameRate.onChange;
+        for (auto* field : {&threshold, &frameRate}) { field->setFill(fieldFill()); }
+        mode.fill = fieldFill();
+        for (auto* combo : {&detail, &samples}) {
+            combo->setColour(juce::ComboBox::backgroundColourId, fieldFill());
+            combo->setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         }
-        for (auto* label : {&note, &error}) {
-            label->setFont(motion::style::body());
-            label->setJustificationType(juce::Justification::topLeft);
-            label->setBorderSize({});
-        }
-        note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-
-        error.setName("Image preparation validation error");
+        for (auto* caption : {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel, &frameRateLabel, &invertLabel}) { styleCaption(*caption); }
+        error.setFont(motion::style::body());
         error.setColour(juce::Label::textColourId, motion::style::error());
-        if (isVideo) {
-        }
-        prepare.setName(isVideo ? "Prepare video" : "Prepare image");
-        prepare.setButtonText(isVideo ? "Prepare video" : "Prepare image");
-        prepare.onClick = [this] {
+        error.setBorderSize({});
+        error.setName("Image preparation validation error");
+        primary.onClick = [this] {
             if (submitted) { return; }
             refresh();
             if (valid && onPrepare) {
                 submitted = true;
-                prepare.setEnabled(false);
+                primary.setEnabled(false);
                 onPrepare(settings);
             }
         };
-        for (auto* component : std::initializer_list<juce::Component*> {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel,
-                &mode, &threshold, &detail, &samples, &invert, &note, &error, &prepare}) {
+        for (auto* component : std::initializer_list<juce::Component*> {&modeLabel, &thresholdLabel, &detailLabel, &samplesLabel, &invertLabel,
+                &mode, &threshold, &detail, &samples, &invert, &error}) {
             addAndMakeVisible(component);
         }
-        setSize(440, 400);
+        if (isVideo) {
+            addAndMakeVisible(frameRateLabel);
+            addAndMakeVisible(frameRate);
+        }
+        if (hasPreview()) { addAndMakeVisible(preview); }
+        const auto rows = isVideo ? 6 : 5;
+        setSize(widthFor(hasPreview() ? bodyHeight(rows) : 0), heightFor(rows));
         refresh();
     }
 
     std::function<void(motion::RasterSettings)> onPrepare;
 
-    void resized() override {
-        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
-        motion::style::dialog::footer(area, {&prepare});
-        const auto row = [&](juce::Label& label, juce::Component& field) { motion::style::dialog::formRow(area, label, field, 142); };
-        row(modeLabel, mode);
-        row(thresholdLabel, threshold);
-        row(detailLabel, detail);
-        row(samplesLabel, samples);
-        if (isVideo) { row(frameRateLabel, frameRate); }
-        // The tick box lines up with the fields' left edge.
-        invert.setBounds(area.removeFromTop(motion::style::dialog::row).withTrimmedLeft(142 - 4));
-        area.removeFromTop(motion::style::dialog::rowGap);
-        error.setBounds(area);
+protected:
+    void layoutBody(juce::Rectangle<int> area) override {
+        if (hasPreview()) {
+            preview.setBounds(area.removeFromLeft(area.getHeight()));
+            area.removeFromLeft(24);
+        }
+        formRow(area, modeLabel, mode);
+        formRow(area, thresholdLabel, threshold, number);
+        formRow(area, detailLabel, detail);
+        formRow(area, samplesLabel, samples);
+        if (isVideo) { formRow(area, frameRateLabel, frameRate, number); }
+        auto line = area.removeFromTop(row);
+        invertLabel.setBounds(line.removeFromLeft(caption));
+        invert.setBounds(line.removeFromLeft(motion::ui::Switch::width + 4));
+        error.setBounds(footerLeft);
     }
 
 private:
+    static constexpr motion::PropertySpec thresholdSpec {"threshold", "Threshold", "", "", 0, 100, 2, .1, 1, "%"};
+    static constexpr motion::PropertySpec frameRateSpec {"frameRate", "Frame rate", "", "", 1, 120, 30, .5, 3, " fps"};
+    bool hasPreview() const { return !isVideo && data.getSize() > 0; }
+    void selectResolution(int resolution) {
+        const auto found = std::find(resolutions.begin(), resolutions.end(), resolution);
+        if (found != resolutions.end()) { detail.setSelectedId(static_cast<int>(std::distance(resolutions.begin(), found) + 1), juce::dontSendNotification); }
+    }
     void refresh() {
         auto next = settings;
-        juce::String message;
-        const auto modeId = mode.getSelectedId();
         const auto detailIndex = detail.getSelectedId() - 1;
         const auto sampleIndex = samples.getSelectedId() - 1;
-        if ((modeId != 1 && modeId != 2) || detailIndex < 0 || sampleIndex < 0
-            || static_cast<std::size_t>(detailIndex) >= resolutions.size() || static_cast<std::size_t>(sampleIndex) >= strides.size()) {
-            message = "Choose a trace mode, image detail and samples per frame.";
+        juce::String message;
+        if (detailIndex < 0 || sampleIndex < 0 || static_cast<std::size_t>(detailIndex) >= resolutions.size() || static_cast<std::size_t>(sampleIndex) >= strides.size()) {
+            message = "Choose an image detail and samples per frame.";
         } else {
-            next.mode = modeId == 1 ? motion::RasterSettings::Mode::contours : motion::RasterSettings::Mode::scanlines;
+            next.mode = mode.getSelected() == 0 ? motion::RasterSettings::Mode::contours : motion::RasterSettings::Mode::scanlines;
             next.resolution = resolutions[static_cast<std::size_t>(detailIndex)];
             next.pointsPerFrame = strides[static_cast<std::size_t>(sampleIndex)];
             next.invert = invert.getToggleState();
@@ -153,22 +131,37 @@ private:
         }
         valid = message.isEmpty();
         error.setText(message, juce::dontSendNotification);
-        prepare.setEnabled(valid && !submitted);
-        if (valid) { settings = next; }
+        primary.setEnabled(valid && !submitted);
+        if (!valid) { return; }
+        settings = next;
+        if (!hasPreview()) { return; }
+        preview.request([image = data, chosen = settings](const std::atomic<bool>& cancel) {
+            motion::ui::SourcePreview::Result result;
+            const auto prepared = motion::RasterSourcePreparer::prepare(image.getData(), image.getSize(), chosen, &cancel);
+            if (!prepared) {
+                result.error = juce::String(prepared.error);
+                return result;
+            }
+            result.path = motion::ui::traceSource(*prepared.source, 0, static_cast<int>(chosen.pointsPerFrame));
+            const auto frames = static_cast<int>(prepared.source->frameCount());
+            result.caption = juce::String(static_cast<juce::int64>(chosen.pointsPerFrame)) + " points" + (frames > 1 ? motion::style::dot() + juce::String(frames) + " frames" : juce::String());
+            return result;
+        });
     }
 
     motion::RasterSettings settings;
     bool isVideo = false;
-    juce::Slider frameRate;
-    juce::Label frameRateLabel {"Video frame rate caption", "Bake frame rate"};
+    juce::MemoryBlock data;
     bool valid = false, submitted = false, thresholdEdited = false, detailEdited = false;
     std::vector<int> resolutions;
     std::vector<std::size_t> strides;
-    juce::ComboBox mode, detail, samples;
-    juce::Slider threshold;
-    juce::ToggleButton invert;
-    juce::Label modeLabel {"Image mode caption", "Trace mode"}, thresholdLabel {"Image threshold caption", "Brightness threshold"};
-    juce::Label detailLabel {"Image detail caption", "Image detail"}, samplesLabel {"Image samples caption", "Samples per frame"};
-    juce::Label note, error;
-    juce::TextButton prepare;
+    motion::ui::SegmentedControl mode {"Image trace mode", {"Outlines", "Scanlines"}};
+    motion::ui::ScrubField threshold, frameRate;
+    juce::ComboBox detail, samples;
+    motion::ui::Switch invert {"Invert image"};
+    motion::ui::SourcePreview preview;
+    juce::Label modeLabel {"Image mode caption", "Trace"}, thresholdLabel {"Image threshold caption", "Threshold"};
+    juce::Label detailLabel {"Image detail caption", "Detail"}, samplesLabel {"Image samples caption", "Samples per frame"};
+    juce::Label frameRateLabel {"Video frame rate caption", "Frame rate"}, invertLabel {"Invert caption", "Invert"};
+    juce::Label error;
 };

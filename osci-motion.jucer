@@ -618,6 +618,8 @@
               file="Source/motion/ui/EffectStack.cpp"/>
         <FILE id="MotuiEffectStackh" name="EffectStack.h" compile="0" resource="0"
               file="Source/motion/ui/EffectStack.h"/>
+        <FILE id="MotuiFormControlsh" name="FormControls.h" compile="0" resource="0"
+              file="Source/motion/ui/FormControls.h"/>
         <FILE id="MotuiFractalSettingsPanelh" name="FractalSettingsPanel.h"
               compile="0" resource="0" file="Source/motion/ui/FractalSettingsPanel.h"/>
         <FILE id="MotGrabCursorC" name="GrabCursor.cpp" compile="1" resource="0"
@@ -658,8 +660,11 @@
               file="Source/motion/ui/ScopeSettings.h"/>
         <FILE id="MotuiScrubFieldh" name="ScrubField.h" compile="0" resource="0"
               file="Source/motion/ui/ScrubField.h"/>
+        <FILE id="MotuiSheeth" name="Sheet.h" compile="0" resource="0" file="Source/motion/ui/Sheet.h"/>
         <FILE id="MotuiShortcutsOverlayh" name="ShortcutsOverlay.h" compile="0"
               resource="0" file="Source/motion/ui/ShortcutsOverlay.h"/>
+        <FILE id="MotuiSourcePreviewh" name="SourcePreview.h" compile="0" resource="0"
+              file="Source/motion/ui/SourcePreview.h"/>
         <FILE id="MotuiStatusBarh" name="StatusBar.h" compile="0" resource="0"
               file="Source/motion/ui/StatusBar.h"/>
         <FILE id="MotuiTextAnimationPanelh" name="TextAnimationPanel.h" compile="0"
