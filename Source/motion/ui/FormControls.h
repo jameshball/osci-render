@@ -46,7 +46,7 @@ public:
                 g.setColour(juce::Colours::white.withAlpha(.05f));
                 g.fillRoundedRectangle(segment, style::radius);
             }
-            g.setFont(style::body());
+            g.setFont(compact ? style::caption() : style::body());
             const auto alpha = !isEnabled() ? .35f : index == selected ? 1.0f : index == hover ? .9f : .62f;
             g.setColour(osci::Colours::text().withAlpha(alpha));
             g.drawText(labels[index], segment, juce::Justification::centred, false);
@@ -68,6 +68,8 @@ public:
     }
     // Fields recess into the panel they sit on; dialogs sit on a darker one.
     juce::Colour fill = osci::Colours::veryDark();
+    // Many short options (six presets in a narrow column) read in captions.
+    bool compact = false;
 
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override {
         // Read and set as text, like a combo box.

@@ -213,7 +213,6 @@ private:
     MotionCurveEditor curveEditor;
     MotionCameraRig cameraRig;
     MotionScopePanel scopePanel { processor };
-    MotionScopeHeading scopeHeading;
     MotionClipTimingPanel clipTimingPanel;
     MotionEffectLibrary effectLibrary;
     MotionEffectStack effectStack;

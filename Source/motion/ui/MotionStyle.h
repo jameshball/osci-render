@@ -168,17 +168,21 @@ public:
     }
 };
 
-// Properties' one-line rows: names on the left, the value in the last of
-// three columns, then the previous, key and next buttons at the right edge.
+// Properties' rows share one grid: three value columns, then a gutter
+// with the modulation glyph and the previous, key and next buttons, so
+// "is this animated or driven?" reads down one column. One-value rows put
+// the value in the last column.
 struct PropertyGrid {
-    static constexpr int keyButtons = 12 + 18 + 12;
+    static constexpr int keyButtons = 12 + 18 + 12, modulateWidth = 18;
+    static constexpr int gutter = modulateWidth + gap + keyButtons;
     explicit PropertyGrid(int width) {
-        const auto line = width - keyButtons - gap;
+        const auto line = width - gutter - gap;
         column = std::min(110, (line - gap * 2) / 3);
         value = 2 * (column + gap);
-        keys = line + gap;
+        modulate = width - gutter;
+        keys = width - keyButtons;
     }
-    int column = 0, value = 0, keys = 0;
+    int column = 0, value = 0, modulate = 0, keys = 0;
 };
 
 inline void fillPanel(juce::Graphics& g, juce::Rectangle<int> bounds) {
@@ -385,18 +389,28 @@ inline void styleCaption(juce::Label& label, const juce::String& text) {
     label.setFont(caption());
     label.setColour(juce::Label::textColourId, osci::Colours::textMuted());
 }
+// Section headings (Timing, Characters) read like Properties' own
+// (Transform, Effects): bold caption, brighter than a field's label.
 inline void styleHeading(juce::Label& label, const juce::String& text) {
-    styleCaption(label, text);
-    label.setBorderSize({0, 2, 0, 0});
+    label.setText(text, juce::dontSendNotification);
+    label.setFont(heading());
+    label.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(.72f));
+    label.setBorderSize({});
 }
-inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields) {
+// Two pairs to a row. Above keyed rows they end where Properties' value
+// columns end, so every field shares one right edge before the keys'
+// gutter; with nothing keyed below (the composition) they take the width.
+inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields, bool toGutter = true) {
+    const PropertyGrid grid(area.getWidth());
+    const auto right = toGutter ? grid.value + grid.column : area.getWidth();
     for (std::size_t line = 0; line < 2; ++line) {
-        auto bounds = area.removeFromTop(row);
-        const auto half = bounds.getWidth() / 2;
+        auto bounds = area.removeFromTop(row).withWidth(right);
+        constexpr int between = 12;
+        const auto half = (right - between) / 2;
         for (std::size_t column = 0; column < 2; ++column) {
             const auto index = line * 2 + column;
-            auto cell = bounds.removeFromLeft(half).withTrimmedRight(column == 0 ? 6 : 0);
-            captions[index].setBounds(cell.removeFromLeft(56));
+            auto cell = column == 0 ? bounds.removeFromLeft(half) : bounds.withTrimmedLeft(between);
+            captions[index].setBounds(cell.removeFromLeft(46));
             fields[index]->setBounds(cell.reduced(0, 3));
         }
     }

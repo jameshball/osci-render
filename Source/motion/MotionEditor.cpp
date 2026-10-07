@@ -465,7 +465,7 @@ void MotionEditor::setUpProperties() {
         beginSourceImport(request);
     };
     // The owner's effects follow its properties.
-    propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); });
+    propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); }, "Effects");
     inspectorTitle.setText("Properties", juce::dontSendNotification);
     inspectorTitle.setFont(motion::style::title());
     inspectorTitle.setBorderSize(juce::BorderSize<int>(0));
@@ -1281,15 +1281,15 @@ void MotionEditor::refreshInspector() {
     if (camera) {
         propertyInspector.setLead(&cameraRig, [this] { return cameraRig.preferredHeight(); });
     } else if (scopeSelected) {
-        propertyInspector.setLead(&scopeHeading, [] { return MotionScopeHeading::preferredHeight(); });
+        propertyInspector.setLead(nullptr, {});
     } else {
         propertyInspector.setLead(&inspectorLead, [this] { return inspectorLead.preferredHeight(); });
     }
     // The Scope has no effects; its fixed options follow its rows instead.
     if (scopeSelected) {
-        propertyInspector.setTrail(&scopePanel, [] { return MotionScopePanel::preferredHeight(); });
+        propertyInspector.setTrail(&scopePanel, [] { return MotionScopePanel::preferredHeight(); }, {}, true);
     } else {
-        propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); });
+        propertyInspector.setTrail(&effectStack, [this] { return effectStack.preferredHeight(); }, "Effects");
     }
     const auto& project = processor.document.project();
     const auto target = motion::findPropertyTarget(project, selection);

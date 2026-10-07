@@ -23,14 +23,17 @@ public:
         parent.setTooltip("Carry this camera with a group's transform");
         lookAt.onChange = [this] { applyRig(); };
         parent.onChange = [this] { applyRig(); };
-        for (auto* label : {&lookAtLabel, &parentLabel}) {
-            label->setFont(motion::style::caption());
-            label->setColour(juce::Label::textColourId, osci::Colours::textMuted());
-            label->setBorderSize({});
+        motion::style::inspector::styleHeading(title, "Rig");
+        addAndMakeVisible(title);
+        for (auto [label, text] : {std::pair {&lookAtLabel, "Look at"}, std::pair {&parentLabel, "Parent"}, std::pair {&shotLabel, "Shot"}}) {
+            motion::style::inspector::styleCaption(*label, text);
             addAndMakeVisible(label);
         }
-        lookAtLabel.setText("Look at", juce::dontSendNotification);
-        parentLabel.setText("Parent", juce::dontSendNotification);
+        showing.setFont(motion::style::body());
+        showing.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+        showing.setBorderSize({});
+        showing.setText("On screen at the playhead", juce::dontSendNotification);
+        addChildComponent(showing);
         cutButton.setName("Cut to camera here");
         cutButton.setTooltip("Show this camera from the playhead until the next cut");
         cutButton.onClick = [this] {
@@ -38,32 +41,43 @@ public:
             processor.document.cutToCamera(camera, frameTime(), cut);
             refresh();
         };
-        addAndMakeVisible(cutButton);
+        cutButton.setButtonText("Cut to it at the playhead");
+        addChildComponent(cutButton);
     }
 
     void setCamera(motion::Id id) {
         camera = id;
         refresh();
     }
-    int preferredHeight() const { return camera == 0 ? 0 : 3 * motion::style::controlHeight + 2 * motion::style::gap + motion::style::padding; }
+    int preferredHeight() const { return camera == 0 ? 0 : motion::style::inspector::headingHeight + 3 * motion::style::controlHeight + 3 * motion::style::gap; }
 
     void refresh() {
         const auto& project = processor.document.project();
         const auto* found = findCamera(project, camera);
         refreshRig(project, found);
-        const auto showing = activeCamera() == camera;
-        cutButton.setButtonText(showing ? "Showing at the playhead" : "Cut to this camera at the playhead");
-        cutButton.setEnabled(found != nullptr && frameTime() < project.duration && !showing);
+        // On screen already, or a cut away to it.
+        const auto onScreen = activeCamera() == camera;
+        showing.setVisible(onScreen);
+        cutButton.setVisible(!onScreen);
+        cutButton.setEnabled(found != nullptr && frameTime() < project.duration);
     }
     void resized() override {
-        auto area = getLocalBounds().withTrimmedTop(motion::style::padding);
-        for (auto [label, box] : {std::pair {&lookAtLabel, &lookAt}, std::pair {&parentLabel, &parent}}) {
-            auto row = area.removeFromTop(motion::style::controlHeight);
+        auto area = getLocalBounds();
+        title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
+        area.removeFromTop(motion::style::gap);
+        // Choices end where Properties' value columns do.
+        const motion::style::PropertyGrid grid(area.getWidth());
+        const auto right = grid.value + grid.column;
+        for (auto [label, box] : {std::pair<juce::Label*, juce::Component*> {&lookAtLabel, &lookAt}, {&parentLabel, &parent}}) {
+            auto row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
             area.removeFromTop(motion::style::gap);
             label->setBounds(row.removeFromLeft(56));
             box->setBounds(row);
         }
-        cutButton.setBounds(area.removeFromTop(motion::style::controlHeight).withTrimmedLeft(56));
+        auto row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
+        shotLabel.setBounds(row.removeFromLeft(56));
+        showing.setBounds(row);
+        cutButton.setBounds(row.withWidth(cutButton.getBestWidthForHeight(row.getHeight()) + 20));
     }
 
 private:
@@ -116,7 +130,7 @@ private:
     MotionProcessor& processor;
     motion::Id camera = 0;
     juce::ComboBox lookAt, parent;
-    juce::Label lookAtLabel, parentLabel;
+    juce::Label title, lookAtLabel, parentLabel, shotLabel, showing;
     std::vector<std::pair<motion::Id, juce::String>> listedTargets, listedParents;
     juce::TextButton cutButton;
 };

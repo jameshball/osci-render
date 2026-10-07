@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../MotionProcessor.h"
-#include "Chip.h"
+#include "FormControls.h"
 #include "MotionStyle.h"
 #include "ScrubField.h"
 #include <array>
@@ -16,20 +16,14 @@ public:
         setName("Text animation inspector");
         motion::style::inspector::styleHeading(title, "Characters");
         addAndMakeVisible(title);
-        const std::array<const char*, 6> chipTips {"Every character shows at once", "Characters appear one by one", "Characters rise into place", "Characters pop in with a small overshoot", "Characters bob in a looping wave", "Characters fly in from all around"};
-        for (std::size_t index = 0; index < kinds.size(); ++index) {
-            auto& chip = *kinds[index];
-            chip.setName("Text animation " + chip.getButtonText());
-            chip.setTitle(chip.getName());
-            chip.setTooltip(chipTips[index]);
-            chip.setClickingTogglesState(false);
-            chip.onClick = [this, index] {
-                auto next = current();
-                next.animation = static_cast<motion::TextSettings::Animation>(index);
-                apply(next);
-            };
-            addAndMakeVisible(chip);
-        }
+        kinds.compact = true;
+        kinds.setTooltip("None: every character at once. Type: one by one. Rise: into place. Pop: with a small overshoot. Wave: a looping bob. Scatter: in from all around.");
+        kinds.onChange = [this](int index) {
+            auto next = current();
+            next.animation = static_cast<motion::TextSettings::Animation>(index);
+            apply(next);
+        };
+        addAndMakeVisible(kinds);
         const std::array<const char*, 4> labels {"Stagger", "Each", "Hold", "Amount"};
         const std::array<const char*, 4> fieldTips {"Seconds between one character starting and the next", "Seconds each character takes to arrive", "Seconds the finished text holds before the source loops", "How far characters travel (1 is one character height)"};
         for (std::size_t index = 0; index < fields.size(); ++index) {
@@ -67,10 +61,8 @@ public:
         if (asset != nullptr && pending.has_value() && pending->first == asset->id && sameAnimation(asset->textSettings, pending->second)) { pending.reset(); }
         const auto settings = current();
         const auto locked = isLocked();
-        for (std::size_t index = 0; index < kinds.size(); ++index) {
-            kinds[index]->setToggleState(static_cast<int>(settings.animation) == static_cast<int>(index), juce::dontSendNotification);
-            kinds[index]->setEnabled(!locked);
-        }
+        kinds.setSelected(static_cast<int>(settings.animation));
+        kinds.setEnabled(!locked);
         const std::array<double, 4> values {settings.characterDelay, settings.characterDuration, settings.hold, settings.amount};
         for (std::size_t index = 0; index < fields.size(); ++index) {
             fields[index].setValue(values[index]);
@@ -83,13 +75,9 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        // Six kinds share one row, edge to edge.
-        auto chips = area.removeFromTop(30).withTrimmedTop(3).withTrimmedBottom(3);
-        const auto each = (chips.getWidth() - 4 * static_cast<int>(kinds.size() - 1)) / static_cast<int>(kinds.size());
-        for (std::size_t index = 0; index < kinds.size(); ++index) {
-            kinds[index]->setBounds(index + 1 == kinds.size() ? chips : chips.removeFromLeft(each));
-            chips.removeFromLeft(4);
-        }
+        // Six kinds share one row, ending with the value columns.
+        const motion::style::PropertyGrid grid(area.getWidth());
+        kinds.setBounds(area.removeFromTop(30).withTrimmedTop(3).withTrimmedBottom(3).withWidth(grid.value + grid.column));
         const auto* asset = textAsset();
         const auto animated = asset != nullptr && current().animated();
         for (std::size_t index = 0; index < fields.size(); ++index) {
@@ -145,8 +133,7 @@ private:
     int lastHeight = 0;
     std::optional<std::pair<motion::Id, motion::TextSettings>> pending;
     juce::Label title;
-    motion::ui::Chip none {"None"}, typeOn {"Type"}, rise {"Rise"}, pop {"Pop"}, wave {"Wave"}, scatter {"Scatter"};
-    std::array<motion::ui::Chip*, 6> kinds {&none, &typeOn, &rise, &pop, &wave, &scatter};
+    motion::ui::SegmentedControl kinds {"Text animation", {"None", "Type", "Rise", "Pop", "Wave", "Scatter"}};
     std::array<juce::Label, 4> captions;
     std::array<motion::ui::ScrubField, 4> fields;
 };

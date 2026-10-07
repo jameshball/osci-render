@@ -6,16 +6,9 @@
 
 #include "../MotionProcessor.h"
 #include "ScrubField.h"
+#include "FormControls.h"
 
 namespace motion::scope {
-// Section headings and one-line rows match Properties (style::PropertyGrid).
-inline void heading(juce::Label& label, const juce::String& text) {
-    label.setText(text, juce::dontSendNotification);
-    label.setFont(motion::style::caption());
-    label.setColour(juce::Label::textColourId, osci::Colours::text());
-    label.setBorderSize({});
-}
-inline constexpr int headingHeight = 18;
 
 // A small text menu in a heading line: muted text and a caret, brighter
 // when hovered.
@@ -43,20 +36,6 @@ private:
 };
 }
 
-// The heading over the Scope's animated rows.
-class MotionScopeHeading final : public juce::Component {
-public:
-    MotionScopeHeading() {
-        motion::scope::heading(label, "Beam");
-        addAndMakeVisible(label);
-    }
-    static constexpr int preferredHeight() { return motion::scope::headingHeight; }
-    void resized() override { label.setBounds(getLocalBounds()); }
-
-private:
-    juce::Label label;
-};
-
 // Below the Scope's animated rows, its few fixed options on the same grid:
 // the overlay drawn over the beam, upsampling, and the project's scope
 // timing (dwell, travel, settle) with presets for common displays. Timing
@@ -66,7 +45,7 @@ public:
     explicit MotionScopePanel(MotionProcessor& owner) : processor(owner) {
         setName("Scope options");
         for (auto [label, text] : {std::pair {&displayTitle, "Display"}, std::pair {&timingTitle, "Timing"}}) {
-            motion::scope::heading(*label, text);
+            motion::style::inspector::styleHeading(*label, text);
             addAndMakeVisible(*label);
         }
         for (auto [label, text] : {std::pair {&overlayCaption, "Overlay"}, std::pair {&upsampleCaption, "Upsample"}}) { caption(*label, text); }
@@ -127,7 +106,15 @@ public:
         cancelPendingUpdate();
     }
 
-    static constexpr int preferredHeight() { return sectionGap + motion::scope::headingHeight + 2 * rowHeight + rowGap + sectionGap + motion::scope::headingHeight + 3 * rowHeight + 2 * rowGap; }
+    // Two sections, each opened like Properties' own: a hairline across the
+    // panel, the heading, then rows on the grid.
+    static constexpr int rowHeight = motion::style::controlHeight, rowGap = motion::style::gap, valueInset = 5;
+    static constexpr int hairline = motion::style::gap, headingTop = 10, headingBlock = 26 + motion::style::gap, sectionEnd = motion::style::padding + motion::style::gap;
+    static constexpr int preferredHeight() { return hairline + headingBlock + 2 * rowHeight + rowGap + sectionEnd + headingBlock + 3 * rowHeight + 2 * rowGap; }
+    void paint(juce::Graphics& g) override {
+        g.setColour(juce::Colours::white.withAlpha(.06f));
+        for (const auto y : rules) { g.fillRect(0, y, getWidth(), 1); }
+    }
 
     void refresh() {
         if (gesture.stale()) { gesture.reset(); }
@@ -147,33 +134,36 @@ public:
     }
 
     void resized() override {
-        const motion::style::PropertyGrid grid(getWidth());
-        auto area = getLocalBounds().withTrimmedTop(sectionGap);
+        // The panel spans the inspector; its rows keep Properties' inset.
+        auto area = getLocalBounds().reduced(motion::style::padding, 0);
+        const motion::style::PropertyGrid grid(area.getWidth());
         const auto line = [&](juce::Label& caption) {
             auto row = area.removeFromTop(rowHeight);
             area.removeFromTop(rowGap);
             caption.setBounds(row.withWidth(grid.column + motion::style::gap + grid.column / 2));
             return row;
         };
-        displayTitle.setBounds(area.removeFromTop(motion::scope::headingHeight));
+        const auto section = [&](juce::Label& title, std::size_t index) {
+            area.removeFromTop(index == 0 ? hairline : sectionEnd - rowGap);
+            rules[index] = area.getY();
+            auto heading = area.removeFromTop(headingBlock);
+            title.setBounds(heading.withTrimmedTop(headingTop).withHeight(26 - headingTop));
+            return heading;
+        };
+        section(displayTitle, 0);
         auto overlayRow = line(overlayCaption);
-        // From the rows' modulate column to the values' right edge.
-        const auto menuLeft = grid.value - motion::style::gap - 20;
-        overlay.setBounds(overlayRow.withX(menuLeft).withRight(grid.value + grid.column));
+        // Choices span the value columns, ending where the values do.
+        overlay.setBounds(overlayRow.withX(area.getX() + grid.column + motion::style::gap).withRight(area.getX() + grid.value + grid.column));
         auto upsampleRow = line(upsampleCaption);
-        // The tick box (drawn 4 px in, 14 px wide) ends where the values' text does.
-        const auto tickRight = grid.value + grid.column - valueInset;
-        upsample.setBounds(upsampleRow.withX(tickRight - 4 - 14).withWidth(rowHeight));
-        area.removeFromTop(sectionGap - rowGap);
-        auto title = area.removeFromTop(motion::scope::headingHeight);
-        timingTitle.setBounds(title);
-        presets.setBounds(title.withX(grid.value + grid.column - presets.idealWidth()).withWidth(presets.idealWidth()));
-        for (auto& field : fields) { field.editor.setBounds(line(field.caption).withX(grid.value).withWidth(grid.column)); }
+        upsample.setBounds(upsampleRow.withX(area.getX() + grid.value + grid.column - motion::ui::Switch::width - 2).withWidth(motion::ui::Switch::width + 2));
+        auto title = section(timingTitle, 1);
+        presets.setBounds(title.withTrimmedTop(headingTop).withHeight(26 - headingTop).withX(area.getX() + grid.value + grid.column - presets.idealWidth()).withWidth(presets.idealWidth()));
+        for (auto& field : fields) { field.editor.setBounds(line(field.caption).withX(area.getX() + grid.value).withWidth(grid.column)); }
+        repaint();
     }
 
 private:
     // The fields' text sits this far inside their right edge.
-    static constexpr int rowHeight = motion::style::controlHeight, rowGap = motion::style::gap, sectionGap = 14, valueInset = 5;
     static constexpr std::array<motion::PropertySpec, 3> specs {{
         {"dwell", "Dwell", "Scope", "", 0, motion::ScopeProfile::maximumDwellMicros, 12, 1, 1, " µs"},
         {"travel", "Travel", "Scope", "", 0, motion::ScopeProfile::maximumTravelMicrosPerUnit, 30, 1, 1, " µs/u"},
@@ -237,7 +227,8 @@ private:
     MotionProcessor& processor;
     juce::Label displayTitle, timingTitle, overlayCaption, upsampleCaption;
     juce::ComboBox overlay;
-    juce::ToggleButton upsample;
+    motion::ui::Switch upsample {"Upsample Audio"};
+    std::array<int, 2> rules {};
     std::array<Field, 3> fields;
     motion::scope::MenuLink presets {"Presets"};
     motion::ui::PreviewGesture gesture {processor.document};

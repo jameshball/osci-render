@@ -45,11 +45,19 @@ public:
     double getValue() const { return value; }
     // Fields recess into the panel they sit on; sheets sit on a darker one.
     void setFill(juce::Colour colour) { fill = colour; editor.setColour(juce::TextEditor::backgroundColourId, colour); repaint(); }
+    // A tint over the field: lilac when something drives the value.
+    void setAccent(std::optional<juce::Colour> colour) {
+        if (accent != colour) {
+            accent = colour;
+            repaint();
+        }
+    }
     bool isEditing() const { return dragging || editor.isVisible(); }
 
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
-        g.setColour(fill);
+        // A driven value is tinted in the colour of what drives it.
+        g.setColour(accent.has_value() ? fill.interpolatedWith(*accent, isEnabled() ? .2f : .1f) : fill);
         g.fillRoundedRectangle(bounds, motion::style::radius);
         if (hovered || dragging || hasKeyboardFocus(false)) {
             g.setColour((hasKeyboardFocus(false) ? osci::Colours::accentColor() : osci::Colours::outlineSubtle()).withAlpha(.8f));
@@ -184,6 +192,7 @@ private:
     juce::String prefix;
     Notation notation;
     juce::Colour fill = osci::Colours::veryDark();
+    std::optional<juce::Colour> accent;
     double value = 0, startValue = 0, accumulated = 0;
     float lastX = 0;
     bool hovered = false, dragging = false, moved = false, dragCancelled = false;

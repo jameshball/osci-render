@@ -34,8 +34,10 @@ void MotionPropertyInspector::setLead(juce::Component* component, std::function<
     layoutContent();
 }
 
-void MotionPropertyInspector::setTrail(juce::Component* component, std::function<int()> height) {
-    if (component == trail) { return; }
+void MotionPropertyInspector::setTrail(juce::Component* component, std::function<int()> height, juce::String title, bool fullWidth) {
+    trailTitle = std::move(title);
+    trailFullWidth = fullWidth;
+    if (component == trail) { layoutContent(); return; }
     if (trail != nullptr) { content.removeChildComponent(trail); }
     trail = component;
     trailHeight = std::move(height);
@@ -133,15 +135,22 @@ void MotionPropertyInspector::refreshValues() {
     if (!found.has_value() || found->isEffect) { return; }
     const auto time = keyTime(*found);
     for (auto& row : rows) {
-        bool allKeyed = true, anyAnimated = false, modulated = false;
+        bool allKeyed = true, anyAnimated = false, modulated = false, earlier = false, later = false;
         for (auto& field : row->fields) {
             const auto property = std::string(field->spec.id);
             const auto* curve = found->curve(property);
-            modulated = modulated || isModulated(property);
+            const auto driven = isModulated(property);
+            modulated = modulated || driven;
+            // A driven value says so down its left edge, in the Graph's lilac.
+            field->editor.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
             if (curve == nullptr) { continue; }
             field->editor.setValue(curve->evaluateBase(time));
             anyAnimated = anyAnimated || curve->animated();
             allKeyed = allKeyed && curve->hasKeyAt(time);
+            for (const auto& key : curve->keyframes()) {
+                earlier = earlier || key.time < time - 1.0e-9;
+                later = later || key.time > time + 1.0e-9;
+            }
         }
         // A locked track's values show but do not edit.
         for (auto& field : row->fields) { field->editor.setEnabled(!found->locked); }
@@ -149,8 +158,11 @@ void MotionPropertyInspector::refreshValues() {
         if (row->swatch != nullptr) { row->swatch->setEnabled(!found->locked); }
         row->key.setState(allKeyed && anyAnimated ? osci::KeyframeButton::State::keyed
             : (anyAnimated ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
-        row->previous.setEnabled(anyAnimated);
-        row->next.setEnabled(anyAnimated);
+        // Key navigation shows only once there are keys, lit towards them.
+        row->previous.setVisible(anyAnimated);
+        row->next.setVisible(anyAnimated);
+        row->previous.setEnabled(earlier);
+        row->next.setEnabled(later);
         row->modulate.setToggleState(modulated, juce::dontSendNotification);
         if (row->swatch != nullptr) {
             const auto rgb = colourOf(*row);
@@ -255,50 +267,55 @@ void MotionPropertyInspector::Swatch::setColour(juce::Colour value) {
 void MotionPropertyInspector::Row::paint(juce::Graphics& g) {
     g.setFont(motion::style::caption());
     g.setColour(osci::Colours::textMuted());
-    g.drawText(group, compact() ? getLocalBounds().withRight(captionRight) : getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
+    const motion::style::PropertyGrid grid(getWidth());
+    g.drawText(group, compact() ? getLocalBounds().withRight(grid.value - motion::style::gap) : getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
 }
 
 void MotionPropertyInspector::Row::resized() {
+    const motion::style::PropertyGrid grid(getWidth());
     auto area = getLocalBounds();
-    if (compact()) {
-        auto line = area;
-        next.setBounds(line.removeFromRight(12));
-        key.setBounds(line.removeFromRight(18));
-        previous.setBounds(line.removeFromRight(12));
-        line.removeFromRight(motion::style::gap);
-        const motion::style::PropertyGrid grid(getWidth());
-        const auto value = line.withLeft(grid.value).withWidth(grid.column);
-        fields.front()->editor.setBounds(value);
-        modulate.setBounds(juce::Rectangle<int>(20, 18).withCentre({value.getX() - motion::style::gap - 10, line.getCentreY()}));
-        captionRight = modulate.getX() - motion::style::gap;
-        return;
+    if (!compact()) {
+        auto heading = area.removeFromTop(16);
+        if (swatch != nullptr) {
+            // Beside the heading, as After Effects places a colour's swatch.
+            const auto label = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), group));
+            swatch->setBounds(heading.getX() + label + 6, heading.getY() + 2, 24, 12);
+        }
+        // A mode sits over the row's modulation glyph, in the same column.
+        if (mode != nullptr) { mode->setBounds(juce::Rectangle<int>(grid.modulate, heading.getY(), motion::style::PropertyGrid::modulateWidth + 2, heading.getHeight()).translated(-1, 0)); }
+        area.removeFromTop(1);
     }
-    auto heading = area.removeFromTop(16);
-    if (swatch != nullptr) {
-        // Beside the heading, as After Effects places a colour's swatch.
-        const auto label = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), group));
-        swatch->setBounds(heading.getX() + label + 6, heading.getY() + 2, 24, 12);
-    }
-    modulate.setBounds(heading.removeFromRight(20).reduced(0, 1));
-    if (mode != nullptr) {
-        heading.removeFromRight(motion::style::gap);
-        mode->setBounds(heading.removeFromRight(20).reduced(0, 1));
-    }
-    area.removeFromTop(1);
     auto line = area.removeFromTop(motion::style::controlHeight);
     next.setBounds(line.removeFromRight(12));
     key.setBounds(line.removeFromRight(18));
     previous.setBounds(line.removeFromRight(12));
-    line.removeFromRight(motion::style::gap);
-    const auto count = static_cast<int>(fields.size());
-    // Capped, so an axis label stays beside its value in a wide inspector.
-    // Single values take one column of the three-axis grid so every row lines up.
-    const auto columns = std::max(3, count);
-    const auto width = std::min(110, (line.getWidth() - motion::style::gap * (columns - 1)) / columns);
-    for (int index = 0; index < count; ++index) {
-        fields[static_cast<std::size_t>(index)]->editor.setBounds(line.removeFromLeft(width));
-        line.removeFromLeft(motion::style::gap);
+    modulate.setBounds(juce::Rectangle<int>(grid.modulate, line.getY(), motion::style::PropertyGrid::modulateWidth, line.getHeight()).reduced(0, 3));
+    if (compact()) {
+        fields.front()->editor.setBounds(line.withX(grid.value).withWidth(grid.column));
+        return;
     }
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        fields[index]->editor.setBounds(line.withX(static_cast<int>(index % 3) * (grid.column + motion::style::gap)).withWidth(grid.column));
+    }
+}
+
+void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
+    for (const auto& [y, title] : sections) {
+        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.fillRect(0, y, getWidth(), 1);
+        g.setFont(motion::style::heading());
+        g.setColour(osci::Colours::text().withAlpha(.72f));
+        g.drawText(title, motion::style::padding, y + sectionGap, getWidth() - motion::style::padding * 2, sectionHeading - sectionGap, juce::Justification::centredLeft, true);
+    }
+}
+
+juce::String MotionPropertyInspector::sectionOf(const juce::String& group) {
+    if (group == "Position" || group == "Rotation" || group == "Scale") { return "Transform"; }
+    if (group == "Colour" || group == "Drawing") { return "Appearance"; }
+    if (group == "Gain" || group == "Pan") { return "Audio"; }
+    if (group == "Lens") { return "Camera"; }
+    if (group.startsWith("Slider")) { return "Script sliders"; }
+    return "Beam";
 }
 
 bool MotionPropertyInspector::isModulated(const std::string& property) const {
@@ -318,6 +335,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         if (rows.empty() || rows.back()->group != juce::String(spec.group.data(), spec.group.size())) {
             auto row = std::make_unique<Row>();
             row->group = juce::String(spec.group.data(), spec.group.size());
+            row->section = sectionOf(row->group);
             row->key.setName("Key " + row->group.toLowerCase());
             row->key.setTitle(row->key.getName());
             row->key.setTooltip("Add or remove keys for " + row->group.toLowerCase() + " at the playhead");
@@ -329,6 +347,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->addAndMakeVisible(row->next);
             row->modulate.setClickingTogglesState(false);
             row->modulate.quiet = true;
+            row->modulate.setOnColour(motion::style::result().withAlpha(.16f));
+            row->modulate.onContent = motion::style::result();
             row->modulate.setName("Modulate " + row->group.toLowerCase());
             row->modulate.setTitle(row->modulate.getName());
             row->modulate.setTooltip("Modulate " + row->group.toLowerCase() + ": open it in the Graph with its oscillator, modulator routes and link. Lit when something drives it.");
@@ -396,15 +416,28 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
 
 void MotionPropertyInspector::layoutContent() {
     const auto width = viewport.getWidth() - (viewport.isVerticalScrollBarShown() ? 8 : 0);
+    content.sections.clear();
     int y = 0;
     const auto leading = lead != nullptr && leadHeight ? leadHeight() : 0;
+    if (leading > 0) {
+        // A rule under the header, then the lead's own heading on the same
+        // rhythm as the sections below.
+        content.sections.emplace_back(0, juce::String());
+        y = sectionGap;
+    }
     if (lead != nullptr) {
         lead->setBounds(motion::style::padding, y, width - motion::style::padding * 2, leading);
         lead->setVisible(leading > 0);
-        y += leading > 0 ? leading + motion::style::padding : 0;
+        y += leading > 0 ? leading + motion::style::gap : 0;
     }
     for (std::size_t index = 0; index < rows.size(); ++index) {
         auto& row = rows[index];
+        // Each group of rows opens with a hairline and its heading.
+        if (index == 0 || row->section != rows[index - 1]->section) {
+            if (index > 0) { y += motion::style::gap; }
+            content.sections.emplace_back(y, row->section);
+            y += sectionHeading + motion::style::gap;
+        }
         row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, row->preferredHeight());
         // One-line values stack closer, as a list.
         const auto nextCompact = index + 1 < rows.size() && rows[index + 1]->compact();
@@ -412,11 +445,18 @@ void MotionPropertyInspector::layoutContent() {
     }
     const auto trailing = trail != nullptr && trailHeight ? trailHeight() : 0;
     if (trail != nullptr) {
-        trail->setBounds(motion::style::padding, y, width - motion::style::padding * 2, trailing);
+        if (trailing > 0 && trailTitle.isNotEmpty()) {
+            if (!rows.empty()) { y += motion::style::gap; }
+            content.sections.emplace_back(y, trailTitle);
+            y += sectionHeading + motion::style::gap;
+        }
+        const auto inset = trailFullWidth ? 0 : motion::style::padding;
+        trail->setBounds(inset, y, width - inset * 2, trailing);
         trail->setVisible(trailing > 0);
         y += trailing > 0 ? trailing + motion::style::padding : 0;
     }
     content.setSize(std::max(0, width), y + motion::style::padding);
+    content.repaint();
 }
 
 double MotionPropertyInspector::keyTime(const motion::PropertyTarget& found) const {

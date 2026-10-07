@@ -5,14 +5,18 @@
 #include "DocumentMenu.h"
 #include "MotionIcons.h"
 #include "ScrubField.h"
+#include "Chip.h"
+#include "FormControls.h"
 
 #include "../MotionProcessor.h"
 #include "../model/PropertySchema.h"
 #include "../model/PropertyTarget.h"
+#include <set>
 
 // The effects of one owner (a clip, track, group or the composition), shown
-// in Properties under the owner's own settings. Each effect is a card with an
-// on/off box, its parameters as scrub fields with keys, and a close button.
+// in Properties under the owner's own settings. Each effect is a card: a
+// header that folds it, a switch, its name and a quiet remove button, then
+// its parameters on Properties' grid (value, modulation, keys).
 // Effects arrive by dragging them from the Effects library; cards reorder by
 // dragging their header. Other stages with effects are listed as chips.
 class MotionEffectStack final : public juce::Component, public juce::DragAndDropTarget {
@@ -53,30 +57,50 @@ public:
     void addEffect(const std::string& type, int index = -1);
 
 private:
-    static constexpr int headingHeight = 20, chipHeight = 22, dropZoneHeight = 36;
+    static constexpr int chipHeight = 22, dropZoneHeight = 36, hintHeight = 20;
 
     // One effect: header (on/off, name, close) and a row per parameter.
     class Card final : public juce::Component {
     public:
         Card(MotionEffectStack& owner, motion::Id effectId);
-        int preferredHeight() const { return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + 2) + motion::style::gap; }
+        int preferredHeight() const {
+            if (folded()) { return headerHeight; }
+            return headerHeight + static_cast<int>(rows.size()) * (motion::style::controlHeight + motion::style::gap) + motion::style::gap;
+        }
         motion::Id getEffectId() const { return id; }
         void update();
         void resized() override;
         void paint(juce::Graphics& g) override;
         void mouseDown(const juce::MouseEvent& event) override;
         void mouseDrag(const juce::MouseEvent& event) override;
+        void mouseUp(const juce::MouseEvent& event) override;
+        void mouseEnter(const juce::MouseEvent&) override { repaint(); }
+        void mouseExit(const juce::MouseEvent&) override { repaint(); }
     private:
-        static constexpr int headerHeight = 28, labelWidth = 92;
-        struct Row { std::string id; juce::String label; motion::ui::ScrubField field; osci::KeyframeButton key; };
+        static constexpr int headerHeight = 28;
+        bool folded() const { return stack.folded.contains(id); }
+        void jump(const std::string& property, bool forward);
+        struct Row {
+            std::string id;
+            juce::String label;
+            motion::ui::ScrubField field;
+            osci::KeyframeButton key;
+            motion::ui::Chip modulate {"Modulate", motion::icons::Icon::wave};
+            motion::style::ChevronButton previous {"Previous key", false}, next {"Next key", true};
+        };
         MotionEffectStack& stack;
         motion::Id id;
         juce::String name;
         bool enabled = true;
-        juce::Rectangle<float> box;
-        osci::CloseButton close {"Remove effect"};
+        juce::Rectangle<float> fold;
+        motion::ui::Switch power {"Effect on"};
+        motion::icons::Button close {"Remove effect", motion::icons::Icon::close};
         std::vector<std::unique_ptr<Row>> rows;
     };
+    // Cards folded to their header (view state, kept while the editor is open).
+    std::set<motion::Id> folded;
+    // Driven by a route or a link, like Properties' lilac fields.
+    bool isDriven(motion::Id effect, const std::string& property) const;
 
     // Chips for the other stages of the selection that have effects.
     void refreshStages();
@@ -108,6 +132,6 @@ private:
     std::vector<float> cardShift;
     int dragged = -1, gapIndex = -1, gapHeight = 0;
     juce::TimedCallback cardAnimation {[this] { stepCards(); }};
-    juce::Rectangle<int> dropZone;
+    juce::Rectangle<int> dropZone, hint, stagesCaption;
     bool cancelledGesture = false, dragActive = false, dropHover = false;
 };

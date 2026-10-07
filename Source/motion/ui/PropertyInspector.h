@@ -35,7 +35,9 @@ public:
     // `height`; 0 hides it.
     void setLead(juce::Component* component, std::function<int()> height);
     // A section below the property rows (the owner's effects).
-    void setTrail(juce::Component* component, std::function<int()> height);
+    // `title` heads it as a section of its own (Effects).
+    // A full-width trail draws its own sections, edge to edge like these.
+    void setTrail(juce::Component* component, std::function<int()> height, juce::String title = {}, bool fullWidth = false);
     // What the header says when the target has no properties of its own (a
     // track or the composition, shown for their effects).
     void setHeading(std::optional<std::pair<juce::String, juce::String>> value);
@@ -77,7 +79,7 @@ private:
         juce::Colour colour = juce::Colours::white;
     };
     struct Row : juce::Component {
-        juce::String group;
+        juce::String group, section;
         std::vector<std::unique_ptr<Field>> fields;
         std::unique_ptr<Swatch> swatch;
         osci::KeyframeButton key;
@@ -92,8 +94,16 @@ private:
         int preferredHeight() const { return compact() ? motion::style::controlHeight : 17 + motion::style::controlHeight; }
         void paint(juce::Graphics& g) override;
         void resized() override;
-        int captionRight = 0;
     };
+    // The scrolled page: rows, and between groups of them a hairline and the
+    // group's heading (Transform, Appearance, ...).
+    struct Content : juce::Component {
+        std::vector<std::pair<int, juce::String>> sections;
+        void paint(juce::Graphics& g) override;
+    };
+    static constexpr int sectionGap = 10, sectionHeading = 26;
+    // Which heading a property group sits under.
+    static juce::String sectionOf(const juce::String& group);
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;
@@ -133,7 +143,7 @@ private:
 
     MotionProcessor& processor;
     juce::Viewport viewport;
-    juce::Component content;
+    Content content;
     juce::Label title, kind;
     std::vector<std::unique_ptr<Row>> rows;
     // The innermost field or row under `point` that a modulator can drive.
@@ -143,6 +153,8 @@ private:
     juce::Component* lead = nullptr;
     juce::Component* trail = nullptr;
     std::function<int()> trailHeight;
+    juce::String trailTitle;
+    bool trailFullWidth = false;
     std::optional<std::pair<juce::String, juce::String>> heading;
     std::size_t selectionCount = 1;
     std::function<int()> leadHeight;

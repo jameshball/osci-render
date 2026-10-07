@@ -76,7 +76,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter});
+        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter}, false);
     }
 
 private:

@@ -34,10 +34,13 @@ public:
             g.setColour(juce::Colours::white.withAlpha(highlighted ? .28f : .16f));
             g.drawRoundedRectangle(bounds.reduced(.5f), style::radius, 1.0f);
         }
-        paintContent(g, bounds, active ? juce::Colours::white : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .85f));
+        paintContent(g, bounds, active ? onContent : osci::Colours::textMuted().withAlpha(highlighted ? 1.0f : .85f));
     }
 
     float iconSize = 13.0f;
+    // The glyph or word when on: white on the accent; a modulation chip's
+    // lilac on a faint lilac fill says what drives the value.
+    juce::Colour onContent = juce::Colours::white;
     // Just the content until hovered or on: a column of these stays light.
     bool quiet = false;
 

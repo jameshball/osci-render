@@ -68,7 +68,7 @@ public:
         }
         updating = false;
         // Which clock the clip keeps, on the heading line.
-        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "In beats" : "In seconds", juce::dontSendNotification);
+        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo" : "Ignores tempo", juce::dontSendNotification);
         details.setTooltip(clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo changes" : "Keeps its time when the tempo changes");
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
@@ -80,7 +80,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         auto heading = area.removeFromTop(motion::style::inspector::headingHeight);
-        details.setBounds(heading.removeFromRight(80));
+        details.setBounds(heading.withWidth(motion::style::PropertyGrid(heading.getWidth()).value + motion::style::PropertyGrid(heading.getWidth()).column));
         title.setBounds(heading);
         motion::style::inspector::layoutFields(area, captions, {&values[0], &values[1], &values[2], &values[3]});
         status.setBounds(area.removeFromTop(30));

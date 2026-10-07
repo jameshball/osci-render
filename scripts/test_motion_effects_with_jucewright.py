@@ -100,7 +100,7 @@ try:
     step("key composition ripple", "click", "--name", "Key effect ripplePhase", "--exact")
     wait_undo("Key effect parameter")
     step("scoped effect screenshot", "screenshot", "--file", session.artifact_dir / "scoped-effects.png")
-    step("remove with close button", "click", "--name", "Remove effect icon", "--exact")
+    step("remove with close button", "click", "--name", "Remove effect", "--exact")
     wait_undo("Remove effect")
     step("undo removal", "click", "--name", "Undo", "--exact")
     command("wait-for-locator", "--component-name", "Effect ripplePhase", "--exact")

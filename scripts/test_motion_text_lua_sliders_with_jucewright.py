@@ -70,8 +70,8 @@ try:
     step("import text", "drop-files", "--file", title, "--class", "MotionEditor", "--exact")
     wait_undo("Import object")
     # Per-character animation lives in the text clip's Properties.
-    command("wait-for-locator", "--name", "Text animation Rise", "--exact", "--timeout-ms", 10000)
-    step("rise", "click", "--name", "Text animation Rise", "--exact")
+    command("wait-for-locator", "--name", "Text animation", "--exact", "--timeout-ms", 10000)
+    step("rise", "set-value", "--name", "Text animation", "--exact", "Rise")
     wait_undo("Animate text")
     step("stagger", "set-value", "--component-name", "Text animation Stagger", "--exact", "0.1")
     command("wait", "--ms", 1500)

@@ -22,9 +22,8 @@ void MotionEffectStack::setDragActive(bool active) {
 int MotionEffectStack::preferredHeight() const {
     if (!owner.has_value()) { return 0; }
     int height = 0;
-    if (!cards.empty() || dragActive) { height += headingHeight; }
     for (const auto& card : cards) { height += card->preferredHeight() + motion::style::gap; }
-    if (dragActive && cards.empty()) { height += dropZoneHeight; }
+    if (cards.empty()) { height += dragActive ? dropZoneHeight : hintHeight; }
     if (!stages.empty()) { height += chipHeight + motion::style::padding; }
     return height;
 }
@@ -70,17 +69,18 @@ void MotionEffectStack::refresh() {
 
 void MotionEffectStack::resized() {
     auto area = getLocalBounds();
-    if (!cards.empty() || dragActive) { area.removeFromTop(headingHeight); }
     for (auto& card : cards) {
         card->setBounds(area.removeFromTop(card->preferredHeight()));
         area.removeFromTop(motion::style::gap);
     }
     dropZone = dragActive && cards.empty() ? area.removeFromTop(dropZoneHeight) : juce::Rectangle<int>();
+    hint = !dragActive && cards.empty() ? area.removeFromTop(hintHeight) : juce::Rectangle<int>();
     if (!stages.empty()) {
         area.removeFromTop(motion::style::padding);
         auto row = area.removeFromTop(chipHeight);
+        stagesCaption = row.removeFromLeft(72);
         for (auto& chip : stages) {
-            const auto width = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), chip->getButtonText()) + 18;
+            const auto width = juce::GlyphArrangement::getStringWidthInt(motion::style::body(), chip->getButtonText()) + 18;
             chip->setBounds(row.removeFromLeft(std::min(width, row.getWidth())));
             row.removeFromLeft(motion::style::gap);
         }
@@ -88,10 +88,15 @@ void MotionEffectStack::resized() {
 }
 
 void MotionEffectStack::paint(juce::Graphics& g) {
-    if (!cards.empty() || dragActive) {
-        g.setColour(osci::Colours::textMuted());
+    if (!hint.isEmpty()) {
+        g.setColour(osci::Colours::textMuted().withAlpha(.6f));
         g.setFont(motion::style::caption());
-        g.drawText("Effects", getLocalBounds().removeFromTop(headingHeight), juce::Justification::centredLeft, false);
+        g.drawText("Drag effects here from the Effects tab.", hint, juce::Justification::centredLeft, true);
+    }
+    if (!stages.empty()) {
+        g.setColour(osci::Colours::textMuted().withAlpha(.6f));
+        g.setFont(motion::style::caption());
+        g.drawText("Also applied", stagesCaption, juce::Justification::centredLeft, false);
     }
     if (!dropZone.isEmpty()) {
         g.setColour(osci::Colours::accentColor().withAlpha(dropHover ? .18f : .07f));
@@ -165,10 +170,14 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
     const auto* definition = effect == nullptr ? nullptr : motion::effectDefinition(effect->type);
     name = effect == nullptr ? juce::String() : juce::String(effect->name);
     setName(name + " effect");
-    close.setPaintsBackground(true);
-    close.setIconPadding(6);
+    setRepaintsOnMouseActivity(true);
+    close.iconSize = 14.0f;
+    close.setTooltip("Remove this effect");
     close.onClick = [this] { juce::MessageManager::callAsync([safe = juce::Component::SafePointer<Card>(this)] { if (safe != nullptr) { safe->stack.remove(safe->id); } }); };
     addAndMakeVisible(close);
+    power.setTooltip("Turn this effect on or off");
+    power.onClick = [this] { stack.setEnabled(id, power.getToggleState()); };
+    addAndMakeVisible(power);
     if (definition == nullptr) { return; }
     for (const auto& parameter : definition->parameters) {
         auto row = std::make_unique<Row>();
@@ -181,6 +190,13 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.getProperties().set("routeProperties", juce::String(parameter.id));
         row->key.setName("Key effect " + juce::String(parameter.id));
         row->key.setTitle(row->key.getName());
+        row->key.setWantsKeyboardFocus(false);
+        row->modulate.setClickingTogglesState(false);
+        row->modulate.quiet = true;
+        row->modulate.setOnColour(motion::style::result().withAlpha(.16f));
+        row->modulate.onContent = motion::style::result();
+        row->modulate.setName("Modulate effect " + juce::String(parameter.id));
+        row->modulate.setTooltip("Modulate " + juce::String(parameter.name).toLowerCase() + ": open it in the Graph. Lit when something drives it.");
         const auto property = parameter.id;
         row->field.onBegin = [this, property] { stack.beginGesture(id, property); };
         row->field.onChange = [this, property](double value) { stack.setValue(id, property, value); };
@@ -188,8 +204,10 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.onCancel = [this] { stack.cancelGesture(); update(); };
         row->field.onCommit = [this, property](double value) { stack.setValue(id, property, value); };
         row->key.onClick = [this, property] { stack.toggleKey(id, property); };
-        addAndMakeVisible(row->field);
-        addAndMakeVisible(row->key);
+        row->modulate.onClick = [this, property] { if (stack.onPropertySelected) { stack.onPropertySelected(id, property); } };
+        row->previous.onClick = [this, property] { jump(property, false); };
+        row->next.onClick = [this, property] { jump(property, true); };
+        for (auto* child : std::initializer_list<juce::Component*> {&row->field, &row->key, &row->modulate, &row->previous, &row->next}) { addAndMakeVisible(child); }
         rows.push_back(std::move(row));
     }
 }
@@ -199,7 +217,11 @@ void MotionEffectStack::Card::update() {
     const auto* effect = motion::findEffect(project, id);
     // Fields and keys repaint themselves; the card only shows its switch.
     const auto wasEnabled = std::exchange(enabled, effect != nullptr && effect->enabled);
+    power.setToggleState(enabled, juce::dontSendNotification);
     if (enabled != wasEnabled) { repaint(); }
+    for (auto& row : rows) {
+        for (auto* child : std::initializer_list<juce::Component*> {&row->field, &row->key, &row->modulate}) { child->setVisible(!folded()); }
+    }
     const auto target = motion::findPropertyTarget(project, id);
     if (!target.has_value()) { return; }
     const auto local = target->localTime(stack.frameTime());
@@ -210,60 +232,104 @@ void MotionEffectStack::Card::update() {
         const auto& keys = curve->keyframes();
         const bool keyed = std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return std::abs(key.time - local) < 1.0e-6; });
         row->key.setState(keyed ? osci::KeyframeButton::State::keyed : (curve->animated() ? osci::KeyframeButton::State::animated : osci::KeyframeButton::State::unanimated));
+        const auto driven = stack.isDriven(id, row->id);
+        row->field.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
+        row->modulate.setToggleState(driven, juce::dontSendNotification);
+        const auto animated = curve->animated() && !folded();
+        row->previous.setVisible(animated);
+        row->next.setVisible(animated);
+        row->previous.setEnabled(std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return key.time < local - 1.0e-6; }));
+        row->next.setEnabled(std::any_of(keys.begin(), keys.end(), [local](const auto& key) { return key.time > local + 1.0e-6; }));
     }
 }
 
+void MotionEffectStack::Card::jump(const std::string& property, bool forward) {
+    const auto target = motion::findPropertyTarget(stack.processor.document.project(), id);
+    const auto* curve = target.has_value() ? target->curve(property) : nullptr;
+    if (curve == nullptr || target->rate == 0) { return; }
+    const auto now = target->localTime(stack.frameTime());
+    std::optional<double> best;
+    for (const auto& key : curve->keyframes()) {
+        const bool candidate = forward ? key.time > now + 1.0e-6 : key.time < now - 1.0e-6;
+        if (candidate && (!best.has_value() || (forward ? key.time < *best : key.time > *best))) { best = key.time; }
+    }
+    if (best.has_value()) { stack.processor.seek(std::clamp(target->projectTime(*best), 0.0, stack.processor.document.project().duration)); }
+}
+
 void MotionEffectStack::Card::resized() {
-    auto area = getLocalBounds().reduced(motion::style::gap, 0);
-    auto header = area.removeFromTop(headerHeight);
-    close.setBounds(header.removeFromRight(headerHeight).reduced(3));
+    auto area = getLocalBounds();
+    auto header = area.removeFromTop(headerHeight).reduced(motion::style::padding, 0);
+    fold = header.removeFromLeft(12).toFloat();
+    header.removeFromLeft(4);
+    power.setBounds(header.removeFromLeft(motion::ui::Switch::width).withSizeKeepingCentre(motion::ui::Switch::width, headerHeight));
+    close.setBounds(header.removeFromRight(22).withSizeKeepingCentre(22, 22));
+    area = area.reduced(motion::style::padding, 0);
+    const motion::style::PropertyGrid grid(area.getWidth());
     for (auto& row : rows) {
-        auto line = area.removeFromTop(motion::style::controlHeight);
-        area.removeFromTop(2);
-        line.removeFromLeft(labelWidth);
+        auto line = area.removeFromTop(motion::style::controlHeight).translated(0, 0);
+        area.removeFromTop(motion::style::gap);
+        row->next.setBounds(line.removeFromRight(12));
         row->key.setBounds(line.removeFromRight(18));
-        line.removeFromRight(motion::style::gap);
-        row->field.setBounds(line);
+        row->previous.setBounds(line.removeFromRight(12));
+        row->modulate.setBounds(juce::Rectangle<int>(line.getX() + grid.modulate, line.getY(), motion::style::PropertyGrid::modulateWidth, line.getHeight()).reduced(0, 3));
+        row->field.setBounds(line.withX(line.getX() + grid.value).withWidth(grid.column));
     }
 }
 
 void MotionEffectStack::Card::paint(juce::Graphics& g) {
-    g.setColour(osci::Colours::surfaceRaised().withAlpha(.45f));
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), motion::style::radius + 1);
-    auto header = getLocalBounds().reduced(motion::style::gap, 0).removeFromTop(headerHeight);
-    // The on/off box, then the name (dimmed when bypassed).
-    box = header.removeFromLeft(22).toFloat().withSizeKeepingCentre(12, 12);
-    g.setColour(osci::Colours::text().withAlpha(.6f));
-    g.drawRoundedRectangle(box, 2, 1.2f);
-    if (enabled) {
-        g.setColour(osci::Colours::accentColor());
-        g.fillRoundedRectangle(box.reduced(2.5f), 1.5f);
+    const auto bounds = getLocalBounds().toFloat();
+    g.setColour(osci::Colours::surfaceRaised().withAlpha(.32f));
+    g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+    const auto header = getLocalBounds().removeFromTop(headerHeight);
+    if (isMouseOver(true) && getMouseXYRelative().y < headerHeight) {
+        g.setColour(juce::Colours::white.withAlpha(.03f));
+        g.fillRoundedRectangle(header.toFloat(), motion::style::radius + 1);
     }
-    g.setColour(osci::Colours::text().withAlpha(enabled ? 1.0f : .4f));
-    g.setFont(motion::style::title());
-    g.drawText(name, header.withTrimmedRight(headerHeight), juce::Justification::centredLeft, true);
+    // The fold triangle: down when open, right when folded.
+    juce::Path triangle;
+    const auto c = fold.getCentre();
+    if (folded()) { triangle.addTriangle(c.x - 2, c.y - 4, c.x + 3, c.y, c.x - 2, c.y + 4); } else { triangle.addTriangle(c.x - 4, c.y - 2, c.x + 4, c.y - 2, c.x, c.y + 3); }
+    g.setColour(osci::Colours::text().withAlpha(.6f));
+    g.fillPath(triangle);
+    g.setColour(osci::Colours::text().withAlpha(enabled ? .95f : .45f));
+    g.setFont(motion::style::body());
+    const auto nameArea = header.withTrimmedLeft(power.getRight() + 8).withTrimmedRight(getWidth() - close.getX() + 4);
+    g.drawText(name, nameArea, juce::Justification::centredLeft, true);
+    if (folded()) { return; }
     g.setFont(motion::style::caption());
     g.setColour(osci::Colours::textMuted().withAlpha(enabled ? 1.0f : .5f));
-    auto area = getLocalBounds().reduced(motion::style::gap, 0).withTrimmedTop(headerHeight);
+    const motion::style::PropertyGrid grid(getWidth() - 2 * motion::style::padding);
     for (const auto& row : rows) {
-        g.drawText(row->label, area.removeFromTop(motion::style::controlHeight).removeFromLeft(labelWidth).withTrimmedLeft(4), juce::Justification::centredLeft, true);
-        area.removeFromTop(2);
+        g.drawText(row->label, row->field.getBounds().withX(motion::style::padding).withRight(row->field.getX() - motion::style::gap), juce::Justification::centredLeft, true);
     }
 }
 
 void MotionEffectStack::Card::mouseDown(const juce::MouseEvent& event) {
-    if (event.y >= headerHeight) { return; }
-    if (event.mods.isPopupMenu()) {
-        stack.showMenu(id);
-        return;
+    if (event.y < headerHeight && event.mods.isPopupMenu()) { stack.showMenu(id); }
+}
+
+void MotionEffectStack::Card::mouseUp(const juce::MouseEvent& event) {
+    if (event.getMouseDownY() >= headerHeight || event.mods.isPopupMenu() || event.mouseWasDraggedSinceMouseDown()) { return; }
+    // A click on the header (not its switch or remove) folds the card.
+    if (event.x < power.getX() || (event.x > power.getRight() && event.x < close.getX())) {
+        if (folded()) { stack.folded.erase(id); } else { stack.folded.insert(id); }
+        update();
+        stack.resized();
+        if (stack.onHeightChanged) { stack.onHeightChanged(); }
     }
-    if (box.expanded(6).contains(event.position)) { stack.setEnabled(id, !enabled); }
 }
 
 void MotionEffectStack::Card::mouseDrag(const juce::MouseEvent& event) {
     if (event.getMouseDownY() >= headerHeight || event.getDistanceFromDragStart() < 4) { return; }
     auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
     if (container != nullptr && !container->isDragAndDropActive()) { container->startDragging("motion-effect-instance:" + juce::String(id), this); }
+}
+
+bool MotionEffectStack::isDriven(motion::Id effect, const std::string& property) const {
+    const auto& project = processor.document.project();
+    if (std::any_of(project.routes.begin(), project.routes.end(), [&](const auto& route) { return route.target == effect && route.property == property; })) { return true; }
+    const auto* curve = motion::findPropertyCurve(project, effect, property);
+    return curve != nullptr && curve->link.has_value();
 }
 
 void MotionEffectStack::refreshStages() {
@@ -302,7 +368,7 @@ void MotionEffectStack::refreshStages() {
         auto chip = std::make_unique<juce::TextButton>(label);
         chip->setName("Effects of " + label.upToFirstOccurrenceOf(juce::String::fromUTF8(" \xc2\xb7"), false, false));
         chip->setTooltip("Also applied");
-        chip->setColour(juce::TextButton::buttonColourId, osci::Colours::veryDark());
+        chip->setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised().withAlpha(.6f));
         // Showing another stage rebuilds these chips, so it waits.
         chip->onClick = [this, id = id] {
             juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MotionEffectStack>(this), id] { if (safe != nullptr && safe->onShowOwner) { safe->onShowOwner(id); } });
