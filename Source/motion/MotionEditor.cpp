@@ -1474,6 +1474,7 @@ void MotionEditor::refreshKeyPanel() {
     const auto key = curveEditor.activeKey();
     const auto height = keyPanel.preferredHeight();
     if (selection.count > 0) {
+        keyPanel.setTimeGrid(processor.document.project().timeGrid());
         const auto spec = key.has_value() ? motion::specFor(processor.document.project(), curveTarget, key->property) : std::nullopt;
         keyPanel.show(selection.count, selection.present, selection.editable, key.has_value() ? std::optional<std::pair<double, double>>({key->time, key->value}) : std::nullopt, spec.value_or(motion::ui::amountSpec));
     }

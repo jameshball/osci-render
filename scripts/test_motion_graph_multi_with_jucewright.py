@@ -222,7 +222,21 @@ try:
     step("deselect", "press", "Escape", "--class", "MotionCurveEditor")
     if find(lambda n: n.get("name") == "Key interpolation" and n.get("visible")):
         raise RuntimeError("Escape left the key bar showing")
+
+    # 7. In bars and beats the Key panel reads and types time like the ruler.
+    nudged = 1.5 + 1 / FPS
+    click("select nudged key", nudged, -0.75, restored)
+    step("timing menu", "click", "--name", "Timing", "--class", "juce::MenuBarComponent::AccessibleItemComponent", "--exact")
+    step("bars and beats", "click", "--name", "Bars / beats", "--role", "menuItem", "--exact")
+    shown = find(lambda n: n.get("name") == "Key time")
+    # 1.5333 s at 120 BPM is 3.0667 beats: bar 1, beat 4, tick 64.
+    if shown is None or shown.get("value") != "1.4.064":
+        raise RuntimeError(f"Key time in bars and beats: {shown and shown.get('value')}")
+    step("type key time in beats", "set-value", "--component-name", "Key time", "--exact", "1.3.480")
+    wait_undo("Move animation key")
+    restored["position.x"] = [(1.25, -0.75)] + restored["position.x"][1:]
+    expect(keys(saved()), restored, "key time typed in bars and beats")
     step("final", "screenshot", "--file", session.artifact_dir / "graph-final.png")
-    print("Graph cross-curve selection, group drag, magnets, scaling, delete, key fields, key bar and nudging passed.", flush=True)
+    print("Graph cross-curve selection, group drag, magnets, scaling, delete, key fields (in seconds and bars), key bar and nudging passed.", flush=True)
 finally:
     session.stop_app()

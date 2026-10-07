@@ -31,6 +31,13 @@ public:
     void setSpec(const motion::PropertySpec& value) { spec = value; repaint(); }
     void setAxisColour(std::optional<juce::Colour> colour) { axisColour = colour; repaint(); }
     void setPrefix(juce::String text) { prefix = std::move(text); repaint(); }
+    // How the value reads and is typed when it isn't a plain number, such as a
+    // time in the ruler's format. Without it, the spec's decimals and unit apply.
+    struct Notation {
+        std::function<juce::String(double)> format;
+        std::function<std::optional<double>(const juce::String&)> parse;
+    };
+    void setNotation(Notation next) { notation = std::move(next); repaint(); }
     void setValue(double next) {
         if (dragging || editor.isVisible()) { return; }
         if (value != next) { value = next; repaint(); }
@@ -122,7 +129,7 @@ public:
             bool isReadOnly() const override { return !owner.isEnabled(); }
             juce::String getCurrentValueAsString() const override { return owner.format(owner.value, false); }
             void setValueAsString(const juce::String& text) override {
-                const auto parsed = parseNumber(text);
+                const auto parsed = owner.parse(text);
                 if (parsed.has_value()) { owner.commit(owner.spec.clamp(*parsed)); }
             }
             ScrubField& owner;
@@ -146,7 +153,7 @@ private:
     void textEditorFocusLost(juce::TextEditor&) override { finishTyping(true); }
     void finishTyping(bool accept) {
         if (!editor.isVisible()) { return; }
-        const auto parsed = parseNumber(editor.getText(), "°");
+        const auto parsed = parse(editor.getText());
         editor.setVisible(false);
         if (!accept) { if (onCancel) { onCancel(); } return; }
         if (!parsed.has_value()) { repaint(); return; }
@@ -161,7 +168,9 @@ private:
         const auto quantum = std::pow(10.0, -spec.decimals);
         return std::round(raw / quantum) * quantum;
     }
+    std::optional<double> parse(const juce::String& text) const { return notation.parse ? notation.parse(text) : parseNumber(text, "°"); }
     juce::String format(double number, bool withUnit = true) const {
+        if (notation.format) { return notation.format(number); }
         auto text = juce::String(number, spec.decimals);
         if (text == "-" + juce::String(0.0, spec.decimals)) { text = text.substring(1); }
         return withUnit ? text + juce::String(juce::CharPointer_UTF8(spec.unit.data()), spec.unit.size()) : text;
@@ -171,6 +180,7 @@ private:
     juce::TextEditor editor;
     std::optional<juce::Colour> axisColour;
     juce::String prefix;
+    Notation notation;
     double value = 0, startValue = 0, accumulated = 0;
     float lastX = 0;
     bool hovered = false, dragging = false, moved = false, dragCancelled = false;

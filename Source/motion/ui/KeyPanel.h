@@ -2,6 +2,7 @@
 
 #include "InterpolationBar.h"
 #include "ModulatorPanels.h"
+#include "../model/TimeGrid.h"
 
 // The selected keys beside the Graph (like Blender's Active Keyframe): how
 // many, their interpolation and Easy ease, and, for one key, its time and
@@ -24,6 +25,13 @@ public:
     std::function<void(double)> onTime, onValue;
     std::function<void(motion::Interpolation)> onInterpolation;
     std::function<void()> onEase;
+
+    // The key's time reads and is typed like the ruler: seconds, frames or
+    // bars.beats.ticks, with "s" or "f" for the other units.
+    void setTimeGrid(motion::TimeGrid grid) {
+        time.field.setNotation({[grid](double seconds) { return juce::String(grid.positionLabel(seconds)); },
+            [grid](const juce::String& text) { return grid.parsePosition(text.trim().toStdString()); }});
+    }
 
     // `single` is the one selected key's time and value, when only one is.
     // Fields being edited keep what the user is typing or dragging.
@@ -74,6 +82,7 @@ public:
 
 private:
     static constexpr int headerHeight = 26;
+    // Drags step in seconds; the field shows the ruler's notation (setTimeGrid).
     static constexpr motion::PropertySpec timeSpec {"time", "Time", "", "", 0, motion::unbounded, 0, .01, 3, "s"};
     MotionInterpolationBar interpolation;
     motion::ui::LabelledScrub time, value;
