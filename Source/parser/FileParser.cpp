@@ -1,6 +1,9 @@
 #include "FileParser.h"
 #include "FileFormatRegistry.h"
 #include <numbers>
+#include "../CommonPluginEditor.h"
+#include "../PluginProcessor.h"
+#include "../components/OverlayDialogHelpers.h"
 
 #if OSCI_PREMIUM
 #include "lottie/DotLottieArchive.h"
@@ -21,11 +24,23 @@ bool looksLikeLottieJson(const juce::String& jsonContent) {
 		&& object->getProperty(juce::Identifier("layers")).isArray();
 }
 
+void showLottieLoadError(OscirenderAudioProcessor& processor, juce::String title, juce::String message) {
+	juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(processor.getActiveEditor()));
+	juce::MessageManager::callAsync([editor, title = std::move(title), message = std::move(message)] {
+		osci::showOverlayMessageOrAlert(editor.getComponent(),
+			title,
+			message,
+			osci::ErrorOverlay::Icon::Warning,
+			juce::MessageBoxIconType::WarningIcon,
+			{ 500, 260 });
+	});
+}
+
 }
 #endif
 
-FileParser::FileParser(std::shared_ptr<ImportServices> services, std::function<void(int, juce::String, juce::String)> errorCallback)
-    : services(std::move(services)), errorCallback(errorCallback) {}
+FileParser::FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback)
+    : audioProcessor(p), errorCallback(errorCallback) {}
 
 void FileParser::clearLoadedSource() {
 	++sourceGeneration;
@@ -53,14 +68,16 @@ std::function<void()> FileParser::makeDeferredLoad(std::function<void()> load) {
 		if (parser == nullptr) {
 			return;
 		}
-		parser->services->performDeferredLoad([parser, generation, &load] {
+		{
+			juce::SpinLock::ScopedLockType fileLock(parser->audioProcessor.getFileController().lock);
+			juce::SpinLock::ScopedLockType effectLock(parser->audioProcessor.effectsLock);
 			juce::SpinLock::ScopedLockType scope(parser->lock);
 			if (parser->sourceGeneration != generation) {
-				return false;
+				return;
 			}
 			load();
-			return true;
-		});
+		}
+		parser->audioProcessor.getFileController().sendChangeMessage();
 	};
 }
 
@@ -83,18 +100,26 @@ void FileParser::showFileSizeWarning(juce::String fileName, int64_t totalBytes, 
 		if (parser == nullptr || parser->sourceGeneration != generation) {
 			return;
 		}
-		parser->services->confirmLargeFile(message,
+		auto* editor = dynamic_cast<CommonPluginEditor*>(parser->audioProcessor.getActiveEditor());
+		osci::showOverlayConfirmationOrAlert(
+			editor,
+			"Large File",
+			message,
+			"Continue",
+			"Cancel",
 			deferredLoad,
 			[weakThis, generation] {
 				auto parser = weakThis.lock();
 				if (parser != nullptr && parser->sourceGeneration == generation) {
-					parser->services->removeSource(parser.get());
+					parser->audioProcessor.getFileController().removeParser(parser.get());
 				}
-			});
+			},
+			osci::ErrorOverlay::Icon::Warning,
+			{ 520, 330 });
 	});
 }
 
-void FileParser::parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font& font) {
+void FileParser::parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font) {
 	juce::SpinLock::ScopedLockType scope(lock);
 
 	if (extension == ".lua" && lua != nullptr && lua->isFunctionValid()) {
@@ -114,7 +139,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 	} else if (extension == ".svg") {
 		svg = std::make_shared<SvgParser>(stream->readEntireStreamAsString());
 	} else if (extension == ".txt") {
-        text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), font);
+        text = std::make_shared<TextParser>(stream->readEntireStreamAsString(), audioProcessor.font);
 	} else if (extension == ".lua") {
 		lua = std::make_shared<LuaParser>(fileId, stream->readEntireStreamAsString(), errorCallback, fallbackLuaScript);
 	} else if (extension == ".gpla") {
@@ -139,7 +164,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		int bytesRead = stream->readIntoMemoryBlock(buffer);
 
 		auto loadImage = [this, buffer, extension] {
-			img = std::make_shared<ImageParser>(services, extension, buffer);
+			img = std::make_shared<ImageParser>(audioProcessor, extension, buffer);
 			frameRate.store(img->getFrameRate(), std::memory_order_relaxed);
 			isAnimatable = osci::files::isAnimated(extension);
 			sampleSource = true;
@@ -147,7 +172,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		showFileSizeWarning(fileName, bytesRead, 20, osci::files::isVideo(extension) ? "video" : "image",
 			[this, loadImage, extension] {
 #if OSCI_PREMIUM
-				if (osci::files::isVideo(extension) && !services->getFFmpegFile().existsAsFile()) {
+				if (osci::files::isVideo(extension) && !audioProcessor.getFFmpegFile().existsAsFile()) {
 					auto weakThis = weak_from_this();
 					const auto generation = sourceGeneration.load();
 					juce::MessageManager::callAsync([weakThis, generation, deferredLoad = makeDeferredLoad(loadImage)] {
@@ -155,7 +180,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 						if (parser == nullptr || parser->sourceGeneration != generation) {
 							return;
 						}
-						parser->services->ensureFFmpegExists(deferredLoad);
+						parser->audioProcessor.ensureFFmpegExists(nullptr, deferredLoad);
 					});
 					return;
 				}
@@ -175,7 +200,9 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			if (extension == ".lottie") {
 				jsonContent = osci::lottie::extractAnimationJsonFromDotLottie(*buffer);
 				if (jsonContent.isEmpty()) {
-					services->showError("Error Loading Lottie", "The .lottie archive did not contain a Lottie animation JSON.");
+					showLottieLoadError(audioProcessor,
+						"Error Loading Lottie",
+						"The .lottie archive did not contain a Lottie animation JSON.");
 					return;
 				}
 			} else {
@@ -184,12 +211,14 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 			}
 
 			if (!looksLikeLottieJson(jsonContent)) {
-				services->showError("Unsupported JSON", "The selected JSON file does not look like a Lottie animation.");
+				showLottieLoadError(audioProcessor,
+					"Unsupported JSON",
+					"The selected JSON file does not look like a Lottie animation.");
 				return;
 			}
 
-			lottie = std::make_shared<OsciLottieParser>(jsonContent, [services = services](juce::String message) {
-				services->showError("Error Loading Lottie", std::move(message));
+			lottie = std::make_shared<OsciLottieParser>(jsonContent, [this](juce::String message) {
+				showLottieLoadError(audioProcessor, "Error Loading Lottie", std::move(message));
 			});
 			frameRate.store(lottie->getFrameRate(), std::memory_order_relaxed);
 			isAnimatable = true;
@@ -197,10 +226,17 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 		});
 #endif
 	} else if (osci::files::isAudio(extension)) {
-		wav = std::make_shared<WavParser>([services = services] { return services->getSampleRate(); });
+		wav = std::make_shared<WavParser>([this] { return audioProcessor.currentSampleRate.load(); });
 		if (!wav->parse(std::move(stream))) {
-			services->showError("Error Loading " + fileName,
-				"The audio file '" + fileName + "' could not be loaded.");
+			juce::Component::SafePointer<CommonPluginEditor> editor(dynamic_cast<CommonPluginEditor*>(audioProcessor.getActiveEditor()));
+			juce::MessageManager::callAsync([editor, fileName] {
+				osci::showOverlayMessageOrAlert(editor.getComponent(),
+					"Error Loading " + fileName,
+					"The audio file '" + fileName + "' could not be loaded.",
+					osci::ErrorOverlay::Icon::Warning,
+					juce::MessageBoxIconType::WarningIcon,
+					{ 500, 260 });
+			});
 		}
 	}
 
@@ -212,7 +248,7 @@ void FileParser::parse(juce::String fileId, juce::String fileName, juce::String 
 }
 
 void FileParser::prepareLiveImageInput(int width, int height) {
-	auto imageParser = std::make_shared<ImageParser>(services, width, height);
+	auto imageParser = std::make_shared<ImageParser>(audioProcessor, width, height);
 
 	juce::SpinLock::ScopedLockType scope(lock);
 
@@ -252,7 +288,7 @@ std::vector<std::unique_ptr<osci::Shape>> FileParser::nextFrame() {
         return lottie->draw();
     }
     else if (fractal != nullptr) {
-        fractal->setIterations(services->getFractalDepth());
+        fractal->setIterations(juce::roundToInt(audioProcessor.fractalDepthEffect->getActualValue()));
         return fractal->draw();
     }
 #endif

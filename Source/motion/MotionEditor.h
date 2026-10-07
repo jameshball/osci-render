@@ -9,7 +9,6 @@
 #include "ui/CurveEditor.h"
 #include "ui/CurveList.h"
 #include "ui/SceneToolbar.h"
-#include "ui/NotesEditor.h"
 #include "ui/CameraPanel.h"
 #include "ui/ClipTimingPanel.h"
 #include "ui/EffectLibrary.h"
@@ -109,7 +108,6 @@ private:
         MotionTimelineView::ViewState timeline;
         MotionCompositionView::ViewState preview;
         MotionCurveEditor::ViewState graph;
-        MotionNotesEditor::ViewState notes;
     };
     std::vector<ScopeView> scopeHistory;
     juce::TextButton scopeBack { "Back to Main" };
@@ -198,7 +196,6 @@ private:
     juce::Rectangle<int> focusedPanel() const;
     void splitAtPlayhead();
     void placeClipAtPlayhead(bool start, bool trim);
-    void recordArmedTrack();
     void showShortcuts();
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
@@ -214,7 +211,6 @@ private:
     MotionCompositionView composition;
     MotionAssetLibrary assetLibrary;
     MotionCurveEditor curveEditor;
-    MotionNotesEditor notesEditor;
     MotionCameraRig cameraRig;
     MotionScopePanel scopePanel { processor };
     MotionScopeHeading scopeHeading;

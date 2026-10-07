@@ -24,7 +24,6 @@ public:
             if (clip.liveIdentity != nullptr) { return juce::Result::fail("Capture live sources before exporting the signal."); }
         }
         if (composition.preparationError.isNotEmpty()) { return juce::Result::fail(composition.preparationError); }
-        if (composition.hasMidi && composition.sampleRate != sampleRate) { return juce::Result::fail("MIDI snapshot sample rate does not match the requested signal export rate."); }
         BeamRenderer beam;
         return WavExporter::write<5>(composition.duration, destination, sampleRate, cancel, progress,
             [&](double index, double time) {

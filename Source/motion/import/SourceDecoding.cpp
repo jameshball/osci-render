@@ -1,7 +1,6 @@
 #include "SourceDecoding.h"
 #include "BakedSourceArchive.h"
 #include "LuaBaker.h"
-#include "MidiSourcePreparer.h"
 #include "RasterSourcePreparer.h"
 #include "VideoSourcePreparer.h"
 #include "../live/BlenderCaptureArchive.h"
@@ -417,7 +416,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     if (asset.extension.equalsIgnoreCase(".blender")) {
         if (!asset.blenderSettings.valid() || asset.data.getSize() != 0) { return juce::Result::fail("Invalid Blender source settings."); }
         asset.liveIdentity = std::make_shared<const LiveSourceIdentity>();
-        asset.source.reset(); asset.audio.reset(); asset.midi.reset();
+        asset.source.reset(); asset.audio.reset();
         if (progress != nullptr) { progress->store(1); }
         return juce::Result::ok();
     }
@@ -441,19 +440,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             if (progress != nullptr) { progress->store(static_cast<double>(drawings.size()) / capture.frames.size()); }
         }
         asset.source = std::make_shared<const PreparedSource>(std::move(drawings), std::move(capture.timing));
-        asset.liveIdentity.reset(); asset.audio.reset(); asset.midi.reset();
-        return juce::Result::ok();
-    }
-    if (isMidiSource(extension)) {
-        const auto prepared = MidiSourcePreparer::prepare(asset.data.getData(), asset.data.getSize(), asset.midiImportBpm, cancel);
-        if (!prepared) { return juce::Result::fail(prepared.error); }
-        asset.midi = prepared.source;
-        asset.midiSuggestedBpm = prepared.suggestedBpm;
-        asset.midiTempoChanges = prepared.tempoChanges.empty() ? nullptr : std::make_shared<const std::vector<TempoChange>>(prepared.tempoChanges);
-        asset.midiIgnoredEvents = prepared.ignoredEvents;
-        asset.source.reset();
-        asset.audio.reset();
-        if (progress != nullptr) { progress->store(1); }
+        asset.liveIdentity.reset(); asset.audio.reset();
         return juce::Result::ok();
     }
     if (osci::files::isVideo(extension)) {

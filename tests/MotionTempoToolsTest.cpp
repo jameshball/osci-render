@@ -107,7 +107,7 @@ public:
             expect(document.setTempoFromAudio(sound.id, 150, 0.0, moved).wasOk());
             expectEquals(moved, 0.0, "already on the grid");
         }
-        beginTest("A MIDI file's tempo map can replace the project's");
+        beginTest("A whole tempo map replaces the project's in one undo step");
         {
             juce::UndoManager undo;
             motion::Document document(undo);
@@ -115,9 +115,8 @@ public:
             project.duration = 20;
             document.reset(project);
             const auto changes = std::make_shared<const std::vector<motion::TempoChange>>(std::vector<motion::TempoChange> {{16, 90}, {32, 140, true}});
-            expect(document.setTempoMap(100, changes, "Use MIDI tempo", true).wasOk());
+            expect(document.setTempoMap(100, changes, "Change tempo map").wasOk());
             expectEquals(document.project().bpm, 100.0);
-            expect(document.project().timeDisplay == motion::TimeDisplay::beats);
             expect(document.project().tempoChanges != nullptr && *document.project().tempoChanges == *changes);
             expect(undo.undo());
             expect(document.project().tempoChanges == nullptr);

@@ -30,8 +30,6 @@ public:
         mute.onClick = [this] { if (onMute) { onMute(id); } };
         solo.onClick = [this] { if (onSolo) { onSolo(id); } };
         lock.onClick = [this] { if (onLock) { onLock(id); } };
-        arm.onClick = [this] { if (onArm) { onArm(id); } };
-        arm.setOnColour(motion::style::record().darker(.5f));
         mute.setOnColour(motion::style::trackMute());
         solo.setOnColour(motion::style::trackSolo());
         lock.setOnColour(motion::style::trackLock());
@@ -44,16 +42,13 @@ public:
         grip.addMouseListener(this, false);
         for (auto* child : std::initializer_list<juce::Component*> { &name, &mute, &solo, &grip }) { addAndMakeVisible(child); }
         addChildComponent(lock);
-        addChildComponent(arm);
     }
     void update(const motion::Track& track, bool group = false, bool collapsed = false, bool lanes = false, bool expanded = false) {
         isGroup = group;
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
-        lock.setVisible(!group);
-        const auto armable = !group && track.kind == motion::TrackKind::visual && armingAvailable;
-        if (arm.isVisible() != armable) {
-            arm.setVisible(armable);
+        if (lock.isVisible() == group) {
+            lock.setVisible(!group);
             resized();
         }
         if (!grabbing) { grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor); }
@@ -76,11 +71,6 @@ public:
         mute.setToggleState(track.muted, juce::dontSendNotification);
         solo.setToggleState(track.solo, juce::dontSendNotification);
         lock.setToggleState(track.locked, juce::dontSendNotification);
-        arm.setName("MIDI input track " + juce::String(track.id));
-        arm.setTitle(arm.getName());
-        arm.setToggleState(track.midiInput != 0, juce::dontSendNotification);
-        arm.setTooltip(track.midiInput == 0 ? "Play and record live MIDI on this track (choose a channel in the track menu)"
-            : "Live MIDI input: " + (track.midiInput == motion::Track::anyMidiChannel ? juce::String("any channel") : "channel " + juce::String(track.midiInput)));
     }
     // While dragged, the timeline draws the header in its lifted block above
     // the other rows; the header itself stays in place, unseen, to keep
@@ -95,10 +85,10 @@ public:
         // Square 16 px switches, 2 px apart.
         constexpr int chip = 16, spacing = 2;
         int count = 0;
-        for (auto* button : std::initializer_list<juce::Button*> { &arm, &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
+        for (auto* button : std::initializer_list<juce::Button*> { &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
         const auto chips = count * (chip + spacing);
         auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, chip);
-        for (auto* button : std::initializer_list<juce::Button*> { &arm, &mute, &solo, &lock }) {
+        for (auto* button : std::initializer_list<juce::Button*> { &mute, &solo, &lock }) {
             if (!button->isVisible()) { continue; }
             button->setBounds(buttons.removeFromLeft(chip));
             buttons.removeFromLeft(spacing);
@@ -144,9 +134,7 @@ public:
     }
     const motion::Id id;
     std::function<void(motion::Id, std::string)> onRename;
-    std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock, onArm;
-    // Live input reaches main-timeline tracks only.
-    bool armingAvailable = true;
+    std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock;
     // The grip's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
@@ -174,5 +162,5 @@ private:
         }
     } grip;
     motion::ui::Chip lock {"Lock", motion::icons::Icon::lock};
-    motion::ui::Chip mute {"M"}, solo {"S"}, arm {juce::String(juce::CharPointer_UTF8("\xe2\x97\x8f"))};
+    motion::ui::Chip mute {"M"}, solo {"S"};
 };

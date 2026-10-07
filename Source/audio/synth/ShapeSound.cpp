@@ -1,10 +1,13 @@
 #include "ShapeSound.h"
+#include "../../parser/FileParser.h"
 
-ShapeSound::ShapeSound(std::shared_ptr<PointSource> source) : parser(std::move(source)) {
-    if (!parser->isSample()) {
+ShapeSound::ShapeSound(OscirenderAudioProcessor &p, std::shared_ptr<FileParser> parser) : parser(parser) {
+    if (parser->isSample()) {
+        producer = std::make_unique<FrameProducer>(*this, std::make_shared<FileParser>(p));
+    } else {
         producer = std::make_unique<FrameProducer>(*this, parser);
-        producer->startThread();
     }
+    producer->startThread();
 }
 
 ShapeSound::ShapeSound() {}

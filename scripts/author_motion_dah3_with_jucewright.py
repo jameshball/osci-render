@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Author "dah" v4, the osci-motion benchmark film, through the application UI.
 
-Every source, clip, property, key, modulation, effect, group, camera, cut and
-MIDI assignment is created with user-facing controls. Only the empty starting
+Every source, clip, property, key, modulation, effect, group, camera and cut
+is created with user-facing controls. Only the empty starting
 project file and the generated source media come from outside the app.
 
 No text and no mouth: geometry, Lua (with animated sliders), L-system fractals,
-Lottie, a traced MP4 and GIF, SVG hits, MIDI and a seamless Lua star field.
+Lottie, a traced MP4 and GIF, SVG hits and a seamless Lua star field.
 
 Run scripts/create_motion_dah3_assets.py build/dah3/assets first.
 Usage: PYTHONPATH=scripts python3 scripts/author_motion_dah3_with_jucewright.py --app <osci-motion.app> [--until PHASE] [--keep-app]
@@ -104,7 +104,7 @@ def seek(seconds):
 
 def tab(name, bar_name="Inspector tabs"):
     """Tabs repeat names across bars (Effects), so resolve within one bar."""
-    if name in ("Timeline", "Graph", "Notes"):
+    if name in ("Timeline", "Graph"):
         step("tab " + name, "click", "--name", name, "--class", "osci::TabBar::Tab", "--exact")
         return
     owner = find(lambda node: node.get("class") == "osci::TabBar" and node.get("name") == bar_name)
@@ -149,7 +149,7 @@ def import_source(name, start, duration=None, bake=None, offset=None, depth=3, s
         command("wait-for-locator", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
         step("fractal depth", "set-value", "--name", "Fractal depth", "--role", "slider", "--exact", str(depth))
         step("grow " + name, "click", "--name", "Prepare fractal", "--class", "juce::TextButton", "--exact")
-    label = "Undo Import soundtrack" if name.endswith(".flac") else "Undo Import MIDI file" if name.endswith(".mid") else "Undo Import object"
+    label = "Undo Import soundtrack" if name.endswith(".flac") else "Undo Import object"
     command("wait-for-locator", "--name", label, "--role", "label", "--exact", "--timeout-ms", 120000)
     timing(duration=duration, offset=offset, back="Properties")
 
@@ -440,7 +440,7 @@ def drop():
 
 def breakdown():
     # Stillness: a slowly tumbling knot inside a breathing spirograph, with a
-    # halo that rings out the MIDI melody.
+    # halo.
     import_source("Knot.obj", bar(48), duration=bar(80) - bar(48))
     rename_track("Knot")
     set_properties({"scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "red": 0.75, "green": 0.45, "blue": 1})
@@ -455,12 +455,6 @@ def breakdown():
     import_source("Ring.svg", bar(56), duration=bar(72) - bar(56))
     rename_track("Halo")
     set_properties({"scale.x": 0.72, "scale.y": 0.72, "scale.z": 0.72, "red": 1, "green": 0.9, "blue": 0.75})
-    step("import melody", "drop-files", "--file", ASSETS / "Melody.mid", "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Undo Import MIDI file", "--role", "label", "--exact", "--timeout-ms", 60000)
-    step("select melody", "click", "--name", "Melody.mid", "--role", "listItem", "--exact")
-    step("assign melody", "click", "--name", "Assign to selected clip", "--exact")
-    command("wait-for-locator", "--name", "Undo Assign MIDI performance", "--role", "label", "--exact", "--timeout-ms", 30000)
-    tab("Timeline")
     save()
 
 

@@ -4,149 +4,20 @@
 #include "audio/synth/ShapeVoice.h"
 #include "audio/synth/VoiceManager.h"
 #include "parser/FileParser.h"
-#include "CommonPluginEditor.h"
-#include "components/OverlayDialogHelpers.h"
 
 #include <algorithm>
 
-// Parsers can outlive FileController because synth retains their ShapeSounds.
-// FileController is destroyed before synth and the source parameter members.
-// Detach waits for complete runtime reads; surviving FrameProducer workers then
-// see defaults until their sounds stop them. UI operations retain the existing
-// message-thread serialization with controller teardown, without holding the
-// runtime lock across dialogs, imports, or callbacks.
-class RenderImportServices final : public ImportServices, public std::enable_shared_from_this<RenderImportServices> {
-public:
-    explicit RenderImportServices(OscirenderAudioProcessor& owner) : processor(&owner), ffmpegFile(getFFmpegPath(owner)) {}
-
-    void detach() {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        processor = nullptr;
-    }
-
-    double getSampleRate() const override {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        return processor != nullptr ? processor->currentSampleRate.load() : 44100.0;
-    }
-
-    ImageSampleSettings getImageSampleSettings(int blockSampleIndex) const override {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        if (processor == nullptr) {
-            return {};
-        }
-        const auto index = static_cast<size_t>(blockSampleIndex);
-        ImageSampleSettings settings;
-        settings.sampleRate = processor->currentSampleRate.load();
-        settings.threshold = processor->imageThreshold->getAnimatedValue(0, index);
-        settings.stride = static_cast<int>(processor->imageStride->getAnimatedValue(0, index));
-        settings.inverted = processor->invertImage->getValue() != 0.0f;
-        return settings;
-    }
-
-    int getFractalDepth() const override {
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-#if OSCI_PREMIUM
-        return processor != nullptr ? juce::roundToInt(processor->fractalDepthEffect->getActualValue()) : 1;
-#else
-        return 1;
-#endif
-    }
-
-    juce::File getFFmpegFile() const override {
-        return ffmpegFile;
-    }
-
-    void ensureFFmpegExists(std::function<void()> ready) override {
-#if OSCI_PREMIUM
-        auto* owner = getMessageThreadOwner();
-        if (owner != nullptr) {
-            owner->ensureFFmpegExists(nullptr, std::move(ready));
-        }
-#endif
-    }
-
-    void showError(juce::String title, juce::String message) override {
-        juce::MessageManager::callAsync([services = shared_from_this(), title = std::move(title), message = std::move(message)] {
-            juce::Component::SafePointer<CommonPluginEditor> editor;
-            {
-                juce::SpinLock::ScopedLockType scope(services->ownerLock);
-                if (services->processor == nullptr) {
-                    return;
-                }
-                editor = dynamic_cast<CommonPluginEditor*>(services->processor->getActiveEditor());
-            }
-            osci::showOverlayMessageOrAlert(editor.getComponent(), title, message,
-                osci::ErrorOverlay::Icon::Warning, juce::MessageBoxIconType::WarningIcon, { 500, 260 });
-        });
-    }
-
-    void confirmLargeFile(juce::String message, std::function<void()> accepted, std::function<void()> cancelled) override {
-        auto* owner = getMessageThreadOwner();
-        if (owner == nullptr) {
-            return;
-        }
-        auto* editor = dynamic_cast<CommonPluginEditor*>(owner->getActiveEditor());
-        osci::showOverlayConfirmationOrAlert(editor, "Large File", message, "Continue", "Cancel",
-            std::move(accepted), std::move(cancelled), osci::ErrorOverlay::Icon::Warning, { 520, 330 });
-    }
-
-    void performDeferredLoad(std::function<bool()> load) override {
-        auto* owner = getMessageThreadOwner();
-        if (owner == nullptr) {
-            return;
-        }
-        bool loaded = false;
-        {
-            juce::SpinLock::ScopedLockType fileLock(owner->getFileController().lock);
-            juce::SpinLock::ScopedLockType effectLock(owner->effectsLock);
-            loaded = load();
-        }
-        if (loaded) {
-            owner->getFileController().sendChangeMessage();
-        }
-    }
-
-    void removeSource(FileParser* parser) override {
-        auto* owner = getMessageThreadOwner();
-        if (owner != nullptr) {
-            owner->getFileController().removeParser(parser);
-        }
-    }
-
-private:
-    static juce::File getFFmpegPath(OscirenderAudioProcessor& owner) {
-#if OSCI_PREMIUM
-        return owner.getFFmpegFile();
-#else
-        juce::ignoreUnused(owner);
-        return {};
-#endif
-    }
-
-    OscirenderAudioProcessor* getMessageThreadOwner() const {
-        // Callers and controller teardown are serialized by the message thread.
-        // Snapshot under the runtime lock so detach also synchronizes this read.
-        juce::SpinLock::ScopedLockType scope(ownerLock);
-        return processor;
-    }
-
-    mutable juce::SpinLock ownerLock;
-    OscirenderAudioProcessor* processor;
-    const juce::File ffmpegFile;
-};
-
 FileController::FileController(OscirenderAudioProcessor& processor, VoiceManager& voices)
-    : processor(processor), voices(voices), importServices(std::make_shared<RenderImportServices>(processor)) {}
+    : processor(processor), voices(voices) {}
 
 FileController::~FileController() {
-    importServices->detach();
     processor.midiManager.setMessageHandler(osci::MidiManager::MessageType::programChange, {});
     cancelPendingUpdate();
 }
 
 void FileController::initialise() {
-    auto defaultParser = std::make_shared<FileParser>(importServices);
-    defaultSound = new ShapeSound(defaultParser);
+    auto defaultParser = std::make_shared<FileParser>(processor);
+    defaultSound = new ShapeSound(processor, defaultParser);
     voices.addSound(defaultSound.get());
     activeSound.store(defaultSound.get(), std::memory_order_release);
 
@@ -179,8 +50,8 @@ int FileController::addFile(juce::String name, const char* data, int size) {
 int FileController::addFile(juce::String name, std::shared_ptr<juce::MemoryBlock> data) {
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
-    auto parser = std::make_shared<FileParser>(importServices, processor.errorCallback);
-    ShapeSound::Ptr sound = new ShapeSound(parser);
+    auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
+    ShapeSound::Ptr sound = new ShapeSound(processor, parser);
     const int index = appendFile(std::move(name), std::move(data), std::move(parser), std::move(sound));
     selectFileUnlocked(index);
     return index;
@@ -249,8 +120,8 @@ int FileController::duplicateFile(int index) {
 
     const juce::File source(files[index].name);
     auto data = std::make_shared<juce::MemoryBlock>(*files[index].data);
-    auto parser = std::make_shared<FileParser>(importServices, processor.errorCallback);
-    ShapeSound::Ptr sound = new ShapeSound(parser);
+    auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
+    ShapeSound::Ptr sound = new ShapeSound(processor, parser);
     const int duplicateIndex = appendFile(source.getFileNameWithoutExtension() + " copy" + source.getFileExtension(),
         std::move(data), std::move(parser), std::move(sound));
     selectFileUnlocked(duplicateIndex);
@@ -440,8 +311,8 @@ void FileController::startTextureInput(juce::String sourceName, int width, int h
     juce::SpinLock::ScopedLockType fileLock(lock);
     juce::SpinLock::ScopedLockType effectLock(processor.effectsLock);
     if (textureInputParser == nullptr) {
-        textureInputParser = std::make_shared<FileParser>(importServices, processor.errorCallback);
-        textureInputSound = new ShapeSound(textureInputParser);
+        textureInputParser = std::make_shared<FileParser>(processor, processor.errorCallback);
+        textureInputSound = new ShapeSound(processor, textureInputParser);
     }
     textureInputParser->prepareLiveImageInput(width, height);
 
@@ -564,8 +435,8 @@ void FileController::restoreState(const juce::XmlElement& xml, bool legacyFileEn
             } else {
                 data->fromBase64Encoding(encodedData);
             }
-            auto parser = std::make_shared<FileParser>(importServices, processor.errorCallback);
-            ShapeSound::Ptr sound = new ShapeSound(parser);
+            auto parser = std::make_shared<FileParser>(processor, processor.errorCallback);
+            ShapeSound::Ptr sound = new ShapeSound(processor, parser);
             appendFile(fileXml->getStringAttribute("name"), std::move(data), std::move(parser), std::move(sound));
         }
         juce::Logger::writeToLog("setStateInformation: restored " + juce::String(size()) + " files");

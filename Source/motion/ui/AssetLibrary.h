@@ -57,8 +57,6 @@ private:
     void listBoxItemClicked(int row, const juce::MouseEvent& event) override;
 
     void showSourceMenu(int row);
-    // Replace the project's tempo map with a MIDI file's, in one undo step.
-    void adoptMidiTempo(motion::Id id);
     // Rename by identity: the list may have changed while the menu was open.
     void beginRename(motion::Id id);
     void finishRename(bool accept);
@@ -82,7 +80,7 @@ private:
     juce::TextEditor search, rename;
     motion::Id renaming = 0;
     juce::Label status;
-    juce::TextButton cancelImport, bakeSettings, assignMidi;
+    juce::TextButton cancelImport, bakeSettings;
     juce::String importStatus, errorMessage;
     bool hasError = false;
 };

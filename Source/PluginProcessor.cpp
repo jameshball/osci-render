@@ -7,7 +7,6 @@
 */
 
 #include "PluginProcessor.h"
-#include "audio/synth/VoiceEffects.h"
 
 #include "audio/AudioThreadGuard.h"
 #include "PluginEditor.h"
@@ -229,7 +228,7 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
     envelopeParameters.params[0].addListenerToAll(this);
 
     // Start the background voice builder thread.
-    voiceBuilder = std::make_unique<VoiceBuilder>(*this, synth, inputBuffer);
+    voiceBuilder = std::make_unique<VoiceBuilder>(*this);
     int initialVoices = voices->getValueUnnormalised();
     synth.setClient(this);
     synth.setPolyphony(initialVoices);
@@ -334,6 +333,49 @@ OscirenderAudioProcessor::OscirenderAudioProcessor()
         }
     };
 }
+
+// ---------------------------------------------------------------------------
+// VoiceBuilder::run() — defined here because it needs the full
+// OscirenderAudioProcessor definition (header is forward-declared).
+// ---------------------------------------------------------------------------
+
+void VoiceBuilder::run() {
+    while (!threadShouldExit()) {
+        wait(-1);
+        if (threadShouldExit()) break;
+
+        // Build or remove voices one at a time, re-checking the target
+        // between each operation to handle rapid slider changes.
+        while (!threadShouldExit()) {
+            const int target = targetCount.load(std::memory_order_acquire);
+            const int current = processor.synth.getNumVoices();
+
+            if (current == target)
+                break;
+
+            if (current < target) {
+                // Build one voice (the expensive part — runs off the
+                // message and audio threads).
+                auto* voice = new ShapeVoice(processor, processor.inputBuffer, current);
+
+                // Re-check: is this voice still needed?
+                if (targetCount.load(std::memory_order_acquire) > current) {
+                    processor.synth.addVoice(voice); // internally locked
+                    readyVoiceCount.store(current + 1, std::memory_order_release);
+                    firstVoiceReady.signal();
+                } else {
+                    delete voice;
+                }
+            } else {
+                // Removal is cheap — just do it directly.
+                processor.synth.removeVoice(current - 1); // internally locked
+                readyVoiceCount.store(current - 1, std::memory_order_release);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 
 OscirenderAudioProcessor::~OscirenderAudioProcessor() {
     // Stop the voice builder before tearing down any processor state it references.
@@ -551,6 +593,7 @@ void OscirenderAudioProcessor::applyToggleableEffectsToBuffer(
 }
 
 void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
+    juce::ScopedNoDenormals noDenormals;
     AudioThreadGuard::ScopedAudioThread audioThreadGuard;
 
     if (isOfflineRenderActive()) {
@@ -701,10 +744,10 @@ void OscirenderAudioProcessor::processBlockInternal(juce::AudioBuffer<float>& bu
         modulationEngine.beginModulationBlock(numSamples);
 
         // Fill modulation block buffers (type-specific generation)
-        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, blockDawPosition, voiceTelemetry.uiVoiceActive);
-        envelopeParameters.fillBlockBuffers(numSamples, voiceTelemetry.uiVoiceEnvActive, voiceTelemetry.uiVoiceEnvValue);
+        lfoParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages, blockDawPosition, uiVoiceActive);
+        envelopeParameters.fillBlockBuffers(numSamples, uiVoiceEnvActive, uiVoiceEnvValue);
         randomParameters.fillBlockBuffers(numSamples, sampleRate, midiMessages,
-                                          blockDawPosition.bpm.load(std::memory_order_relaxed), voiceTelemetry.uiVoiceActive);
+                                          blockDawPosition.bpm.load(std::memory_order_relaxed), uiVoiceActive);
 #endif
 
         // Always run the sidechain envelope follower so the UI display
@@ -1202,10 +1245,10 @@ void OscirenderAudioProcessor::parameterValueChanged(int parameterIndex, float n
         if (numVoices != currentVoices) {
             // Reset UI telemetry for voices that are about to be added/removed.
             const int lo = std::min(numVoices, currentVoices);
-            const int hi = std::min(std::max(numVoices, currentVoices), VoiceTelemetry::kMaxUiVoices);
+            const int hi = std::min(std::max(numVoices, currentVoices), kMaxUiVoices);
             for (int i = lo; i < hi; i++) {
-                voiceTelemetry.uiVoiceActive[i].store(false, std::memory_order_relaxed);
-                voiceTelemetry.uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
+                uiVoiceActive[i].store(false, std::memory_order_relaxed);
+                uiVoiceEnvelopeTimeSeconds[i].store(0.0, std::memory_order_relaxed);
             }
         }
         voiceBuilder->setTargetVoiceCount(numVoices + 1); // +1 overlap voice for kill-fade
@@ -1533,6 +1576,11 @@ void OscirenderAudioProcessor::buildParamLocationMap() {
     // See visualiserParameters.applyExternalModulation.
 }
 
+DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams() const
+{
+    return envelopeParameters.getDahdsrParams(0);
+}
+
 DahdsrParams OscirenderAudioProcessor::getCurrentDahdsrParams(int envIndex) const
 {
     return envelopeParameters.getDahdsrParams(envIndex);
@@ -1595,24 +1643,6 @@ double OscirenderAudioProcessor::noteToFrequency(int note, int channel) {
 #else
     return juce::MidiMessage::getMidiNoteInHertz(note);
 #endif
-}
-
-VoiceParameters OscirenderAudioProcessor::getVoiceParameters() {
-    return { midiEnabled, frequencyEffect.get(), velocityTracking
-#if OSCI_PREMIUM
-        , pitchBendRange, glideTime, glideSlope, alwaysGlide, octaveScale
-#endif
-    };
-}
-
-VoiceEffectMap OscirenderAudioProcessor::cloneVoiceEffectInstances() {
-    return cloneVoiceEffects(toggleableEffects, effectsLock, getEffectiveSampleRate());
-}
-
-void OscirenderAudioProcessor::processVoiceEffects(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& envelope,
-    juce::AudioBuffer<float>& frequency, juce::AudioBuffer<float>& frameSync,
-    const VoiceEffectMap& effects, const std::shared_ptr<osci::SimpleEffect>& preview) {
-    applyToggleableEffectsToBuffer(buffer, &inputBuffer, &envelope, &frequency, &frameSync, &effects, preview);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() {

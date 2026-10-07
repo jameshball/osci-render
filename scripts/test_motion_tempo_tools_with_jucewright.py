@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tempo from the soundtrack, tap tempo, a MIDI file's tempo, ramps and ruler-format timing through the real workspace."""
+"""Tempo from the soundtrack, tap tempo, ramps and ruler-format timing through the real workspace."""
 import json
 import math
 import re
@@ -73,23 +73,6 @@ def groove(path, bpm, offset, seconds):
         out.writeframes(b"".join(struct.pack("<h", max(-32767, min(32767, int(v * 20000)))) for v in samples))
 
 
-def midi_with_tempo(path):
-    """One note; 100 BPM, then 140 BPM from beat 4."""
-    def vlq(value):
-        out = [value & 0x7f]
-        value >>= 7
-        while value:
-            out.append((value & 0x7f) | 0x80)
-            value >>= 7
-        return bytes(reversed(out))
-    track = vlq(0) + bytes([0xff, 0x51, 3]) + (600000).to_bytes(3, "big")
-    track += vlq(0) + bytes([0x90, 60, 100]) + vlq(480) + bytes([0x80, 60, 0])
-    track += vlq(3 * 480) + bytes([0xff, 0x51, 3]) + int(60000000 / 140).to_bytes(3, "big")
-    track += vlq(0) + bytes([0xff, 0x2f, 0])
-    path.write_bytes(b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big") + (480).to_bytes(2, "big")
-                     + b"MTrk" + len(track).to_bytes(4, "big") + track)
-
-
 project = session.artifact_dir / "tempo-tools.osci-motion"
 root = ET.Element("motion-project", schema="1")
 ET.SubElement(root, "composition", name="Tempo tools", duration="12", bpm="100", fps="30")
@@ -97,8 +80,6 @@ xml = ET.tostring(root, encoding="utf-8")
 project.write_bytes(struct.pack("<II", 0x21324356, len(xml)) + xml + b"\0")
 loop = session.artifact_dir / "loop.wav"
 groove(loop, 128, 0.3, 12)
-melody = session.artifact_dir / "Tempo.mid"
-midi_with_tempo(melody)
 
 
 def saved():
@@ -144,15 +125,6 @@ try:
     wait_undo("Change tempo", 10000)
     bpm = float(saved().get("bpm"))
     assert 60 <= bpm <= 200 and abs(bpm - 128) > 0.5, bpm
-    # A MIDI file's tempo map replaces the project's.
-    step("import midi", "drop-files", "--file", melody, "--class", "MotionEditor", "--exact")
-    wait_undo("Import MIDI file", 60000)
-    step("midi menu", "click", "--name", "Tempo.mid", "--role", "listItem", "--exact", "--button", "right")
-    step("use tempo", "click", "--name", "Use this file's tempo (100 BPM, 1 change)", "--role", "menuItem", "--exact")
-    wait_undo("Use MIDI tempo")
-    tree = saved()
-    change = tree.find("tempo")
-    assert float(tree.get("bpm")) == 100 and change is not None and float(change.get("beat")) == 4 and abs(float(change.get("bpm")) - 140) < 1e-6, ET.tostring(tree)
     # A new tempo change that glides in from the previous tempo.
     step("ruler menu", "click", "--class", "MotionTimelineView", "--position", "950,12", "--button", "right")
     step("add tempo", "click", "--name", "Add tempo change here...", "--role", "menuItem", "--exact")

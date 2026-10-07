@@ -610,7 +610,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           source ./ci/setup-env.sh
-          source ./ci/test.sh Motion MotionMidi MotionLive MotionBake MotionRaster MotionVideo
+          source ./ci/test.sh Motion MotionLive MotionBake MotionRaster MotionVideo
 
       - name: Build osci-motion (Standalone)
         shell: bash

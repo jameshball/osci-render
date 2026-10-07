@@ -218,10 +218,6 @@ public:
             expect(f.document.project().assets[0]->name == "square.svg");
             expect(f.clip(f.first) != nullptr && f.clip(f.first)->asset == original->id, "clips keep their source identity");
             expect(f.undo.getUndoDescription() == "Replace source");
-            auto notes = std::make_shared<motion::Asset>(*square);
-            notes->midi = motion::MidiNotes::create({}).source;
-            notes->source.reset();
-            expect(f.document.replaceAsset(original->id, notes).failed(), "a visual source cannot become a MIDI file");
             expect(f.undo.undo());
             expect(f.document.project().assets[0] == original);
         }

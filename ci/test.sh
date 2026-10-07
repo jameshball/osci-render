@@ -2,7 +2,7 @@
 
 PLUGIN="osci-render-test"
 
-# Optional test categories (e.g. `source ./ci/test.sh Motion MotionMidi`).
+# Optional test categories (e.g. `source ./ci/test.sh Motion MotionLive`).
 # With none, every test runs, as before.
 TEST_CATEGORIES=("$@")
 

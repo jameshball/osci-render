@@ -2,7 +2,6 @@
 #include "../Source/motion/render/BeamRenderer.h"
 #include "../Source/motion/live/LiveSourceExchange.h"
 #include "../Source/motion/live/PreparedBlenderFrame.h"
-#include "../Source/motion/render/LiveMidiAudition.h"
 #include "../Source/motion/export/SignalExporter.h"
 #include <thread>
 #include <future>
@@ -43,17 +42,6 @@ public:
         expect(dark(beamAt(123, empty.get())));
         auto disconnected = std::make_shared<const motion::LiveSourceFrames>(std::vector<motion::LiveSourceFrames::Entry>{{identity, nullptr}});
         expect(dark(beamAt(123, disconnected.get())));
-        beginTest("Live MIDI audition uses the same frame set");
-        motion::LiveMidiPerformance midi;
-        midi.prepare(48000);
-        midi.useInstrument(*composition.clips.front().liveInstrument);
-        expect(midi.noteOn(1, 60, 127, 0));
-        bool lit = false;
-        for (std::uint64_t index = 100; index < 2000; ++index) {
-            const auto point = motion::sampleLiveMidiAudition(composition, composition.clips.front(), midi, .25, index, 48000, false, two.get());
-            if (!dark(point)) { lit = true; expectWithinAbsoluteError(point.x, 2.0f, 1e-6f); }
-        }
-        expect(lit);
         beginTest("Uncaptured live sources reject offline signal export before creating output");
         juce::TemporaryFile destination(".wav");
         const std::atomic<bool> cancel{false};

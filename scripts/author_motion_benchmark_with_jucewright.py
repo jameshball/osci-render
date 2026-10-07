@@ -169,9 +169,6 @@ try:
     import_source("Raster pulse.gif", 88, 16, {"position.x": .6, "position.y": .45, "scale.x": .15, "scale.y": .15, "scale.z": .15})
     import_source("Accent.txt", 48, 8, {"position.y": -.8, "scale.x": .5, "scale.y": .5, "scale.z": .5, "red": .8, "green": .7, "blue": 1})
     import_source("MIDI pulse.svg", 128, 8, {"position.y": -.7, "scale.x": .12, "scale.y": .12, "scale.z": .12, "red": 1, "green": .5, "blue": .15})
-    step("import pulse score", "drop-files", "--file", assets / "Pulse phrase.mid", "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Assign to selected clip", "--exact")
-    step("assign pulse score", "click", "--name", "Assign to selected clip", "--exact")
     camera("Main", 0, {})
     camera("Corridor", 48, {"fov": 65}, {"position.z": [(48, 2), (79, 1.4)]})
     camera("Drift", 80, {"position.x": -.4, "rotation.y": -6})
@@ -192,7 +189,6 @@ try:
     assert len(tracks) == 14
     assert len(saved.findall("./composition/camera")) == 3
     assert len(saved.findall("./composition/cameraCut")) == 4
-    assert saved.findall(".//midi/note"), "Imported MIDI was not assigned"
     assert len(saved.findall(".//key")) >= 20, "Animation was not authored"
     print("Fourteen-layer arrangement saved; pacing, grouping, effects and export review remain", flush=True)
 finally:

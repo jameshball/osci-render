@@ -25,8 +25,6 @@ public:
         }
         beginTest("Nested compositions");
         benchmarkProject("nested", nestedProject());
-        beginTest("MIDI chords");
-        benchmarkProject("midi", midiProject());
         beginTest("Imports");
         benchmarkImports();
     }
@@ -163,21 +161,6 @@ private:
         root.id = next++;
         root.insert(motion::Document::makeCompositionClip(next++, *below, 0), project.tempo());
         project.tracks.push_back(std::move(root));
-        return project;
-    }
-
-    // Sixteen-note chords on every sixteenth for the whole render.
-    static motion::Project midiProject() {
-        auto project = stressProject({1, 1, 2, 0, 0});
-        auto& clip = project.tracks.change(0).clips[0];
-        clip.duration = renderSeconds;
-        std::vector<motion::MidiNote> notes;
-        motion::Id id = 1;
-        for (int step = 0; step < static_cast<int>(renderSeconds * 8); ++step) {
-            for (int voice = 0; voice < 16; ++voice) { notes.push_back({id++, step * 0.25, 0.5, 48 + voice * 2, 100, 1}); }
-        }
-        clip.midi = motion::MidiNotes::create(std::move(notes)).source;
-        project.duration = renderSeconds;
         return project;
     }
 

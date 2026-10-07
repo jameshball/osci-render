@@ -212,7 +212,6 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         row->setAttribute("locked", track.locked);
         row->setAttribute("group", juce::String(track.group));
         row->setAttribute("kind", track.kind == TrackKind::audio ? "audio" : "visual");
-        if (track.midiInput != 0) { row->setAttribute("midiInput", track.midiInput); }
         if (track.height != 0) { row->setAttribute("height", track.height); }
         if (track.label != 0) { row->setAttribute("label", track.label); }
         saveEffects(*row, track.effects);
@@ -233,34 +232,6 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
             item->setAttribute("rate", exactNumber(clip.rate));
             if (clip.spatialPath) { item->setAttribute("spatialPath", true); }
             if (clip.quaternionRotation) { item->setAttribute("quaternionRotation", true); }
-            if (track.kind == TrackKind::visual && clip.composition == 0) {
-                auto* instrument = item->createNewChildElement("instrument");
-                instrument->setAttribute("attack", exactNumber(clip.instrument.attack));
-                instrument->setAttribute("decay", exactNumber(clip.instrument.decay));
-                instrument->setAttribute("sustain", exactNumber(clip.instrument.sustain));
-                instrument->setAttribute("release", exactNumber(clip.instrument.release));
-                if (clip.instrument.bendRange != MidiInstrument{}.bendRange) { instrument->setAttribute("bendRange", exactNumber(clip.instrument.bendRange)); }
-            }
-            if (clip.midi != nullptr) {
-                auto* pattern = item->createNewChildElement("midi");
-                pattern->setAttribute("asset", juce::String(clip.midiAsset));
-                for (const auto& note : clip.midi->notes()) {
-                    auto* event = pattern->createNewChildElement("note");
-                    event->setAttribute("id", juce::String(note.id));
-                    event->setAttribute("start", exactNumber(note.start));
-                    event->setAttribute("duration", exactNumber(note.duration));
-                    event->setAttribute("pitch", note.pitch);
-                    event->setAttribute("velocity", note.velocity);
-                    event->setAttribute("channel", note.channel);
-                }
-                for (const auto& control : clip.midi->controls()) {
-                    auto* change = pattern->createNewChildElement("control");
-                    change->setAttribute("beat", exactNumber(control.beat));
-                    change->setAttribute("channel", control.channel);
-                    change->setAttribute("number", control.number);
-                    change->setAttribute("value", control.value);
-                }
-            }
             saveEffects(*item, clip.effects);
             saveProperties(*item, clip.properties);
             if (clip.luaBake != nullptr && clip.luaBake->archive.getSize() > 0) {
@@ -295,23 +266,12 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         auto* item = xml.createNewChildElement("modulator");
         item->setAttribute("id", juce::String(modulator.id));
         item->setAttribute("name", juce::String(modulator.name));
-        item->setAttribute("kind", modulator.kind == ModulatorKind::envelope ? "envelope" : modulator.kind == ModulatorKind::controller ? "controller" : "oscillator");
-        item->setAttribute("controller", modulator.controller);
-        item->setAttribute("controllerChannel", modulator.controllerChannel);
         item->setAttribute("waveform", static_cast<int>(modulator.shape.waveform));
         item->setAttribute("rateHz", exactNumber(modulator.shape.rateHz));
         item->setAttribute("phase", exactNumber(modulator.shape.phase));
         item->setAttribute("tempoSync", modulator.shape.tempoSync);
         item->setAttribute("beatsPerCycle", exactNumber(modulator.shape.beatsPerCycle));
         item->setAttribute("seed", juce::String(static_cast<juce::int64>(modulator.shape.seed)));
-        item->setAttribute("source", juce::String(modulator.source));
-        item->setAttribute("attack", exactNumber(modulator.attack));
-        item->setAttribute("decay", exactNumber(modulator.decay));
-        item->setAttribute("sustain", exactNumber(modulator.sustain));
-        item->setAttribute("release", exactNumber(modulator.release));
-        item->setAttribute("velocity", exactNumber(modulator.velocity));
-        item->setAttribute("lowestPitch", modulator.lowestPitch);
-        item->setAttribute("highestPitch", modulator.highestPitch);
     }
     for (const auto& route : state.routes) {
         auto* item = xml.createNewChildElement("route");
@@ -405,13 +365,9 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         track.muted = row->getBoolAttribute("muted", false);
         track.solo = row->getBoolAttribute("solo", false);
         track.locked = row->getBoolAttribute("locked", false);
-        track.midiInput = row->getIntAttribute("midiInput", 0);
         track.height = std::clamp(row->getIntAttribute("height", 0), 0, Track::maximumHeight);
         if (track.height != 0) { track.height = std::max(track.height, Track::minimumHeight); }
         track.label = std::clamp(row->getIntAttribute("label", 0), 0, 8);
-        if (track.midiInput < 0 || track.midiInput > Track::anyMidiChannel || (track.midiInput != 0 && track.kind != TrackKind::visual)) {
-            return juce::Result::fail("MIDI input needs a visual track and a channel 1-16 (or any).");
-        }
         const auto groupIdentity = readId(*row, "group");
         if (!groupIdentity.has_value()) {
             return juce::Result::fail("Invalid track group identity.");
@@ -453,58 +409,6 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
                 if ((track.kind == TrackKind::audio) != (found->audio != nullptr)) {
                     return juce::Result::fail("The clip source type does not match its audio or visual track.");
                 }
-                if (found->midi != nullptr) { return juce::Result::fail("A MIDI pattern requires a visual instrument source for its clip."); }
-            }
-            const auto* instrument = item->getChildByName("instrument");
-            if (instrument != nullptr) {
-                clip.instrument = {instrument->getDoubleAttribute("attack", -1), instrument->getDoubleAttribute("decay", -1),
-                    instrument->getDoubleAttribute("sustain", -1), instrument->getDoubleAttribute("release", -1),
-                    instrument->getDoubleAttribute("bendRange", MidiInstrument{}.bendRange)};
-                if (track.kind != TrackKind::visual || clip.composition != 0 || instrument->getNextElementWithTagName("instrument") != nullptr || !clip.instrument.valid()) {
-                    return juce::Result::fail("Invalid MIDI envelope settings.");
-                }
-            }
-            const auto* pattern = item->getChildByName("midi");
-            if (pattern != nullptr) {
-                if (track.kind != TrackKind::visual || pattern->getNextElementWithTagName("midi") != nullptr) {
-                    return juce::Result::fail("MIDI performances require a single pattern on a visual clip.");
-                }
-                const auto midiAsset = readId(*pattern, "asset");
-                if (!midiAsset.has_value()) {
-                    return juce::Result::fail("Invalid MIDI source identity.");
-                }
-                clip.midiAsset = *midiAsset;
-                if (clip.midiAsset != 0) {
-                    const auto source = findAsset(assets, clip.midiAsset);
-                    if (source == nullptr || source->midi == nullptr) { return juce::Result::fail("MIDI pattern source is missing or is not a MIDI asset."); }
-                }
-                std::vector<MidiNote> notes;
-                for (auto* event : pattern->getChildWithTagNameIterator("note")) {
-                    if (notes.size() >= MidiNotes::maximumNotes) { return juce::Result::fail("MIDI content exceeds 100000 notes."); }
-                    const auto id = readId(*event, "id");
-                    if (id.value_or(0) == 0) { return juce::Result::fail("Invalid MIDI note identity."); }
-                    const auto readNumber = [&](const char* name, auto& value) {
-                        std::istringstream stream(event->getStringAttribute(name).toStdString());
-                        stream.imbue(std::locale::classic());
-                        stream >> std::noskipws >> value;
-                        return !stream.fail() && stream.peek() == std::char_traits<char>::eof();
-                    };
-                    MidiNote note;
-                    note.id = *id;
-                    if (!readNumber("start", note.start) || !readNumber("duration", note.duration)
-                        || !readNumber("pitch", note.pitch) || !readNumber("velocity", note.velocity) || !readNumber("channel", note.channel)) {
-                        return juce::Result::fail("MIDI note fields must contain valid numbers.");
-                    }
-                    notes.push_back(note);
-                }
-                std::vector<MidiControl> controls;
-                for (auto* change : pattern->getChildWithTagNameIterator("control")) {
-                    if (controls.size() >= MidiNotes::maximumControls) { return juce::Result::fail("MIDI content exceeds 400000 controller changes."); }
-                    controls.push_back({change->getDoubleAttribute("beat", -1), change->getIntAttribute("channel", 0), change->getIntAttribute("number", -1), change->getIntAttribute("value", 100000)});
-                }
-                const auto prepared = MidiNotes::create(std::move(notes), std::move(controls));
-                if (!prepared) { return juce::Result::fail(prepared.error); }
-                clip.midi = prepared.source;
             }
             // Every clip property must be a known, unique schema entry whose
             // values lie inside its declared range.
@@ -620,15 +524,11 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         const auto identity = claimId(*item, identities);
         modulator.id = identity.value_or(0);
         modulator.name = item->getStringAttribute("name").toStdString();
-        const auto kind = item->getStringAttribute("kind");
         const auto tempoSync = item->getIntAttribute("tempoSync", -1);
         const auto seed = item->getStringAttribute("seed", "0").getLargeIntValue();
-        if ((kind != "oscillator" && kind != "envelope" && kind != "controller") || tempoSync < 0 || tempoSync > 1 || seed < 0 || seed > static_cast<juce::int64>(std::numeric_limits<std::uint32_t>::max())) {
+        if (tempoSync < 0 || tempoSync > 1 || seed < 0 || seed > static_cast<juce::int64>(std::numeric_limits<std::uint32_t>::max())) {
             return juce::Result::fail("Invalid modulator settings.");
         }
-        modulator.kind = kind == "envelope" ? ModulatorKind::envelope : kind == "controller" ? ModulatorKind::controller : ModulatorKind::oscillator;
-        modulator.controller = item->getIntAttribute("controller", 1);
-        modulator.controllerChannel = item->getIntAttribute("controllerChannel", 0);
         modulator.shape.enabled = true;
         modulator.shape.amount = 1;
         modulator.shape.waveform = static_cast<ModulationWaveform>(item->getIntAttribute("waveform", -1));
@@ -637,16 +537,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         modulator.shape.tempoSync = tempoSync != 0;
         modulator.shape.beatsPerCycle = item->getDoubleAttribute("beatsPerCycle", 1);
         modulator.shape.seed = static_cast<std::uint32_t>(seed);
-        const auto source = readId(*item, "source");
-        modulator.source = source.value_or(0);
-        modulator.attack = item->getDoubleAttribute("attack", -1);
-        modulator.decay = item->getDoubleAttribute("decay", -1);
-        modulator.sustain = item->getDoubleAttribute("sustain", -1);
-        modulator.release = item->getDoubleAttribute("release", -1);
-        modulator.velocity = item->getDoubleAttribute("velocity", -1);
-        modulator.lowestPitch = item->getIntAttribute("lowestPitch", -1);
-        modulator.highestPitch = item->getIntAttribute("highestPitch", -1);
-        if (!identity.has_value() || !source.has_value() || !modulator.valid()) { return juce::Result::fail("Invalid modulator settings or identity."); }
+        if (!identity.has_value() || !modulator.valid()) { return juce::Result::fail("Invalid modulator settings or identity."); }
         project.modulators.push_back(std::move(modulator));
     }
     for (auto* item : xml.getChildWithTagNameIterator("route")) {
@@ -701,7 +592,6 @@ juce::XmlElement Document::save() const {
             continue;
         }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { item->setAttribute("fractalDepth", asset->fractalDepth); }
-        if (isMidiSource(asset->extension)) { item->setAttribute("midiImportBpm", exactNumber(asset->midiImportBpm)); }
         if (asset->extension.equalsIgnoreCase(".lua")) {
             item->createNewChildElement("source")->addTextElement(asset->data.toBase64Encoding());
             auto* bake = item->createNewChildElement("bake");
@@ -802,7 +692,6 @@ juce::Result Document::prepareLoad(const juce::XmlElement& xml, Project& output,
             continue;
         }
         if (asset->extension.equalsIgnoreCase(".lsystem")) { asset->fractalDepth = item->getIntAttribute("fractalDepth", -1); }
-        if (isMidiSource(asset->extension)) { asset->midiImportBpm = item->getDoubleAttribute("midiImportBpm", 0); }
         if (asset->extension.equalsIgnoreCase(".txt")) {
             const auto* text = item->getChildByName("typography");
             if (text != nullptr) {

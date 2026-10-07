@@ -5,7 +5,6 @@
 #include "../model/CompositionGraph.h"
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
-#include "PreparedMidiPerformance.h"
 #include "PreparedDrivers.h"
 #include "../model/SpatialMotion.h"
 #include "../model/Vec3.h"
@@ -193,8 +192,6 @@ struct PreparedClipStage {
 struct PreparedClip : PreparedClipStage {
     std::shared_ptr<const LiveSourceIdentity> liveIdentity;
     std::shared_ptr<const PreparedSource> source;
-    std::shared_ptr<const PreparedMidiPerformance> midi;
-    std::shared_ptr<const PreparedMidiInstrument> liveInstrument;
     std::vector<PreparedClipStage> ancestors; // inner-to-outer
     Id rootTrack = 0; // the main timeline track this clip plays on
 
@@ -467,7 +464,6 @@ struct PreparedComposition {
             if (index == 0) { return project; }
             return *definitions.at(stages[index - 1].clip->composition);
         };
-        std::map<std::array<double, 5>, std::shared_ptr<const PreparedMidiInstrument>> instruments;
         const auto expanded = expandComposition(project, [&](const auto&, const auto& stages) {
             if (preparationError.isNotEmpty()) { return; }
             const auto& leaf = stages.back();
@@ -483,59 +479,28 @@ struct PreparedComposition {
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
             }
-            if (purpose == CompositionPurpose::signal) {
-                // One instrument serves live input and the clip's own notes.
-                const auto key = clip.instrument.key();
-                auto found = instruments.find(key);
-                if (found == instruments.end()) {
-                    const auto instrument = PreparedMidiInstrument::prepare(clip.instrument, sampleRate, cancel);
-                    if (!instrument) { preparationError = "Could not prepare the MIDI instrument."; return; }
-                    found = instruments.emplace(key, std::make_shared<const PreparedMidiInstrument>(*instrument)).first;
-                }
-                item.liveInstrument = found->second;
-            }
-            if (clip.midi != nullptr && purpose == CompositionPurpose::signal) {
-                const auto performance = PreparedMidiPerformance::prepare(*clip.midi, clip, item.liveInstrument, leaf.tempo, cancel, &leaf.clipClock);
-                if (!performance) {
-                    preparationError = "MIDI clip \"" + juce::String(clip.name) + "\": " + juce::String(performance.error);
-                    return;
-                }
-                item.midi = performance.performance;
-                hasMidi = true;
-            }
             clips.push_back(std::move(item));
         }, cancel);
         if (!expanded) { preparationError = expanded.error; }
-        if (preparationError.isNotEmpty()) { clips.clear(); return; }
-        for (const auto& track : project.tracks) {
-            if (track.midiInput == 0 || track.kind != TrackKind::visual) { continue; }
-            const auto clip = std::find_if(clips.begin(), clips.end(), [&](const auto& item) { return item.rootTrack == track.id && item.liveInstrument != nullptr; });
-            if (clip == clips.end()) { continue; }
-            liveTracks.push_back({track.id, track.midiInput == Track::anyMidiChannel ? 0 : track.midiInput, clip->liveInstrument});
-        }
+        if (preparationError.isNotEmpty()) { clips.clear(); }
     }
 
     // Geometry probe: the beam allocation at one phase of a static multiplexed
     // cycle. Output signals use BeamRenderer; tests use this direct time/phase
     // lookup to check the allocation.
-    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, double oscillatorTime = -1, const LiveSourceFrames* liveFrames = nullptr) const {
-        if (oscillatorTime < 0) { oscillatorTime = time; }
+    osci::Point sample(double time, double phase, double phaseSpan = 0, double timeSpan = 0, const LiveSourceFrames* liveFrames = nullptr) const {
         if (!std::isfinite(time) || !std::isfinite(phase) || !std::isfinite(phaseSpan) || phaseSpan < 0) { return {0, 0, 0, 0, 0, 0}; }
-        const auto current = selectBeam(time, phase, oscillatorTime);
+        const auto current = selectBeam(time, phase);
         if (current.clip == nullptr) { return {0, 0, 0, 0, 0, 0}; }
-        const auto localSpan = current.note != 0 ? current.notePhaseSpan : phaseSpan * current.phaseScale;
-        return projectPoint(current.clip->sample(time, current.phase, localSpan, timeSpan, liveFrames), time);
+        return projectPoint(current.clip->sample(time, current.phase, phaseSpan * current.phaseScale, timeSpan, liveFrames), time);
     }
 
     struct BeamSelection {
         const PreparedClip* clip = nullptr;
         double phase = 0, phaseScale = 0;
-        Id note = 0;
-        double notePhaseSpan = 0;
     };
 
-    BeamSelection selectBeam(double time, double phase, double oscillatorTime = -1) const {
-        if (oscillatorTime < 0) { oscillatorTime = time; }
+    BeamSelection selectBeam(double time, double phase) const {
         double allocation = 0.0;
         for (const auto& clip : clips) {
             if (clip.active(time)) { allocation += std::max(1.0, clip.weight(time)); }
@@ -545,13 +510,7 @@ struct PreparedComposition {
         for (const auto& clip : clips) {
             if (!clip.active(time)) { continue; }
             const auto weight = clip.weight(time);
-            if (cursor < weight) {
-                if (clip.midi != nullptr) {
-                    const auto note = clip.midi->select(time, cursor / weight, oscillatorTime);
-                    return note.note == 0 ? BeamSelection{} : BeamSelection{&clip, note.phase, 0, note.note, note.phaseSpan};
-                }
-                return {&clip, cursor / weight, allocation / weight};
-            }
+            if (cursor < weight) { return {&clip, cursor / weight, allocation / weight}; }
             cursor -= weight;
         }
         // Unused allocation stays dark rather than normalizing away a fade.
@@ -628,16 +587,12 @@ public:
     double sampleRate = 48000;
     double beamRate = 60;
     ScopeProfile scope;
-    bool hasMidi = false;
     std::uint64_t publicationRevision = 0;
     juce::String preparationError;
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
     PreparedBeam beam;
-    // Tracks armed for live MIDI (at most LiveMidiInputs::maximumRoutes are used).
-    struct LiveTrack { Id track; int channel; std::shared_ptr<const PreparedMidiInstrument> instrument; };
-    std::vector<LiveTrack> liveTracks;
 
 private:
     // Loudness at 240 Hz: rectified peak per bin, then a fast-attack /

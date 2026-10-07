@@ -268,8 +268,6 @@
         <GROUP id="{AUD_MODULATION}" name="modulation">
           <FILE id="Y1Qska" name="DahdsrEnvelope.h" compile="0" resource="0"
                 file="Source/audio/modulation/DahdsrEnvelope.h"/>
-          <FILE id="DhsSeg" name="DahdsrSegments.h" compile="0" resource="0"
-                file="Source/audio/modulation/DahdsrSegments.h"/>
           <FILE id="LfStH1" name="LfoState.h" compile="0" resource="0" file="Source/audio/modulation/LfoState.h"/>
           <FILE id="LfStC1" name="LfoState.cpp" compile="1" resource="0" file="Source/audio/modulation/LfoState.cpp"/>
           <FILE id="LfPmH1" name="LfoPresetManager.h" compile="0" resource="0"
@@ -311,10 +309,6 @@
           <FILE id="VKBirB" name="ShapeSound.h" compile="0" resource="0" file="Source/audio/synth/ShapeSound.h"/>
           <FILE id="UcPZ09" name="ShapeVoice.cpp" compile="1" resource="0" file="Source/audio/synth/ShapeVoice.cpp"/>
           <FILE id="WId4vx" name="ShapeVoice.h" compile="0" resource="0" file="Source/audio/synth/ShapeVoice.h"/>
-          <FILE id="VcBldC" name="VoiceBuilder.cpp" compile="1" resource="0"
-                file="Source/audio/synth/VoiceBuilder.cpp"/>
-          <FILE id="VcCtx1" name="VoiceContext.h" compile="0" resource="0" file="Source/audio/synth/VoiceContext.h"/>
-          <FILE id="PtSrc1" name="PointSource.h" compile="0" resource="0" file="Source/audio/synth/PointSource.h"/>
           <FILE id="VcBldr" name="VoiceBuilder.h" compile="0" resource="0" file="Source/audio/synth/VoiceBuilder.h"/>
           <FILE id="VEffects" name="VoiceEffects.h" compile="0" resource="0"
                 file="Source/audio/synth/VoiceEffects.h"/>
@@ -591,8 +585,6 @@
         <FILE id="HWSJK8" name="FileParser.h" compile="0" resource="0" file="Source/parser/FileParser.h"/>
         <FILE id="FmtReg1" name="FileFormatRegistry.h" compile="0" resource="0"
               file="Source/parser/FileFormatRegistry.h"/>
-        <FILE id="ImpSvc1" name="ImportServices.h" compile="0" resource="0"
-              file="Source/parser/ImportServices.h"/>
         <GROUP id="{A3E24187-62A5-AB8D-8837-14043B89A640}" name="gpla"/>
         <GROUP id="{8AC1A0A6-6E5E-D533-33A6-76002E1DD885}" name="img">
           <FILE id="w6xTAH" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>

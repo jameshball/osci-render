@@ -87,7 +87,7 @@ private:
 
 /**
  */
-class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient, public VoiceContext
+class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcessorParameter::Listener, public VoiceManagerClient
 #if JucePlugin_Enable_ARA
     ,
                                  public juce::AudioProcessorARAExtension
@@ -97,8 +97,7 @@ class OscirenderAudioProcessor : public CommonAudioProcessor, juce::AudioProcess
     // Declared first so unhosted parameters outlive every modulation source and consumer.
     juce::OwnedArray<juce::AudioProcessorParameter> unhostedModulationParameters;
 #endif
-    // Declared before the synth so voice telemetry outlives every voice.
-    VoiceTelemetry voiceTelemetry;
+    friend class VoiceBuilder;
 public:
     OscirenderAudioProcessor();
     ~OscirenderAudioProcessor() override;
@@ -162,17 +161,18 @@ public:
     // setters to any custom-target CC mappings that were restored inert by
     // MidiManager::load().
     void rebindAllModDepthCCMappings();
-    DahdsrParams getCurrentDahdsrParams(int envIndex) const override;
+    DahdsrParams getCurrentDahdsrParams() const;
+    DahdsrParams getCurrentDahdsrParams(int envIndex) const;
 
-    VoiceParameters getVoiceParameters() override;
-    VoiceTelemetry& getVoiceTelemetry() override { return voiceTelemetry; }
-    VoiceEffectMap cloneVoiceEffectInstances() override;
-    double getVoiceSampleRate() override { return getEffectiveSampleRate(); }
-    const osci::DawPosition& getVoiceTransport() const override { return dawPosition; }
-    const std::vector<std::shared_ptr<osci::Effect>>& getVoiceScriptParameters() const override { return luaEffects; }
-    void processVoiceEffects(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& envelope,
-        juce::AudioBuffer<float>& frequency, juce::AudioBuffer<float>& frameSync,
-        const VoiceEffectMap& effects, const std::shared_ptr<osci::SimpleEffect>& preview) override;
+    // UI telemetry for per-voice envelope visualization (written on audio thread, read on message thread)
+    static constexpr int kMaxUiVoices = 16;
+    std::atomic<double> uiVoiceEnvelopeTimeSeconds[kMaxUiVoices]{};
+    std::atomic<bool> uiVoiceActive[kMaxUiVoices]{};
+    // Per-envelope UI telemetry for flow markers (same as envelope 0 for backward compat)
+    std::atomic<double> uiVoiceEnvTimeSeconds[NUM_ENVELOPES][kMaxUiVoices]{};
+    std::atomic<bool> uiVoiceEnvActive[NUM_ENVELOPES][kMaxUiVoices]{};
+    // Per-voice per-envelope current values for modulation (written by audio-thread voices)
+    std::atomic<float> uiVoiceEnvValue[NUM_ENVELOPES][kMaxUiVoices]{};
 
     std::vector<std::shared_ptr<osci::Effect>> toggleableEffects;
     std::vector<std::shared_ptr<osci::Effect>> luaEffects;
@@ -259,14 +259,14 @@ public:
 #endif
 
     // Number of MIDI notes currently held. Audio-thread only.
-    int getNumPressedNotes() const override;
+    int getNumPressedNotes() const;
     void sendMidiPanic(bool immediate);
 
     // Frequency of the globally-last-played note (before the current noteOn).
     // Used as glide source so any voice can portamento from the last note.
     double getLastPlayedNoteFreq() const;
 
-    ShapeSound* getActiveShapeSound() const override { return fileController.getActiveSound(); }
+    ShapeSound* getActiveShapeSound() const { return fileController.getActiveSound(); }
 
     osci::BooleanParameter* animateFrames = new osci::BooleanParameter("Animate", "animateFrames", VERSION_HINT, true, "Enables animation for files that have multiple frames, such as GIFs or Line Art.");
     osci::BooleanParameter* loopAnimation = new osci::BooleanParameter("Loop Animation", "loopAnimation", VERSION_HINT, true, "Loops the animation. If disabled, the animation will stop at the last frame.");
@@ -328,7 +328,7 @@ public:
     // Preview API: set/clear a temporary effect by ID for hover auditioning
     void setPreviewEffectId(const juce::String& effectId);
     void clearPreviewEffect();
-    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() override { 
+    std::shared_ptr<osci::SimpleEffect> getCachedPreviewEffect() { 
         return std::dynamic_pointer_cast<osci::SimpleEffect>(previewEffect); 
     }
 

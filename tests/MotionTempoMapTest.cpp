@@ -2,7 +2,6 @@
 #include "../Source/motion/model/Document.h"
 #include "../Source/motion/import/SourceDecoding.h"
 #include "../Source/motion/render/CompositionRenderer.h"
-#include "../Source/motion/render/MidiTakeNotes.h"
 
 class MotionTempoMapTest : public juce::UnitTest {
 public:
@@ -80,25 +79,6 @@ public:
             const auto nested = innerTiming.nestedIn(instance);
             expect(nested.has_value() && nested->warp.has_value());
             for (const auto local : {3.5, 4.0, 5.0}) { expectWithinAbsoluteError(nested->localTime(10 + local), innerTiming.localTime(local), 1.0e-9); }
-        }
-        beginTest("Recorded MIDI lands on the beats of a musical clip under a tempo map");
-        {
-            const auto tempo = halfTimeAtBar3();
-            motion::Clip clip;
-            clip.id = 7; clip.timeBase = motion::ClipTimeBase::beats; clip.contentBpm = 120; clip.start = 4; clip.duration = 8;
-            const auto timing = clip.timing(tempo);
-            motion::MidiRecording::Take take;
-            const double rate = 1000;
-            take.config.token = 1; take.config.target = 7; take.config.sampleRate = rate; take.config.sourceBpm = 120;
-            take.config.firstSample = static_cast<std::uint64_t>(timing.start * rate); take.config.endSample = static_cast<std::uint64_t>(timing.end() * rate);
-            take.config.sourceRate = timing.rate; take.config.sourceOffset = timing.localTime(timing.start);
-            take.firstSample = take.config.firstSample; take.endSample = take.config.endSample;
-            // A note on project beat 10 (after the change, 6 s) is clip beat 6.
-            const auto on = static_cast<std::uint64_t>(tempo.seconds(10) * rate);
-            take.events = {{on, {0x90, 60, 100}, 3}, {on + 500, {0x80, 60, 0}, 3}};
-            const auto notes = motion::MidiTakeNotes::convert(take, {}, nullptr, &timing);
-            expect(notes && notes.source->notes().size() == 1, juce::String(notes.error));
-            if (notes) { expectWithinAbsoluteError(notes.source->notes()[0].start, 6.0, 1.0e-9); }
         }
         beginTest("Ramps save, reload and survive edits of their change");
         {

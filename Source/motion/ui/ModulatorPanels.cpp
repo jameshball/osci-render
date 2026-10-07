@@ -105,12 +105,12 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
         refresh();
     };
     content.addAndMakeVisible(remove);
-    // What kind of modulator, as pictures: wave shapes, random, the
-    // soundtrack's loudness, envelopes on MIDI notes and MIDI controllers.
+    // What kind of modulator, as pictures: wave shapes, random and the
+    // soundtrack's loudness.
     for (std::size_t index = 0; index < kinds().size(); ++index) {
         const auto& kind = kinds()[index];
         auto& button = shapes[index];
-        button = std::make_unique<ShapeButton>(kind.name, kind.kind, kind.waveform);
+        button = std::make_unique<ShapeButton>(kind.name, kind.waveform);
         button->onClick = [this, index] { setKind(index); };
         content.addAndMakeVisible(*button);
     }
@@ -126,52 +126,14 @@ MotionModulatorLibrary::MotionModulatorLibrary(MotionProcessor& owner) : process
     }
     hertz.setTooltip("Cycles per second");
     beatsChip.setTooltip("Beats per cycle, following the tempo");
-    source.setName("Envelope source");
-    source.setTextWhenNothingSelected("Choose a MIDI clip");
-    source.onChange = [this] {
-        const auto index = source.getSelectedItemIndex();
-        if (index < 0 || index >= static_cast<int>(sourceIds.size())) { return; }
-        const auto id = sourceIds[static_cast<std::size_t>(index)];
-        change([id](auto& modulator) { modulator.source = id; });
-    };
-    controller.setName("Modulator controller");
-    controller.setTitle("Modulator controller");
-    controller.addItem("Pitch bend", 129);
-    for (const auto [number, label] : std::initializer_list<std::pair<int, const char*>> {{1, "Mod wheel (CC 1)"}, {2, "Breath (CC 2)"}, {7, "Volume (CC 7)"}, {10, "Pan (CC 10)"}, {11, "Expression (CC 11)"}}) {
-        controller.addItem(label, number + 1);
-    }
-    for (int number = 0; number < 128; ++number) {
-        if (number != 1 && number != 2 && number != 7 && number != 10 && number != 11) { controller.addItem("CC " + juce::String(number), number + 1); }
-    }
-    controller.onChange = [this] { const auto number = controller.getSelectedId() - 1; change([number](auto& modulator) { modulator.controller = number; }); };
-    channel.setName("Modulator channel");
-    channel.setTitle("Modulator channel");
-    channel.addItem("Any channel", 1);
-    for (int index = 1; index <= 16; ++index) { channel.addItem("Channel " + juce::String(index), index + 1); }
-    channel.onChange = [this] { const auto value = channel.getSelectedId() - 1; change([value](auto& modulator) { modulator.controllerChannel = value; }); };
-    for (auto* box : {&source, &controller, &channel}) { content.addAndMakeVisible(box); }
     rate.setup(content, "Rate", "Modulator rate", motion::ui::rateHzSpec);
     phase.setup(content, "Phase", "Modulator phase", motion::ui::phaseSpec);
     seed.setup(content, "Seed", "Modulator seed", motion::ui::seedSpec);
-    attack.setup(content, "Attack", "Envelope attack", motion::ui::secondsSpec);
-    decay.setup(content, "Decay", "Envelope decay", motion::ui::secondsSpec);
-    sustain.setup(content, "Sustain", "Envelope sustain", motion::ui::unitSpec);
-    release.setup(content, "Release", "Envelope release", motion::ui::secondsSpec);
-    velocity.setup(content, "Velocity", "Envelope velocity", motion::ui::unitSpec);
-    lowest.setup(content, "Low note", "Envelope lowest pitch", motion::ui::pitchSpec);
-    highest.setup(content, "High note", "Envelope highest pitch", motion::ui::pitchSpec);
     bind(rate, [](auto& modulator, double value) {
         if (modulator.shape.tempoSync) { modulator.shape.beatsPerCycle = value; } else { modulator.shape.rateHz = value; }
     });
     bind(phase, [](auto& modulator, double value) { modulator.shape.phase = value / 360.0; });
     bind(seed, [](auto& modulator, double value) { modulator.shape.seed = static_cast<std::uint32_t>(value); });
-    bind(attack, [](auto& modulator, double value) { modulator.attack = value; });
-    bind(decay, [](auto& modulator, double value) { modulator.decay = value; });
-    bind(sustain, [](auto& modulator, double value) { modulator.sustain = value; });
-    bind(release, [](auto& modulator, double value) { modulator.release = value; });
-    bind(velocity, [](auto& modulator, double value) { modulator.velocity = value; });
-    bind(lowest, [](auto& modulator, double value) { modulator.lowestPitch = static_cast<int>(value); });
-    bind(highest, [](auto& modulator, double value) { modulator.highestPitch = static_cast<int>(value); });
     routesTitle.setFont(motion::style::caption());
     routesTitle.setColour(juce::Label::textColourId, osci::Colours::textMuted());
     routesTitle.setText("Drives", juce::dontSendNotification);
@@ -209,58 +171,28 @@ void MotionModulatorLibrary::refresh() {
     }
     for (auto& card : cards) { card->repaint(); }
     const auto* modulator = current();
-    const auto oscillator = modulator != nullptr && modulator->kind == motion::ModulatorKind::oscillator;
-    const auto envelope = modulator != nullptr && modulator->kind == motion::ModulatorKind::envelope;
-    const auto midiControl = modulator != nullptr && modulator->kind == motion::ModulatorKind::controller;
-    const auto loudness = oscillator && modulator->shape.waveform == motion::ModulationWaveform::soundtrack;
+    const auto oscillator = modulator != nullptr && modulator->shape.waveform != motion::ModulationWaveform::soundtrack;
     const auto noise = oscillator && (modulator->shape.waveform == motion::ModulationWaveform::noiseHold || modulator->shape.waveform == motion::ModulationWaveform::noiseSmooth);
     name.setVisible(modulator != nullptr);
     remove.setVisible(modulator != nullptr);
     for (auto& button : shapes) { button->setVisible(modulator != nullptr); }
-    // The essentials show; phase, seed, velocity, note range and channel
-    // wait behind More.
-    const auto hasMore = (oscillator && !loudness) || envelope || midiControl;
-    more.setVisible(hasMore);
+    // The essentials show; phase and seed wait behind More.
+    more.setVisible(oscillator);
     more.setToggleState(showMore, juce::dontSendNotification);
-    hertz.setVisible(oscillator && !loudness);
-    beatsChip.setVisible(oscillator && !loudness);
-    rate.setVisible(oscillator && !loudness);
-    phase.setVisible(oscillator && !loudness && showMore);
+    hertz.setVisible(oscillator);
+    beatsChip.setVisible(oscillator);
+    rate.setVisible(oscillator);
+    phase.setVisible(oscillator && showMore);
     seed.setVisible(noise && showMore);
-    source.setVisible(envelope || midiControl);
-    controller.setVisible(midiControl);
-    channel.setVisible(midiControl && showMore);
-    for (auto* row : {&attack, &decay, &sustain, &release}) { row->setVisible(envelope); }
-    for (auto* row : {&velocity, &lowest, &highest}) { row->setVisible(envelope && showMore); }
     if (modulator != nullptr) {
         if (!name.isBeingEdited()) { name.setText(juce::String(modulator->name), juce::dontSendNotification); }
         for (std::size_t index = 0; index < shapes.size(); ++index) { shapes[index]->setToggleState(kindIndex(*modulator) == index, juce::dontSendNotification); }
         hertz.setToggleState(!modulator->shape.tempoSync, juce::dontSendNotification);
         beatsChip.setToggleState(modulator->shape.tempoSync, juce::dontSendNotification);
-        controller.setSelectedId(modulator->controller + 1, juce::dontSendNotification);
-        channel.setSelectedId(modulator->controllerChannel + 1, juce::dontSendNotification);
         rate.field.setSpec(modulator->shape.tempoSync ? motion::ui::beatsSpec : motion::ui::rateHzSpec);
         rate.field.setValue(modulator->shape.tempoSync ? modulator->shape.beatsPerCycle : modulator->shape.rateHz);
         phase.field.setValue(modulator->shape.phase * 360.0);
         seed.field.setValue(modulator->shape.seed);
-        attack.field.setValue(modulator->attack);
-        decay.field.setValue(modulator->decay);
-        sustain.field.setValue(modulator->sustain);
-        release.field.setValue(modulator->release);
-        velocity.field.setValue(modulator->velocity);
-        lowest.field.setValue(modulator->lowestPitch);
-        highest.field.setValue(modulator->highestPitch);
-        source.clear(juce::dontSendNotification);
-        sourceIds.clear();
-        for (const auto& track : project.tracks) {
-            for (const auto& clip : track.clips) {
-                if (track.kind != motion::TrackKind::visual || clip.midi == nullptr) { continue; }
-                sourceIds.push_back(clip.id);
-                source.addItem(juce::String(clip.name), static_cast<int>(sourceIds.size()));
-                if (clip.id == modulator->source) { source.setSelectedItemIndex(static_cast<int>(sourceIds.size()) - 1, juce::dontSendNotification); }
-            }
-        }
-        source.setTextWhenNoChoicesAvailable("No MIDI clips yet");
     }
     showRoutes();
     resized();
@@ -287,10 +219,10 @@ void MotionModulatorLibrary::resized() {
         name.setBounds(header);
         area.removeFromTop(motion::style::gap);
         {
-            // Two rows of five kinds.
-            const auto each = (area.getWidth() + 2) / 5;
+            // Two rows of four kinds.
+            const auto each = (area.getWidth() + 2) / 4;
             for (std::size_t index = 0; index < shapes.size(); ++index) {
-                const auto column = static_cast<int>(index % 5), line = static_cast<int>(index / 5);
+                const auto column = static_cast<int>(index % 4), line = static_cast<int>(index / 4);
                 shapes[index]->setBounds(area.getX() + column * each, area.getY() + line * 30, each - 2, 28);
             }
             area.removeFromTop(60);
@@ -298,11 +230,6 @@ void MotionModulatorLibrary::resized() {
         }
         previewArea = area.removeFromTop(44);
         area.removeFromTop(motion::style::padding);
-        for (auto* box : {&source, &controller, &channel}) {
-            if (!box->isVisible()) { continue; }
-            box->setBounds(area.removeFromTop(motion::style::controlHeight));
-            area.removeFromTop(motion::style::gap);
-        }
         if (rate.field.isVisible()) {
             // The clock's unit sits on the label line; the value gets the width.
             auto heading = area.removeFromTop(18);
@@ -314,14 +241,11 @@ void MotionModulatorLibrary::resized() {
             rate.field.setBounds(area.removeFromTop(motion::style::controlHeight));
             area.removeFromTop(motion::style::gap);
         }
-        for (auto* row : {&attack, &decay, &sustain, &release}) {
-            if (row->field.isVisible()) { row->layout(area); }
-        }
         if (more.isVisible()) {
             more.setBounds(area.removeFromTop(20).removeFromLeft(56));
             area.removeFromTop(motion::style::gap);
         }
-        for (auto* row : {&phase, &seed, &velocity, &lowest, &highest}) {
+        for (auto* row : {&phase, &seed}) {
             if (row->field.isVisible()) { row->layout(area); }
         }
         area.removeFromTop(motion::style::padding);
@@ -369,15 +293,12 @@ void MotionModulatorLibrary::Card::mouseDrag(const juce::MouseEvent& event) {
     if (container != nullptr && !container->isDragAndDropActive()) { container->startDragging("motion-modulator:" + juce::String(static_cast<juce::int64>(modulator.id)), this); }
 }
 
-MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motion::ModulatorKind kind, motion::ModulationWaveform waveform) : juce::Button("Shape " + text) {
+MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motion::ModulationWaveform waveform) : juce::Button("Shape " + text) {
     setTitle(getName());
     setTooltip(text);
     setWantsKeyboardFocus(false);
-    shape.kind = kind;
     shape.shape.waveform = waveform;
     shape.shape.seed = 3;
-    shape.sustain = .5;
-    if (text == "Pitch bend") { shape.controller = motion::MidiControl::pitchBend; }
 }
 
 void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool, bool down) {
@@ -394,20 +315,15 @@ const motion::Modulator* MotionModulatorLibrary::current() const {
     return found == modulators.end() ? nullptr : &*found;
 }
 
-const std::array<MotionModulatorLibrary::Kind, 10>& MotionModulatorLibrary::kinds() {
-    using motion::ModulatorKind, motion::ModulationWaveform;
-    static const std::array<Kind, 10> list {{
-        {"Sine", ModulatorKind::oscillator, ModulationWaveform::sine}, {"Triangle", ModulatorKind::oscillator, ModulationWaveform::triangle},
-        {"Saw", ModulatorKind::oscillator, ModulationWaveform::saw}, {"Square", ModulatorKind::oscillator, ModulationWaveform::square},
-        {"Smooth random", ModulatorKind::oscillator, ModulationWaveform::noiseSmooth}, {"Random steps", ModulatorKind::oscillator, ModulationWaveform::noiseHold},
-        {"Soundtrack loudness", ModulatorKind::oscillator, ModulationWaveform::soundtrack}, {"Envelope on MIDI notes", ModulatorKind::envelope, ModulationWaveform::sine},
-        {"MIDI controller", ModulatorKind::controller, ModulationWaveform::sine}, {"Pitch bend", ModulatorKind::controller, ModulationWaveform::sine}}};
+const std::array<MotionModulatorLibrary::Kind, 7>& MotionModulatorLibrary::kinds() {
+    using motion::ModulationWaveform;
+    static const std::array<Kind, 7> list {{
+        {"Sine", ModulationWaveform::sine}, {"Triangle", ModulationWaveform::triangle}, {"Saw", ModulationWaveform::saw}, {"Square", ModulationWaveform::square},
+        {"Smooth random", ModulationWaveform::noiseSmooth}, {"Random steps", ModulationWaveform::noiseHold}, {"Soundtrack loudness", ModulationWaveform::soundtrack}}};
     return list;
 }
 
 std::size_t MotionModulatorLibrary::kindIndex(const motion::Modulator& modulator) {
-    if (modulator.kind == motion::ModulatorKind::envelope) { return 7; }
-    if (modulator.kind == motion::ModulatorKind::controller) { return modulator.controller == motion::MidiControl::pitchBend ? 9 : 8; }
     return std::min<std::size_t>(static_cast<std::size_t>(modulator.shape.waveform), 6);
 }
 
@@ -417,18 +333,13 @@ void MotionModulatorLibrary::setKind(std::size_t index) {
     const auto& kind = kinds()[index];
     const auto oldBase = motion::ui::modulatorKindName(*modulator).toStdString();
     change([&](auto& edited) {
-        edited.kind = kind.kind;
-        if (kind.kind == motion::ModulatorKind::oscillator) { edited.shape.waveform = kind.waveform; }
-        if (index == 9) { edited.controller = motion::MidiControl::pitchBend; }
-        if (index == 8 && edited.controller == motion::MidiControl::pitchBend) { edited.controller = 1; }
+        edited.shape.waveform = kind.waveform;
         if (edited.name.rfind(oldBase + " ", 0) == 0) { edited.name = motion::ui::modulatorKindName(edited).toStdString() + edited.name.substr(oldBase.size()); }
     });
 }
 
-void MotionModulatorLibrary::add(motion::ModulatorKind kind, motion::ModulationWaveform waveform) {
+void MotionModulatorLibrary::add() {
     motion::Modulator modulator;
-    modulator.kind = kind;
-    modulator.shape.waveform = waveform;
     const auto base = motion::ui::modulatorKindName(modulator).toStdString();
     const auto& existing = processor.document.project().modulators;
     for (int number = 1;; ++number) {
@@ -470,7 +381,7 @@ void MotionModulatorLibrary::changeListenerCallback(juce::ChangeBroadcaster*) {
     // Hidden, it refreshes when its tab is shown.
     if (!isShowing()) { return; }
     // A scrub in progress keeps its own value until release.
-    for (auto* row : {&rate, &phase, &seed, &attack, &decay, &sustain, &release, &velocity, &lowest, &highest}) {
+    for (auto* row : {&rate, &phase, &seed}) {
         if (row->field.isEditing()) { return; }
     }
     for (const auto& route : routes) { if (route->isEditing()) { return; } }

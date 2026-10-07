@@ -87,7 +87,6 @@ inline juce::Colour axisColour(std::string_view axis, juce::Colour fallback = ke
 inline juce::Colour visualClip() { return juce::Colour(0xff34524a); }
 inline juce::Colour audioClip() { return juce::Colour(0xff2f4657); }
 inline juce::Colour compositionClip() { return juce::Colour(0xff4a4260); }
-inline juce::Colour midiClip() { return juce::Colour(0xff55503a); }
 // A track's mute, solo and lock switches when on.
 inline juce::Colour trackMute() { return juce::Colour(0xff8b6434); }
 inline juce::Colour trackSolo() { return juce::Colour(0xff347b52); }

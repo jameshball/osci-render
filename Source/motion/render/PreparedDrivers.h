@@ -110,59 +110,16 @@ private:
         const auto modulator = std::find_if(scope.modulators.begin(), scope.modulators.end(), [id](const auto& item) { return item.id == id; });
         if (modulator == scope.modulators.end() || !modulator->valid()) { return nullptr; }
         auto prepared = std::make_shared<PreparedModulator>();
-        prepared->kind = modulator->kind;
         prepared->shape = modulator->shape;
         prepared->shape.enabled = true;
         prepared->shape.amount = 1;
         prepared->shape.mode = ModulationMode::add;
         prepared->bpm = scope.bpm;
         if (scope.tempoChanges != nullptr) { prepared->tempo = scope.tempo(); }
-        if (modulator->kind == ModulatorKind::oscillator && modulator->shape.waveform == ModulationWaveform::soundtrack && loudness) {
-            prepared->soundtrack = loudness();
-        }
-        if (modulator->kind == ModulatorKind::controller) { collectSteps(*prepared, *modulator, scope); }
-        if (modulator->kind == ModulatorKind::envelope) {
-            prepared->envelope.attackSeconds = modulator->attack;
-            prepared->envelope.decaySeconds = modulator->decay;
-            prepared->envelope.sustainLevel = modulator->sustain;
-            prepared->envelope.releaseSeconds = modulator->release;
-            collectNotes(*prepared, *modulator, scope);
-        }
+        if (modulator->shape.waveform == ModulationWaveform::soundtrack && loudness) { prepared->soundtrack = loudness(); }
         std::shared_ptr<const PreparedModulator> result = std::move(prepared);
         cache.emplace(id, result);
         return result;
-    }
-
-    // Controller changes as held steps in composition seconds.
-    static void collectSteps(PreparedModulator& prepared, const Modulator& modulator, const Composition& scope) {
-        const auto* clip = findClip(scope, modulator.source);
-        const auto tempo = scope.tempo();
-        if (clip == nullptr || clip->midi == nullptr) { return; }
-        const auto timing = clip->timing(tempo);
-        if (!timing.valid()) { return; }
-        for (const auto& control : clip->midi->controls()) {
-            if (control.number != modulator.controller || (modulator.controllerChannel != 0 && control.channel != modulator.controllerChannel)) { continue; }
-            prepared.steps.emplace_back(std::clamp(clip->beatTime(control.beat, tempo, timing), timing.start, timing.end()), control.normalised());
-        }
-        std::stable_sort(prepared.steps.begin(), prepared.steps.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-    }
-
-    static void collectNotes(PreparedModulator& prepared, const Modulator& modulator, const Composition& scope) {
-        const auto* clip = findClip(scope, modulator.source);
-        const auto tempo = scope.tempo();
-        if (clip == nullptr || clip->midi == nullptr) { return; }
-        const auto timing = clip->timing(tempo);
-        if (!timing.valid()) { return; }
-        for (const auto& note : clip->midi->notes()) {
-            if (note.pitch < modulator.lowestPitch || note.pitch > modulator.highestPitch) { continue; }
-            const auto start = std::max(timing.start, clip->beatTime(note.start, tempo, timing));
-            const auto end = std::min(timing.end(), clip->beatTime(note.end(), tempo, timing));
-            if (!(end > start)) { continue; }
-            const auto level = (1 - modulator.velocity) + modulator.velocity * note.velocity / 127.0;
-            prepared.notes.push_back({start, end, level});
-        }
-        std::sort(prepared.notes.begin(), prepared.notes.end(), [](const auto& a, const auto& b) { return a.start < b.start; });
-        prepared.buildIndex();
     }
 
     Loudness loudness;

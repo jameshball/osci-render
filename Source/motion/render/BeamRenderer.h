@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CompositionRenderer.h"
-#include "LiveMidiInputs.h"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -37,7 +36,7 @@ public:
     // layers, bounding planning cost however many layers are visible.
     static constexpr std::int64_t maximumOrderingWork = 8192;
 
-    enum class Kind : std::uint8_t { draw, midi, live, move, hold };
+    enum class Kind : std::uint8_t { draw, move, hold };
     struct Segment {
         Kind kind = Kind::hold;
         std::int64_t first = 0, count = 0;
@@ -46,7 +45,6 @@ public:
         std::size_t frame = 0;
         bool reversed = false;
         osci::Point from, to;
-        const LiveMidiPerformance* live = nullptr;
     };
 
     // Cycles never straddle a frame of the project's frame rate, so exported
@@ -71,11 +69,9 @@ public:
     // index is the oscillator sample. time is the timeline time of that sample;
     // when advancing, the cycle latches the timeline time of its first sample.
     // generation must change whenever the composition or live frames change.
-    // live: armed tracks' live voices, drawn with their clips (never in export).
     osci::Point sample(const PreparedComposition& composition, double time, std::int64_t index, double rate, bool advancing,
-        std::uint64_t generation, const LiveSourceFrames* liveFrames = nullptr, const LiveMidiInputs* live = nullptr) {
+        std::uint64_t generation, const LiveSourceFrames* liveFrames = nullptr) {
         if (index < 0 || !std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { return {0, 0, 0, 0, 0, 0}; }
-        liveInputs = live;
         const auto cycleRate = composition.beamRate;
         auto first = planFirst, end = planEnd;
         if (!planned || index < planFirst || index >= planEnd || rate != planRate || cycleRate != planCycleRate || generation != planGeneration) {
@@ -106,7 +102,7 @@ public:
             planCycleRate = cycleRate;
             planAdvancing = advancing;
         }
-        return evaluate(composition, index, time, rate, advancing);
+        return evaluate(composition, index);
     }
 
     // Diagnostic view of the current plan, for tests and the editor meter.
@@ -135,9 +131,7 @@ private:
         std::size_t frame;
         double weight, length;
         osci::Point start, end;
-        bool midi;
         std::int64_t minimum;
-        const LiveMidiPerformance* live = nullptr;
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -170,7 +164,7 @@ private:
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
         const auto frame = source->frameIndex(clip.localTime(time));
-        const auto* drawing = clip.midi == nullptr ? source->drawingAt(frame) : nullptr;
+        const auto* drawing = source->drawingAt(frame);
         return Visible {weight, source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2)};
     }
 
@@ -181,41 +175,13 @@ private:
             if (layerCount == maximumLayers) { break; }
             const auto shown = visible(clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            double voices = 1;
-            if (clip.midi != nullptr) {
-                voices = static_cast<double>(clip.midi->activeCount(time));
-                if (voices == 0) { continue; }
-            }
-            measure(composition, {&clip, shown->source, shown->frame, shown->weight, 0, {}, {}, clip.midi != nullptr, shown->minimum}, voices);
-        }
-        // Armed tracks draw their live voices with the track's clip under the
-        // playhead (or its nearest clip while the playhead is between clips).
-        if (liveInputs != nullptr) {
-            const auto clock = static_cast<std::uint64_t>(std::max<std::int64_t>(0, first + liveInputs->clockOffset));
-            for (std::size_t route = 0; route < liveInputs->count && layerCount < maximumLayers; ++route) {
-                const auto& input = liveInputs->routes[route];
-                const auto voices = static_cast<double>(input.performance.activeCount(clock));
-                if (voices == 0) { continue; }
-                const PreparedClip* chosen = nullptr;
-                double nearest = std::numeric_limits<double>::infinity();
-                for (const auto& clip : composition.clips) {
-                    if (clip.rootTrack != input.track) { continue; }
-                    const auto gap = clip.active(time) ? 0.0 : std::min(std::abs(clip.start - time), std::abs(clip.end - time));
-                    if (gap < nearest) { nearest = gap; chosen = &clip; }
-                }
-                if (chosen == nullptr) { continue; }
-                const auto* source = chosen->resolveSource(liveFrames);
-                if (source == nullptr || source->frameCount() == 0) { continue; }
-                const auto position = chosen->clampToContent(time);
-                Layer layer{chosen, source, source->frameIndex(chosen->localTime(position)), std::max(1.0, chosen->weight(position)), 0, {}, {}, true, 2, &input.performance};
-                measure(composition, layer, voices);
-            }
+            measure(composition, {&clip, shown->source, shown->frame, shown->weight, 0, {}, {}, shown->minimum});
         }
         finishPlan(composition, first, end, rate);
     }
 
     // Lengths and endpoints from probes; appends the layer.
-    void measure(const PreparedComposition& composition, Layer layer, double voices) {
+    void measure(const PreparedComposition& composition, Layer layer) {
         // Vector drawings know their exact length; probes only measure how
         // the clip's transforms, effects and camera scale it on screen. The
         // ratio of projected to source distance is uniform under affine
@@ -247,7 +213,7 @@ private:
         } else {
             layer.length = litDistance;
         }
-        layer.length = std::max(minimumLayerLength, layer.length) * voices;
+        layer.length = std::max(minimumLayerLength, layer.length);
         (*layers)[layerCount++] = layer;
     }
 
@@ -322,7 +288,7 @@ private:
                 hold(entryOf(i), dwell + settle);
             }
             const auto& layer = items[i];
-            push({layer.live != nullptr ? Kind::live : layer.midi ? Kind::midi : Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.live});
+            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end});
             cursor += counts[i];
         }
         hold(exitOf(layerCount - 1), dwell);
@@ -337,8 +303,6 @@ private:
     // Cycles needed to draw every visible layer's complete strokes once,
     // from minimum traversal budgets plus dwell, settle and a unit of travel
     // per jump, capped at the maximum span. Cheap: no geometry is transformed.
-    // Armed live-input layers are not counted: they share the span the
-    // timeline's own layers need.
     static std::int64_t spanFor(const PreparedComposition& composition, double time, double rate, std::int64_t cycleSamples, const LiveSourceFrames* liveFrames) {
         if (cycleSamples <= 0) { return 1; }
         const auto timing = timingFor(composition.scope, rate);
@@ -356,7 +320,7 @@ private:
     }
 
     // Greedy nearest-neighbour order from the first layer, allowing either
-    // traversal direction for vector layers. Deterministic for a given plan.
+    // traversal direction. Deterministic for a given plan.
     void order() {
         auto& items = *layers;
         reversedFlags.fill(false);
@@ -368,10 +332,8 @@ private:
             for (std::size_t candidate = placed; candidate < layerCount; ++candidate) {
                 const auto forward = distance(at, items[candidate].start);
                 if (forward < bestDistance) { bestDistance = forward; best = candidate; bestReversed = false; }
-                if (!items[candidate].midi) {
-                    const auto backward = distance(at, items[candidate].end);
-                    if (backward < bestDistance) { bestDistance = backward; best = candidate; bestReversed = true; }
-                }
+                const auto backward = distance(at, items[candidate].end);
+                if (backward < bestDistance) { bestDistance = backward; best = candidate; bestReversed = true; }
             }
             std::swap(items[placed], items[best]);
             reversedFlags[placed] = bestReversed;
@@ -380,11 +342,11 @@ private:
 
     osci::Point entryOf(std::size_t index) const {
         const auto& layer = (*layers)[index];
-        return layer.midi ? layer.start : (reversedFlags[index] ? layer.end : layer.start);
+        return reversedFlags[index] ? layer.end : layer.start;
     }
     osci::Point exitOf(std::size_t index) const {
         const auto& layer = (*layers)[index];
-        return layer.midi ? layer.start : (reversedFlags[index] ? layer.start : layer.end);
+        return reversedFlags[index] ? layer.start : layer.end;
     }
 
     // Bounded 2-opt over the closed tour, including the return jump. Reversing
@@ -431,11 +393,9 @@ private:
             std::swap(ends[i], ends[j]);
         }
         for (auto i = first; i <= last; ++i) {
-            if (!items[i].midi) {
-                reversedFlags[i] = !reversedFlags[i];
-                std::swap(ends[i].entryX, ends[i].exitX);
-                std::swap(ends[i].entryY, ends[i].exitY);
-            }
+            reversedFlags[i] = !reversedFlags[i];
+            std::swap(ends[i].entryX, ends[i].exitX);
+            std::swap(ends[i].entryY, ends[i].exitY);
         }
     }
 
@@ -463,7 +423,7 @@ private:
         return &all[low];
     }
 
-    osci::Point evaluate(const PreparedComposition& composition, std::int64_t index, double time, double rate, bool advancing) {
+    osci::Point evaluate(const PreparedComposition& composition, std::int64_t index) {
         const auto* segment = find(index);
         if (segment == nullptr) { return {0, 0, 0, 0, 0, 0}; }
         const auto j = index - segment->first;
@@ -490,41 +450,12 @@ private:
                 // Behind the camera there is no position: hold dark at the entry.
                 return place(composition, *segment->clip, raw).value_or(dark(segment->from));
             }
-            case Kind::live: {
-                if (liveInputs == nullptr) { return dark(segment->from); }
-                const auto offset = liveInputs->clockOffset;
-                return voiced(composition, *segment, j, [&](std::int64_t k) {
-                    const auto clock = static_cast<std::uint64_t>(std::max<std::int64_t>(0, segment->first + k + offset));
-                    return segment->live->select(clock, (static_cast<double>(k) + 0.5) / static_cast<double>(segment->count));
-                });
-            }
-            case Kind::midi: {
-                return voiced(composition, *segment, j, [&](std::int64_t k) {
-                    const auto sampleTime = advancing ? planTime + static_cast<double>(segment->first + k - planFirst) / rate : time;
-                    return segment->clip->midi->select(sampleTime, (static_cast<double>(k) + 0.5) / static_cast<double>(segment->count), static_cast<double>(segment->first + k) / rate);
-                });
-            }
         }
         return {0, 0, 0, 0, 0, 0};
     }
 
-    // Sample j of a segment shared among notes: `at(k)` is the note at sample
-    // k. The beam is dark where no note sounds and at each note's ends, so it
-    // blanks between voices.
-    template <typename NoteAt>
-    osci::Point voiced(const PreparedComposition& composition, const Segment& segment, std::int64_t j, const NoteAt& at) const {
-        const auto current = at(j);
-        if (current.note == 0) { return dark(segment.from); }
-        const auto raw = segment.source->sampleFrame(segment.frame, current.phase, current.phaseSpan);
-        const bool edge = j == 0 || j == segment.count - 1 || at(j - 1).note != current.note || at(j + 1).note != current.note;
-        const auto projected = place(composition, *segment.clip, raw);
-        if (!projected.has_value()) { return dark(segment.from); }
-        return edge ? dark(*projected) : *projected;
-    }
-
     std::unique_ptr<std::array<Segment, maximumSegments>> segments;
     std::unique_ptr<std::array<Layer, maximumLayers>> layers;
-    const LiveMidiInputs* liveInputs = nullptr;
     std::array<bool, maximumLayers> reversedFlags{};
     // Entry and exit of each ordered layer while the tour is improved.
     struct Ends { double entryX, entryY, exitX, exitY; };

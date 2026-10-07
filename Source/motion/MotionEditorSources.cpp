@@ -56,7 +56,7 @@ void MotionEditor::replaceSourceFile(motion::Id asset) {
 
 bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, std::optional<std::pair<double, motion::Id>> placement) {
     const auto extension = file.getFileExtension().toLowerCase();
-    if (!motion::isImportableSource(extension)) {
+    if (!osci::files::isSupportedSource(extension)) {
         importError = "This source type is not connected yet.";
         statusBar.show(importError);
         repaint();
@@ -65,10 +65,6 @@ bool MotionEditor::importSourceFile(const juce::File& file, motion::Id relink, s
     SourceRequest request {file, placement.has_value() ? placement->first : processor.position.load(), processor.document.generation(), {}};
     request.relink = relink;
     if (placement.has_value()) { request.track = placement->second; }
-    if (relink != 0 && motion::isMidiSource(extension)) {
-        statusBar.show("MIDI files are assigned to clips, not swapped in as their media.");
-        return false;
-    }
     if (extension == ".lua" || extension == ".lsystem" || osci::files::isImage(extension)) {
         preparationRequests.push_back(std::move(request));
         showNextPreparationSettings();
@@ -154,7 +150,7 @@ void MotionEditor::openProject(const juce::File& file) {
 }
 
 void MotionEditor::chooseSourceFile() {
-    chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), motion::importWildcard());
+    chooser = std::make_unique<juce::FileChooser>("Import media", processor.getLastOpenedDirectory(), osci::files::sourceWildcard());
     const juce::Component::SafePointer<MotionEditor> owner(this);
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [owner](const juce::FileChooser& chosen) {
         if (owner != nullptr && chosen.getResult().existsAsFile()) {
@@ -355,7 +351,6 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     asset->rasterSettings = rasterSettings;
     asset->fractalDepth = request.fractalDepth.value_or(request.replacement != nullptr ? request.replacement->fractalDepth : 3);
     asset->textSettings = request.textSettings.value_or(request.replacement != nullptr ? request.replacement->textSettings : motion::TextSettings());
-    asset->midiImportBpm = processor.document.project().bpm;
     const auto time = request.time;
     const auto generation = request.generation;
     auto task = std::make_shared<ImportState>();
@@ -463,17 +458,6 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             }
             asset->id = document.newId();
             asset->name = motion::Document::uniqueAssetName(document.mainProject(), asset->name);
-            if (asset->midi != nullptr) {
-                document.edit("Import MIDI file", [&](motion::Project& project) { project.assets.push_back(asset); });
-                owner->assetLibrary.refresh(); owner->assetLibrary.selectAsset(asset->id);
-                // Point at the file's tempo when it differs from the project's.
-                const auto& project = document.project();
-                if (asset->midiSuggestedBpm != project.bpm || asset->midiTempoChanges != nullptr) {
-                    owner->statusBar.show(asset->name + " is written at " + juce::String(asset->midiSuggestedBpm, 1) + " BPM"
-                        + (asset->midiTempoChanges != nullptr ? " with tempo changes" : "") + ". Right-click it in Assets to use its tempo.", MotionStatusBar::Kind::notice);
-                }
-                return;
-            }
             auto clip = motion::Document::makeClip(document.newId(), *asset, time);
             motion::Track track;
             track.id = document.newId();

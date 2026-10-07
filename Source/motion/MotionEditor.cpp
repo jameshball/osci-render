@@ -1,7 +1,6 @@
 #include "MotionEditor.h"
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
-#include "ui/MidiEnvelopePanel.h"
 #include "../components/OverlayDialogHelpers.h"
 #include <cstdlib>
 
@@ -19,7 +18,7 @@ void styleTabs(osci::TabBar& tabs) {
 
 
 MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
-    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), notesEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectStack(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
+    : CommonPluginEditor(ownerProcessor, "osci-motion", "osci-motion", 1440, 900), processor(ownerProcessor), timeline(ownerProcessor), composition(ownerProcessor), assetLibrary(ownerProcessor.document), curveEditor(ownerProcessor), cameraRig(ownerProcessor), clipTimingPanel(ownerProcessor), effectStack(ownerProcessor), routingPanel(ownerProcessor), modulatorLibrary(ownerProcessor), propertyInspector(ownerProcessor) {
     lookAndFeel.setControlCornerRadius(3.0f);
     motionLookAndFeel.setControlCornerRadius(3.0f);
     setLookAndFeel(&motionLookAndFeel);
@@ -38,7 +37,7 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     for (auto* header : { &viewportHeader, &outputHeader, &inspectorHeader, &timelineHeader }) {
         addAndMakeVisible(header);
     }
-    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &notesEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
+    for (auto* component : std::initializer_list<juce::Component*> { &timeline, &composition, &assetLibrary, &importButton, &playButton, &startButton, &endButton, &timeLabel, &propertyInspector, &curveEditor, &timelineTabs, &timelineDivider, &previewDivider, &statusBar }) {
         addAndMakeVisible(component);
     }
     addChildComponent(scopeBack);
@@ -398,7 +397,7 @@ void MotionEditor::setUpLibrary() {
     assetLibrary.onSelectUses = [this](motion::Id id) {
         std::vector<motion::Id> clips;
         for (const auto& track : processor.document.project().tracks) {
-            for (const auto& clip : track.clips) { if (clip.asset == id || clip.midiAsset == id) { clips.push_back(clip.id); } }
+            for (const auto& clip : track.clips) { if (clip.asset == id) { clips.push_back(clip.id); } }
         }
         timelineTabs.setSelectedIndex(0);
         timeline.selectClips(clips);
@@ -499,18 +498,14 @@ void MotionEditor::setUpTimeline() {
     timelineTabs.setName("Timeline tabs");
     timelineTabs.addTab("Timeline");
     timelineTabs.addTab("Graph");
-    timelineTabs.addTab("Notes");
     timelineTabs.onSelectionChanged = [this](int index) {
-        // All three share the panel height the user chose: switching never
-        // moves the Scene or Scope.
+        // Both share the panel height the user chose: switching never moves
+        // the Scene or Scope.
         timeline.setVisible(index == 0);
         curveEditor.setVisible(index == 1);
-        notesEditor.setVisible(index == 2);
         if (index == 1) { refreshCurveList(); }
         resized();
-        if (index == 2) { notesEditor.fitContents(); }
     };
-    notesEditor.setVisible(false);
     timelineDivider.onStart = [this] { dividerStart = timelineFraction; };
     timelineDivider.onDrag = [this](int delta) {
         timelineFraction = std::clamp(dividerStart - static_cast<double>(delta) / workspaceHeight, 0.25, 0.65);
@@ -524,17 +519,6 @@ void MotionEditor::setUpTimeline() {
     };
     previewDivider.onReset = [this] { previewFraction = 0.5; resized(); };
     timeline.onOpenSource = [this](motion::Id id) { composition.onOpenSource(id); };
-    notesEditor.onEditInstrument = [this](motion::Id id) {
-        const auto* clip = motion::findClip(processor.document.project(), id);
-        if (clip == nullptr) { return; }
-        auto panel = std::make_unique<MotionMidiEnvelopePanel>(clip->instrument);
-        panel->setSize(380, 294);
-        const auto apply = popoverEdit(panel.get());
-        panel->onApply = [apply, id](motion::MidiInstrument settings) {
-            apply([id, settings](motion::Document& document) { return document.setMidiInstrument(id, settings); });
-        };
-        showPopover(std::move(panel), getLocalArea(&notesEditor, notesEditor.envelopeAnchor().getBounds()));
-    };
     timeline.onEditTempo = [this](double beat, double bpm, std::optional<double> replacing) {
         const auto& changes = processor.document.project().tempoChanges;
         const auto existing = changes != nullptr && replacing.has_value() ? std::find_if(changes->begin(), changes->end(), [&](const auto& change) { return change.beat == *replacing; }) : std::vector<motion::TempoChange>::const_iterator();
@@ -572,7 +556,6 @@ void MotionEditor::setUpTimeline() {
     timeline.onEnterComposition = [this](motion::Id id) { enterComposition(id); };
     timeline.onSelection = [this](motion::Id id) { select(id); };
     timeline.onAddCamera = [this](double time) { addCamera(time); };
-    timeline.onMidiAssigned = [this](motion::Id id) { select(id); timelineTabs.setSelectedIndex(2); notesEditor.fitContents(); };
     timeline.onMakeUnique = [this](motion::Id id) {
         libraryTabs.setSelectedIndex(0);
         const auto& project = processor.document.project();
@@ -766,7 +749,6 @@ void MotionEditor::resized() {
         scopeLabel.setBounds(breadcrumb);
     }
     this->timeline.setBounds(timeline.withTrimmedTop(3));
-    notesEditor.setBounds(timeline.withTrimmedTop(3));
     auto graph = timeline.withTrimmedTop(3);
     // The three columns stay put with or without a target, so the frame never jumps.
     curveList.setVisible(timelineTabs.getCurrentTabIndex() == 1);
@@ -880,7 +862,7 @@ juce::Rectangle<int> MotionEditor::focusedPanel() const {
     const auto* focused = juce::Component::getCurrentlyFocusedComponent();
     if (focused == nullptr) { return {}; }
     const auto within = [focused](const juce::Component& component) { return &component == focused || component.isParentOf(focused); };
-    if (within(timeline) || within(curveEditor) || within(notesEditor) || within(curveList) || within(graphSideViewport)) { return timelineBounds; }
+    if (within(timeline) || within(curveEditor) || within(curveList) || within(graphSideViewport)) { return timelineBounds; }
     if (within(composition) || within(sceneTools)) { return viewportBounds; }
     if (within(assetLibrary) || within(effectLibrary) || within(modulatorLibrary)) { return libraryBounds; }
     if (within(propertyInspector) || within(clipTimingPanel)) { return inspectorBounds; }
@@ -1047,16 +1029,12 @@ void MotionEditor::timerCallback() {
     if (!tempoValue.isBeingEdited() && !tappedBpm.has_value()) { tempoValue.setText(juce::String(processor.document.project().bpm, 1), juce::dontSendNotification); }
     // A moving playhead repaints only its own columns of the time views, and a
     // slow full refresh (about 3 Hz) catches anything that changes without an
-    // edit or a playhead move. Live inputs (armed MIDI tracks, Blender capture)
-    // show in the Scene, which repaints for them while stopped too.
+    // edit or a playhead move. Live Blender capture shows in the Scene, which
+    // repaints for it while stopped too.
     const auto position = processor.position.load();
     const auto liveFrames = processor.liveSourcePreview();
-    const auto isArmed = [](const auto& track) { return track.midiInput != 0; };
-    const auto& mainTracks = processor.document.mainProject().tracks;
-    const auto& scopeTracks = processor.document.project().tracks;
-    const auto armed = std::any_of(mainTracks.begin(), mainTracks.end(), isArmed) || std::any_of(scopeTracks.begin(), scopeTracks.end(), isArmed);
     // The snapshot is held, so a new one can never reuse the old address.
-    const auto live = armed || liveFrames != lastLiveFrames;
+    const auto live = liveFrames != lastLiveFrames;
     lastLiveFrames = liveFrames;
     const auto slowTick = ++ticks % 10 == 0;
     const auto moved = position != lastPaintedPosition || playing;
@@ -1065,11 +1043,9 @@ void MotionEditor::timerCallback() {
     if (curveEditor.isVisible() && timeline.layout().follow) { curveEditor.followPlayhead(position, playing); }
     if (slowTick) {
         timeline.repaint();
-        if (notesEditor.isVisible()) { notesEditor.repaint(); }
         if (curveEditor.isVisible()) { curveEditor.repaint(); }
     } else if (moved) {
         timeline.repaintPlayhead();
-        if (notesEditor.isVisible()) { notesEditor.repaintPlayhead(); }
         if (curveEditor.isVisible()) { curveEditor.repaintPlayhead(); }
     }
     if (slowTick || moved || live) { composition.repaint(); }
@@ -1119,7 +1095,6 @@ void MotionEditor::refreshFromDocument() {
     refreshTiming();
     timeline.refreshTracks();
     curveEditor.refresh();
-    notesEditor.refresh();
     composition.refresh();
     refreshInspector();
     refreshCameraTools();
@@ -1177,7 +1152,7 @@ void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {
     previous.timelineTab = timelineTabs.getCurrentTabIndex();
     previous.curveTarget = curveTarget; previous.property = curvePropertyName; previous.cameraCurve = cameraCurve;
     previous.timeline = timeline.viewState(); previous.preview = composition.viewState();
-    previous.graph = curveEditor.viewState(); previous.notes = notesEditor.viewState();
+    previous.graph = curveEditor.viewState();
 
     composition.setNavigating(false);
     composition.setDrivenCamera(0);
@@ -1210,13 +1185,11 @@ void MotionEditor::leaveComposition() {
     timeline.restoreView(previous.timeline);
     composition.restoreView(previous.preview);
     curveEditor.restoreView(previous.graph);
-    notesEditor.restoreView(previous.notes);
     refreshFromDocument();
 }
 
 void MotionEditor::select(motion::Id id) {
     selection = id;
-    notesEditor.setSelection(id);
     clipTimingPanel.setSelection(id);
     textAnimation.setSelection(id);
     // Cameras have no effects, so selecting one shows its Properties.

@@ -12,9 +12,6 @@ inline constexpr PropertySpec rateHzSpec {"rate", "Rate", "", "", 0.001, 1000, 1
 inline constexpr PropertySpec beatsSpec {"beats", "Beats", "", "", 0.0625, 64, 1, .25, 3, " beats"};
 inline constexpr PropertySpec phaseSpec {"phase", "Phase", "", "", 0, 360, 0, 1, 1, "\xc2\xb0"};
 inline constexpr PropertySpec seedSpec {"seed", "Seed", "", "", 0, 4294967295.0, 0, 1, 0, ""};
-inline constexpr PropertySpec secondsSpec {"seconds", "Seconds", "", "", 0, 60, 0, .01, 3, "s"};
-inline constexpr PropertySpec unitSpec {"unit", "Level", "", "", 0, 1, 0, .01, 2, ""};
-inline constexpr PropertySpec pitchSpec {"pitch", "Pitch", "", "", 0, 127, 0, 1, 0, ""};
 inline constexpr PropertySpec amountSpec {"amount", "Amount", "", "", -unbounded, unbounded, 1, .01, 3, ""};
 inline constexpr PropertySpec delaySpec {"delay", "Delay", "", "", -3600, 3600, 0, .01, 3, "s"};
 
@@ -58,34 +55,12 @@ private:
 }
 
 namespace motion::ui {
-// What a modulator does, drawn: two cycles of an oscillator, an envelope's
-// ADSR, or a controller's sweep. Shared by the cards and the shape picker.
+// What a modulator does, drawn: two cycles of its wave, or the soundtrack's
+// loudness. Shared by the cards and the shape picker.
 inline void paintModulatorShape(juce::Graphics& g, const Modulator& modulator, juce::Rectangle<float> area, juce::Colour colour, float stroke = 1.4f) {
     juce::Path path;
     const auto point = [&](double x, double y) { return juce::Point<float>(area.getX() + static_cast<float>(x) * area.getWidth(), area.getCentreY() - static_cast<float>(y) * area.getHeight() * .5f); };
-    if (modulator.kind == ModulatorKind::envelope) {
-        const auto total = std::max(1.0e-3, modulator.attack + modulator.decay + modulator.release + .3);
-        const auto bottom = -1.0, sustain = -1.0 + 2.0 * std::clamp(modulator.sustain, 0.0, 1.0);
-        double x = 0;
-        path.startNewSubPath(point(0, bottom));
-        x += modulator.attack / total; path.lineTo(point(x, 1));
-        x += modulator.decay / total; path.lineTo(point(x, sustain));
-        x += .3 / total; path.lineTo(point(x, sustain));
-        path.lineTo(point(1, bottom));
-    } else if (modulator.kind == ModulatorKind::controller && modulator.controller == MidiControl::pitchBend) {
-        // A bend: centred, a dip and back.
-        path.startNewSubPath(point(0, 0));
-        for (int step = 1; step <= 40; ++step) {
-            const auto x = step / 40.0;
-            path.lineTo(point(x, -.85 * std::exp(-std::pow((x - .5) * 5, 2))));
-        }
-    } else if (modulator.kind == ModulatorKind::controller) {
-        path.startNewSubPath(point(0, -.8));
-        for (int step = 1; step <= 40; ++step) {
-            const auto x = step / 40.0;
-            path.lineTo(point(x, -.8 + 1.6 * (x * x * (3 - 2 * x)) + .12 * std::sin(x * 19)));
-        }
-    } else if (modulator.shape.waveform == ModulationWaveform::soundtrack) {
+    if (modulator.shape.waveform == ModulationWaveform::soundtrack) {
         // Loudness: a level that follows the music.
         Modulation shape;
         shape.waveform = ModulationWaveform::noiseSmooth;
@@ -110,8 +85,6 @@ inline void paintModulatorShape(juce::Graphics& g, const Modulator& modulator, j
 }
 
 inline juce::String modulatorKindName(const Modulator& modulator) {
-    if (modulator.kind == ModulatorKind::envelope) { return "Envelope"; }
-    if (modulator.kind == ModulatorKind::controller) { return modulator.controller == MidiControl::pitchBend ? "Pitch bend" : "MIDI CC"; }
     if (modulator.shape.waveform == ModulationWaveform::soundtrack) { return "Loudness"; }
     if (modulator.shape.waveform == ModulationWaveform::noiseSmooth || modulator.shape.waveform == ModulationWaveform::noiseHold) { return "Random"; }
     return "LFO";
@@ -154,7 +127,7 @@ private:
     // One oscillator shape, drawn.
     class ShapeButton final : public juce::Button {
     public:
-        ShapeButton(const juce::String& text, motion::ModulatorKind kind, motion::ModulationWaveform waveform);
+        ShapeButton(const juce::String& text, motion::ModulationWaveform waveform);
         void buttonStateChanged() override { fade.follow(*this); }
         void paintButton(juce::Graphics& g, bool highlighted, bool down) override;
     private:
@@ -162,12 +135,12 @@ private:
         motion::style::Fade fade {*this};
     };
     const motion::Modulator* current() const;
-    struct Kind { const char* name; motion::ModulatorKind kind; motion::ModulationWaveform waveform; };
-    static const std::array<Kind, 10>& kinds();
+    struct Kind { const char* name; motion::ModulationWaveform waveform; };
+    static const std::array<Kind, 7>& kinds();
     static std::size_t kindIndex(const motion::Modulator& modulator);
     // Changing the kind renames a modulator that still has its default name.
     void setKind(std::size_t index);
-    void add(motion::ModulatorKind kind = motion::ModulatorKind::oscillator, motion::ModulationWaveform waveform = motion::ModulationWaveform::sine);
+    void add();
     void change(const std::function<void(motion::Modulator&)>& update);
     void bind(motion::ui::LabelledScrub& row, std::function<void(motion::Modulator&, double)> apply);
     void report(const juce::Result& result) {
@@ -190,15 +163,13 @@ private:
     Content content {*this};
     juce::TextButton addButton;
     motion::icons::Button remove {"Delete modulator", motion::icons::Icon::trash};
-    std::array<std::unique_ptr<ShapeButton>, 10> shapes;
+    std::array<std::unique_ptr<ShapeButton>, 7> shapes;
     std::vector<std::pair<motion::Modulator, int>> listedCards;
     motion::style::Disclosure more {"More modulator settings"};
     bool showMore = false;
     motion::ui::Chip hertz {"Hz"}, beatsChip {"Beats"};
-    juce::ComboBox source, controller, channel;
-    std::vector<motion::Id> sourceIds;
     juce::Label name, routesTitle, routesHint;
-    motion::ui::LabelledScrub rate, phase, seed, attack, decay, sustain, release, velocity, lowest, highest;
+    motion::ui::LabelledScrub rate, phase, seed;
     std::vector<std::unique_ptr<Card>> cards;
     std::vector<std::unique_ptr<motion::ui::RouteRow>> routes;
     juce::Rectangle<int> previewArea;

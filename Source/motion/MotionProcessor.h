@@ -7,9 +7,6 @@
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
 #include "render/BeamRenderer.h"
-#include "render/LiveMidiAudition.h"
-#include "render/MidiRecording.h"
-#include "render/MidiRecordingSession.h"
 #include "render/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
@@ -24,19 +21,11 @@ public:
     }
     OutputMode getOutputMode() const { return outputMode.load(); }
     void setOutputMode(OutputMode value) { outputMode.store(value); }
-    // Transient input monitoring: neither note events nor this choice are part
-    // of the document/export. The audio thread resolves the ID in its snapshot.
-    void setMidiAudition(motion::Id clip) { midiAuditionTarget.store(clip); }
-    motion::Id getMidiAudition() const { return midiAuditionTarget.load(); }
-    motion::MidiRecording& midiRecorder() { return midiRecording; }
-    motion::MidiRecordingSession& midiRecordingSession() { return *midiSession; }
     // The live rate: exports use it so the file matches what the scope showed.
     double exportSampleRate() const {
         const auto rate = std::round(requestedSampleRate.load());
         return std::isfinite(rate) && rate >= 8000 && rate <= 768000 ? rate : 48000.0;
     }
-    void releaseResources() override;
-    void processBlockSkipped(bool unavailable) override { midiRecording.skippedBlock(unavailable); }
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     MotionProcessor();
     ~MotionProcessor() override;
@@ -83,8 +72,6 @@ public:
 private:
     void handleAsyncUpdate() override;
     void routeSignalOutput(juce::AudioBuffer<float>& buffer);
-    // Audio thread: held live notes end with any jump in the clock.
-    void resetLiveMidi() { liveMidi.reset(); liveInputs.reset(); }
     void writeSignal(int index, const osci::Point& point) {
         const std::array<float, 6> values {point.x, point.y, point.z, point.r, point.g, point.b};
         for (int channel = 0; channel < 6; ++channel) { signal.setSample(channel, index, values[static_cast<std::size_t>(channel)]); }
@@ -94,33 +81,19 @@ private:
     std::atomic<double> requestedSampleRate {48000};
     double preparationSampleRate = 48000;
     juce::String preparationError;
-    std::atomic<bool> preparationFailed {false};
     std::uint64_t previousRevision = 0;
     bool wasPlaying = false;
     motion::BeamTransitionGuard transitionGuard;
     motion::BeamRenderer beam;
-    motion::LiveMidiPerformance liveMidi;
-    motion::LiveMidiInputs liveInputs;
-    motion::MidiRecording midiRecording;
-    std::unique_ptr<motion::MidiRecordingSession> midiSession;
 public:
     // Last beam plan, for the status bar. Written by the audio thread.
     std::atomic<int> beamLayers {0};
     std::atomic<int> beamInterleave {1};
 private:
-    bool armMidiRecording(const motion::MidiRecording::Config& config);
-    void stopMidiDevice();
-    void releaseRecordingTransport();
-    juce::SpinLock midiLifecycleLock;
-    std::atomic<bool> midiDeviceReady{false};
-    bool recordingOwnsTransport = false; // Audio thread, or lifecycle with callbacks excluded.
-    std::atomic<motion::Id> midiAuditionTarget {0};
     // The Scope's picture at the last audio block, applied by the visualiser
     // through its external modulation hook (see ScopeBeam.h).
     std::array<std::atomic<float>, motion::beamPropertySpecs.size()> scopeBeam;
     std::unique_ptr<motion::ScopeBeamSlots> scopeBeamSlots;
-    motion::Id previousAuditionTarget = 0;
-    std::uint64_t liveMidiSample = 0;
     juce::int64 oscillatorSample = 0;
     std::atomic<OutputMode> outputMode { OutputMode::soundtrack };
     motion::PreparedState<motion::PreparedComposition> composition;

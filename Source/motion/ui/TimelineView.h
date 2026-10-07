@@ -30,7 +30,7 @@ public:
     std::function<void(const juce::String&)> onCommand;
     // Add a camera that takes over the output at the playhead.
     std::function<void(double)> onAddCamera;
-    std::function<void(motion::Id)> onSelection, onMidiAssigned, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
+    std::function<void(motion::Id)> onSelection, onTimingRequested, onMakeUnique, onEnterComposition, onRevealSource;
     std::function<void()> onLoopSelection;
     std::function<void(const juce::String&)> onError;
     std::function<void(motion::Id, double)> onEditMarker;
@@ -112,7 +112,7 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& event) override;
     std::function<void(motion::Id)> onOpenSource;
 
-    // One convention across the timeline, graph and notes: the wheel and
+    // One convention across the timeline and graph: the wheel and
     // trackpad pan (Shift makes the wheel horizontal), Cmd/Ctrl+wheel or a
     // pinch zooms time around the pointer, Alt+wheel changes track height.
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
@@ -316,7 +316,6 @@ private:
     void createGroup(motion::Id trackId, motion::Id parent);
     void showGroupMenu(motion::Id id);
     void showTrackMenu(motion::Id id);
-    void setMidiInput(motion::Id id, int input);
     void toggleLock(motion::Id id);
     void toggleTrack(motion::Id id, bool solo);
     void placeTrack(motion::Id id, int boundary, motion::Id group);

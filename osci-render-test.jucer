@@ -42,24 +42,10 @@
             file="tests/MotionDrawingTest.cpp"/>
       <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"
             resource="0" file="tests/MotionTypographyTest.cpp"/>
-      <FILE id="MotionMidiExprT" name="MotionMidiExpressionTest.cpp" compile="1"
-            resource="0" file="tests/MotionMidiExpressionTest.cpp"/>
       <FILE id="MotionLuaSlidersT" name="MotionLuaSlidersTest.cpp" compile="1"
             resource="0" file="tests/MotionLuaSlidersTest.cpp"/>
       <FILE id="MotionDrawingGuardT" name="MotionDrawingGuardTest.cpp" compile="1"
             resource="0" file="tests/MotionDrawingGuardTest.cpp"/>
-      <FILE id="MotionMidiRecSessionT" name="MotionMidiRecordingSessionTest.cpp"
-            compile="1" resource="0" file="tests/MotionMidiRecordingSessionTest.cpp"/>
-      <FILE id="MotionMidiEditingT" name="MotionMidiEditingTest.cpp" compile="1"
-            resource="0" file="tests/MotionMidiEditingTest.cpp"/>
-      <FILE id="MotionMidiRenderT" name="MotionMidiRenderTest.cpp" compile="1"
-            resource="0" file="tests/MotionMidiRenderTest.cpp"/>
-      <FILE id="PreparedNoteVoiceT" name="PreparedNoteVoiceTest.cpp" compile="1"
-            resource="0" file="tests/PreparedNoteVoiceTest.cpp"/>
-      <FILE id="MotionMidiDocumentT" name="MotionMidiDocumentTest.cpp" compile="1"
-            resource="0" file="tests/MotionMidiDocumentTest.cpp"/>
-      <FILE id="MotionMidiImportT" name="MotionMidiImportTest.cpp" compile="1"
-            resource="0" file="tests/MotionMidiImportTest.cpp"/>
       <FILE id="MotionSignalT" name="MotionSignalExportTest.cpp" compile="1"
             resource="0" file="tests/MotionSignalExportTest.cpp"/>
       <FILE id="MotionPerfT" name="MotionPerformanceTest.cpp" compile="1"
@@ -88,14 +74,6 @@
             resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
       <FILE id="MotionSrcDec" name="SourceDecoding.cpp" compile="1" resource="0"
             file="Source/motion/import/SourceDecoding.cpp"/>
-    </GROUP>
-    <GROUP id="SharedVoiceTest" name="Shared voice engine">
-      <FILE id="SVEngTest" name="SharedVoiceEngineTest.cpp" compile="1" resource="0"
-            file="tests/SharedVoiceEngineTest.cpp"/>
-      <FILE id="SVEngSound" name="ShapeSound.cpp" compile="1" resource="0"
-            file="Source/audio/synth/ShapeSound.cpp"/>
-      <FILE id="SVEngVoice" name="ShapeVoice.cpp" compile="1" resource="0"
-            file="Source/audio/synth/ShapeVoice.cpp"/>
     </GROUP>
     <GROUP id="{4373FA2A-1E20-AAA6-40E0-740C13D88B75}" name="Source">
       <GROUP id="{F3A16E09-874D-45F4-A045-20839A1CDB88}" name="video">
@@ -212,11 +190,6 @@
                 file="Source/parser/lottie/LottieParser.cpp"/>
           <FILE id="lTsP02" name="LottieParser.h" compile="0" resource="0" file="Source/parser/lottie/LottieParser.h"/>
         </GROUP>
-        <GROUP id="{B7E30008-2D78-4CD2-9195-222222222222}" name="img">
-          <FILE id="iTsP01" name="ImageParser.cpp" compile="1" resource="0" file="Source/parser/img/ImageParser.cpp"/>
-          <FILE id="iTsP02" name="ImageParser.h" compile="0" resource="0" file="Source/parser/img/ImageParser.h"/>
-          <FILE id="iTsG01" name="gifdec.c" compile="1" resource="0" file="modules/gifdec/gifdec.c"/>
-        </GROUP>
       </GROUP>
     </GROUP>
     <GROUP id="{C3D4E5F6-A7B8-9012-CDEF-123456789012}" name="Tests">
@@ -255,8 +228,6 @@
             file="tests/ObjLoadingTests.cpp"/>
       <FILE id="LotTst" name="LottieParserTests.cpp" compile="1" resource="0"
             file="tests/LottieParserTests.cpp"/>
-      <FILE id="ImgSvT" name="ImageParserServicesTest.cpp" compile="1" resource="0"
-            file="tests/ImageParserServicesTest.cpp"/>
       <FILE id="UndoRedo" name="UndoRedoTests.cpp" compile="1" resource="0"
             file="tests/UndoRedoTests.cpp"/>
       <FILE id="LuBnH" name="LuaBenchmarkHelpers.h" compile="0" resource="0"

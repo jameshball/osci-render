@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 #include <cmath>
-#include "DahdsrSegments.h"
 
 // Centralized constants for audio/MIDI quirks.
 namespace osci_audio
@@ -10,10 +9,6 @@ namespace osci_audio
 // Tiny epsilon prevents a weird mac glitch at certain exact frequencies.
 // Keep this centralized so we don't cargo-cult magic numbers.
 inline constexpr double kMacFrequencyEpsilonHz = 1.0e-6;
-
-inline float voiceVelocityGain(float velocity, float tracking) {
-    return 1.0f + tracking * (velocity - 1.0f);
-}
 
 // DAHDSR time parameter bounds and step.
 inline constexpr float kDahdsrTimeMinSeconds = 0.0f;
@@ -23,6 +18,29 @@ inline constexpr float kDahdsrTimeStepSeconds = 0.00001f;
 // Envelope time-axis zoom bounds (seconds).
 inline constexpr double kEnvelopeZoomMinSeconds = 0.05;
 inline constexpr double kEnvelopeZoomMaxSeconds = 30.0;
+
+inline float evalCurve01(float curveValue, float pos)
+{
+    pos = juce::jlimit(0.0f, 1.0f, pos);
+
+    if (std::abs(curveValue) <= 0.001f)
+        return pos;
+
+    const float denom = 1.0f - std::exp(curveValue);
+    const float numer = 1.0f - std::exp(pos * curveValue);
+    return (denom != 0.0f) ? (numer / denom) : pos;
+}
+
+inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
+
+inline float evalSegment(float start, float end, double elapsed, double duration, float curve)
+{
+    if (duration <= 0.0)
+        return end;
+    const float pos = (float) juce::jlimit(0.0, 1.0, elapsed / duration);
+    const float shaped = evalCurve01(curve, pos);
+    return lerp(start, end, shaped);
+}
 
 // Maximum absolute power value for smooth/power segments (matches Vital's kMaxPower).
 inline constexpr float kMaxPower = 20.0f;
@@ -61,10 +79,34 @@ inline float evalSmoothPowerSegment(float start, float end, double elapsed, doub
 }
 }
 
+struct DahdsrParams
+{
+    double delaySeconds = 0.0;
+    double attackSeconds = 0.0;
+    double attackLevel = 1.0;
+    double holdSeconds = 0.0;
+    double decaySeconds = 0.0;
+    double sustainLevel = 0.0; // [0..1]
+    double releaseSeconds = 0.0;
+
+    float attackCurve = 0.0f;
+    float decayCurve = 0.0f;
+    float releaseCurve = 0.0f;
+};
 // Lightweight per-voice envelope evaluator (hot path).
-class DahdsrState {
+class DahdsrState
+{
 public:
-    using Stage = DahdsrStage;
+    enum class Stage
+    {
+        Delay,
+        Attack,
+        Hold,
+        Decay,
+        Sustain,
+        Release,
+        Done,
+    };
 
     void reset(const DahdsrParams& p)
     {
@@ -90,11 +132,12 @@ public:
         if (!midiEnabled)
             return 1.0f;
 
-        float envValue = evaluateDahdsrStage(stage, params, stageElapsed, releaseStartValue);
+        float envValue = currentValue;
 
         switch (stage)
         {
             case Stage::Delay:
+                envValue = 0.0f;
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.delaySeconds)
                 {
@@ -104,6 +147,7 @@ public:
                 break;
 
             case Stage::Attack:
+                envValue = osci_audio::evalSegment(0.0f, (float)params.attackLevel, stageElapsed, params.attackSeconds, params.attackCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.attackSeconds)
                 {
@@ -113,6 +157,7 @@ public:
                 break;
 
             case Stage::Hold:
+                envValue = (float)params.attackLevel;
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.holdSeconds)
                 {
@@ -122,6 +167,7 @@ public:
                 break;
 
             case Stage::Decay:
+                envValue = osci_audio::evalSegment((float)params.attackLevel, (float)params.sustainLevel, stageElapsed, params.decaySeconds, params.decayCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.decaySeconds)
                 {
@@ -131,9 +177,11 @@ public:
                 break;
 
             case Stage::Sustain:
+                envValue = (float) params.sustainLevel;
                 break;
 
             case Stage::Release:
+                envValue = osci_audio::evalSegment(releaseStartValue, 0.0f, stageElapsed, params.releaseSeconds, params.releaseCurve);
                 stageElapsed += dtSeconds;
                 if (stageElapsed >= params.releaseSeconds)
                 {
@@ -143,6 +191,7 @@ public:
                 break;
 
             case Stage::Done:
+                envValue = 0.0f;
                 break;
         }
 

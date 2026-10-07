@@ -10,7 +10,6 @@
 #include <vector>
 
 class FileParser;
-class RenderImportServices;
 class OscirenderAudioProcessor;
 class VoiceManager;
 
@@ -107,7 +106,6 @@ private:
 
     OscirenderAudioProcessor& processor;
     VoiceManager& voices;
-    std::shared_ptr<RenderImportServices> importServices;
     std::vector<File> files;
     int nextFileId = 0;
 

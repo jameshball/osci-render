@@ -104,7 +104,6 @@ void MotionEditor::registerCommands() {
     addCommand(3, "Play / pause", juce::KeyPress(juce::KeyPress::spaceKey), "Space", [this] { togglePlayback(); });
     addCommand(3, "Go to start", juce::KeyPress(juce::KeyPress::homeKey), "Home", [this] { seekAndReveal(0); });
     addCommand(3, "Go to end", juce::KeyPress(juce::KeyPress::endKey), "End", [this] { seekAndReveal(processor.document.project().duration); });
-    addCommand(3, "Record armed track", juce::KeyPress('r', shift, 0), "Shift+R", [this] { recordArmedTrack(); });
     addCommand(3, "Previous frame", juce::KeyPress(juce::KeyPress::leftKey), "Left", [this] { stepFrames(-1); });
     addCommand(3, "Next frame", juce::KeyPress(juce::KeyPress::rightKey), "Right", [this] { stepFrames(1); });
     addCommand(3, "Back ten frames", juce::KeyPress(juce::KeyPress::leftKey, shift, 0), "Shift+Left", [this] { stepFrames(-10); });
@@ -122,12 +121,10 @@ void MotionEditor::registerCommands() {
     menus.addMenuSeparator(5);
     addCommand(5, "Show timeline", juce::KeyPress('1', juce::ModifierKeys::altModifier, 0), "Alt+1", [this] { timelineTabs.setSelectedIndex(0); });
     addCommand(5, "Show graph", juce::KeyPress('2', juce::ModifierKeys::altModifier, 0), "Alt+2", [this] { timelineTabs.setSelectedIndex(1); });
-    addCommand(5, "Show notes", juce::KeyPress('3', juce::ModifierKeys::altModifier, 0), "Alt+3", [this] { timelineTabs.setSelectedIndex(2); });
     menus.addMenuSeparator(5);
     // Zoom acts on whichever lower panel is showing.
     const auto zoom = [this](double factor) {
         if (curveEditor.isVisible()) { curveEditor.zoomTime(curveEditor.getWidth() * .5f, factor); curveEditor.repaint(); return; }
-        if (notesEditor.isVisible()) { notesEditor.zoomAround(notesEditor.getWidth() / 2, factor); notesEditor.repaint(); return; }
         timeline.zoomBy(factor);
     };
     addCommand(5, "Zoom in", juce::KeyPress('=', command, 0), "Cmd+=", [zoom] { zoom(1.5); });
@@ -346,34 +343,6 @@ void MotionEditor::jumpToKey(bool forward) {
     seekAndReveal(time);
 }
 
-// Records into the first armed track's clip under the playhead (or the next
-// clip after it), through the same take pipeline as the Notes editor.
-void MotionEditor::recordArmedTrack() {
-    auto& session = processor.midiRecordingSession();
-    if (session.busy()) {
-        session.stop();
-        return;
-    }
-    const auto& project = processor.document.project();
-    const auto tempo = project.tempo();
-    const auto time = processor.position.load();
-    for (const auto& track : project.tracks) {
-        if (track.midiInput == 0 || track.kind != motion::TrackKind::visual) { continue; }
-        const motion::Clip* target = nullptr;
-        for (const auto& clip : track.clips) {
-            const auto timing = clip.timing(tempo);
-            if (clip.composition != 0 || timing.end() <= time) { continue; }
-            if (target == nullptr || timing.start < target->timing(tempo).start) { target = &clip; }
-        }
-        if (target == nullptr) { continue; }
-        const auto started = session.start(target->id);
-        if (started.failed()) { statusBar.show(started.getErrorMessage()); } else { statusBar.show("Recording into " + juce::String(target->name) + ". Shift+R stops.", MotionStatusBar::Kind::notice); }
-        return;
-    }
-    const auto armed = std::any_of(project.tracks.begin(), project.tracks.end(), [](const auto& track) { return track.midiInput != 0; });
-    statusBar.show(armed ? "No armed track has a clip at or after the playhead to record into." : "Arm a track for MIDI input first (the red dot in its header).");
-}
-
 void MotionEditor::placeClipAtPlayhead(bool start, bool trim) {
     // Like After Effects, [ ] and Alt+[ ] act on every selected clip at once.
     const auto& project = processor.document.project();
@@ -470,7 +439,7 @@ void MotionEditor::showShortcuts() {
     sections.push_back({"Timeline", {{"V / B / S / R", "Move, ripple trim, slip and stretch tools"}, {"M", "Add a marker at the playhead"},
         {"Drag empty space", "Select clips (Shift adds)"}, {"Alt while dragging", "Bypass snapping"}, {"Drag a row's bottom edge", "Resize the track (double-click resets)"},
         {"Double-click a lane", "Add a key"}}});
-    sections.push_back({"Scrolling and zoom (timeline, graph, notes)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
+    sections.push_back({"Scrolling and zoom (timeline, graph)", {{"Wheel / two fingers", "Pan (Shift: horizontal)"}, {"Cmd+wheel / pinch", "Zoom time around the pointer"},
         {"Alt+wheel", "Track height, value range or key height"}}});
     sections.push_back({"Graph", {{"Double-click", "Add a key"}, {"Drag a box", "Select keys (Shift adds)"}, {"Drag box edges", "Scale key times"},
         {"F / Shift+F", "Frame all curves / this curve"}, {"Right-click a key", "Interpolation and easing"}, {"Drag the time axis", "Scrub"}}});

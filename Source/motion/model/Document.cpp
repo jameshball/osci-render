@@ -459,11 +459,10 @@ static juce::Result retimed(const Project& state, double initialBpm, std::shared
     return juce::Result::ok();
 }
 
-juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label, bool showBars) {
+juce::Result Document::setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label) {
     Project next;
     const auto result = retimed(project(), initialBpm, std::move(changes), next);
     if (result.failed()) { return result; }
-    if (showBars) { next.timeDisplay = TimeDisplay::beats; }
     edit(label, [next = std::move(next)](Project& project) { project = next; });
     return juce::Result::ok();
 }
@@ -542,8 +541,7 @@ juce::Result Document::duplicateClip(Id sourceId, Id& duplicateId) {
 
 std::size_t Document::assetUses(Id assetId) const {
     if (assetId == 0) { return 0; }
-    return countClips(mainProject(), [assetId](const auto& clip) { return clip.asset == assetId; })
-        + countClips(mainProject(), [assetId](const auto& clip) { return clip.midiAsset == assetId; });
+    return countClips(mainProject(), [assetId](const auto& clip) { return clip.asset == assetId; });
 }
 
 bool Document::setTrackHeight(Id trackId, int height) {
@@ -605,8 +603,7 @@ juce::Result Document::replaceAsset(Id assetId, std::shared_ptr<const Asset> rep
     if (found == nullptr) { return juce::Result::fail("The source no longer exists."); }
     if (replacement == nullptr || replacement->id != assetId) { return juce::Result::fail("Invalid replacement source."); }
     const auto audio = [](const Asset& asset) { return asset.audio != nullptr; };
-    const auto midiOnly = [](const Asset& asset) { return asset.midi != nullptr && asset.source == nullptr; };
-    if (audio(*found) != audio(*replacement) || midiOnly(*found) || midiOnly(*replacement)) {
+    if (audio(*found) != audio(*replacement)) {
         return juce::Result::fail(audio(*found) ? "Replace a soundtrack with another audio file." : "Replace a visual source with another visual file.");
     }
     const bool lua = replacement->extension.equalsIgnoreCase(".lua");
@@ -1015,7 +1012,6 @@ juce::Result Document::makeCompositionUnique(Id clipId, Id& definitionId) {
         const auto old = modulator.id;
         modulator.id = ++highest;
         modulators.emplace(old, modulator.id);
-        modulator.source = remap(modulator.source);
     }
     for (auto& route : copy->routes) {
         route.id = ++highest;
@@ -1083,7 +1079,6 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
         // scoped independently inside the definition after this operation.
         copy.muted = !trackIsAudible(state, track);
         copy.solo = false;
-        copy.midiInput = 0; // live input reaches main-timeline tracks only
         auto group = track.group;
         while (group != 0) {
             requiredGroups.insert(group);
@@ -1135,7 +1130,6 @@ juce::Result Document::createComposition(const std::vector<Id>& clipIds, juce::S
             if (source == state.modulators.end()) { continue; }
             auto copy = *source;
             copy.id = ++highest;
-            if (copy.kind != ModulatorKind::oscillator && !selected.contains(copy.source)) { copy.source = 0; }
             modulatorIds.emplace(route.modulator, copy.id);
             definition->modulators.push_back(std::move(copy));
         }
@@ -1261,99 +1255,6 @@ juce::Result Document::setClipTiming(Id clipId, ClipTiming resolvedSeconds) {
         }
     }
     return juce::Result::fail("The selected clip no longer exists.");
-}
-
-juce::Result Document::editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation) {
-    const auto& state = project();
-    for (std::size_t trackIndex = 0; trackIndex < state.tracks.size(); ++trackIndex) {
-        const auto& track = state.tracks[trackIndex];
-        for (std::size_t clipIndex = 0; clipIndex < track.clips.size(); ++clipIndex) {
-            const auto& original = track.clips[clipIndex];
-            if (original.id != clipId) { continue; }
-            if (track.kind != TrackKind::visual) { return juce::Result::fail("MIDI performance requires a visual track."); }
-            if (original.composition != 0) { return juce::Result::fail("Open the composition and assign MIDI to one of its media clips."); }
-            if (track.locked) { return juce::Result::fail("Unlock the track before editing its MIDI performance."); }
-            auto changed = original;
-            const auto result = operation(changed);
-            if (result.failed()) { return result; }
-            if (!track.canPlace(changed, clipId, state.tempo())) {
-                return juce::Result::fail("MIDI assignment would produce invalid or overlapping clip timing.");
-            }
-            if (changed.instrument == original.instrument && changed.midi == original.midi && changed.midiAsset == original.midiAsset
-                && changed.timeBase == original.timeBase && changed.contentBpm == original.contentBpm && changed.sameTiming(original)) {
-                return juce::Result::ok();
-            }
-            edit(label, [trackIndex, clipIndex, changed = std::move(changed)](Project& project) {
-                project.tracks.change(trackIndex).clips[clipIndex] = changed;
-            });
-            return juce::Result::ok();
-        }
-    }
-    return juce::Result::fail("The selected clip no longer exists.");
-}
-
-juce::Result Document::setMidiInstrument(Id clipId, MidiInstrument settings) {
-    if (!settings.valid()) { return juce::Result::fail("Envelope times must be between 0 and 30 seconds; sustain must be between 0 and 1."); }
-    return editMidi(clipId, "Change MIDI envelope", [settings](Clip& clip) {
-        clip.instrument = settings;
-        return juce::Result::ok();
-    });
-}
-
-juce::Result Document::assignMidi(Id clipId, Id assetId) {
-    const auto& state = project();
-    std::shared_ptr<const MidiNotes> notes;
-    if (assetId == 0) {
-        const auto empty = MidiNotes::create({});
-        if (!empty) { return juce::Result::fail(empty.error); }
-        notes = empty.source;
-    } else {
-        const auto asset = findAsset(state.assets, assetId);
-        if (asset != nullptr && isMidiSource(asset->extension)) { notes = asset->midi; }
-        if (notes == nullptr) { return juce::Result::fail("Choose an imported MIDI source that has been decoded successfully."); }
-    }
-    return editMidi(clipId, "Assign MIDI performance", [&](Clip& clip) {
-        if (!clip.anchorToBeats(state.tempo())) { return juce::Result::fail("Cannot anchor this clip to the project tempo."); }
-        clip.midi = notes;
-        clip.midiAsset = assetId;
-        return juce::Result::ok();
-    });
-}
-
-juce::Result Document::setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel) {
-    if (notes == nullptr) { return juce::Result::fail("MIDI note content must not be null. Use Clear MIDI to remove a performance."); }
-    return editMidi(clipId, undoLabel.isEmpty() ? "Edit MIDI notes" : undoLabel, [&](Clip& clip) {
-        if (clip.midi == nullptr) { return juce::Result::fail("Assign a MIDI performance before editing notes."); }
-        if (clip.midi->sameContent(*notes)) { return juce::Result::ok(); }
-        clip.midi = notes;
-        return juce::Result::ok();
-    });
-}
-
-juce::Result Document::recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration) {
-    if (merged == nullptr) { return juce::Result::fail("Recorded MIDI note content must not be null."); }
-    if (generation() != expectedGeneration) {
-        return juce::Result::fail("The recording target changed before the take was saved.");
-    }
-    const auto tempo = project().tempo();
-    return editMidi(clipId, "Record MIDI notes", [expected = std::move(expected), merged = std::move(merged), tempo](Clip& clip) {
-        if (clip.midi != expected) { return juce::Result::fail("The recording target changed before the take was saved."); }
-        if (expected != nullptr && expected->sameContent(*merged)) { return juce::Result::ok(); }
-        if (clip.timeBase != ClipTimeBase::beats && !clip.anchorToBeats(tempo)) {
-            return juce::Result::fail("Cannot anchor this clip to the project tempo.");
-        }
-        clip.midi = merged;
-        clip.midiAsset = 0;
-        return juce::Result::ok();
-    });
-}
-
-juce::Result Document::clearMidi(Id clipId) {
-    return editMidi(clipId, "Clear MIDI performance", [](Clip& clip) {
-        clip.midi.reset();
-        clip.midiAsset = 0;
-        return juce::Result::ok();
-    });
 }
 
 static bool hasCamera(const Project& project, Id id) {
@@ -1517,7 +1418,6 @@ juce::Result Document::addModulator(Modulator modulator, Id& id) {
     modulator.id = newId();
     normaliseModulator(modulator);
     if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
-    if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(project(), modulator.source)) { return juce::Result::fail("The modulator's source clip does not exist."); }
     id = modulator.id;
     edit("Add modulator", [modulator](Project& project) { project.modulators.push_back(modulator); });
     return juce::Result::ok();
@@ -1529,7 +1429,6 @@ juce::Result Document::setModulator(Modulator modulator) {
     const auto found = std::find_if(list.begin(), list.end(), [&](const auto& item) { return item.id == modulator.id; });
     if (found == list.end()) { return juce::Result::fail("The modulator no longer exists."); }
     if (!modulator.valid()) { return juce::Result::fail("Invalid modulator settings."); }
-    if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(project(), modulator.source)) { return juce::Result::fail("The modulator's source clip does not exist."); }
     if (*found == modulator) { return juce::Result::ok(); }
     editCoalesced("Change modulator", "modulator:" + juce::String(modulator.id), [modulator](Project& project) {
         for (auto& item : project.modulators) {

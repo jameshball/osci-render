@@ -76,10 +76,6 @@ CompositionExpansionResult expandComposition(const ProjectType& project, Visitor
                 if (!mapped.has_value()) { continue; }
                 stages.push_back({&track, &clip, *visible, *mapped, &scope.groups, &scope.effects, scope.tempo()});
                 if (clip.composition != 0) {
-                    if (clip.midi != nullptr) {
-                        result.error = "MIDI patterns must be assigned to media clips inside a reusable composition.";
-                        return false;
-                    }
                     if (track.kind != TrackKind::visual) {
                         result.error = "Reusable compositions require a visual track.";
                         return false;

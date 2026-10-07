@@ -9,7 +9,7 @@
 namespace motion {
 
 // Prepared off the render thread. Lengths and search boundaries never change
-// during playback; product timelines and MIDI voices may share the geometry.
+// during playback; product timelines may share the geometry.
 class PreparedDrawing {
 public:
     explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source) : shapes(std::move(source)) {

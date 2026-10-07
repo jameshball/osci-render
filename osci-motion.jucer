@@ -7,8 +7,7 @@
               companyWebsite="https://osci-render.com" companyEmail="james@ball.sh"
               defines="NOMINMAX=1&#10;INTERNET_FLAG_NO_AUTO_REDIRECT=0&#10;OSCI_PREMIUM=1&#10;JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1&#10;JUCE_MODAL_LOOPS_PERMITTED=1&#10;MOODYCAMEL_ATOMICOPS=1&#10;OSCI_GUI_ENABLE_VISUALISER=1&#10;OSCI_GUI_ENABLE_CHOWDSP_RESAMPLING=1&#10;OSCI_LICENSING_BACKEND_PUBLIC_KEY_B64=&quot;k+h7shISLMQLpxigeGnb47E7CuO+EK0XQTFSTApC7RE=&quot;&#10;OSCI_LICENSING_RELEASE_PUBLIC_KEY_B64=&quot;RP/nTsRlcw7c19gM6Cw8QU7JjhO+RxrPiTkJtS52n9s=&quot;&#10;OSCI_MOTION=1&#10;TVG_STATIC=1&#10;THORVG_LOTTIE_LOADER_SUPPORT=1"
               pluginManufacturerCode="Jhba" pluginCode="Osmo" bundleIdentifier="sh.ball.oscimotion"
-              pluginFormats="buildStandalone" pluginCharacteristicsValue="pluginWantsMidiIn"
-              postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
+              pluginFormats="buildStandalone" postExportShellCommandPosix="echo &quot;Building LuaJIT for $OSTYPE...&quot; &amp;&amp; DIR=%%1%% %%1%%/luajit_linux_macos.sh ">
   <MAINGROUP id="j5Ge2T" name="osci-motion">
     <GROUP id="{5ABCED88-0059-A7AF-9596-DBF91DDB0292}" name="Resources">
       <GROUP id="{42A9EAA7-6D00-065D-0F8B-755E9B552173}" name="audio"/>
@@ -439,8 +438,6 @@
               file="Source/motion/import/LuaBaker.h"/>
         <FILE id="MotimportLuaSliderBakesh" name="LuaSliderBakes.h" compile="0"
               resource="0" file="Source/motion/import/LuaSliderBakes.h"/>
-        <FILE id="MotimportMidiSourcePreparerh" name="MidiSourcePreparer.h"
-              compile="0" resource="0" file="Source/motion/import/MidiSourcePreparer.h"/>
         <FILE id="MotimportRasterBeamBuilderh" name="RasterBeamBuilder.h" compile="0"
               resource="0" file="Source/motion/import/RasterBeamBuilder.h"/>
         <FILE id="MotimportRasterSourcePreparerh" name="RasterSourcePreparer.h"
@@ -512,10 +509,6 @@
               compile="0" resource="0" file="Source/motion/model/LiveSourceIdentity.h"/>
         <FILE id="MotmodelLuaClipBakeh" name="LuaClipBake.h" compile="0" resource="0"
               file="Source/motion/model/LuaClipBake.h"/>
-        <FILE id="MotmodelMidiInstrumenth" name="MidiInstrument.h" compile="0"
-              resource="0" file="Source/motion/model/MidiInstrument.h"/>
-        <FILE id="MotmodelMidiNotesh" name="MidiNotes.h" compile="0" resource="0"
-              file="Source/motion/model/MidiNotes.h"/>
         <FILE id="motmodulation" name="Modulation.h" compile="0" resource="0"
               file="Source/motion/model/Modulation.h"/>
         <FILE id="motmodgraph" name="ModulationGraph.h" compile="0" resource="0"
@@ -566,30 +559,10 @@
               compile="0" resource="0" file="Source/motion/render/CompositionPreparationWorker.h"/>
         <FILE id="MotCompositionRenderer" name="CompositionRenderer.h" compile="0"
               resource="0" file="Source/motion/render/CompositionRenderer.h"/>
-        <FILE id="MotrenderLiveMidiAuditionh" name="LiveMidiAudition.h" compile="0"
-              resource="0" file="Source/motion/render/LiveMidiAudition.h"/>
-        <FILE id="MotrenderLiveMidiInputsh" name="LiveMidiInputs.h" compile="0"
-              resource="0" file="Source/motion/render/LiveMidiInputs.h"/>
-        <FILE id="MotrenderLiveMidiPerformanceh" name="LiveMidiPerformance.h"
-              compile="0" resource="0" file="Source/motion/render/LiveMidiPerformance.h"/>
-        <FILE id="MotrenderMidiRecordingh" name="MidiRecording.h" compile="0"
-              resource="0" file="Source/motion/render/MidiRecording.h"/>
-        <FILE id="MotrenderMidiRecordingSessionh" name="MidiRecordingSession.h"
-              compile="0" resource="0" file="Source/motion/render/MidiRecordingSession.h"/>
-        <FILE id="MotrenderMidiTakeNotesh" name="MidiTakeNotes.h" compile="0"
-              resource="0" file="Source/motion/render/MidiTakeNotes.h"/>
         <FILE id="MotPreparedDrivers" name="PreparedDrivers.h" compile="0"
               resource="0" file="Source/motion/render/PreparedDrivers.h"/>
         <FILE id="MotPreparedEffects" name="PreparedEffects.h" compile="0"
               resource="0" file="Source/motion/render/PreparedEffects.h"/>
-        <FILE id="MotrenderPreparedMidiInstrumenth" name="PreparedMidiInstrument.h"
-              compile="0" resource="0" file="Source/motion/render/PreparedMidiInstrument.h"/>
-        <FILE id="MotrenderPreparedMidiPerformanceh" name="PreparedMidiPerformance.h"
-              compile="0" resource="0" file="Source/motion/render/PreparedMidiPerformance.h"/>
-        <FILE id="MotrenderPreparedMidiScheduleh" name="PreparedMidiSchedule.h"
-              compile="0" resource="0" file="Source/motion/render/PreparedMidiSchedule.h"/>
-        <FILE id="MotrenderPreparedNoteVoiceh" name="PreparedNoteVoice.h" compile="0"
-              resource="0" file="Source/motion/render/PreparedNoteVoice.h"/>
         <FILE id="motsoundtrack" name="PreparedSoundtrack.h" compile="0" resource="0"
               file="Source/motion/render/PreparedSoundtrack.h"/>
         <FILE id="MotrenderPreparedStateh" name="PreparedState.h" compile="0"
@@ -661,8 +634,6 @@
               resource="0" file="Source/motion/ui/LuaSourceEditor.h"/>
         <FILE id="MotuiMarkerPanelh" name="MarkerPanel.h" compile="0" resource="0"
               file="Source/motion/ui/MarkerPanel.h"/>
-        <FILE id="MotuiMidiEnvelopePanelh" name="MidiEnvelopePanel.h" compile="0"
-              resource="0" file="Source/motion/ui/MidiEnvelopePanel.h"/>
         <FILE id="MotuiModulatorPanelscpp" name="ModulatorPanels.cpp" compile="1"
               resource="0" file="Source/motion/ui/ModulatorPanels.cpp"/>
         <FILE id="MotModulatorPanels" name="ModulatorPanels.h" compile="0"
@@ -673,10 +644,6 @@
               file="Source/motion/ui/MotionPath.h"/>
         <FILE id="MotuiMotionStyleh" name="MotionStyle.h" compile="0" resource="0"
               file="Source/motion/ui/MotionStyle.h"/>
-        <FILE id="MotuiNotesEditorcpp" name="NotesEditor.cpp" compile="1" resource="0"
-              file="Source/motion/ui/NotesEditor.cpp"/>
-        <FILE id="MotuiNotesEditorh" name="NotesEditor.h" compile="0" resource="0"
-              file="Source/motion/ui/NotesEditor.h"/>
         <FILE id="MotuiPreviewGestureh" name="PreviewGesture.h" compile="0"
               resource="0" file="Source/motion/ui/PreviewGesture.h"/>
         <FILE id="MotuiPropertyInspectorcpp" name="PropertyInspector.cpp" compile="1"

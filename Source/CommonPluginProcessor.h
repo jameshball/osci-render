@@ -54,10 +54,6 @@ public:
 
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override final;
     virtual void processBlockInternal(juce::AudioBuffer<float>&, juce::MidiBuffer&) = 0;
-    // Called instead of processBlockInternal when a block is not processed:
-    // `unavailable` is true while suspended or awaiting the legal notice (the
-    // buffer is cleared) and false for an empty block.
-    virtual void processBlockSkipped(bool unavailable) {}
     virtual void prepareToPlayInternal(double effectiveSampleRate, int internalSamplesPerBlock) {}
     virtual bool supportsInternalSampleRateOverride() const { return false; }
 

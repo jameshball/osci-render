@@ -2,7 +2,6 @@
 """Generate original Phase / Space inputs; never construct an arranged project."""
 import argparse
 import math
-import struct
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -48,21 +47,6 @@ def create_assets(destination):
         draw.ellipse((48-radius, 48-radius, 48+radius, 48+radius), outline=1, width=2)
         frames.append(frame)
     frames[0].save(destination / "Raster pulse.gif", save_all=True, append_images=frames[1:], duration=80, loop=0, disposal=2, transparency=0)
-
-    def variable(value):
-        result = [value & 127]
-        while value > 127:
-            value >>= 7
-            result.insert(0, 128 | (value & 127))
-        return bytes(result)
-
-    events = bytearray(b"\x00\xff\x51\x03\x07\xa1\x20")
-    for pitch in (62, 69, 65, 72, 69, 62, 65, 60):
-        events += b"\x00\x90" + bytes((pitch, 96))
-        events += variable(360) + b"\x80" + bytes((pitch, 0))
-        events += variable(120) + b"\xff\x01\x00"
-    events += b"\x00\xff\x2f\x00"
-    (destination / "Pulse phrase.mid").write_bytes(b"MThd" + struct.pack(">IHHH", 6, 0, 1, 480) + b"MTrk" + struct.pack(">I", len(events)) + events)
 
 
 if __name__ == "__main__":

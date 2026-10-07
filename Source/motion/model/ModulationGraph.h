@@ -57,7 +57,7 @@ private:
     std::map<Id, const PropertyMap*> owners;
 };
 
-// A visual media clip (the kind that can carry MIDI or be a camera target).
+// A visual media clip (the kind that can be a camera target).
 template <typename CompositionType>
 bool hasVisualClip(const CompositionType& composition, Id clipId) {
     for (const auto& track : composition.tracks) {
@@ -89,9 +89,6 @@ std::string validateModulation(const CompositionType& composition) {
     std::set<Id> modulators;
     for (const auto& modulator : composition.modulators) {
         if (!modulator.valid() || !modulators.insert(modulator.id).second) { return "Invalid or duplicate modulator settings."; }
-        if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) {
-            return "A MIDI modulator follows a clip that does not exist in its composition.";
-        }
     }
     const DrivableProperties drivable(composition);
     for (const auto& route : composition.routes) {
@@ -138,16 +135,13 @@ void cloneDrivers(CompositionType& composition, const std::map<Id, Id>& owners, 
     });
 }
 
-// Drops routes, links, envelope sources and camera targets/parents whose
+// Drops routes, links and camera targets/parents whose
 // referents were deleted, so removing a clip never leaves the composition
 // unloadable.
 template <typename CompositionType>
 void pruneReferences(CompositionType& composition) {
     std::set<Id> modulators;
-    for (auto& modulator : composition.modulators) {
-        modulators.insert(modulator.id);
-        if (modulator.kind != ModulatorKind::oscillator && modulator.source != 0 && !hasVisualClip(composition, modulator.source)) { modulator.source = 0; }
-    }
+    for (const auto& modulator : composition.modulators) { modulators.insert(modulator.id); }
     const DrivableProperties drivable(composition);
     std::erase_if(composition.routes, [&](const auto& route) {
         return !modulators.contains(route.modulator) || !drivable.contains(route.target, route.property);

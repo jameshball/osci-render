@@ -2,8 +2,6 @@
 
 #include "Animation.h"
 #include "Effects.h"
-#include "MidiNotes.h"
-#include "MidiInstrument.h"
 #include "ClipTiming.h"
 #include "SharedList.h"
 #include "Tempo.h"
@@ -41,12 +39,6 @@ struct Clip {
     double rate = 1.0;
     PropertyMap properties;
     std::vector<EffectInstance> effects;
-    // Optional performance for this visual source. Immutable patterns are shared
-    // by duplication/undo; an edit replaces only the selected clip's pattern.
-    MidiInstrument instrument;
-    Id midiAsset = 0;
-    std::shared_ptr<const MidiNotes> midi;
-
     ClipTimeBase timeBase = ClipTimeBase::seconds;
     double contentBpm = 120;
     // Position keys aligned on all three axes travel one spatial path; aligned
@@ -78,10 +70,6 @@ struct Clip {
     void nudgeStartPast(double boundary, const Tempo& tempo) {
         for (int step = 0; step < 4 && timing(tempo).start < boundary; ++step) { start = std::nextafter(start, std::numeric_limits<double>::infinity()); }
     }
-    // A beat of the clip's MIDI in content seconds, and in project seconds on
-    // its resolved timing.
-    double contentSeconds(double beat, const Tempo& tempo) const { return beat * 60 / curveBpm(tempo); }
-    double beatTime(double beat, const Tempo& tempo, const ClipTiming& timing) const { return timing.projectTime(contentSeconds(beat, tempo)); }
     bool setTiming(ClipTiming value, const Tempo& tempo) {
         if (!tempo.valid() || !value.valid()) { return false; }
         auto next = *this;
@@ -135,7 +123,6 @@ struct Clip {
     bool contains(double projectTime, const Tempo& tempo) const { const auto t = timing(tempo); return projectTime >= t.start && projectTime < t.end(); }
     double localTime(double projectTime, const Tempo& tempo) const { return timing(tempo).localTime(projectTime); }
     bool valid() const {
-        if (!instrument.valid()) { return false; }
         for (const auto& [name, curve] : properties) {
             if (!curve.valid()) {
                 return false;
@@ -215,16 +202,12 @@ struct Track {
     bool locked = false;
     Id group = 0;
     TrackKind kind = TrackKind::visual;
-    // Live MIDI input: 0 off, 1-16 one channel, 17 any channel. Armed visual
-    // tracks play and record what arrives, drawn inside the composition.
-    int midiInput = 0;
     // Timeline row height in pixels (0: the default). View state: saved with
     // the project, changed without undo and kept across undo/redo.
     int height = 0;
     static constexpr int minimumHeight = 22, maximumHeight = 240;
     // Label colour index for the timeline (0: automatic, by clip kind).
     int label = 0;
-    static constexpr int anyMidiChannel = 17;
 
     // Overlap requires an explicit transition (added by the transition model).
     // Ordinary placement is non-destructive: rejection leaves existing clips intact.

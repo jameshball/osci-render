@@ -11,7 +11,7 @@ public:
     struct Fixture {
         juce::UndoManager undo;
         motion::Document document{undo};
-        motion::Id first = 0, second = 0, drums = 0;
+        motion::Id first = 0, second = 0;
         void initialise() {
             auto asset = std::make_shared<motion::Asset>();
             asset->id = document.newId(); asset->name = "triangle.obj"; asset->extension = ".obj";
@@ -25,17 +25,12 @@ public:
             auto b = motion::Document::makeClip(document.newId(), *asset, 2);
             b.duration = 6;
             b.offset = 1;
-            auto c = motion::Document::makeClip(document.newId(), *asset, 0);
-            c.duration = 8;
-            std::vector<motion::MidiNote> notes {{1, 0, 0.5, 36, 127, 1}, {2, 2, 0.5, 38, 64, 1}, {3, 4, 0.5, 36, 127, 1}};
-            c.midi = motion::MidiNotes::create(notes).source;
-            first = a.id; second = b.id; drums = c.id;
-            motion::Track one, two, three;
+            first = a.id; second = b.id;
+            motion::Track one, two;
             one.id = document.newId(); one.name = "One"; one.insert(a, motion::Tempo(120));
             two.id = document.newId(); two.name = "Two"; two.insert(b, motion::Tempo(120));
-            three.id = document.newId(); three.name = "Drums"; three.insert(c, motion::Tempo(120));
             motion::Project project;
-            project.duration = 10; project.bpm = 120; project.assets = {asset}; project.tracks = {one, two, three};
+            project.duration = 10; project.bpm = 120; project.assets = {asset}; project.tracks = {one, two};
             document.reset(std::move(project));
         }
         const motion::PreparedClip* prepared(const motion::PreparedComposition& composition, motion::Id id) const {
@@ -68,33 +63,6 @@ public:
             expectWithinAbsoluteError(b->curves[1].evaluate(b->localTime(3.5)), -(2 * 0.75 - 1), 1.0e-9);
             expect(f.document.removeModulator(lfoId).wasOk());
             expect(f.document.project().routes.empty());
-        }
-        beginTest("Envelopes follow a MIDI clip's notes, pitch range and velocity");
-        {
-            Fixture f; f.initialise();
-            motion::Modulator kick;
-            kick.name = "Kick";
-            kick.kind = motion::ModulatorKind::envelope;
-            kick.source = f.drums;
-            kick.attack = 0.01; kick.decay = 0.1; kick.sustain = 0.5; kick.release = 0.2;
-            kick.lowestPitch = 36; kick.highestPitch = 36;
-            motion::Id id = 0, route = 0;
-            expect(f.document.addModulator(kick, id).wasOk());
-            expect(f.document.addRoute({0, id, f.first, "scale.x", 1, motion::ModulationMode::add}, route).wasOk());
-            motion::PreparedComposition composition(f.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry);
-            const auto* a = f.prepared(composition, f.first);
-            const auto scaleAt = [&](double time) { return a->curves[6].evaluate(a->localTime(time)) - 1; };
-            expectWithinAbsoluteError(scaleAt(0.005), 0.5, 1.0e-9); // halfway up the attack
-            expectWithinAbsoluteError(scaleAt(0.06), 0.75, 1.0e-9); // halfway down the decay
-            expectWithinAbsoluteError(scaleAt(0.2), 0.5, 1.0e-9);   // sustain while held (0.25 s note)
-            expectWithinAbsoluteError(scaleAt(0.35), 0.25, 1.0e-9); // halfway through the release
-            expectWithinAbsoluteError(scaleAt(1.1), 0.0, 1.0e-9);   // the snare (38) is outside the range
-            expectWithinAbsoluteError(scaleAt(2.2), 0.5, 1.0e-9);   // the second kick at beat 4 = 2 s
-            kick.id = id; kick.velocity = 1; kick.lowestPitch = 0; kick.highestPitch = 127;
-            expect(f.document.setModulator(kick).wasOk());
-            motion::PreparedComposition all(f.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry);
-            const auto* b = f.prepared(all, f.first);
-            expectWithinAbsoluteError(b->curves[6].evaluate(b->localTime(1.2)) - 1, 0.5 * 64 / 127.0, 1.0e-9);
         }
         beginTest("Links replace keys with a scaled, delayed copy of another property");
         {
@@ -175,19 +143,6 @@ public:
             expectEquals(static_cast<int>(fork.routes.size()), 1);
             expect(fork.routes[0].target != f.first && fork.routes[0].modulator == fork.modulators[0].id);
             expect(motion::findPropertyCurve(fork, fork.routes[0].target, "position.y") != nullptr);
-        }
-        beginTest("Envelopes stay exact and cheap under a long held note");
-        {
-            motion::PreparedModulator envelope;
-            envelope.kind = motion::ModulatorKind::envelope;
-            envelope.envelope.sustainLevel = 0.25;
-            envelope.envelope.releaseSeconds = 0.1;
-            envelope.notes.push_back({0, 60, 1});
-            for (int index = 0; index < 2000; ++index) { envelope.notes.push_back({0.5 + index * 0.02, 0.5 + index * 0.02 + 0.01, 0.8}); }
-            envelope.buildIndex();
-            expectWithinAbsoluteError(envelope.value(10.505, 0), 0.25, 1.0e-9); // drone sustain vs a short note's sustain
-            expectWithinAbsoluteError(envelope.value(60.05, 0), 0.125, 1.0e-9);  // drone halfway through its release
-            expectWithinAbsoluteError(envelope.value(61, 0), 0.0, 1.0e-9);
         }
         beginTest("Audio properties refuse routes and links; duplicates keep internal links");
         {

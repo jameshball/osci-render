@@ -22,11 +22,6 @@ MotionProcessor::MotionProcessor()
     getUndoManager().setMaxNumberOfStoredUnits(256 * 1024, 5);
     preparationWorker = std::make_unique<motion::CompositionPreparationWorker>([this] { triggerAsyncUpdate(); });
     blender = std::make_unique<motion::LiveBlenderController>(document, [this](auto frames) { publishLiveSources(std::move(frames)); });
-    midiSession = std::make_unique<motion::MidiRecordingSession>(document, midiRecording, motion::MidiRecordingSession::Transport{
-        [this] { return getEffectiveSampleRate(); }, [this] { return position.load(); },
-        [this] { return midiDeviceReady.load() && !isSuspended() && !legalNoticePending.load() && !isPreparingComposition() && !preparationFailed.load(); },
-        [this](motion::Id id) { setMidiAudition(id); }, [this](const auto& config) { return armMidiRecording(config); }
-    });
     document.onChanged = [this] {
         // The loop range reaches the audio thread with every edit, editor or not.
         const auto& project = document.project();
@@ -44,7 +39,6 @@ MotionProcessor::~MotionProcessor() {
     // timer before destroying its document access and publication callback.
     const juce::MessageManagerLock messageLock;
     visualiserParameters.applyExternalModulation = nullptr;
-    midiSession.reset();
     blender.reset();
     preparationWorker.reset();
     cancelPendingUpdate();
@@ -69,7 +63,6 @@ void MotionProcessor::handleAsyncUpdate() {
     if (result->composition != nullptr && result->composition->sampleRate != preparationSampleRate) { return; }
     acceptedPreparationRevision = result->revision;
     preparationError = result->error;
-    preparationFailed.store(preparationError.isNotEmpty());
     // A failed edit keeps playing the last good snapshot instead of blanking;
     // the editor reports the error. The audio thread only ever sees snapshots
     // that prepared completely.
@@ -84,53 +77,19 @@ bool MotionProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     return layouts.getMainInputChannelSet().isDisabled() && (channels == 2 || channels == 5);
 }
 
-bool MotionProcessor::armMidiRecording(const motion::MidiRecording::Config& config) {
-    const juce::SpinLock::ScopedLockType lock(midiLifecycleLock);
-    return midiDeviceReady.load() && midiRecording.arm(config);
-}
-
-void MotionProcessor::stopMidiDevice() {
-    // Callbacks are excluded here. Holding the arm lock means a take is either
-    // armed before this stop (and finished by it) or refused afterwards.
-    const juce::SpinLock::ScopedLockType lock(midiLifecycleLock);
-    midiDeviceReady.store(false);
-    midiRecording.deviceStopped();
-    recordingOwnsTransport = false;
-}
-
-void MotionProcessor::releaseResources() {
-    stopMidiDevice();
-    CommonAudioProcessor::releaseResources();
-}
-
 void MotionProcessor::prepareToPlayInternal(double sampleRate, int samplesPerBlock) {
-    stopMidiDevice();
     signal.setSize(6, samplesPerBlock);
     audioSample = motion::sampleIndex(audioTime, sampleRate).value_or(0);
     oscillatorSample = audioSample;
-    liveMidi.prepare(sampleRate);
-    liveMidiSample = 0;
-    {
-        const juce::SpinLock::ScopedLockType lock(midiLifecycleLock);
-        midiDeviceReady.store(true);
-    }
     requestedSampleRate.store(sampleRate);
     triggerAsyncUpdate();
     transitionGuard.begin();
 }
 
-void MotionProcessor::releaseRecordingTransport() {
-    const auto state = midiRecording.state();
-    if (recordingOwnsTransport && state != motion::MidiRecording::State::armed && state != motion::MidiRecording::State::recording) {
-        recordingOwnsTransport = false;
-        playing.store(false);
-    }
-}
-
 void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
+    juce::ScopedNoDenormals noDenormals;
     lastCallbackMs.store(juce::Time::getMillisecondCounterHiRes(), std::memory_order_relaxed);
     buffer.clear();
-    releaseRecordingTransport();
     const auto* prepared = composition.acquire();
     const auto* liveBlock = liveSources.acquire();
     const auto* liveFrames = liveBlock != nullptr ? liveBlock->frames.get() : nullptr;
@@ -140,17 +99,12 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto sampleRate = getEffectiveSampleRate();
     const auto count = buffer.getNumSamples();
-    const auto unavailableRecording = [&] {
-        midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(std::max<juce::int64>(0, audioSample)), static_cast<std::uint32_t>(std::max(0, count)), playing.load(), false);
-    };
-    if (count > signal.getNumSamples()) { unavailableRecording(); midi.clear(); resetLiveMidi(); return; }
+    if (count > signal.getNumSamples()) { midi.clear(); return; }
     // Shared output gain/clip buffers are allocated during prepareToPlay, but
     // must be populated each block before music monitoring or physical XY output.
     volumeEffect->animateValues(count, nullptr);
     thresholdEffect->animateValues(count, nullptr);
     if (prepared == nullptr || prepared->preparationError.isNotEmpty() || prepared->sampleRate != sampleRate || !std::isfinite(sampleRate) || sampleRate <= 0) {
-        unavailableRecording();
-        resetLiveMidi();
         midi.clear();
         transitionGuard.begin();
         for (int i = 0; i < count; ++i) {
@@ -168,88 +122,27 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     }
     const auto durationIndex = motion::sampleIndex(prepared->duration, sampleRate);
     if (!durationIndex.has_value() || *durationIndex < 1) {
-        unavailableRecording();
         midi.clear();
-        resetLiveMidi();
         return;
     }
     const auto durationSamples = *durationIndex;
     // Plans hold pointers into the composition and live frames; either change replans.
     const auto liveGeneration = liveBlock != nullptr ? liveBlock->revision : std::numeric_limits<std::uint64_t>::max();
     const auto beamGeneration = prepared->publicationRevision * 0x9E3779B97F4A7C15ull + liveGeneration;
-    const auto auditionId = midiAuditionTarget.load();
-    const motion::PreparedClip* audition = nullptr;
-    if (auditionId != 0) {
-        const auto found = std::find_if(prepared->clips.begin(), prepared->clips.end(), [auditionId](const auto& clip) { return clip.id == auditionId; });
-        if (found != prepared->clips.end()) { audition = &*found; }
-    }
-    const auto resolvedAudition = audition != nullptr ? auditionId : 0;
-    if (resolvedAudition != previousAuditionTarget) {
-        resetLiveMidi();
-        previousAuditionTarget = resolvedAudition;
-        transitionGuard.begin();
-    }
-    if (audition != nullptr && audition->liveInstrument != nullptr && !liveMidi.usesInstrument(*audition->liveInstrument)) {
-        liveMidi.useInstrument(*audition->liveInstrument);
-        transitionGuard.begin();
-    }
-    // Armed tracks, in project order, each with its clip's instrument.
-    const auto armed = std::min(prepared->liveTracks.size(), motion::LiveMidiInputs::maximumRoutes);
-    for (std::size_t index = 0; index < armed; ++index) {
-        const auto& track = prepared->liveTracks[index];
-        auto& route = liveInputs.routes[index];
-        if (route.track != track.track) {
-            route.performance.reset();
-            route.track = track.track;
-        }
-        route.channel = track.channel;
-        if (track.instrument != nullptr && !route.performance.usesInstrument(*track.instrument)) { route.performance.useInstrument(*track.instrument); }
-    }
-    for (auto index = armed; index < liveInputs.count; ++index) {
-        liveInputs.routes[index].performance.reset();
-        liveInputs.routes[index].track = 0;
-    }
-    liveInputs.count = armed;
     const auto requested = requestedPosition.exchange(-1.0);
     if (requested >= 0.0 && std::isfinite(requested)) {
         audioSample = motion::sampleIndex(std::min(requested, prepared->duration), sampleRate).value_or(0);
         oscillatorSample = audioSample;
-        resetLiveMidi();
         transitionGuard.begin();
     }
-    const auto recordingStart = midiRecording.transportStart();
-    if (recordingStart.has_value()) {
-        audioSample = static_cast<juce::int64>(std::min<std::uint64_t>(*recordingStart, static_cast<std::uint64_t>(durationSamples - 1)));
-        oscillatorSample = audioSample;
-        resetLiveMidi();
-        playing.store(true);
-        recordingOwnsTransport = true;
-        transitionGuard.begin();
-    }
-    const auto requestedPlay = playing.load();
-    if (requestedPlay && audioSample >= durationSamples) {
-        audioSample = 0;
-    }
-    // Capture unowned byte views before the input buffer is consumed. Only the
-    // continuous span before a project wrap belongs to this pass.
-    const auto recordSamples = static_cast<std::uint32_t>(std::min<juce::int64>(count, std::max<juce::int64>(0, durationSamples - audioSample)));
-    if (midiRecording.beginBlock(sampleRate, static_cast<std::uint64_t>(audioSample), recordSamples, requestedPlay, true, requested >= 0)) {
-        for (const auto metadata : midi) { midiRecording.event(metadata.samplePosition, metadata.data, metadata.numBytes); }
-        midiRecording.endBlock();
-    } else {
-        // A Stop or Cancel observed by beginBlock ends recording-started playback
-        // before this block produces a sample, even if it raced the start above.
-        releaseRecordingTransport();
-    }
-    // The beam keeps drawing while stopped (the picture at the playhead, and
-    // held notes on armed tracks); starting or stopping guards the jump.
-    const auto running = playing.load() && requestedPlay;
+    // The beam keeps drawing while stopped (the picture at the playhead);
+    // starting or stopping guards the jump.
+    const auto running = playing.load();
+    if (running && audioSample >= durationSamples) { audioSample = 0; }
     if (running != wasPlaying) { transitionGuard.begin(); }
     wasPlaying = running;
     juce::int64 loopStartSample = 0, loopEndSample = 0;
-    // A take records straight through: no loop while recording MIDI.
-    const auto takeOpen = midiRecording.state() == motion::MidiRecording::State::armed || midiRecording.state() == motion::MidiRecording::State::recording;
-    if (looping.load(std::memory_order_relaxed) && !takeOpen) {
+    if (looping.load(std::memory_order_relaxed)) {
         const auto first = motion::sampleIndex(std::clamp(loopStart.load(std::memory_order_relaxed), 0.0, prepared->duration), sampleRate);
         const auto last = motion::sampleIndex(std::clamp(loopEnd.load(std::memory_order_relaxed), 0.0, prepared->duration), sampleRate);
         if (first.has_value() && last.has_value() && *last > *first) { loopStartSample = static_cast<juce::int64>(*first); loopEndSample = static_cast<juce::int64>(*last); }
@@ -258,15 +151,10 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
     const auto audible = !muteParameter->getBoolValue();
     const auto* volumes = volumeEffect->getAnimatedValuesReadPointer(0, count);
     const auto fallbackVolume = volumeEffect->getValue();
-    motion::LiveMidiInputCursor events(midi);
     for (int i = 0; i < count; ++i) {
-        if (events.dispatch(audition != nullptr ? &liveMidi : nullptr, i, liveMidiSample, &liveInputs)) { transitionGuard.begin(); }
         audioTime = static_cast<double>(audioSample) / sampleRate;
         if (running) { oscillatorSample = audioSample; }
-        liveInputs.clockOffset = static_cast<std::int64_t>(liveMidiSample) - static_cast<std::int64_t>(oscillatorSample);
-        auto point = audition != nullptr ? motion::sampleLiveMidiAudition(*prepared, *audition, liveMidi, audioTime, liveMidiSample, sampleRate, running, liveFrames)
-            : beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames, liveInputs.count > 0 ? &liveInputs : nullptr);
-        point = transitionGuard.apply(point);
+        const auto point = transitionGuard.apply(beam.sample(*prepared, audioTime, static_cast<std::int64_t>(oscillatorSample), sampleRate, running, beamGeneration, liveFrames));
         if (mode == OutputMode::soundtrack && running && audible && buffer.getNumChannels() >= 2) {
             const auto audio = prepared->soundtrack.sample(audioTime);
             const auto volume = volumes != nullptr ? volumes[i] : fallbackVolume;
@@ -277,11 +165,6 @@ void MotionProcessor::processBlockInternal(juce::AudioBuffer<float>& buffer, juc
         }
         writeSignal(i, point);
         ++oscillatorSample;
-        if (liveMidiSample == std::numeric_limits<std::uint64_t>::max()) {
-            resetLiveMidi();
-            liveMidiSample = 0;
-            transitionGuard.begin();
-        } else { ++liveMidiSample; }
         if (running) {
             ++audioSample;
             // Crossing the loop end jumps back to its start; starting after
@@ -353,7 +236,6 @@ void MotionProcessor::applyPreparedProject(motion::Project prepared, juce::XmlEl
     // with the editor and the live-source owner, after worker preparation.
     const juce::MessageManagerLock messageLock;
     document.reset(std::move(prepared));
-    setMidiAudition(0);
     VisualiserState::load(state, visualiserParameters, recordingParameters);
     restoreStandaloneProjectFilePathFromXml(state);
     loadProperties(state);

@@ -33,12 +33,6 @@ struct Asset {
     juce::String bakeKey;
     std::shared_ptr<const PreparedSource> source;
     std::shared_ptr<const PreparedAudio> audio;
-    std::shared_ptr<const MidiNotes> midi;
-    double midiImportBpm = 120;
-    double midiSuggestedBpm = 120;
-    // The file's tempo changes after its first beat (runtime, re-derived on load).
-    std::shared_ptr<const std::vector<TempoChange>> midiTempoChanges;
-    int midiIgnoredEvents = 0;
 };
 
 // Composition content is independent of the project-wide media registry.
@@ -183,7 +177,7 @@ public:
     void reset(Project project);
     juce::Result changeTempo(double bpm);
     // Replace the initial tempo and every change in one undo step.
-    juce::Result setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label, bool showBars = false);
+    juce::Result setTempoMap(double initialBpm, std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
     // A steady tempo from audio analysis, and the soundtrack clip moved so its
     // first downbeat (content seconds) lands on a bar line. One undo step.
     juce::Result setTempoFromAudio(Id soundtrackClip, double bpm, double downbeat, double& moved);
@@ -213,8 +207,6 @@ public:
     // Pastes keys with their relative timing so the earliest lands at `time`.
     juce::Result pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, double time);
     juce::Result removeClips(const std::vector<Id>& clipIds, bool ripple = false);
-    juce::Result setMidiInstrument(Id clipId, MidiInstrument settings);
-    juce::Result assignMidi(Id clipId, Id assetId);
     juce::Result renameAsset(Id assetId, juce::String name);
     // Swaps a source's media in place (same identity, so every clip keeps its
     // timing, keys and effects). The kind must match: visual for visual,
@@ -242,14 +234,9 @@ public:
     // step, and kept by later undo and redo.
     void changeView(std::function<void(Composition&)> change);
     // Removes the listed sources (or every unused source when empty) that no
-    // clip, composition or MIDI assignment references; one undo step.
+    // clip or composition references; one undo step.
     juce::Result removeUnusedAssets(std::vector<Id> assetIds, int& removed);
     std::size_t assetUses(Id assetId) const;
-    juce::Result setMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> notes, juce::String undoLabel);
-    // Guarded by the clip's current notes, not the global revision, so edits
-    // elsewhere during a take do not discard it.
-    juce::Result recordMidiNotes(Id clipId, std::shared_ptr<const MidiNotes> expected, std::shared_ptr<const MidiNotes> merged, std::uint64_t expectedGeneration);
-    juce::Result clearMidi(Id clipId);
     // Camera cuts form the camera track: each shows one camera over a range.
     // A cut at `time` ends the cut it falls in and lasts until the next cut.
     juce::Result cutToCamera(Id camera, double time, Id& cutId);
@@ -314,7 +301,6 @@ private:
     bool beamOutsideMain(Id target) const { return scopeId != 0 && target == state.beam.id; }
     Id highestId() const;
     juce::Result retempo(std::shared_ptr<const std::vector<TempoChange>> changes, juce::String label);
-    juce::Result editMidi(Id clipId, juce::String label, const std::function<juce::Result(Clip&)>& operation);
     void apply(Project value);
     Project mergeScope(Project view) const;
     // An edited view, made consistent and merged into the whole project.

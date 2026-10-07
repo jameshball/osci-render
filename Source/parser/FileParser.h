@@ -1,8 +1,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "../audio/synth/PointSource.h"
-#include "ImportServices.h"
 #include "img/ImageParser.h"
 #include <osci_file_import/osci_file_import.h>
 #include <osci_scripting/osci_scripting.h>
@@ -10,15 +8,16 @@
 #include "lottie/LottieParser.h"
 #endif
 
-class FileParser : public PointSource, public std::enable_shared_from_this<FileParser> {
+class OscirenderAudioProcessor;
+class FileParser : public FrameSource, public std::enable_shared_from_this<FileParser> {
 public:
-	FileParser(std::shared_ptr<ImportServices> services, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
+	FileParser(OscirenderAudioProcessor &p, std::function<void(int, juce::String, juce::String)> errorCallback = nullptr);
 
-	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font& font);
+	void parse(juce::String fileId, juce::String fileName, juce::String extension, std::unique_ptr<juce::InputStream> stream, juce::Font font);
 	void prepareLiveImageInput(int width, int height);
 	void updateLiveImageFrame(const std::vector<std::uint8_t>& rgba, int width, int height, bool verticallyFlipped);
 	std::vector<std::unique_ptr<osci::Shape>> nextFrame() override;
-	osci::Point nextSample(LuaState& L, LuaVariables& vars) override;
+	osci::Point nextSample(LuaState& L, LuaVariables& vars);
 
 	bool isSample() override;
 	bool isActive() override;
@@ -51,7 +50,7 @@ private:
 	void showFileSizeWarning(juce::String fileName, int64_t totalBytes, int64_t mbLimit,
 		juce::String fileType, std::function<void()> callback);
 
-	std::shared_ptr<ImportServices> services;
+	OscirenderAudioProcessor& audioProcessor;
 
 	bool active = true;
 	bool sampleSource = false;

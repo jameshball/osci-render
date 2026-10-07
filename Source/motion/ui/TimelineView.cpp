@@ -302,11 +302,6 @@ void MotionTimelineView::refreshTracks() {
                 refreshTracks();
             };
             header->onLock = [this](motion::Id id) { toggleLock(id); };
-            header->onArm = [this](motion::Id id) {
-                const auto& tracks = processor.document.project().tracks;
-                const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
-                if (found != tracks.end()) { setMidiInput(id, found->midiInput == 0 ? motion::Track::anyMidiChannel : 0); }
-            };
             header->onMute = [this](motion::Id id) { toggleTrack(id, false); };
             header->onSolo = [this](motion::Id id) { toggleTrack(id, true); };
             headerArea.addAndMakeVisible(*header);
@@ -314,7 +309,6 @@ void MotionTimelineView::refreshTracks() {
             found = headers.end() - 1;
         }
         const auto lanes = group ? false : !animatedProperties(track).empty();
-        (*found)->armingAvailable = processor.document.editingComposition() == 0;
         (*found)->update(track, group, collapsedGroups.contains(track.id), lanes, expandedTracks.contains(track.id));
     };
     for (const auto& track : project.tracks) { updateHeader(track, false); }
@@ -395,15 +389,6 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
             candidate = motion::Document::makeCompositionClip(candidate.id, **definition, candidate.start);
         }
         const bool recursive = definition != definitions.end() && !processor.document.canReferenceComposition(dropAssetId);
-        if (asset != assets.end() && (*asset)->midi != nullptr) {
-            int targetRow = -1;
-            const auto* target = clipAt(*dropPosition, targetRow);
-            if (target != nullptr && tracks[targetRow].kind == motion::TrackKind::visual && !tracks[targetRow].locked) {
-                g.setColour(osci::Colours::accentColor());
-                g.drawRoundedRectangle(clipBounds(*target, targetRow).toFloat().reduced(2), 3, 2);
-            }
-            return;
-        }
         const bool audio = asset != assets.end() && (*asset)->audio != nullptr;
         const auto kind = audio ? motion::TrackKind::audio : motion::TrackKind::visual;
         const bool correctKind = row < 0 || row >= static_cast<int>(tracks.size()) || tracks[row].kind == kind;
@@ -562,18 +547,6 @@ void MotionTimelineView::insertAsset(motion::Id assetId, int x, int y) {
         const auto result = processor.document.insertComposition(assetId, snapTime(time, juce::ModifierKeys::getCurrentModifiers()), track, groupAtY(y), inserted);
         if (result.failed()) { if (onError) { onError(result.getErrorMessage()); } return; }
         selectClip(inserted); refreshTracks();
-        return;
-    }
-    if ((*asset)->midi != nullptr) {
-        int row = -1;
-        const auto* under = x >= namesWidth ? clipAt({x, y}, row) : nullptr;
-        const auto target = x < 0 ? selected : (under != nullptr ? under->id : 0);
-        const auto result = processor.document.assignMidi(target, assetId);
-        if (result.failed()) {
-            if (onError) { onError(result.getErrorMessage()); }
-        } else if (onMidiAssigned) {
-            onMidiAssigned(target);
-        }
         return;
     }
     const auto time = x < namesWidth ? processor.position.load() : std::max(0.0, scrollTime + (x - namesWidth) / pixelsPerSecond);
@@ -1580,7 +1553,6 @@ juce::Colour MotionTimelineView::clipColour(const motion::Clip& clip, const moti
     if (label.has_value()) { return *label; }
     if (track.kind == motion::TrackKind::audio) { return motion::style::audioClip(); }
     if (clip.composition != 0) { return motion::style::compositionClip(); }
-    if (clip.midi != nullptr) { return motion::style::midiClip(); }
     return motion::style::visualClip();
 }
 
@@ -2526,13 +2498,6 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
         labels.addColouredItem(300 + static_cast<int>(index), label.name, colour, true, found->label == static_cast<int>(index));
     }
     menu.addSubMenu("Label colour", labels);
-    if (found->kind == motion::TrackKind::visual && processor.document.editingComposition() == 0) {
-        juce::PopupMenu input;
-        input.addItem(200, "Off", true, found->midiInput == 0);
-        input.addItem(200 + motion::Track::anyMidiChannel, "Any channel", true, found->midiInput == motion::Track::anyMidiChannel);
-        for (int channel = 1; channel <= 16; ++channel) { input.addItem(200 + channel, "Channel " + juce::String(channel), true, found->midiInput == channel); }
-        menu.addSubMenu("MIDI input", input);
-    }
     menu.addSeparator();
     menu.addItem(3, "Delete track");
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this, id, groups](int result) {
@@ -2542,7 +2507,6 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
         if (track == current.end()) { return; }
         const auto index = static_cast<int>(track - current.begin());
         if (result == 4) { createGroup(id, track->group); return; }
-        if (result >= 200 && result <= 200 + motion::Track::anyMidiChannel) { setMidiInput(id, result - 200); return; }
         if (result >= 300 && result < 300 + static_cast<int>(motion::style::trackLabels().size())) {
             const auto label = result - 300;
             processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {
@@ -2569,16 +2533,6 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
                 }
             }
         }
-    });
-}
-
-void MotionTimelineView::setMidiInput(motion::Id id, int input) {
-    cancelGesture();
-    processor.document.tryEdit(input == 0 ? "Disarm MIDI input" : "Arm MIDI input", [id, input](motion::Project& project) {
-        auto* track = project.tracks.changeById(id);
-        if (track == nullptr || track->kind != motion::TrackKind::visual || track->midiInput == input) { return false; }
-        track->midiInput = input;
-        return true;
     });
 }
 

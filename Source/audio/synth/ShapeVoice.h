@@ -2,14 +2,14 @@
 #include <JuceHeader.h>
 #include "VoiceManager.h"
 #include "ShapeSound.h"
-#include "VoiceContext.h"
 #include "../modulation/DahdsrEnvelope.h"
 #include "../modulation/EnvState.h"
 #include <osci_scripting/osci_scripting.h>
 
+class OscirenderAudioProcessor;
 class ShapeVoice : public juce::SynthesiserVoice {
 public:
-	ShapeVoice(VoiceContext& context, juce::AudioSampleBuffer& externalAudio, int voiceIndex);
+	ShapeVoice(OscirenderAudioProcessor& p, juce::AudioSampleBuffer& externalAudio, int voiceIndex);
 
 	void prepareToPlay(double sampleRate, int samplesPerBlock);
 	bool canPlaySound(juce::SynthesiserSound* sound) override;
@@ -51,9 +51,7 @@ public:
 private:
 	const double MIN_LENGTH_INCREMENT = 0.000001;
 
-	VoiceContext& context;
-	VoiceParameters parameters;
-	VoiceTelemetry& telemetry;
+	OscirenderAudioProcessor& audioProcessor;
 	const int voiceIndex = 0;
 	std::vector<std::unique_ptr<osci::Shape>> frame;
 	std::atomic<ShapeSound*> sound = nullptr;
@@ -104,7 +102,7 @@ private:
 
 	// Per-voice effect instances (cloned from global toggleableEffects)
 	// Mapped by effect ID so we can use global ordering from toggleableEffects
-	VoiceEffectMap voiceEffectsMap;
+	std::unordered_map<juce::String, std::shared_ptr<osci::SimpleEffect>> voiceEffectsMap;
 	std::shared_ptr<osci::SimpleEffect> voicePreviewEffect;
 	
 	// Working buffers for per-voice effect processing

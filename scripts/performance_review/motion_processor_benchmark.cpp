@@ -68,14 +68,13 @@ struct Options {
     juce::String project, output, mode = "xyrgb";
     double rate = 48000;
     int blockSize = 256, warmup = 2000, blocks = 5000;
-    bool verifyOutputControls = false, liveSourceChurn = false, midiRecording = false;
+    bool verifyOutputControls = false, liveSourceChurn = false;
 };
 
 Options parse(const juce::StringArray& args) {
     Options options;
     for (int i = 0; i < args.size(); ++i) {
         const auto key = args[i];
-        if (key == "--midi-recording") { options.midiRecording = true; continue; }
         if (key == "--live-source-churn") { options.liveSourceChurn = true; continue; }
         if (key == "--verify-output-controls") {
             options.verifyOutputControls = true;
@@ -380,26 +379,11 @@ int runBenchmark() {
         const auto deadline = options.blockSize / options.rate;
         const auto durationSamples = motion::sampleIndex(processor.document.project().duration, options.rate).value_or(0);
         if (durationSamples < 1) { throw std::runtime_error("Invalid project sample duration"); }
-        if (options.midiRecording) {
-            if (options.blockSize < 32 || static_cast<std::uint64_t>(options.blocks) * options.blockSize >= static_cast<std::uint64_t>(durationSamples)) {
-                throw std::runtime_error("MIDI recording fixture needs blocks >=32 samples and one continuous project pass");
-            }
-            motion::MidiRecording::Config config;
-            config.token = 1; config.target = 1; config.sampleRate = options.rate;
-            config.endSample = static_cast<std::uint64_t>(durationSamples);
-            if (!processor.midiRecorder().arm(config)) { throw std::runtime_error("Cannot arm MIDI recording fixture"); }
-        }
         for (int index = 0; index < options.blocks; ++index) {
             const auto liveX = index % 2 == 0 ? .2f : .4f;
             if (options.liveSourceChurn) { publishLiveFrame(liveX); }
             audio.clear();
             midi.clear();
-            if (options.midiRecording) {
-                midi.addEvent(juce::MidiMessage::noteOn(2, 60 + index % 12, static_cast<juce::uint8>(96)), 5);
-                midi.addEvent(juce::MidiMessage::controllerEvent(2, 64, index % 2 == 0 ? 127 : 0), 13);
-                midi.addEvent(juce::MidiMessage::pitchWheel(2, 8192 + index % 1024), 21);
-                midi.addEvent(juce::MidiMessage::noteOff(2, 60 + index % 12), options.blockSize - 7);
-            }
 #if defined(OSCI_ALLOCATION_PROBE) && OSCI_ALLOCATION_PROBE
             allocationProbe.enable(1);
 #endif
@@ -447,46 +431,6 @@ int runBenchmark() {
                 }
             }
         }
-        if (options.midiRecording) {
-            processor.midiRecorder().requestStop(1);
-            process();
-            const auto take = processor.midiRecorder().collect();
-            if (!take || take->failure != motion::MidiRecording::Failure::none || take->firstSample != 0
-                || take->endSample != static_cast<std::uint64_t>(options.blocks) * options.blockSize
-                || take->events.size() != static_cast<std::size_t>(options.blocks) * 4) {
-                throw std::runtime_error("MIDI recording did not preserve the complete measured pass");
-            }
-            const std::array<int, 4> offsets{5, 13, 21, options.blockSize - 7};
-            const std::array<int, 4> statuses{0x91, 0xb1, 0xe1, 0x81};
-            for (std::size_t index = 0; index < take->events.size(); ++index) {
-                const auto& event = take->events[index];
-                if (event.sample != (index / 4) * options.blockSize + offsets[index % 4]
-                    || event.size != 3 || event.bytes[0] != statuses[index % 4]) {
-                    throw std::runtime_error("MIDI recording changed channel bytes or sample offsets");
-                }
-            }
-        }
-        if (options.midiRecording) {
-            motion::MidiRecording::Config config;
-            config.token = 2; config.target = 1; config.sampleRate = options.rate;
-            config.endSample = static_cast<std::uint64_t>(durationSamples);
-            if (!processor.midiRecorder().arm(config)) { throw std::runtime_error("Cannot arm suspension fixture"); }
-            processor.suspendProcessing(true); process(); processor.suspendProcessing(false);
-            const auto suspended = processor.midiRecorder().collect();
-            if (!suspended || suspended->failure != motion::MidiRecording::Failure::unavailable) { throw std::runtime_error("Suspension did not terminate recording"); }
-            config.token = 3;
-            if (!processor.midiRecorder().arm(config)) { throw std::runtime_error("Cannot arm legal gate fixture"); }
-            processor.legalNoticePending.store(true); process(); processor.legalNoticePending.store(false);
-            const auto gated = processor.midiRecorder().collect();
-            if (!gated || gated->failure != motion::MidiRecording::Failure::unavailable) { throw std::runtime_error("Legal gate did not terminate recording"); }
-            config.token = 4;
-            if (!processor.midiRecorder().arm(config)) { throw std::runtime_error("Cannot arm empty callback fixture"); }
-            processor.midiRecorder().requestStop(config.token);
-            juce::AudioBuffer<float> empty(channels, 0);
-            processor.processBlock(empty, midi);
-            const auto emptyTake = processor.midiRecorder().collect();
-            if (!emptyTake || emptyTake->failure != motion::MidiRecording::Failure::none || !emptyTake->events.empty()) { throw std::runtime_error("Empty callback did not acknowledge Stop"); }
-        }
         if (options.liveSourceChurn && !(sawLiveBase[0] && sawLiveBase[1] && sawLiveTranslated[0] && sawLiveTranslated[1])) {
             throw std::runtime_error("Live callback did not render both instances for both frame versions");
         }
@@ -511,7 +455,6 @@ int runBenchmark() {
         result->setProperty("output_mode", options.mode);
         result->setProperty("output_controls_verified", outputControls.has_value());
         result->setProperty("live_source_churn_verified", options.liveSourceChurn);
-        result->setProperty("midi_recording_verified", options.midiRecording);
         if (outputControls.has_value()) {
             auto controls = std::make_unique<juce::DynamicObject>();
             controls->setProperty("representative_time_seconds", 10.0);

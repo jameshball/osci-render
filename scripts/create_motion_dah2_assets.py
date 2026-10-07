@@ -167,39 +167,6 @@ TEXT = {
 }
 
 
-def melody_midi(path):
-    """A "do da dahh" answer phrase for the breakdown, 8 bars at 150 BPM."""
-    division = 480
-    phrase = [(0, 1, 76, 90), (1, 1, 79, 90), (2, 2, 84, 110),     # do da dahh
-              (4, 1, 74, 80), (5, 1, 77, 80), (6, 2, 81, 100),
-              (8, 1, 76, 90), (9, 1, 79, 90), (10, 1, 84, 105), (11, 1, 86, 110),
-              (12, 4, 88, 120)]
-    events = []
-    for repeat in range(2):
-        for beat, length, pitch, velocity in phrase:
-            start = (repeat * 16 + beat) * division
-            events.append((start, 0x90, pitch, velocity))
-            events.append((start + length * division - 30, 0x80, pitch, 0))
-    events.sort(key=lambda event: (event[0], event[1]))
-    data, last = bytearray(), 0
-
-    def vlq(value):
-        out = [value & 0x7f]
-        value >>= 7
-        while value:
-            out.append((value & 0x7f) | 0x80)
-            value >>= 7
-        return bytes(reversed(out))
-    tempo = int(60_000_000 / BPM)
-    data += vlq(0) + bytes([0xff, 0x51, 3]) + tempo.to_bytes(3, "big")
-    for time, status, pitch, velocity in events:
-        data += vlq(time - last) + bytes([status, pitch, velocity])
-        last = time
-    data += vlq(0) + bytes([0xff, 0x2f, 0])
-    path.write_bytes(b"MThd" + (6).to_bytes(4, "big") + (0).to_bytes(2, "big") + (1).to_bytes(2, "big") + division.to_bytes(2, "big")
-                     + b"MTrk" + len(data).to_bytes(4, "big") + bytes(data))
-
-
 def equaliser_gif(path, frames=16, size=96):
     from PIL import Image, ImageDraw
     images = []
@@ -235,16 +202,14 @@ def main():
         record(name, "OBJ", f"{note}; {vertices} vertices, {edges} edges")
     svg(out / "Dot.svg", '<circle cx="0" cy="0" r="3" fill="none" stroke="white"/>', "a single point of light")
     record("Dot.svg", "SVG", "tiny circle")
-    svg(out / "Ring.svg", '<circle cx="0" cy="0" r="60" fill="none" stroke="white"/>', "note ring for MIDI")
-    record("Ring.svg", "SVG", "circle traced at note pitch")
+    svg(out / "Ring.svg", '<circle cx="0" cy="0" r="60" fill="none" stroke="white"/>', "halo ring")
+    record("Ring.svg", "SVG", "circle")
     for name, source in LUA.items():
         (out / name).write_text(source.strip() + "\n")
         record(name, "Lua", "loops on bar multiples at 150 BPM")
     for name, text in TEXT.items():
         (out / name).write_text(text + "\n")
         record(name, "Text", text)
-    melody_midi(out / "Melody.mid")
-    record("Melody.mid", "MIDI", "8-bar do-da-dahh answer phrase, repeated once")
     equaliser_gif(out / "Equaliser.gif")
     record("Equaliser.gif", "GIF", "6 bars, 16 frames, one frame per sixteenth")
     if args.music.exists():

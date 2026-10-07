@@ -43,7 +43,7 @@ inline void writeCurveKey(juce::MemoryOutputStream& key, const Curve& curve) {
 // The bake a Lua clip needs, or nothing when it has no slider curves: the
 // script, its bake settings stretched over the clip's content, and a key over
 // everything that shapes the frames, including the routes, their modulators
-// (and MIDI sources) and the links that drive its sliders. Soundtrack
+// and the links that drive its sliders. Soundtrack
 // loudness is not available at bake time.
 inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip& clip, const Composition& composition) {
     if (!asset.extension.equalsIgnoreCase(".lua") || asset.bakeKey.isEmpty()) { return std::nullopt; }
@@ -77,16 +77,6 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
                 if (other.id != id) { continue; }
                 const auto placed = other.timing(tempo);
                 for (const auto value : {placed.start, placed.end(), placed.offset, placed.rate}) { key.writeDouble(value); }
-                // The notes themselves, so a saved bake still matches after loading.
-                if (other.midi == nullptr) { continue; }
-                for (const auto& note : other.midi->notes()) {
-                    for (const auto value : {note.start, note.duration}) { key.writeDouble(value); }
-                    for (const auto value : {note.pitch, note.velocity, note.channel}) { key.writeInt(value); }
-                }
-                for (const auto& control : other.midi->controls()) {
-                    key.writeDouble(control.beat);
-                    for (const auto value : {control.channel, control.number, control.value}) { key.writeInt(value); }
-                }
             }
         }
     };
@@ -99,14 +89,10 @@ inline std::optional<LuaSliderPlan> luaSliderPlan(const Asset& asset, const Clip
             key.writeInt(static_cast<int>(route.mode));
             for (const auto& modulator : composition.modulators) {
                 if (modulator.id != route.modulator) { continue; }
-                key.writeInt(static_cast<int>(modulator.kind));
                 key.writeInt(static_cast<int>(modulator.shape.waveform));
                 for (const auto value : {modulator.shape.rateHz, modulator.shape.phase, modulator.shape.beatsPerCycle}) { key.writeDouble(value); }
                 key.writeBool(modulator.shape.tempoSync);
                 key.writeInt64(modulator.shape.seed);
-                for (const auto value : {modulator.attack, modulator.decay, modulator.sustain, modulator.release, modulator.velocity}) { key.writeDouble(value); }
-                for (const auto value : {modulator.lowestPitch, modulator.highestPitch, modulator.controller, modulator.controllerChannel}) { key.writeInt(value); }
-                writeClip(modulator.source);
             }
         }
         if (curve == nullptr || !curve->link.has_value() || depth > 64) { return; }
