@@ -389,10 +389,10 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
             if (task->cancelled.load() || owner->processor.document.generation() != generation) { return; }
             if (result.failed()) {
                 owner->importError = result.getErrorMessage();
-                owner->statusBar.show(owner->importError);
                 owner->textAnimation.clearPending();
                 owner->repaint();
-                // A new script that fails reopens with its code, as an edit does.
+                // A new script that fails reopens with its code, as an edit
+                // does; the editor shows the error where it is.
                 if (request.replacement == nullptr && request.relink == 0 && request.file.hasFileExtension("lua")) {
                     auto retry = request;
                     retry.retrySettings = asset->bakeSettings;
@@ -409,8 +409,10 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
                         retry.preparationError = result.getErrorMessage();
                         owner->preparationRequests.push_front(std::move(retry));
                         owner->showNextPreparationSettings();
+                        return;
                     }
                 }
+                owner->statusBar.show(owner->importError);
                 return;
             }
             auto& document = owner->processor.document;

@@ -68,8 +68,8 @@ try:
     broken = 'error("Keep this draft")'
     source.write_text(original)
     step("import Lua", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
-    step("short source cache", "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", "1")
+    command("wait-for-locator", "--name", "Bake duration", "--exact")
+    step("short source cache", "set-value", "--name", "Bake duration", "--exact", "1")
     step("bake initial source", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", "Undo Import object", "--role", "label", "--exact")
     step("duplicate shared source", "press", "command + d", "--class", "MotionTimelineView")

@@ -4,25 +4,23 @@
 #include "ScrubField.h"
 #include "../model/TextSettings.h"
 
-// Edits a text source inside the Scene, like the drawing editor: the words in
-// their font on a dark page, a floating type bar, and the Scope showing the
-// beam as you type. Per-character animation lives in the clip's Properties.
+// Edits a text source inside the Scene, like the drawing editor: a type bar
+// under the header (font, style, alignment, spacing), the words in their
+// font on the dark page, and the count or a problem in a strip at the foot.
+// The Scope shows the beam as you type. Per-character animation lives in the
+// clip's Properties.
 class MotionTextSourceEditor final : public juce::Component {
 public:
     MotionTextSourceEditor(const juce::String& initial, const juce::String& title, motion::TextSettings initialSettings, const juce::String& preparationError)
         : settings(initialSettings), original(initial), originalSettings(initialSettings) {
         setName("Text editor");
         setWantsKeyboardFocus(true);
-        name.setText(title, juce::dontSendNotification);
-        name.setFont(motion::style::title());
-        name.setBorderSize({0, 6, 0, 0});
-        addAndMakeVisible(name);
         cancelButton.setButtonText("Cancel");
         cancelButton.onClick = [this] { if (onCancel) { onCancel(); } };
         doneButton.setName("Apply text");
         doneButton.setTitle("Apply text");
-        doneButton.setButtonText("Save");
-        doneButton.setTooltip("Save the text");
+        doneButton.setButtonText("Apply");
+        doneButton.setTooltip("Apply the text (Cmd+Return)");
         motion::style::makePrimary(doneButton);
         doneButton.onClick = [this] { finish(); };
         for (auto* button : {&cancelButton, &doneButton}) { addAndMakeVisible(button); }
@@ -39,6 +37,7 @@ public:
         }
         family.setSelectedId(settings.family.isEmpty() ? 1 : families.indexOf(settings.family) + 2, juce::dontSendNotification);
         family.setColour(juce::ComboBox::backgroundColourId, osci::Colours::veryDark());
+        sourceName = title;
         family.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
         family.onChange = [this] {
             const auto index = family.getSelectedId() - 2;
@@ -105,19 +104,20 @@ public:
 
 
     void resized() override {
-        name.setBounds(motion::style::sceneEditor::layoutHeader(getLocalBounds(), doneButton, cancelButton));
-        const auto page = motion::style::sceneEditor::page(getLocalBounds());
-        // The type bar floats 8 px in, like the Scene's tool strip: the font,
-        // its style, alignment, then spacing. A narrow Scene folds it onto
-        // two lines.
-        constexpr int cell = motion::icons::ToolStrip::cell, inset = motion::icons::ToolStrip::inset, groupGap = motion::icons::ToolStrip::groupGap;
+        titleArea = motion::style::sceneEditor::layoutHeader(getLocalBounds(), doneButton, cancelButton);
+        auto page = motion::style::sceneEditor::page(getLocalBounds());
+        // The type bar spans the page under the header: the font and its
+        // style, alignment, then spacing. A narrow Scene folds it onto two
+        // lines.
+        constexpr int cell = motion::icons::ToolStrip::cell, groupGap = motion::icons::ToolStrip::groupGap;
         constexpr int fieldsWidth = 34 + 58 + 8 + 56 + 58, styleWidth = 2 * cell, alignWidth = 3 * cell;
-        constexpr int oneLine = 2 * inset + 150 + groupGap + styleWidth + groupGap + alignWidth + groupGap + fieldsWidth;
-        const auto room = page.getWidth() - 16;
+        constexpr int oneLine = 150 + groupGap + styleWidth + groupGap + alignWidth + groupGap + fieldsWidth;
+        const auto room = page.getWidth() - 2 * motion::style::padding;
         twoLines = room < oneLine;
+        bar = page.removeFromTop((twoLines ? 2 : 1) * cell + 2 * barInset);
         separators.clear();
         const auto separate = [&](juce::Rectangle<int>& line) {
-            separators.push_back(juce::Rectangle<float>(static_cast<float>(line.getX() + groupGap / 2), static_cast<float>(line.getY() + 4), 1.0f, static_cast<float>(cell - 8)));
+            separators.push_back(juce::Rectangle<float>(static_cast<float>(line.getX() + groupGap / 2), static_cast<float>(line.getY() + 5), 1.0f, static_cast<float>(cell - 10)));
             line.removeFromLeft(groupGap);
         };
         const auto spacing = [&](juce::Rectangle<int>& line) {
@@ -127,28 +127,32 @@ public:
             trackingCaption.setBounds(line.removeFromLeft(56).withTrimmedRight(4));
             tracking.setBounds(line.removeFromLeft(58).reduced(0, 3));
         };
-        const auto width = twoLines ? std::min(room, 2 * inset + alignWidth + groupGap + fieldsWidth) : std::min(room, oneLine + 90);
-        bar = {page.getX() + 8, page.getY() + 8, width, (twoLines ? 2 : 1) * cell + 2 * inset};
-        auto first = bar.reduced(inset).removeFromTop(cell);
-        family.setBounds(first.removeFromLeft(first.getWidth() - groupGap - styleWidth - (twoLines ? 0 : groupGap + alignWidth + groupGap + fieldsWidth)).reduced(2, 2));
+        auto inner = bar.reduced(motion::style::padding, barInset);
+        auto first = inner.removeFromTop(cell);
+        family.setBounds(first.removeFromLeft(twoLines ? first.getWidth() - groupGap - styleWidth : std::min(200, room - (oneLine - 150))).reduced(0, 3));
         separate(first);
         bold.setBounds(first.removeFromLeft(cell));
         italic.setBounds(first.removeFromLeft(cell));
-        auto second = twoLines ? bar.reduced(inset).removeFromBottom(cell) : first;
+        auto second = twoLines ? inner.removeFromTop(cell) : first;
         if (!twoLines) { separate(second); }
         for (auto* button : {&alignLeft, &alignCentre, &alignRight}) { button->setBounds(second.removeFromLeft(cell)); }
         separate(second);
         spacing(second);
-        auto writing = page.withTrimmedTop(bar.getBottom() - page.getY() + 8).reduced(16, 0);
-        status.setBounds(writing.removeFromBottom(24).withTrimmedRight(-8));
-        text.setBounds(writing.withTrimmedTop(8));
+        footer = page.removeFromBottom(footerHeight);
+        status.setBounds(footer.reduced(motion::style::padding, 0));
+        text.setBounds(page.reduced(motion::style::padding * 2, motion::style::padding));
     }
 
     void paint(juce::Graphics& g) override {
-        motion::style::sceneEditor::paint(g, getLocalBounds());
-        // A floating panel like the popovers, so its fields read as fields.
-        const auto bounds = bar.toFloat();
-        motion::style::fillFloatingPanel(g, bounds, osci::Colours::surface());
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".txt");
+        // The type bar and the foot are bands of the panel's surface.
+        for (const auto& band : {bar, footer}) {
+            g.setColour(osci::Colours::surface());
+            g.fillRect(band);
+        }
+        g.setColour(juce::Colours::white.withAlpha(.06f));
+        g.fillRect(bar.withTop(bar.getBottom() - 1));
+        g.fillRect(footer.withHeight(1));
         g.setColour(juce::Colours::white.withAlpha(.1f));
         for (const auto& separator : separators) { g.fillRect(separator); }
     }
@@ -213,10 +217,12 @@ private:
     const motion::TextSettings originalSettings;
     juce::String error;
     juce::StringArray families;
-    juce::Rectangle<int> bar;
+    static constexpr int barInset = 2, footerHeight = 26;
+    juce::String sourceName;
+    juce::Rectangle<int> bar, footer, titleArea;
     std::vector<juce::Rectangle<float>> separators;
     bool twoLines = false;
-    juce::Label name, status, lineCaption {{}, "Line"}, trackingCaption {{}, "Tracking"};
+    juce::Label status, lineCaption {{}, "Line"}, trackingCaption {{}, "Tracking"};
     juce::TextButton cancelButton, doneButton;
     juce::ComboBox family;
     using Tool = motion::icons::Button;

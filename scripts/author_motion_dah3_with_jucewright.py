@@ -132,8 +132,8 @@ def import_source(name, start, duration=None, bake=None, offset=None, depth=3, s
     seek(start)
     step("import " + name, "drop-files", "--file", ASSETS / name, "--class", "MotionEditor", "--exact")
     if name.endswith(".lua"):
-        command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
-        step("bake length", "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", str(bake))
+        command("wait-for-locator", "--name", "Bake duration", "--exact")
+        step("bake length", "set-value", "--name", "Bake duration", "--exact", str(bake))
         if samples is not None:
             step("bake samples", "select-option", "--name", "Bake samples per frame", "--exact", "--text", str(samples))
         step("bake " + name, "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")

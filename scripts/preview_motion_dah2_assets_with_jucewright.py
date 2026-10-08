@@ -33,8 +33,8 @@ try:
                  "DAHH.obj", "Tunnel.obj", "Stars.obj", "Ring.svg", "Equaliser.gif", "dahhhhh.txt", "dahh!.txt"]:
         step("import " + name, "drop-files", "--file", (assets / name).resolve(), "--class", "MotionEditor", "--exact")
         if name.endswith(".lua"):
-            command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
-            step("bake length", "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", "6.4")
+            command("wait-for-locator", "--name", "Bake duration", "--exact")
+            step("bake length", "set-value", "--name", "Bake duration", "--exact", "6.4")
             step("bake", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
         elif name.endswith(".gif"):
             command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")

@@ -74,8 +74,8 @@ def import_source(name, start, duration, properties, animation=None):
     seek(start)
     step("import " + name, "drop-files", "--file", assets / name, "--class", "MotionEditor", "--exact")
     if name.endswith(".lua"):
-        command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
-        step("set ribbon bake length", "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", "3.2")
+        command("wait-for-locator", "--name", "Bake duration", "--exact")
+        step("set ribbon bake length", "set-value", "--name", "Bake duration", "--exact", "3.2")
         step("bake ribbon", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     elif name.endswith(".gif"):
         command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")

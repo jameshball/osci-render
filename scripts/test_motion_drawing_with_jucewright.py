@@ -117,7 +117,7 @@ try:
     step('select tool', 'press', 'V', '--class', 'MotionDrawingEditor')
     drag([at(0, .6), at(0, .4), at(0, .3)], 'move curve point')
     step('edited drawing screenshot', 'screenshot', '--file', session.artifact_dir / 'drawing-edit.png')
-    step('save drawing', 'click', '--name', 'Save', '--class', 'juce::TextButton', '--exact')
+    step('save drawing', 'click', '--name', 'Apply', '--class', 'juce::TextButton', '--exact')
     time.sleep(3)
     state = saved()
     edited = drawing_svg(state)

@@ -358,24 +358,46 @@ inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButto
 // The frame the Scene's source editors share: a header with the source's
 // name on the left and Cancel and the primary action on the right, over a
 // dark page.
+// The Scene while a source is written in it (Lua, text, drawing) is a
+// mode: its header is tinted, says "Editing" before the source's name, and
+// holds Cancel and the one action (Add for a new source, Apply otherwise),
+// clear of the next pane's header.
 namespace sceneEditor {
-inline constexpr int headerHeight = 30;
+inline constexpr int headerHeight = 30, buttonWidth = 72;
 // Places the header's buttons and returns the room left for the name.
 inline juce::Rectangle<int> layoutHeader(juce::Rectangle<int> bounds, juce::Component& primary, juce::Component& cancel) {
-    auto header = bounds.removeFromTop(headerHeight).reduced(5, 3);
-    primary.setBounds(header.removeFromRight(64));
-    header.removeFromRight(gap);
-    cancel.setBounds(header.removeFromRight(64));
+    auto header = bounds.removeFromTop(headerHeight).reduced(padding, 4).withTrimmedRight(padding);
+    primary.setBounds(header.removeFromRight(buttonWidth));
+    header.removeFromRight(gap + 2);
+    cancel.setBounds(header.removeFromRight(buttonWidth));
     header.removeFromRight(padding);
     return header;
 }
 inline juce::Rectangle<int> page(juce::Rectangle<int> bounds) { return bounds.withTrimmedTop(headerHeight + 1); }
-inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds) {
-    osci::PanelHeader::paintBackground(g, bounds.removeFromTop(headerHeight).toFloat(), osci::Colours::veryDark());
-    g.setColour(osci::Colours::surface());
+// Where the source's name goes, after the mode's dot and "Editing".
+inline int modeWidth() { return 14 + juce::roundToInt(juce::TextLayout::getStringWidth(body(), "Editing")) + 6; }
+inline juce::Rectangle<int> nameArea(juce::Rectangle<int> titleArea) { return titleArea.withTrimmedLeft(modeWidth()); }
+// `titleArea` is what layoutHeader returned; `name` is drawn after the
+// mode unless the editor shows its own (an editable name).
+inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds, juce::Rectangle<int> titleArea, const juce::String& name = {}) {
+    auto header = bounds.removeFromTop(headerHeight);
+    g.setColour(osci::Colours::veryDark().interpolatedWith(osci::Colours::accentColor(), .06f));
+    g.fillRect(header);
+    g.setColour(osci::Colours::accentColor().withAlpha(.35f));
     g.fillRect(bounds.removeFromTop(1));
     g.setColour(osci::Colours::veryDark());
     g.fillRect(bounds);
+    auto line = titleArea.withY(header.getY()).withHeight(header.getHeight());
+    g.setColour(osci::Colours::accentColor());
+    g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(line.getX()) + 3.0f, static_cast<float>(header.getCentreY())}));
+    line.removeFromLeft(14);
+    g.setFont(body());
+    g.setColour(osci::Colours::textMuted());
+    g.drawText("Editing", line.removeFromLeft(modeWidth() - 14), juce::Justification::centredLeft, false);
+    if (name.isEmpty()) { return; }
+    g.setFont(title());
+    g.setColour(osci::Colours::text());
+    g.drawText(name, line, juce::Justification::centredLeft, true);
 }
 }
 

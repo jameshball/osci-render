@@ -88,5 +88,6 @@ private:
     motion::icons::Button undoButton {"Undo drawing", Icon::undo}, redoButton {"Redo drawing", Icon::redo}, clearButton {"Clear drawing", Icon::trash};
     motion::icons::ToolStrip tools;
     juce::TextEditor name;
+    juce::Rectangle<int> titleArea;
     juce::TextButton cancelButton, doneButton;
 };

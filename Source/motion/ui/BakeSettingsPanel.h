@@ -1,16 +1,15 @@
 #pragma once
 
 #include "../model/BakeSettings.h"
-#include "TypedNumber.h"
 #include <JuceHeader.h>
 #include "MotionStyle.h"
+#include "ScrubField.h"
 #include <array>
-#include <cstdlib>
 #include <functional>
-#include <sstream>
-#include <iomanip>
-#include <locale>
 
+// How a Lua source is baked, as the foot of its editor: a "Bake" heading
+// with the estimate (frames and memory) on its right, then the settings two
+// to a row. The bake itself is the editor's primary button.
 class MotionBakeSettingsPanel final : public juce::Component {
 public:
     explicit MotionBakeSettingsPanel(motion::BakeSettings initial) : settings(initial) {
@@ -20,50 +19,47 @@ public:
         samples.setName("Bake samples per frame");
         seed.setName("Bake random seed");
         bpm.setName("Bake tempo");
-        for (auto* input : { &duration, &seed, &bpm }) {
-            input->setFont(motion::style::body());
-            input->setJustification(juce::Justification::centredLeft);
-            input->setSelectAllWhenFocused(true);
-        }
-        duration.setText(displayNumber(initial.duration), false);
-        bpm.setText(displayNumber(initial.bpm), false);
-        seed.setText(juce::String(static_cast<juce::int64>(initial.seed)), false);
-        duration.setTooltip("Length of the prepared source in seconds. Rounded up to complete frames.");
+        duration.setSpec(durationSpec);
+        bpm.setSpec(tempoSpec);
+        seed.setSpec(seedSpec);
+        duration.setValue(initial.duration);
+        bpm.setValue(initial.bpm);
+        seed.setValue(initial.seed);
+        duration.setTooltip("Length of the prepared source. Rounded up to complete frames.");
         frameRate.setTooltip("Frames of source animation prepared each second.");
         samples.setTooltip("Samples retained per frame, preserving the source's point density.");
-        seed.setTooltip("An unsigned 32-bit seed keeps random source generation repeatable.");
+        seed.setTooltip("Keeps random source generation repeatable.");
         bpm.setTooltip("Fixed tempo used while evaluating the source.");
         rates = { 24, 25, 30, 50, 60, 120 };
         strides = { 256, 512, 1024, 2048, 4096 };
         if (std::find(rates.begin(), rates.end(), initial.frameRate) == rates.end()) { rates.push_back(initial.frameRate); }
         if (std::find(strides.begin(), strides.end(), initial.pointsPerFrame) == strides.end()) { strides.push_back(initial.pointsPerFrame); }
         for (std::size_t index = 0; index < rates.size(); ++index) {
-            frameRate.addItem(juce::String(rates[index], rates[index] == std::floor(rates[index]) ? 0 : 6) + " fps", static_cast<int>(index + 1));
-            if (rates[index] == initial.frameRate || (std::isnan(rates[index]) && std::isnan(initial.frameRate))) {
-                frameRate.setSelectedId(static_cast<int>(index + 1), juce::dontSendNotification);
-            }
+            frameRate.addItem(juce::String(rates[index], rates[index] == std::floor(rates[index]) ? 0 : 3) + " fps", static_cast<int>(index + 1));
+            if (rates[index] == initial.frameRate) { frameRate.setSelectedId(static_cast<int>(index + 1), juce::dontSendNotification); }
         }
         for (std::size_t index = 0; index < strides.size(); ++index) {
             samples.addItem(juce::String(static_cast<juce::int64>(strides[index])), static_cast<int>(index + 1));
             if (strides[index] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(index + 1), juce::dontSendNotification); }
         }
         for (auto* combo : { &frameRate, &samples }) { combo->onChange = [this] { refresh(); }; }
-        duration.onTextChange = [this] { durationEdited = true; refresh(); };
-        bpm.onTextChange = [this] { tempoEdited = true; refresh(); };
-        seed.onTextChange = [this] { refresh(); };
-        for (auto* caption : { &durationLabel, &rateLabel, &samplesLabel, &seedLabel, &bpmLabel }) { motion::style::dialog::caption(*caption); }
-        for (auto* label : { &summary, &note, &error }) {
-            label->setFont(motion::style::body());
-            label->setJustificationType(juce::Justification::topLeft);
-            label->setBorderSize({});
+        for (auto* field : { &duration, &bpm, &seed }) {
+            field->onChange = [this](double) { refresh(); };
+            field->onCommit = field->onChange;
+        }
+        motion::style::inspector::styleHeading(title, "Bake");
+        for (auto [caption, text] : { std::pair { &durationLabel, "Duration" }, std::pair { &rateLabel, "Frame rate" }, std::pair { &samplesLabel, "Samples" }, std::pair { &seedLabel, "Seed" }, std::pair { &bpmLabel, "Tempo" } }) {
+            motion::style::inspector::styleCaption(*caption, text);
         }
         summary.setName("Bake prepared payload estimate");
-        note.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        note.setVisible(false);
-        error.setName("Bake validation error");
-        error.setColour(juce::Label::textColourId, motion::style::error());
+        summary.setFont(motion::style::caption());
+        summary.setJustificationType(juce::Justification::centredRight);
+        summary.setBorderSize({});
+        for (auto* component : std::initializer_list<juce::Component*> { &title, &summary, &durationLabel, &rateLabel, &samplesLabel, &seedLabel, &bpmLabel,
+                 &duration, &frameRate, &samples, &seed, &bpm }) {
+            addAndMakeVisible(component);
+        }
         bake.setName("Bake source");
-        bake.setButtonText("Bake source");
         bake.onClick = [this] {
             refresh();
             if (valid && onBake) {
@@ -71,123 +67,70 @@ public:
                 onBake(settings);
             }
         };
-        for (auto* component : std::initializer_list<juce::Component*> { &durationLabel, &rateLabel, &samplesLabel, &seedLabel, &bpmLabel,
-                 &duration, &frameRate, &samples, &seed, &bpm, &summary, &note, &error, &bake }) {
-            addAndMakeVisible(component);
-        }
-        setSize(440, 290);
         refresh();
     }
 
     std::function<void(motion::BakeSettings)> onBake;
-    // Inside the Scene's Lua editor: a footer of two columns, captions beside
-    // fields like a clip's timing, and the bake button in the editor's header.
+    // The editor's header holds the bake button.
     juce::TextButton& bakeButton() { return bake; }
     // The last valid settings shown.
     const motion::BakeSettings& currentSettings() const { return settings; }
-    void setEmbedded(bool value) {
-        embedded = value;
-        // One line in the grid's last cell, centred like the fields.
-        for (auto* label : { &summary, &note, &error }) { label->setJustificationType(embedded ? juce::Justification::centredLeft : juce::Justification::topLeft); }
-        resized();
-    }
-    static constexpr int embeddedRow = 28, embeddedHeight = 3 * embeddedRow;
+    static constexpr int headingBlock = 30, row = 28, preferredHeight = headingBlock + 3 * row;
 
     void resized() override {
-        if (embedded) {
-            auto area = getLocalBounds();
-            const std::array<std::pair<juce::Label*, juce::Component*>, 5> cells { { { &durationLabel, &duration }, { &rateLabel, &frameRate }, { &samplesLabel, &samples }, { &seedLabel, &seed }, { &bpmLabel, &bpm } } };
-            juce::Rectangle<int> last;
-            for (std::size_t line = 0; line < 3; ++line) {
-                auto row = area.removeFromTop(embeddedRow);
-                const auto half = row.getWidth() / 2;
-                for (std::size_t column = 0; column < 2; ++column) {
-                    auto cell = row.removeFromLeft(half).withTrimmedRight(column == 0 ? 8 : 0);
-                    const auto index = line * 2 + column;
-                    if (index >= cells.size()) {
-                        last = cell;
-                        continue;
-                    }
-                    cells[index].first->setBounds(cell.removeFromLeft(112));
-                    cells[index].second->setBounds(cell.reduced(0, 2));
-                }
-            }
-            // The estimate, or what is wrong, fills the last cell.
-            summary.setBounds(last);
-            error.setBounds(last);
-            return;
+        auto area = getLocalBounds();
+        auto heading = area.removeFromTop(headingBlock).withTrimmedTop(10).withHeight(16);
+        title.setBounds(heading);
+        summary.setBounds(heading);
+        const std::array<std::pair<juce::Label*, juce::Component*>, 5> cells { { { &durationLabel, &duration }, { &rateLabel, &frameRate }, { &samplesLabel, &samples }, { &seedLabel, &seed }, { &bpmLabel, &bpm } } };
+        // Two columns, captions beside their fields, the fields a fixed width
+        // so numbers and choices line up whatever the editor's width.
+        const auto column = std::min(260, (area.getWidth() - 24) / 2);
+        for (std::size_t index = 0; index < cells.size(); ++index) {
+            auto cell = juce::Rectangle<int>(area.getX() + static_cast<int>(index % 2) * (column + 24), area.getY() + static_cast<int>(index / 2) * row, column, row);
+            cells[index].first->setBounds(cell.removeFromLeft(72));
+            cells[index].second->setBounds(cell.withWidth(std::min(cell.getWidth(), 120)).reduced(0, 2));
         }
-        auto area = getLocalBounds().reduced(motion::style::dialog::margin);
-        motion::style::dialog::footer(area, { &bake });
-        const auto row = [&](juce::Label& label, juce::Component& field) { motion::style::dialog::formRow(area, label, field, 142); };
-        row(durationLabel, duration);
-        row(rateLabel, frameRate);
-        row(samplesLabel, samples);
-        row(seedLabel, seed);
-        row(bpmLabel, bpm);
-        // The estimate and any problem share one slot above the button.
-        summary.setBounds(area);
-        error.setBounds(area);
     }
 
 private:
-    static juce::String displayNumber(double value) {
-        std::ostringstream stream;
-        stream.imbue(std::locale::classic());
-        stream << std::setprecision(9) << value;
-        return juce::String(stream.str());
-    }
+    static constexpr motion::PropertySpec durationSpec {"duration", "Duration", "", "", 0.01, 3600, 5, .05, 3, "s"};
+    static constexpr motion::PropertySpec tempoSpec {"tempo", "Tempo", "", "", 1, 1000, 120, 1, 1, " BPM"};
+    static constexpr motion::PropertySpec seedSpec {"seed", "Seed", "", "", 0, 4294967295.0, 0, 1, 0, ""};
     void refresh() {
         auto next = settings;
-        juce::String message;
-        const auto typedDuration = motion::ui::parseNumber(duration.getText()), typedTempo = motion::ui::parseNumber(bpm.getText());
-        if (durationEdited && !typedDuration.has_value()) {
-            message = "Enter a finite duration in seconds.";
-        } else if (tempoEdited && !typedTempo.has_value()) {
-            message = "Enter a tempo between 1 and 1000 BPM.";
-        }
-        if (durationEdited) { next.duration = typedDuration.value_or(next.duration); }
-        if (tempoEdited) { next.bpm = typedTempo.value_or(next.bpm); }
-        const auto seedText = seed.getText().trim();
-        if (message.isEmpty()) {
-            if (seedText.isEmpty() || seedText.length() > 10 || !seedText.containsOnly("0123456789") || seedText.getLargeIntValue() > 0xffffffffLL) {
-                message = "Seed must be a whole number from 0 to 4294967295.";
-            } else { next.seed = static_cast<std::uint32_t>(seedText.getLargeIntValue()); }
-        }
+        next.duration = duration.getValue();
+        next.bpm = bpm.getValue();
+        next.seed = static_cast<std::uint32_t>(std::clamp(seed.getValue(), 0.0, 4294967295.0));
         const auto rateIndex = frameRate.getSelectedId() - 1;
         const auto strideIndex = samples.getSelectedId() - 1;
-        if (message.isEmpty()) {
-            if (rateIndex < 0 || strideIndex < 0 || static_cast<std::size_t>(rateIndex) >= rates.size() || static_cast<std::size_t>(strideIndex) >= strides.size()) {
-                message = "Choose a frame rate and samples per frame.";
-            } else {
-                next.frameRate = rates[static_cast<std::size_t>(rateIndex)];
-                next.pointsPerFrame = strides[static_cast<std::size_t>(strideIndex)];
-                message = juce::String(next.validate());
-            }
+        juce::String message;
+        if (rateIndex < 0 || strideIndex < 0 || static_cast<std::size_t>(rateIndex) >= rates.size() || static_cast<std::size_t>(strideIndex) >= strides.size()) {
+            message = "Choose a frame rate and samples per frame.";
+        } else {
+            next.frameRate = rates[static_cast<std::size_t>(rateIndex)];
+            next.pointsPerFrame = strides[static_cast<std::size_t>(strideIndex)];
+            message = juce::String(next.validate());
         }
         valid = message.isEmpty();
-        error.setText(message, juce::dontSendNotification);
-        summary.setVisible(valid);
         bake.setEnabled(valid);
-        if (valid) {
-            settings = next;
-            const auto frames = next.frameCount();
-            const auto mib = static_cast<double>(frames) * next.pointsPerFrame * sizeof(motion::PointSample) / (1024 * 1024);
-            const auto seconds = static_cast<double>(frames) / next.frameRate;
-            const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
-            summary.setText(juce::String(static_cast<juce::int64>(frames)) + " frames" + dot + juce::String(mib, 2) + " MiB"
-                + (std::abs(seconds - next.duration) > 1.0e-9 ? dot + "rounded to " + displayNumber(seconds) + " s" : juce::String()), juce::dontSendNotification);
+        summary.setColour(juce::Label::textColourId, valid ? osci::Colours::textMuted() : motion::style::error());
+        if (!valid) {
+            summary.setText(message, juce::dontSendNotification);
+            return;
         }
+        settings = next;
+        const auto frames = next.frameCount();
+        const auto mib = static_cast<double>(frames) * next.pointsPerFrame * sizeof(motion::PointSample) / (1024 * 1024);
+        summary.setText(juce::String(static_cast<juce::int64>(frames)) + " frames" + motion::style::dot() + juce::String(mib, 2) + " MiB", juce::dontSendNotification);
     }
     motion::BakeSettings settings;
-    bool valid = false, embedded = false;
-    bool durationEdited = false, tempoEdited = false;
+    bool valid = false;
     std::vector<double> rates;
     std::vector<std::size_t> strides;
-    juce::Label durationLabel { "Bake duration caption", "Duration (seconds)" }, rateLabel { "Bake frame rate caption", "Frame rate" };
-    juce::Label samplesLabel { "Bake samples caption", "Samples per frame" }, seedLabel { "Bake seed caption", "Random seed" }, bpmLabel { "Bake tempo caption", "Tempo (BPM)" };
-    juce::TextEditor duration, seed, bpm;
+    juce::Label title, summary;
+    juce::Label durationLabel, rateLabel, samplesLabel, seedLabel, bpmLabel;
+    motion::ui::ScrubField duration, seed, bpm;
     juce::ComboBox frameRate, samples;
-    juce::Label summary, note, error;
     juce::TextButton bake;
 };

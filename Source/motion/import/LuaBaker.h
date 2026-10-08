@@ -25,8 +25,9 @@ public:
         if (cancelled(cancel)) { return {nullptr, "Bake cancelled."}; }
         try {
             juce::String scriptError;
-            LuaParser parser(name, script, [&](int, juce::String, juce::String message) {
-                if (scriptError.isEmpty() && message.isNotEmpty()) { scriptError = message; }
+            // The first error, with its line so the editor can mark it.
+            LuaParser parser(name, script, [&](int line, juce::String, juce::String message) {
+                if (scriptError.isEmpty() && message.isNotEmpty()) { scriptError = line > 0 ? "Line " + juce::String(line) + ": " + message : message; }
             });
             LuaParser::OfflinePolicy policy;
             policy.randomSeed = settings.seed;

@@ -109,7 +109,7 @@ try:
     step("edit interference", "click", "--name", "Edit Lua...", "--exact")
     code = (session.root_dir / "research/osci-motion/benchmark-sources/Interference.lua").read_text()
     step("author evolving knot", "fill", "--name", "Lua Code Editor", "--role", "editableText", "--exact", code)
-    step("prepare whole phrase", "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", "25.6")
+    step("prepare whole phrase", "set-value", "--name", "Bake duration", "--exact", "25.6")
     step("bake evolving knot", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", "Undo Edit Lua source", "--role", "label", "--exact", "--timeout-ms", 120000)
     select_track(32, 60)

@@ -80,7 +80,7 @@ try:
     assert typography is not None and typography.get("animation") == "2" and float(typography.get("characterDelay")) == 0.1, typography.attrib if typography is not None else None
     # Lua: bake, then animate slider A from the inspector.
     step("import lua", "drop-files", "--file", radius, "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
+    command("wait-for-locator", "--name", "Bake duration", "--exact")
     step("bake", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", "Radius.lua", "--role", "label", "--exact", "--timeout-ms", 60000)
     command("wait-for-locator", "--component-name", "slider.a", "--timeout-ms", 20000)

@@ -37,11 +37,11 @@ def nodes(value):
 
 def field(name):
     tree = json.loads(command("snapshot", "--json", "--full"))
-    return next(node for node in nodes(tree) if node.get("class") == "juce::TextEditor" and node.get("componentName") == name)
+    return next(node for node in nodes(tree) if node.get("componentName") == name and "value" in node)
 
 
 def duration(value):
-    step("set bake duration " + value, "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", value)
+    step("set bake duration " + value, "set-value", "--name", "Bake duration", "--exact", value)
 
 
 def wait_undo(label):
@@ -54,11 +54,9 @@ try:
     command("wait-for-locator", "--class", "MotionEditor", "--exact")
     step("resize workspace", "resize-window", "--w", 1440, "--h", 900)
     step("import Lua", "drop-files", "--file", fixture, "--class", "MotionEditor", "--exact")
-    command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
+    command("wait-for-locator", "--name", "Bake duration", "--exact")
     duration("0")
-    tree = json.loads(command("snapshot", "--json", "--full"))
-    bake = next(node for node in nodes(tree) if node.get("class") == "juce::TextButton" and node.get("componentName") == "Bake source")
-    assert not bake.get("enabled", True), "Invalid duration must disable baking"
+    assert float(field("Bake duration").get("value", "nan")) > 0, "A bake keeps a positive duration"
     duration("1")
     step("bake settings screenshot", "screenshot", "--file", session.artifact_dir / "settings.png")
     step("prepare Lua", "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")

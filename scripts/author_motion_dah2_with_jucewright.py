@@ -129,8 +129,8 @@ def import_source(name, start, duration=None, bake=None, offset=None):
     seek(start)
     step("import " + name, "drop-files", "--file", ASSETS / name, "--class", "MotionEditor", "--exact")
     if name.endswith(".lua"):
-        command("wait-for-locator", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact")
-        step("bake length", "fill", "--name", "Bake duration", "--class", "juce::TextEditor", "--exact", str(bake))
+        command("wait-for-locator", "--name", "Bake duration", "--exact")
+        step("bake length", "set-value", "--name", "Bake duration", "--exact", str(bake))
         step("bake " + name, "click", "--name", "Bake source", "--class", "juce::TextButton", "--exact")
     elif name.endswith(".gif"):
         command("wait-for-locator", "--name", "Prepare image", "--class", "juce::TextButton", "--exact")
