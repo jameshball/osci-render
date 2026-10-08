@@ -200,7 +200,8 @@ public:
     }
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
-        motion::style::fillFloatingPanel(g, bounds, osci::Colours::veryDark().withAlpha(.86f));
+        // Opaque, so strokes behind it never show through the tools.
+        motion::style::fillFloatingPanel(g, bounds, osci::Colours::veryDark());
         g.setColour(juce::Colours::white.withAlpha(.1f));
         for (const auto y : separators) { g.fillRect(static_cast<float>(inset + 4), static_cast<float>(y), static_cast<float>(cell - 8), 1.0f); }
     }

@@ -42,7 +42,11 @@ public:
             samples.addItem(juce::String(static_cast<juce::int64>(strides[index])), static_cast<int>(index + 1));
             if (strides[index] == initial.pointsPerFrame) { samples.setSelectedId(static_cast<int>(index + 1), juce::dontSendNotification); }
         }
-        for (auto* combo : { &frameRate, &samples }) { combo->onChange = [this] { refresh(); }; }
+        for (auto* combo : { &frameRate, &samples }) {
+            // Values end at the right like the number fields beside them.
+            combo->setJustificationType(juce::Justification::centredRight);
+            combo->onChange = [this] { refresh(); };
+        }
         for (auto* field : { &duration, &bpm, &seed }) {
             field->onChange = [this](double) { refresh(); };
             field->onCommit = field->onChange;

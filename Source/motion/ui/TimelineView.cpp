@@ -1702,7 +1702,7 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
         const auto timing = clip.timing(project.tempo());
         const auto left = timeX(timing.start), right = timeX(timing.end());
         const auto found = clip.properties.find(row.lane);
-        if (found == clip.properties.end() || timing.rate == 0) { continue; }
+        if (found == clip.properties.end() || !found->second.animated() || timing.rate == 0) { continue; }
         g.setColour(clipColour(clip, track).withAlpha(.18f));
         g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
         const auto& keys = found->second.keyframes();

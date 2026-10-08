@@ -323,8 +323,20 @@ public:
         // Selected text: a muted accent behind white, not bright green.
         setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(.35f));
         setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
+        // Scroll thumbs are quiet grey everywhere, never as bright as text.
+        setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }
     juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return body(); }
+    // A hovered or open menu lifts slightly and keeps its light text.
+    void drawMenuBarItem(juce::Graphics& g, int width, int height, int, const juce::String& text, bool over, bool open, bool, juce::MenuBarComponent& bar) override {
+        if (open || (over && bar.isEnabled())) {
+            g.setColour(juce::Colours::white.withAlpha(open ? .12f : .07f));
+            g.fillRoundedRectangle(juce::Rectangle<float>(static_cast<float>(width), static_cast<float>(height)).reduced(1.0f, 3.0f), radius);
+        }
+        g.setColour(osci::Colours::text().withAlpha(bar.isEnabled() ? (open || over ? 1.0f : .85f) : .4f));
+        g.setFont(body());
+        g.drawFittedText(text, 0, 0, width, height, juce::Justification::centred, 1);
+    }
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
@@ -376,6 +388,7 @@ public:
     DialogLookAndFeel() {
         setColour(juce::TextEditor::highlightColourId, osci::Colours::accentColor().withAlpha(.35f));
         setColour(juce::TextEditor::highlightedTextColourId, juce::Colours::white);
+        setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }

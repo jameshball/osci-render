@@ -128,7 +128,8 @@ public:
         g.fillRoundedRectangle(pill, pill.getHeight() * .5f);
         const auto knob = pill.getHeight() - 4.0f;
         const auto x = pill.getX() + 2.0f + (pill.getWidth() - 4.0f - knob) * on;
-        g.setColour(juce::Colours::white.interpolatedWith(osci::Colours::veryDark(), on).withAlpha(isEnabled() ? .95f : .5f));
+        // Off, the knob is a muted grey, so only a switch that is on is lit.
+        g.setColour(osci::Colours::textMuted().interpolatedWith(osci::Colours::veryDark(), on).withAlpha(isEnabled() ? .95f : .5f));
         g.fillEllipse(x, pill.getY() + 2.0f, knob, knob);
     }
 private:
