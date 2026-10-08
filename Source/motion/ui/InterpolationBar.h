@@ -74,7 +74,7 @@ private:
             const auto bounds = getLocalBounds().toFloat().reduced(1.0f, 0.0f);
             const auto lit = getToggleState();
             if (lit || over || down) {
-                g.setColour(lit ? osci::Colours::accentColor().withAlpha(down ? .45f : .32f) : juce::Colours::white.withAlpha(down ? .12f : .07f));
+                g.setColour(lit ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : juce::Colours::white.withAlpha(down ? .12f : .07f));
                 g.fillRoundedRectangle(bounds, motion::style::radius);
             }
             if (mixed && !lit) {

@@ -9,6 +9,8 @@
 
 class MotionAssetLibrary : public juce::Component, private juce::ListBoxModel {
 public:
+    // While a source is written in the Scene, the panel's own edit action rests.
+    void setEditingSource(bool editing) { bakeSettings.setEnabled(!editing); }
     explicit MotionAssetLibrary(motion::Document& document);
     std::function<void(motion::Id)> onSelectUses;
     std::function<void(const juce::String&)> onMessage;

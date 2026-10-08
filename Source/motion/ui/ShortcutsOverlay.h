@@ -38,10 +38,12 @@ public:
 
 protected:
     void layoutBody(juce::Rectangle<int> area) override {
-        filter.setBounds(area.removeFromTop(row));
+        // The search field ends where the keycaps do, clear of the scrollbar.
+        constexpr int scrollGutter = 10;
+        filter.setBounds(area.removeFromTop(row).withTrimmedRight(scrollGutter));
         area.removeFromTop(8);
         viewport.setBounds(area);
-        list.setSize(area.getWidth() - 10, list.contentHeight());
+        list.setSize(area.getWidth() - scrollGutter, list.contentHeight());
         viewport.setViewPosition(0, 0);
     }
 
@@ -90,7 +92,12 @@ private:
                 }
                 if (shown.empty()) { continue; }
                 any = true;
-                g.setColour(osci::Colours::textMuted());
+                // Sections break the list; rows within one need no rules.
+                if (y > 0) {
+                    g.setColour(juce::Colours::white.withAlpha(.07f));
+                    g.fillRect(0, y + 4, getWidth(), 1);
+                }
+                g.setColour(osci::Colours::text());
                 g.setFont(motion::style::heading());
                 g.drawText(section.title, 0, y + 12, getWidth(), 16, juce::Justification::centredLeft);
                 y += headingHeight;
@@ -99,8 +106,6 @@ private:
                     g.setColour(osci::Colours::text().withAlpha(.85f));
                     g.drawText(entry->action, 0, y, getWidth() - 160, rowHeight, juce::Justification::centredLeft, true);
                     paintKeys(g, entry->keys, juce::Rectangle<int>(0, y, getWidth(), rowHeight));
-                    g.setColour(juce::Colours::white.withAlpha(.04f));
-                    g.fillRect(0, y + rowHeight - 1, getWidth(), 1);
                     y += rowHeight;
                 }
             }

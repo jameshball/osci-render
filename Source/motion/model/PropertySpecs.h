@@ -75,7 +75,7 @@ inline constexpr std::array<PropertySpec, 7> cameraPropertySpecs {{
     {"rotation.x", "Rotation X", "Rotation", "X", -unbounded, unbounded, 0, 1, 1, "°"},
     {"rotation.y", "Rotation Y", "Rotation", "Y", -unbounded, unbounded, 0, 1, 1, "°"},
     {"rotation.z", "Rotation Z", "Rotation", "Z", -unbounded, unbounded, 0, 1, 1, "°"},
-    {"fov", "Field of view", "Lens", "", 1, 179, defaultCameraFieldOfView, .5, 1, "°"},
+    {"fov", "Field of view", "Field of view", "", 1, 179, defaultCameraFieldOfView, .5, 1, "°"},
 }};
 
 // The Scope's picture: one row each, in the visualiser's own ranges.

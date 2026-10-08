@@ -3,17 +3,23 @@
 #include "CanvasSizeEditor.h"
 #include "ScrubField.h"
 
-// What the exported video looks like: its canvas, codec, quality and
-// whether the soundtrack goes with it. The frame rate is the composition's.
+// How the composition is encoded: codec, quality and whether the
+// soundtrack goes with it. The frame is the output canvas at the
+// composition's frame rate, shown here and changed where they live.
 class MotionVideoExportSettings final : public motion::ui::Sheet {
 public:
-    explicit MotionVideoExportSettings(VideoEncodingConfiguration initial)
-        : Sheet("Export video", juce::String(initial.frameRate, initial.frameRate == std::round(initial.frameRate) ? 0 : 3) + " fps", "Export..."),
-          canvas(initial.renderSize, caption, row, rowGap), config(std::move(initial)) {
+    MotionVideoExportSettings(VideoEncodingConfiguration initial, const juce::String& composition)
+        : Sheet("Export video", composition, "Export..."), config(std::move(initial)) {
         nameAction("Choose file and export...");
-        for (auto* component : std::initializer_list<juce::Component*> { &canvas, &codecLabel, &qualityLabel, &soundtrackLabel, &codec, &quality, &soundtrack, &note, &error }) {
+        for (auto* component : std::initializer_list<juce::Component*> { &frameLabel, &frame, &codecLabel, &qualityLabel, &soundtrackLabel, &codec, &quality, &soundtrack, &note }) {
             addAndMakeVisible(component);
         }
+        const auto rate = juce::String(config.frameRate, config.frameRate == std::round(config.frameRate) ? 0 : 3);
+        frame.setName("Export frame");
+        frame.setText(juce::String(config.renderSize.width) + juce::String::fromUTF8(" \xc3\x97 ") + juce::String(config.renderSize.height) + " px" + motion::style::dot() + rate + " fps", juce::dontSendNotification);
+        frame.setTooltip("The output canvas (the Scope's canvas button) at the composition's frame rate.");
+        frame.setFont(motion::style::body());
+        frame.setBorderSize({});
         codec.setName("Video codec");
         for (const auto& item : VideoEncodingConstants::videoCodecs) {
             codec.addItem(item.displayName, static_cast<int>(item.codec) + 1);
@@ -28,19 +34,9 @@ public:
         quality.setFill(fieldFill());
         soundtrack.setToggleState(config.includeAudio, juce::dontSendNotification);
         soundtrack.setTooltip("Include the stereo soundtrack");
-        for (auto* label : { &codecLabel, &qualityLabel, &soundtrackLabel, &note }) { styleCaption(*label); }
+        for (auto* label : { &frameLabel, &codecLabel, &qualityLabel, &soundtrackLabel, &note }) { styleCaption(*label); }
         note.setText(config.preserveAlpha ? "Transparent background: ProRes 4444 with alpha." : juce::String(), juce::dontSendNotification);
-        error.setFont(motion::style::body());
-        error.setBorderSize({});
-        error.setColour(juce::Label::textColourId, motion::style::error());
-        canvas.onChange = [this] { error.setText({}, juce::dontSendNotification); };
         primary.onClick = [this] {
-            const auto size = canvas.value();
-            if (!size.has_value()) {
-                error.setText("Even sizes, 128-4096 px", juce::dontSendNotification);
-                return;
-            }
-            config.renderSize = *size;
             config.codec = static_cast<VideoCodec>(codec.getSelectedId() - 1);
             config.crf = juce::roundToInt(51.0 - quality.getValue() * 0.5);
             const auto& info = VideoEncodingConstants::getVideoCodecInfo(config.codec);
@@ -51,15 +47,14 @@ public:
             if (onExport) { onExport(config); }
         };
         updateQuality();
-        const auto rows = MotionCanvasSizeEditor::rows + 3;
+        const auto rows = 4;
         setSize(widthFor(), heightFor(rows, config.preserveAlpha ? 28 : 0));
     }
     std::function<void(VideoEncodingConfiguration)> onExport;
 
 protected:
     void layoutBody(juce::Rectangle<int> area) override {
-        canvas.setBounds(area.removeFromTop(canvas.preferredHeight()));
-        area.removeFromTop(rowGap);
+        formRow(area, frameLabel, frame, 0);
         formRow(area, codecLabel, codec);
         formRow(area, qualityLabel, quality, number);
         auto line = area.removeFromTop(row);
@@ -67,7 +62,6 @@ protected:
         soundtrack.setBounds(line.removeFromLeft(motion::ui::Switch::width + 4));
         area.removeFromTop(rowGap);
         note.setBounds(area);
-        error.setBounds(footerLeft);
     }
 
 private:
@@ -76,10 +70,9 @@ private:
         const auto chosen = static_cast<VideoCodec>(codec.getSelectedId() - 1);
         quality.setEnabled(!VideoEncodingConstants::getVideoCodecInfo(chosen).proRes);
     }
-    MotionCanvasSizeEditor canvas;
     VideoEncodingConfiguration config;
-    juce::Label note, error;
-    juce::Label codecLabel { "Video codec caption", "Codec" }, qualityLabel { "Video quality caption", "Quality" }, soundtrackLabel { "Soundtrack caption", "Soundtrack" };
+    juce::Label note, frame;
+    juce::Label frameLabel { "Export frame caption", "Frame" }, codecLabel { "Video codec caption", "Codec" }, qualityLabel { "Video quality caption", "Quality" }, soundtrackLabel { "Soundtrack caption", "Soundtrack" };
     juce::ComboBox codec;
     motion::ui::ScrubField quality;
     motion::ui::Switch soundtrack { "Include stereo soundtrack" };

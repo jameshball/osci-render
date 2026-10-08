@@ -106,8 +106,10 @@ private:
         timerCallback();
     }
     void timerCallback() override {
-        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::text());
         const auto state = !existing ? juce::String("Listens once added") : connectionStatus ? connectionStatus() : "Not connected";
+        // Only a real state (listening, connected) or a problem is bright.
+        const auto live = state.startsWith("Connected") || state.startsWith("Listening");
+        status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : live ? osci::Colours::text() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : state, juce::dontSendNotification);
         if (existing) {
             const bool recording = isCapturing && isCapturing();

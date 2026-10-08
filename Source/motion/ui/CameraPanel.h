@@ -29,7 +29,8 @@ public:
             motion::style::inspector::styleCaption(*label, text);
             addAndMakeVisible(label);
         }
-        showing.setFont(motion::style::body());
+        // A status, not a value: caption-sized and muted.
+        showing.setFont(motion::style::caption());
         showing.setColour(juce::Label::textColourId, osci::Colours::textMuted());
         showing.setBorderSize({});
         showing.setText("On screen at the playhead", juce::dontSendNotification);
@@ -65,17 +66,17 @@ public:
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
         area.removeFromTop(motion::style::gap);
-        // Choices end where Properties' value columns do.
+        // Choices span the Y and Z columns, like the Scope's overlay.
         const motion::style::PropertyGrid grid(area.getWidth());
-        const auto right = grid.value + grid.column;
+        const auto right = grid.value + grid.column, left = grid.column + motion::style::gap;
         for (auto [label, box] : {std::pair<juce::Label*, juce::Component*> {&lookAtLabel, &lookAt}, {&parentLabel, &parent}}) {
             auto row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
             area.removeFromTop(motion::style::gap);
-            label->setBounds(row.removeFromLeft(56));
+            label->setBounds(row.removeFromLeft(left));
             box->setBounds(row);
         }
         auto row = area.removeFromTop(motion::style::controlHeight).withWidth(right);
-        shotLabel.setBounds(row.removeFromLeft(56));
+        shotLabel.setBounds(row.removeFromLeft(left));
         showing.setBounds(row);
         cutButton.setBounds(row.withWidth(cutButton.getBestWidthForHeight(row.getHeight()) + 20));
     }

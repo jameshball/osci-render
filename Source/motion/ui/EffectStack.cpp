@@ -80,7 +80,7 @@ void MotionEffectStack::resized() {
         auto row = area.removeFromTop(chipHeight);
         stagesCaption = row.removeFromLeft(72);
         for (auto& chip : stages) {
-            const auto width = juce::GlyphArrangement::getStringWidthInt(motion::style::body(), chip->getButtonText()) + 18;
+            const auto width = juce::GlyphArrangement::getStringWidthInt(motion::style::caption(), chip->getButtonText()) + 16;
             chip->setBounds(row.removeFromLeft(std::min(width, row.getWidth())));
             row.removeFromLeft(motion::style::gap);
         }
@@ -189,6 +189,7 @@ MotionEffectStack::Card::Card(MotionEffectStack& owner, motion::Id effectId) : s
         row->field.getProperties().set("routeTarget", juce::String(static_cast<juce::int64>(id)));
         row->field.getProperties().set("routeProperties", juce::String(parameter.id));
         row->key.setName("Key effect " + juce::String(parameter.id));
+        row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
         row->key.setTitle(row->key.getName());
         row->key.setWantsKeyboardFocus(false);
         row->modulate.setClickingTogglesState(false);
@@ -263,7 +264,8 @@ void MotionEffectStack::Card::resized() {
     header.removeFromLeft(4);
     power.setBounds(header.removeFromLeft(motion::ui::Switch::width).withSizeKeepingCentre(motion::ui::Switch::width, headerHeight));
     close.setBounds(header.removeFromRight(22).withSizeKeepingCentre(22, 22));
-    area = area.reduced(motion::style::padding, 0);
+    // Rows sit on Properties' own grid, so fields and the keys' gutter line
+    // up with the rows above the card; only the captions are inset.
     const motion::style::PropertyGrid grid(area.getWidth());
     for (auto& row : rows) {
         auto line = area.removeFromTop(motion::style::controlHeight).translated(0, 0);
@@ -298,7 +300,6 @@ void MotionEffectStack::Card::paint(juce::Graphics& g) {
     if (folded()) { return; }
     g.setFont(motion::style::caption());
     g.setColour(osci::Colours::textMuted().withAlpha(enabled ? 1.0f : .5f));
-    const motion::style::PropertyGrid grid(getWidth() - 2 * motion::style::padding);
     for (const auto& row : rows) {
         g.drawText(row->label, row->field.getBounds().withX(motion::style::padding).withRight(row->field.getX() - motion::style::gap), juce::Justification::centredLeft, true);
     }
@@ -365,10 +366,10 @@ void MotionEffectStack::refreshStages() {
     listedStages = found;
     stages.clear();
     for (const auto& [label, id] : found) {
-        auto chip = std::make_unique<juce::TextButton>(label);
+        auto chip = std::make_unique<motion::ui::Chip>(label);
+        chip->setClickingTogglesState(false);
         chip->setName("Effects of " + label.upToFirstOccurrenceOf(juce::String::fromUTF8(" \xc2\xb7"), false, false));
-        chip->setTooltip("Also applied");
-        chip->setColour(juce::TextButton::buttonColourId, osci::Colours::surfaceRaised().withAlpha(.6f));
+        chip->setTooltip("Show these effects");
         // Showing another stage rebuilds these chips, so it waits.
         chip->onClick = [this, id = id] {
             juce::MessageManager::callAsync([safe = juce::Component::SafePointer<MotionEffectStack>(this), id] { if (safe != nullptr && safe->onShowOwner) { safe->onShowOwner(id); } });

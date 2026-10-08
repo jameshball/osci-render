@@ -75,8 +75,8 @@ def enter_position(value, expected=None, reject=False, cancel=False):
     step("type position " + value, "fill", editor["ref"], value)
     step("finish position entry", "press", "Escape" if cancel else "Return")
     if reject:
-        command("wait-for-locator", "--name", "Cannot go to position", "--exact")
-        step("dismiss invalid position", "click", "--name", "OK", "--class", "juce::TextButton", "--exact")
+        command("wait-for-locator", "--text", "Enter a position from 0 to")
+        step("dismiss invalid position", "click", "--name", "Dismiss message", "--exact")
     if expected is not None:
         position(expected)
 

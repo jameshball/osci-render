@@ -34,7 +34,7 @@ void MotionEditor::exportVideo() {
     state->sampleRate = processor.exportSampleRate();
     exportState = state;
     const juce::Component::SafePointer<MotionEditor> owner(this);
-    auto settings = std::make_unique<MotionVideoExportSettings>(config);
+    auto settings = std::make_unique<MotionVideoExportSettings>(config, juce::String(project.name));
     auto* settingsPointer = settings.get();
     const auto size = juce::Point<int>(settings->getWidth(), settings->getHeight());
     auto overlay = std::make_unique<osci::ComponentOverlay>(std::move(settings), juce::String(), size, false);

@@ -52,7 +52,7 @@ public:
             g.drawText(labels[index], segment, juce::Justification::centred, false);
         }
         if (hasKeyboardFocus(false)) {
-            g.setColour(osci::Colours::accentColor().withAlpha(.6f));
+            g.setColour(style::accent().withAlpha(.6f));
             g.drawRoundedRectangle(bounds.reduced(.5f), style::radius + 1, 1.0f);
         }
     }
@@ -123,11 +123,12 @@ public:
         const auto pill = getLocalBounds().toFloat().withSizeKeepingCentre(static_cast<float>(width), static_cast<float>(height));
         const auto on = slide.getProgress();
         const auto off = osci::Colours::surfaceRaised().brighter(.25f + .15f * fade.value());
-        g.setColour(off.interpolatedWith(osci::Colours::accentColor().withAlpha(.75f), on).withMultipliedAlpha(isEnabled() ? 1.0f : .45f));
+        // On is a light track with a dark knob: green stays for selection.
+        g.setColour(off.interpolatedWith(osci::Colours::text().withAlpha(.85f), on).withMultipliedAlpha(isEnabled() ? 1.0f : .45f));
         g.fillRoundedRectangle(pill, pill.getHeight() * .5f);
         const auto knob = pill.getHeight() - 4.0f;
         const auto x = pill.getX() + 2.0f + (pill.getWidth() - 4.0f - knob) * on;
-        g.setColour(juce::Colours::white.withAlpha(isEnabled() ? .95f : .5f));
+        g.setColour(juce::Colours::white.interpolatedWith(osci::Colours::veryDark(), on).withAlpha(isEnabled() ? .95f : .5f));
         g.fillEllipse(x, pill.getY() + 2.0f, knob, knob);
     }
 private:

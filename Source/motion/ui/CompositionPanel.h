@@ -15,7 +15,7 @@ public:
         setName("Composition settings");
         motion::style::inspector::styleHeading(title, "Timing");
         addAndMakeVisible(title);
-        const std::array<const char*, 4> labels {"Length", "Frames", "Tempo", "Meter"};
+        const std::array<const char*, 4> labels {"Length", "Rate", "Tempo", "Meter"};
         for (std::size_t index = 0; index < captions.size(); ++index) {
             motion::style::inspector::styleCaption(captions[index], labels[index]);
             addAndMakeVisible(captions[index]);
@@ -64,8 +64,8 @@ public:
         if (!shown) { return; }
         const auto& project = processor.document.project();
         updating = true;
-        if (!length.isBeingEdited()) { length.setText(juce::String(project.duration, 2) + "s", juce::dontSendNotification); }
-        if (!tempo.isBeingEdited()) { tempo.setText(juce::String(project.bpm, project.bpm == std::round(project.bpm) ? 0 : 2), juce::dontSendNotification); }
+        if (!length.isBeingEdited()) { length.setText(juce::String(project.duration, 3) + "s", juce::dontSendNotification); }
+        if (!tempo.isBeingEdited()) { tempo.setText(juce::String(project.bpm, project.bpm == std::round(project.bpm) ? 0 : 2) + " BPM", juce::dontSendNotification); }
         int rate = 0;
         for (std::size_t index = 0; index < rates.size(); ++index) { if (std::abs(project.frameRate - rates[index]) < 1.0e-9) { rate = 500 + static_cast<int>(index); } }
         frameRate.setSelectedId(rate, juce::dontSendNotification);
@@ -76,7 +76,7 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter}, false);
+        motion::style::inspector::layoutFields(area, captions, {&length, &frameRate, &tempo, &meter});
     }
 
 private:
@@ -97,7 +97,7 @@ private:
         refresh();
     }
     void applyTempo() {
-        const auto value = motion::ui::parseNumber(tempo.getText());
+        const auto value = motion::ui::parseNumber(tempo.getText(), "BPM");
         if (!value.has_value() || *value < 1 || *value > 1000) {
             if (onError) { onError("Enter a tempo between 1 and 1000 BPM."); }
         } else if (*value != processor.document.project().bpm) {

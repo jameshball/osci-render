@@ -326,10 +326,10 @@ void MotionTimelineView::refreshTracks() {
 void MotionTimelineView::resized() {
     ensureTrackRows();
     validateTrackDrag();
-    snapButton.setBounds(namesWidth - 26, 2, 22, 22);
-    // The tool highlights line up with the cards below.
+    // The tools, then snapping beside them after a divider.
     auto tools = juce::Rectangle<int>(cardInset - 1, 2, 4 * 22, 22);
     for (auto* button : {&selectTool, &slipTool, &stretchTool, &rippleTool}) { button->setBounds(tools.removeFromLeft(22)); }
+    snapButton.setBounds(tools.getX() + 9, 2, 22, 22);
     scrollY = std::clamp(scrollY, 0, maximumScrollY());
     // Headers live in a container clipped below the ruler, so rows scroll
     // smoothly under it.
@@ -344,7 +344,7 @@ void MotionTimelineView::resized() {
         header->setVisible(shown + height > 0 && shown < headerArea.getHeight());
         // Centred on the card; the rest of the row's foot still resizes it.
         // A dragged track's header rides with it; the others slide.
-        const auto indent = cardInset + std::min(48, found->depth * 8);
+        const auto indent = cardInset + std::min(64, found->depth * 16);
         const auto lifted = trackDrag.has_value() && trackDrag->id == header->id;
         const auto top = lifted ? liftedTop() - rulerHeight : y + shiftOf(static_cast<int>(row));
         header->setBounds(indent, top + (resizeStrip - bandGap) / 2, namesWidth - 5 - indent, height - resizeStrip);
@@ -411,9 +411,9 @@ void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
         }
         juce::Graphics::ScopedSaveState scope(g);
         g.reduceClipRegion(namesWidth, rulerHeight, getWidth() - namesWidth, getHeight() - rulerHeight);
-        g.setColour((allowed ? motion::style::key() : motion::style::error()).withAlpha(0.2f));
+        g.setColour((allowed ? motion::style::accent() : motion::style::error()).withAlpha(0.2f));
         g.fillRoundedRectangle(bounds, 4);
-        g.setColour(allowed ? motion::style::key() : motion::style::error());
+        g.setColour(allowed ? motion::style::accent() : motion::style::error());
         g.drawRoundedRectangle(bounds, 4, 1);
         g.drawText(allowed ? (audio ? "Add audio" : definition != definitions.end() ? "Add composition" : "Add object") : (recursive ? "Cannot contain itself" : correctKind ? "Clips cannot overlap" : "Use a matching or empty lane"), bounds.reduced(8, 0), juce::Justification::centredLeft);
     }
@@ -427,11 +427,10 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
     juce::Graphics::ScopedSaveState view(g);
     g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
     const auto top = liftedTop();
-    const auto block = juce::Rectangle<int>(cardInset, top, getWidth() - cardInset, trackDrag->height - bandGap);
+    const auto block = juce::Rectangle<int>(0, top, getWidth(), trackDrag->height - bandGap);
     const auto shape = [&block](float inset) {
-        const auto area = block.toFloat().reduced(inset);
         juce::Path path;
-        path.addRoundedRectangle(area.getX(), area.getY(), area.getWidth(), area.getHeight(), cardRadius, cardRadius, true, false, true, false);
+        path.addRoundedRectangle(block.toFloat().reduced(inset), cardRadius);
         return path;
     };
     // A wide soft shadow and a tight one, so the block reads as lifted
@@ -598,12 +597,17 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         const auto x = timeX(time);
         g.setColour(juce::Colours::white.withAlpha(0.06f));
         g.drawVerticalLine(x, rulerHeight, static_cast<float>(getHeight()));
+        // A label that would be cut at the right edge is left out.
+        const auto text = juce::String(grid.label(time, step));
+        if (x + 5 + juce::TextLayout::getStringWidth(motion::style::body(), text) > static_cast<float>(getWidth() - 4)) { return; }
         g.setColour(osci::Colours::text().withAlpha(0.7f));
-        g.drawText(juce::String(grid.label(time, step)), x + 5, 0, 70, 26, juce::Justification::centredLeft);
+        g.drawText(text, x + 5, 0, 70, 26, juce::Justification::centredLeft);
     });
     paintLoop(g);
     g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(0, 0, namesWidth, toolsHeight);
+    g.setColour(juce::Colours::white.withAlpha(.1f));
+    g.fillRect(snapButton.getX() - 5, 7, 1, toolsHeight - 14);
     const auto& tracks = processor.document.project().tracks;
     g.saveState();
     g.reduceClipRegion(0, rulerHeight, getWidth(), viewHeight());
@@ -622,7 +626,7 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         if (dragging && trackDrag->group != 0 && rows[static_cast<std::size_t>(visible)].group() && rows[static_cast<std::size_t>(visible)].id == trackDrag->group) {
             // The group it will join.
             g.setColour(osci::Colours::accentColor().withAlpha(.7f));
-            g.drawRoundedRectangle(juce::Rectangle<float>(static_cast<float>(cardInset), static_cast<float>(rowY(visible)), static_cast<float>(getWidth() - cardInset), static_cast<float>(heightOf(static_cast<std::size_t>(visible)) - bandGap)).reduced(.75f), cardRadius, 1.5f);
+            g.drawRoundedRectangle(juce::Rectangle<float>(0.0f, static_cast<float>(rowY(visible)), static_cast<float>(getWidth()), static_cast<float>(heightOf(static_cast<std::size_t>(visible)) - bandGap)).reduced(.75f), cardRadius, 1.5f);
         }
     }
     g.restoreState();
@@ -681,14 +685,20 @@ void MotionTimelineView::paint(juce::Graphics& g) {
             const auto bounds = markerBounds(marker);
             if (bounds.isEmpty()) { continue; }
             const auto colour = motion::style::marker();
-            g.setColour(colour.withAlpha(0.12f));
+            // The staff runs through the tracks, so clips can be lined up to it.
+            g.setColour(colour.withAlpha(0.28f));
             g.drawVerticalLine(bounds.getX(), rulerHeight, static_cast<float>(getHeight()));
-            g.setColour(colour.withAlpha(marker.id == selectedMarker ? 0.3f : 0.12f));
-            g.fillRoundedRectangle(bounds.toFloat(), 2.0f);
+            // The staff, then the name on a small tag beside it.
+            const auto tag = bounds.toFloat().withTrimmedLeft(2).reduced(0, 3);
+            juce::Path flag;
+            flag.addRoundedRectangle(tag.getX(), tag.getY(), tag.getWidth(), tag.getHeight(), 3.0f, 3.0f, false, true, false, true);
+            g.setColour(colour.withAlpha(marker.id == selectedMarker ? 0.34f : 0.16f));
+            g.fillPath(flag);
             g.setColour(colour);
             g.fillRect(bounds.getX(), bounds.getY(), 2, bounds.getHeight());
-            g.setColour(osci::Colours::text());
-            g.drawText(marker.name, bounds.reduced(6, 0), juce::Justification::centredLeft, true);
+            g.setFont(motion::style::caption());
+            g.setColour(osci::Colours::text().withAlpha(.9f));
+            g.drawText(marker.name, tag.reduced(6, 0).toNearestInt(), juce::Justification::centredLeft, true);
         }
     }
     if (showsCameraBand()) { paintCameraBand(g); }
@@ -1578,37 +1588,45 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
     const auto active = selectedClips.contains(clip.id);
     const bool audio = track.kind == motion::TrackKind::audio;
     const auto base = clipColour(clip, track);
-    g.setColour((active ? base.brighter(.35f) : clip.id == hoveredClip ? base.brighter(.15f) : base).withAlpha(opacity));
+    // Selection keeps the clip's colour inside a crisp accent stroke.
+    // Hovering lifts it, brightens its edge and shows the trim grips.
+    const auto hovered = clip.id == hoveredClip && !active;
+    g.setColour((hovered ? base.brighter(.1f) : base).withAlpha(opacity));
     g.fillRoundedRectangle(bounds, motion::style::radius);
-    g.setColour((active ? motion::style::key() : base.brighter(.5f)).withAlpha(opacity * (active ? 1.0f : .55f)));
-    g.drawRoundedRectangle(bounds, motion::style::radius, active ? 1.4f : 1.0f);
-    g.setFont(motion::style::body());
-    if (!clip.effects.empty() && bounds.getWidth() > 90) {
-        g.setColour(juce::Colours::white.withAlpha(0.6f * opacity));
-        g.setFont(motion::style::caption());
-        g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38).withTrimmedBottom(8), juce::Justification::centred);
-        g.setFont(motion::style::body());
+    if (active) {
+        g.setColour(motion::style::accent().withAlpha(opacity));
+        g.drawRoundedRectangle(bounds.reduced(.75f), motion::style::radius, 1.5f);
+    } else {
+        g.setColour(base.brighter(.6f).withAlpha(opacity * (hovered ? .75f : .35f)));
+        g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius, 1.0f);
     }
-    if (active && tool == Tool::ripple && bounds.getWidth() > 18) {
-        g.setColour(motion::style::key().withAlpha(opacity));
-        g.fillRoundedRectangle(bounds.getX() + 3, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
-        g.fillRoundedRectangle(bounds.getRight() - 6, bounds.getY() + 5, 3, bounds.getHeight() - 10, 1);
+    // Too narrow for anything but its colour.
+    if (bounds.getWidth() < 14) { return; }
+    if ((hovered || (active && tool == Tool::ripple)) && bounds.getWidth() > 24) {
+        g.setColour(active ? motion::style::accent().withAlpha(opacity) : juce::Colours::white.withAlpha(.35f * opacity));
+        g.fillRoundedRectangle(bounds.getX() + 3, bounds.getY() + 6, 2, bounds.getHeight() - 12, 1);
+        g.fillRoundedRectangle(bounds.getRight() - 5, bounds.getY() + 6, 2, bounds.getHeight() - 12, 1);
     }
-    auto label = juce::String(clip.name);
-    if (active && tool == Tool::slip) {
-        label += "  offset " + juce::String(clip.timing(project.tempo()).offset, 2) + "s";
-    } else if (active && tool == Tool::stretch) {
-        label += "  " + juce::String(clip.timing(project.tempo()).rate, 2) + "x";
-    }
-    auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(!clip.effects.empty() && bounds.getWidth() > 90 ? 32.0f : 0.0f).withTrimmedBottom(7);
+    // Every clip's name sits in the same band at its top, clear of the key
+    // ticks along its foot and the waveform below, so names line up along a
+    // row.
+    // An audio clip's name is a caption on a narrower band, leaving the
+    // waveform room below it.
+    const auto nameBand = std::min(bounds.getHeight() - 6.0f, audio ? 15.0f : 20.0f);
+    const auto keyTimes = clipKeyTimes(clip);
     if (audio) {
+        // The waveform fills the clip below its name, as in a DAW's
+        // regions; a clip too short for both draws it behind the name.
         const auto& assets = project.assets;
         const auto asset = std::find_if(assets.begin(), assets.end(), [&](const auto& item) { return item->id == clip.asset; });
         if (asset != assets.end() && (*asset)->audio != nullptr) {
             const auto left = std::max(namesWidth, static_cast<int>(bounds.getX()) + 2);
             const auto right = std::min(getWidth(), static_cast<int>(bounds.getRight()) - 2);
-            const auto centre = bounds.getBottom() - 7.5f;
-            g.setColour(motion::style::waveform().withAlpha(opacity * .8f));
+            auto wave = bounds.withTrimmedTop(nameBand).withTrimmedBottom(2.0f);
+            if (wave.getHeight() < 6.0f) { wave = bounds.reduced(0, 3.0f); }
+            const auto centre = wave.getCentreY();
+            const auto reach = wave.getHeight() * .5f;
+            g.setColour(motion::style::waveform().withAlpha(opacity * .38f));
             for (int x = left; x < right; ++x) {
                 const auto time = scrollTime + (x - namesWidth) / pixelsPerSecond;
                 const auto end = time + 1.0 / pixelsPerSecond;
@@ -1616,22 +1634,47 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
                 const auto b = (*asset)->audio->querySeconds(1, clip.localTime(time, project.tempo()), clip.localTime(end, project.tempo()));
                 const auto low = std::clamp(std::min(a.minimum, b.minimum), -1.0f, 1.0f);
                 const auto high = std::clamp(std::max(a.maximum, b.maximum), -1.0f, 1.0f);
-                g.drawVerticalLine(x, centre - high * 6, centre - low * 6 + 0.5f);
+                g.drawVerticalLine(x, centre - high * reach, centre - low * reach + 0.5f);
             }
         }
-        labelBounds = labelBounds.withHeight(15);
     }
-    g.setColour(juce::Colours::white.withAlpha(.92f * opacity));
-    g.drawText(label, labelBounds, juce::Justification::centredLeft);
-    // Key summary ticks along the bottom edge.
-    g.setColour(motion::style::key().withAlpha(.8f * opacity));
+    auto label = juce::String(clip.name);
+    if (active && tool == Tool::slip) {
+        label += "  offset " + juce::String(clip.timing(project.tempo()).offset, 2) + "s";
+    } else if (active && tool == Tool::stretch) {
+        label += "  " + juce::String(clip.timing(project.tempo()).rate, 2) + "x";
+    }
+    const auto effects = !clip.effects.empty() && bounds.getWidth() > 90;
+    auto labelBounds = bounds.reduced(8, 0).withTrimmedRight(effects ? 32.0f : 0.0f).withHeight(nameBand);
+    if (effects) {
+        g.setColour(juce::Colours::white.withAlpha(0.55f * opacity));
+        g.setFont(motion::style::caption());
+        g.drawText(juce::String(static_cast<int>(clip.effects.size())) + " fx", bounds.withLeft(bounds.getRight() - 38).withHeight(labelBounds.getHeight()).withY(labelBounds.getY()), juce::Justification::centred);
+    }
+    // A name longer than the clip fades out at its edge instead of an ellipsis.
+    {
+        juce::Graphics::ScopedSaveState clipLabel(g);
+        g.reduceClipRegion(labelBounds.toNearestInt());
+        g.setFont(audio ? motion::style::caption() : motion::style::body());
+        // A muted track's names stay legible (3:1 or better) while its fills dim.
+        g.setColour(juce::Colours::white.withAlpha((active ? 1.0f : .88f) * std::max(opacity, .6f)));
+        g.drawText(label, labelBounds.withWidth(std::max(labelBounds.getWidth(), 2000.0f)), juce::Justification::centredLeft, false);
+        if (juce::TextLayout::getStringWidth(audio ? motion::style::caption() : motion::style::body(), label) > labelBounds.getWidth()) {
+            const auto fade = labelBounds.withLeft(labelBounds.getRight() - 14);
+            const auto fill = (hovered ? base.brighter(.1f) : base).withAlpha(opacity);
+            g.setGradientFill(juce::ColourGradient(fill.withAlpha(0.0f), fade.getX(), 0, fill, fade.getRight(), 0, false));
+            g.fillRect(fade);
+        }
+    }
+    // Key summary ticks along the bottom edge, neutral like keys elsewhere.
+    g.setColour(motion::style::keyTick().withMultipliedAlpha(opacity));
     double lastX = -10;
     juce::Path ticks;
-    for (const auto time : clipKeyTimes(clip)) {
+    for (const auto time : keyTimes) {
         const auto x = static_cast<float>(timeX(time));
         if (x - lastX < 3 || x < bounds.getX() - 2 || x > bounds.getRight() + 2) { continue; }
         // Keys on a clip edge are inset so they are never cut in half.
-        motion::style::addDiamond(ticks, {std::clamp(x, bounds.getX() + 3.0f, std::max(bounds.getX() + 3.0f, bounds.getRight() - 3.0f)), bounds.getBottom() - 5.0f}, 3.5f);
+        motion::style::addDiamond(ticks, {std::clamp(x, bounds.getX() + 6.0f, std::max(bounds.getX() + 6.0f, bounds.getRight() - 6.0f)), bounds.getBottom() - 5.0f}, 3.5f);
         lastX = x;
     }
     g.fillPath(ticks);
@@ -1640,23 +1683,28 @@ void MotionTimelineView::paintClip(juce::Graphics& g, const motion::Clip& clip, 
 void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int height) const {
     const auto& project = processor.document.project();
     const auto& track = project.tracks[static_cast<std::size_t>(row.track)];
-    fillCard(g, y, height - bandGap, osci::Colours::surfaceSunken(), osci::Colours::surfaceSunken());
+    // A lane reads like a channel in the Graph: under its track's header,
+    // as light as it, with the axis colour as a dot and on its keys.
+    fillCard(g, y, height - bandGap, osci::Colours::surface(), osci::Colours::surfaceSunken());
     const auto specs = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
     const auto* spec = motion::findPropertySpec(specs, row.lane);
+    const auto colour = spec != nullptr && !spec->axis.empty() ? motion::style::axisColour(spec->axis) : motion::style::key();
+    const auto indent = std::min(64, row.depth * 16) + 30;
+    g.setColour(colour.withAlpha(.85f));
+    g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(indent) + 3.0f, y + (height - bandGap) * .5f}));
     g.setFont(motion::style::caption());
     g.setColour(osci::Colours::textMuted());
-    const auto indent = std::min(48, row.depth * 8) + 30;
-    g.drawText(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(row.lane), indent, y, namesWidth - indent - 6, height, juce::Justification::centredLeft);
+    g.drawText(spec != nullptr ? juce::String(spec->label.data(), spec->label.size()) : juce::String(row.lane), indent + 12, y, namesWidth - indent - 18, height - bandGap, juce::Justification::centredLeft);
     juce::Graphics::ScopedSaveState scope(g);
     g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
     const auto centre = y + height * .5f;
     for (const auto& clip : track.clips) {
         const auto timing = clip.timing(project.tempo());
         const auto left = timeX(timing.start), right = timeX(timing.end());
-        g.setColour(clipColour(clip, track).withAlpha(.18f));
-        g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
         const auto found = clip.properties.find(row.lane);
         if (found == clip.properties.end() || timing.rate == 0) { continue; }
+        g.setColour(clipColour(clip, track).withAlpha(.18f));
+        g.fillRect(left, y + 2, std::max(1, right - left), height - 4);
         const auto& keys = found->second.keyframes();
         // A faint value curve normalised to the lane shows each move's shape.
         if (keys.size() > 1) {
@@ -1673,7 +1721,7 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
                 const auto yOf = [&](double value) { return static_cast<float>(y + height - 4 - (value - low) / (high - low) * (height - 8)); };
                 shape.startNewSubPath(static_cast<float>(first), yOf(found->second.evaluateBase(localAt(first))));
                 for (int x = first + 2; x < last; x += 2) { shape.lineTo(static_cast<float>(x), yOf(found->second.evaluateBase(localAt(x)))); }
-                g.setColour(motion::style::key().withAlpha(.35f));
+                g.setColour(colour.withAlpha(.4f));
                 g.strokePath(shape, juce::PathStrokeType(1.0f));
             }
         }
@@ -1683,7 +1731,7 @@ void MotionTimelineView::paintLane(juce::Graphics& g, const Row& row, int y, int
             const auto time = timing.projectTime(keys[k].time);
             // A key at the very start stays clear of the name column.
             const auto x = std::max(static_cast<float>(timeX(time)), static_cast<float>(namesWidth) + 4.5f);
-            motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], motion::style::key(), isKeySelected(clip.id, row.lane, keys[k].time), false, behind);
+            motion::style::drawKey(g, {x, centre}, 4.5f, keys[k], colour, isKeySelected(clip.id, row.lane, keys[k].time), false, behind);
         }
     }
     if (marquee.has_value()) {
@@ -1923,17 +1971,25 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
         paintLane(g, row, y, height);
         return;
     }
-    // Alternate lanes are faintly lighter; the gap under each card
-    // separates the rows. A label colour tints the whole track.
+    // Rows are flush, like the Graph's channel list: a hairline gap between
+    // them, alternate lanes faintly lighter, and a label colour tinting the
+    // track. A selected row lifts to a neutral fill with an accent bar; the
+    // track of a selected clip shows a fainter bar.
     const auto selectedRow = row.id == selected;
     const auto cardHeight = height - bandGap;
     const auto index = row.track;
+    const auto owning = index >= 0 && std::any_of(tracks[static_cast<std::size_t>(index)].clips.begin(), tracks[static_cast<std::size_t>(index)].clips.end(), [this](const auto& clip) { return selectedClips.contains(clip.id); });
     const auto label = index >= 0 ? labelColour(tracks[static_cast<std::size_t>(index)]) : std::nullopt;
-    auto card = label.has_value() ? osci::Colours::surfaceRaised().interpolatedWith(*label, .45f) : osci::Colours::surfaceRaised();
-    if (selectedRow) { card = card.interpolatedWith(osci::Colours::accentColor(), .12f); }
+    auto card = index < 0 ? osci::Colours::surface().brighter(.06f) : osci::Colours::surface();
+    if (label.has_value()) { card = card.interpolatedWith(*label, .3f); }
+    if (selectedRow || owning) { card = osci::Colours::surfaceRaised(); }
     auto lane = visible % 2 == 1 ? std::optional<juce::Colour>(juce::Colours::white.withAlpha(.018f)) : std::nullopt;
     if (label.has_value()) { lane = label->withAlpha(.12f); }
     fillCard(g, y, cardHeight, card, lane);
+    if (selectedRow || owning) {
+        g.setColour(motion::style::accent().withAlpha(selectedRow ? 1.0f : .45f));
+        g.fillRect(0, y, 2, cardHeight);
+    }
     if (index < 0) {
         g.setColour(osci::Colours::surfaceRaised().withAlpha(0.25f));
         g.fillRect(namesWidth, y, getWidth() - namesWidth, cardHeight);
@@ -1943,10 +1999,16 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
             auto parent = track.group;
             for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
                 if (parent == row.id) {
-                    g.setColour(osci::Colours::accentColor().withAlpha(motion::trackIsAudible(project, track) ? 0.35f : 0.1f));
+                    // Members' spans as brackets in the group's slate, so they
+                    // never read as a scrollbar.
+                    g.setColour(motion::style::compositionClip().brighter(.6f).withAlpha(motion::trackIsAudible(project, track) ? .9f : .35f));
+                    const auto middle = y + cardHeight * 0.5f;
                     for (const auto& clip : track.clips) {
                         const auto timing = clip.timing(project.tempo());
-                        g.fillRoundedRectangle(static_cast<float>(timeX(timing.start)), y + height * 0.5f - 3, static_cast<float>(std::max(2, boundedPixel(timing.duration() * pixelsPerSecond))), 6, 2);
+                        const auto left = static_cast<float>(timeX(timing.start)), width = static_cast<float>(std::max(3, boundedPixel(timing.duration() * pixelsPerSecond)));
+                        g.fillRect(juce::Rectangle<float>(left, middle - 1.5f, width, 3.0f));
+                        g.fillRect(juce::Rectangle<float>(left, middle - 5.0f, 1.5f, 10.0f));
+                        g.fillRect(juce::Rectangle<float>(left + width - 1.5f, middle - 5.0f, 1.5f, 10.0f));
                     }
                     break;
                 }
@@ -1967,10 +2029,8 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
 }
 
 void MotionTimelineView::fillCard(juce::Graphics& g, int y, int height, juce::Colour header, std::optional<juce::Colour> lane) const {
-    juce::Path card;
-    card.addRoundedRectangle(static_cast<float>(cardInset), static_cast<float>(y), static_cast<float>(namesWidth - 1 - cardInset), static_cast<float>(height), cardRadius, cardRadius, true, false, true, false);
     g.setColour(header);
-    g.fillPath(card);
+    g.fillRect(0, y, namesWidth - 1, height);
     if (lane.has_value()) {
         g.setColour(*lane);
         g.fillRect(namesWidth, y, getWidth() - namesWidth, height);
@@ -1987,7 +2047,9 @@ juce::Rectangle<int> MotionTimelineView::cutBounds(const motion::CameraCut& cut)
 juce::Colour MotionTimelineView::cameraColour(const motion::Project& project, motion::Id camera) {
     const auto found = std::find_if(project.cameras.begin(), project.cameras.end(), [camera](const auto& item) { return item.id == camera; });
     const auto index = found == project.cameras.end() ? 0 : static_cast<int>(found - project.cameras.begin());
-    return juce::Colour::fromHSV(std::fmod(0.58f + 0.17f * static_cast<float>(index), 1.0f), 0.32f, 0.42f, 1.0f);
+    // Cool and warm greys, never lilac (modulation) or green (selection).
+    static const std::array<juce::uint32, 4> palette {0xff3d4f63, 0xff3f5a56, 0xff5a533f, 0xff4b505c};
+    return juce::Colour(palette[static_cast<std::size_t>(index) % palette.size()]);
 }
 
 juce::String MotionTimelineView::cameraName(motion::Id camera) const {
@@ -2019,7 +2081,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
         const auto left = std::max(namesWidth, timeX(from)), right = std::min(getWidth(), timeX(end));
         if (right <= left) { return; }
         if (defaultSelected) {
-            g.setColour(osci::Colours::accentColor().withAlpha(.12f));
+            g.setColour(juce::Colours::white.withAlpha(.07f));
             g.fillRect(left, top + 2, right - left, cameraBandHeight - 4);
         }
         g.setColour(osci::Colours::textMuted().withAlpha(defaultSelected ? .9f : .55f));
@@ -2056,7 +2118,7 @@ void MotionTimelineView::paintCameraBand(juce::Graphics& g) const {
         const auto chosen = selectedCameraKey.has_value() && selectedCameraKey->first == camera->id && std::abs(selectedCameraKey->second - time) < 1.0e-6;
         g.setColour(osci::Colours::veryDark());
         motion::style::drawDiamond(g, centre, chosen ? 6.0f : 5.0f, true);
-        g.setColour(chosen ? osci::Colours::accentColor().brighter(.4f) : osci::Colours::text());
+        g.setColour(chosen ? motion::style::accent() : osci::Colours::text().withAlpha(.8f));
         motion::style::drawDiamond(g, centre, chosen ? 4.5f : 3.5f, true);
     }
 }
@@ -2263,7 +2325,9 @@ void MotionTimelineView::deleteCameraKey(motion::Id id, double time) {
 juce::Rectangle<int> MotionTimelineView::markerBounds(const motion::Marker& marker) const {
     const auto x = timeX(marker.time);
     if (x < namesWidth || x >= getWidth()) { return {}; }
-    auto right = std::min(getWidth(), x + 140);
+    // A flag as wide as its name, not a block that reads as a clip.
+    const auto label = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), marker.name));
+    auto right = std::min(getWidth(), x + std::min(140, label + 16));
     for (const auto& next : processor.document.project().markers) {
         if (next.time > marker.time) { right = std::min(right, timeX(next.time) - 2); break; }
     }

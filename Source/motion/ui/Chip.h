@@ -61,7 +61,7 @@ private:
     }
 
     std::optional<icons::Icon> icon;
-    // Toggles light up in the same muted green as the tool strips.
-    juce::Colour on = osci::Colours::accentColor().withAlpha(.45f);
+    // A toggle that is on is neutral, like the tool strips.
+    juce::Colour on = style::onFill();
 };
 }

@@ -156,9 +156,10 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     }
     auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(4, 2);
     if (selected) {
-        graphics.setColour(osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), 0.08f));
+        // The one selected-row look: a neutral lift and an accent bar.
+        graphics.setColour(osci::Colours::surfaceRaised());
         graphics.fillRoundedRectangle(bounds.toFloat(), motion::style::radius);
-        graphics.setColour(osci::Colours::accentColor().withAlpha(0.65f));
+        graphics.setColour(motion::style::accent());
         graphics.fillRect(bounds.withWidth(2).reduced(0, 5));
     }
     bounds.reduce(8, 3);

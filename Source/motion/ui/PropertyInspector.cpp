@@ -111,7 +111,7 @@ void MotionPropertyInspector::refresh() {
         };
         row->misaligned = on && keyed && (times(*x) != times(*y) || times(*x) != times(*z));
         row->mode->setToggleState(on, juce::dontSendNotification);
-        row->mode->setOnColour(row->misaligned ? osci::Colours::warning().withAlpha(.6f) : osci::Colours::accentColor().withAlpha(.45f));
+        row->mode->setOnColour(row->misaligned ? osci::Colours::warning().withAlpha(.6f) : motion::style::onFill());
         const juce::String base = path ? "Travel one smooth path through the keyed positions at constant speed (Bezier keys ease in and out)."
                                        : "Interpolate keyed rotations as orientations along the shortest arc, free of gimbal lock.";
         row->mode->setTooltip(row->misaligned ? "X, Y and Z no longer share key times, so this is paused. Click to key every axis at each key time." : base + " Keys all three axes together.");
@@ -304,7 +304,7 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
         g.setColour(juce::Colours::white.withAlpha(.06f));
         g.fillRect(0, y, getWidth(), 1);
         g.setFont(motion::style::heading());
-        g.setColour(osci::Colours::text().withAlpha(.72f));
+        g.setColour(osci::Colours::text());
         g.drawText(title, motion::style::padding, y + sectionGap, getWidth() - motion::style::padding * 2, sectionHeading - sectionGap, juce::Justification::centredLeft, true);
     }
 }
@@ -313,7 +313,7 @@ juce::String MotionPropertyInspector::sectionOf(const juce::String& group) {
     if (group == "Position" || group == "Rotation" || group == "Scale") { return "Transform"; }
     if (group == "Colour" || group == "Drawing") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
-    if (group == "Lens") { return "Camera"; }
+    if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }
     return "Beam";
 }
@@ -337,6 +337,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             row->group = juce::String(spec.group.data(), spec.group.size());
             row->section = sectionOf(row->group);
             row->key.setName("Key " + row->group.toLowerCase());
+            // Keys are neutral: filled on a key, outlined off one.
+            row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
             row->key.setTitle(row->key.getName());
             row->key.setTooltip("Add or remove keys for " + row->group.toLowerCase() + " at the playhead");
             row->previous.setName("Previous " + row->group.toLowerCase() + " key");
@@ -372,6 +374,8 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
                 row->mode = std::make_unique<motion::ui::Chip>(path ? "Spatial path" : "Quaternion rotation", path ? motion::icons::Icon::path : motion::icons::Icon::rotate);
                 row->mode->setName(path ? "Spatial path" : "Quaternion rotation");
                 row->mode->setTitle(row->mode->getName());
+                // A glyph until hovered or on, so it never reads as a second gutter.
+                row->mode->quiet = true;
                 // A misaligned mode stays on and realigns its keys.
                 row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState() || raw->misaligned); };
                 row->addAndMakeVisible(*row->mode);

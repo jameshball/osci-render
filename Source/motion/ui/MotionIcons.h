@@ -135,13 +135,13 @@ public:
     // A glyph that keeps its own colour (the red record dot), and the fill
     // behind a button that is on.
     std::optional<juce::Colour> tint;
-    juce::Colour onColour = osci::Colours::accentColor().withAlpha(.35f);
+    juce::Colour onColour = motion::style::onFill();
 private:
     Icon icon;
     motion::style::Fade fade {*this};
 };
 
-// An accent text action with a leading icon (Add track), hover fades in.
+// A quiet text action with a leading icon (Add track), hover fades in.
 class LabelButton final : public juce::Button {
 public:
     LabelButton(const juce::String& name, Icon glyph) : juce::Button(name), icon(glyph) {
@@ -157,10 +157,10 @@ public:
     void paintButton(juce::Graphics& g, bool, bool down) override {
         const auto bounds = getLocalBounds().toFloat();
         if (fade.value() > 0.0f || down) {
-            g.setColour(osci::Colours::accentColor().withAlpha(down ? .22f : .12f * fade.value()));
+            g.setColour(juce::Colours::white.withAlpha(down ? .12f : .06f * fade.value()));
             g.fillRoundedRectangle(bounds, motion::style::radius + 1);
         }
-        const auto colour = osci::Colours::accentColor().brighter(.35f).withMultipliedAlpha(isEnabled() ? 1.0f : .35f);
+        const auto colour = osci::Colours::textMuted().interpolatedWith(osci::Colours::text(), fade.value()).withMultipliedAlpha(isEnabled() ? 1.0f : .35f);
         auto area = getLocalBounds().withTrimmedLeft(leading);
         draw(g, icon, area.removeFromLeft(static_cast<int>(iconSize)).toFloat(), colour, iconSize);
         area.removeFromLeft(gap);

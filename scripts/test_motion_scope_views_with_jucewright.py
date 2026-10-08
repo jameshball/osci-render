@@ -105,7 +105,7 @@ try:
     assert len(read_project(seed).findall("./composition/definition")) == 1
     step("reopen unused menu", "click", "--name", "Composition 1", "--role", "listItem", "--exact", "--position", "6,12", "--button", "right")
     step("request confirmed cleanup", "click", "--name", "Remove unused composition", "--role", "menuItem", "--exact")
-    step("confirm cleanup", "click", "--name", "Remove composition", "--class", "juce::TextButton", "--exact")
+    step("confirm cleanup", "click", "--name", "Remove", "--class", "juce::TextButton", "--exact")
     command("wait-for-locator", "--name", "Undo Remove unused composition", "--exact")
     step("save cleanup", "press", "command + s", "--class", "MotionEditor")
     cleaned = read_project(seed)

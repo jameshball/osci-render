@@ -13,6 +13,18 @@ inline constexpr int padding = 8;
 inline constexpr int controlHeight = 24;
 inline constexpr float radius = 3.0f;
 inline constexpr float panelRadius = 5.0f;
+// Every button, whatever surface it sits on.
+inline constexpr float buttonRadius = 4.0f;
+
+// Green means one thing: what is selected or focused, and the one action a
+// panel exists for. A switch, tool or toggle that is on is neutral.
+inline juce::Colour accent() { return osci::Colours::accentColor(); }
+// The wash behind a selected row, region or choice.
+inline juce::Colour accentFill() { return accent().withAlpha(.12f); }
+// The primary action's fill.
+inline juce::Colour accentStrong() { return accent().withAlpha(.5f); }
+// A toggle, tool or switch that is on.
+inline juce::Colour onFill() { return juce::Colours::white.withAlpha(.16f); }
 
 // The only type styles in osci-motion. All UI text uses one of these;
 // MotionTypographyTest fails if code anywhere else asks for a font.
@@ -56,10 +68,13 @@ inline juce::PopupMenu::Item menuItem(const juce::String& text, int id, const ju
 }
 
 
-// Beam-adjacent accents: keys and the playhead share the phosphor green.
+// The beam's phosphor green: traces, previews and the playhead. Keys are
+// neutral (or their axis' colour) so they never read as selected.
 inline juce::Colour key() { return juce::Colour(0xff72de98); }
 inline juce::Colour playhead() { return key(); }
-inline juce::Colour marker() { return juce::Colour(0xffcfb779); }
+inline juce::Colour keyTick() { return juce::Colours::white.withAlpha(.7f); }
+// Orange, apart from solo's yellow and the tangent handles' gold.
+inline juce::Colour marker() { return juce::Colour(0xffeb9a5c); }
 inline juce::Colour tempo() { return juce::Colour(0xff8fb6e8); }
 // The selected stroke or point, brighter than the key green.
 inline juce::Colour selection() { return juce::Colour(0xff9affb3); }
@@ -86,12 +101,15 @@ inline juce::Colour axisColour(std::string_view axis, juce::Colour fallback = ke
 }
 
 // Clip families are distinguished by hue at equal, low saturation.
-inline juce::Colour visualClip() { return juce::Colour(0xff34524a); }
+inline juce::Colour visualClip() { return juce::Colour(0xff2e5a63); }
 inline juce::Colour audioClip() { return juce::Colour(0xff2f4657); }
-inline juce::Colour compositionClip() { return juce::Colour(0xff4a4260); }
+// A neutral slate: lilac means modulation.
+inline juce::Colour compositionClip() { return juce::Colour(0xff464b58); }
 // A track's mute, solo and lock switches when on.
 inline juce::Colour trackMute() { return juce::Colour(0xff8b6434); }
-inline juce::Colour trackSolo() { return juce::Colour(0xff347b52); }
+// Solo is yellow and mute amber, as in Ableton and Logic: green stays for
+// selection.
+inline juce::Colour trackSolo() { return juce::Colour(0xff8a7a26); }
 inline juce::Colour trackLock() { return juce::Colour(0xff5c5f6b); }
 // Track label colours (After Effects / Premiere style), muted for clip fills.
 // Index 0 means "automatic" (by clip kind).
@@ -202,6 +220,8 @@ inline void fillWell(juce::Graphics& g, juce::Rectangle<float> bounds) {
     g.fillRoundedRectangle(bounds, radius);
 }
 // A library card's fill as the pointer fades over it.
+// Popovers sit a step above the panel they point at.
+inline juce::Colour popoverSurface() { return juce::Colour(0xff202126); }
 inline juce::Colour cardFill(float hover) { return osci::Colours::veryDark().interpolatedWith(osci::Colours::surfaceRaised(), hover); }
 // Many diamonds share one path, filled once.
 inline void addDiamond(juce::Path& path, juce::Point<float> centre, float radius) {
@@ -278,6 +298,22 @@ inline void paintComboBox(juce::Graphics& g, int width, int height, juce::ComboB
     g.strokePath(chevron, juce::PathStrokeType(1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
+// A button's fill: one radius everywhere, and a disabled one goes neutral
+// so a dimmed primary never reads as available.
+inline void paintButtonBackground(juce::Graphics& g, juce::Button& button, juce::Colour colour, bool highlighted, bool down) {
+    const auto bounds = button.getLocalBounds().toFloat().reduced(.5f);
+    auto fill = colour;
+    if (!button.isEnabled()) {
+        fill = juce::Colours::white.withAlpha(.06f);
+    } else if (down) {
+        fill = colour.brighter(.25f);
+    } else if (highlighted) {
+        fill = colour.brighter(.12f);
+    }
+    g.setColour(fill);
+    g.fillRoundedRectangle(bounds, buttonRadius);
+}
+
 // Routes the editor's menus, buttons and pickers through the type styles.
 class LookAndFeel final : public PluginLookAndFeel {
 public:
@@ -292,17 +328,18 @@ public:
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
-    // Popovers look like the panels they sit over, with a soft shadow.
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& colour, bool highlighted, bool down) override { paintButtonBackground(g, button, colour, highlighted, down); }
+    // Popovers float a step above the panels they point at, with a shadow.
     void drawCallOutBoxBackground(juce::CallOutBox& box, juce::Graphics& g, const juce::Path& path, juce::Image& cachedImage) override {
         if (cachedImage.isNull()) {
             cachedImage = juce::Image(juce::Image::ARGB, box.getWidth(), box.getHeight(), true);
             juce::Graphics shadow(cachedImage);
-            juce::DropShadow(juce::Colours::black.withAlpha(.55f), 14, {0, 4}).drawForPath(shadow, path);
+            juce::DropShadow(juce::Colours::black.withAlpha(.5f), 24, {0, 8}).drawForPath(shadow, path);
         }
         g.drawImageAt(cachedImage, 0, 0);
-        g.setColour(osci::Colours::surface());
+        g.setColour(popoverSurface());
         g.fillPath(path);
-        g.setColour(juce::Colours::white.withAlpha(.1f));
+        g.setColour(juce::Colours::white.withAlpha(.08f));
         g.strokePath(path, juce::PathStrokeType(1.0f));
     }
     int getCallOutBoxBorderSize(const juce::CallOutBox&) override { return 16; }
@@ -343,6 +380,7 @@ public:
     juce::Font getPopupMenuFont() override { return body(); }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& colour, bool highlighted, bool down) override { paintButtonBackground(g, button, colour, highlighted, down); }
     void drawComboBox(juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override { paintComboBox(g, width, height, box); }
     // Combo text starts where a dialog field's text does.
     void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override {
@@ -353,20 +391,17 @@ public:
 };
 
 // The one action a panel exists for (Save, Add, Bake) stands out in the accent.
-inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, osci::Colours::accentColor().withAlpha(.5f)); }
+inline void makePrimary(juce::Button& button) { button.setColour(juce::TextButton::buttonColourId, accentStrong()); }
 
-// The frame the Scene's source editors share: a header with the source's
-// name on the left and Cancel and the primary action on the right, over a
-// dark page.
 // The Scene while a source is written in it (Lua, text, drawing) is a
-// mode: its header is tinted, says "Editing" before the source's name, and
-// holds Cancel and the one action (Add for a new source, Apply otherwise),
-// clear of the next pane's header.
+// mode: a raised header names it ("Editing Orbit.lua", "New Lua source")
+// and holds Cancel and the one action (Add for a new source, Apply
+// otherwise), over a dark page. A problem turns the header's dot red.
 namespace sceneEditor {
-inline constexpr int headerHeight = 30, buttonWidth = 72;
+inline constexpr int headerHeight = 30, buttonWidth = 72, inset = 12;
 // Places the header's buttons and returns the room left for the name.
 inline juce::Rectangle<int> layoutHeader(juce::Rectangle<int> bounds, juce::Component& primary, juce::Component& cancel) {
-    auto header = bounds.removeFromTop(headerHeight).reduced(padding, 4).withTrimmedRight(padding);
+    auto header = bounds.removeFromTop(headerHeight).reduced(inset, 4);
     primary.setBounds(header.removeFromRight(buttonWidth));
     header.removeFromRight(gap + 2);
     cancel.setBounds(header.removeFromRight(buttonWidth));
@@ -374,26 +409,28 @@ inline juce::Rectangle<int> layoutHeader(juce::Rectangle<int> bounds, juce::Comp
     return header;
 }
 inline juce::Rectangle<int> page(juce::Rectangle<int> bounds) { return bounds.withTrimmedTop(headerHeight + 1); }
-// Where the source's name goes, after the mode's dot and "Editing".
-inline int modeWidth() { return 14 + juce::roundToInt(juce::TextLayout::getStringWidth(body(), "Editing")) + 6; }
-inline juce::Rectangle<int> nameArea(juce::Rectangle<int> titleArea) { return titleArea.withTrimmedLeft(modeWidth()); }
+// Where the source's name goes, after the mode.
+inline int modeWidth(const juce::String& mode = "Editing") { return juce::roundToInt(juce::TextLayout::getStringWidth(body(), mode)) + 6; }
+inline juce::Rectangle<int> nameArea(juce::Rectangle<int> titleArea, const juce::String& mode = "Editing") { return titleArea.withTrimmedLeft(modeWidth(mode)); }
 // `titleArea` is what layoutHeader returned; `name` is drawn after the
 // mode unless the editor shows its own (an editable name).
-inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds, juce::Rectangle<int> titleArea, const juce::String& name = {}) {
+inline void paint(juce::Graphics& g, juce::Rectangle<int> bounds, juce::Rectangle<int> titleArea, const juce::String& name = {}, const juce::String& mode = "Editing", bool problem = false) {
     auto header = bounds.removeFromTop(headerHeight);
-    g.setColour(osci::Colours::veryDark().interpolatedWith(osci::Colours::accentColor(), .06f));
+    g.setColour(osci::Colours::surfaceRaised());
     g.fillRect(header);
-    g.setColour(osci::Colours::accentColor().withAlpha(.35f));
+    g.setColour(juce::Colours::white.withAlpha(.08f));
     g.fillRect(bounds.removeFromTop(1));
     g.setColour(osci::Colours::veryDark());
     g.fillRect(bounds);
     auto line = titleArea.withY(header.getY()).withHeight(header.getHeight());
-    g.setColour(osci::Colours::accentColor());
-    g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(line.getX()) + 3.0f, static_cast<float>(header.getCentreY())}));
-    line.removeFromLeft(14);
+    if (problem) {
+        g.setColour(error());
+        g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(line.getX()) + 3.0f, static_cast<float>(header.getCentreY())}));
+        line.removeFromLeft(12);
+    }
     g.setFont(body());
     g.setColour(osci::Colours::textMuted());
-    g.drawText("Editing", line.removeFromLeft(modeWidth() - 14), juce::Justification::centredLeft, false);
+    g.drawText(mode, line.removeFromLeft(modeWidth(mode)), juce::Justification::centredLeft, false);
     if (name.isEmpty()) { return; }
     g.setFont(title());
     g.setColour(osci::Colours::text());
@@ -416,24 +453,28 @@ inline void styleCaption(juce::Label& label, const juce::String& text) {
 inline void styleHeading(juce::Label& label, const juce::String& text) {
     label.setText(text, juce::dontSendNotification);
     label.setFont(heading());
-    label.setColour(juce::Label::textColourId, osci::Colours::text().withAlpha(.72f));
+    label.setColour(juce::Label::textColourId, osci::Colours::text());
     label.setBorderSize({});
 }
-// Two pairs to a row. Above keyed rows they end where Properties' value
-// columns end, so every field shares one right edge before the keys'
-// gutter; with nothing keyed below (the composition) they take the width.
-inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields, bool toGutter = true) {
+// Two fields to a row, each with its caption inside on the left as X, Y
+// and Z carry their axis, and the value on the right. They share the left
+// and right edges of Properties' value columns, clear of the keys' gutter.
+inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields) {
     const PropertyGrid grid(area.getWidth());
-    const auto right = toGutter ? grid.value + grid.column : area.getWidth();
+    const auto right = grid.value + grid.column;
+    const auto half = (right - gap) / 2;
     for (std::size_t line = 0; line < 2; ++line) {
         auto bounds = area.removeFromTop(row).withWidth(right);
-        constexpr int between = 12;
-        const auto half = (right - between) / 2;
         for (std::size_t column = 0; column < 2; ++column) {
             const auto index = line * 2 + column;
-            auto cell = column == 0 ? bounds.removeFromLeft(half) : bounds.withTrimmedLeft(between);
-            captions[index].setBounds(cell.removeFromLeft(46));
-            fields[index]->setBounds(cell.reduced(0, 3));
+            const auto cell = (column == 0 ? bounds.withWidth(half) : bounds.withLeft(bounds.getRight() - half)).reduced(0, 3);
+            auto* combo = dynamic_cast<juce::ComboBox*>(fields[index]);
+            if (combo != nullptr) { combo->setJustificationType(juce::Justification::centredRight); }
+            fields[index]->setBounds(cell);
+            auto& caption = captions[index];
+            caption.setInterceptsMouseClicks(false, false);
+            caption.setBounds(cell.withTrimmedLeft(6).withWidth(juce::roundToInt(juce::TextLayout::getStringWidth(caption.getFont(), caption.getText())) + 2));
+            caption.toFront(false);
         }
     }
 }
@@ -486,6 +527,8 @@ inline void styleField(juce::Component& component) {
     auto* editor = dynamic_cast<juce::TextEditor*>(&component);
     auto* combo = dynamic_cast<juce::ComboBox*>(&component);
     if (editor != nullptr) {
+        // A single line sits on the same baseline as the caption beside it.
+        if (!editor->isMultiLine()) { editor->setJustification(editor->getJustificationType().getOnlyHorizontalFlags() | juce::Justification::verticallyCentred); }
         // A centred field centres its text below the top indent, so the
         // indent would push single lines low.
         const auto centred = (editor->getJustificationType().getFlags() & juce::Justification::verticallyCentred) != 0;

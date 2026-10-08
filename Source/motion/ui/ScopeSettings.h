@@ -23,11 +23,14 @@ public:
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override {
         const auto colour = (highlighted || down ? osci::Colours::text() : osci::Colours::textMuted());
         auto area = getLocalBounds();
-        auto arrow = area.removeFromRight(caret).toFloat().withSizeKeepingCentre(7.0f, 4.0f);
+        // The dropdowns' stroked chevron.
+        const auto arrow = area.removeFromRight(caret).toFloat().withSizeKeepingCentre(7.0f, 3.5f);
         juce::Path path;
-        path.addTriangle(arrow.getX(), arrow.getY(), arrow.getRight(), arrow.getY(), arrow.getCentreX(), arrow.getBottom());
+        path.startNewSubPath(arrow.getX(), arrow.getY());
+        path.lineTo(arrow.getCentreX(), arrow.getBottom());
+        path.lineTo(arrow.getRight(), arrow.getY());
         g.setColour(colour);
-        g.fillPath(path);
+        g.strokePath(path, juce::PathStrokeType(1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setFont(motion::style::caption());
         g.drawText(getButtonText(), area.withTrimmedRight(4), juce::Justification::centredRight, false);
     }

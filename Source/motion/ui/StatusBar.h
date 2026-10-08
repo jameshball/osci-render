@@ -30,7 +30,7 @@ public:
         current = kind;
         message.setText(text, juce::dontSendNotification);
         message.setTooltip(text);
-        message.setColour(juce::Label::textColourId, kind == Kind::error ? osci::Colours::danger() : kind == Kind::warning ? osci::Colours::warning() : osci::Colours::textMuted());
+        message.setColour(juce::Label::textColourId, kind == Kind::notice ? osci::Colours::textMuted() : osci::Colours::text().withAlpha(.9f));
         dismiss.setVisible(true);
         if (kind == Kind::notice) { startTimer(6000); } else { stopTimer(); }
         resized();
@@ -47,23 +47,35 @@ public:
         if (stats.getText() != text) { stats.setText(text, juce::dontSendNotification); }
     }
 
+    // A problem is a pill as long as its words: a dot in its colour, the
+    // message, and the dismiss button inside it. A notice is just text.
     void paint(juce::Graphics& g) override {
-        if (message.getText().isNotEmpty() && current != Kind::notice) {
-            g.setColour((current == Kind::error ? osci::Colours::danger() : osci::Colours::warning()).withAlpha(.08f));
-            g.fillRoundedRectangle(message.getBounds().expanded(4, 0).toFloat(), motion::style::radius);
-        }
+        if (message.getText().isEmpty() || current == Kind::notice) { return; }
+        const auto colour = current == Kind::error ? osci::Colours::danger() : osci::Colours::warning();
+        g.setColour(colour.withAlpha(.12f));
+        g.fillRoundedRectangle(pill.toFloat(), pill.getHeight() * .5f);
+        g.setColour(colour);
+        g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(pill.getX()) + 10.0f, static_cast<float>(pill.getCentreY())}));
     }
     void resized() override {
         auto area = getLocalBounds().reduced(motion::style::padding, 0);
         stats.setBounds(area.removeFromRight(360));
-        if (dismiss.isVisible()) { dismiss.setBounds(area.removeFromLeft(16).withSizeKeepingCentre(16, 16)); area.removeFromLeft(4); }
-        message.setBounds(area);
+        area.removeFromRight(motion::style::padding);
+        const auto problem = current != Kind::notice;
+        const auto text = juce::roundToInt(juce::TextLayout::getStringWidth(motion::style::caption(), message.getText())) + 2;
+        const auto lead = problem ? 20 : 0, trail = dismiss.isVisible() ? 22 : 0;
+        pill = area.withWidth(std::min(area.getWidth(), lead + text + trail + (problem ? 4 : 0))).withSizeKeepingCentre(std::min(area.getWidth(), lead + text + trail + (problem ? 4 : 0)), 18).withX(area.getX());
+        auto inside = pill;
+        inside.removeFromLeft(lead);
+        if (dismiss.isVisible()) { dismiss.setBounds(inside.removeFromRight(trail).withSizeKeepingCentre(14, 14)); }
+        message.setBounds(inside.withY(area.getY()).withHeight(area.getHeight()));
     }
 
 private:
     void timerCallback() override { clear(); }
 
     juce::Label message, stats;
+    juce::Rectangle<int> pill;
     osci::CloseButton dismiss {"Dismiss message"};
     Kind current = Kind::notice;
 };

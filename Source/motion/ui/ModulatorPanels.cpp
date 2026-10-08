@@ -268,10 +268,10 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     const auto active = modulator.id == owner.selected;
     const auto hover = fade.value();
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(active ? osci::Colours::surfaceRaised().interpolatedWith(osci::Colours::accentColor(), .1f) : motion::style::cardFill(hover));
+    g.setColour(active ? osci::Colours::surfaceRaised() : motion::style::cardFill(hover));
     g.fillRoundedRectangle(bounds, motion::style::radius + 1);
     if (active) {
-        g.setColour(osci::Colours::accentColor().withAlpha(.7f));
+        g.setColour(motion::style::accent().withAlpha(.7f));
         g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
     }
     auto area = getLocalBounds().reduced(motion::style::gap + 2, motion::style::gap);
@@ -280,7 +280,7 @@ void MotionModulatorLibrary::Card::paint(juce::Graphics& g) {
     motion::ui::paintModulatorShape(g, modulator, picture.reduced(5, 7), motion::style::key().withAlpha(.6f + .4f * (active ? 1.0f : hover)), 1.2f);
     area.removeFromLeft(motion::style::padding);
     g.setFont(motion::style::caption());
-    g.setColour(routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : osci::Colours::accentColor().brighter(.3f));
+    g.setColour(routes == 0 ? osci::Colours::textMuted().withAlpha(.7f) : motion::style::result());
     g.drawText(routes == 0 ? juce::String("Not routed") : routes == 1 ? juce::String("Drives 1") : "Drives " + juce::String(routes), area.removeFromBottom(area.getHeight() / 2), juce::Justification::topLeft, true);
     g.setFont(motion::style::body());
     g.setColour(osci::Colours::text());
@@ -304,7 +304,7 @@ MotionModulatorLibrary::ShapeButton::ShapeButton(const juce::String& text, motio
 void MotionModulatorLibrary::ShapeButton::paintButton(juce::Graphics& g, bool, bool down) {
     const auto bounds = getLocalBounds().toFloat();
     const auto on = getToggleState();
-    g.setColour(on ? osci::Colours::accentColor().withAlpha(down ? .45f : .35f) : juce::Colours::white.withAlpha(down ? .12f : .04f + .05f * fade.value()));
+    g.setColour(on ? motion::style::onFill().withMultipliedAlpha(down ? 1.3f : 1.0f) : juce::Colours::white.withAlpha(down ? .12f : .04f + .05f * fade.value()));
     g.fillRoundedRectangle(bounds, motion::style::radius);
     motion::ui::paintModulatorShape(g, shape, bounds.reduced(5, 8), on ? juce::Colours::white : osci::Colours::text().withAlpha(.6f + .4f * fade.value()), 1.3f);
 }

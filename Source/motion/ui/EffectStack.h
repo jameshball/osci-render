@@ -126,7 +126,7 @@ private:
     std::vector<motion::Id> listed;
     std::vector<std::unique_ptr<Card>> cards;
     std::vector<std::pair<juce::String, motion::Id>> listedStages;
-    std::vector<std::unique_ptr<juce::TextButton>> stages;
+    std::vector<std::unique_ptr<motion::ui::Chip>> stages;
     motion::ui::PreviewGesture gesture {processor.document};
     double gestureTime = 0;
     std::vector<float> cardShift;

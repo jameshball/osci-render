@@ -89,5 +89,6 @@ private:
     motion::icons::ToolStrip tools;
     juce::TextEditor name;
     juce::Rectangle<int> titleArea;
+    const juce::String mode;
     juce::TextButton cancelButton, doneButton;
 };

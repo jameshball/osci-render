@@ -250,8 +250,8 @@ private:
     bool showsMarkerBand() const { return !processor.document.project().markers.empty() || processor.document.project().tempoChanges != nullptr; }
     // Bands and rows are cards with rounded left ends, inset from the panel
     // edge and separated by one small gap.
-    static constexpr int toolsHeight = 26, bandGap = 2, markerBandHeight = 22, cardInset = 4;
-    static constexpr float cardRadius = 5.0f;
+    static constexpr int toolsHeight = 26, bandGap = 1, markerBandHeight = 22, cardInset = 4;
+    static constexpr float cardRadius = 3.0f;
     int markerBandTop() const { return toolsHeight + bandGap; }
     int cameraBandTop() const { return (showsMarkerBand() ? markerBandTop() + markerBandHeight : toolsHeight) + bandGap; }
     // One row: a track's or group's card and clips, or a keyframe lane.

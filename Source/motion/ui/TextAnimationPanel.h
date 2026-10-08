@@ -16,14 +16,23 @@ public:
         setName("Text animation inspector");
         motion::style::inspector::styleHeading(title, "Characters");
         addAndMakeVisible(title);
-        kinds.compact = true;
+        kinds.setName("Text animation");
+        kinds.setTitle("Text animation");
+        const std::array<const char*, 6> kindNames {"None", "Type", "Rise", "Pop", "Wave", "Scatter"};
+        for (std::size_t index = 0; index < kindNames.size(); ++index) { kinds.addItem(kindNames[index], static_cast<int>(index) + 1); }
+        kinds.setJustificationType(juce::Justification::centredRight);
         kinds.setTooltip("None: every character at once. Type: one by one. Rise: into place. Pop: with a small overshoot. Wave: a looping bob. Scatter: in from all around.");
-        kinds.onChange = [this](int index) {
+        motion::style::styleField(kinds);
+        kinds.onChange = [this] {
+            if (kinds.getSelectedId() <= 0) { return; }
             auto next = current();
-            next.animation = static_cast<motion::TextSettings::Animation>(index);
+            next.animation = static_cast<motion::TextSettings::Animation>(kinds.getSelectedId() - 1);
             apply(next);
         };
         addAndMakeVisible(kinds);
+        motion::style::inspector::styleCaption(kindCaption, "Animation");
+        kindCaption.setInterceptsMouseClicks(false, false);
+        addAndMakeVisible(kindCaption);
         const std::array<const char*, 4> labels {"Stagger", "Each", "Hold", "Amount"};
         const std::array<const char*, 4> fieldTips {"Seconds between one character starting and the next", "Seconds each character takes to arrive", "Seconds the finished text holds before the source loops", "How far characters travel (1 is one character height)"};
         for (std::size_t index = 0; index < fields.size(); ++index) {
@@ -53,7 +62,7 @@ public:
     int preferredHeight() const {
         const auto* asset = textAsset();
         if (asset == nullptr) { return 0; }
-        return motion::style::inspector::headingHeight + 30 + (current().animated() ? 2 * motion::style::inspector::row : 0) + 10;
+        return motion::style::inspector::headingHeight + motion::style::inspector::row + (current().animated() ? 2 * motion::style::inspector::row : 0) + 10;
     }
     void refresh() {
         const auto previous = lastHeight;
@@ -61,7 +70,7 @@ public:
         if (asset != nullptr && pending.has_value() && pending->first == asset->id && sameAnimation(asset->textSettings, pending->second)) { pending.reset(); }
         const auto settings = current();
         const auto locked = isLocked();
-        kinds.setSelected(static_cast<int>(settings.animation));
+        kinds.setSelectedId(static_cast<int>(settings.animation) + 1, juce::dontSendNotification);
         kinds.setEnabled(!locked);
         const std::array<double, 4> values {settings.characterDelay, settings.characterDuration, settings.hold, settings.amount};
         for (std::size_t index = 0; index < fields.size(); ++index) {
@@ -75,9 +84,11 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         title.setBounds(area.removeFromTop(motion::style::inspector::headingHeight));
-        // Six kinds share one row, ending with the value columns.
+        // The kind, captioned inside like the fields below, ending with the
+        // value columns.
         const motion::style::PropertyGrid grid(area.getWidth());
-        kinds.setBounds(area.removeFromTop(30).withTrimmedTop(3).withTrimmedBottom(3).withWidth(grid.value + grid.column));
+        kinds.setBounds(area.removeFromTop(motion::style::inspector::row).reduced(0, 3).withWidth(grid.value + grid.column));
+        kindCaption.setBounds(kinds.getBounds().withTrimmedLeft(6).withWidth(60));
         const auto* asset = textAsset();
         const auto animated = asset != nullptr && current().animated();
         for (std::size_t index = 0; index < fields.size(); ++index) {
@@ -133,7 +144,8 @@ private:
     int lastHeight = 0;
     std::optional<std::pair<motion::Id, motion::TextSettings>> pending;
     juce::Label title;
-    motion::ui::SegmentedControl kinds {"Text animation", {"None", "Type", "Rise", "Pop", "Wave", "Scatter"}};
+    juce::ComboBox kinds;
+    juce::Label kindCaption;
     std::array<juce::Label, 4> captions;
     std::array<motion::ui::ScrubField, 4> fields;
 };

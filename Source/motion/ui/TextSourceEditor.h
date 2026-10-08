@@ -84,6 +84,8 @@ public:
         text.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
         text.setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
         text.setColour(juce::TextEditor::textColourId, osci::Colours::text());
+        // The words start on the page's inset, like the type bar above.
+        text.setIndents(0, 4);
         text.setText(initial, false);
         text.onTextChange = [this] { changed(); };
         addAndMakeVisible(text);
@@ -112,7 +114,7 @@ public:
         constexpr int cell = motion::icons::ToolStrip::cell, groupGap = motion::icons::ToolStrip::groupGap;
         constexpr int fieldsWidth = 34 + 58 + 8 + 56 + 58, styleWidth = 2 * cell, alignWidth = 3 * cell;
         constexpr int oneLine = 150 + groupGap + styleWidth + groupGap + alignWidth + groupGap + fieldsWidth;
-        const auto room = page.getWidth() - 2 * motion::style::padding;
+        const auto room = page.getWidth() - 2 * motion::style::sceneEditor::inset;
         twoLines = room < oneLine;
         bar = page.removeFromTop((twoLines ? 2 : 1) * cell + 2 * barInset);
         separators.clear();
@@ -127,7 +129,8 @@ public:
             trackingCaption.setBounds(line.removeFromLeft(56).withTrimmedRight(4));
             tracking.setBounds(line.removeFromLeft(58).reduced(0, 3));
         };
-        auto inner = bar.reduced(motion::style::padding, barInset);
+        constexpr auto inset = motion::style::sceneEditor::inset;
+        auto inner = bar.reduced(inset, barInset);
         auto first = inner.removeFromTop(cell);
         family.setBounds(first.removeFromLeft(twoLines ? first.getWidth() - groupGap - styleWidth : std::min(200, room - (oneLine - 150))).reduced(0, 3));
         separate(first);
@@ -139,12 +142,12 @@ public:
         separate(second);
         spacing(second);
         footer = page.removeFromBottom(footerHeight);
-        status.setBounds(footer.reduced(motion::style::padding, 0));
-        text.setBounds(page.reduced(motion::style::padding * 2, motion::style::padding));
+        status.setBounds(footer.reduced(inset, 0));
+        text.setBounds(page.reduced(inset, motion::style::padding));
     }
 
     void paint(juce::Graphics& g) override {
-        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".txt");
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".txt", "Editing", error.isNotEmpty());
         // The type bar and the foot are bands of the panel's surface.
         for (const auto& band : {bar, footer}) {
             g.setColour(osci::Colours::surface());
@@ -209,8 +212,8 @@ private:
         if (onDone) { onDone(text.getText(), settings); }
     }
 
-    static constexpr motion::PropertySpec lineSpacingSpec {"text.lineSpacing", "Line spacing", "Text", "", 0.5, 4.0, 1.2, .05, 2, ""};
-    static constexpr motion::PropertySpec trackingSpec {"text.tracking", "Tracking", "Text", "", -0.2, 1.0, 0.0, .01, 2, ""};
+    static constexpr motion::PropertySpec lineSpacingSpec {"text.lineSpacing", "Line spacing", "Text", "", 0.5, 4.0, 1.2, .05, 2, "\u00d7"};
+    static constexpr motion::PropertySpec trackingSpec {"text.tracking", "Tracking", "Text", "", -0.2, 1.0, 0.0, .01, 2, " em"};
 
     motion::TextSettings settings;
     const juce::String original;

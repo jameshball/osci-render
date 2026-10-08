@@ -11,7 +11,7 @@
 class MotionLuaSourceEditor final : public juce::Component, private juce::CodeDocument::Listener {
 public:
     MotionLuaSourceEditor(const juce::String& code, const juce::String& title, motion::BakeSettings settings, bool editing, const juce::String& preparationError)
-        : model("motion-source-draft", "Lua source", code), editor(model, editorOptions()), baking(settings), original(code), originalSettings(settings), sourceName(title) {
+        : model("motion-source-draft", "Lua source", code), editor(model, editorOptions()), baking(settings), original(code), originalSettings(settings), sourceName(title), mode(editing ? "Editing" : "New Lua source") {
         setName("Lua source editor");
         setWantsKeyboardFocus(true);
         cancelButton.setButtonText("Cancel");
@@ -30,10 +30,13 @@ public:
         auto& codeView = editor.getEditor();
         codeView.setFont(motion::style::mono());
         codeView.setColour(juce::CodeEditorComponent::backgroundColourId, osci::Colours::veryDark());
-        codeView.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, osci::Colours::veryDark().darker(.25f));
-        codeView.setColour(juce::CodeEditorComponent::lineNumberTextId, osci::Colours::textMuted().withAlpha(.45f));
-        codeView.setColour(juce::CodeEditorComponent::highlightColourId, osci::Colours::accentColor().withAlpha(.3f));
-        codeView.setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
+        // Line numbers sit on the page itself, so the code's top margin is
+        // one continuous surface.
+        codeView.setColour(juce::CodeEditorComponent::lineNumberBackgroundId, osci::Colours::veryDark());
+        codeView.setColour(juce::CodeEditorComponent::lineNumberTextId, osci::Colours::textMuted().withAlpha(.4f));
+        codeView.setColour(juce::CodeEditorComponent::highlightColourId, motion::style::accent().withAlpha(.3f));
+        codeView.setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.09f));
+        codeView.setScrollbarThickness(5);
         codeView.setColour(juce::ScrollBar::trackColourId, juce::Colours::transparentBlack);
         codeFrame.addAndMakeVisible(editor);
         addAndMakeVisible(codeFrame);
@@ -62,19 +65,22 @@ public:
     void resized() override {
         titleArea = motion::style::sceneEditor::layoutHeader(getLocalBounds(), baking.bakeButton(), cancelButton);
         auto page = motion::style::sceneEditor::page(getLocalBounds());
+        constexpr auto inset = motion::style::sceneEditor::inset;
         footer = page.removeFromBottom(MotionBakeSettingsPanel::preferredHeight + motion::style::padding);
-        baking.setBounds(footer.reduced(motion::style::padding * 2, 0).withTrimmedBottom(motion::style::padding));
+        baking.setBounds(footer.reduced(inset, 0).withTrimmedBottom(motion::style::padding));
         strip = problem.isVisible() ? page.removeFromBottom(problemHeight) : juce::Rectangle<int>();
-        problem.setBounds(strip.withTrimmedLeft(24).withTrimmedRight(motion::style::padding));
-        codeFrame.setBounds(page);
+        problem.setBounds(strip.withTrimmedLeft(inset + 14).withTrimmedRight(inset));
+        // The first line breathes below the header.
+        codeFrame.setBounds(page.withTrimmedTop(motion::style::padding));
+        page = codeFrame.getLocalBounds();
         // The shared editor draws a frame and a button row around its code;
         // place it so only the code shows, filling the page.
-        constexpr int inset = 5, header = 28;
-        editor.setBounds(-inset, -header, page.getWidth() + 2 * inset, page.getHeight() + header + inset);
+        constexpr int frame = 5, header = 28;
+        editor.setBounds(-frame, -header, page.getWidth() + 2 * frame, page.getHeight() + header + frame);
     }
 
     void paint(juce::Graphics& g) override {
-        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".lua");
+        motion::style::sceneEditor::paint(g, getLocalBounds(), titleArea, sourceName + ".lua", mode, problem.isVisible() && !stale);
         // The bake settings: a rule above, on the page's colour.
         g.setColour(osci::Colours::surface());
         g.fillRect(footer);
@@ -86,7 +92,7 @@ public:
             g.fillRect(strip);
             g.setColour(motion::style::error().withAlpha(stale ? .45f : 1.0f));
             g.fillRect(strip.withHeight(1));
-            g.fillEllipse(juce::Rectangle<float>(7, 7).withCentre({static_cast<float>(strip.getX()) + 11.0f, static_cast<float>(strip.getCentreY())}));
+            g.fillEllipse(juce::Rectangle<float>(6, 6).withCentre({static_cast<float>(strip.getX() + motion::style::sceneEditor::inset) + 3.0f, static_cast<float>(strip.getCentreY())}));
         }
     }
 
@@ -147,7 +153,7 @@ private:
     MotionBakeSettingsPanel baking;
     const juce::String original;
     const motion::BakeSettings originalSettings;
-    const juce::String sourceName;
+    const juce::String sourceName, mode;
     juce::Rectangle<int> titleArea, footer, strip;
     juce::Component codeFrame;
     juce::Label problem;

@@ -33,6 +33,9 @@ public:
         mute.setOnColour(motion::style::trackMute());
         solo.setOnColour(motion::style::trackSolo());
         lock.setOnColour(motion::style::trackLock());
+        // Off, a switch is just its letter or glyph; on, it fills.
+        for (auto* chip : {&mute, &solo, &lock}) { chip->quiet = true; }
+        setRepaintsOnMouseActivity(true);
         // The glyph matches the M and S letters' height.
         lock.iconSize = 10.0f;
         // A click opens the menu; a drag moves the track instead. The open
@@ -47,10 +50,7 @@ public:
         isGroup = group;
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
-        if (lock.isVisible() == group) {
-            lock.setVisible(!group);
-            resized();
-        }
+        lock.setVisible(!group);
         if (!grabbing) { grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor); }
         grip.setTooltip(group ? "Group actions" : juce::String());
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
@@ -82,14 +82,11 @@ public:
         auto bounds = getLocalBounds().removeFromTop(std::min(getHeight(), 28)).reduced(3, 0);
         disclosure.setBounds(bounds.removeFromLeft(16));
         grip.setBounds(bounds.removeFromLeft(14));
-        // Square 16 px switches, 2 px apart.
-        constexpr int chip = 16, spacing = 2;
-        int count = 0;
-        for (auto* button : std::initializer_list<juce::Button*> { &mute, &solo, &lock }) { count += button->isVisible() ? 1 : 0; }
-        const auto chips = count * (chip + spacing);
-        auto buttons = bounds.removeFromRight(chips).withSizeKeepingCentre(chips, chip);
+        // Three fixed 18 px slots, so every row's switches line up; a group
+        // leaves its lock slot empty.
+        constexpr int chip = 18, spacing = 1;
+        auto buttons = bounds.removeFromRight(3 * (chip + spacing)).withSizeKeepingCentre(3 * (chip + spacing), chip);
         for (auto* button : std::initializer_list<juce::Button*> { &mute, &solo, &lock }) {
-            if (!button->isVisible()) { continue; }
             button->setBounds(buttons.removeFromLeft(chip));
             buttons.removeFromLeft(spacing);
         }
@@ -153,6 +150,9 @@ private:
     juce::Label name;
     class ReorderHandle : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool down) override {
+            // Only while the row is under the pointer: a column of grips is noise.
+            const auto* row = getParentComponent();
+            if (!over && !down && (row == nullptr || !row->isMouseOver(true))) { return; }
             g.setColour(osci::Colours::text().withAlpha(over || down ? 0.9f : 0.4f));
             for (int row = -1; row <= 1; ++row) {
                 for (int column = 0; column < 2; ++column) {

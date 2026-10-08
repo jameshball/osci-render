@@ -28,8 +28,8 @@ public:
         addAndMakeVisible(depthLabel);
         addAndMakeVisible(depth);
         if (source.isNotEmpty()) { addAndMakeVisible(preview); }
-        // One row beside a preview as tall as the image sheet's.
-        setSize(widthFor(source.isNotEmpty() ? previewSize : 0), source.isNotEmpty() ? heightFor(1, previewSize - row) : heightFor(1));
+        // One column: the preview across the form, then its one setting.
+        setSize(widthFor(), source.isNotEmpty() ? heightFor(1, previewSize + rowGap) : heightFor(1));
         refresh();
     }
 
@@ -38,8 +38,8 @@ public:
 protected:
     void layoutBody(juce::Rectangle<int> area) override {
         if (source.isNotEmpty()) {
-            preview.setBounds(area.removeFromLeft(previewSize).withHeight(previewSize));
-            area.removeFromLeft(24);
+            preview.setBounds(area.removeFromTop(previewSize));
+            area.removeFromTop(rowGap);
         }
         formRow(area, depthLabel, depth, number);
     }

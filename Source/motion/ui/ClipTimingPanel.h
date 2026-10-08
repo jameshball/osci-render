@@ -39,7 +39,8 @@ public:
         }
         details.setFont(motion::style::caption());
         details.setColour(juce::Label::textColourId, osci::Colours::textMuted());
-        details.setJustificationType(juce::Justification::centredRight);
+        details.setJustificationType(juce::Justification::centredLeft);
+        details.setBorderSize({});
         addAndMakeVisible(details);
         status.setFont(motion::style::caption());
         status.setJustificationType(juce::Justification::topLeft);
@@ -68,7 +69,7 @@ public:
         }
         updating = false;
         // Which clock the clip keeps, on the heading line.
-        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo" : "Ignores tempo", juce::dontSendNotification);
+        details.setText(clip == nullptr ? juce::String() : clip->timeBase == motion::ClipTimeBase::beats ? "follows tempo" : "fixed in seconds", juce::dontSendNotification);
         details.setTooltip(clip != nullptr && clip->timeBase == motion::ClipTimeBase::beats ? "Follows tempo changes" : "Keeps its time when the tempo changes");
         status.setColour(juce::Label::textColourId, error.isNotEmpty() ? motion::style::error() : osci::Colours::textMuted());
         status.setText(error.isNotEmpty() ? error : (locked ? "Track locked: timing is read-only." : juce::String()), juce::dontSendNotification);
@@ -80,8 +81,9 @@ public:
     void resized() override {
         auto area = getLocalBounds();
         auto heading = area.removeFromTop(motion::style::inspector::headingHeight);
-        details.setBounds(heading.withWidth(motion::style::PropertyGrid(heading.getWidth()).value + motion::style::PropertyGrid(heading.getWidth()).column));
+        // What clock the clip keeps qualifies the heading: "Timing  fixed in seconds".
         title.setBounds(heading);
+        details.setBounds(heading.withTrimmedLeft(juce::roundToInt(juce::TextLayout::getStringWidth(title.getFont(), title.getText())) + 8));
         motion::style::inspector::layoutFields(area, captions, {&values[0], &values[1], &values[2], &values[3]});
         status.setBounds(area.removeFromTop(30));
     }

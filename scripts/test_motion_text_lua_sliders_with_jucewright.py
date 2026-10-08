@@ -71,7 +71,7 @@ try:
     wait_undo("Import object")
     # Per-character animation lives in the text clip's Properties.
     command("wait-for-locator", "--name", "Text animation", "--exact", "--timeout-ms", 10000)
-    step("rise", "set-value", "--name", "Text animation", "--exact", "Rise")
+    step("rise", "select-option", "--name", "Text animation", "--class", "juce::ComboBox", "--exact", "--text", "Rise")
     wait_undo("Animate text")
     step("stagger", "set-value", "--component-name", "Text animation Stagger", "--exact", "0.1")
     command("wait", "--ms", 1500)

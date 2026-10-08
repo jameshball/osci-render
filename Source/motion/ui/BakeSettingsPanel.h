@@ -79,13 +79,15 @@ public:
 
     void resized() override {
         auto area = getLocalBounds();
+        // Two columns, captions beside their fields, the fields a fixed width
+        // so numbers and choices line up whatever the editor's width. The
+        // estimate ends where the fields do.
+        const auto column = std::min(260, (area.getWidth() - 24) / 2);
+        const auto fieldsRight = area.getX() + column + 24 + std::min(column - 72, 120) + 72;
         auto heading = area.removeFromTop(headingBlock).withTrimmedTop(10).withHeight(16);
         title.setBounds(heading);
-        summary.setBounds(heading);
+        summary.setBounds(heading.withRight(std::min(heading.getRight(), fieldsRight)));
         const std::array<std::pair<juce::Label*, juce::Component*>, 5> cells { { { &durationLabel, &duration }, { &rateLabel, &frameRate }, { &samplesLabel, &samples }, { &seedLabel, &seed }, { &bpmLabel, &bpm } } };
-        // Two columns, captions beside their fields, the fields a fixed width
-        // so numbers and choices line up whatever the editor's width.
-        const auto column = std::min(260, (area.getWidth() - 24) / 2);
         for (std::size_t index = 0; index < cells.size(); ++index) {
             auto cell = juce::Rectangle<int>(area.getX() + static_cast<int>(index % 2) * (column + 24), area.getY() + static_cast<int>(index / 2) * row, column, row);
             cells[index].first->setBounds(cell.removeFromLeft(72));

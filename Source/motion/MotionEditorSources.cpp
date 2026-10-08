@@ -116,7 +116,7 @@ void MotionEditor::openProject(const juce::File& file) {
             if (overlay != nullptr) { owner->dismissOverlay(overlay); }
             if (result.failed()) {
                 owner->projectLoadFailed = true;
-                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", result.getErrorMessage());
+                motion::ui::MessageSheet::show(*owner, "Couldn't open the project", result.getErrorMessage(), "OK", {}, file.getFileName());
                 return;
             }
             if (owner->processor.document.generation() != generation || owner->processor.document.revision() != revision) {
@@ -481,6 +481,7 @@ Editor& MotionEditor::openSceneEditor(std::unique_ptr<Editor> editor) {
     auto& opened = *editor;
     sceneEditor = std::move(editor);
     sceneEditorGeneration = processor.document.generation();
+    assetLibrary.setEditingSource(true);
     addAndMakeVisible(opened);
     opened.onCancel = [this] { juce::MessageManager::callAsync([owner = juce::Component::SafePointer<MotionEditor>(this)] { if (owner != nullptr) { owner->closeSceneEditor(); } }); };
     return opened;
@@ -492,6 +493,7 @@ void MotionEditor::closeSceneEditor() {
     if (sceneEditorAs<MotionDrawingEditor>() == nullptr) { preparationSettingsOpen = false; }
     removeChildComponent(sceneEditor.get());
     sceneEditor.reset();
+    assetLibrary.setEditingSource(false);
     textPreviewDue = 0;
     for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
     // Drop the preview of what was being edited.

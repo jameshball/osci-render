@@ -175,15 +175,19 @@ public:
         addAndMakeVisible(status);
     }
 
-    static constexpr int titleHeight = 18, titleGap = 10, row = 26, rowGap = 6, caption = 64, footerHeight = 26, footerGap = 12;
-    static int heightFor(int rows, int extra = 0) { return titleHeight + titleGap + rows * row + std::max(0, rows - 1) * rowGap + extra + footerGap + footerHeight; }
+    static constexpr int titleHeight = 18, titleGap = 12, row = 26, rowGap = 6, caption = 64, number = 96, footerHeight = 26, footerGap = 12;
+    // The call-out's bubble sits 4.5 px outside its content; this brings
+    // the content 12 px in from the bubble's edge.
+    static constexpr int inset = 8;
+    static int heightFor(int rows, int extra = 0) { return 2 * inset + titleHeight + titleGap + rows * row + std::max(0, rows - 1) * rowGap + extra + footerGap + footerHeight; }
+    static int widthFor(int content) { return 2 * inset + content; }
 
     void setError(const juce::String& message) { status.setText(message, juce::dontSendNotification); }
 
     void paint(juce::Graphics& g) override {
-        auto heading = getLocalBounds().removeFromTop(titleHeight);
+        auto heading = getLocalBounds().reduced(inset).removeFromTop(titleHeight);
         g.setFont(style::heading());
-        g.setColour(osci::Colours::textMuted());
+        g.setColour(osci::Colours::text());
         g.drawText(title, heading, juce::Justification::centredLeft, true);
         if (detail.isNotEmpty()) {
             g.setFont(style::caption());
@@ -192,7 +196,7 @@ public:
         }
     }
     void resized() override {
-        auto area = getLocalBounds();
+        auto area = getLocalBounds().reduced(inset);
         auto footer = area.removeFromBottom(footerHeight);
         primary.setBounds(footer.removeFromRight(std::max(72, primary.getBestWidthForHeight(footerHeight) + 12)));
         footer.removeFromRight(8);
@@ -225,8 +229,8 @@ namespace motion::ui {
 // question with a destructive answer (Remove, beside Cancel).
 class MessageSheet final : public Sheet {
 public:
-    MessageSheet(const juce::String& heading, const juce::String& message, const juce::String& verb, std::function<void()> confirmed = {})
-        : Sheet(heading, {}, verb), onConfirm(std::move(confirmed)) {
+    MessageSheet(const juce::String& heading, const juce::String& message, const juce::String& verb, std::function<void()> confirmed = {}, const juce::String& about = {})
+        : Sheet(heading, about, verb), onConfirm(std::move(confirmed)) {
         nameAction(verb);
         cancel.setVisible(onConfirm != nullptr);
         text.setText(message, juce::dontSendNotification);
@@ -244,8 +248,9 @@ public:
         const auto lines = juce::jmax(1, juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(style::body(), message) / (width - 8.0f))) + message.retainCharacters("\n").length());
         setSize(width, headerHeight + headerGap + lines * 18 + footerGap + footerHeight);
     }
-    static void show(juce::Component& owner, const juce::String& heading, const juce::String& message, const juce::String& verb = "OK", std::function<void()> confirmed = {}) {
-        auto sheet = std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed));
+    // `about` names what the message is about (a file), muted beside the title.
+    static void show(juce::Component& owner, const juce::String& heading, const juce::String& message, const juce::String& verb = "OK", std::function<void()> confirmed = {}, const juce::String& about = {}) {
+        auto sheet = std::make_unique<MessageSheet>(heading, message, verb, std::move(confirmed), about);
         const auto size = juce::Point<int>(sheet->getWidth(), sheet->getHeight());
         osci::OverlayComponent::show(owner, std::make_unique<osci::ComponentOverlay>(std::move(sheet), juce::String(), size, false));
     }

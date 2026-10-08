@@ -16,6 +16,9 @@ public:
         initialPosition = juce::String(grid.positionLabel(seconds));
         position.setText(initialPosition, false);
         position.setTooltip("Use the current time display, or append s for seconds or f for frames.");
+        // Positions read like the other number fields: right-aligned.
+        position.setJustification(juce::Justification::centredRight);
+        name.setJustification(juce::Justification::centredLeft);
         for (auto* field : {&name, &position}) {
             field->setFont(motion::style::body());
             field->setSelectAllWhenFocused(true);
@@ -30,7 +33,7 @@ public:
         primary.onClick = [this] { if (time.has_value() && primary.isEnabled() && onApply) { onApply(name.getText().trim(), *time); } };
         addAndMakeVisible(nameLabel);
         addAndMakeVisible(positionLabel);
-        setSize(272, heightFor(2));
+        setSize(widthFor(256), heightFor(2));
         refresh();
     }
     std::function<void(juce::String, double)> onApply;
@@ -38,7 +41,7 @@ public:
 protected:
     void layoutBody(juce::Rectangle<int> area) override {
         formRow(area, nameLabel, name);
-        formRow(area, positionLabel, position, 112);
+        formRow(area, positionLabel, position, number);
     }
 
 private:
@@ -69,6 +72,9 @@ public:
         tempo.setTitle("Tempo change BPM");
         tempo.setText(juce::String(bpm, bpm == std::round(bpm) ? 0 : 2), false);
         tempo.setFont(motion::style::body());
+        tempo.setJustification(juce::Justification::centredRight);
+        // The unit sits inside the field, after the number.
+        tempo.setBorder({1, 1, 1, unitWidth});
         tempo.setSelectAllWhenFocused(true);
         tempo.setInputRestrictions(8, "0123456789.");
         tempo.onTextChange = [this] { refresh(); };
@@ -77,12 +83,13 @@ public:
         rampLabel.setText("Glide in", juce::dontSendNotification);
         unit.setText("BPM", juce::dontSendNotification);
         for (auto* label : {&tempoLabel, &rampLabel, &unit}) { motion::ui::Sheet::styleCaption(*label); }
+        unit.setInterceptsMouseClicks(false, false);
         primary.onClick = [this] {
             const auto value = motion::ui::parseNumber(tempo.getText());
             if (primary.isEnabled() && value.has_value() && onApply) { onApply(*value, ramp.getToggleState()); }
         };
         for (auto* component : std::initializer_list<juce::Component*>{&tempo, &tempoLabel, &unit, &rampLabel, &ramp}) { addAndMakeVisible(component); }
-        setSize(272, heightFor(2));
+        setSize(widthFor(256), heightFor(2));
         refresh();
     }
     std::function<void(double, bool)> onApply;
@@ -91,8 +98,8 @@ protected:
     void layoutBody(juce::Rectangle<int> area) override {
         auto line = area.removeFromTop(row);
         tempoLabel.setBounds(line.removeFromLeft(caption));
-        tempo.setBounds(line.removeFromLeft(72));
-        unit.setBounds(line.withTrimmedLeft(8));
+        tempo.setBounds(line.removeFromLeft(number));
+        unit.setBounds(tempo.getBounds().removeFromRight(unitWidth - 2));
         area.removeFromTop(rowGap);
         line = area.removeFromTop(row);
         rampLabel.setBounds(line.removeFromLeft(caption));
@@ -106,6 +113,7 @@ private:
         primary.setEnabled(valid);
         setError(valid ? "" : "Tempo: 1-1000 BPM");
     }
+    static constexpr int unitWidth = 36;
     juce::TextEditor tempo;
     juce::Label tempoLabel, rampLabel, unit;
     motion::ui::Switch ramp {"Ramp into tempo"};

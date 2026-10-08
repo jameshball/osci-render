@@ -93,7 +93,7 @@ public:
             if (!value.has_value()) { setError("Even sizes, 128-4096 px"); return; }
             if (onApply) { onApply(*value); }
         };
-        setSize(300, heightFor(MotionCanvasSizeEditor::rows));
+        setSize(widthFor(284), heightFor(MotionCanvasSizeEditor::rows));
     }
     std::function<void(VisualiserRenderSize)> onApply;
 

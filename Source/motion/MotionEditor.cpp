@@ -849,7 +849,8 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     if (findActiveOverlay<osci::OverlayComponent>() != nullptr) { return; }
     const auto panel = focusedPanel();
     if (!panel.isEmpty()) {
-        graphics.setColour(osci::Colours::accentColor().withAlpha(.45f));
+        // Which panel the keyboard acts on, quietly: an outline, not a frame.
+        graphics.setColour(osci::Colours::accentColor().withAlpha(.22f));
         graphics.drawRoundedRectangle(panel.toFloat().reduced(.5f), motion::style::panelRadius, 1.0f);
     }
 }
