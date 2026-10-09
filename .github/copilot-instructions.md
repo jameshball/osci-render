@@ -4,6 +4,7 @@
 
 - **Backwards compatibility**: Always ask before adding it. Do not assume it is needed.
 - **README files**: Do not edit `README.md` files unless the user explicitly asks for README changes.
+- **Internal documents are never committed**: Research, notes, plans, handoffs, audits, critiques, reports, benchmark write-ups, design explorations and work-in-progress screenshots are internal. Keep them in the git-ignored `research/` folder (or `docs/research/`) and never `git add` them, even when asked to "commit everything". Only commit documentation meant for users or contributors, and only when the user asks for it.
 - **Formatting scope**: Apply the formatting rules below to new code and to lines you are already changing for the task. Do not reformat unrelated code just to satisfy style rules.
 - **Long-running commands**: For builds, tests, deployments, and exhaustive automation runs, prefer one blocking command with a long timeout and wait for completion. Avoid frequent short polling or progress checks unless the user asks for live updates or the command is genuinely interactive.
 - **Visualiser render semaphore logic**: Do not change the `VisualiserRenderer` render semaphore / `triggerRepaint()` / `renderingSemaphore.acquire()` logic unless the user explicitly asks for that specific work. This synchronization is subtle and easy to break.

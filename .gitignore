@@ -368,6 +368,7 @@ MigrationBackup/
 vital/
 
 # Local-only research/reference checkouts
+/research/
 /osci-render-api/
 /osci-render-website/
 /docs/research/
