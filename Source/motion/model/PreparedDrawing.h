@@ -2,6 +2,7 @@
 
 #include <osci_render_core/osci_render_core.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -12,6 +13,14 @@ namespace motion {
 // during playback; product timelines may share the geometry.
 class PreparedDrawing {
 public:
+    // A mesh's faces in the drawing's own space, as triangles of shared
+    // vertices; lines behind faces can be hidden.
+    struct Mesh {
+        std::vector<osci::Point> vertices;
+        std::vector<std::array<std::uint32_t, 3>> triangles;
+        bool empty() const { return triangles.empty(); }
+    };
+
     explicit PreparedDrawing(std::vector<std::unique_ptr<osci::Shape>> source) : shapes(std::move(source)) {
         ends.reserve(shapes.size());
         osci::Point firstStart, previousEnd;
@@ -110,8 +119,12 @@ public:
     // it unchanged (lengths are cached at construction), as sample() relies on.
     std::size_t shapeCount() const { return shapes.size(); }
     osci::Shape* shape(std::size_t index) const { return index < shapes.size() ? shapes[index].get() : nullptr; }
+    // A mesh's faces, set while it is prepared; empty for line drawings.
+    const Mesh& faces() const { return meshFaces; }
+    void setFaces(Mesh value) { meshFaces = std::move(value); }
 
 private:
+    Mesh meshFaces;
     struct TraversalSegment {
         std::size_t shape;
         std::int64_t baseEnd;

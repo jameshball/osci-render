@@ -9,6 +9,7 @@
 #include "../model/SpatialMotion.h"
 #include "../model/Vec3.h"
 #include "../live/LiveSourceFrames.h"
+#include "HiddenLineBake.h"
 #include "../model/PropertySchema.h"
 #include "../model/LuaClipBake.h"
 #include "SampleClock.h"
@@ -269,6 +270,7 @@ struct PreparedCamera {
     Id id;
     std::array<Curve, 7> curves;
     PreparedChain target, parent;
+    bool hidesHiddenLines = false;
 
     struct Frame {
         Vec3 position, right, up, forward;
@@ -420,6 +422,7 @@ struct PreparedComposition {
         };
         for (const auto& camera : project.cameras) {
             PreparedCamera item { camera.id, {} };
+            item.hidesHiddenLines = camera.hideHiddenLines;
             if (camera.target != 0) { item.target = chainFor(camera.target, false); }
             if (camera.parent != 0) { item.parent = chainFor(camera.parent, true); }
             for (std::size_t index = 0; index < cameraPropertySpecs.size(); ++index) {
@@ -427,6 +430,10 @@ struct PreparedComposition {
                 drivers.drive(item.curves[index], project, mainClock, camera.id, cameraPropertySpecs[index].id);
             }
             cameras.push_back(std::move(item));
+        }
+        // Cameras that hide hidden lines show frames baked off the render thread.
+        if (purpose == CompositionPurpose::signal && std::any_of(cameras.begin(), cameras.end(), [](const auto& camera) { return camera.hidesHiddenLines; })) {
+            hiddenLines = std::make_shared<hidden::Bake>(std::make_shared<const Project>(project), project.frameRate, project.duration);
         }
         for (std::size_t index = 0; index < beamPropertySpecs.size(); ++index) {
             beam.curves[index] = curveOrDefault(project.beam.properties, beamPropertySpecs[index]);
@@ -586,6 +593,20 @@ struct PreparedComposition {
     osci::Point projectPoint(osci::Point point, double time) const {
         return projectVisible(point, time).value_or(osci::Point(0, 0, 0, 0, 0, 0));
     }
+    // A world point in the active camera's eye space (x right, y up, z along
+    // its view), as projectVisible sees it before dividing by depth; none
+    // without a camera.
+    std::optional<Vec3> eyePoint(osci::Point point, double time) const {
+        if (!std::isfinite(time) || !point.hasFinitePosition()) { return std::nullopt; }
+        point = applyCompositionEffects(point, time);
+        const auto& view = views.at(time, [&] {
+            const auto* camera = activeCamera(time);
+            return View {camera != nullptr, camera != nullptr ? camera->frame(time) : std::nullopt};
+        });
+        if (!view.frame.has_value()) { return std::nullopt; }
+        const auto offset = Vec3 {point.x, point.y, point.z} - view.frame->position;
+        return Vec3 {offset.dot(view.frame->right), offset.dot(view.frame->up), offset.dot(view.frame->forward)};
+    }
 
 private:
     // The camera shown at a time and its frame (none without cameras).
@@ -606,6 +627,8 @@ public:
     PreparedSoundtrack soundtrack;
     std::vector<PreparedClip> clips;
     std::vector<PreparedCamera> cameras;
+    // Frames with hidden lines removed, when a camera hides them.
+    std::shared_ptr<hidden::Bake> hiddenLines;
     PreparedBeam beam;
 
 private:

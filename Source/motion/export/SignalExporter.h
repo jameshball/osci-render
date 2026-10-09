@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../render/BeamRenderer.h"
+#include "../render/HiddenLines.h"
 #include "WavExporter.h"
 
 namespace motion {
@@ -24,6 +25,11 @@ public:
             if (clip.liveIdentity != nullptr) { return juce::Result::fail("Capture live sources before exporting the signal."); }
         }
         if (composition.preparationError.isNotEmpty()) { return juce::Result::fail(composition.preparationError); }
+        // Every frame's hidden lines are removed before the signal is drawn.
+        if (composition.hiddenLines != nullptr) {
+            hidden::Baker::bakeAll(*composition.hiddenLines, sampleRate, cancel);
+            if (cancel.load()) { return juce::Result::fail("Export cancelled."); }
+        }
         BeamRenderer beam;
         return WavExporter::write<5>(composition.duration, destination, sampleRate, cancel, progress,
             [&](double index, double time) {

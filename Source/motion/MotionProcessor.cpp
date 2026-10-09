@@ -68,7 +68,13 @@ void MotionProcessor::handleAsyncUpdate() {
     // that prepared completely.
     if (result->composition != nullptr && preparationError.isEmpty()) {
         result->composition->publicationRevision = result->revision;
+        publishedBake = result->composition->hiddenLines;
         composition.publish(std::move(result->composition));
+        if (publishedBake != nullptr) {
+            hiddenLineBaker.start(publishedBake, preparationSampleRate, publishedBake->frameOf(position.load()));
+        } else {
+            hiddenLineBaker.stop();
+        }
     }
 }
 

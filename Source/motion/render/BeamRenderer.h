@@ -46,6 +46,9 @@ public:
         std::size_t frame = 0;
         bool reversed = false;
         osci::Point from, to;
+        // The vector drawing drawn (hidden lines removed, when baked); none
+        // for point frames.
+        const PreparedDrawing* drawing = nullptr;
     };
 
     // Cycles never straddle a frame of the project's frame rate, so exported
@@ -143,6 +146,7 @@ private:
         osci::Point start, end;
         std::int64_t minimum;
         double share = 1;
+        const PreparedDrawing* drawing = nullptr;
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -167,16 +171,29 @@ private:
         std::size_t frame;
         std::int64_t minimum;
         double share;
+        const PreparedDrawing* drawing;
     };
-    static std::optional<Visible> visible(const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
+    // A clip's vector drawing at a frame: with the lines its camera can't see
+    // removed once that frame is baked.
+    static const PreparedDrawing* shownDrawing(const PreparedComposition& composition, const PreparedClip& clip, const PreparedSource& source, std::size_t frame, double time) {
+        const auto* whole = source.drawingAt(frame);
+        if (whole == nullptr || composition.hiddenLines == nullptr || clip.liveIdentity != nullptr) { return whole; }
+        const auto* baked = composition.hiddenLines->at(time);
+        if (baked == nullptr) { return whole; }
+        const auto* culled = baked->drawing(static_cast<std::size_t>(&clip - composition.clips.data()));
+        return culled != nullptr ? culled : whole;
+    }
+    static std::optional<Visible> visible(const PreparedComposition& composition, const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
         if (!clip.active(time) || !clip.visible(time)) { return std::nullopt; }
         const auto share = clip.beam(time);
         if (!(share > 0)) { return std::nullopt; }
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
         const auto frame = source->frameIndex(clip.localTime(time));
-        const auto* drawing = source->drawingAt(frame);
-        return Visible {source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2), share};
+        const auto* drawing = shownDrawing(composition, clip, *source, frame, time);
+        // Wholly hidden behind meshes.
+        if (drawing != nullptr && drawing->empty()) { return std::nullopt; }
+        return Visible {source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2), share, drawing};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -184,9 +201,9 @@ private:
         segmentCount = 0; layerCount = 0; lastSegment = 0;
         for (const auto& clip : composition.clips) {
             if (layerCount == maximumLayers) { break; }
-            const auto shown = visible(clip, time, liveFrames);
+            const auto shown = visible(composition, clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share});
+            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share, shown->drawing});
         }
         finishPlan(composition, first, end, rate);
     }
@@ -198,13 +215,13 @@ private:
         // ratio of projected to source distance is uniform under affine
         // transforms, so pen-up jumps measure scale as well as strokes do.
         // Point frames have no stored length: sum their lit steps directly.
-        const auto* vector = layer.source->drawingAt(layer.frame);
+        const auto* vector = layer.drawing;
         const auto probes = vector != nullptr ? lengthProbes : pointLengthProbes;
         osci::Point previousRaw, previousPoint;
         double sourceDistance = 0, projectedDistance = 0, litDistance = 0;
         for (int probe = 0; probe < probes; ++probe) {
             const auto phase = static_cast<double>(probe) / (probes - 1);
-            const auto raw = layer.source->sampleFrame(layer.frame, phase);
+            const auto raw = vector != nullptr ? vector->sample(phase) : layer.source->sampleFrame(layer.frame, phase);
             const auto point = place(composition, *layer.clip, raw).value_or(osci::Point(0, 0, 0, 0, 0, 0));
             if (probe == 0) {
                 layer.start = point;
@@ -333,7 +350,7 @@ private:
                 hold(entryOf(i), dwell + settle);
             }
             const auto& layer = items[i];
-            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end});
+            push({Kind::draw, cursor, counts[i], layer.clip, layer.source, layer.frame, reversedFlags[i], layer.start, layer.end, layer.drawing});
             cursor += counts[i];
         }
         hold(exitOf(layerCount - 1), dwell);
@@ -356,7 +373,7 @@ private:
         std::size_t counted = 0;
         for (const auto& clip : composition.clips) {
             if (counted == maximumLayers) { break; }
-            const auto shown = visible(clip, time, liveFrames);
+            const auto shown = visible(composition, clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
             demand += static_cast<double>(shown->minimum + jump);
             ++counted;
@@ -484,13 +501,13 @@ private:
             case Kind::draw: {
                 const auto n = segment->count;
                 const auto step = segment->reversed ? n - 1 - j : j;
-                const auto* drawing = segment->source->drawingAt(segment->frame);
+                const auto* drawing = segment->drawing;
                 osci::Point raw;
                 if (drawing != nullptr && drawing->minimumTraversalSamples() > 0 && n >= drawing->minimumTraversalSamples()) {
                     raw = drawing->sampleTraversal(step, n);
                 } else {
                     const auto span = n > 1 ? 1.0 / static_cast<double>(n - 1) : 1.0;
-                    raw = segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
+                    raw = drawing != nullptr ? drawing->sample(static_cast<double>(step) * span, span) : segment->source->sampleFrame(segment->frame, static_cast<double>(step) * span, span);
                 }
                 // Behind the camera there is no position: hold dark at the entry.
                 return place(composition, *segment->clip, raw).value_or(dark(segment->from));

@@ -248,6 +248,7 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         item->setAttribute("name", juce::String(camera.name));
         if (camera.target != 0) { item->setAttribute("target", juce::String(camera.target)); }
         if (camera.parent != 0) { item->setAttribute("parent", juce::String(camera.parent)); }
+        if (camera.hideHiddenLines) { item->setAttribute("hideHiddenLines", true); }
         saveProperties(*item, camera.properties);
     }
     for (const auto& marker : state.markers) {
@@ -335,8 +336,8 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         group.name = item->getStringAttribute("name", "Group").toStdString();
         group.muted = item->getBoolAttribute("muted", false);
         group.solo = item->getBoolAttribute("solo", false);
-        group.spatialPath = item->getBoolAttribute("spatialPath", false);
         group.height = std::clamp(item->getIntAttribute("height", 0), 0, Track::maximumHeight);
+        group.spatialPath = item->getBoolAttribute("spatialPath", false);
         group.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
         const auto effects = loadEffects(*item, group.effects, identities);
         if (effects.failed()) {
@@ -474,6 +475,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         const auto target = readId(*item, "target"), parent = readId(*item, "parent");
         camera.target = target.value_or(0);
         camera.parent = parent.value_or(0);
+        camera.hideHiddenLines = item->getBoolAttribute("hideHiddenLines", false);
         if (!target.has_value() || !parent.has_value() || (camera.parent != 0 && findGroup(project, camera.parent) == nullptr)
             || (camera.target != 0 && findGroup(project, camera.target) == nullptr && !hasVisualClip(project, camera.target))) {
             return juce::Result::fail("A camera aims at or is parented to a missing object.");

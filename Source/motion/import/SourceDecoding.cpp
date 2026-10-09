@@ -7,7 +7,9 @@
 #include "../model/Cancellation.h"
 #include "../model/Drawing.h"
 #include "../model/SourceParts.h"
+#include "../model/MeshFaces.h"
 #include "FractalPreparation.h"
+#include "../../../modules/osci_file_import/third_party/tinyobjloader/tiny_obj_loader.h"
 #include <cstring>
 #include <new>
 #if OSCI_PREMIUM
@@ -81,7 +83,32 @@ juce::Result prepareBaked(Asset& asset, const juce::String& key, const std::func
 
 // repeatsPrevious(frame) lets identical frames share one drawing (and count
 // once against the geometry budget).
-juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress, const std::function<bool(int)>& repeatsPrevious = {}) {
+// An OBJ's faces as triangles (polygons fanned), in the normalised space its
+// edges are drawn in: the vertices WorldObject centred and scaled.
+PreparedDrawing::Mesh meshFaces(const std::string& content, const std::vector<float>& vertices) {
+    tinyobj::ObjReaderConfig config;
+    config.triangulate = false;
+    config.vertex_color = false;
+    tinyobj::ObjReader reader;
+    PreparedDrawing::Mesh mesh;
+    if (!reader.ParseFromString(content, "", config)) { return mesh; }
+    const auto count = static_cast<int>(vertices.size() / 3);
+    mesh.vertices.reserve(static_cast<std::size_t>(count));
+    for (std::size_t index = 0; index + 2 < vertices.size(); index += 3) { mesh.vertices.emplace_back(vertices[index], vertices[index + 1], vertices[index + 2]); }
+    for (const auto& shape : reader.GetShapes()) {
+        std::size_t offset = 0;
+        for (const auto corners : shape.mesh.num_face_vertices) {
+            for (std::size_t corner = 2; corner < corners; ++corner) {
+                const auto a = shape.mesh.indices[offset].vertex_index, b = shape.mesh.indices[offset + corner - 1].vertex_index, c = shape.mesh.indices[offset + corner].vertex_index;
+                if (a >= 0 && b >= 0 && c >= 0 && a < count && b < count && c < count) { mesh.triangles.push_back({static_cast<std::uint32_t>(a), static_cast<std::uint32_t>(b), static_cast<std::uint32_t>(c)}); }
+            }
+            offset += corners;
+        }
+    }
+    return mesh;
+}
+
+juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate, const std::function<juce::Result(int, ImportShapes&)>& draw, const std::atomic<bool>* cancel, std::atomic<double>* progress, const std::function<bool(int)>& repeatsPrevious = {}, PreparedDrawing::Mesh faces = {}) {
     if (frameCount <= 0 || static_cast<std::size_t>(frameCount) > maximumSourceFrames
         || !std::isfinite(frameRate) || frameRate <= 0.0 || frameRate > 1000.0
         || !std::isfinite(frameCount / frameRate)) {
@@ -109,6 +136,7 @@ juce::Result prepareSourceFrames(Asset& asset, int frameCount, double frameRate,
             return juce::Result::fail("Animation exceeds the geometry budget (100000 shapes per frame or 1000000 total). Simplify or shorten the source.");
         }
         auto drawing = std::make_shared<motion::PreparedDrawing>(std::move(shapes));
+        if (frame == 0) { drawing->setFaces(std::move(faces)); }
         hasGeometry = hasGeometry || !drawing->empty();
         frames.push_back(std::move(drawing));
         if (progress != nullptr) {
@@ -543,6 +571,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
 #endif
     }
     ImportShapes shapes;
+    PreparedDrawing::Mesh faces;
     const auto content = asset.data.toString();
     if (extension == ".lsystem") {
         const auto prepared = motion::fractal::prepare(content, asset.fractalDepth, cancel);
@@ -552,11 +581,16 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
             shapes.push_back(std::make_unique<osci::Line>(osci::Point(segment[0], segment[1], 0), osci::Point(segment[2], segment[3], 0)));
         }
     } else if (extension == ".obj" && parts::isLineSet(content)) {
-        // Parts split from another source keep their place and size.
+        // Parts split from another source keep their place and size, and
+        // their faces are the ones their lines enclose.
         shapes = parts::lineSetShapes(content);
+        faces = mesh::facesOfLines(shapes);
     } else if (extension == ".obj") {
         WorldObject object(content.toStdString());
         shapes = object.draw();
+        faces = meshFaces(content.toStdString(), object.vs);
+        // An OBJ of lines alone: the faces they enclose.
+        if (faces.empty()) { faces = mesh::facesOfLines(shapes); }
     } else if (extension == ".svg" && drawing::isDrawing(content)) {
         // Drawings keep the place and size they were drawn at.
         for (auto [path, smooth] : drawing::paths(content)) {
@@ -599,7 +633,7 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
     return prepareSourceFrames(asset, 1, 30.0, [&](int, ImportShapes& frame) {
         frame = std::move(shapes);
         return juce::Result::ok();
-    }, cancel, progress);
+    }, cancel, progress, {}, std::move(faces));
 } catch (const std::bad_alloc&) {
     return juce::Result::fail("Not enough memory to prepare this source. Simplify or shorten it.");
 } catch (const std::exception& error) {

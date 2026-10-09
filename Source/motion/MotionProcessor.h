@@ -7,6 +7,7 @@
 #include "render/CompositionPreparationWorker.h"
 #include "render/BeamTransitionGuard.h"
 #include "render/BeamRenderer.h"
+#include "render/HiddenLines.h"
 #include "render/PreparedState.h"
 #include "live/LiveSourceExchange.h"
 #include "live/LiveBlenderController.h"
@@ -100,6 +101,15 @@ private:
     motion::LiveSourceExchange liveSources;
     std::unique_ptr<motion::LiveBlenderController> blender;
     std::uint64_t previousLiveRevision = 0;
+public:
+    // How far the current composition's hidden lines are baked, when its
+    // cameras hide them; message thread.
+    std::optional<double> hiddenLineProgress() const { return publishedBake != nullptr && !publishedBake->complete() ? std::optional<double>(publishedBake->progress()) : std::nullopt; }
+    bool hidesHiddenLines() const { return publishedBake != nullptr; }
+private:
+    // Removes the lines cameras can't see, off the audio thread, from the
+    // playhead out. Last, so its workers stop before the rest is destroyed.
+    std::shared_ptr<motion::hidden::Bake> publishedBake;
     juce::AudioBuffer<float> signal;
     std::atomic<double> requestedPosition { -1.0 };
     std::atomic<std::uint64_t> seekSerial {0};
@@ -113,4 +123,6 @@ public:
     void setStateInformation(const void* data, int size) override;
     // Message-thread publication after standalone background preparation.
     void applyPreparedProject(motion::Project prepared, juce::XmlElement& state);
+private:
+    motion::hidden::Baker hiddenLineBaker;
 };

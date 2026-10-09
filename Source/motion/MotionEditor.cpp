@@ -1125,6 +1125,12 @@ void MotionEditor::timerCallback() {
             statistics += dot + "drawing " + juce::String(layers) + (layers == 1 ? " object" : " objects");
             if (interleave > 1) { statistics += dot + "dense: each object every " + juce::String(interleave) + " cycles"; }
         }
+        const auto hiding = processor.hiddenLineProgress();
+        if (hiding.has_value()) {
+            statistics += dot + "hiding lines " + juce::String(juce::roundToInt(*hiding * 100)) + "%";
+        } else if (processor.hidesHiddenLines()) {
+            statistics += dot + "hidden lines removed";
+        }
         statusBar.setStatistics(statistics);
     }
     processor.collectPreparedState();
