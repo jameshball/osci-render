@@ -47,7 +47,7 @@ def names():
 
 def part_count():
     for name in names():
-        found = re.fullmatch(r"(\d+) parts?", name)
+        found = re.fullmatch(r"(\d+) (parts?|pieces?)", name)
         if found:
             return int(found.group(1))
     return 0
@@ -112,9 +112,11 @@ try:
     step("pick whole pieces", "click", "--name", "Pick pieces", "--exact")
     centre_y = scene["y"] + scene["h"] // 2
     step("drag across the left square", "drag-xy", middle - 4, centre_y, scene["x"] + 2, centre_y + 6, "--steps", 6)
+    if "2 pieces" not in names():
+        raise RuntimeError("Pieces should count the square's two outlines as pieces")
+    step("back to box picking", "click", "--name", "Box pick", "--exact")
     if part_count() != picked:
         raise RuntimeError(f"Pieces should take the whole square ({part_count()} of {picked})")
-    step("back to box picking", "click", "--name", "Box pick", "--exact")
     step("clear the picked parts", "press", "Escape", "--class", "MotionCompositionView", "--exact")
     if part_count() != 0:
         raise RuntimeError("Escape should clear the picked parts")

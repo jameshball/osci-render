@@ -725,6 +725,10 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
     }
     composition.setPartMode(false);
     timeline.selectClips(created);
+    // The library shows the new part's source, as importing does.
+    const auto* made = created.empty() ? nullptr : motion::findClip(processor.document.project(), created.front());
+    assetLibrary.refresh();
+    if (made != nullptr) { assetLibrary.selectAsset(made->asset); }
 }
 
 // Examples are written to a temporary folder and imported like any file;

@@ -9,6 +9,7 @@ MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : proce
     partCount.setFont(motion::style::body());
     partCount.setColour(juce::Label::textColourId, osci::Colours::text());
     partCount.setJustificationType(juce::Justification::centred);
+    partCount.setBorderSize({0, 0, 0, 0});
     partCount.setInterceptsMouseClicks(false, false);
     extractButton.setTitle("Extract parts");
     extractButton.setTooltip("Make the picked parts an object of their own (E)");
@@ -202,6 +203,9 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     }
     juce::Graphics::ScopedSaveState sceneState(g);
     const auto time = editingTime();
+    // With an object selected, the others step back so the selection reads
+    // whatever their colour.
+    const auto anySelected = !partMode && selected != 0;
     const motion::PreparedClip* clip = nullptr;
     bool highlighted = false, pickable = false;
     auto chosen = picked.end();
@@ -217,6 +221,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         // Long, fast jumps in a traced beam fade so the shape reads over them.
         auto alpha = piece.shape < 0 ? std::min(1.0f, 12.0f / std::max(1.0f, piece.line.getLength())) * .8f : .85f;
         if (partMode && !pickable) { alpha *= .3f; }
+        if (anySelected && !highlighted) { alpha *= .55f; }
         // Lines beyond the orbit pivot fade with depth, so 3D reads at a glance.
         alpha *= depthFade(piece.depth);
         const auto shape = static_cast<std::size_t>(std::max(0, piece.shape));
@@ -225,14 +230,15 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         if (highlighted || isChosen) {
             highlightedLines.add(piece.line, motion::style::selection().withAlpha(alpha));
         } else if (hovered) {
-            highlightedLines.add(piece.line, juce::Colours::white.withAlpha(.9f));
+            hoveredLines.add(piece.line, juce::Colours::white);
         } else {
-            // Unpicked parts are neutral, so the picked ones stand out.
-            lines.add(piece.line, pickable ? osci::Colours::text().withAlpha(.5f * depthFade(piece.depth)) : piece.colour.withAlpha(alpha));
+            // Unpicked parts are neutral and quiet, so picked and hovered ones stand out.
+            lines.add(piece.line, pickable ? osci::Colours::text().withAlpha(.38f * depthFade(piece.depth)) : piece.colour.withAlpha(alpha));
         }
     }
     lines.stroke(g, 1.0f);
     highlightedLines.stroke(g, 1.4f);
+    hoveredLines.stroke(g, 2.0f);
     paintCameras(g, time);
     paintMotionPath(g);
     if (!partMode) { currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle); }
@@ -398,6 +404,26 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
     }
 }
 
+bool MotionCompositionView::lookingAlong(ViewPreset preset) const {
+    const auto forward = camera.forward();
+    const auto along = preset == ViewPreset::front ? motion::Vec3 {0, 0, -1} : preset == ViewPreset::back ? motion::Vec3 {0, 0, 1}
+        : preset == ViewPreset::right ? motion::Vec3 {-1, 0, 0} : preset == ViewPreset::left ? motion::Vec3 {1, 0, 0}
+        : preset == ViewPreset::top ? motion::Vec3 {0, -1, 0} : motion::Vec3 {0, 1, 0};
+    return forward.dot(along) > .999;
+}
+
+MotionCompositionView::ViewPreset MotionCompositionView::opposite(ViewPreset preset) {
+    switch (preset) {
+        case ViewPreset::front: return ViewPreset::back;
+        case ViewPreset::back: return ViewPreset::front;
+        case ViewPreset::right: return ViewPreset::left;
+        case ViewPreset::left: return ViewPreset::right;
+        case ViewPreset::top: return ViewPreset::bottom;
+        case ViewPreset::bottom: return ViewPreset::top;
+    }
+    return preset;
+}
+
 std::optional<MotionCompositionView::ViewPreset> MotionCompositionView::orientationHit(juce::Point<float> position) const {
     const auto view = camera.view();
     if (!view.has_value() || getWidth() < 240 || getHeight() < 160 || position.getDistanceFrom(orientationCentre()) > 44) { return std::nullopt; }
@@ -430,6 +456,9 @@ void MotionCompositionView::paintOrientation(juce::Graphics& g) const {
     const auto view = camera.view();
     if (!view.has_value() || getWidth() < 240 || getHeight() < 160) { return; }
     const auto centre = orientationCentre();
+    // A quiet backing keeps lines behind it from running through the axes.
+    g.setColour(osci::Colours::veryDark().withAlpha(.6f));
+    g.fillEllipse(juce::Rectangle<float>(80, 80).withCentre(centre));
     if (hoverCorner) {
         g.setColour(juce::Colours::white.withAlpha(.05f));
         g.fillEllipse(juce::Rectangle<float>(80, 80).withCentre(centre));
@@ -457,7 +486,7 @@ void MotionCompositionView::paintOrientation(juce::Graphics& g) const {
             g.setColour(osci::Colours::veryDark());
             g.fillPath(letter, juce::AffineTransform::translation(dot.getCentreX() - ink.getCentreX(), dot.getCentreY() - ink.getCentreY()));
         } else {
-            g.setColour(osci::Colours::veryDark());
+            g.setColour(axis.colour.withAlpha(lit ? .45f : .2f));
             g.fillEllipse(dot.reduced(2));
             g.setColour(axis.colour.withAlpha(lit ? .9f : .55f));
             g.drawEllipse(dot.reduced(2.5f), 1.5f);
@@ -508,7 +537,8 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     }
     const auto axis = orientationHit(event.position);
     if (axis.has_value()) {
-        setViewPreset(*axis);
+        // Clicking the axis already looked along turns the view around, as in Blender.
+        setViewPreset(lookingAlong(*axis) ? opposite(*axis) : *axis);
         return;
     }
     if (prepared == nullptr) { return; }
@@ -785,13 +815,15 @@ std::optional<MotionCompositionView::PartHit> MotionCompositionView::pickPart(ju
     return hit;
 }
 
-// A shape is picked when all of it on screen lies inside the area, as
-// Blender's box select takes edges; picking pieces takes every piece the
-// area touches.
+// A shape is picked when the area crosses any of it on screen; picking
+// pieces takes every piece the area crosses.
 void MotionCompositionView::pickParts(const juce::Path& area, bool add, bool touching) {
     if (prepared == nullptr) { return; }
     if (!add) { picked.clear(); }
     const auto bounds = area.getBounds();
+    juce::Path box;
+    box.addRectangle(bounds);
+    const auto rectangular = area == box;
     std::map<const motion::PreparedClip*, std::vector<signed char>> inside;
     for (const auto& piece : screenPieces()) {
         const auto* drawing = piece.shape >= 0 ? partDrawing(*piece.clip) : nullptr;
@@ -799,13 +831,10 @@ void MotionCompositionView::pickParts(const juce::Path& area, bool add, bool tou
         auto& states = inside[piece.clip];
         states.resize(drawing->shapeCount(), -1);
         auto& state = states[static_cast<std::size_t>(piece.shape)];
-        if (touching) {
-            // Pieces are picked with a box: any crossing counts.
-            state = static_cast<signed char>(state == 1 || bounds.intersects(piece.line) ? 1 : 0);
-        } else {
-            const auto within = area.contains(piece.line.getStart()) && area.contains(piece.line.getEnd());
-            state = static_cast<signed char>(state != 0 && within ? 1 : 0);
-        }
+        // Anything the area crosses is picked, as the object marquee picks.
+        const auto crossed = rectangular ? bounds.intersects(piece.line)
+            : area.contains(piece.line.getStart()) || area.contains(piece.line.getEnd()) || area.contains(piece.line.getPointAlongLineProportionally(.5f));
+        state = static_cast<signed char>(state == 1 || crossed ? 1 : 0);
     }
     for (const auto& [clip, states] : inside) {
         const auto paths = touching ? motion::parts::pathIndices(*partDrawing(*clip)) : std::vector<std::size_t>();
@@ -905,6 +934,23 @@ void MotionCompositionView::prunePicked() {
     refreshPartBar();
 }
 
+std::size_t MotionCompositionView::pickedPieceCount() const {
+    std::size_t count = 0;
+    if (prepared == nullptr) { return count; }
+    for (const auto& [id, entry] : picked) {
+        const auto clip = std::find_if(prepared->clips.begin(), prepared->clips.end(), [id = id](const auto& item) { return item.editorId() == id && item.ancestors.empty(); });
+        const auto* drawing = clip != prepared->clips.end() ? partDrawing(*clip) : nullptr;
+        if (drawing == nullptr) { continue; }
+        const auto paths = motion::parts::pathIndices(*drawing);
+        std::set<std::size_t> touched;
+        for (const auto shape : entry.shapes) {
+            if (shape < paths.size()) { touched.insert(paths[shape]); }
+        }
+        count += touched.size();
+    }
+    return count;
+}
+
 std::size_t MotionCompositionView::pickedPartCount() const {
     std::size_t count = 0;
     for (const auto& [id, entry] : picked) { count += entry.shapes.size(); }
@@ -913,6 +959,12 @@ std::size_t MotionCompositionView::pickedPartCount() const {
 
 void MotionCompositionView::setPartMode(bool enabled) {
     if (partMode == enabled) { return; }
+    if (enabled && !anythingPickable()) {
+        if (onStatus) { onStatus("Text, SVG, OBJ and drawings at the playhead have parts to pick"); }
+        // The tool strip shows the mode as it is.
+        if (onPartModeChanged) { onPartModeChanged(false); }
+        return;
+    }
     setNavigating(false);
     cancelGesture();
     partMode = enabled;
@@ -928,7 +980,17 @@ void MotionCompositionView::setPartMode(bool enabled) {
 }
 
 void MotionCompositionView::extractPicked() {
-    if (!picked.empty() && onExtractParts) { onExtractParts(picked); }
+    if (picked.empty()) {
+        if (onStatus) { onStatus("Pick some parts first"); }
+        return;
+    }
+    if (onExtractParts) { onExtractParts(picked); }
+}
+
+bool MotionCompositionView::anythingPickable() const {
+    if (prepared == nullptr) { return false; }
+    const auto time = editingTime();
+    return std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.active(clipTime(clip, time)) && partDrawing(clip) != nullptr; });
 }
 
 void MotionCompositionView::resetMarquee() {
@@ -941,7 +1003,10 @@ void MotionCompositionView::resetMarquee() {
 void MotionCompositionView::refreshPartBar() {
     const auto count = pickedPartCount();
     const auto shown = partMode && count > 0;
-    partCount.setText(juce::String(static_cast<juce::uint64>(count)) + (count == 1 ? " part" : " parts"), juce::dontSendNotification);
+    // Picking pieces counts pieces, as they were clicked.
+    const auto pieces = partPick == PartPick::pieces;
+    const auto shownCount = pieces ? pickedPieceCount() : count;
+    partCount.setText(juce::String(static_cast<juce::uint64>(shownCount)) + (pieces ? (shownCount == 1 ? " piece" : " pieces") : (shownCount == 1 ? " part" : " parts")), juce::dontSendNotification);
     partCount.setVisible(shown);
     extractButton.setVisible(shown);
     resized();
@@ -951,14 +1016,17 @@ void MotionCompositionView::refreshPartBar() {
 // The part bar: the count, then Extract, 4 px inside a floating panel
 // 12 px above the Scene's foot.
 juce::Rectangle<int> MotionCompositionView::partBar() const {
-    const auto labelWidth = juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::body(), partCount.getText()))) + 2 * 12;
-    const auto width = labelWidth + 72 + 2 * 4;
-    return {(getWidth() - width) / 2, getHeight() - 12 - 32, width, 32};
+    constexpr auto inset = motion::icons::ToolStrip::inset, cell = motion::icons::ToolStrip::cell;
+    const auto labelWidth = juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::body(), partCount.getText())));
+    const auto width = inset + barTextInset + labelWidth + barTextInset + extractWidth + inset;
+    return {(getWidth() - width) / 2, getHeight() - 8 - (cell + 2 * inset), width, cell + 2 * inset};
 }
 
+// Laid out as the tool strips are: 3 px in, a 28 px tall button, 8 px from
+// the Scene's edge.
 void MotionCompositionView::resized() {
-    auto bar = partBar().reduced(4);
-    extractButton.setBounds(bar.removeFromRight(72));
+    auto bar = partBar().reduced(motion::icons::ToolStrip::inset);
+    extractButton.setBounds(bar.removeFromRight(extractWidth));
     partCount.setBounds(bar);
 }
 

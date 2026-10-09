@@ -117,18 +117,36 @@ void MotionEditor::setUpMenus() {
             menu = timingMenu();
             menu.setLookAndFeel(&motionLookAndFeel);
         }
+        // Undo and redo name the step and are off with nothing to undo, as
+        // the buttons beside the transport are.
+        if (index == 1) {
+            auto& undoManager = processor.getUndoManager();
+            const auto undo = undoManager.getUndoDescription(), redo = undoManager.getRedoDescription();
+            juce::PopupMenu::Item undoItem(undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo"));
+            undoItem.itemID = undoMenuId;
+            undoItem.isEnabled = undoManager.canUndo();
+            undoItem.shortcutKeyDescription = motion::style::shortcutText("Cmd+Z");
+            menu.addItem(undoItem);
+            juce::PopupMenu::Item redoItem(redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo"));
+            redoItem.itemID = redoMenuId;
+            redoItem.isEnabled = undoManager.canRedo();
+            redoItem.shortcutKeyDescription = motion::style::shortcutText("Cmd+Shift+Z");
+            menu.addItem(redoItem);
+        }
     };
     menus.customMenuSelectedLogic = [this](int id, int index) {
         if (index == 4 && id > 2000 && id <= 2003) {
             monitorOutput.setSelectedId(id - 2000);
             return true;
         }
+        if (index == 1 && (id == undoMenuId || id == redoMenuId)) {
+            if (id == undoMenuId) { undoRedoControls.undo(); } else { undoRedoControls.redo(); }
+            refreshUndo();
+            return true;
+        }
         return (index == 0 && fileMenuItemSelected(id)) || (index == timingMenuIndex && applyTiming(id));
     };
     menus.addTopLevelMenu("Edit");
-    // Undo and redo keys are handled by the shared editor; these list them.
-    menus.addMenuItem(1, "Undo", [this] { processor.getUndoManager().undo(); }, motion::style::shortcutText("Cmd+Z"));
-    menus.addMenuItem(1, "Redo", [this] { processor.getUndoManager().redo(); }, motion::style::shortcutText("Cmd+Shift+Z"));
     menus.addTopLevelMenu("Clip");
     menus.addTopLevelMenu("Transport");
     menus.addTopLevelMenu("Audio");

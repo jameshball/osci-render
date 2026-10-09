@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStyle.h"
+#include "MotionIcons.h"
 #include "PreviewGesture.h"
 
 #include "../MotionProcessor.h"
@@ -44,7 +45,11 @@ public:
     // pieces picks whole separate pieces (a letter, an outline) that a click
     // or a box touches.
     enum class PartPick { box, lasso, pieces };
-    void setPartPick(PartPick mode) { partPick = mode; }
+    void setPartPick(PartPick mode) {
+        partPick = mode;
+        hoverShapes.clear();
+        refreshPartBar();
+    }
     void extractPicked();
     void resized() override;
     std::function<void(bool)> onNavigationChanged;
@@ -216,6 +221,11 @@ private:
     std::set<std::size_t> pickedBy(PartHit part) const;
     std::set<std::size_t> hoverShapes;
     juce::Rectangle<int> partBar() const;
+    static constexpr int barTextInset = 12, extractWidth = 72;
+    std::size_t pickedPieceCount() const;
+    bool anythingPickable() const;
+    bool lookingAlong(ViewPreset preset) const;
+    static ViewPreset opposite(ViewPreset preset);
     std::optional<PartHit> pressedPart;
     void prunePicked();
     void refreshPartBar();
@@ -251,7 +261,7 @@ private:
     MotionProcessor& processor;
     std::unique_ptr<motion::PreparedComposition> prepared;
     // The preview's segments, stroked together; the selection's draw on top.
-    osci::LineBatch lines, highlightedLines;
+    osci::LineBatch lines, highlightedLines, hoveredLines;
     std::optional<motion::Id> dropHover;
     bool effectDrag = false;
     motion::ui::PreviewGesture edit {processor.document};

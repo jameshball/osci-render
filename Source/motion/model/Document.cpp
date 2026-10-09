@@ -836,8 +836,11 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
         copy.name = part->name.toStdString();
         auto* kept = changeClip(candidate, clipId);
         kept->asset = rest->id;
-        // A clip still named after its source follows it; a renamed one keeps its name.
+        // A clip or track still named after its source follows it; a renamed one keeps its name.
         if (kept->name == original->name.toStdString()) { kept->name = rest->name.toStdString(); }
+        if (trackAt->name == original->name.toStdString() || trackAt->name == clip.name) {
+            candidate.tracks.change(trackAt).name = rest->name.toStdString();
+        }
         Track track;
         track.id = ++highest;
         track.kind = trackAt->kind;
