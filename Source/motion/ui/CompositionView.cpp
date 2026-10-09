@@ -1408,7 +1408,10 @@ bool MotionCompositionView::editable(double time) const {
 MotionCompositionGizmo MotionCompositionView::currentGizmo() const {
     const auto time = editingTime();
     gizmoFrame = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
-    if (navigating || !editable(time) || !gizmoFrame.has_value() || gizmoFrame->parent.hasPostTransformEffects) { return {}; }
+    // Effects after the transform (track, group or composition) can move what
+    // is drawn away from the handles; as in After Effects, the handles still
+    // show and edit the object's own transform.
+    if (navigating || !editable(time) || !gizmoFrame.has_value()) { return {}; }
     return MotionCompositionGizmo::layout(*gizmoFrame, camera, tool, std::clamp(getWidth() * 0.2, 35.0, 72.0), outputFrame().getHeight(),
         [this](motion::Vec3 point) { return screenPoint(point); });
 }
@@ -1421,8 +1424,8 @@ bool MotionCompositionView::beginGesture(double time) {
         }
     }
     gizmoAtDown = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
-    if (!editable(time) || !gizmoAtDown.has_value() || gizmoAtDown->parent.hasPostTransformEffects) {
-        dragHint = "Use the inspector for modulated or effected results";
+    if (!editable(time) || !gizmoAtDown.has_value()) {
+        dragHint = "Edit this object's transform in Properties";
         return false;
     }
     // A plain click only selects: the document is touched only once the
