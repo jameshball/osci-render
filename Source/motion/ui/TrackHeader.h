@@ -47,7 +47,11 @@ public:
         addChildComponent(lock);
     }
     void update(const motion::Track& track, bool group = false, bool collapsed = false, bool lanes = false, bool expanded = false) {
-        isGroup = group;
+        if (isGroup != group) {
+            isGroup = group;
+            resized();
+            repaint();
+        }
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
@@ -90,7 +94,12 @@ public:
             button->setBounds(buttons.removeFromLeft(chip));
             buttons.removeFromLeft(spacing);
         }
+        // A group shows a folder before its name.
+        folderArea = isGroup ? bounds.removeFromLeft(18).toFloat() : juce::Rectangle<float>();
         name.setBounds(bounds.reduced(4, 0).withSizeKeepingCentre(bounds.getWidth() - 8, 18));
+    }
+    void paintOverChildren(juce::Graphics& g) override {
+        if (!folderArea.isEmpty()) { motion::icons::draw(g, motion::icons::Icon::folder, folderArea, osci::Colours::text().withAlpha(.7f), 14.0f); }
     }
     void mouseDown(const juce::MouseEvent& event) override {
         // Right-click anywhere on the header opens the track's menu.
@@ -100,7 +109,7 @@ public:
         }
         if (event.eventComponent == &grip) { gripTravel = 0; }
         // Anywhere on the header but its buttons selects the track or group.
-        if ((event.eventComponent == &name || event.eventComponent == this) && onSelect) { onSelect(id); }
+        if ((event.eventComponent == &name || event.eventComponent == this) && onSelect) { onSelect(id, event.mods); }
     }
     // Dragging the grip moves the track itself: the timeline lifts it and
     // slides the other rows aside.
@@ -131,11 +140,14 @@ public:
     }
     const motion::Id id;
     std::function<void(motion::Id, std::string)> onRename;
-    std::function<void(motion::Id)> onMute, onSolo, onMenu, onSelect, onCollapse, onLanes, onLock;
+    std::function<void(motion::Id)> onMute, onSolo, onMenu, onCollapse, onLanes, onLock;
+    // Cmd adds or removes the track from a selection; Shift takes a run.
+    std::function<void(motion::Id, juce::ModifierKeys)> onSelect;
     // The grip's drag, in screen coordinates; `finished` on release.
     std::function<void(motion::Id, juce::Point<int>, bool finished)> onReorder;
 private:
     bool isGroup = false, grabbing = false;
+    juce::Rectangle<float> folderArea;
     int gripTravel = 0;
     class FoldButton : public juce::TextButton {
         void paintButton(juce::Graphics& g, bool over, bool) override {

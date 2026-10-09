@@ -50,6 +50,7 @@ void MotionEditor::registerCommands() {
     addCommand(1, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
     addCommand(1, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
     addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] { timeline.deleteSelection(); });
+    addCommand(2, "Group tracks", juce::KeyPress('g', command, 0), "Cmd+G", [this] { timeline.groupSelectedTracks(); });
     // Cut, Copy and Delete act on selected keys or clips; Paste needs a copy.
     const auto anySelection = [this] { return timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
     for (const auto* name : {"Cut", "Copy", "Delete"}) { menus.setMenuItemEnabled(1, name, anySelection); }

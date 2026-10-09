@@ -80,7 +80,88 @@ void MotionTimelineView::setSelection(motion::Id id) {
         selectedClips.clear();
         if (isClip(id)) { selectedClips.insert(id); }
     }
+    // Picking anything else ends a selection of track headers.
+    if (!selectedTracks.contains(id)) { selectedTracks.clear(); }
     repaint();
+}
+
+void MotionTimelineView::pickTrack(motion::Id id, juce::ModifierKeys mods) {
+    auto picked = selectedTracks;
+    if (picked.empty() && selected != 0 && std::any_of(rows.begin(), rows.end(), [this](const auto& row) { return !row.isLane() && row.id == selected; })) { picked.insert(selected); }
+    if (mods.isCommandDown()) {
+        if (picked.contains(id) && picked.size() > 1) { picked.erase(id); } else { picked.insert(id); }
+    } else if (mods.isShiftDown() && trackAnchor != 0) {
+        // Every header between the first picked and this one, as listed.
+        picked.clear();
+        bool inside = false;
+        for (const auto& row : rows) {
+            if (row.isLane()) { continue; }
+            const auto end = row.id == id || row.id == trackAnchor;
+            if (end || inside) { picked.insert(row.id); }
+            if (end && id != trackAnchor) { inside = !inside; }
+        }
+    } else {
+        picked = {id};
+    }
+    if (!mods.isShiftDown()) { trackAnchor = id; }
+    selectedTracks = picked;
+    selectClip(picked.contains(id) ? id : *picked.begin());
+    selectedTracks = picked.size() > 1 ? picked : std::set<motion::Id>();
+    repaint();
+}
+
+std::vector<motion::Id> MotionTimelineView::tracksToGroup() const {
+    if (selectedTracks.size() > 1) { return {selectedTracks.begin(), selectedTracks.end()}; }
+    // Otherwise the tracks of the selected clips, or the selected track.
+    std::vector<motion::Id> result;
+    for (const auto& track : processor.document.project().tracks) {
+        const auto holds = std::any_of(track.clips.begin(), track.clips.end(), [this](const auto& clip) { return selectedClips.contains(clip.id); });
+        if (holds || track.id == selected) { result.push_back(track.id); }
+    }
+    if (result.empty() && motion::findGroup(processor.document.project(), selected) != nullptr) { result.push_back(selected); }
+    return result;
+}
+
+void MotionTimelineView::groupSelectedTracks() {
+    const auto ids = tracksToGroup();
+    if (ids.empty()) {
+        if (onError) { onError("Select tracks to group: Cmd-click their names."); }
+        return;
+    }
+    const auto& project = processor.document.project();
+    // The new group sits where its members did when they shared a parent.
+    std::optional<motion::Id> shared;
+    bool same = true;
+    for (const auto id : ids) {
+        const auto* group = motion::findGroup(project, id);
+        const auto track = std::find_if(project.tracks.begin(), project.tracks.end(), [id](const auto& item) { return item.id == id; });
+        const auto parent = group != nullptr ? group->parent : track != project.tracks.end() ? track->group : motion::Id(0);
+        if (shared.has_value() && *shared != parent) { same = false; }
+        shared = parent;
+    }
+    motion::Group group;
+    group.id = processor.document.newId();
+    group.name = "Group " + std::to_string(project.groups.size() + 1);
+    group.parent = same && shared.has_value() ? *shared : 0;
+    auto candidate = project;
+    candidate.groups.push_back(group);
+    for (const auto id : ids) {
+        auto* member = motion::findGroup(candidate, id);
+        if (member != nullptr) { member->parent = group.id; }
+        auto* track = candidate.tracks.changeById(id);
+        if (track != nullptr) { track->group = group.id; }
+    }
+    if (!motion::validGroupHierarchy(candidate)) {
+        if (onError) { onError("Those tracks cannot share a group."); }
+        return;
+    }
+    processor.document.edit(ids.size() > 1 ? "Group tracks" : "Group track", [candidate](motion::Project& updated) {
+        updated.groups = candidate.groups;
+        updated.tracks = candidate.tracks;
+    });
+    selectedTracks.clear();
+    refreshTracks();
+    selectClip(group.id);
 }
 
 MotionTimelineView::ViewState MotionTimelineView::viewState() const {
@@ -289,7 +370,7 @@ void MotionTimelineView::refreshTracks() {
             };
             header->onMenu = [this](motion::Id id) { showTrackMenu(id); };
             // A track or group name selects it, to show its effects.
-            header->onSelect = [this](motion::Id id) { selectClip(id); };
+            header->onSelect = [this](motion::Id id, juce::ModifierKeys mods) { pickTrack(id, mods); };
             header->onCollapse = [this](motion::Id id) {
                 if (collapsedGroups.contains(id)) { collapsedGroups.erase(id); } else { collapsedGroups.insert(id); }
                 refreshTracks();
@@ -360,7 +441,8 @@ void MotionTimelineView::resized() {
 void MotionTimelineView::paintDropPreview(juce::Graphics& g) {
     if (!dropPosition.has_value()) { return; }
     const auto& tracks = processor.document.project().tracks;
-    if (!dropEffect.empty()) {
+    // Effects, from the library or a card, outline what they would land on.
+    if (!dropEffect.empty() || dropInstance != 0) {
         int row = 0;
         const auto* clip = clipAt(*dropPosition, row);
         if (dropPosition->x < namesWidth && dropPosition->y >= rulerHeight) { row = trackAtY(dropPosition->y); }
@@ -490,7 +572,7 @@ void MotionTimelineView::itemDragMove(const SourceDetails& details) {
     const auto description = details.description.toString();
     dropEffect = description.startsWith("motion-effect:") ? description.fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
     dropInstance = description.startsWith("motion-effect-instance:") ? static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id(0);
-    dropAssetId = static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
+    dropAssetId = description.startsWith("motion-asset:") ? static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id(0);
     previewEffect(dropEffect.empty() && dropInstance == 0 ? 0 : effectOwnerAt(details.localPosition));
     repaint();
 }
@@ -1992,12 +2074,13 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
     // them, alternate lanes faintly lighter, and a label colour tinting the
     // track. A selected row lifts to a neutral fill with an accent bar; the
     // track of a selected clip shows a fainter bar.
-    const auto selectedRow = row.id == selected;
+    const auto selectedRow = row.id == selected || selectedTracks.contains(row.id);
     const auto cardHeight = height - bandGap;
     const auto index = row.track;
     const auto owning = index >= 0 && std::any_of(tracks[static_cast<std::size_t>(index)].clips.begin(), tracks[static_cast<std::size_t>(index)].clips.end(), [this](const auto& clip) { return selectedClips.contains(clip.id); });
     const auto label = index >= 0 ? labelColour(tracks[static_cast<std::size_t>(index)]) : std::nullopt;
-    auto card = index < 0 ? osci::Colours::surface().brighter(.06f) : osci::Colours::surface();
+    // A group's own row is a raised slate band, so groups read as containers.
+    auto card = index < 0 ? osci::Colours::surfaceRaised().interpolatedWith(motion::style::compositionClip(), .55f) : osci::Colours::surface();
     if (label.has_value()) { card = card.interpolatedWith(*label, .3f); }
     if (selectedRow || owning) { card = osci::Colours::surfaceRaised(); }
     auto lane = visible % 2 == 1 ? std::optional<juce::Colour>(juce::Colours::white.withAlpha(.018f)) : std::nullopt;
@@ -2007,8 +2090,15 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
         g.setColour(motion::style::accent().withAlpha(selectedRow ? 1.0f : .45f));
         g.fillRect(0, y, 2, cardHeight);
     }
+    // Members of a group hang from a rail in the group's slate, one per level,
+    // running through the gaps so a group's rows read as one block.
+    for (int level = 0; level < std::min(row.depth, 4); ++level) {
+        g.setColour(motion::style::compositionClip().brighter(.7f).withAlpha(.75f));
+        // Under the group's fold triangle.
+        g.fillRect(cardInset + 10 + level * 16, y - bandGap, 2, height);
+    }
     if (index < 0) {
-        g.setColour(osci::Colours::surfaceRaised().withAlpha(0.25f));
+        g.setColour(motion::style::compositionClip().withAlpha(0.45f));
         g.fillRect(namesWidth, y, getWidth() - namesWidth, cardHeight);
         juce::Graphics::ScopedSaveState summaryScope(g);
         g.reduceClipRegion(namesWidth, y, getWidth() - namesWidth, height);
@@ -2556,6 +2646,15 @@ void MotionTimelineView::showGroupMenu(motion::Id id) {
 }
 
 void MotionTimelineView::showTrackMenu(motion::Id id) {
+    // Right-clicking one of several picked headers acts on them all.
+    if (selectedTracks.size() > 1 && selectedTracks.contains(id)) {
+        juce::PopupMenu menu;
+        menu.addItem(motion::style::menuItem("Group " + juce::String(static_cast<int>(selectedTracks.size())) + " tracks", 1, "Cmd+G"));
+        motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
+            if (result == 1) { groupSelectedTracks(); }
+        });
+        return;
+    }
     if (motion::findGroup(processor.document.project(), id) != nullptr) { showGroupMenu(id); return; }
     const auto& tracks = processor.document.project().tracks;
     const auto found = std::find_if(tracks.begin(), tracks.end(), [id](const auto& track) { return track.id == id; });
@@ -2563,7 +2662,7 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
     juce::PopupMenu menu;
     menu.addItem(1, "Move track up", std::any_of(tracks.begin(), found, [&](const auto& track) { return track.group == found->group; }));
     menu.addItem(2, "Move track down", std::any_of(found + 1, tracks.end(), [&](const auto& track) { return track.group == found->group; }));
-    menu.addItem(4, "Group track");
+    menu.addItem(motion::style::menuItem("Group track", 4, "Cmd+G"));
     std::vector<motion::Id> groups { 0 };
     juce::PopupMenu destinations;
     destinations.addItem(100, "Root", true, found->group == 0);
@@ -2587,7 +2686,12 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
         const auto track = std::find_if(current.begin(), current.end(), [id](const auto& item) { return item.id == id; });
         if (track == current.end()) { return; }
         const auto index = static_cast<int>(track - current.begin());
-        if (result == 4) { createGroup(id, track->group); return; }
+        if (result == 4) {
+            selectedTracks.clear();
+            selected = id;
+            groupSelectedTracks();
+            return;
+        }
         if (result >= 300 && result < 300 + static_cast<int>(motion::style::trackLabels().size())) {
             const auto label = result - 300;
             processor.document.tryEdit("Change track colour", [id, label](motion::Project& project) {

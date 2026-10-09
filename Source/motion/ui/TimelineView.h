@@ -316,6 +316,15 @@ private:
 
     void showClipMenu(motion::Id id);
     void createGroup(motion::Id trackId, motion::Id parent);
+public:
+    // Tracks and groups picked together by their headers (Cmd or Shift),
+    // for grouping them in one go (Cmd+G).
+    void groupSelectedTracks();
+private:
+    void pickTrack(motion::Id id, juce::ModifierKeys mods);
+    std::vector<motion::Id> tracksToGroup() const;
+    std::set<motion::Id> selectedTracks;
+    motion::Id trackAnchor = 0;
     void showGroupMenu(motion::Id id);
     void showTrackMenu(motion::Id id);
     void toggleLock(motion::Id id);

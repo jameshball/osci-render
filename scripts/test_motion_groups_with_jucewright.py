@@ -68,7 +68,7 @@ try:
     track = header_id("cube.obj")
     step("track menu", "click", "--name", "Reorder track " + track, "--exact")
     step("group track", "click", "--name", "Group track", "--role", "menuItem", "--exact")
-    wait_undo("Create group")
+    wait_undo("Group track")
     group = header_id("Group 1")
     source = header_bounds(track)
     timeline = find(snapshot(), lambda node: node.get("class") == "MotionTimelineView")["bounds"]
