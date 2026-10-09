@@ -202,6 +202,8 @@ juce::PopupMenu MainMenuBarModel::getMenuForIndex(int topLevelMenuIndex, const j
             item.shortcutKeyDescription = mi.shortcutKey;
         if (mi.hasTick && mi.isTicked)
             item.setTicked(mi.isTicked());
+        if (mi.isEnabled)
+            item.setEnabled(mi.isEnabled());
         menu.addItem(item);
     }
 
@@ -215,6 +217,15 @@ void MainMenuBarModel::menuItemSelected(int menuItemID, int topLevelMenuIndex) {
     auto& mi = menuItems[topLevelMenuIndex][menuItemID - 1];
     if (mi.action)
         mi.action();
+}
+
+void MainMenuBarModel::setMenuItemEnabled(int topLevelMenuIndex, const juce::String& name, std::function<bool()> isEnabled) {
+    if (topLevelMenuIndex < 0 || topLevelMenuIndex >= (int) menuItems.size())
+        return;
+    for (auto& item : menuItems[(size_t) topLevelMenuIndex]) {
+        if (item.name == name)
+            item.isEnabled = isEnabled;
+    }
 }
 
 void MainMenuBarModel::menuBarActivated(bool isActive) {}
