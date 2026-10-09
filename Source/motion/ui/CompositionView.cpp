@@ -221,7 +221,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
             const auto id = clip->editorId();
             // While a box is dragged, what it would select lights up; with
             // Shift the selection it adds to stays lit too.
-            const auto current = id == selected || (isSelected && isSelected(id));
+            const auto current = id == selected || (isSelected && isSelected(id)) || inSelectedGroup(id);
             const auto boxing = marquee.has_value() && !partMode;
             const auto inBox = std::find(marqueeClips.begin(), marqueeClips.end(), id) != marqueeClips.end();
             highlighted = !partMode && ((boxing ? inBox || (marqueeAdds && current) : current) || (dropHover.has_value() && *dropHover != 0 && id == *dropHover));
@@ -531,7 +531,7 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     if (event.mods.isPopupMenu()) {
         // Like a left click, the menu acts on what is under the pointer.
         if (prepared != nullptr) {
-            const auto hit = pickAt(event.position, nullptr);
+            const auto hit = pickTarget(event.position, nullptr);
             // Right-clicking one of several selected clips keeps the set.
             const auto inSelection = isSelected && isSelected(hit);
             if (hit != 0 && hit != selected && !inSelection) {
@@ -588,16 +588,18 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     const auto time = editingTime();
-    const auto hit = pickAt(event.position, &dragAnchor);
+    const auto object = pickAt(event.position, &dragAnchor);
     // Empty space starts a marquee; Shift adds to the selection.
-    if (hit == 0) {
+    if (object == 0) {
         marqueeArmed = true;
         marqueeAdds = adding;
         if (adding) { return; }
     } else if (adding) {
-        if (onSelectClips) { onSelectClips({hit}, SelectionChange::toggle); }
+        if (onSelectClips) { onSelectClips({object}, SelectionChange::toggle); }
         return;
     }
+    // With a group selected, dragging anything in it moves the group.
+    const auto hit = inSelectedGroup(object) ? selected : object;
     selected = hit;
     if (onSelection) {
         onSelection(hit);
@@ -822,7 +824,8 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
         return;
     }
     if (validGesture()) {
-        const auto label = tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : tool == MotionTransformTool::anchor ? "Move anchor" : "Scale object";
+        const auto noun = motion::findGroup(processor.document.project(), editSelection) != nullptr ? juce::String(" group") : juce::String(" object");
+        const auto label = tool == MotionTransformTool::anchor ? juce::String("Move anchor") : (tool == MotionTransformTool::move ? "Move" : tool == MotionTransformTool::rotate ? "Rotate" : "Scale") + noun;
         // The Graph shows the channel the drag changed.
         if (edit.commit(label) && onPropertyEdited && !editedProperty.empty()) { onPropertyEdited(editSelection, editedProperty); }
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
@@ -843,6 +846,20 @@ motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Ve
     if (hit == nullptr) { return 0; }
     if (anchor != nullptr) { *anchor = nearestOnSegment(position, hit->a, hit->b); }
     return hit->clip->editorId();
+}
+
+// What a click acts on: the object under the pointer, or the selected group
+// when that object is in it.
+motion::Id MotionCompositionView::pickTarget(juce::Point<float> position, motion::Vec3* anchor) const {
+    const auto hit = pickAt(position, anchor);
+    return inSelectedGroup(hit) ? selected : hit;
+}
+
+bool MotionCompositionView::inSelectedGroup(motion::Id clip) const {
+    const auto& project = processor.document.project();
+    if (clip == 0 || motion::findGroup(project, selected) == nullptr) { return false; }
+    const auto* track = motion::findClipTrack(project, clip);
+    return track != nullptr && motion::groupHolds(project, selected, track->group);
 }
 
 // The point of a world segment nearest the pointer's ray: where the pointer
@@ -1417,6 +1434,12 @@ bool MotionCompositionView::seekMotionKey(juce::Point<float> position) {
 
 bool MotionCompositionView::editable(double time) const {
     const auto& project = processor.document.project();
+    if (motion::findGroup(project, selected) != nullptr) {
+        // A group moves while anything it holds is shown and unlocked.
+        return std::any_of(project.tracks.begin(), project.tracks.end(), [&](const auto& track) {
+            return track.kind == motion::TrackKind::visual && !track.locked && motion::groupHolds(project, selected, track.group) && motion::trackIsAudible(project, track);
+        });
+    }
     const auto* track = motion::findClipTrack(project, selected);
     if (track == nullptr || track->locked || !motion::trackIsAudible(project, *track)) { return false; }
     return motion::findClip(project, selected)->contains(time, project.tempo()) || atSelectedPathEnd(time);
@@ -1424,7 +1447,7 @@ bool MotionCompositionView::editable(double time) const {
 
 MotionCompositionGizmo MotionCompositionView::currentGizmo() const {
     const auto time = editingTime();
-    gizmoFrame = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
+    gizmoFrame = motion::editor::gizmoFrameFor(processor.document.project(), selected, time);
     // Effects after the transform (track, group or composition) can move what
     // is drawn away from the handles; as in After Effects, the handles still
     // show and edit the object's own transform.
@@ -1440,7 +1463,7 @@ bool MotionCompositionView::beginGesture(double time) {
             return false;
         }
     }
-    gizmoAtDown = motion::editor::gizmoFrameForClip(processor.document.project(), selected, time);
+    gizmoAtDown = motion::editor::gizmoFrameFor(processor.document.project(), selected, time);
     if (!editable(time) || !gizmoAtDown.has_value()) {
         dragHint = "Edit this object's transform in Properties";
         return false;

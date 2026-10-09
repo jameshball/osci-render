@@ -77,11 +77,41 @@ struct TransformFrame {
         return worldDelta;
     }
 
+    // Carries the frame up through a group and its ancestors.
+    template <typename ProjectType>
+    bool addGroups(const ProjectType& project, Id groupId, double projectTime) {
+        std::array<Id, maximumGroupDepth> seen {};
+        std::size_t depth = 0;
+        while (groupId != 0) {
+            if (parentCount >= maximumGroupDepth || std::find(seen.begin(), seen.begin() + depth, groupId) != seen.begin() + depth) {
+                return false;
+            }
+            const auto* group = findGroup(project, groupId);
+            if (group == nullptr) { return false; }
+            const auto parent = transform_detail::evaluate(group->properties, projectTime);
+            if (!parent.has_value() || parent->scale.x == 0 || parent->scale.y == 0 || parent->scale.z == 0) {
+                return false;
+            }
+            seen[depth++] = groupId;
+            parents[parentCount++] = *parent;
+            worldOrigin = parent->point(worldOrigin);
+            if (!worldOrigin.finite()) { return false; }
+            for (auto& basis : parentBasis) {
+                basis = parent->direction(basis);
+                if (!basis.finite()) { return false; }
+            }
+            hasPostTransformEffects = hasPostTransformEffects || transform_detail::hasEffects(group->effects, projectTime);
+            groupId = group->parent;
+        }
+        for (const auto axis : { Vec3 { 1, 0, 0 }, Vec3 { 0, 1, 0 }, Vec3 { 0, 0, 1 } }) {
+            if (!positionDelta(axis).has_value()) { return false; }
+        }
+        return true;
+    }
+
 private:
     std::array<transform_detail::Affine, maximumGroupDepth> parents {};
     std::size_t parentCount = 0;
-    template <typename ProjectType>
-    friend std::optional<TransformFrame> clipTransformFrame(const ProjectType&, Id, double);
 };
 
 // Affine authoring frame only: excludes effect processing and output-camera
@@ -104,38 +134,27 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
             frame.worldOrigin = own->position;
             frame.hasPostTransformEffects = transform_detail::hasEffects(track.effects, projectTime)
                 || transform_detail::hasEffects(project.effects, projectTime);
-            auto groupId = track.group;
-            std::array<Id, maximumGroupDepth> seen {};
-            while (groupId != 0) {
-                if (frame.parentCount >= maximumGroupDepth
-                    || std::find(seen.begin(), seen.begin() + frame.parentCount, groupId) != seen.begin() + frame.parentCount) {
-                    return std::nullopt;
-                }
-                const auto* group = findGroup(project, groupId);
-                if (group == nullptr) { return std::nullopt; }
-                const auto parent = transform_detail::evaluate(group->properties, projectTime);
-                if (!parent.has_value() || parent->scale.x == 0 || parent->scale.y == 0 || parent->scale.z == 0) {
-                    return std::nullopt;
-                }
-                seen[frame.parentCount] = groupId;
-                frame.parents[frame.parentCount++] = *parent;
-                frame.worldOrigin = parent->point(frame.worldOrigin);
-                if (!frame.worldOrigin.finite()) { return std::nullopt; }
-                for (auto& basis : frame.parentBasis) {
-                    basis = parent->direction(basis);
-                    if (!basis.finite()) { return std::nullopt; }
-                }
-                frame.hasPostTransformEffects = frame.hasPostTransformEffects
-                    || transform_detail::hasEffects(group->effects, projectTime);
-                groupId = group->parent;
-            }
-            for (const auto axis : { Vec3 { 1, 0, 0 }, Vec3 { 0, 1, 0 }, Vec3 { 0, 0, 1 } }) {
-                if (!frame.positionDelta(axis).has_value()) { return std::nullopt; }
-            }
+            if (!frame.addGroups(project, track.group, projectTime)) { return std::nullopt; }
             return frame;
         }
     }
     return std::nullopt;
+}
+
+// A group's own frame: its position in its parent groups' space. Groups run
+// on project time.
+template <typename ProjectType>
+std::optional<TransformFrame> groupTransformFrame(const ProjectType& project, Id groupId, double projectTime) {
+    if (!std::isfinite(projectTime)) { return std::nullopt; }
+    const auto* group = findGroup(project, groupId);
+    if (group == nullptr) { return std::nullopt; }
+    const auto own = transform_detail::evaluate(group->properties, projectTime);
+    if (!own.has_value()) { return std::nullopt; }
+    TransformFrame frame;
+    frame.worldOrigin = own->position;
+    frame.hasPostTransformEffects = transform_detail::hasEffects(group->effects, projectTime) || transform_detail::hasEffects(project.effects, projectTime);
+    if (!frame.addGroups(project, group->parent, projectTime)) { return std::nullopt; }
+    return frame;
 }
 
 // Parameter-aligned gizmo frame. Rotation rings exclude the edited axis and
@@ -214,5 +233,17 @@ std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id 
         }
     }
     return std::nullopt;
+}
+
+// The gizmo for whatever is selected: a clip, or a group, which moves all
+// it holds.
+template <typename ProjectType>
+std::optional<EulerGizmoFrame> gizmoFrameFor(const ProjectType& project, Id id, double projectTime) {
+    const auto* group = findGroup(project, id);
+    if (group == nullptr) { return gizmoFrameForClip(project, id, projectTime); }
+    const auto parent = groupTransformFrame(project, id, projectTime);
+    const auto transform = transform_detail::evaluate(group->properties, projectTime);
+    if (!parent.has_value() || !transform.has_value()) { return std::nullopt; }
+    return EulerGizmoFrame { *parent, transform->rotation, transform->scale, transform->anchor };
 }
 }

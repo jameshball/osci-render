@@ -122,6 +122,8 @@ public:
     // The visible clip drawn nearest the point (within 18 px), and the world
     // point there.
     motion::Id pickAt(juce::Point<float> position, motion::Vec3* anchor) const;
+    motion::Id pickTarget(juce::Point<float> position, motion::Vec3* anchor) const;
+    bool inSelectedGroup(motion::Id clip) const;
 
     // Context hints only while flying or dragging (the tool strip's tooltips
     // cover the rest), like Blender's status hints, drawn over the scene.

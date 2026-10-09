@@ -55,6 +55,20 @@ bool validGroupHierarchy(const ProjectType& project) {
     return true;
 }
 
+// Whether `group` holds what is filed under `child` (a track's or group's
+// parent), directly or through groups inside it.
+template <typename ProjectType>
+bool groupHolds(const ProjectType& project, Id group, Id child) {
+    std::size_t depth = 0;
+    while (child != 0 && depth++ <= maximumGroupDepth) {
+        if (child == group) { return true; }
+        const auto* found = findGroup(project, child);
+        if (found == nullptr) { return false; }
+        child = found->parent;
+    }
+    return false;
+}
+
 template <typename ProjectType>
 bool trackIsAudible(const ProjectType& project, const Track& track) {
     if (track.muted) {

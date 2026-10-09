@@ -424,10 +424,11 @@ void MotionTimelineView::resized() {
         const auto shown = y + shiftOf(static_cast<int>(row));
         header->setVisible(shown + height > 0 && shown < headerArea.getHeight());
         // Centred on the card; the rest of the row's foot still resizes it.
-        // A dragged track's header rides with it; the others slide.
+        // A dragged track's header (or a dragged group's headers) rides with
+        // it; the others slide.
         const auto indent = cardInset + std::min(64, found->depth * 16);
-        const auto lifted = trackDrag.has_value() && trackDrag->id == header->id;
-        const auto top = lifted ? liftedTop() - rulerHeight : y + shiftOf(static_cast<int>(row));
+        const auto lifted = inLiftedBlock(static_cast<int>(row));
+        const auto top = lifted ? liftedTop() - rulerHeight + rowY(static_cast<int>(row)) - rowY(trackDrag->first) : y + shiftOf(static_cast<int>(row));
         header->setBounds(indent, top + (resizeStrip - bandGap) / 2, namesWidth - 5 - indent, height - resizeStrip);
         header->setLifted(lifted);
         if (lifted) { header->setVisible(true); header->toFront(false); }
@@ -531,7 +532,8 @@ void MotionTimelineView::paintOverChildren(juce::Graphics& g) {
         g.fillAll();
     }
     for (auto& header : headers) {
-        if (header->id != trackDrag->id) { continue; }
+        const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == header->id && !row.isLane(); });
+        if (found == rows.end() || !inLiftedBlock(static_cast<int>(found - rows.begin()))) { continue; }
         juce::Graphics::ScopedSaveState placed(g);
         g.setOrigin(headerArea.getPosition() + header->getPosition());
         header->paintEntireComponent(g, true);
@@ -2764,6 +2766,46 @@ void MotionTimelineView::placeTrack(motion::Id id, int boundary, motion::Id grou
     refreshTracks();
 }
 
+// Moves a group, and every track it holds as one block, before the track at
+// `boundary`, into `parent`.
+void MotionTimelineView::placeGroup(motion::Id id, int boundary, motion::Id parent) {
+    cancelGesture();
+    const auto& project = processor.document.project();
+    const auto* group = motion::findGroup(project, id);
+    if (group == nullptr || (parent != 0 && motion::findGroup(project, parent) == nullptr) || motion::groupHolds(project, id, parent)) { return; }
+    const auto& tracks = project.tracks;
+    std::vector<motion::Id> order, members;
+    const auto destination = std::clamp(boundary, 0, static_cast<int>(tracks.size()));
+    for (int index = 0; index <= static_cast<int>(tracks.size()); ++index) {
+        if (index == destination) { order.push_back(0); }
+        if (index == static_cast<int>(tracks.size())) { break; }
+        const auto& track = tracks[static_cast<std::size_t>(index)];
+        (motion::groupHolds(project, id, track.group) ? members : order).push_back(track.id);
+    }
+    const auto place = std::find(order.begin(), order.end(), motion::Id(0));
+    order.insert(order.erase(place), members.begin(), members.end());
+    auto unchanged = parent == group->parent;
+    for (std::size_t index = 0; unchanged && index < order.size(); ++index) { unchanged = tracks[index].id == order[index]; }
+    if (unchanged) { return; }
+    processor.document.tryEdit("Move group", [&](motion::Project& project) {
+        for (std::size_t position = 0; position < order.size(); ++position) {
+            for (auto index = position; index < project.tracks.size(); ++index) {
+                if (project.tracks[index].id == order[position]) {
+                    if (index != position) { project.tracks.move(index, position); }
+                    break;
+                }
+            }
+        }
+        motion::findGroup(project, id)->parent = parent;
+        return motion::validGroupHierarchy(project);
+    });
+    refreshTracks();
+}
+
+bool MotionTimelineView::inLiftedBlock(int row) const {
+    return trackDrag.has_value() && row >= trackDrag->first && row < trackDrag->last;
+}
+
 void MotionTimelineView::validateTrackDrag() {
     if (!trackDrag.has_value()) { return; }
     const auto stale = processor.document.revision() != trackDrag->revision || trackDrag->last > static_cast<int>(rows.size())
@@ -2778,12 +2820,13 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     ensureTrackRows();
     if (!trackDrag.has_value()) {
         if (finished) { return; }
-        const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane() && !row.group(); });
+        const auto found = std::find_if(rows.begin(), rows.end(), [id](const auto& row) { return row.id == id && !row.isLane(); });
         if (found == rows.end()) { return; }
         cancelGesture();
         const auto first = static_cast<int>(found - rows.begin());
+        // A track lifts with its lanes; a group with everything under it.
         auto last = first + 1;
-        while (last < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(last)].isLane()) { ++last; }
+        while (last < static_cast<int>(rows.size()) && (found->group() ? rows[static_cast<std::size_t>(last)].depth > found->depth : rows[static_cast<std::size_t>(last)].isLane())) { ++last; }
         trackDrag = TrackDrag {id, first, last, rowY(last) - rowY(first), y - rowY(first), y, processor.document.revision(), first};
         rowShift.assign(rows.size(), 0.0f);
         rowAnimation.startTimerHz(60);
@@ -2800,14 +2843,20 @@ void MotionTimelineView::dragTrack(motion::Id id, int y, bool finished) {
     const auto top = liftedTop();
     trackDrag.reset();
     const auto [boundary, group] = dropTarget(drag);
-    placeTrack(drag.id, boundary, group);
+    if (motion::findGroup(processor.document.project(), drag.id) != nullptr) {
+        placeGroup(drag.id, boundary, group);
+    } else {
+        placeTrack(drag.id, boundary, group);
+    }
     // The block glides from where it was let go into its new place.
     ensureTrackRows();
     rowShift.assign(rows.size(), 0.0f);
     const auto landed = std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == drag.id && !row.isLane(); });
     if (landed != rows.end()) {
         const auto index = static_cast<int>(landed - rows.begin());
-        for (auto row = index; row < static_cast<int>(rows.size()) && (row == index || rows[static_cast<std::size_t>(row)].isLane()); ++row) {
+        const auto& head = *landed;
+        const auto inBlock = [&](int row) { return row == index || (head.group() ? rows[static_cast<std::size_t>(row)].depth > head.depth : rows[static_cast<std::size_t>(row)].isLane()); };
+        for (auto row = index; row < static_cast<int>(rows.size()) && inBlock(row); ++row) {
             rowShift[static_cast<std::size_t>(row)] = static_cast<float>(top - rowY(index));
         }
     }
@@ -2848,7 +2897,11 @@ std::pair<int, motion::Id> MotionTimelineView::dropTarget(const TrackDrag& drag)
     const auto count = static_cast<int>(rows.size());
     const auto own = trackIndex(drag.id);
     if (drag.group != 0) { return {static_cast<int>(tracks.size()), drag.group}; }
-    if (drag.boundary >= drag.first && drag.boundary <= drag.last) { return {own, own >= 0 ? tracks[static_cast<std::size_t>(own)].group : 0}; }
+    if (drag.boundary >= drag.first && drag.boundary <= drag.last) {
+        // Let go where it was: a group stays put.
+        const auto* folder = motion::findGroup(project, drag.id);
+        return {own, folder != nullptr ? folder->parent : own >= 0 ? tracks[static_cast<std::size_t>(own)].group : 0};
+    }
     if (drag.boundary >= count) { return {static_cast<int>(tracks.size()), 0}; }
     const auto& row = rows[static_cast<std::size_t>(drag.boundary)];
     if (!row.group()) { return {row.track, tracks[static_cast<std::size_t>(row.track)].group}; }
@@ -2857,7 +2910,7 @@ std::pair<int, motion::Id> MotionTimelineView::dropTarget(const TrackDrag& drag)
     auto index = static_cast<int>(tracks.size());
     for (auto next = drag.boundary + 1; next < count; ++next) {
         const auto& below = rows[static_cast<std::size_t>(next)];
-        if (!below.group() && !below.isLane() && below.track != own) { index = below.track; break; }
+        if (!below.group() && !below.isLane() && (next < drag.first || next >= drag.last)) { index = below.track; break; }
     }
     return {index, folder != nullptr ? folder->parent : 0};
 }

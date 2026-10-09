@@ -172,5 +172,26 @@ int main() {
     gizmo = gizmoFrameForClip(project, 2, 2);
     check(gizmo.has_value() && std::abs(gizmo->eulerRadians.x - 45 * radians) < 1.0e-9, "gizmo Euler animation uses clip-local offset/rate time");
     check(!gizmoFrameForClip(project, 999, 0), "missing clip has no gizmo");
+
+    // A group's gizmo sits at its own position in its parents' space.
+    auto grouped = fixture();
+    Group child, parent;
+    child.id = 5;
+    child.parent = 6;
+    child.properties["position.x"] = Curve(1);
+    child.properties["rotation.z"] = Curve(30);
+    parent.id = 6;
+    parent.properties["position.y"] = Curve(2);
+    parent.properties["scale.x"] = Curve(3);
+    grouped.groups = { child, parent };
+    grouped.tracks[0].group = 5;
+    const auto groupGizmo = gizmoFrameFor(grouped, 5, 0);
+    check(groupGizmo.has_value() && near(groupGizmo->parent.worldOrigin, {3, 2, 0}), "a group's origin is its position through its parents");
+    check(near(groupGizmo->eulerRadians, {0, 0, 30 * radians}), "a group's gizmo turns with the group");
+    check(near(*groupGizmo->parent.positionDelta({3, 0, 0}), {1, 0, 0}), "a drag moves the group in its parent's space");
+    check(near(gizmoFrameFor(grouped, 2, 0)->parent.worldOrigin, gizmoFrameForClip(grouped, 2, 0)->parent.worldOrigin), "a clip's gizmo is unchanged");
+    grouped.groups[1].parent = 5;
+    check(!gizmoFrameFor(grouped, 5, 0), "cyclic groups have no gizmo");
+    check(groupHolds(grouped, 6, 5) && groupHolds(grouped, 5, 5) && !groupHolds(grouped, 7, 5), "membership follows the parent chain");
     std::cout << "Editor transform frame tests passed\n";
 }

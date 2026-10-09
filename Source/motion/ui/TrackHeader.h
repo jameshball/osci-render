@@ -55,8 +55,6 @@ public:
         disclosure.setVisible(group || lanes);
         disclosure.setToggleState(group ? collapsed : !expanded, juce::dontSendNotification);
         lock.setVisible(!group);
-        if (!grabbing) { grip.setMouseCursor(group ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::DraggingHandCursor); }
-        grip.setTooltip(group ? "Group actions" : juce::String());
         disclosure.setTitle(group ? "Fold group " + juce::String(id) : "Keyframe lanes " + juce::String(id));
         disclosure.setTooltip(group ? "Fold or unfold this group" : "Show or hide keyframe lanes");
         name.setFont(group ? motion::style::title() : motion::style::body());
@@ -111,10 +109,10 @@ public:
         // Anywhere on the header but its buttons selects the track or group.
         if ((event.eventComponent == &name || event.eventComponent == this) && onSelect) { onSelect(id, event.mods); }
     }
-    // Dragging the grip moves the track itself: the timeline lifts it and
-    // slides the other rows aside.
+    // Dragging the grip moves the track, or a group with all it holds: the
+    // timeline lifts it and slides the other rows aside.
     void mouseDrag(const juce::MouseEvent& event) override {
-        if (isGroup || event.eventComponent != &grip) { return; }
+        if (event.eventComponent != &grip) { return; }
         gripTravel = std::max(gripTravel, event.getDistanceFromDragStart());
         if (gripTravel >= 4 && onReorder) {
             // The hand closes on the track while it is carried.
@@ -132,7 +130,7 @@ public:
             grip.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
             grip.updateMouseCursor();
         }
-        if (isGroup || event.eventComponent != &grip || gripTravel < 4) { return; }
+        if (event.eventComponent != &grip || gripTravel < 4) { return; }
         // The button has already ignored this release as a click; later
         // clicks (or an accessibility press) open the menu again.
         gripTravel = 0;

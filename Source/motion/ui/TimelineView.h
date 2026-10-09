@@ -330,6 +330,7 @@ private:
     void toggleLock(motion::Id id);
     void toggleTrack(motion::Id id, bool solo);
     void placeTrack(motion::Id id, int boundary, motion::Id group);
+    void placeGroup(motion::Id id, int boundary, motion::Id parent);
     // Dragging a track by its grip: the track lifts and follows the pointer,
     // the rows around it ease aside to open the place it will land, and on
     // release it settles there.
@@ -354,6 +355,7 @@ private:
         return rowShift.size() == rows.size() && row >= 0 && row < static_cast<int>(rows.size()) ? juce::roundToInt(rowShift[static_cast<std::size_t>(row)]) : 0;
     }
     void dragTrack(motion::Id id, int y, bool finished);
+    bool inLiftedBlock(int row) const;
     // Where the dragged block would land, as a row boundary in the current
     // layout: the block's centre is compared with the midpoints of the other
     // rows as they sit with it taken out, so the gap follows the block. Over
