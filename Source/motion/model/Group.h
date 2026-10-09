@@ -16,6 +16,8 @@ struct Group {
     std::vector<EffectInstance> effects;
     bool muted = false, solo = false;
     bool spatialPath = false, quaternionRotation = false;
+    // Timeline row height in pixels (0: the default), as a track's: view state.
+    int height = 0;
 
     bool valid() const { return id != 0 && parent != id && validProperties(properties, objectPropertySpecs); }
 };

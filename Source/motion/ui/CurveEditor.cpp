@@ -1426,7 +1426,7 @@ void MotionCurveEditor::showKeyMenu() {
     menu.addItem(motion::style::menuItem("Easy ease", 11, "F9").setEnabled(editable));
     menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9").setEnabled(editable));
     menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9").setEnabled(editable));
-    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this), [this](int result) {
+    motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
         if (result >= 11 && result <= 13) {
             easeSelected(result != 13, result != 12);
         } else if (result >= 1 && result <= 4) {

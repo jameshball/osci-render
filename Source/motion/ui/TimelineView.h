@@ -159,7 +159,9 @@ private:
     // on keys and clips at the start of the timeline are never taken.
     bool onNamesEdge(const juce::MouseEvent& event) const { return event.y >= rulerHeight && event.x >= namesWidth - 5 && event.x < namesWidth; }
     // The track whose bottom edge (in the names column) is under the pointer.
-    int trackEdgeAt(juce::Point<int> point) const;
+    // The row (track or group) whose bottom edge resizes under the point.
+    int rowEdgeAt(juce::Point<int> point) const;
+    int storedHeight(motion::Id id) const;
     struct HeightDrag { motion::Id track; int startHeight, downY, original; };
     std::optional<HeightDrag> heightDrag;
     static constexpr int laneHeight = 22;

@@ -93,6 +93,17 @@ try:
     session.wait_for_undo("Move group")
     if not header(group_name)[1] > header("teapot.obj")[1] or not header("cube.obj")[1] > header("teapot.obj")[1] or not header("cat.svg")[1] > header("teapot.obj")[1]:
         raise RuntimeError("The group and its tracks should move below the teapot together")
+    # A group's row resizes from its bottom edge, as a track's does.
+    def group_header():
+        for node in nodes(snapshot()):
+            if node.get("name") == "Track header" and any(child.get("componentName") == "Track name " + group_id for child in nodes(node.get("children", []))):
+                return node["bounds"]
+        raise RuntimeError("Missing the group's header")
+    before_height = group_header()["h"]
+    edge = group_header()
+    step("resize the group row", "drag-xy", edge["x"] + 30, edge["y"] + edge["h"] + 1, edge["x"] + 30, edge["y"] + edge["h"] + 31, "--steps", 6)
+    if not group_header()["h"] >= before_height + 20:
+        raise RuntimeError("Dragging a group row's edge should make it taller")
     # Selected, the group moves in the Scene by dragging anything in it.
     step("select the group", "click-xy", *header(group_name))
     before = field("position.x")

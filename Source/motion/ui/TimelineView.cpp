@@ -182,15 +182,24 @@ void MotionTimelineView::restoreView(const ViewState& state) {
     refreshTracks();
 }
 
-int MotionTimelineView::trackEdgeAt(juce::Point<int> point) const {
+int MotionTimelineView::rowEdgeAt(juce::Point<int> point) const {
     ensureTrackRows();
     if (point.x >= namesWidth - 5 || point.y < rulerHeight) { return -1; }
     for (int row = firstVisibleRow(); row < static_cast<int>(rows.size()); ++row) {
         const auto bottom = rowY(row) + heightAt(row);
         if (bottom > getHeight() + resizeStrip) { break; }
-        if (!rows[static_cast<std::size_t>(row)].isLane() && rows[static_cast<std::size_t>(row)].track >= 0 && point.y >= bottom - resizeStrip - 1 && point.y <= bottom + 1) { return rows[static_cast<std::size_t>(row)].track; }
+        // Tracks and groups resize; lanes keep their height.
+        if (!rows[static_cast<std::size_t>(row)].isLane() && point.y >= bottom - resizeStrip - 1 && point.y <= bottom + 1) { return row; }
     }
     return -1;
+}
+
+int MotionTimelineView::storedHeight(motion::Id id) const {
+    const auto& project = processor.document.project();
+    const auto* group = motion::findGroup(project, id);
+    if (group != nullptr) { return group->height; }
+    const auto track = std::find_if(project.tracks.begin(), project.tracks.end(), [id](const auto& item) { return item.id == id; });
+    return track != project.tracks.end() ? track->height : 0;
 }
 
 void MotionTimelineView::revealSelection() {
@@ -814,12 +823,15 @@ void MotionTimelineView::paint(juce::Graphics& g) {
         }
     }
     // The row edge under the pointer (or being dragged) shows where it resizes.
-    const auto edgeTrack = heightDrag.has_value() ? -2 : hoveredEdge;
-    if (edgeTrack >= 0 || heightDrag.has_value()) {
-        const auto index = heightDrag.has_value() ? trackIndex(heightDrag->track) : edgeTrack;
-        if (index >= 0) {
+    if (hoveredEdge >= 0 || heightDrag.has_value()) {
+        auto row = hoveredEdge;
+        if (heightDrag.has_value()) {
+            const auto found = std::find_if(rows.begin(), rows.end(), [&](const auto& item) { return item.id == heightDrag->track && !item.isLane(); });
+            row = found != rows.end() ? static_cast<int>(found - rows.begin()) : -1;
+        }
+        if (row >= 0 && row < static_cast<int>(rows.size())) {
             g.setColour(osci::Colours::accentColor().withAlpha(.8f));
-            g.fillRect(0, trackY(index) + trackHeight(index) - 2, getWidth(), 2);
+            g.fillRect(0, rowY(row) + heightOf(static_cast<std::size_t>(row)) - 2, getWidth(), 2);
         }
     }
     g.setColour(osci::Colours::veryDark().darker(.25f));
@@ -846,16 +858,16 @@ void MotionTimelineView::mouseDown(const juce::MouseEvent& event) {
         resizingNames = true;
         return;
     }
-    const auto edge = trackEdgeAt(event.getPosition());
-    if (edge >= 0 && edge < static_cast<int>(processor.document.project().tracks.size()) && event.mods.isLeftButtonDown()) {
-        const auto& track = processor.document.project().tracks[static_cast<std::size_t>(edge)];
+    const auto edge = rowEdgeAt(event.getPosition());
+    if (edge >= 0 && event.mods.isLeftButtonDown()) {
+        const auto id = rows[static_cast<std::size_t>(edge)].id;
         if (event.getNumberOfClicks() > 1) {
             // Double-click an edge: back to the default height.
-            processor.document.setTrackHeight(track.id, 0);
+            processor.document.setTrackHeight(id, 0);
             layoutRows(); resized(); repaint();
             return;
         }
-        heightDrag = HeightDrag {track.id, trackHeight(edge), event.y, track.height};
+        heightDrag = HeightDrag {id, heightOf(static_cast<std::size_t>(edge)), event.y, storedHeight(id)};
         return;
     }
     if (inCameraBand(event.y)) {
@@ -1251,8 +1263,8 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
         setTooltip(bar == 1 ? "Drag to scroll; drag either end to zoom" : "Drag to scroll tracks");
         return;
     }
-    const auto edgeTrack = trackEdgeAt(event.getPosition());
-    if (edgeTrack != hoveredEdge) { hoveredEdge = edgeTrack; repaint(); }
+    const auto edgeRow = rowEdgeAt(event.getPosition());
+    if (edgeRow != hoveredEdge) { hoveredEdge = edgeRow; repaint(); }
     const auto loop = loopBounds();
     if (!loop.isEmpty() && event.y >= loopTop - 4 && event.y < loopTop + loopHeight && event.x >= loop.getX() - 5 && event.x <= loop.getRight() + 5) {
         const auto edge = std::abs(event.x - loop.getX()) <= 5 || std::abs(event.x - loop.getRight()) <= 5;
@@ -1260,7 +1272,7 @@ void MotionTimelineView::mouseMove(const juce::MouseEvent& event) {
         setTooltip("Loop: drag to move, drag an end to resize, double-click to switch looping on or off");
         return;
     }
-    if (edgeTrack >= 0) {
+    if (edgeRow >= 0) {
         setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
         setTooltip("Drag to resize this track; double-click for the default height. Alt+wheel resizes every track.");
         return;
@@ -1744,11 +1756,11 @@ void MotionTimelineView::mouseUp(const juce::MouseEvent&) {
 
 void MotionTimelineView::mouseDoubleClick(const juce::MouseEvent& event) {
     cancelGesture();
-    const auto edge = trackEdgeAt(event.getPosition());
-    if (edge >= 0 && edge < static_cast<int>(processor.document.project().tracks.size())) {
+    const auto edge = rowEdgeAt(event.getPosition());
+    if (edge >= 0) {
         // Double-click a row's bottom edge: back to the default height.
         heightDrag.reset();
-        processor.document.setTrackHeight(processor.document.project().tracks[static_cast<std::size_t>(edge)].id, 0);
+        processor.document.setTrackHeight(rows[static_cast<std::size_t>(edge)].id, 0);
         layoutRows(); resized(); repaint();
         return;
     }
@@ -2403,6 +2415,24 @@ void MotionTimelineView::paintRow(juce::Graphics& g, int visible) {
         // Its share of the beam: everything it holds.
         const auto area = juce::Rectangle<float>(static_cast<float>(namesWidth), static_cast<float>(y), static_cast<float>(getWidth() - namesWidth), static_cast<float>(cardHeight)).reduced(0, 4);
         paintBeamShare(g, row.id, area, area.expanded(0, 4), 1.0f);
+        // Its own keys along its foot, as a clip's are.
+        const auto* folder = motion::findGroup(project, row.id);
+        if (folder != nullptr) {
+            std::set<double> times;
+            for (const auto& [name, curve] : folder->properties) {
+                for (const auto& key : curve.keyframes()) { times.insert(key.time); }
+            }
+            juce::Path ticks;
+            double lastX = -10;
+            for (const auto time : times) {
+                const auto x = static_cast<double>(timeX(time));
+                if (x - lastX < 3 || x < namesWidth - 4 || x > getWidth() + 4) { continue; }
+                motion::style::addDiamond(ticks, {static_cast<float>(x), static_cast<float>(y + cardHeight) - 5.0f}, 3.5f);
+                lastX = x;
+            }
+            g.setColour(motion::style::keyTick());
+            g.fillPath(ticks);
+        }
         for (const auto& track : tracks) {
             auto parent = track.group;
             for (std::size_t depth = 0; parent != 0 && depth < motion::maximumGroupDepth; ++depth) {
@@ -3438,7 +3468,8 @@ int MotionTimelineView::heightOf(std::size_t row) const {
     if (rows[row].isLane()) { return laneHeight; }
     const auto& tracks = processor.document.project().tracks;
     const auto index = rows[row].track;
-    const auto own = index >= 0 && index < static_cast<int>(tracks.size()) ? tracks[static_cast<std::size_t>(index)].height : 0;
+    const auto* group = index < 0 ? motion::findGroup(processor.document.project(), rows[row].id) : nullptr;
+    const auto own = group != nullptr ? group->height : index >= 0 && index < static_cast<int>(tracks.size()) ? tracks[static_cast<std::size_t>(index)].height : 0;
     return own > 0 ? own : defaultTrackHeight;
 }
 
@@ -3528,6 +3559,21 @@ std::optional<double> MotionTimelineView::magnet(double time, const motion::Proj
     if (project.hasLoop()) {
         consider(project.loopStart);
         consider(project.loopEnd);
+    }
+    // Camera and group keys run on the composition's time, as do camera cuts.
+    for (const auto& camera : project.cameras) {
+        for (const auto& [name, curve] : camera.properties) {
+            for (const auto& key : curve.keyframes()) { consider(key.time); }
+        }
+    }
+    for (const auto& cut : project.cameraCuts) {
+        consider(cut.start);
+        consider(cut.end());
+    }
+    for (const auto& group : project.groups) {
+        for (const auto& [name, curve] : group.properties) {
+            for (const auto& key : curve.keyframes()) { consider(key.time); }
+        }
     }
     for (const auto& track : project.tracks) {
         for (const auto& clip : track.clips) {

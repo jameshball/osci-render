@@ -196,6 +196,7 @@ juce::XmlElement saveCompositionContent(const Composition& state) {
         item->setAttribute("id", juce::String(group.id));
         item->setAttribute("name", juce::String(group.name));
         item->setAttribute("parent", juce::String(group.parent));
+        if (group.height != 0) { item->setAttribute("height", group.height); }
         item->setAttribute("muted", group.muted);
         item->setAttribute("solo", group.solo);
         if (group.spatialPath) { item->setAttribute("spatialPath", true); }
@@ -335,6 +336,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
         group.muted = item->getBoolAttribute("muted", false);
         group.solo = item->getBoolAttribute("solo", false);
         group.spatialPath = item->getBoolAttribute("spatialPath", false);
+        group.height = std::clamp(item->getIntAttribute("height", 0), 0, Track::maximumHeight);
         group.quaternionRotation = item->getBoolAttribute("quaternionRotation", false);
         const auto effects = loadEffects(*item, group.effects, identities);
         if (effects.failed()) {

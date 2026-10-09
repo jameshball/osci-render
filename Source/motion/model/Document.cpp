@@ -554,13 +554,17 @@ bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     std::set<Id> found;
     forEachComposition(state, [&](const Composition& composition) {
         for (const auto& track : composition.tracks) { if (wanted.contains(track.id)) { found.insert(track.id); } }
+        for (const auto& group : composition.groups) { if (wanted.contains(group.id)) { found.insert(group.id); } }
     });
-    const auto trackDiffers = [&](const Track& track) {
-        const auto height = wanted.find(track.id);
-        return height != wanted.end() && track.height != height->second;
+    // Tracks and groups both have rows.
+    const auto rowDiffers = [&](const auto& row) {
+        const auto height = wanted.find(row.id);
+        return height != wanted.end() && row.height != height->second;
     };
+    const auto trackDiffers = [&](const Track& track) { return rowDiffers(track); };
     const auto differs = [&](const Composition& composition) {
-        return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackDiffers);
+        return std::any_of(composition.tracks.begin(), composition.tracks.end(), trackDiffers)
+            || std::any_of(composition.groups.begin(), composition.groups.end(), [&](const Group& group) { return rowDiffers(group); });
     };
     // View state: no undo step, no revision bump and no change broadcast (it
     // affects neither playback nor any other view); the timeline relayouts
@@ -570,6 +574,9 @@ bool Document::setTrackHeights(const std::vector<std::pair<Id, int>>& heights) {
     changeEachComposition(next, differs, [&](Composition& composition) {
         changed = true;
         composition.tracks.changeEach(trackDiffers, [&](Track& track) { track.height = wanted.at(track.id); });
+        for (auto& group : composition.groups) {
+            if (rowDiffers(group)) { group.height = wanted.at(group.id); }
+        }
     });
     if (changed) {
         state = std::move(next);

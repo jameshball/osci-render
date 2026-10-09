@@ -952,6 +952,15 @@ private:
         expectWithinAbsoluteError(motion::PreparedComposition(shared).clips[0].beam(3), 1.5, 1.0e-9, "groups scale the beam of what they hold");
         shared.groups[0].properties["beam"] = motion::Curve(0);
         expect(!motion::PreparedComposition(shared).clips[0].visible(3), "a group with no beam leaves out what it holds");
+        {
+            juce::UndoManager heightUndo, restoredUndo;
+            motion::Document heights(heightUndo), restored(restoredUndo);
+            heights.reset(project);
+            expect(heights.setTrackHeight(outer.id, 80), "a group's row has a height, like a track's");
+            expect(!heightUndo.canUndo(), "as view state, without an undo step");
+            expect(restored.load(heights.save()).wasOk());
+            expectEquals(motion::findGroup(restored.project(), outer.id)->height, 80, "and it is saved with the project");
+        }
 
         int lit = 0;
         for (int index = 0; index < 1000; ++index) {
