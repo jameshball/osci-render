@@ -256,17 +256,33 @@ private:
             push({Kind::hold, first, total, nullptr, nullptr, 0, false, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}});
             return;
         }
-        double reserved = 0;
-        for (std::size_t i = 0; i < layerCount; ++i) { reserved += items[i].length; }
-        const auto density = static_cast<double>(budget) / reserved;
+        // Even brightness above the floors: every layer gets the same samples
+        // per unit of length, or its complete-stroke floor if that is more,
+        // at the density that fills the budget. A layer whose floor is large
+        // (a detailed drawing) takes only that, never the others' fair share.
+        double shortest = std::numeric_limits<double>::infinity();
+        for (std::size_t i = 0; i < layerCount; ++i) { shortest = std::min(shortest, items[i].length); }
+        const auto demand = [&](double density) {
+            std::int64_t total = 0;
+            for (std::size_t i = 0; i < layerCount; ++i) {
+                const auto ideal = std::floor(items[i].length * density);
+                total += std::max<std::int64_t>(std::min(items[i].minimum, budget), std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : 0);
+            }
+            return total;
+        };
+        double low = 0, high = static_cast<double>(budget) / shortest;
+        for (int step = 0; step < 48 && high - low > 1.0e-9 * high; ++step) {
+            const auto middle = (low + high) * .5;
+            if (demand(middle) <= budget) { low = middle; } else { high = middle; }
+        }
         std::int64_t used = 0;
         for (std::size_t i = 0; i < layerCount; ++i) {
-            const auto ideal = std::floor(items[i].length * density);
+            const auto ideal = std::floor(items[i].length * low);
             const auto least = std::min(items[i].minimum, budget);
             counts[i] = std::max<std::int64_t>(least, std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : least);
             used += counts[i];
         }
-        // Complete strokes first: trim the layers furthest above their minimum.
+        // Floors that do not fit: trim the layers furthest above their minimum.
         while (used > budget) {
             std::size_t largest = layerCount;
             std::int64_t surplus = 0;
