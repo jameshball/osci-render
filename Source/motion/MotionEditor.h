@@ -78,6 +78,7 @@ private:
         motion::Id track = 0;  // dropped on this timeline track (0: a new track)
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
+    void moveEffectTo(motion::Id effect, motion::Id owner, bool copy);
     // Splits picked shapes off a clip's source into a clip of their own.
     void extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks, const juce::String& name);
     // The clips parts were extracted from, selected again if the extraction is undone.

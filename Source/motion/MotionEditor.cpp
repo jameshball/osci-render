@@ -261,6 +261,14 @@ void MotionEditor::setUpScene() {
         resized();
     };
     composition.onContextMenu = [this] { showSceneMenu(); };
+    composition.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
+    composition.onEffectMovePreview = [this](motion::Id effect, std::optional<motion::Id> owner) {
+        auto project = processor.document.project();
+        const auto moved = owner.has_value() && motion::moveEffect(project, effect, *owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), std::numeric_limits<motion::Id>::max());
+        processor.prepareComposition(moved ? project : processor.document.project());
+        if (moved) { composition.preview(project); } else { composition.refresh(); }
+    };
+    timeline.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
     composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
     composition.onOpenSource = [this](motion::Id id) {
@@ -1351,11 +1359,26 @@ void MotionEditor::addEffectTo(const std::string& type, motion::Id owner) {
 }
 
 void MotionEditor::dragOperationStarted(const juce::DragAndDropTarget::SourceDetails& details) {
-    const auto effect = details.description.toString().startsWith("motion-effect:");
-    propertyInspector.setModulatorDrag(details.description.toString().startsWith("motion-modulator:"));
+    const auto description = details.description.toString();
+    // Library effects and effect cards both land on clips, tracks and the Scene.
+    const auto effect = description.startsWith("motion-effect:") || description.startsWith("motion-effect-instance:");
+    propertyInspector.setModulatorDrag(description.startsWith("motion-modulator:"));
     timeline.setEffectDragActive(effect);
     composition.setEffectDragActive(effect);
-    effectStack.setDragActive(effect);
+    effectStack.setDragActive(description.startsWith("motion-effect:"));
+}
+
+// Moves an effect card's effect to another owner (Alt: a copy), and shows
+// that owner so the effect is seen where it went.
+void MotionEditor::moveEffectTo(motion::Id effect, motion::Id owner, bool copy) {
+    const auto* from = motion::findEffectList(processor.document.project(), effect);
+    if (from != nullptr && from == motion::findEffectOwner(processor.document.project(), owner) && !copy) { return; }
+    const auto result = processor.document.moveEffect(effect, owner, copy);
+    if (result.failed()) {
+        statusBar.show(result.getErrorMessage());
+        return;
+    }
+    select(owner);
 }
 
 void MotionEditor::dragOperationEnded(const juce::DragAndDropTarget::SourceDetails&) {

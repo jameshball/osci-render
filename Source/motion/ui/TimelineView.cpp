@@ -481,15 +481,17 @@ void MotionTimelineView::paintPlayhead(juce::Graphics& g) {
 
 bool MotionTimelineView::isInterestedInDragSource(const SourceDetails& details) {
     const auto description = details.description.toString();
-    return description.startsWith("motion-asset:") || description.startsWith("motion-effect:");
+    return description.startsWith("motion-asset:") || description.startsWith("motion-effect:") || description.startsWith("motion-effect-instance:");
 }
 
 void MotionTimelineView::itemDragMove(const SourceDetails& details) {
     dropPosition = details.localPosition;
     addTrack.setVisible(false);
-    dropEffect = details.description.toString().startsWith("motion-effect:") ? details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
-    dropAssetId = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
-    previewEffect(dropEffect.empty() ? 0 : effectOwnerAt(details.localPosition));
+    const auto description = details.description.toString();
+    dropEffect = description.startsWith("motion-effect:") ? description.fromFirstOccurrenceOf(":", false, false).toStdString() : std::string();
+    dropInstance = description.startsWith("motion-effect-instance:") ? static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()) : motion::Id(0);
+    dropAssetId = static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
+    previewEffect(dropEffect.empty() && dropInstance == 0 ? 0 : effectOwnerAt(details.localPosition));
     repaint();
 }
 
@@ -505,6 +507,13 @@ void MotionTimelineView::previewEffect(motion::Id owner) {
     previewedOwner = owner;
     previewedRevision = processor.document.revision();
     if (!onPreview) { return; }
+    // A moved card plays where it would land.
+    if (dropInstance != 0 && owner != 0) {
+        auto project = processor.document.project();
+        const auto moved = motion::moveEffect(project, dropInstance, owner, juce::ModifierKeys::getCurrentModifiers().isAltDown(), std::numeric_limits<motion::Id>::max());
+        onPreview(moved ? &project : nullptr);
+        return;
+    }
     const auto* definition = motion::effectDefinition(dropEffect);
     if (owner == 0 || definition == nullptr) {
         onPreview(nullptr);
@@ -528,6 +537,14 @@ void MotionTimelineView::itemDropped(const SourceDetails& details) {
     previewEffect(0);
     if (details.description.toString().startsWith("motion-effect:")) {
         insertEffect(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), details.localPosition);
+        repaint();
+        return;
+    }
+    if (dropInstance != 0) {
+        const auto owner = effectOwnerAt(details.localPosition);
+        const auto effect = dropInstance;
+        dropInstance = 0;
+        if (owner != 0 && onEffectMoved) { onEffectMoved(effect, owner, juce::ModifierKeys::getCurrentModifiers().isAltDown()); }
         repaint();
         return;
     }

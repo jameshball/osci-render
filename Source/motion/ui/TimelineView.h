@@ -90,6 +90,8 @@ public:
     // An effect dragged over a clip, track or group is heard and seen before
     // it is dropped.
     std::function<void(const motion::Project*)> onPreview;
+    // An effect card dropped on a clip or track moves its effect (Alt copies it).
+    std::function<void(motion::Id, motion::Id, bool)> onEffectMoved;
     void setEffectDragActive(bool active);
 
     void itemDropped(const SourceDetails& details) override;
@@ -457,6 +459,7 @@ private:
     std::optional<juce::Point<int>> dropPosition;
     motion::Id dropAssetId = 0;
     std::string dropEffect;
+    motion::Id dropInstance = 0; // an effect card being moved
     std::vector<KeyRef> selectedKeys;
     struct KeyDrag {
         motion::Project before;

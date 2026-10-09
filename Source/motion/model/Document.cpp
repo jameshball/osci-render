@@ -1561,6 +1561,13 @@ juce::Result Document::routeModulator(Id modulator, Id target, const std::vector
     return juce::Result::ok();
 }
 
+juce::Result Document::moveEffect(Id effect, Id owner, bool copy) {
+    if (findEffect(project(), effect) == nullptr) { return juce::Result::fail("The effect no longer exists."); }
+    const auto copyId = copy ? newId() : Id(0);
+    const auto moved = tryEdit(copy ? "Copy effect" : "Move effect", [&](Project& updated) { return motion::moveEffect(updated, effect, owner, copy, copyId); });
+    return moved ? juce::Result::ok() : juce::Result::fail("The effect is already there, or that has no room for more effects.");
+}
+
 std::optional<Project> Document::previewRoute(Id modulator, Id target, const std::vector<std::string>& properties) const {
     auto preview = project();
     if (std::none_of(preview.modulators.begin(), preview.modulators.end(), [&](const auto& item) { return item.id == modulator; }) || beamOutsideMain(target)) { return std::nullopt; }

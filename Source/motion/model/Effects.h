@@ -150,6 +150,28 @@ auto findEffectList(ProjectType& project, Id id) -> std::conditional_t<std::is_c
     return nullptr;
 }
 
+// Moves effect `id`, with its parameters and keys, to the end of `owner`'s
+// effects (0: the whole composition), or adds a copy under `copyId`. Moving
+// keeps the identity, so routes to its parameters follow it. False when it
+// cannot: no such effect or owner, a full owner, or a move onto its own owner.
+template <typename ProjectType>
+bool moveEffect(ProjectType& project, Id id, Id owner, bool copy, Id copyId) {
+    auto* from = findEffectList(project, id);
+    if (from == nullptr) { return false; }
+    const auto found = std::find_if(from->begin(), from->end(), [id](const auto& effect) { return effect.id == id; });
+    auto effect = *found;
+    auto* to = findEffectOwner(project, owner);
+    from = findEffectList(project, id);
+    if (to == nullptr || from == nullptr || (to == from && !copy) || to->size() >= maximumEffectsPerOwner) { return false; }
+    if (copy) {
+        effect.id = copyId;
+    } else {
+        std::erase_if(*from, [id](const auto& item) { return item.id == id; });
+    }
+    to->push_back(std::move(effect));
+    return true;
+}
+
 template <typename ProjectType>
 auto findEffect(ProjectType& project, Id id) -> std::conditional_t<std::is_const_v<ProjectType>, const EffectInstance*, EffectInstance*> {
     auto* list = findEffectList(project, id);

@@ -128,7 +128,13 @@ public:
     // Effects dropped on an object apply to it; anywhere else, to everything.
     std::function<void(const std::string&, std::optional<motion::Id>)> onEffectPreview;
     std::function<void(const std::string&, motion::Id)> onEffectDropped;
-    bool isInterestedInDragSource(const SourceDetails& details) override { return details.description.toString().startsWith("motion-effect:"); }
+    // An effect card dragged out of Properties moves its effect (Alt copies it).
+    std::function<void(motion::Id, std::optional<motion::Id>)> onEffectMovePreview;
+    std::function<void(motion::Id, motion::Id, bool)> onEffectMoved;
+    bool isInterestedInDragSource(const SourceDetails& details) override {
+        const auto description = details.description.toString();
+        return description.startsWith("motion-effect:") || description.startsWith("motion-effect-instance:");
+    }
     void itemDragMove(const SourceDetails& details) override;
     void itemDragExit(const SourceDetails& details) override;
     void itemDropped(const SourceDetails& details) override;

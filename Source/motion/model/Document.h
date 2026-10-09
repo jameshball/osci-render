@@ -269,6 +269,9 @@ public:
     juce::Result addRoute(ModulationRoute route, Id& id);
     // Routes `modulator` to each of `properties` of `target` that it does not
     // drive yet, at a visible but contained default depth. One undo step.
+    // Moves an effect to another owner (0: the whole composition), or copies
+    // it there, in one undo step.
+    juce::Result moveEffect(Id effect, Id owner, bool copy);
     juce::Result routeModulator(Id modulator, Id target, const std::vector<std::string>& properties);
     // The project as routeModulator would leave it, recording nothing: a
     // preview while a modulator is dragged over a property. None when no new

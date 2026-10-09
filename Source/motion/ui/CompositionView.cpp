@@ -1135,24 +1135,41 @@ void MotionCompositionView::resized() {
 }
 
 void MotionCompositionView::itemDragMove(const SourceDetails& details) {
-    const auto type = details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString();
+    const auto description = details.description.toString();
     const auto hit = prepared != nullptr ? pickAt(details.localPosition.toFloat(), nullptr) : motion::Id(0);
     if (dropHover == hit) { return; }
     dropHover = hit;
-    if (onEffectPreview) { onEffectPreview(type, hit); }
+    if (description.startsWith("motion-effect-instance:")) {
+        if (onEffectMovePreview) { onEffectMovePreview(static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), hit); }
+    } else if (onEffectPreview) {
+        onEffectPreview(description.fromFirstOccurrenceOf(":", false, false).toStdString(), hit);
+    }
     repaint();
 }
 
 void MotionCompositionView::itemDragExit(const SourceDetails& details) {
     dropHover.reset();
-    if (onEffectPreview) { onEffectPreview(details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString(), std::nullopt); }
+    const auto description = details.description.toString();
+    if (description.startsWith("motion-effect-instance:")) {
+        if (onEffectMovePreview) { onEffectMovePreview(static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue()), std::nullopt); }
+    } else if (onEffectPreview) {
+        onEffectPreview(description.fromFirstOccurrenceOf(":", false, false).toStdString(), std::nullopt);
+    }
     repaint();
 }
 
 void MotionCompositionView::itemDropped(const SourceDetails& details) {
     const auto hit = dropHover.value_or(0);
     dropHover.reset();
-    const auto type = details.description.toString().fromFirstOccurrenceOf(":", false, false).toStdString();
+    const auto description = details.description.toString();
+    if (description.startsWith("motion-effect-instance:")) {
+        const auto effect = static_cast<motion::Id>(description.fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
+        if (onEffectMovePreview) { onEffectMovePreview(effect, std::nullopt); }
+        if (onEffectMoved) { onEffectMoved(effect, hit, juce::ModifierKeys::getCurrentModifiers().isAltDown()); }
+        repaint();
+        return;
+    }
+    const auto type = description.fromFirstOccurrenceOf(":", false, false).toStdString();
     if (onEffectPreview) { onEffectPreview(type, std::nullopt); }
     if (onEffectDropped) { onEffectDropped(type, hit); }
     repaint();

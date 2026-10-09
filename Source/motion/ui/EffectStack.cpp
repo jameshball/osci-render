@@ -280,11 +280,14 @@ void MotionEffectStack::Card::resized() {
 
 void MotionEffectStack::Card::paint(juce::Graphics& g) {
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(osci::Colours::surfaceRaised().withAlpha(.32f));
+    // A raised card with a hairline edge, so it reads clearly against the panel.
+    g.setColour(osci::Colours::surfaceRaised().withAlpha(.6f));
     g.fillRoundedRectangle(bounds, motion::style::radius + 1);
+    g.setColour(juce::Colours::white.withAlpha(.08f));
+    g.drawRoundedRectangle(bounds.reduced(.5f), motion::style::radius + 1, 1.0f);
     const auto header = getLocalBounds().removeFromTop(headerHeight);
     if (isMouseOver(true) && getMouseXYRelative().y < headerHeight) {
-        g.setColour(juce::Colours::white.withAlpha(.03f));
+        g.setColour(juce::Colours::white.withAlpha(.05f));
         g.fillRoundedRectangle(header.toFloat(), motion::style::radius + 1);
     }
     // The fold triangle: down when open, right when folded.
@@ -299,7 +302,7 @@ void MotionEffectStack::Card::paint(juce::Graphics& g) {
     g.drawText(name, nameArea, juce::Justification::centredLeft, true);
     if (folded()) { return; }
     g.setFont(motion::style::caption());
-    g.setColour(osci::Colours::textMuted().withAlpha(enabled ? 1.0f : .5f));
+    g.setColour(osci::Colours::text().withAlpha(enabled ? .78f : .4f));
     for (const auto& row : rows) {
         g.drawText(row->label, row->field.getBounds().withX(motion::style::padding).withRight(row->field.getX() - motion::style::gap), juce::Justification::centredLeft, true);
     }
