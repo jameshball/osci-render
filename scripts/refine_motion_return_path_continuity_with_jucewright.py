@@ -109,14 +109,14 @@ try:
     select_track(22,60)
     tab("Properties"); edit("Clip duration",67.2)
     tab("Properties")
-    for moment,value in [(76.7,.05),(80,.06),(89.5,.03)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(76.7,5),(80,6),(89.5,3)]:
+        seek(moment); edit("opacity",value)
     for prop,initial,final in [("scale.x",.5,.1),("scale.y",.5,.3),("scale.z",.5,.3),("position.y",-.05,-.1)]:
         seek(76.8); edit(prop,initial)
         step("retain thread " + prop, "click", "--name", "Key " + prop, "--exact")
         seek(89.5); edit(prop,final)
     select_track(38,90)
-    seek(89.6); edit("weight",.03)
+    seek(89.6); edit("opacity",3)
     step("save surviving thread", "press", "command + s", "--class", "MotionEditor")
     for moment in (73.6,80,89.5,90,112,115.2,116.8):
         seek(moment); command("wait", "--ms", 1000)

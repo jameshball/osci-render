@@ -328,7 +328,7 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
 
 juce::String MotionPropertyInspector::sectionOf(const juce::String& group) {
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
-    if (group == "Colour" || group == "Drawing") { return "Appearance"; }
+    if (group == "Colour" || group == "Opacity") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }

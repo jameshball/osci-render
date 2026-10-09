@@ -112,8 +112,8 @@ try:
         select_track(track,140)
         step("mute superseded bridge layer", "click", "--name", "Mute track " + str(track), "--exact")
     select_track(38,140)
-    for moment,value in [(124.8,.4),(128,0),(153.6,.06),(166.4,.06),(172.8,.12)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(124.8,40),(128,0),(153.6,6),(166.4,6),(172.8,12)]:
+        seek(moment); edit("opacity",value)
     seek(128)
     source = session.root_dir / "research/osci-motion/benchmark-sources/Bridge activation.mp4"
     step("import bridge activation", "drop-files", "--file", source, "--class", "MotionEditor", "--exact")
@@ -122,13 +122,13 @@ try:
     step("bake bridge video", "click", "--name", "Prepare video", "--exact")
     command("wait-for-locator", "--name", "Bridge activation.mp4", "--class", "juce::Label", "--exact", "--timeout-ms", 120000)
     tab("Properties")
-    for prop,value in {"scale.x":.6,"scale.y":.6,"scale.z":.6,"weight":.8}.items():
+    for prop,value in {"scale.x":.6,"scale.y":.6,"scale.z":.6,"opacity":80}.items():
         edit(prop,value)
     select_track(3,140)
     for moment,value in [(128,0),(140.8,0),(153.6,0),(160,.04),(166.4,0),(179.2,0)]:
         seek(moment); edit("position.y",value)
-    for moment,value in [(128,.3),(129.6,.5),(153.6,.7),(166.4,.5),(179.2,.3)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(128,30),(129.6,50),(153.6,70),(166.4,50),(179.2,30)]:
+        seek(moment); edit("opacity",value)
     select_track(15,154)
     seek(166.4); edit("position.x",.15)
     for prop,values in {
@@ -158,12 +158,12 @@ try:
     assert abs(float(video.get("start"))-128)<1e-9 and abs(float(video.get("duration"))-38.4)<1e-9
     assert all(saved.find("composition/track[@id='"+str(id_)+"']").get("muted")=="1" for id_ in (41,44))
     assert len(saved.findall("composition/track")) == 17
-    assert abs(float(video.find("property[@name='weight']").get("base")) - .8) < 1e-9
+    assert abs(float(video.find("property[@name='opacity']").get("base")) - 80) < 1e-9
     reply = saved.find("composition/track[@id='38']/clip")
-    reply_keys = reply.findall("property[@name='weight']/key")
+    reply_keys = reply.findall("property[@name='opacity']/key")
     for moment in (153.6, 166.4):
         matching = [key for key in reply_keys if abs(float(key.get("time")) + float(reply.get("start")) - moment) < 1e-9]
-        assert len(matching) == 1 and abs(float(matching[0].get("value")) - .06) < 1e-9
+        assert len(matching) == 1 and abs(float(matching[0].get("value")) - 6) < 1e-9
     print("Activated bridge and shared arrival saved; export review pending", flush=True)
 finally:
     session.stop_app()

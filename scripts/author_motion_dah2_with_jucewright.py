@@ -294,14 +294,14 @@ def intro():
     # the trace starts to sing, and the title types itself in.
     import_source("Dot.svg", 0, duration=bar(2))
     set_properties({"scale.x": 0.025, "scale.y": 0.025, "scale.z": 0.025, "red": 0.5, "green": 1, "blue": 0.7})
-    modulate("Drawing weight", "Sine", 0.6, beats=1, mode="Multiply")
+    modulate("Opacity", "Sine", 0.6, beats=1, mode="Multiply")
     import_source("Trace.lua", bar(2), duration=bar(5), bake=12.8)
     set_properties({"red": 0.4, "green": 1, "blue": 0.55})
-    keys("Trace", "Drawing", [(bar(2), {"weight": 0}), (bar(2.5), {"weight": 1}), (bar(6.5), {"weight": 1}), (bar(7), {"weight": 0})])
+    keys("Trace", "Opacity", [(bar(2), {"opacity": 0}), (bar(2.5), {"opacity": 100}), (bar(6.5), {"opacity": 100}), (bar(7), {"opacity": 0})])
     import_source("dahhhhh.txt", bar(4), duration=bar(4))
     set_properties({"position.y": -0.55, "scale.y": 0.16, "scale.z": 0.16, "red": 0.85, "green": 0.9, "blue": 0.8})
     keys("Title", "Scale", [(bar(4), {"scale.x": 0.0}), (bar(5), {"scale.x": 0.16})])
-    keys("Title", "Drawing", [(bar(7), {"weight": 1}), (bar(8), {"weight": 0})])
+    keys("Title", "Opacity", [(bar(7), {"opacity": 100}), (bar(8), {"opacity": 0})])
     save()
 
 
@@ -311,12 +311,12 @@ def mouths():
     import_source("Mouth.lua", bar(7), duration=bar(30) - bar(7), bake=1.6)
     rename_track("Mouth")
     set_properties({"position.y": 0.05, "position.z": 0.3, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1})
-    keys("Mouth", "Drawing", [(bar(7), {"weight": 0}), (bar(7.5), {"weight": 2.5})])
+    keys("Mouth", "Opacity", [(bar(7), {"opacity": 0}), (bar(7.5), {"opacity": 100})])
     duplicate_to(bar(80), duration=bar(96) - bar(80))
     set_properties({"position.x": -0.42, "position.y": 0, "scale.x": 0.62, "scale.y": 0.62, "scale.z": 0.62})
     import_source("Mouth.lua", bar(22), duration=bar(30) - bar(22), bake=1.6, offset=BEAT / 2)
     rename_track("Answer")
-    set_properties({"position.x": 0.72, "position.y": 0.36, "position.z": 0.3, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "weight": 2.2})
+    set_properties({"position.x": 0.72, "position.y": 0.36, "position.z": 0.3, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "opacity": 100})
     add_effect("Colour", {"hue": -80, "saturation": 1.3})
     duplicate_to(bar(80), duration=bar(96) - bar(80))
     set_properties({"position.x": 0.42, "position.y": 0, "scale.x": 0.62, "scale.y": 0.62, "scale.z": 0.62})
@@ -325,7 +325,7 @@ def mouths():
 
 def type_hits():
     # "do" on the downbeat, "da" on beat two, "dahh!" on beat four.
-    groove = {"red": 0.35, "green": 1, "blue": 0.6, "scale.x": 0.15, "scale.y": 0.15, "scale.z": 0.15, "weight": 1.4}
+    groove = {"red": 0.35, "green": 1, "blue": 0.6, "scale.x": 0.15, "scale.y": 0.15, "scale.z": 0.15, "opacity": 100}
     words("do.txt", bar(10), bar(2), bar(30), BEAT, dict(groove, **{"position.x": -0.7, "position.y": 0.62}), "do")
     duplicate_to(bar(80), duration=BEAT)
     words_after = bar(84)
@@ -339,7 +339,7 @@ def type_hits():
         duplicate_to(words_after)
         words_after += bar(4)
     words("dahh!.txt", bar(10) + 3 * BEAT, bar(2), bar(30), 2 * BEAT,
-          {"position.y": -0.66, "scale.x": 0.24, "scale.y": 0.24, "scale.z": 0.24, "red": 1, "green": 0.62, "blue": 0.25, "weight": 1.6}, "dahh!")
+          {"position.y": -0.66, "scale.x": 0.24, "scale.y": 0.24, "scale.z": 0.24, "red": 1, "green": 0.62, "blue": 0.25, "opacity": 100}, "dahh!")
     # The drop lands on one huge "dahh!".
     duplicate_to(bar(30), duration=bar(1))
     set_properties({"position.y": 0, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55})
@@ -355,13 +355,13 @@ def type_hits():
 def ornaments():
     import_source("Lissajous.lua", bar(12), duration=bar(30) - bar(12), bake=6.4)
     rename_track("Figure left")
-    set_properties({"position.x": -0.8, "position.y": -0.52, "scale.x": 0.26, "scale.y": 0.26, "scale.z": 0.26, "weight": 0.8})
+    set_properties({"position.x": -0.8, "position.y": -0.52, "scale.x": 0.26, "scale.y": 0.26, "scale.z": 0.26, "opacity": 80})
     import_source("Lissajous.lua", bar(12), duration=bar(30) - bar(12), bake=6.4, offset=3.2)
     rename_track("Figure right")
-    set_properties({"position.x": 0.8, "position.y": -0.52, "scale.x": 0.26, "scale.y": 0.26, "scale.z": 0.26, "weight": 0.8})
+    set_properties({"position.x": 0.8, "position.y": -0.52, "scale.x": 0.26, "scale.y": 0.26, "scale.z": 0.26, "opacity": 80})
     import_source("Equaliser.gif", bar(16), duration=bar(30) - bar(16))
     rename_track("Meter")
-    set_properties({"position.y": 0.82, "scale.x": 0.13, "scale.y": 0.13, "scale.z": 0.13, "red": 0.35, "green": 1, "blue": 0.6, "weight": 0.7})
+    set_properties({"position.y": 0.82, "scale.x": 0.13, "scale.y": 0.13, "scale.z": 0.13, "red": 0.35, "green": 1, "blue": 0.6, "opacity": 70})
     duplicate_to(bar(80), duration=bar(88) - bar(80))
     save()
 
@@ -373,19 +373,19 @@ def drop():
     import_source("Tunnel.obj", bar(30), duration=bar(48) - bar(30))
     rename_track("Tunnel")
     # Sources are normalised on import: restore the corridor's 14-unit depth.
-    set_properties({"scale.x": 7, "scale.y": 7, "scale.z": 7, "red": 0.3, "green": 0.9, "blue": 1, "weight": 0.8})
+    set_properties({"scale.x": 7, "scale.y": 7, "scale.z": 7, "red": 0.3, "green": 0.9, "blue": 1, "opacity": 80})
     modulate("Position Z", "Saw", 1, beats=8)
     modulate("Rotation Z", "Saw", 180, beats=16)
     add_effect("Vortex", {"strength": 0.35})
     duplicate_to(bar(88), duration=bar(112) - bar(88))
     import_source("Stars.obj", bar(30), duration=bar(48) - bar(30))
     rename_track("Stars")
-    set_properties({"scale.x": 3, "scale.y": 3, "scale.z": 3, "red": 0.85, "green": 0.95, "blue": 1, "weight": 0.7})
+    set_properties({"scale.x": 3, "scale.y": 3, "scale.z": 3, "red": 0.85, "green": 0.95, "blue": 1, "opacity": 70})
     modulate("Position Z", "Saw", 3, beats=4)
     duplicate_to(bar(88), duration=bar(112) - bar(88))
     import_source("DAHH.obj", bar(34), duration=bar(48) - bar(34))
     rename_track("Letters")
-    set_properties({"position.z": -2.5, "scale.x": 1.2, "scale.y": 1.2, "scale.z": 1.2, "red": 1, "green": 0.8, "blue": 0.55, "weight": 1.8})
+    set_properties({"position.z": -2.5, "scale.x": 1.2, "scale.y": 1.2, "scale.z": 1.2, "red": 1, "green": 0.8, "blue": 0.55, "opacity": 100})
     for axis in ("X", "Y", "Z"):
         modulate("Scale " + axis, "Soundtrack loudness", 0.9, mode="Multiply")
     modulate("Rotation Y", "Sine", 25, beats=8)
@@ -401,12 +401,12 @@ def breakdown():
     set_properties({"scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "red": 0.75, "green": 0.45, "blue": 1})
     modulate("Rotation X", "Saw", 180, beats=48)
     modulate("Rotation Y", "Saw", 180, beats=32)
-    keys("Knot", "Drawing", [(bar(48), {"weight": 0}), (bar(50), {"weight": 1.2}), (bar(78), {"weight": 1.2}), (bar(80), {"weight": 0})])
+    keys("Knot", "Opacity", [(bar(48), {"opacity": 0}), (bar(50), {"opacity": 100}), (bar(78), {"opacity": 100}), (bar(80), {"opacity": 0})])
     add_effect("Ripple", {"rippleDepth": 0.12, "rippleAmount": 0.08})
     import_source("Spirograph.lua", bar(52), duration=bar(78) - bar(52), bake=12.8)
     rename_track("Spirograph")
-    set_properties({"position.z": -0.6, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1, "weight": 0.35})
-    keys("Spirograph", "Drawing", [(bar(52), {"weight": 0}), (bar(54), {"weight": 0.35})])
+    set_properties({"position.z": -0.6, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1, "opacity": 35})
+    keys("Spirograph", "Opacity", [(bar(52), {"opacity": 0}), (bar(54), {"opacity": 35})])
     import_source("Ring.svg", bar(56), duration=bar(72) - bar(56))
     rename_track("Halo")
     set_properties({"scale.x": 0.72, "scale.y": 0.72, "scale.z": 0.72, "red": 1, "green": 0.9, "blue": 0.75})
@@ -416,7 +416,7 @@ def breakdown():
 def endings():
     select_uses("Dot.svg")
     duplicate_to(bar(112), duration=185.45 - bar(112))
-    keys("Dot", "Drawing", [(bar(112), {"weight": 1}), (184.4, {"weight": 0})])
+    keys("Dot", "Opacity", [(bar(112), {"opacity": 100}), (184.4, {"opacity": 0})])
     import_source("dah..txt", bar(112.5), duration=bar(115) - bar(112.5))
     rename_track("Sign-off")
     set_properties({"position.y": -0.3, "scale.x": 0.1, "scale.y": 0.1, "scale.z": 0.1, "red": 0.85, "green": 0.9, "blue": 0.8})

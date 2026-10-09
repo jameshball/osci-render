@@ -29,7 +29,8 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
 // A transform's curves evaluated at one time: the anchor taken away, scale,
 // then rotation (Euler X, Y, Z, or a keyed orientation after modulation
 // offsets), then translation (along a spatial path when there is one), and
-// colour gains. Evaluated once, it applies to any number of points.
+// colour gains dimmed by the opacity. Evaluated once, it applies to any number
+// of points.
 struct TransformPose {
     using Matrix = std::array<std::array<float, 3>, 3>;
     std::array<float, 3> scale {1, 1, 1}, translation {}, colour {1, 1, 1}, anchor {};
@@ -73,8 +74,14 @@ struct TransformPose {
         } else {
             for (std::size_t axis = 0; axis < 3; ++axis) { pose.translation[axis] = static_cast<float>(curves[axis].evaluate(time)); }
         }
-        for (std::size_t channel = 0; channel < 3; ++channel) { pose.colour[channel] = static_cast<float>(curves[9 + channel].evaluate(time)); }
+        const auto opacity = static_cast<float>(opacityAt(curves, time));
+        for (std::size_t channel = 0; channel < 3; ++channel) { pose.colour[channel] = static_cast<float>(curves[9 + channel].evaluate(time)) * opacity; }
         return pose;
+    }
+    // Opacity as a 0..1 gain; a modulated value past either end is clamped.
+    static double opacityAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto value = curves[opacityIndex].evaluate(time) / 100;
+        return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
     }
 
     // The source's colour (white when it has none) times the colour gains.
@@ -136,9 +143,7 @@ struct PreparedGroup {
         }
         spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
-    double weight(double time) const {
-        return clampWeight(curves[12].evaluate(time));
-    }
+    bool visible(double time) const { return TransformPose::opacityAt(curves, time) > 0; }
     const TransformPose& pose(double time) const {
         return poses.at(time, [&] { return TransformPose::at(curves, time, spatial.get()); });
     }
@@ -167,19 +172,10 @@ struct PreparedClipStage {
     // The nearest time inside the clip's own interval.
     double clampToContent(double time) const { return std::clamp(time, start, std::nextafter(end, start)); }
     double localTime(double time) const { return clock.localTime(time); }
-    double localWeight(double time) const {
-        return clampWeight(curves[12].evaluate(localTime(time)));
-    }
-    bool accumulateWeightLog(double time, double& logarithm) const {
-        const auto value = localWeight(time);
-        if (value <= 0) { return false; }
-        logarithm += std::log(value);
-        for (const auto& group : groups) {
-            const auto factor = group.weight(scopeTime(time));
-            if (factor <= 0) { return false; }
-            logarithm += std::log(factor);
-        }
-        return true;
+    // Shown unless it or a group holding it is fully transparent.
+    bool stageVisible(double time) const {
+        if (!(TransformPose::opacityAt(curves, localTime(time)) > 0)) { return false; }
+        return std::all_of(groups.begin(), groups.end(), [&](const auto& group) { return group.visible(scopeTime(time)); });
     }
     osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
@@ -201,21 +197,10 @@ struct PreparedClip : PreparedClipStage {
 
     Id editorId() const { return ancestors.empty() ? id : ancestors.back().id; }
     bool active(double time) const { return time >= start && time < end; }
-    double weight(double time) const {
-        if (!ancestors.empty()) {
-            // Nested group products can overflow before a later fade attenuates
-            // them. Accumulate logs and saturate only after all attenuation.
-            double logarithm = 0;
-            if (!accumulateWeightLog(time, logarithm)) { return 0; }
-            for (const auto& ancestor : ancestors) {
-                if (!ancestor.accumulateWeightLog(time, logarithm)) { return 0; }
-            }
-            return std::min(maximumWeight, std::exp(std::min(logarithm, std::log(maximumWeight))));
-        }
-        auto value = localWeight(time);
-        for (const auto& group : groups) { value *= group.weight(scopeTime(time)); }
-        // A direct leaf has at most 32 ancestors bounded to maximumWeight each.
-        return std::clamp(value, 0.0, maximumWeight);
+    // Whether the beam draws it at all: opacity dims a clip through its
+    // colour, and only a fully transparent one gives up its beam time.
+    bool visible(double time) const {
+        return stageVisible(time) && std::all_of(ancestors.begin(), ancestors.end(), [&](const auto& ancestor) { return ancestor.stageVisible(time); });
     }
     const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
         if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
@@ -514,17 +499,15 @@ struct PreparedComposition {
     BeamSelection selectBeam(double time, double phase) const {
         double allocation = 0.0;
         for (const auto& clip : clips) {
-            if (clip.active(time)) { allocation += std::max(1.0, clip.weight(time)); }
+            if (clip.active(time) && clip.visible(time)) { allocation += 1; }
         }
         if (allocation <= 0.0) { return {}; }
         auto cursor = phase * allocation;
         for (const auto& clip : clips) {
-            if (!clip.active(time)) { continue; }
-            const auto weight = clip.weight(time);
-            if (cursor < weight) { return {&clip, cursor / weight, allocation / weight}; }
-            cursor -= weight;
+            if (!clip.active(time) || !clip.visible(time)) { continue; }
+            if (cursor < 1) { return {&clip, cursor, allocation}; }
+            cursor -= 1;
         }
-        // Unused allocation stays dark rather than normalizing away a fade.
         return {};
     }
 

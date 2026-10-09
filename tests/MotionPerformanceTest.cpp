@@ -103,7 +103,7 @@ private:
             for (int clipIndex = 0; clipIndex < scale.clipsPerTrack; ++clipIndex) {
                 auto clip = motion::Document::makeClip(next++, clipIndex % 2 == 0 ? *still : *animated, clipIndex * 2.0);
                 clip.duration = 1.8;
-                for (const auto* property : {"position.x", "position.y", "rotation.z", "scale.x", "red", "weight"}) {
+                for (const auto* property : {"position.x", "position.y", "rotation.z", "scale.x", "red", "opacity"}) {
                     auto& curve = clip.properties[property];
                     for (int key = 0; key < scale.keysPerCurve; ++key) {
                         const auto time = 1.8 * key / std::max(1, scale.keysPerCurve - 1);

@@ -132,19 +132,19 @@ try:
     subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
     command("wait-for-locator", "--name", "Hero diamond.obj", "--class", "juce::Label", "--exact")
     step("size workspace", "resize-window", "--w", 1600, "--h", 1000)
-    for name, time, weight in [("Corridor.obj", 64, 3), ("Horizon.svg", 64, .12), ("Raster pulse.gif", 96, .15),
-                               ("Left satellite.obj", 128, .22), ("Right satellite.obj", 128, .22), ("MIDI pulse.svg", 130, .25)]:
+    for name, time, opacity in [("Corridor.obj", 64, 100), ("Horizon.svg", 64, 12), ("Raster pulse.gif", 96, 15),
+                                ("Left satellite.obj", 128, 22), ("Right satellite.obj", 128, 22), ("MIDI pulse.svg", 130, 25)]:
         select_clip(name, time)
-        edit("weight", weight)
+        edit("opacity", opacity)
     select_clip("Hero diamond.obj", 170)
     # This curve is already animated; editing adds keys without toggling one off.
     seek(168)
     edit("rotation.y", 0)
     seek(176)
     edit("rotation.y", 88)
-    keys("weight", [(176, 2), (179, 0)])
+    keys("opacity", [(176, 100), (179, 0)])
     select_clip("Title.txt", 174)
-    keys("weight", [(178, 1), (179, 0)])
+    keys("opacity", [(178, 100), (179, 0)])
     tab("Camera")
     step("inspect corridor camera", "select-option", "--name", "Camera to edit", "--class", "juce::ComboBox", "--exact", "--text", "Corridor")
     for time, depth in [(48, 1.35), (79, 1.05)]:
@@ -190,7 +190,7 @@ try:
     assert [float(key.get("time")) for key in swirl.findall("key")] == [0, 112, 120, 128, 136, 144]
     for name, end_time in [("Hero diamond.obj", 67), ("Title.txt", 11)]:
         track = next(t for t in saved.findall("./composition/track") if t.get("name") == name)
-        ending = track.findall("clip")[-1].find("property[@name='weight']/key[@value='0.0']")
+        ending = track.findall("clip")[-1].find("property[@name='opacity']/key[@value='0']")
         assert ending is not None and float(ending.get("time")) == end_time, "Ending fade missing: " + name
     assert float(saved.find("composition").get("duration")) == 180
     print("Polish authored and saved; inspect beam balance, keyed group effect and dark ending", flush=True)

@@ -67,7 +67,7 @@ for identity, name, start, duration, domain in [(3, "Musical clip", 4, 8, "beats
     for group, base in [("position", 0), ("rotation", 0), ("scale", 1)]:
         for axis in "xyz":
             ET.SubElement(clip, "property", name=group + "." + axis, base=str(base))
-    for name, base in [("red", .2), ("green", 1), ("blue", .35), ("weight", 1)]:
+    for name, base in [("red", .2), ("green", 1), ("blue", .35), ("opacity", 100)]:
         ET.SubElement(clip, "property", name=name, base=str(base))
 ET.SubElement(composition, "camera", id="5", name="Camera")
 xml = ET.tostring(root, encoding="utf-8")

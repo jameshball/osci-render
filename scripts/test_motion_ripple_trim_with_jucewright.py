@@ -45,7 +45,7 @@ for track_id, title, clips in [(2, 'Edited sequence', [(3, 0, 5), (4, 5, 5), (6,
         for group, base in [('position', 0), ('rotation', 0), ('scale', 1)]:
             for axis in 'xyz':
                 ET.SubElement(clip, 'property', name=group + '.' + axis, base=str(base))
-        for name, base in [('red', .2), ('green', 1), ('blue', .35), ('weight', 1)]:
+        for name, base in [('red', .2), ('green', 1), ('blue', .35), ('opacity', 100)]:
             ET.SubElement(clip, 'property', name=name, base=str(base))
 ET.SubElement(composition, 'camera', id='5', name='Camera')
 ET.SubElement(composition, 'marker', id='40', time='8', name='Fixed music cue')

@@ -421,26 +421,24 @@ public:
         expect(document.revision() > revisionBeforeRedo);
         expect(document.project().assets[0] == asset);
 
-        beginTest("RGB is carried by the sampled signal and a single-object budget fade remains effective");
+        beginTest("RGB is carried by the sampled signal and opacity dims it without leaving gaps");
         auto project = document.project();
         auto& properties = project.tracks.change(0).clips[0].properties;
         properties["red"] = motion::Curve(0.8);
         properties["green"] = motion::Curve(0.2);
         properties["blue"] = motion::Curve(0.4);
-        properties["weight"] = motion::Curve(0.25);
+        properties["opacity"] = motion::Curve(25);
         motion::PreparedComposition prepared(project);
         const auto lit = prepared.sample(0, 0.1);
-        const auto dark = prepared.sample(0, 0.5);
-        expectWithinAbsoluteError(lit.r, 0.8f, 0.00001f);
-        expectWithinAbsoluteError(lit.g, 0.2f, 0.00001f);
-        expectWithinAbsoluteError(lit.b, 0.4f, 0.00001f);
-        expectEquals(dark.r + dark.g + dark.b, 0.0f);
+        expectWithinAbsoluteError(lit.r, 0.2f, 0.00001f);
+        expectWithinAbsoluteError(lit.g, 0.05f, 0.00001f);
+        expectWithinAbsoluteError(lit.b, 0.1f, 0.00001f);
         int drawnSamples = 0;
         for (int i = 0; i < 1000; ++i) {
             const auto point = prepared.sample(0, i / 1000.0);
             drawnSamples += point.r > 0 ? 1 : 0;
         }
-        expectEquals(drawnSamples, 250);
+        expectEquals(drawnSamples, 1000);
 
         beginTest("Extreme transforms cannot send non-finite coordinates to the output");
         properties["scale.x"] = motion::Curve(std::numeric_limits<double>::max());
@@ -883,21 +881,21 @@ private:
         }
         expectEquals(prepared.sample(time, 0.2).x, original.x);
 
-        beginTest("Modulated drawing weight, colour and effect parameters remain bounded");
+        beginTest("Modulated opacity, colour and effect parameters remain bounded");
         auto bounded = project;
         auto& boundedClip = bounded.tracks.change(0).clips[0];
-        boundedClip.properties["weight"] = motion::Curve(0.5);
+        boundedClip.properties["opacity"] = motion::Curve(50);
         boundedClip.properties["red"] = motion::Curve(0.5);
-        for (const auto* property : {"weight", "red"}) {
+        for (const auto* property : {"opacity", "red"}) {
             motion::ModulationRoute value;
             value.id = routeId++; value.modulator = lfo.id; value.target = boundedClip.id; value.property = property; value.amount = 1000000;
             bounded.routes.push_back(value);
         }
         const motion::PreparedComposition boundedPrepared(bounded);
         // At 2.75 s the oscillator is at its trough, at 2.25 s its peak.
-        expectEquals(boundedPrepared.clips[0].weight(2.75), 0.0);
+        expect(!boundedPrepared.clips[0].visible(2.75));
         expectEquals(boundedPrepared.clips[0].sample(2.75, 0.2).r, 0.0f);
-        expect(boundedPrepared.clips[0].weight(time) <= 1000000);
+        expect(boundedPrepared.clips[0].visible(time));
         expectEquals(boundedPrepared.clips[0].sample(time, 0.2).r, 1.0f);
     }
 
@@ -916,14 +914,14 @@ private:
         outer.name = "Outer";
         outer.properties["scale.x"] = motion::Curve(2);
         outer.properties["red"] = motion::Curve(0.5);
-        outer.properties["weight"] = motion::Curve(0.5);
+        outer.properties["opacity"] = motion::Curve(50);
         motion::Group inner;
         inner.id = 701;
         inner.parent = outer.id;
         inner.properties["position.x"].setKey({ 0, 0, motion::Interpolation::linear });
         inner.properties["position.x"].setKey({ 10, 1 });
         inner.properties["red"] = motion::Curve(0.5);
-        inner.properties["weight"] = motion::Curve(0.5);
+        inner.properties["opacity"] = motion::Curve(50);
         auto innerEffect = motion::makeEffect(702, *motion::effectDefinition("translate"));
         innerEffect.properties["translateX"] = motion::Curve(0.1);
         inner.effects.push_back(innerEffect);
@@ -937,28 +935,22 @@ private:
         const auto raw = sourceProject.assets[0]->source->sample(clip.localTime(3, motion::Tempo(120)), 0.2);
         const auto world = nested.clips[0].sample(3, 0.2);
         expectWithinAbsoluteError(world.x, (raw.x + 0.2f + 0.3f + 0.1f) * 2, 0.00001f);
-        expectWithinAbsoluteError(world.r, 0.25f, 0.000001f);
-        expectEquals(nested.clips[0].weight(3), 0.25);
-        auto amplified = project;
-        amplified.tracks.change(0).clips[0].properties["weight"] = motion::Curve(1000000);
-        amplified.groups[1].properties["weight"] = motion::Curve(2);
-        amplified.groups[0].properties["weight"] = motion::Curve(0.5);
-        expectEquals(motion::PreparedComposition(amplified).clips[0].weight(3), 1000000.0);
-        amplified.tracks.change(0).clips[0].properties["weight"] = motion::Curve(1);
-        amplified.groups[1].properties["weight"] = motion::Curve(1000000);
-        amplified.groups[0].properties["weight"] = motion::Curve(1000000);
-        motion::Group attenuator;
-        attenuator.id = 706;
-        attenuator.properties["weight"] = motion::Curve(0.000001);
-        amplified.groups[0].parent = attenuator.id;
-        amplified.groups.push_back(attenuator);
-        expectWithinAbsoluteError(motion::PreparedComposition(amplified).clips[0].weight(3), 1000000.0, 0.000001);
+        // Each group's colour and opacity multiply in: (0.5 x 50%) twice.
+        expectWithinAbsoluteError(world.r, 0.0625f, 0.000001f);
+        expect(nested.clips[0].visible(3));
+        auto hidden = project;
+        motion::Group transparent;
+        transparent.id = 706;
+        transparent.properties["opacity"] = motion::Curve(0);
+        hidden.groups[0].parent = transparent.id;
+        hidden.groups.push_back(transparent);
+        expect(!motion::PreparedComposition(hidden).clips[0].visible(3), "a fully transparent ancestor hides what it holds");
 
         int lit = 0;
         for (int index = 0; index < 1000; ++index) {
             lit += nested.sample(3, index / 1000.0).r > 0 ? 1 : 0;
         }
-        expectEquals(lit, 250);
+        expectEquals(lit, 1000);
         const auto target = motion::findPropertyTarget(project, inner.id);
         expect(target.has_value() && target->isGroup && !target->isEffect && !target->camera);
         if (target.has_value()) {
@@ -1092,15 +1084,15 @@ private:
         expectEquals(static_cast<int>(multipleSolo.clips.size()), 1);
         expectEquals(multipleSolo.sample(1, 0.75).r, 1.0f);
 
-        beginTest("Lock leaves playback unchanged and excluded tracks consume no fade budget");
+        beginTest("Lock leaves playback unchanged and excluded tracks consume no beam time");
         project.tracks.change(0).locked = true;
-        project.tracks.change(0).clips[0].properties["weight"] = motion::Curve(0.25);
+        project.tracks.change(0).clips[0].properties["opacity"] = motion::Curve(25);
         const motion::PreparedComposition locked(project);
         int litSamples = 0;
         for (int index = 0; index < 1000; ++index) {
             litSamples += locked.sample(1, index / 1000.0).r > 0 ? 1 : 0;
         }
-        expectEquals(litSamples, 250);
+        expectEquals(litSamples, 1000);
         project.tracks.change(1).muted = false;
         const motion::PreparedComposition bothSolo(project);
         expectEquals(static_cast<int>(bothSolo.clips.size()), 2);
@@ -1385,7 +1377,7 @@ private:
         child.duration = 6;
         child.properties["position.x"].setKey({0, 0, motion::Interpolation::linear});
         child.properties["position.x"].setKey({10, 10, motion::Interpolation::linear});
-        child.properties["weight"] = motion::Curve(0.5);
+        child.properties["opacity"] = motion::Curve(50);
         motion::Track nestedTrack; nestedTrack.id = 61002; nestedTrack.clips = {child};
         auto translate = motion::makeEffect(61003, *motion::effectDefinition("translate"));
         translate.properties["translateX"] = motion::Curve(0.25);
@@ -1398,7 +1390,7 @@ private:
         placement.start = 4; placement.duration = 3; placement.offset = 2; placement.rate = 2;
         placement.properties["position.x"] = motion::Curve(1);
         placement.properties["scale.x"] = motion::Curve(3);
-        placement.properties["weight"] = motion::Curve(0.25);
+        placement.properties["opacity"] = motion::Curve(25);
         motion::Track mainTrack; mainTrack.id = 61007; mainTrack.clips = {placement}; visual.tracks = {mainTrack};
         const motion::PreparedComposition nestedVisual(visual);
         expect(nestedVisual.preparationError.isEmpty(), nestedVisual.preparationError);
@@ -1406,10 +1398,11 @@ private:
         if (!nestedVisual.clips.empty()) {
             const auto& leaf = nestedVisual.clips.front();
             expectWithinAbsoluteError(leaf.processPoint({0, 0, 0, 1, 1, 1}, 5).x, 22.0f, 0.0001f);
-            expectWithinAbsoluteError(leaf.weight(5), 0.125, 0.000001);
+            // Its red (0.2) dimmed by its own 50% and the placement's 25%.
+            expectWithinAbsoluteError(leaf.processPoint({0, 0, 0, 1, 1, 1}, 5).r, 0.025f, 0.000001f);
+            expect(leaf.visible(5));
             expect(!leaf.active(3.99) && leaf.active(4) && !leaf.active(6.5));
-            expect(nestedVisual.selectBeam(5, 0.2).clip == nullptr, "Outer fades retain unused dark allocation");
-            expect(nestedVisual.selectBeam(5, 0.1).clip != nullptr);
+            expect(nestedVisual.selectBeam(5, 0.2).clip != nullptr, "A faded nested object keeps the whole beam");
             motion::BeamRenderer beam;
             const auto first = beam.sample(nestedVisual, 5, 240000, 48000, true, 1);
             beam.sample(nestedVisual, 4.5, 216000, 48000, true, 1);
@@ -1427,10 +1420,10 @@ private:
         }
         beginTest("Repeated definitions stay visible across instance cuts");
         visual.tracks.change(0).clips[0].duration = 2;
-        visual.tracks.change(0).clips[0].properties["weight"] = motion::Curve(1);
+        visual.tracks.change(0).clips[0].properties["opacity"] = motion::Curve(100);
         visual.tracks.change(0).clips[1].start = 6;
-        visual.tracks.change(0).clips[1].properties["weight"] = motion::Curve(1);
-        motif->tracks.change(0).clips[0].properties["weight"] = motion::Curve(1);
+        visual.tracks.change(0).clips[1].properties["opacity"] = motion::Curve(100);
+        motif->tracks.change(0).clips[0].properties["opacity"] = motion::Curve(100);
         const motion::PreparedComposition cuts(visual);
         expect(cuts.preparationError.isEmpty(), cuts.preparationError);
         const auto after = std::find_if(cuts.clips.begin(), cuts.clips.end(), [](const auto& clip) { return clip.active(6.1); });

@@ -174,9 +174,9 @@ try:
     subprocess.run(["open", "-a", str(session.app_path), str(project)], check=True)
     step("size workspace", "resize-window", "--w", 1600, "--h", 1000)
     for at in (14,27):
-        select_clip("Relay packet.json",at);edit("weight",.045)
+        select_clip("Relay packet.json",at);edit("opacity",4)
     extend("Carrier.obj",1,185.6)
-    keys("weight",[(0,.3),(76.8,.3),(128,.3),(179.2,.3),(184,0)])
+    keys("opacity",[(0,30),(76.8,30),(128,30),(179.2,30),(184,0)])
     keys("position.x",[(51.2,.3),(57.6,.35),(64,.15),(70.4,.35),(76.8,.1),(89.6,-.25),(102.4,-.25),(115.2,-.15),(128,-.1),(153.6,.35),(166.4,.15),(179.2,.15)])
     keys("position.y",[(51.2,.15),(64,-.1),(76.8,0),(102.4,0),(128,0),(153.6,.12),(166.4,.08),(179.2,0)])
     keys("rotation.z",[(51.2,0),(57.6,25),(64,-30),(76.8,0),(102.4,0),(128,-25),(153.6,0),(179.2,0)])
@@ -184,28 +184,28 @@ try:
     repeat_selected(102.4,83.2)
     tab("Properties")
     keys("position.x",[(102.4,.65),(115.2,.45),(128,.4),(153.6,.35),(179.2,.15)])
-    keys("weight",[(102.4,.1),(115.2,.4),(153.6,.4),(179.2,.4),(184,0)])
+    keys("opacity",[(102.4,10),(115.2,40),(153.6,40),(179.2,40),(184,0)])
     extend("Relay corridor.obj",34,44.8)
-    keys("weight",[(32,.15),(44.8,.6),(57.6,.9),(70.4,1),(76.7,0)])
+    keys("opacity",[(32,15),(44.8,60),(57.6,90),(70.4,100),(76.7,0)])
     keys("rotation.y",[(51.2,20),(64,-15),(70.4,10),(76.7,80)])
     select_clip("Relay packet.json",27);tab("Properties");edit("Clip duration",51.2);tab("Properties")
     select_clip("Reply.lua",24);tab("Properties");edit("Clip duration",54.4);tab("Properties")
-    keys("weight",[(51.2,.65),(64,.25),(76.7,0)])
+    keys("opacity",[(51.2,65),(64,25),(76.7,0)])
     import_source("Interference.lua",51.2,25.6,{"red":1,"green":.2,"blue":.12,"scale.x":.7,"scale.y":.7,"scale.z":.7}, {
-        "weight":[(51.2,0),(57.6,.35),(64,.7),(73.6,1),(76.7,0)],
+        "opacity":[(51.2,0),(57.6,35),(64,70),(73.6,100),(76.7,0)],
         "rotation.z":[(51.2,0),(64,25),(70.4,-25),(76.7,75)]})
     import_source("Relay corridor.obj",57.6,19.2,{"red":.35,"green":.4,"blue":.45,"scale.x":.75,"scale.y":.75,"scale.z":.75,"rotation.z":90}, {
         "rotation.x":[(57.6,70),(64,35),(73.6,0),(76.7,80)],
-        "weight":[(57.6,0),(64,.3),(73.6,.7),(76.7,0)]})
+        "opacity":[(57.6,0),(64,30),(73.6,70),(76.7,0)]})
     import_source("Reply.lua",89.6,96,{"red":.25,"green":.8,"blue":1,"scale.x":.3,"scale.y":.3,"scale.z":.3,"position.y":-.1}, {
-        "weight":[(89.6,0),(96,.12),(102.4,.2),(115.2,.4),(128,.4),(179.2,.2),(184,0)],
+        "opacity":[(89.6,0),(96,12),(102.4,20),(115.2,40),(128,40),(179.2,20),(184,0)],
         "scale.x":[(89.6,.1),(102.4,.25),(128,.45),(153.6,.25),(179.2,.15)]})
     import_source("Relay corridor.obj",128,51.2,{"red":.3,"green":.6,"blue":.7,"scale.x":.7,"scale.y":.7,"scale.z":.7}, {
         "rotation.y":[(128,75),(140.8,45),(153.6,0),(166.4,0),(179.1,0)],
         "position.z":[(128,1.8),(140.8,1),(153.6,0),(179.1,1.8)],
-        "weight":[(128,0),(140.8,.5),(153.6,.6),(166.4,.35),(179.1,0)]})
-    import_source("Relay packet.json",128,38.4,{"red":.25,"green":.8,"blue":1,"scale.x":.5,"scale.y":.08,"scale.z":.08,"weight":.045})
-    import_source("Still here.txt",176,8,{"red":.7,"green":.8,"blue":.8,"position.y":-.5,"scale.x":.38,"scale.y":.38,"scale.z":.38}, {"weight":[(176,0),(177.6,.8),(182.4,.8),(184,0)]})
+        "opacity":[(128,0),(140.8,50),(153.6,60),(166.4,35),(179.1,0)]})
+    import_source("Relay packet.json",128,38.4,{"red":.25,"green":.8,"blue":1,"scale.x":.5,"scale.y":.08,"scale.z":.08,"opacity":4})
+    import_source("Still here.txt",176,8,{"red":.7,"green":.8,"blue":.8,"position.y":-.5,"scale.x":.38,"scale.y":.38,"scale.z":.38}, {"opacity":[(176,0),(177.6,80),(182.4,80),(184,0)]})
     tab("Timeline");step("fit story", "press", "F", "--class", "MotionTimelineView")
     for moment in (14.4,36.8,60.8,73.6,83.2,99.2,118.4,140.8,160,179.2,184.8):
         seek(moment);command("wait","--ms",900)

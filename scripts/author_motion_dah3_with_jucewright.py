@@ -286,10 +286,10 @@ def camera_look_at(names):
     raise RuntimeError("no look-at target among " + ", ".join(names))
 
 
-def fade(track, start, end, weight, length=None):
+def fade(track, start, end, opacity, length=None):
     """Draw a clip on over `length` and back off at its end."""
     length = length if length is not None else bar(1)
-    keys(track, "Drawing", [(start, {"weight": 0}), (start + length, {"weight": weight}), (end - length, {"weight": weight}), (end, {"weight": 0})])
+    keys(track, "Opacity", [(start, {"opacity": 0}), (start + length, {"opacity": opacity}), (end - length, {"opacity": opacity}), (end, {"opacity": 0})])
 
 
 # ---------------------------------------------------------------------------
@@ -326,14 +326,14 @@ def intro():
     # to sing, and a six-point star blooms out of it.
     import_source("Dot.svg", 0, duration=bar(2))
     set_properties({"scale.x": 0.025, "scale.y": 0.025, "scale.z": 0.025, "red": 0.5, "green": 1, "blue": 0.7})
-    modulate("Drawing weight", "Sine", 0.6, beats=1, mode="Multiply")
+    modulate("Opacity", "Sine", 0.6, beats=1, mode="Multiply")
     import_source("Trace.lua", bar(2), duration=bar(5), bake=12.8)
     set_properties({"red": 0.4, "green": 1, "blue": 0.55})
-    keys("Trace", "Drawing", [(bar(2), {"weight": 0}), (bar(2.5), {"weight": 1}), (bar(6.5), {"weight": 1}), (bar(7), {"weight": 0})])
+    keys("Trace", "Opacity", [(bar(2), {"opacity": 0}), (bar(2.5), {"opacity": 100}), (bar(6.5), {"opacity": 100}), (bar(7), {"opacity": 0})])
     import_source("Bloom.json", bar(4), duration=bar(4))
     rename_track("Bloom")
     set_properties({"scale.x": 0.7, "scale.y": 0.7, "scale.z": 0.7, "red": 0.85, "green": 0.9, "blue": 0.8})
-    fade("Bloom", bar(4), bar(8), 1.2)
+    fade("Bloom", bar(4), bar(8), 100)
     save()
 
 
@@ -346,16 +346,16 @@ def groove():
     set_properties({"position.z": 0.3, "scale.x": 1.2, "scale.y": 1.2, "scale.z": 1.2})
     keys("Harmonograph", "Slider A", [(bar(7), {"slider.a": 0}), (bar(18), {"slider.a": 0.6}), (bar(29), {"slider.a": 1})])
     keys("Harmonograph", "Slider B", [(bar(7), {"slider.b": 0.9}), (bar(14), {"slider.b": 0.2}), (bar(22), {"slider.b": 0.6}), (bar(29), {"slider.b": 0.1})])
-    keys("Harmonograph", "Drawing", [(bar(7), {"weight": 0}), (bar(7.5), {"weight": 2.2})])
+    keys("Harmonograph", "Opacity", [(bar(7), {"opacity": 0}), (bar(7.5), {"opacity": 100})])
     import_source("Fern.lsystem", bar(14), duration=bar(30) - bar(14), depth=4)
     rename_track("Fern left")
     set_properties({"position.x": -1.05, "position.y": -0.1, "scale.x": 0.5, "scale.y": 0.5, "scale.z": 0.5, "red": 0.35, "green": 1, "blue": 0.5})
-    fade("Fern left", bar(14), bar(30), 0.9, length=bar(4))
+    fade("Fern left", bar(14), bar(30), 90, length=bar(4))
     modulate("Rotation Z", "Sine", 4, beats=8)
     import_source("Fern.lsystem", bar(14), duration=bar(30) - bar(14), depth=4)
     rename_track("Fern right")
     set_properties({"position.x": 1.05, "position.y": -0.1, "scale.x": -0.5, "scale.y": 0.5, "scale.z": 0.5, "red": 0.35, "green": 1, "blue": 0.5})
-    fade("Fern right", bar(14), bar(30), 0.9, length=bar(4))
+    fade("Fern right", bar(14), bar(30), 90, length=bar(4))
     modulate("Rotation Z", "Sine", 4, beats=8)
     save()
 
@@ -363,21 +363,21 @@ def groove():
 def shape_hits():
     # Triangle on the downbeat, square on beat two, a spinning burst on beat four.
     hits("Triangle.svg", bar(10), bar(2), bar(30), BEAT,
-         {"position.x": -0.72, "position.y": 0.6, "scale.x": 0.13, "scale.y": 0.13, "scale.z": 0.13, "red": 0.35, "green": 1, "blue": 0.6, "weight": 1.4}, "Triangle")
+         {"position.x": -0.72, "position.y": 0.6, "scale.x": 0.13, "scale.y": 0.13, "scale.z": 0.13, "red": 0.35, "green": 1, "blue": 0.6, "opacity": 100}, "Triangle")
     duplicate_to(bar(80), duration=BEAT)
     moment = bar(84)
     while moment < bar(94):
         duplicate_to(moment)
         moment += bar(4)
     hits("Square.svg", bar(10) + BEAT, bar(2), bar(30), BEAT,
-         {"position.x": 0.72, "position.y": 0.6, "scale.x": 0.12, "scale.y": 0.12, "scale.z": 0.12, "red": 0.35, "green": 1, "blue": 0.6, "weight": 1.4}, "Square")
+         {"position.x": 0.72, "position.y": 0.6, "scale.x": 0.12, "scale.y": 0.12, "scale.z": 0.12, "red": 0.35, "green": 1, "blue": 0.6, "opacity": 100}, "Square")
     duplicate_to(bar(80) + BEAT, duration=BEAT)
     moment = bar(84) + BEAT
     while moment < bar(94):
         duplicate_to(moment)
         moment += bar(4)
     hits("Burst.svg", bar(10) + 3 * BEAT, bar(2), bar(30), 2 * BEAT,
-         {"position.y": -0.62, "scale.x": 0.2, "scale.y": 0.2, "scale.z": 0.2, "red": 1, "green": 0.62, "blue": 0.25, "weight": 1.6}, "Burst")
+         {"position.y": -0.62, "scale.x": 0.2, "scale.y": 0.2, "scale.z": 0.2, "red": 1, "green": 0.62, "blue": 0.25, "opacity": 100}, "Burst")
     modulate("Rotation Z", "Saw", 45, beats=2)
     # The drop lands on one huge burst.
     duplicate_to(bar(30), duration=bar(1))
@@ -394,17 +394,17 @@ def shape_hits():
 def ornaments():
     import_source("Lissajous.lua", bar(12), duration=bar(30) - bar(12), bake=6.4)
     rename_track("Figure left")
-    set_properties({"position.x": -0.8, "position.y": -0.55, "scale.x": 0.22, "scale.y": 0.22, "scale.z": 0.22, "weight": 0.8})
+    set_properties({"position.x": -0.8, "position.y": -0.55, "scale.x": 0.22, "scale.y": 0.22, "scale.z": 0.22, "opacity": 80})
     import_source("Lissajous.lua", bar(12), duration=bar(30) - bar(12), bake=6.4, offset=3.2)
     rename_track("Figure right")
-    set_properties({"position.x": 0.8, "position.y": -0.55, "scale.x": 0.22, "scale.y": 0.22, "scale.z": 0.22, "weight": 0.8})
+    set_properties({"position.x": 0.8, "position.y": -0.55, "scale.x": 0.22, "scale.y": 0.22, "scale.z": 0.22, "opacity": 80})
     import_source("Equaliser.gif", bar(16), duration=bar(22) - bar(16))
     rename_track("Meter")
-    set_properties({"position.y": 0.76, "scale.x": 0.2, "scale.y": 0.2, "scale.z": 0.2, "red": 0.35, "green": 1, "blue": 0.6, "weight": 0.7})
+    set_properties({"position.y": 0.76, "scale.x": 0.2, "scale.y": 0.2, "scale.z": 0.2, "red": 0.35, "green": 1, "blue": 0.6, "opacity": 70})
     duplicate_to(bar(80), duration=bar(88) - bar(80))
     import_source("Ripples.mp4", bar(22), duration=bar(30) - bar(22))
     rename_track("Ripples")
-    set_properties({"position.y": 0.72, "scale.x": 0.28, "scale.y": 0.28, "scale.z": 0.28, "red": 0.4, "green": 0.9, "blue": 1, "weight": 0.7})
+    set_properties({"position.y": 0.72, "scale.x": 0.28, "scale.y": 0.28, "scale.z": 0.28, "red": 0.4, "green": 0.9, "blue": 1, "opacity": 70})
     duplicate_to(bar(88), duration=bar(96) - bar(88))
     save()
 
@@ -416,7 +416,7 @@ def drop():
     # the track's loudness.
     import_source("Tunnel.obj", bar(30), duration=bar(48) - bar(30))
     rename_track("Tunnel")
-    set_properties({"scale.x": 7, "scale.y": 7, "scale.z": 7, "red": 0.3, "green": 0.9, "blue": 1, "weight": 0.8})
+    set_properties({"scale.x": 7, "scale.y": 7, "scale.z": 7, "red": 0.3, "green": 0.9, "blue": 1, "opacity": 80})
     modulate("Position Z", "Saw", 1, beats=8)
     modulate("Rotation Z", "Saw", 180, beats=16)
     add_effect("Vortex", {"strength": 0.35})
@@ -425,11 +425,11 @@ def drop():
     # over its 6.4 s bake, so the loop has no seam.
     import_source("Starfield.lua", bar(30), duration=bar(48) - bar(30), bake=6.4, samples=4096)
     rename_track("Stars")
-    set_properties({"weight": 2})
+    set_properties({"opacity": 100})
     duplicate_to(bar(88), duration=bar(112) - bar(88))
     import_source("Globe.obj", bar(34), duration=bar(48) - bar(34))
     rename_track("Globe")
-    set_properties({"position.z": -2.5, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "red": 1, "green": 0.8, "blue": 0.55, "weight": 1.4})
+    set_properties({"position.z": -2.5, "scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "red": 1, "green": 0.8, "blue": 0.55, "opacity": 100})
     for axis in ("X", "Y", "Z"):
         modulate("Scale " + axis, "Soundtrack loudness", 0.9, mode="Multiply")
     modulate("Rotation Y", "Saw", 180, beats=16)
@@ -446,12 +446,12 @@ def breakdown():
     set_properties({"scale.x": 0.55, "scale.y": 0.55, "scale.z": 0.55, "red": 0.75, "green": 0.45, "blue": 1})
     modulate("Rotation X", "Saw", 180, beats=48)
     modulate("Rotation Y", "Saw", 180, beats=32)
-    keys("Knot", "Drawing", [(bar(48), {"weight": 0}), (bar(50), {"weight": 1.2}), (bar(78), {"weight": 1.2}), (bar(80), {"weight": 0})])
+    keys("Knot", "Opacity", [(bar(48), {"opacity": 0}), (bar(50), {"opacity": 100}), (bar(78), {"opacity": 100}), (bar(80), {"opacity": 0})])
     add_effect("Ripple", {"rippleDepth": 0.12, "rippleAmount": 0.08})
     import_source("Spirograph.lua", bar(52), duration=bar(78) - bar(52), bake=12.8)
     rename_track("Spirograph")
-    set_properties({"position.z": -0.6, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1, "weight": 0.35})
-    keys("Spirograph", "Drawing", [(bar(52), {"weight": 0}), (bar(54), {"weight": 0.35})])
+    set_properties({"position.z": -0.6, "scale.x": 1.1, "scale.y": 1.1, "scale.z": 1.1, "opacity": 35})
+    keys("Spirograph", "Opacity", [(bar(52), {"opacity": 0}), (bar(54), {"opacity": 35})])
     import_source("Ring.svg", bar(56), duration=bar(72) - bar(56))
     rename_track("Halo")
     set_properties({"scale.x": 0.72, "scale.y": 0.72, "scale.z": 0.72, "red": 1, "green": 0.9, "blue": 0.75})
@@ -466,7 +466,7 @@ def rebuild():
     import_source("Island.lsystem", bar(80), duration=bar(96) - bar(80), depth=2)
     rename_track("Island")
     set_properties({"scale.x": 0.85, "scale.y": 0.85, "scale.z": 0.85, "red": 0.5, "green": 0.8, "blue": 1})
-    fade("Island", bar(80), bar(96), 0.8, length=bar(2))
+    fade("Island", bar(80), bar(96), 80, length=bar(2))
     modulate("Rotation Z", "Saw", 45, beats=32)
     save()
 
@@ -474,7 +474,7 @@ def rebuild():
 def endings():
     select_uses("Dot.svg")
     duplicate_to(bar(112), duration=185.45 - bar(112))
-    keys("Dot", "Drawing", [(bar(112), {"weight": 1}), (184.4, {"weight": 0})])
+    keys("Dot", "Opacity", [(bar(112), {"opacity": 100}), (184.4, {"opacity": 0})])
     select_uses("Bloom.json")
     duplicate_to(bar(112), duration=bar(4))
     set_properties({"scale.x": 0.45, "scale.y": 0.45, "scale.z": 0.45})

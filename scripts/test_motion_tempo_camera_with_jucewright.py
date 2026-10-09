@@ -46,7 +46,7 @@ clip = ET.SubElement(track, "clip", id="3", asset="1", name="On the beat", start
 for group, base in (("position", 0), ("rotation", 0), ("scale", 1)):
     for axis in "xyz":
         ET.SubElement(clip, "property", name=f"{group}.{axis}", base=str(base))
-for prop, base in (("red", 1), ("green", 1), ("blue", 1), ("weight", 1)):
+for prop, base in (("red", 1), ("green", 1), ("blue", 1), ("opacity", 100)):
     ET.SubElement(clip, "property", name=prop, base=str(base))
 ET.SubElement(composition, "camera", id="9", name="Front")
 ET.SubElement(composition, "camera", id="10", name="Side")

@@ -115,15 +115,15 @@ try:
     select_track(32, 60)
     for moment in (51.2,64,70.4,76.7):
         seek(moment); edit("rotation.z", 0)
-    for moment,value in [(51.2,0),(57.6,.55),(64,1.1),(73.6,1.6),(76.7,0)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(51.2,0),(57.6,55),(64,100),(73.6,100),(76.7,0)]:
+        seek(moment); edit("opacity",value)
     # Retain the architecture as context, rather than several competing cages.
     select_track(25, 60)
-    for moment,value in [(51.1,.6),(57.6,.35),(70.4,.2),(76.7,0)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(51.1,60),(57.6,35),(70.4,20),(76.7,0)]:
+        seek(moment); edit("opacity",value)
     select_track(35, 60)
-    for moment,value in [(57.6,0),(64,.12),(73.6,.18),(76.7,0)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(57.6,0),(64,12),(73.6,18),(76.7,0)]:
+        seek(moment); edit("opacity",value)
     step("save developing overload", "press", "command + s", "--class", "MotionEditor")
     for moment in (54.4,60.8,67.2,73.6,75.8,80):
         seek(moment); command("wait", "--ms", 1000)

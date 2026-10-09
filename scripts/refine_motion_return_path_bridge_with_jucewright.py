@@ -120,9 +120,9 @@ try:
     edit("position.x", .15); edit("position.y", -.27)
     for axis in ("x","y","z"):
         edit("scale."+axis, .28)
-    # Give the title enough trace allocation to retain its letter corners.
-    for moment,value in [(177.6,1.5),(182.4,1.5)]:
-        seek(moment); edit("weight",value)
+    # Keep the title fully lit here.
+    for moment,value in [(177.6,100),(182.4,100)]:
+        seek(moment); edit("opacity",value)
     for channel,value in [("red",.5),("green",.6),("blue",.6)]:
         edit(channel,value)
     tab("Camera")

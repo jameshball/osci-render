@@ -51,7 +51,7 @@ for track_id, clip_id, name in ((2, 3, "Leader"), (4, 5, "Follower")):
             if clip_id == 3 and group == "position" and axis == "x":
                 for t, v in ((0, -0.5), (4, 0.5)):
                     ET.SubElement(prop, "key", time=str(t), value=str(v), interpolation="1", **{"in": "0", "out": "0"})
-    for prop, base in (("red", 1), ("green", 1), ("blue", 1), ("weight", 1)):
+    for prop, base in (("red", 1), ("green", 1), ("blue", 1), ("opacity", 100)):
         ET.SubElement(clip, "property", name=prop, base=str(base))
 ET.SubElement(composition, "camera", id="9", name="Camera")
 xml = ET.tostring(root, encoding="utf-8")

@@ -34,7 +34,7 @@ public:
         asset->source = std::make_shared<motion::PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {std::make_shared<motion::PreparedDrawing>(std::move(lines))}, 30.0);
         return asset;
     }
-    struct Layer { std::shared_ptr<motion::Asset> asset; double x = 0, y = 0, weight = 1; };
+    struct Layer { std::shared_ptr<motion::Asset> asset; double x = 0, y = 0, opacity = 100; };
     static motion::Project project(const std::vector<Layer>& layers, double duration = 2) {
         motion::Project result;
         result.duration = duration;
@@ -47,7 +47,7 @@ public:
             clip.id = ++id; clip.asset = layer.asset->id; clip.duration = duration;
             clip.properties["position.x"] = motion::Curve(layer.x);
             clip.properties["position.y"] = motion::Curve(layer.y);
-            clip.properties["weight"] = motion::Curve(layer.weight);
+            clip.properties["opacity"] = motion::Curve(layer.opacity);
             motion::Track track;
             track.id = ++id;
             track.insert(clip, motion::Tempo(120));
@@ -131,7 +131,7 @@ public:
             expectEquals(static_cast<int>(darkAtOrigin), 0, "Idle and dwell samples hold on the path, never at the origin");
         }
 
-        beginTest("Budgets follow projected length so equal weights share brightness per unit length");
+        beginTest("Budgets follow projected length so layers share brightness per unit length");
         {
             const motion::PreparedComposition composition(project({{square(1, .2f), -.5}, {square(2, .1f), .5}}), 48000);
             motion::BeamRenderer beam;
@@ -158,15 +158,26 @@ public:
             }
         }
 
-        beginTest("A fading layer reserves its share: other layers keep their brightness");
+        beginTest("Opacity dims a layer through its colour; the beam time stays the same for every layer");
         {
             const auto shape = square(1, .15f);
             const motion::PreparedComposition full(project({{shape, -.5}, {shape, .5}}), 48000);
-            const motion::PreparedComposition faded(project({{shape, -.5}, {shape, .5, 0, .5}}), 48000);
+            const motion::PreparedComposition faded(project({{shape, -.5}, {shape, .5, 0, 50}}), 48000);
             motion::BeamRenderer a, b;
             const auto fullPoints = cycle(full, 48000, 7, a), fadedPoints = cycle(faded, 48000, 7, b);
-            expect(std::abs(litNear(fullPoints, -.5f, .3f) - litNear(fadedPoints, -.5f, .3f)) <= 2);
-            expectWithinAbsoluteError(static_cast<double>(litNear(fadedPoints, .5f, .3f)) / litNear(fullPoints, .5f, .3f), 0.5, 0.05);
+            expectEquals(litNear(fadedPoints, -.5f, .3f), litNear(fullPoints, -.5f, .3f), "the other layer is untouched");
+            expectEquals(litNear(fadedPoints, .5f, .3f), litNear(fullPoints, .5f, .3f), "the faded layer keeps its samples");
+            const auto brightness = [](const std::vector<osci::Point>& points) {
+                double total = 0;
+                for (const auto& point : points) { if (std::abs(point.x - .5f) < .3f) { total += point.r + point.g + point.b; } }
+                return total;
+            };
+            expectWithinAbsoluteError(brightness(fadedPoints) / brightness(fullPoints), 0.5, 0.01);
+            const motion::PreparedComposition hidden(project({{shape, -.5}, {shape, .5, 0, 0}}), 48000);
+            motion::BeamRenderer c;
+            const auto hiddenPoints = cycle(hidden, 48000, 7, c);
+            expectEquals(litNear(hiddenPoints, .5f, .3f), 0, "at 0% it is not drawn");
+            expect(litNear(hiddenPoints, -.5f, .3f) > litNear(fullPoints, -.5f, .3f), "and gives its beam time to the rest");
         }
 
         beginTest("Travel order visits nearby layers first");

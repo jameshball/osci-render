@@ -23,11 +23,6 @@ inline constexpr double unbounded = 1.0e6;
 // 2 atan(1/4): a 0.5-wide frame fills the view at the default distance of 4.
 inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 
-// Every effective weight (a clip's times its groups') saturates at the
-// property's own maximum, so products stay finite.
-inline constexpr double maximumWeight = unbounded;
-inline double clampWeight(double value) { return std::isfinite(value) ? std::clamp(value, 0.0, maximumWeight) : 0.0; }
-
 // Clips (visual) and groups. The anchor is the point (in the object's own
 // space) that rotation and scale turn about, and that lands on the position,
 // as After Effects' anchor point does.
@@ -44,12 +39,12 @@ inline constexpr std::array<PropertySpec, 16> objectPropertySpecs {{
     {"red", "Red", "Colour", "R", 0, 1, 1, .01, 2, ""},
     {"green", "Green", "Colour", "G", 0, 1, 1, .01, 2, ""},
     {"blue", "Blue", "Colour", "B", 0, 1, 1, .01, 2, ""},
-    {"weight", "Drawing weight", "Drawing", "", 0, unbounded, 1, .01, 2, ""},
+    {"opacity", "Opacity", "Opacity", "", 0, 100, 100, 1, 0, "%"},
     {"anchor.x", "Anchor X", "Anchor", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"anchor.y", "Anchor Y", "Anchor", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"anchor.z", "Anchor Z", "Anchor", "Z", -unbounded, unbounded, 0, .01, 3, ""},
 }};
-inline constexpr std::size_t anchorIndex = 13;
+inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13;
 
 // The same properties as Properties shows them: the anchor closes Transform.
 inline constexpr auto objectInspectorSpecs = [] {

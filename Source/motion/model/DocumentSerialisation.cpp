@@ -345,7 +345,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
             return properties;
         }
         if (!group.valid()) {
-            return juce::Result::fail("Invalid group transform, tint or drawing weight.");
+            return juce::Result::fail("Invalid group transform, colour or opacity.");
         }
         project.groups.push_back(std::move(group));
     }

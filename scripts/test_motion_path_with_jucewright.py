@@ -43,7 +43,7 @@ def create_fixture(destination):
         add_property(clip, name, 0.15)
     for name in ("red", "green", "blue"):
         add_property(clip, name, 1)
-    add_property(clip, "weight", 1)
+    add_property(clip, "opacity", 100)
     ET.SubElement(composition, "camera", id="4", name="Output camera")
     xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     destination.parent.mkdir(parents=True, exist_ok=True)

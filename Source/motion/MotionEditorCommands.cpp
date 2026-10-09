@@ -98,7 +98,7 @@ void MotionEditor::registerCommands() {
     menus.addMenuSeparator(2);
     const auto alt = juce::ModifierKeys::altModifier;
     for (const auto& [letter, group, name] : std::initializer_list<std::tuple<char, const char*, const char*>> {
-             {'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'c', "Colour", "Key colour"}, {'t', "Drawing", "Key drawing weight"}}) {
+             {'p', "Position", "Key position"}, {'r', "Rotation", "Key rotation"}, {'s', "Scale", "Key scale"}, {'c', "Colour", "Key colour"}, {'t', "Opacity", "Key opacity"}}) {
         const juce::String groupName(group);
         addCommand(2, name, juce::KeyPress(letter, alt | shift, 0), "Alt+Shift+" + juce::String::charToString(letter).toUpperCase(), [this, groupName] {
             if (!propertyInspector.toggleGroupKeys(groupName)) { statusBar.show("Select a clip or camera with " + groupName.toLowerCase() + " to key it."); }
@@ -197,7 +197,7 @@ void MotionEditor::stepFrames(int frames) {
 // keying the selection.
 void MotionEditor::showSceneMenu() {
     const std::array<std::pair<const char*, const char*>, 6> views {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"}, {"Bottom", "Ctrl+7"}}};
-    const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key drawing weight", "Alt+Shift+T"}}};
+    const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key opacity", "Alt+Shift+T"}}};
     juce::PopupMenu menu;
     menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
     menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
@@ -220,7 +220,7 @@ void MotionEditor::showSceneMenu() {
         if (result >= 1 && result <= 6) { composition.setViewPreset(presets[static_cast<std::size_t>(result - 1)]); }
         if (result == 7) { composition.frameSelection(); }
         if (result == 8) { composition.resetView(); }
-        const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Drawing"};
+        const std::array<const char*, 5> groups {"Position", "Rotation", "Scale", "Colour", "Opacity"};
         if (result >= 20 && result < 25 && !propertyInspector.toggleGroupKeys(groups[static_cast<std::size_t>(result - 20)])) {
             statusBar.show("The selection has no such property to key.");
         }

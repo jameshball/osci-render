@@ -213,7 +213,7 @@ private:
             auto& row = *rows[index];
             row.setVisible(shown(row));
             if (!row.isVisible()) { continue; }
-            // A caption opens each group with more than its own name ("Position", not "Drawing").
+            // A caption opens each group with more than its own name ("Position", not "Opacity").
             const auto& group = row.channel.group;
             const auto startsGroup = std::none_of(rows.begin(), rows.begin() + static_cast<std::ptrdiff_t>(index), [&](const auto& other) { return other->isVisible() && other->channel.group == group; });
             const auto grouped = group.isNotEmpty() && row.shortLabel != row.channel.label;

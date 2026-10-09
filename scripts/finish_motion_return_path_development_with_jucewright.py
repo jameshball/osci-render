@@ -118,8 +118,8 @@ try:
     for axis in ("x","y","z"):
         for moment,value in [(116.8,.065),(121.6,.09)]:
             seek(moment); edit("scale."+axis,value)
-    for moment,value in [(116.8,.12),(118.4,0)]:
-        seek(moment); edit("weight",value)
+    for moment,value in [(116.8,12),(118.4,0)]:
+        seek(moment); edit("opacity",value)
     step("save visual revision", "press", "command + s", "--class", "MotionEditor")
     for moment in (67.2,73.6,75.8,80,112,115.2,116.8):
         seek(moment); command("wait", "--ms", 1000)

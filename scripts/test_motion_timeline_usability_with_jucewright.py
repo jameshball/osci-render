@@ -54,7 +54,7 @@ def encoded(data):
     return str(len(data)) + "." + "".join(alphabet[(value >> bit) & 63] for bit in range(0, len(data) * 8, 6))
 
 
-# Three visual tracks: clips at 0-4, 6-10 and 2-8 s; the first clip's weight is keyed.
+# Three visual tracks: clips at 0-4, 6-10 and 2-8 s; the first clip's opacity is keyed.
 root = ET.Element("motion-project", schema="1")
 composition = ET.SubElement(root, "composition", name="Usability study", duration="20", bpm="120", fps="30")
 asset = ET.SubElement(composition, "asset", id="1", name="Square.obj", extension=".obj")
@@ -67,10 +67,10 @@ for track_id, clip_id, start, duration in ((10, 11, 0, 4), (20, 21, 6, 4), (30, 
             ET.SubElement(clip, "property", name=f"{group}.{axis}", base=str(base))
     for prop, base in (("red", 1), ("green", 1), ("blue", 1)):
         ET.SubElement(clip, "property", name=prop, base=str(base))
-    weight = ET.SubElement(clip, "property", name="weight", base="1")
+    opacity = ET.SubElement(clip, "property", name="opacity", base="100")
     if clip_id == 11:
-        ET.SubElement(weight, "key", time="0", value="0", interpolation="1")
-        ET.SubElement(weight, "key", time="2", value="1", interpolation="1")
+        ET.SubElement(opacity, "key", time="0", value="0", interpolation="1")
+        ET.SubElement(opacity, "key", time="2", value="100", interpolation="1")
 ET.SubElement(composition, "camera", id="9", name="Camera")
 xml = ET.tostring(root, encoding="utf-8")
 project = session.artifact_dir / "usability.osci-motion"
@@ -180,12 +180,12 @@ try:
     step("previous edit", "press", "Up", "--class", "MotionTimelineView")
     command("wait-for-value", "--component-name", "Timeline position", "--value", "2.000s", "--timeout-ms", 5000)
 
-    # The Graph's channel list: the first clip's weight is keyed; the filter
+    # The Graph's channel list: the first clip's opacity is keyed; the filter
     # hides the rest.
     seek(1)
     step("select first clip", "click", "--class", "MotionTimelineView", "--position", f"{220 + round(1 * pixels)},{track_row(10) + 16}")
     step("graph", "click", "--name", "Graph", "--class", "osci::TabBar::Tab", "--exact")
-    command("wait-for-locator", "--name", "Curve Drawing weight", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
+    command("wait-for-locator", "--name", "Curve Opacity", "--role", "listItem", "--selected", "--exact", "--timeout-ms", 5000)
     # Only animated channels are listed until the filter is switched off.
     hidden = find(lambda n: n.get("name") == "Curve Position X")
     assert hidden is None or not hidden.get("visible"), "unanimated channels are listed"
@@ -202,7 +202,7 @@ try:
 
     step("select all keys", "press", "command + a", "--class", "MotionCurveEditor")
     step("easy ease", "press", "F9", "--class", "MotionCurveEditor")
-    eased = keys("weight")
+    eased = keys("opacity")
     assert eased[0].get("interpolation") == "3" and float(eased[0].get("out", "0")) == 0 and float(eased[1].get("in", "0")) == 0, [k.attrib for k in eased]
     # Alt+Shift+P keys position at the playhead, as in After Effects.
     step("key position", "press", "alt + shift + p", "--class", "MotionCurveEditor")

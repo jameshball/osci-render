@@ -141,11 +141,11 @@ try:
     import_source("Relay packet.json",12.8,6.4,{"position.y":.05,"scale.x":.4,"scale.y":.08,"scale.z":.08,"red":1,"green":.55,"blue":.15})
     repeat_selected(25.6,25.6)
     import_source("Reply.lua",22.4,28.8,{"position.y":-.05,"scale.x":.5,"scale.y":.5,"scale.z":.5,"red":.25,"green":.8,"blue":1}, {
-        "weight":[(22.4,0),(24,.3),(25.6,.3),(38.4,.65),(51.1,.65)]})
+        "opacity":[(22.4,0),(24,30),(25.6,30),(38.4,65),(51.1,65)]})
     import_source("Relay corridor.obj",32,19.2,{"position.y":0,"scale.x":.6,"scale.y":.6,"scale.z":.6,"red":.35,"green":.4,"blue":.45}, {
         "rotation.y":[(32,65),(38.4,45),(51.1,20)],
         "position.z":[(32,1.8),(38.4,1.2),(51.1,.3)],
-        "weight":[(32,0),(35.2,.25),(44.8,.4),(51.1,.6)]})
+        "opacity":[(32,0),(35.2,25),(44.8,40),(51.1,60)]})
     import_source("Soundtrack.wav",0,185.6,{})
     tab("Timeline")
     step("fit project", "press", "F", "--class", "MotionTimelineView")

@@ -15,9 +15,9 @@ namespace motion {
 // random access, live playback and offline export produce identical samples.
 //
 // Within a cycle every visible layer is drawn once. Samples are apportioned by
-// weight times projected path length, so equally weighted layers keep equal
-// brightness per unit length. Faded layers reserve their full-weight share so a
-// fade never brightens the rest of the scene. Layers are ordered to minimise
+// projected path length, so every layer keeps the same brightness per unit
+// length; opacity dims a layer through its colour, without taking beam time
+// from the others. Layers are ordered to minimise
 // dark travel, and every jump dwells dark at both ends, then settles, so
 // reconstruction filters and slow scopes arrive before the next stroke lights;
 // the project's scope profile calibrates those times. When complete
@@ -129,7 +129,7 @@ private:
         const PreparedClip* clip;
         const PreparedSource* source;
         std::size_t frame;
-        double weight, length;
+        double length;
         osci::Point start, end;
         std::int64_t minimum;
     };
@@ -149,23 +149,20 @@ private:
         return composition.projectVisible(clip.processPoint(raw, planTime), planTime);
     }
 
-    // A clip drawn at `time`: its weight, source frame and the fewest samples
-    // that draw its strokes completely.
+    // A clip drawn at `time`: its source frame and the fewest samples that
+    // draw its strokes completely.
     struct Visible {
-        double weight;
         const PreparedSource* source;
         std::size_t frame;
         std::int64_t minimum;
     };
     static std::optional<Visible> visible(const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
-        if (!clip.active(time)) { return std::nullopt; }
-        const auto weight = clip.weight(time);
-        if (!(weight > 0)) { return std::nullopt; }
+        if (!clip.active(time) || !clip.visible(time)) { return std::nullopt; }
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
         const auto frame = source->frameIndex(clip.localTime(time));
         const auto* drawing = source->drawingAt(frame);
-        return Visible {weight, source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2)};
+        return Visible {source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2)};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -175,7 +172,7 @@ private:
             if (layerCount == maximumLayers) { break; }
             const auto shown = visible(clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            measure(composition, {&clip, shown->source, shown->frame, shown->weight, 0, {}, {}, shown->minimum});
+            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum});
         }
         finishPlan(composition, first, end, rate);
     }
@@ -246,11 +243,11 @@ private:
             return;
         }
         double reserved = 0;
-        for (std::size_t i = 0; i < layerCount; ++i) { reserved += std::max(1.0, items[i].weight) * items[i].length; }
+        for (std::size_t i = 0; i < layerCount; ++i) { reserved += items[i].length; }
         const auto density = static_cast<double>(budget) / reserved;
         std::int64_t used = 0;
         for (std::size_t i = 0; i < layerCount; ++i) {
-            const auto ideal = std::floor(items[i].weight * items[i].length * density);
+            const auto ideal = std::floor(items[i].length * density);
             const auto least = std::min(items[i].minimum, budget);
             counts[i] = std::max<std::int64_t>(least, std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : least);
             used += counts[i];

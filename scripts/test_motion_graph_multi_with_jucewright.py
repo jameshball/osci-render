@@ -70,7 +70,7 @@ for group, base in (("position", 0), ("rotation", 0), ("scale", 1)):
         prop = ET.SubElement(clip, "property", name=f"{group}.{axis}", base=str(base))
         for t, v in AUTHORED.get(f"{group}.{axis}", []):
             ET.SubElement(prop, "key", time=str(t), value=str(v), interpolation="1", **{"in": "0", "out": "0"})
-for name, base in (("red", 1), ("green", 1), ("blue", 1), ("weight", 1)):
+for name, base in (("red", 1), ("green", 1), ("blue", 1), ("opacity", 100)):
     ET.SubElement(clip, "property", name=name, base=str(base))
 ET.SubElement(composition, "camera", id="9", name="Camera")
 xml = ET.tostring(root, encoding="utf-8")
