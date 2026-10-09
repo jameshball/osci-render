@@ -10,6 +10,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -238,7 +239,9 @@ class BrowserSession:
         """Opens a project in the running app: as Finder does on macOS, by dropping
         the file on the editor elsewhere (the editor opens dropped projects)."""
         if is_macos():
-            subprocess.run(["open", "-a", str(self.app_path), str(path)], check=True)
+            # -g hands over the file without bringing the app to the front.
+            background = ["-g"] if os.environ.get("OSCI_AUTOMATION_FOREGROUND") != "1" else []
+            subprocess.run(["open", *background, "-a", str(self.app_path), str(path)], check=True)
         else:
             subprocess.run(self.cli("drop-files", "--file", str(path), "--class", editor_class, "--exact"), check=True)
 
@@ -604,6 +607,10 @@ end clickDenyButton
             "--timeout-ms",
             self.session_timeout_seconds * 1000,
         )
+        # The app opens behind whatever the user is working in (automation
+        # treats it as frontmost); OSCI_AUTOMATION_FOREGROUND=1 brings it forward.
+        if sys.platform == "darwin" and os.environ.get("OSCI_AUTOMATION_FOREGROUND") != "1":
+            command.append("--background")
 
         prompt_watcher = self.start_audio_permission_prompt_watcher()
         try:
