@@ -61,6 +61,9 @@ public:
     std::function<void(std::optional<RouteRequest>)> onRoutePreview;
     // The Anchor row's centre button.
     std::function<void(motion::Id)> onCentreAnchor;
+    // The share of the beam's time an object gets at the playhead, beside
+    // its Beam; none when it isn't drawn there.
+    std::function<std::optional<double>(motion::Id)> beamShare;
     void setModulatorDrag(bool active);
     bool isInterestedInDragSource(const SourceDetails& details) override { return details.description.toString().startsWith("motion-modulator:"); }
     void itemDragMove(const SourceDetails& details) override;
@@ -96,6 +99,7 @@ private:
         // Position: one spatial path; Rotation: quaternion orientation.
         std::unique_ptr<motion::ui::Chip> mode;
         bool misaligned = false; // mode on, but axes no longer share key times
+        juce::String note; // beside a single value: what it amounts to (Beam's share)
         // A single value sits on one line: its name, then the value in the
         // grid's last column, beside its keys.
         bool compact() const { return fields.size() == 1 && mode == nullptr && swatch == nullptr; }

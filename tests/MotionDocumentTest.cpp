@@ -945,6 +945,13 @@ private:
         hidden.groups[0].parent = transparent.id;
         hidden.groups.push_back(transparent);
         expect(!motion::PreparedComposition(hidden).clips[0].visible(3), "a fully transparent ancestor hides what it holds");
+        auto shared = project;
+        shared.groups[0].properties["beam"] = motion::Curve(2);
+        shared.groups[1].properties["beam"] = motion::Curve(1.5);
+        shared.tracks.change(0).clips[0].properties["beam"] = motion::Curve(.5);
+        expectWithinAbsoluteError(motion::PreparedComposition(shared).clips[0].beam(3), 1.5, 1.0e-9, "groups scale the beam of what they hold");
+        shared.groups[0].properties["beam"] = motion::Curve(0);
+        expect(!motion::PreparedComposition(shared).clips[0].visible(3), "a group with no beam leaves out what it holds");
 
         int lit = 0;
         for (int index = 0; index < 1000; ++index) {

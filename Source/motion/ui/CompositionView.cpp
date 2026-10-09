@@ -181,6 +181,7 @@ void MotionCompositionView::preview(const motion::Project& project) {
     ++preparedSerial;
     prunePicked();
     repaint();
+    if (onPrepared) { onPrepared(); }
 }
 
 void MotionCompositionView::paint(juce::Graphics& g) {

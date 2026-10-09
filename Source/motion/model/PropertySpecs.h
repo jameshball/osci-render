@@ -21,12 +21,16 @@ struct PropertySpec {
 
 inline constexpr double unbounded = 1.0e6;
 // 2 atan(1/4): a 0.5-wide frame fills the view at the default distance of 4.
+// The most one object's beam time can be scaled by.
+inline constexpr double maximumBeam = 16;
 inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 
 // Clips (visual) and groups. The anchor is the point (in the object's own
 // space) that rotation and scale turn about, and that lands on the position,
-// as After Effects' anchor point does.
-inline constexpr std::array<PropertySpec, 16> objectPropertySpecs {{
+// as After Effects' anchor point does. Beam scales the object's share of the
+// beam's time: 2x draws it twice as slowly (brighter on a scope) and takes the
+// time from the others; 0 leaves it out.
+inline constexpr std::array<PropertySpec, 17> objectPropertySpecs {{
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 0, .01, 3, ""},
@@ -43,13 +47,14 @@ inline constexpr std::array<PropertySpec, 16> objectPropertySpecs {{
     {"anchor.x", "Anchor X", "Anchor", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"anchor.y", "Anchor Y", "Anchor", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"anchor.z", "Anchor Z", "Anchor", "Z", -unbounded, unbounded, 0, .01, 3, ""},
+    {"beam", "Beam", "Beam", "", 0, maximumBeam, 1, .01, 2, "×"},
 }};
-inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13;
+inline constexpr std::size_t opacityIndex = 12, anchorIndex = 13, beamIndex = 16;
 
 // The same properties as Properties shows them: the anchor closes Transform.
 inline constexpr auto objectInspectorSpecs = [] {
-    constexpr std::array<std::size_t, 16> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12};
-    std::array<PropertySpec, 16> result {};
+    constexpr std::array<std::size_t, 17> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12, 16};
+    std::array<PropertySpec, 17> result {};
     for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
     return result;
 }();

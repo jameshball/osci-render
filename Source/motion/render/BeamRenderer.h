@@ -16,8 +16,9 @@ namespace motion {
 //
 // Within a cycle every visible layer is drawn once. Samples are apportioned by
 // projected path length, so every layer keeps the same brightness per unit
-// length; opacity dims a layer through its colour, without taking beam time
-// from the others. Layers are ordered to minimise
+// length, then scaled by each layer's Beam: a layer at 2x takes twice its even
+// share from the others, with no floor. Opacity dims a layer through its
+// colour, without taking beam time from the others. Layers are ordered to minimise
 // dark travel, and every jump dwells dark at both ends, then settles, so
 // reconstruction filters and slow scopes arrive before the next stroke lights;
 // the project's scope profile calibrates those times. When complete
@@ -105,6 +106,15 @@ public:
         return evaluate(composition, index);
     }
 
+    // Plans one cycle at `time` without sampling, so the editor can show how
+    // the beam is shared; read it with plannedSegments().
+    void planCycle(const PreparedComposition& composition, double time, double rate, const LiveSourceFrames* liveFrames = nullptr) {
+        if (!std::isfinite(rate) || rate <= 0 || !std::isfinite(time)) { segmentCount = 0; layerCount = 0; return; }
+        const auto span = spanFor(composition, time, rate, cycleStart(1, rate, composition.beamRate), liveFrames);
+        plan(composition, time, 0, cycleStart(span, rate, composition.beamRate), rate, liveFrames);
+        planned = false;
+    }
+
     // Diagnostic view of the current plan, for tests and the editor meter.
     std::span<const Segment> plannedSegments() const { return {segments->data(), segmentCount}; }
     std::size_t plannedLayers() const { return layerCount; }
@@ -132,6 +142,7 @@ private:
         double length;
         osci::Point start, end;
         std::int64_t minimum;
+        double share = 1;
     };
 
     // The beam's travel between two points; a non-finite one counts as far.
@@ -155,14 +166,17 @@ private:
         const PreparedSource* source;
         std::size_t frame;
         std::int64_t minimum;
+        double share;
     };
     static std::optional<Visible> visible(const PreparedClip& clip, double time, const LiveSourceFrames* liveFrames) {
         if (!clip.active(time) || !clip.visible(time)) { return std::nullopt; }
+        const auto share = clip.beam(time);
+        if (!(share > 0)) { return std::nullopt; }
         const auto* source = clip.resolveSource(liveFrames);
         if (source == nullptr || source->frameCount() == 0) { return std::nullopt; }
         const auto frame = source->frameIndex(clip.localTime(time));
         const auto* drawing = source->drawingAt(frame);
-        return Visible {source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2)};
+        return Visible {source, frame, std::max<std::int64_t>(2, drawing != nullptr ? drawing->minimumTraversalSamples() : 2), share};
     }
 
     void plan(const PreparedComposition& composition, double time, std::int64_t first, std::int64_t end, double rate, const LiveSourceFrames* liveFrames) {
@@ -172,7 +186,7 @@ private:
             if (layerCount == maximumLayers) { break; }
             const auto shown = visible(clip, time, liveFrames);
             if (!shown.has_value()) { continue; }
-            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum});
+            measure(composition, {&clip, shown->source, shown->frame, 0, {}, {}, shown->minimum, shown->share});
         }
         finishPlan(composition, first, end, rate);
     }
@@ -263,6 +277,24 @@ private:
             if (largest == layerCount) { break; }
             const auto cut = std::min(surplus, used - budget);
             counts[largest] -= cut; used -= cut;
+        }
+        // Beam scales each layer's even share with no floor: what one layer
+        // gives up goes to the others, and their total stays the same. Below
+        // its complete-stroke budget a layer is traced by phase instead.
+        double scaled = 0;
+        bool even = true;
+        for (std::size_t i = 0; i < layerCount; ++i) {
+            scaled += static_cast<double>(counts[i]) * items[i].share;
+            even = even && items[i].share == 1;
+        }
+        if (!even && scaled > 0) {
+            const auto shared = static_cast<double>(used);
+            used = 0;
+            for (std::size_t i = 0; i < layerCount; ++i) {
+                const auto ideal = std::floor(static_cast<double>(counts[i]) * items[i].share * shared / scaled);
+                counts[i] = std::max<std::int64_t>(2, std::isfinite(ideal) ? static_cast<std::int64_t>(ideal) : 2);
+                used += counts[i];
+            }
         }
         while (used > budget) {
             std::size_t largest = 0;

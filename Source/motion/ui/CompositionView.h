@@ -100,7 +100,11 @@ public:
     void setViewPreset(ViewPreset preset);
 
     std::function<void(motion::Id)> onSelection;
-    void refresh() { pathDirty = true; prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); ++preparedSerial; prunePicked(); repaint(); }
+    void refresh() { pathDirty = true; prepared = std::make_unique<motion::PreparedComposition>(processor.document.project(), 48000, nullptr, motion::CompositionPurpose::editorGeometry); ++preparedSerial; prunePicked(); repaint(); if (onPrepared) { onPrepared(); } }
+    // What the Scene shows, prepared; others read it (the beam's shares) and
+    // hear when it changes.
+    const motion::PreparedComposition* preparedComposition() const { return prepared.get(); }
+    std::function<void()> onPrepared;
     void preview(const motion::Project& project);
 
     void paint(juce::Graphics& g) override;

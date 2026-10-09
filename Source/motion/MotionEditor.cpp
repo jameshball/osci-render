@@ -261,6 +261,28 @@ void MotionEditor::setUpScene() {
         resized();
     };
     composition.onContextMenu = [this] { showSceneMenu(); };
+    composition.onPrepared = [this] { timeline.beamChanged(); propertyInspector.refreshValues(); };
+    propertyInspector.beamShare = [this](motion::Id id) -> std::optional<double> {
+        const auto* prepared = composition.preparedComposition();
+        if (prepared == nullptr) { return std::nullopt; }
+        const auto& project = processor.document.project();
+        const auto time = processor.position.load();
+        const auto live = processor.liveSourcePreview();
+        const auto& shares = beamShares.at(*prepared, time, live.get());
+        // A group's share is everything it holds.
+        if (motion::findGroup(project, id) != nullptr) {
+            double total = 0;
+            for (const auto& share : shares) {
+                const auto* track = motion::findClipTrack(project, share.clip);
+                if (track != nullptr && motion::groupHolds(project, id, track->group)) { total += share.fraction; }
+            }
+            return total;
+        }
+        const auto* clip = motion::findClip(project, id);
+        if (clip == nullptr || !clip->contains(time, project.tempo())) { return std::nullopt; }
+        return MotionBeamShares::of(shares, id);
+    };
+    timeline.beamComposition = [this] { return composition.preparedComposition(); };
     composition.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
     composition.onEffectMovePreview = [this](motion::Id effect, std::optional<motion::Id> owner) {
         auto project = processor.document.project();

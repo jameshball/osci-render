@@ -3,6 +3,7 @@
 #include "../CommonPluginEditor.h"
 #include "MotionProcessor.h"
 #include "ui/TimelineView.h"
+#include "ui/BeamShares.h"
 #include "ui/CompositionView.h"
 #include "ui/AssetLibrary.h"
 #include "ui/ScopeSettings.h"
@@ -214,6 +215,8 @@ private:
     motion::LuaSliderBakes sliderBakes { processor.document };
     MotionTimelineView timeline;
     MotionCompositionView composition;
+    // The beam's shares at the playhead, for Properties.
+    MotionBeamShares beamShares;
     MotionAssetLibrary assetLibrary;
     MotionCurveEditor curveEditor;
     MotionCameraRig cameraRig;

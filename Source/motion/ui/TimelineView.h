@@ -10,6 +10,7 @@
 #include "../model/CompositionGraph.h"
 #include "../model/PropertySchema.h"
 #include "../model/KeyEasing.h"
+#include "BeamShares.h"
 #include "MotionIcons.h"
 #include "DocumentMenu.h"
 
@@ -97,6 +98,11 @@ public:
     void itemDropped(const SourceDetails& details) override;
 
     void insertAsset(motion::Id assetId, int x, int y);
+
+    // The beam's time: every visual clip shows the share it gets as a fill
+    // rising from its foot, and dragging that edge sets its Beam.
+    std::function<const motion::PreparedComposition*()> beamComposition;
+    void beamChanged() { beamCache.reset(); repaint(); }
 
     void paint(juce::Graphics& g) override;
 
@@ -222,6 +228,35 @@ private:
     // Project times of every key on a clip, restricted to its visible interval.
     std::vector<double> clipKeyTimes(const motion::Clip& clip, const std::string& property = {}) const;
     void paintClip(juce::Graphics& g, const motion::Clip& clip, const motion::Track& track, int index, float opacity) const;
+    // The beam's shares across the visible time, one value per column.
+    static constexpr int beamStep = 4;
+    // A share between two sampled columns.
+    static float interpolatedShare(const std::vector<float>& values, float offset);
+    struct BeamCache { double start = 0, pixels = 0; int left = 0, width = 0; std::map<motion::Id, std::vector<float>> shares; };
+    mutable std::optional<BeamCache> beamCache;
+    mutable MotionBeamShares beamShares;
+    const BeamCache* ensureBeamShares() const;
+    std::optional<float> beamShareAt(motion::Id id, float x) const;
+    // Where a share is drawn: inside a clip's body, or along a group's row.
+    juce::Rectangle<float> beamArea(const motion::Clip& clip, int row) const;
+    std::optional<juce::Rectangle<float>> groupBeamArea(motion::Id group) const;
+    // Shares rise on a square-root scale, so one of many still shows and can
+    // be grabbed: a quarter of the beam fills half the height.
+    static float beamY(juce::Rectangle<float> area, float share) { return area.getBottom() - std::sqrt(std::clamp(share, 0.0f, 1.0f)) * area.getHeight(); }
+    static double beamShareOfY(juce::Rectangle<float> area, float y) { const auto level = std::clamp(static_cast<double>(area.getBottom() - y) / std::max(1.0f, area.getHeight()), 0.0, 1.0); return level * level; }
+    void paintBeamShare(juce::Graphics& g, motion::Id id, juce::Rectangle<float> area, juce::Rectangle<float> body, float opacity) const;
+    void paintBeamLabel(juce::Graphics& g) const;
+    // The clip or group whose share edge is under the point, if any.
+    struct BeamTarget { motion::Id id; juce::Rectangle<float> area; };
+    std::optional<BeamTarget> beamEdgeAt(juce::Point<int> point) const;
+    struct BeamDrag { motion::Id id; juce::Rectangle<float> area; double time, fraction, beam; motion::Project before; std::uint64_t revision; bool changed, keyed; int downY; };
+    std::optional<BeamDrag> beamDrag;
+    // The hovered or dragged share's readout, drawn over every row.
+    mutable std::optional<std::pair<juce::Rectangle<float>, juce::String>> beamLabel;
+    bool beamDown(const juce::MouseEvent& event);
+    void beamDragged(const juce::MouseEvent& event);
+    motion::Id beamHover = 0;
+    int beamPointer = 0;
     void paintLane(juce::Graphics& g, const Row& row, int y, int height) const;
     static bool sameTime(double a, double b) { return std::abs(a - b) < 1.0e-6; }
     bool isKeySelected(motion::Id clip, const std::string& property, double time) const {

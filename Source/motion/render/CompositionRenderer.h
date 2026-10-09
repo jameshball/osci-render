@@ -83,6 +83,10 @@ struct TransformPose {
         const auto value = curves[opacityIndex].evaluate(time) / 100;
         return std::isfinite(value) ? std::clamp(value, 0.0, 1.0) : 0.0;
     }
+    static double beamAt(const std::array<Curve, objectPropertySpecs.size()>& curves, double time) {
+        const auto value = curves[beamIndex].evaluate(time);
+        return std::isfinite(value) ? std::clamp(value, 0.0, maximumBeam) : 0.0;
+    }
 
     // The source's colour (white when it has none) times the colour gains.
     osci::Point colourOf(osci::Point point) const {
@@ -143,7 +147,8 @@ struct PreparedGroup {
         }
         spatial = prepareSpatial(group.spatialPath, group.quaternionRotation, curves);
     }
-    bool visible(double time) const { return TransformPose::opacityAt(curves, time) > 0; }
+    bool visible(double time) const { return TransformPose::opacityAt(curves, time) > 0 && TransformPose::beamAt(curves, time) > 0; }
+    double beam(double time) const { return TransformPose::beamAt(curves, time); }
     const TransformPose& pose(double time) const {
         return poses.at(time, [&] { return TransformPose::at(curves, time, spatial.get()); });
     }
@@ -172,10 +177,16 @@ struct PreparedClipStage {
     // The nearest time inside the clip's own interval.
     double clampToContent(double time) const { return std::clamp(time, start, std::nextafter(end, start)); }
     double localTime(double time) const { return clock.localTime(time); }
-    // Shown unless it or a group holding it is fully transparent.
+    // Shown unless it or a group holding it is fully transparent or has no beam.
     bool stageVisible(double time) const {
-        if (!(TransformPose::opacityAt(curves, localTime(time)) > 0)) { return false; }
+        const auto local = localTime(time);
+        if (!(TransformPose::opacityAt(curves, local) > 0) || !(TransformPose::beamAt(curves, local) > 0)) { return false; }
         return std::all_of(groups.begin(), groups.end(), [&](const auto& group) { return group.visible(scopeTime(time)); });
+    }
+    double stageBeam(double time) const {
+        auto value = TransformPose::beamAt(curves, localTime(time));
+        for (const auto& group : groups) { value *= group.beam(scopeTime(time)); }
+        return value;
     }
     osci::Point processStage(osci::Point point, double time) const {
         const auto local = localTime(time);
@@ -201,6 +212,13 @@ struct PreparedClip : PreparedClipStage {
     // colour, and only a fully transparent one gives up its beam time.
     bool visible(double time) const {
         return stageVisible(time) && std::all_of(ancestors.begin(), ancestors.end(), [&](const auto& ancestor) { return ancestor.stageVisible(time); });
+    }
+    // The scale on its share of the beam's time: its own Beam times its
+    // groups' and its nested placements'.
+    double beam(double time) const {
+        auto value = stageBeam(time);
+        for (const auto& ancestor : ancestors) { value *= ancestor.stageBeam(time); }
+        return std::isfinite(value) ? value : 0.0;
     }
     const PreparedSource* resolveSource(const LiveSourceFrames* liveFrames = nullptr) const noexcept {
         if (liveIdentity != nullptr) { return liveFrames != nullptr ? liveFrames->resolve(liveIdentity.get()) : nullptr; }
@@ -499,14 +517,15 @@ struct PreparedComposition {
     BeamSelection selectBeam(double time, double phase) const {
         double allocation = 0.0;
         for (const auto& clip : clips) {
-            if (clip.active(time) && clip.visible(time)) { allocation += 1; }
+            if (clip.active(time) && clip.visible(time)) { allocation += clip.beam(time); }
         }
-        if (allocation <= 0.0) { return {}; }
+        if (!(allocation > 0.0)) { return {}; }
         auto cursor = phase * allocation;
         for (const auto& clip : clips) {
             if (!clip.active(time) || !clip.visible(time)) { continue; }
-            if (cursor < 1) { return {&clip, cursor, allocation}; }
-            cursor -= 1;
+            const auto share = clip.beam(time);
+            if (cursor < share) { return {&clip, cursor / share, allocation / share}; }
+            cursor -= share;
         }
         return {};
     }

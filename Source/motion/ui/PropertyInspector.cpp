@@ -143,7 +143,8 @@ void MotionPropertyInspector::refreshValues() {
             modulated = modulated || driven;
             // A driven value says so down its left edge, in the Graph's lilac.
             field->editor.setAccent(driven ? std::optional<juce::Colour>(motion::style::result()) : std::nullopt);
-            if (curve == nullptr) { continue; }
+            // A property the project never stored shows its default.
+            if (curve == nullptr) { field->editor.setValue(field->spec.defaultValue); continue; }
             field->editor.setValue(curve->evaluateBase(time));
             anyAnimated = anyAnimated || curve->animated();
             allKeyed = allKeyed && curve->hasKeyAt(time);
@@ -164,6 +165,12 @@ void MotionPropertyInspector::refreshValues() {
         row->previous.setEnabled(earlier);
         row->next.setEnabled(later);
         row->modulate.setToggleState(modulated, juce::dontSendNotification);
+        if (row->group == "Beam") {
+            const auto share = beamShare ? beamShare(target) : std::nullopt;
+            const auto note = !share.has_value() ? juce::String() : *share > .999 ? juce::String("all of the beam")
+                : *share <= 0 ? juce::String("not drawn here") : juce::String(std::max(1, juce::roundToInt(*share * 100))) + "% of the beam";
+            if (note != row->note) { row->note = note; row->repaint(); }
+        }
         if (row->swatch != nullptr) {
             const auto rgb = colourOf(*row);
             row->swatch->setColour(juce::Colour::fromFloatRGBA(static_cast<float>(rgb[0]), static_cast<float>(rgb[1]), static_cast<float>(rgb[2]), 1.0f));
@@ -286,6 +293,10 @@ void MotionPropertyInspector::Row::paint(juce::Graphics& g) {
     g.setColour(osci::Colours::textMuted());
     const motion::style::PropertyGrid grid(getWidth());
     g.drawText(group, compact() ? getLocalBounds().withRight(grid.value - motion::style::gap) : getLocalBounds().removeFromTop(16), juce::Justification::centredLeft);
+    if (compact() && note.isNotEmpty()) {
+        g.setColour(osci::Colours::textMuted().withMultipliedAlpha(.8f));
+        g.drawText(note, getLocalBounds().withRight(grid.value - motion::style::gap), juce::Justification::centredRight);
+    }
 }
 
 void MotionPropertyInspector::Row::resized() {
@@ -328,7 +339,7 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
 
 juce::String MotionPropertyInspector::sectionOf(const juce::String& group) {
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
-    if (group == "Colour" || group == "Opacity") { return "Appearance"; }
+    if (group == "Colour" || group == "Opacity" || group == "Beam") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
     if (group.startsWith("Slider")) { return "Script sliders"; }
@@ -426,6 +437,9 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
         editor.setTitle(juce::String(spec.label.data(), spec.label.size()));
         editor.setComponentID("motion." + juce::String(spec.id.data(), spec.id.size()));
         editor.setTooltip(juce::String(spec.label.data(), spec.label.size()) + ": drag to scrub (Shift fine, Cmd coarse), double-click to type.");
+        if (spec.id == "beam") {
+            editor.setTooltip("Beam: this object's share of the beam's time, as a multiple of its even share. More draws it slower and brighter on a scope, taking the time from the others; 0 leaves it out. Its level in the timeline can be dragged too.");
+        }
         if (spec.axis.size() == 1) {
             editor.setPrefix(juce::String(spec.axis.data(), spec.axis.size()));
             editor.setAxisColour(motion::style::axisColour(spec.axis, motion::style::axisZ()));

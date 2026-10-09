@@ -34,7 +34,7 @@ public:
         asset->source = std::make_shared<motion::PreparedSource>(std::vector<std::shared_ptr<const motion::PreparedDrawing>> {std::make_shared<motion::PreparedDrawing>(std::move(lines))}, 30.0);
         return asset;
     }
-    struct Layer { std::shared_ptr<motion::Asset> asset; double x = 0, y = 0, opacity = 100; };
+    struct Layer { std::shared_ptr<motion::Asset> asset; double x = 0, y = 0, opacity = 100, beam = 1; };
     static motion::Project project(const std::vector<Layer>& layers, double duration = 2) {
         motion::Project result;
         result.duration = duration;
@@ -48,6 +48,7 @@ public:
             clip.properties["position.x"] = motion::Curve(layer.x);
             clip.properties["position.y"] = motion::Curve(layer.y);
             clip.properties["opacity"] = motion::Curve(layer.opacity);
+            clip.properties["beam"] = motion::Curve(layer.beam);
             motion::Track track;
             track.id = ++id;
             track.insert(clip, motion::Tempo(120));
@@ -178,6 +179,49 @@ public:
             const auto hiddenPoints = cycle(hidden, 48000, 7, c);
             expectEquals(litNear(hiddenPoints, .5f, .3f), 0, "at 0% it is not drawn");
             expect(litNear(hiddenPoints, -.5f, .3f) > litNear(fullPoints, -.5f, .3f), "and gives its beam time to the rest");
+        }
+
+        beginTest("Beam scales a layer's share of the cycle and takes the time from the others");
+        {
+            const auto shape = square(1, .15f);
+            const motion::PreparedComposition even(project({{shape, -.5}, {shape, .5}}), 48000);
+            const motion::PreparedComposition doubled(project({{shape, -.5}, {shape, .5, 0, 100, 2}}), 48000);
+            motion::BeamRenderer a, b;
+            const auto evenPoints = cycle(even, 48000, 7, a), doubledPoints = cycle(doubled, 48000, 7, b);
+            const auto left = litNear(doubledPoints, -.5f, .3f), right = litNear(doubledPoints, .5f, .3f);
+            expectWithinAbsoluteError(static_cast<double>(right) / left, 2.0, 0.05);
+            expect(std::abs(left + right - litNear(evenPoints, -.5f, .3f) - litNear(evenPoints, .5f, .3f)) <= 4, "the cycle's drawing time stays the same");
+        }
+
+        beginTest("Beam has no floor: a layer can give up time below its complete-stroke budget");
+        {
+            const auto dense = strokes(1, 60);
+            const motion::PreparedComposition starved(project({{dense, 0, .5, 100, .05}, {square(2, .5f), 0, -.2}}), 192000);
+            motion::BeamRenderer beam;
+            cycle(starved, 192000, 3, beam);
+            std::int64_t denseCount = -1, minimum = dense->source->drawingAt(0)->minimumTraversalSamples();
+            for (const auto& segment : beam.plannedSegments()) {
+                if (segment.kind == motion::BeamRenderer::Kind::draw && segment.source == dense->source.get()) { denseCount = segment.count; }
+            }
+            expect(denseCount > 0 && denseCount < minimum, "drawn with " + juce::String(denseCount) + " of its " + juce::String(minimum) + " samples");
+            const motion::PreparedComposition off(project({{dense, 0, .5, 100, 0}, {square(2, .5f), 0, -.2}}), 192000);
+            motion::BeamRenderer offBeam;
+            cycle(off, 192000, 3, offBeam);
+            expectEquals(static_cast<int>(offBeam.plannedLayers()), 1, "at 0 it is left out");
+        }
+
+        beginTest("The editor can plan a cycle without sampling");
+        {
+            const auto shape = square(1, .15f);
+            const motion::PreparedComposition composition(project({{shape, -.5}, {shape, .5, 0, 100, 3}}), 48000);
+            motion::BeamRenderer beam;
+            beam.planCycle(composition, 1, 48000);
+            std::vector<std::int64_t> counts;
+            for (const auto& segment : beam.plannedSegments()) {
+                if (segment.kind == motion::BeamRenderer::Kind::draw) { counts.push_back(segment.count); }
+            }
+            expectEquals(static_cast<int>(counts.size()), 2);
+            if (counts.size() == 2) { expectWithinAbsoluteError(static_cast<double>(std::max(counts[0], counts[1])) / std::min(counts[0], counts[1]), 3.0, 0.05); }
         }
 
         beginTest("Travel order visits nearby layers first");
