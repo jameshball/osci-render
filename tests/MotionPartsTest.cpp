@@ -156,7 +156,7 @@ private:
         const auto split = motion::parts::split(*drawing, {0, 1, 2});
         auto part = prepared(split->extension, split->part), rest = prepared(split->extension, split->rest);
         std::vector<motion::Id> made;
-        expect(document.extractParts({{20, part, rest}}, made).wasOk());
+        expect(document.extractParts({{20, part, rest, "Hello part"}}, made).wasOk());
         const auto created = made.empty() ? motion::Id(0) : made.front();
         const auto& after = document.project();
         expectEquals(static_cast<int>(after.tracks.size()), 3);
@@ -169,7 +169,8 @@ private:
         expect(after.tracks[1].solo && after.tracks[1].effects.size() == 1 && after.tracks[1].effects.front().id != 40, "the part's track keeps the track's solo and effects");
         expect(motion::findAsset(after.assets, 1) == nullptr, "the unused original leaves the library");
         expectEquals(part->name, juce::String("Hello part.svg"));
-        expectEquals(rest->name, juce::String("Hello rest.svg"));
+        expectEquals(rest->name, juce::String("Hello.svg"), "the rest keeps its source's name");
+        expectEquals(juce::String(kept.name), juce::String("Hello.txt"), "the clip keeps its own name");
         expect(undo.undo());
         expectEquals(static_cast<int>(document.project().tracks.size()), 2);
         expect(motion::findAsset(document.project().assets, 1) != nullptr && document.project().tracks[1].clips.front().asset == 1, "undo restores the original");
@@ -179,7 +180,7 @@ private:
         locked.tracks.change(1).locked = true;
         document.reset(locked);
         auto again = prepared(split->extension, split->part), remaining = prepared(split->extension, split->rest);
-        expect(document.extractParts({{20, again, remaining}}, made).failed());
+        expect(document.extractParts({{20, again, remaining, "Hello part"}}, made).failed());
     }
 };
 

@@ -51,7 +51,6 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     // Tools live inside the Scene, Blender style; the header keeps its title
     // and the view presets.
     addAndMakeVisible(sceneTools);
-    addAndMakeVisible(sceneView);
     addChildComponent(exportBar);
     addAndMakeVisible(libraryTabs);
     addChildComponent(graphSideViewport);
@@ -181,10 +180,17 @@ void MotionEditor::setUpScene() {
     sceneTools.move.onClick = [this] { composition.setTool(MotionTransformTool::move); };
     sceneTools.rotate.onClick = [this] { composition.setTool(MotionTransformTool::rotate); };
     sceneTools.scale.onClick = [this] { composition.setTool(MotionTransformTool::scale); };
+    sceneTools.anchor.onClick = [this] { composition.setTool(MotionTransformTool::anchor); };
+    const auto centreAnchor = [this](motion::Id id) {
+        const auto problem = composition.centreAnchor(id);
+        if (problem.isNotEmpty()) { statusBar.show(problem); }
+    };
+    propertyInspector.onCentreAnchor = centreAnchor;
     composition.onToolChanged = [this](MotionTransformTool tool) {
         sceneTools.move.setToggleState(tool == MotionTransformTool::move, juce::dontSendNotification);
         sceneTools.rotate.setToggleState(tool == MotionTransformTool::rotate, juce::dontSendNotification);
         sceneTools.scale.setToggleState(tool == MotionTransformTool::scale, juce::dontSendNotification);
+        sceneTools.anchor.setToggleState(tool == MotionTransformTool::anchor, juce::dontSendNotification);
     };
     sceneTools.parts.onClick = [this] { composition.setPartMode(true); };
     addChildComponent(partPickTools);
@@ -197,9 +203,22 @@ void MotionEditor::setUpScene() {
         sceneTools.move.setToggleState(!active && tool == MotionTransformTool::move, juce::dontSendNotification);
         sceneTools.rotate.setToggleState(!active && tool == MotionTransformTool::rotate, juce::dontSendNotification);
         sceneTools.scale.setToggleState(!active && tool == MotionTransformTool::scale, juce::dontSendNotification);
+        sceneTools.anchor.setToggleState(!active && tool == MotionTransformTool::anchor, juce::dontSendNotification);
         resized();
     };
-    composition.onExtractParts = [this](const std::map<motion::Id, MotionCompositionView::Picked>& picks) { extractParts(picks); };
+    // Extract asks for the part's name first, beside the bar it came from.
+    composition.onExtractParts = [this](const std::map<motion::Id, MotionCompositionView::Picked>& picks) {
+        const auto* clip = picks.empty() ? nullptr : motion::findClip(processor.document.project(), picks.begin()->first);
+        const auto asset = clip != nullptr ? motion::findAsset(processor.document.project().assets, clip->asset) : nullptr;
+        const auto stem = asset == nullptr ? juce::String("Part") : asset->name.containsChar('.') ? asset->name.upToLastOccurrenceOf(".", false, false) : asset->name;
+        auto panel = std::make_unique<MotionExtractPanel>(stem + " part");
+        auto* shown = panel.get();
+        panel->onApply = [this, picks, shown](juce::String name) {
+            dismissPopover(shown);
+            extractParts(picks, name);
+        };
+        showPopover(std::move(panel), getLocalArea(&composition, composition.extractAnchor()));
+    };
     composition.onStatus = [this](const juce::String& message) { if (message.isNotEmpty()) { statusBar.show(message); } };
     composition.onSelectClips = [this](const std::vector<motion::Id>& ids, MotionCompositionView::SelectionChange change) {
         using Change = MotionCompositionView::SelectionChange;
@@ -241,10 +260,7 @@ void MotionEditor::setUpScene() {
         refreshCameraTools();
         resized();
     };
-    sceneView.setName("Scene view");
-    sceneView.setTooltip("Look along an axis (numpad 1, 3, 7), frame the selection (F) or reset the view (0)");
-    sceneView.onClick = [this] { showSceneViewMenu(false); };
-    composition.onContextMenu = [this] { showSceneViewMenu(true); };
+    composition.onContextMenu = [this] { showSceneMenu(); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
     composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
     composition.onOpenSource = [this](motion::Id id) {
@@ -489,6 +505,16 @@ void MotionEditor::setUpProperties() {
         if (result.failed()) { statusBar.show(result.getErrorMessage()); return; }
         modulatorLibrary.refresh();
         if (!properties.empty()) { selectCurveTarget(target, properties.front(), selectionIsCamera(), true); }
+    };
+    propertyInspector.onRoutePreview = [this](std::optional<MotionPropertyInspector::RouteRequest> request) {
+        const auto preview = request.has_value() ? processor.document.previewRoute(request->modulator, request->target, request->properties) : std::nullopt;
+        if (preview.has_value()) {
+            processor.prepareComposition(*preview);
+            composition.preview(*preview);
+        } else {
+            processor.prepareComposition(processor.document.project());
+            composition.refresh();
+        }
     };
     effectStack.onHeightChanged = [this] { propertyInspector.relayout(); };
     effectStack.onReveal = [this](juce::Component& card) { propertyInspector.reveal(card); };
@@ -871,7 +897,6 @@ void MotionEditor::resized() {
     viewportHeader.setBounds(editing.removeFromTop(30));
     auto viewControls = viewportHeader.getBounds().reduced(8, 3);
     compositionTitle.setVisible(viewControls.getWidth() >= 160);
-    sceneView.setBounds(viewControls.removeFromRight(std::min(64, viewControls.getWidth())));
     if (compositionTitle.isVisible()) { compositionTitle.setBounds(viewControls.removeFromLeft(100)); }
     // The tool strip floats at the Scene's top left.
     const auto room = editing.getHeight() - 20;
@@ -887,7 +912,7 @@ void MotionEditor::resized() {
     // A drawing or text being edited takes over the Scene.
     if (sceneEditor != nullptr) {
         sceneEditor->setBounds(viewportBounds);
-        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &partPickTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
+        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &partPickTools, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
     }
     // Full screen, the Scope covers everything; its strip stays at the top
     // right, with the recording stopwatch beside it.
@@ -1155,8 +1180,18 @@ void MotionEditor::changeListenerCallback(juce::ChangeBroadcaster* source) {
 void MotionEditor::refreshFromDocument() {
     // A drawing belongs to the project it was started in.
     if (sceneEditor != nullptr && processor.document.generation() != sceneEditorGeneration) { closeSceneEditor(); }
-    // An undo or a delete can remove what was selected.
-    if (selection != 0 && !selectionExists()) { select(0); }
+    // An undo or a delete can remove what was selected. Undoing an extraction
+    // removes the parts it made and selects the clips they came from again.
+    if (selection != 0 && !selectionExists()) {
+        const auto& project = processor.document.project();
+        const auto restorable = !selectionBeforeExtract.empty() && std::all_of(selectionBeforeExtract.begin(), selectionBeforeExtract.end(), [&project](motion::Id id) { return motion::findClip(project, id) != nullptr; });
+        if (restorable) {
+            timeline.selectClips(selectionBeforeExtract);
+        } else {
+            select(0);
+        }
+        selectionBeforeExtract.clear();
+    }
     sliderBakes.requestUpdate();
     refreshOutputChoices();
     if (curveList.isVisible()) { refreshCurveList(); }

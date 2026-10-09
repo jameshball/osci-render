@@ -134,7 +134,7 @@ try:
     if saved().find("beam/booleans/parameter[@id='upsamplingEnabled']").get("value") != "1":
         step("enable upsampling", "click", "--name", "Upsample Audio", "--exact")
     step("set beam intensity", "set-value", intensity()["ref"], "6")
-    session.wait_for_undo("Change property")
+    session.wait_for_undo("Change Intensity")
     step("open scope presets", "click", "--name", "Scope presets", "--exact")
     step("choose laser timing", "click", "--name", "Laser (slow galvo)", "--role", "menuItem", "--exact")
     command("wait-for-locator", "--name", "Undo Apply Laser (slow galvo) scope timing", "--role", "label", "--exact")
@@ -151,7 +151,7 @@ try:
     session.wait_for_undo("Set keyframe")
     seek(10)
     step("intensity later", "set-value", intensity()["ref"], "2")
-    session.wait_for_undo("Change property")
+    session.wait_for_undo("Change Intensity")
     save("save animated intensity")
     assert saved_intensity()[1] == [(0.0, 6.0), (10.0, 2.0)], saved_intensity()
     step("undo the later key", "click", "--name", "Undo", "--exact")

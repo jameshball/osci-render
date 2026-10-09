@@ -28,8 +28,10 @@ inline constexpr double defaultCameraFieldOfView = 28.072486935852954;
 inline constexpr double maximumWeight = unbounded;
 inline double clampWeight(double value) { return std::isfinite(value) ? std::clamp(value, 0.0, maximumWeight) : 0.0; }
 
-// Clips (visual) and groups.
-inline constexpr std::array<PropertySpec, 13> objectPropertySpecs {{
+// Clips (visual) and groups. The anchor is the point (in the object's own
+// space) that rotation and scale turn about, and that lands on the position,
+// as After Effects' anchor point does.
+inline constexpr std::array<PropertySpec, 16> objectPropertySpecs {{
     {"position.x", "Position X", "Position", "X", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.y", "Position Y", "Position", "Y", -unbounded, unbounded, 0, .01, 3, ""},
     {"position.z", "Position Z", "Position", "Z", -unbounded, unbounded, 0, .01, 3, ""},
@@ -43,7 +45,19 @@ inline constexpr std::array<PropertySpec, 13> objectPropertySpecs {{
     {"green", "Green", "Colour", "G", 0, 1, 1, .01, 2, ""},
     {"blue", "Blue", "Colour", "B", 0, 1, 1, .01, 2, ""},
     {"weight", "Drawing weight", "Drawing", "", 0, unbounded, 1, .01, 2, ""},
+    {"anchor.x", "Anchor X", "Anchor", "X", -unbounded, unbounded, 0, .01, 3, ""},
+    {"anchor.y", "Anchor Y", "Anchor", "Y", -unbounded, unbounded, 0, .01, 3, ""},
+    {"anchor.z", "Anchor Z", "Anchor", "Z", -unbounded, unbounded, 0, .01, 3, ""},
 }};
+inline constexpr std::size_t anchorIndex = 13;
+
+// The same properties as Properties shows them: the anchor closes Transform.
+inline constexpr auto objectInspectorSpecs = [] {
+    constexpr std::array<std::size_t, 16> order {0, 1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 9, 10, 11, 12};
+    std::array<PropertySpec, 16> result {};
+    for (std::size_t index = 0; index < order.size(); ++index) { result[index] = objectPropertySpecs[order[index]]; }
+    return result;
+}();
 
 inline constexpr std::array<PropertySpec, 2> audioPropertySpecs {{
     {"gain", "Gain", "Gain", "", 0, 4, 1, .01, 2, ""},

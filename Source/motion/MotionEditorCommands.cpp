@@ -50,6 +50,10 @@ void MotionEditor::registerCommands() {
     addCommand(1, "Copy", juce::KeyPress('c', command, 0), "Cmd+C", [this] { copySelection(false); });
     addCommand(1, "Paste", juce::KeyPress('v', command, 0), "Cmd+V", [this] { pasteClipboard(); });
     addCommand(1, "Delete", juce::KeyPress(), "Delete", [this] { timeline.deleteSelection(); });
+    // Cut, Copy and Delete act on selected keys or clips; Paste needs a copy.
+    const auto anySelection = [this] { return timeline.hasSelectedKeys() || timeline.hasSelectedClips(); };
+    for (const auto* name : {"Cut", "Copy", "Delete"}) { menus.setMenuItemEnabled(1, name, anySelection); }
+    menus.setMenuItemEnabled(1, "Paste", [this] { return !std::holds_alternative<std::monostate>(clipboard); });
     menus.addMenuSeparator(1);
     addCommand(1, "Select all", juce::KeyPress('a', command, 0), "Cmd+A", [this] {
         if (timelineTabs.getCurrentTabIndex() == 1) { curveEditor.selectAllKeys(); } else { timeline.selectAll(); }
@@ -188,36 +192,27 @@ void MotionEditor::stepFrames(int frames) {
     seekAndReveal(next);
 }
 
-// The Views button's menu; right-clicking the Scene adds keying for the
-// selection.
-void MotionEditor::showSceneViewMenu(bool atMouse) {
+// Right-clicking the Scene: framing, views along an axis, picking parts and
+// keying the selection.
+void MotionEditor::showSceneMenu() {
     const std::array<std::pair<const char*, const char*>, 6> views {{{"Front", "1"}, {"Right", "3"}, {"Top", "7"}, {"Back", "Ctrl+1"}, {"Left", "Ctrl+3"}, {"Bottom", "Ctrl+7"}}};
-    const auto addViews = [&views](juce::PopupMenu& target) {
-        for (std::size_t index = 0; index < views.size(); ++index) { target.addItem(motion::style::menuItem(views[index].first, static_cast<int>(index) + 1, views[index].second)); }
-    };
-    const auto addFraming = [](juce::PopupMenu& target) {
-        target.addItem(motion::style::menuItem("Frame selection", 7, "F"));
-        target.addItem(motion::style::menuItem("Reset view", 8, "0"));
-    };
     const std::array<std::pair<const char*, const char*>, 5> keys {{{"Key position", "Alt+Shift+P"}, {"Key rotation", "Alt+Shift+R"}, {"Key scale", "Alt+Shift+S"}, {"Key colour", "Alt+Shift+C"}, {"Key drawing weight", "Alt+Shift+T"}}};
     juce::PopupMenu menu;
-    if (atMouse) {
-        addFraming(menu);
-        juce::PopupMenu from;
-        addViews(from);
-        menu.addSubMenu("View from", from);
-        if (selection != 0) {
-            menu.addSeparator();
-            for (std::size_t index = 0; index < keys.size(); ++index) { menu.addItem(motion::style::menuItem(keys[index].first, 20 + static_cast<int>(index), keys[index].second)); }
-            menu.addSeparator();
-            menu.addItem(motion::style::menuItem("Show in timeline", 30, {}));
-        }
-    } else {
-        addViews(menu);
+    menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
+    menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
+    juce::PopupMenu from;
+    for (std::size_t index = 0; index < views.size(); ++index) { from.addItem(motion::style::menuItem(views[index].first, static_cast<int>(index) + 1, views[index].second)); }
+    menu.addSubMenu("View from", from);
+    menu.addSeparator();
+    menu.addItem(motion::style::menuItem("Pick parts", 40, "Tab"));
+    if (selection != 0) {
         menu.addSeparator();
-        addFraming(menu);
+        for (std::size_t index = 0; index < keys.size(); ++index) { menu.addItem(motion::style::menuItem(keys[index].first, 20 + static_cast<int>(index), keys[index].second)); }
+        menu.addSeparator();
+        menu.addItem(motion::style::menuItem("Centre anchor", 41, {}));
+        menu.addItem(motion::style::menuItem("Show in timeline", 30, {}));
     }
-    const auto options = atMouse ? juce::PopupMenu::Options().withTargetComponent(composition).withMousePosition() : juce::PopupMenu::Options().withTargetComponent(sceneView);
+    const auto options = juce::PopupMenu::Options().withTargetComponent(composition).withMousePosition();
     motion::ui::showDocumentMenu(menu, *this, processor.document, options, [this](int result) {
         using Preset = MotionCompositionView::ViewPreset;
         const std::array<Preset, 6> presets {Preset::front, Preset::right, Preset::top, Preset::back, Preset::left, Preset::bottom};
@@ -229,6 +224,11 @@ void MotionEditor::showSceneViewMenu(bool atMouse) {
             statusBar.show("The selection has no such property to key.");
         }
         if (result == 30) { timelineTabs.setSelectedIndex(0); timeline.revealSelection(); }
+        if (result == 40) { composition.setPartMode(true); }
+        if (result == 41) {
+            const auto problem = composition.centreAnchor(selection);
+            if (problem.isNotEmpty()) { statusBar.show(problem); }
+        }
     });
 }
 

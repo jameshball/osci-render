@@ -1,6 +1,7 @@
 #include "CompositionView.h"
 #include "../model/KeyEdit.h"
 #include "../model/SourceParts.h"
+#include "../model/AnchorEdit.h"
 
 MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : processor(processor) {
     setName("Composition preview");
@@ -185,12 +186,16 @@ void MotionCompositionView::preview(const motion::Project& project) {
 void MotionCompositionView::paint(juce::Graphics& g) {
     const auto liveFrames = processor.liveSourcePreview();
     g.fillAll(osci::Colours::veryDark());
-    // The ground grid; its two axes take X's and Y's colours.
+    // The ground grid; its two axes take X's and Y's colours. Seen edge-on
+    // its lines would pile into one bright line, so they fade as the view
+    // turns along the grid; the axes stay.
+    const auto gridFade = static_cast<float>(std::clamp(std::abs(camera.forward().z) / .25, 0.0, 1.0));
     for (int line = -5; line <= 5; ++line) {
         const auto value = static_cast<double>(line);
-        g.setColour(line == 0 ? motion::style::axisY().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f));
+        if (line != 0 && gridFade <= 0) { continue; }
+        g.setColour(line == 0 ? motion::style::axisY().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f * gridFade));
         drawWorldLine(g, {value, -5, 0}, {value, 5, 0});
-        g.setColour(line == 0 ? motion::style::axisX().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f));
+        g.setColour(line == 0 ? motion::style::axisX().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f * gridFade));
         drawWorldLine(g, {-5, value, 0}, {5, value, 0});
     }
     if (prepared == nullptr || prepared->clips.empty()) {
@@ -205,18 +210,25 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     const auto time = editingTime();
     // With an object selected, the others step back so the selection reads
     // whatever their colour.
-    const auto anySelected = !partMode && selected != 0;
+    const auto anySelected = !partMode && (marquee.has_value() ? !marqueeClips.empty() || (marqueeAdds && selected != 0) : selected != 0);
     const motion::PreparedClip* clip = nullptr;
     bool highlighted = false, pickable = false;
     auto chosen = picked.end();
+    auto boxed = marqueeParts.end();
     for (const auto& piece : screenPieces()) {
         if (piece.clip != clip) {
             clip = piece.clip;
             const auto id = clip->editorId();
-            highlighted = !partMode && (id == selected || (isSelected && isSelected(id)) || (dropHover.has_value() && *dropHover != 0 && id == *dropHover));
+            // While a box is dragged, what it would select lights up; with
+            // Shift the selection it adds to stays lit too.
+            const auto current = id == selected || (isSelected && isSelected(id));
+            const auto boxing = marquee.has_value() && !partMode;
+            const auto inBox = std::find(marqueeClips.begin(), marqueeClips.end(), id) != marqueeClips.end();
+            highlighted = !partMode && ((boxing ? inBox || (marqueeAdds && current) : current) || (dropHover.has_value() && *dropHover != 0 && id == *dropHover));
             // Picking parts, objects that can only be picked whole step back.
             pickable = partMode && partDrawing(*clip) != nullptr;
-            chosen = pickable ? picked.find(id) : picked.end();
+            chosen = pickable && (!marquee.has_value() || marqueeAdds) ? picked.find(id) : picked.end();
+            boxed = pickable && marquee.has_value() ? marqueeParts.find(id) : marqueeParts.end();
         }
         // Long, fast jumps in a traced beam fade so the shape reads over them.
         auto alpha = piece.shape < 0 ? std::min(1.0f, 12.0f / std::max(1.0f, piece.line.getLength())) * .8f : .85f;
@@ -225,7 +237,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
         // Lines beyond the orbit pivot fade with depth, so 3D reads at a glance.
         alpha *= depthFade(piece.depth);
         const auto shape = static_cast<std::size_t>(std::max(0, piece.shape));
-        const auto isChosen = chosen != picked.end() && piece.shape >= 0 && chosen->second.shapes.contains(shape);
+        const auto isChosen = piece.shape >= 0 && ((chosen != picked.end() && chosen->second.shapes.contains(shape)) || (boxed != marqueeParts.end() && boxed->second.shapes.contains(shape)));
         const auto hovered = pickable && piece.shape >= 0 && hoverPart.has_value() && hoverPart->clip == clip->editorId() && hoverShapes.contains(shape);
         if (highlighted || isChosen) {
             highlightedLines.add(piece.line, motion::style::selection().withAlpha(alpha));
@@ -243,13 +255,7 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     paintMotionPath(g);
     if (!partMode) { currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle); }
     if (marquee.has_value()) {
-        juce::Path region;
-        if (partMode && partPick == PartPick::lasso) {
-            region = lasso;
-            region.closeSubPath();
-        } else {
-            region.addRectangle(*marquee);
-        }
+        const auto region = marqueeRegion();
         g.setColour(osci::Colours::accentColor().withAlpha(.08f));
         g.fillPath(region);
         g.setColour(osci::Colours::accentColor().withAlpha(.7f));
@@ -394,7 +400,11 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
         const auto depth = (motion::Vec3 {} - position).dot(forward);
         if (depth <= .5) { continue; }
         const auto shot = rectangle(depth);
-        g.setColour(colour.withAlpha(isSelected ? .5f : .22f));
+        // The frame faces the camera; seen edge-on it fades rather than
+        // drawing as stray lines across the view.
+        const auto facing = static_cast<float>(std::clamp(std::abs(this->camera.forward().dot(forward)) / .3, 0.0, 1.0));
+        if (facing <= 0) { continue; }
+        g.setColour(colour.withAlpha((isSelected ? .5f : .22f) * facing));
         for (std::size_t index = 0; index < shot.size(); ++index) {
             const auto line = screenLine(view, shot[index], shot[(index + 1) % shot.size()]);
             if (!line.has_value()) { continue; }
@@ -564,7 +574,7 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
         dragAnchor = gizmoFrame->parent.worldOrigin;
         if (beginGesture(editingTime())) {
             dragAxis = handle;
-            gesture = tool == MotionTransformTool::move ? (handle == 3 ? Gesture::plane : Gesture::moveAxis)
+            gesture = tool == MotionTransformTool::move || tool == MotionTransformTool::anchor ? (handle == 3 ? Gesture::plane : Gesture::moveAxis)
                 : tool == MotionTransformTool::rotate ? Gesture::rotateAxis
                 : handle == 3 ? Gesture::uniformScale : Gesture::scaleAxis;
             if (handle < 3) {
@@ -592,7 +602,8 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     if (onSelection) {
         onSelection(hit);
     }
-    if (hit != 0 && tool == MotionTransformTool::move) {
+    // Move and anchor drag from anywhere on the object, as in After Effects.
+    if (hit != 0 && (tool == MotionTransformTool::move || tool == MotionTransformTool::anchor)) {
         gesture = Gesture::plane;
         dragAxis = 3;
         beginGesture(time);
@@ -620,6 +631,12 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
                 lasso.lineTo(event.position);
                 marquee = lasso.getBounds();
             }
+            // What the drag would pick lights up as it goes.
+            if (partMode) {
+                marqueeParts = partsIn(marqueeRegion(), partPick == PartPick::pieces);
+            } else {
+                marqueeClips = clipsIn(*marquee);
+            }
             repaint();
         }
         return;
@@ -627,9 +644,8 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
     if (!validGesture() || !gizmoAtDown.has_value()) { return; }
     if (!dragStarted) {
         if (event.getDistanceFromDragStart() < 3) { return; }
+        // Playback carries on: the drag edits at the time it began.
         dragStarted = true;
-        processor.playing.store(false);
-        if (!pathKey.has_value()) { processor.seek(editTime); }
     }
     std::array<double, 3> offsets { 0, 0, 0 };
     double scaleFactor = 1;
@@ -668,6 +684,10 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
         const auto factor = motion::editor::gizmo::uniformScaleFactor(distance);
         if (!factor.has_value()) { return; }
         scaleFactor = *factor;
+    }
+    if (tool == MotionTransformTool::anchor && (gesture == Gesture::plane || gesture == Gesture::moveAxis)) {
+        moveAnchor({offsets[0], offsets[1], offsets[2]});
+        return;
     }
     auto project = edit.start();
     const auto target = motion::findPropertyTarget(project, editSelection);
@@ -714,20 +734,79 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
     if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
 }
 
+void MotionCompositionView::moveAnchor(motion::Vec3 delta) {
+    auto project = edit.start();
+    const auto target = motion::findPropertyTarget(project, editSelection);
+    if (!target.has_value() || !gizmoAtDown.has_value()) { return; }
+    const auto localTime = pathKey.has_value() && pathKey->selection == editSelection ? pathKey->contentTime : target->localTime(editTime);
+    // The anchor moves with the pointer; in the object's own space that is
+    // the drag undone by its rotation and scale.
+    const motion::editor::transform_detail::Affine own {{}, gizmoAtDown->eulerRadians, gizmoAtDown->evaluatedScale, {}};
+    const auto changed = motion::anchor::shift(project, editSelection, localTime, delta, own.inverseDirection(delta));
+    if (changed) { editedProperty = "anchor.x"; }
+    edit.show(std::move(project), changed);
+}
+
+juce::String MotionCompositionView::centreAnchor(motion::Id id) {
+    if (prepared == nullptr) { return "The Scene is still preparing"; }
+    const auto time = editingTime();
+    const auto clip = std::find_if(prepared->clips.begin(), prepared->clips.end(), [&](const auto& item) { return item.editorId() == id && item.ancestors.empty() && item.active(clipTime(item, time)); });
+    if (clip == prepared->clips.end()) { return "Select an object at the playhead to centre its anchor"; }
+    const auto* track = motion::findClipTrack(processor.document.project(), id);
+    if (track != nullptr && track->locked) { return "This object's track is locked"; }
+    // The middle of the source's own geometry at the playhead, before effects.
+    const auto* source = clip->resolveSource(processor.liveSourcePreview().get());
+    if (source == nullptr) { return "This object has nothing to centre on"; }
+    const auto frame = source->frameIndex(clip->localTime(clipTime(*clip, time)));
+    motion::Vec3 low {1.0e300, 1.0e300, 1.0e300}, high {-1.0e300, -1.0e300, -1.0e300};
+    bool any = false;
+    const auto include = [&](const osci::Point& point) {
+        if (!point.hasFinitePosition()) { return; }
+        low = {std::min(low.x, static_cast<double>(point.x)), std::min(low.y, static_cast<double>(point.y)), std::min(low.z, static_cast<double>(point.z))};
+        high = {std::max(high.x, static_cast<double>(point.x)), std::max(high.y, static_cast<double>(point.y)), std::max(high.z, static_cast<double>(point.z))};
+        any = true;
+    };
+    const auto* drawing = source->drawingAt(frame);
+    if (drawing != nullptr) {
+        for (std::size_t index = 0; index < drawing->shapeCount(); ++index) {
+            auto* shape = drawing->shape(index);
+            if (shape == nullptr || !(shape->length() > 0)) { continue; }
+            for (int step = 0; step <= 8; ++step) { include(shape->nextVector(static_cast<float>(step) / 8)); }
+        }
+    } else {
+        const auto count = source->previewSampleCount();
+        for (std::size_t index = 0; index < count; ++index) {
+            const auto point = source->sampleFrame(frame, static_cast<double>(index) / count);
+            if (point.r != 0 || point.g != 0 || point.b != 0) { include(point); }
+        }
+    }
+    if (!any) { return "This object has nothing to centre on"; }
+    const auto centre = (low + high) * .5;
+    const auto pose = motion::editor::gizmoFrameForClip(processor.document.project(), id, time);
+    if (!pose.has_value()) { return "This object's transform cannot be edited here"; }
+    const motion::editor::transform_detail::Affine own {{}, pose->eulerRadians, pose->evaluatedScale, {}};
+    const auto local = centre - pose->evaluatedAnchor;
+    const auto parent = own.direction(local);
+    processor.document.tryEdit("Centre anchor", [&](motion::Project& project) {
+        const auto target = motion::findPropertyTarget(project, id);
+        return target.has_value() && motion::anchor::shift(project, id, target->localTime(time), parent, local);
+    });
+    repaint();
+    return {};
+}
+
 void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
     navigationDrag = false;
     if (marqueeArmed) {
         marqueeArmed = false;
         const auto area = marquee;
         marquee.reset();
+        marqueeParts.clear();
+        marqueeClips.clear();
         if (area.has_value() && partMode) {
-            juce::Path region;
-            if (partPick == PartPick::lasso) {
-                region = lasso;
-                region.closeSubPath();
-            } else {
-                region.addRectangle(*area);
-            }
+            marquee = area;
+            const auto region = marqueeRegion();
+            marquee.reset();
             pickParts(region, marqueeAdds, partPick == PartPick::pieces);
             lasso.clear();
         } else if (area.has_value()) {
@@ -743,7 +822,7 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
         return;
     }
     if (validGesture()) {
-        const auto label = tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object";
+        const auto label = tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : tool == MotionTransformTool::anchor ? "Move anchor" : "Scale object";
         // The Graph shows the channel the drag changed.
         if (edit.commit(label) && onPropertyEdited && !editedProperty.empty()) { onPropertyEdited(editSelection, editedProperty); }
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
@@ -817,9 +896,9 @@ std::optional<MotionCompositionView::PartHit> MotionCompositionView::pickPart(ju
 
 // A shape is picked when the area crosses any of it on screen; picking
 // pieces takes every piece the area crosses.
-void MotionCompositionView::pickParts(const juce::Path& area, bool add, bool touching) {
-    if (prepared == nullptr) { return; }
-    if (!add) { picked.clear(); }
+std::map<motion::Id, MotionCompositionView::Picked> MotionCompositionView::partsIn(const juce::Path& area, bool touching) const {
+    std::map<motion::Id, Picked> found;
+    if (prepared == nullptr) { return found; }
     const auto bounds = area.getBounds();
     juce::Path box;
     box.addRectangle(bounds);
@@ -844,13 +923,36 @@ void MotionCompositionView::pickParts(const juce::Path& area, bool add, bool tou
         }
         for (std::size_t shape = 0; shape < states.size(); ++shape) {
             if (touching ? !touchedPaths.contains(paths[shape]) : states[shape] != 1) { continue; }
-            auto& entry = picked[clip->editorId()];
+            auto& entry = found[clip->editorId()];
             entry.source = clip->source;
             entry.shapes.insert(shape);
         }
     }
+    return found;
+}
+
+void MotionCompositionView::pickParts(const juce::Path& area, bool add, bool touching) {
+    if (prepared == nullptr) { return; }
+    if (!add) { picked.clear(); }
+    for (const auto& [id, entry] : partsIn(area, touching)) {
+        auto& merged = picked[id];
+        merged.source = entry.source;
+        merged.shapes.insert(entry.shapes.begin(), entry.shapes.end());
+    }
     refreshPartBar();
     repaint();
+}
+
+// The area being dragged, as it would pick: a box, or the lasso closed.
+juce::Path MotionCompositionView::marqueeRegion() const {
+    juce::Path region;
+    if (partMode && partPick == PartPick::lasso) {
+        region = lasso;
+        region.closeSubPath();
+    } else if (marquee.has_value()) {
+        region.addRectangle(*marquee);
+    }
+    return region;
 }
 
 // Every shape of every object whose parts can be picked, on screen or not.
@@ -996,6 +1098,8 @@ bool MotionCompositionView::anythingPickable() const {
 void MotionCompositionView::resetMarquee() {
     marqueeArmed = false;
     marquee.reset();
+    marqueeParts.clear();
+    marqueeClips.clear();
     lasso.clear();
     pressedPart.reset();
 }
@@ -1176,6 +1280,7 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
     if (key.getModifiers().isShiftDown()) { return false; }
     if (key.getKeyCode() == 'P') { setMotionPathVisible(!showMotionPath); return true; }
     if (key.getKeyCode() == 'G') { setTool(MotionTransformTool::move); return true; }
+    if (key.getKeyCode() == 'Y') { setTool(MotionTransformTool::anchor); return true; }
     if (key.getKeyCode() == 'R') { setTool(MotionTransformTool::rotate); return true; }
     if (key.getKeyCode() == 'S') { setTool(MotionTransformTool::scale); return true; }
     if (key.getKeyCode() == 'F') { frameSelection(); return true; }
@@ -1320,8 +1425,8 @@ bool MotionCompositionView::beginGesture(double time) {
         dragHint = "Use the inspector for modulated or effected results";
         return false;
     }
-    // A plain click only selects: playback stops and the document is
-    // touched only once the pointer actually drags.
+    // A plain click only selects: the document is touched only once the
+    // pointer actually drags.
     editTime = time;
     editSelection = selected;
     edit.begin();

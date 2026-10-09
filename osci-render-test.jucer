@@ -42,6 +42,8 @@
             file="tests/MotionDrawingTest.cpp"/>
       <FILE id="MotionParts" name="MotionPartsTest.cpp" compile="1" resource="0"
             file="tests/MotionPartsTest.cpp"/>
+      <FILE id="MotionAnchor" name="MotionAnchorTest.cpp" compile="1" resource="0"
+            file="tests/MotionAnchorTest.cpp"/>
       <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"
             resource="0" file="tests/MotionTypographyTest.cpp"/>
       <FILE id="MotionLuaSlidersT" name="MotionLuaSlidersTest.cpp" compile="1"

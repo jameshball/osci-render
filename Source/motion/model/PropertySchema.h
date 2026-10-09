@@ -11,7 +11,7 @@ inline std::span<const PropertySpec> propertySpecs(const PropertyTarget& target)
     if (target.beam) { return beamPropertySpecs; }
     if (target.camera) { return cameraPropertySpecs; }
     if (target.isAudio) { return audioPropertySpecs; }
-    return objectPropertySpecs;
+    return objectInspectorSpecs;
 }
 
 inline const PropertySpec* findPropertySpec(std::span<const PropertySpec> specs, std::string_view id) {
@@ -44,6 +44,21 @@ std::optional<PropertySpec> specFor(const ProjectType& project, Id target, std::
     const auto* spec = found.has_value() ? findPropertySpec(propertySpecs(*found), property) : nullptr;
     if (spec == nullptr) { spec = findPropertySpec(luaSliderSpecs, property); }
     return spec != nullptr ? std::optional<PropertySpec>(*spec) : std::nullopt;
+}
+
+// A property's curve, made at its default when the project never stored it
+// (a property added after the project was saved, such as the anchor).
+template <typename ProjectType>
+Curve* ensurePropertyCurve(ProjectType& project, Id id, std::string_view property) {
+    auto target = findPropertyTarget(project, id);
+    if (!target.has_value() || target->properties == nullptr) { return nullptr; }
+    auto* curve = target->curve(property);
+    if (curve != nullptr || target->isEffect) { return curve; }
+    const auto specs = target->beam ? std::span<const PropertySpec>(beamPropertySpecs) : target->camera ? std::span<const PropertySpec>(cameraPropertySpecs)
+        : target->isAudio ? std::span<const PropertySpec>(audioPropertySpecs) : std::span<const PropertySpec>(objectPropertySpecs);
+    const auto* spec = findPropertySpec(specs, property);
+    if (spec == nullptr) { return nullptr; }
+    return &target->properties->emplace(std::string(property), Curve(spec->defaultValue)).first->second;
 }
 
 // A property's name as shown.

@@ -55,9 +55,17 @@ public:
 
     // Modulators dragged from the library route to the field or row dropped on.
     std::function<void(motion::Id modulator, motion::Id target, std::vector<std::string> properties)> onRouteModulator;
+    // While a modulator hovers a field or row, the route it would make (none
+    // when it leaves), so its effect shows before the drop.
+    struct RouteRequest { motion::Id modulator = 0, target = 0; std::vector<std::string> properties; };
+    std::function<void(std::optional<RouteRequest>)> onRoutePreview;
+    // The Anchor row's centre button.
+    std::function<void(motion::Id)> onCentreAnchor;
     void setModulatorDrag(bool active);
     bool isInterestedInDragSource(const SourceDetails& details) override { return details.description.toString().startsWith("motion-modulator:"); }
     void itemDragMove(const SourceDetails& details) override;
+    std::optional<RouteRequest> routeRequest(const SourceDetails& details, juce::Component* found) const;
+    bool previewingRoute = false;
     void itemDragExit(const SourceDetails&) override;
     void itemDropped(const SourceDetails& details) override;
     void paintOverChildren(juce::Graphics& g) override;
@@ -121,7 +129,7 @@ private:
     static osci::ColourPicker::Rgb colourOf(const Row& row);
     // The picker edits all three channels as one gesture and one undo step.
     void openColourPicker(Row& row);
-    void commitValue(const std::string& property, double value);
+    void commitValue(const std::string& property, double value, const juce::String& label);
 public:
     // Alt+Shift+P/R/S/T, as in After Effects: key a group at the playhead.
     bool toggleGroupKeys(const juce::String& group);

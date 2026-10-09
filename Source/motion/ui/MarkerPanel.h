@@ -118,3 +118,39 @@ private:
     juce::Label tempoLabel, rampLabel, unit;
     motion::ui::Switch ramp {"Ramp into tempo"};
 };
+
+// Names the part being extracted; the rest keeps its source's name.
+class MotionExtractPanel final : public motion::ui::Popover {
+public:
+    explicit MotionExtractPanel(juce::String initialName) : Popover("Extract parts", "Extract", "Extract with this name") {
+        name.setName("Part name");
+        name.setTitle("Part name");
+        name.setText(initialName, false);
+        name.setJustification(juce::Justification::centredLeft);
+        name.setFont(motion::style::body());
+        name.setSelectAllWhenFocused(true);
+        name.onTextChange = [this] { refresh(); };
+        name.onReturnKey = [this] { primary.triggerClick(); };
+        addAndMakeVisible(name);
+        nameLabel.setText("Name", juce::dontSendNotification);
+        motion::ui::Sheet::styleCaption(nameLabel);
+        addAndMakeVisible(nameLabel);
+        primary.onClick = [this] { if (primary.isEnabled() && onApply) { onApply(name.getText().trim()); } };
+        setSize(widthFor(256), heightFor(1));
+        refresh();
+    }
+    std::function<void(juce::String)> onApply;
+
+protected:
+    void layoutBody(juce::Rectangle<int> area) override { formRow(area, nameLabel, name); }
+
+private:
+    void refresh() {
+        const auto text = name.getText().trim();
+        const auto valid = text.isNotEmpty() && text.length() <= 200;
+        primary.setEnabled(valid);
+        setError(valid ? "" : "Name: 1-200 characters");
+    }
+    juce::TextEditor name;
+    juce::Label nameLabel;
+};

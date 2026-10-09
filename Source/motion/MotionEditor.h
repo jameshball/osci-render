@@ -79,7 +79,9 @@ private:
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
     // Splits picked shapes off a clip's source into a clip of their own.
-    void extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks);
+    void extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks, const juce::String& name);
+    // The clips parts were extracted from, selected again if the extraction is undone.
+    std::vector<motion::Id> selectionBeforeExtract;
     void showNextPreparationSettings();
     void showBlenderSettings(motion::Id id = 0);
     void chooseSourceFile();
@@ -254,8 +256,8 @@ private:
     // The Scope filling the window (its full-screen control or Escape).
     bool scopeFullScreen = false;
     void setScopeFullScreen(bool value);
-    juce::TextButton sceneView { "Views" };
-    void showSceneViewMenu(bool atMouse);
+    // The Scene's right-click menu: framing, views along an axis, keys.
+    void showSceneMenu();
 
     juce::TextButton importButton { "Add source" };
     motion::icons::Button playButton { "Play", motion::icons::Icon::play };

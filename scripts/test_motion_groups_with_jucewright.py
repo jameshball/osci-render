@@ -85,7 +85,7 @@ try:
         raise RuntimeError("Undo did not put the track back in its group")
     position = find(snapshot(), lambda node: node.get("componentName") == "position.x")
     step("translate group", "set-value", position["ref"], "0.35")
-    wait_undo("Change property")
+    wait_undo("Change Position X")
     step("key group position", "click", "--name", "Key position", "--exact")
     wait_undo("Set keyframe")
     step("fold group", "click", "--name", "Fold group " + group, "--exact")

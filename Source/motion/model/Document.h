@@ -208,11 +208,12 @@ public:
     juce::Result pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, double time);
     juce::Result removeClips(const std::vector<Id>& clipIds, bool ripple = false);
     // Splits clips' sources into two prepared sources each, in one undo step:
-    // each clip keeps its `rest`, and a copy of it (timing, keys, effects and
-    // routes) plays its `part` on a new track just above, which keeps the
-    // track's effects, mute and solo. An old source leaves the library when
-    // no other clip uses it. Takes over both assets' identities and names.
-    struct PartSplit { Id clip = 0; std::shared_ptr<Asset> part, rest; };
+    // each clip keeps its `rest` (named as its source was) and its own name,
+    // and a copy of it (timing, keys, effects and routes) plays its `part`,
+    // named `name`, on a new track just above, which keeps the track's
+    // effects, mute and solo. An old source leaves the library when no other
+    // clip uses it. Takes over both assets' identities and names.
+    struct PartSplit { Id clip = 0; std::shared_ptr<Asset> part, rest; juce::String name; };
     juce::Result extractParts(const std::vector<PartSplit>& splits, std::vector<Id>& partClips);
     juce::Result renameAsset(Id assetId, juce::String name);
     // Swaps a source's media in place (same identity, so every clip keeps its
@@ -269,6 +270,10 @@ public:
     // Routes `modulator` to each of `properties` of `target` that it does not
     // drive yet, at a visible but contained default depth. One undo step.
     juce::Result routeModulator(Id modulator, Id target, const std::vector<std::string>& properties);
+    // The project as routeModulator would leave it, recording nothing: a
+    // preview while a modulator is dragged over a property. None when no new
+    // route would be made.
+    std::optional<Project> previewRoute(Id modulator, Id target, const std::vector<std::string>& properties) const;
     static double routeAmount(const Project& project, Id target, const std::string& property);
     // Creates a modulator already driving one property, as one undo step.
     juce::Result addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId);

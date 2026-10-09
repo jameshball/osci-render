@@ -14,7 +14,7 @@
 #include <map>
 #include <set>
 
-class MotionCompositionView : public juce::Component, public juce::DragAndDropTarget, private juce::Timer {
+class MotionCompositionView : public juce::Component, public juce::DragAndDropTarget, public juce::TooltipClient, private juce::Timer {
 public:
     explicit MotionCompositionView(MotionProcessor& processor);
     ~MotionCompositionView() override;
@@ -51,7 +51,14 @@ public:
         refreshPartBar();
     }
     void extractPicked();
+    // Puts the anchor at the middle of the object's geometry, keeping the
+    // object in place; a reason when it cannot.
+    juce::String centreAnchor(motion::Id id);
+    // Where the name prompt points: the Extract button, or the parts bar.
+    juce::Rectangle<int> extractAnchor() const { return extractButton.isVisible() ? extractButton.getBounds() : partBar(); }
     void resized() override;
+    // Only the axes widget has a tip; the Scene's tools carry their own.
+    juce::String getTooltip() override { return hoverCorner ? "Click an axis to look along it, again to look from behind" + motion::style::dot() + "0 resets the view" : juce::String(); }
     std::function<void(bool)> onNavigationChanged;
     std::function<void()> onContextMenu;
     std::function<void(motion::Id, const std::string&)> onPropertyEdited;
@@ -213,7 +220,13 @@ private:
     // Picks the parts inside `area` (all of each shape), or with `touching`
     // the whole pieces it touches.
     void pickParts(const juce::Path& area, bool add, bool touching);
+    std::map<motion::Id, Picked> partsIn(const juce::Path& area, bool touching) const;
+    juce::Path marqueeRegion() const;
+    // What the box or lasso being dragged would pick or select.
+    std::map<motion::Id, Picked> marqueeParts;
+    std::vector<motion::Id> marqueeClips;
     void pickAllParts();
+    void moveAnchor(motion::Vec3 delta);
     void resetMarquee();
     motion::Vec3 nearestOnSegment(juce::Point<float> position, motion::Vec3 a, motion::Vec3 b) const;
     void pickPath(PartHit hit, bool add);

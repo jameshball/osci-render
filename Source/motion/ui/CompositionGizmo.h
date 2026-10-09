@@ -4,7 +4,9 @@
 #include <JuceHeader.h>
 #include "MotionStyle.h"
 
-enum class MotionTransformTool { move, rotate, scale };
+// The anchor tool moves an object's anchor (the point it rotates and scales
+// about) with the move handles, keeping the object where it is.
+enum class MotionTransformTool { move, rotate, scale, anchor };
 
 // Stateless, screen-sized handles. Editing and undo remain in the composition view.
 struct MotionCompositionGizmo {
@@ -32,7 +34,8 @@ struct MotionCompositionGizmo {
         if (parentSize <= 0 || !std::isfinite(radius)) { return {}; }
         for (int axis = 0; axis < 3; ++axis) {
             auto& handle = result.axes[axis];
-            const auto direction = tool == MotionTransformTool::move ? std::optional(frame.parent.parentBasis[axis]) : frame.axisDirection(axis, false);
+            const auto moves = tool == MotionTransformTool::move || tool == MotionTransformTool::anchor;
+            const auto direction = moves ? std::optional(frame.parent.parentBasis[axis]) : frame.axisDirection(axis, false);
             if (!direction.has_value()) { continue; }
             const std::array<double, 3> scale { frame.evaluatedScale.x, frame.evaluatedScale.y, frame.evaluatedScale.z };
             const auto sign = tool == MotionTransformTool::scale && scale[axis] < 0 ? -1.0 : 1.0;
@@ -95,7 +98,7 @@ struct MotionCompositionGizmo {
                 g.drawText(juce::String::charToString("XYZ"[axis]), juce::Rectangle<float>(20, 18).withCentre(points.front() + offset * (14 / std::max(1.0f, offset.getDistanceFromOrigin()))), juce::Justification::centred);
             } else {
                 const juce::Line<float> line(origin, points.back());
-                if (tool == MotionTransformTool::move) {
+                if (tool == MotionTransformTool::move || tool == MotionTransformTool::anchor) {
                     g.drawArrow(line, 2.0f, 8.0f, 8.0f);
                 } else {
                     g.drawLine(line, 2.0f);
@@ -105,9 +108,24 @@ struct MotionCompositionGizmo {
                 g.drawText(juce::String::charToString("XYZ"[axis]), juce::Rectangle<float>(20, 18).withCentre(points.back() + (points.back() - origin) * (14 / points.back().getDistanceFrom(origin))), juce::Justification::centred);
             }
         }
-        if (tool != MotionTransformTool::rotate) {
-            g.setColour(hover == 3 ? juce::Colours::white : osci::Colours::text());
+        g.setColour(hover == 3 ? juce::Colours::white : osci::Colours::text());
+        if (tool == MotionTransformTool::anchor) {
+            paintAnchor(g, 7.0f, 2.0f);
+        } else if (tool == MotionTransformTool::rotate) {
+            // The point the rings turn about.
+            g.setColour(osci::Colours::text().withAlpha(.8f));
+            paintAnchor(g, 4.5f, 1.5f);
+        } else {
             g.fillRect(juce::Rectangle<float>(8, 8).withCentre(origin));
         }
+    }
+
+private:
+    // A ring with a crosshair through it, as anchors are drawn elsewhere.
+    void paintAnchor(juce::Graphics& g, float radius, float thickness) const {
+        g.drawEllipse(juce::Rectangle<float>(radius * 2, radius * 2).withCentre(origin), thickness);
+        const auto reach = radius + 4.0f;
+        g.drawLine({origin.translated(-reach, 0), origin.translated(reach, 0)}, thickness * .75f);
+        g.drawLine({origin.translated(0, -reach), origin.translated(0, reach)}, thickness * .75f);
     }
 };

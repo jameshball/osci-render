@@ -96,7 +96,7 @@ void MotionPropertyInspector::refresh() {
         build(specs);
     }
     for (auto& row : rows) {
-        if (row->mode == nullptr || !modes.has_value()) { continue; }
+        if (row->mode == nullptr || !modes.has_value() || (row->group != "Position" && row->group != "Rotation")) { continue; }
         const bool path = row->group == "Position";
         const bool on = path ? modes->first : modes->second;
         const std::string prefix = path ? "position." : "rotation.";
@@ -173,34 +173,51 @@ void MotionPropertyInspector::refreshValues() {
 
 void MotionPropertyInspector::setModulatorDrag(bool active) {
     modulatorDrag = active;
-    if (!active) { dropTarget = nullptr; }
+    if (!active) {
+        dropTarget = nullptr;
+        if (previewingRoute && onRoutePreview) { onRoutePreview(std::nullopt); }
+        previewingRoute = false;
+    }
     repaint();
+}
+
+std::optional<MotionPropertyInspector::RouteRequest> MotionPropertyInspector::routeRequest(const SourceDetails& details, juce::Component* found) const {
+    if (found == nullptr) { return std::nullopt; }
+    RouteRequest request;
+    request.modulator = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
+    const auto& properties = found->getProperties();
+    request.target = properties.contains("routeTarget") ? static_cast<motion::Id>(properties["routeTarget"].toString().getLargeIntValue()) : target;
+    for (const auto& name : juce::StringArray::fromTokens(properties["routeProperties"].toString(), ",", "")) { request.properties.push_back(name.toStdString()); }
+    return request;
 }
 
 void MotionPropertyInspector::itemDragMove(const SourceDetails& details) {
     auto* found = routeTargetAt(details.localPosition);
     if (found != dropTarget.getComponent()) {
         dropTarget = found;
+        // The route plays as it would once dropped.
+        const auto request = routeRequest(details, found);
+        if ((request.has_value() || previewingRoute) && onRoutePreview) { onRoutePreview(request); }
+        previewingRoute = request.has_value();
         repaint();
     }
 }
 
 void MotionPropertyInspector::itemDragExit(const SourceDetails&) {
     dropTarget = nullptr;
+    if (previewingRoute && onRoutePreview) { onRoutePreview(std::nullopt); }
+    previewingRoute = false;
     repaint();
 }
 
 void MotionPropertyInspector::itemDropped(const SourceDetails& details) {
-    auto* found = routeTargetAt(details.localPosition);
+    const auto request = routeRequest(details, routeTargetAt(details.localPosition));
     dropTarget = nullptr;
+    if (previewingRoute && onRoutePreview) { onRoutePreview(std::nullopt); }
+    previewingRoute = false;
     repaint();
-    if (found == nullptr || !onRouteModulator) { return; }
-    const auto modulator = static_cast<motion::Id>(details.description.toString().fromFirstOccurrenceOf(":", false, false).getLargeIntValue());
-    const auto& properties = found->getProperties();
-    const auto owner = properties.contains("routeTarget") ? static_cast<motion::Id>(properties["routeTarget"].toString().getLargeIntValue()) : target;
-    std::vector<std::string> names;
-    for (const auto& name : juce::StringArray::fromTokens(properties["routeProperties"].toString(), ",", "")) { names.push_back(name.toStdString()); }
-    onRouteModulator(modulator, owner, names);
+    if (!request.has_value() || !onRouteModulator) { return; }
+    onRouteModulator(request->modulator, request->target, request->properties);
 }
 
 void MotionPropertyInspector::paintOverChildren(juce::Graphics& g) {
@@ -310,7 +327,7 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
 }
 
 juce::String MotionPropertyInspector::sectionOf(const juce::String& group) {
-    if (group == "Position" || group == "Rotation" || group == "Scale") { return "Transform"; }
+    if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Drawing") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
     if (group == "Field of view") { return "Lens"; }
@@ -380,6 +397,17 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
                 row->mode->onClick = [this, raw, path] { setMotionMode(path, raw->mode->getToggleState() || raw->misaligned); };
                 row->addAndMakeVisible(*row->mode);
             }
+            // The anchor: the point rotation and scale turn about.
+            if (row->group == "Anchor" && onCentreAnchor) {
+                row->mode = std::make_unique<motion::ui::Chip>("Centre anchor", motion::icons::Icon::centre);
+                row->mode->setName("Centre anchor");
+                row->mode->setTitle("Centre anchor");
+                row->mode->setTooltip("Centre the anchor on the object, keeping it in place");
+                row->mode->quiet = true;
+                row->mode->setClickingTogglesState(false);
+                row->mode->onClick = [this] { onCentreAnchor(target); };
+                row->addAndMakeVisible(*row->mode);
+            }
             if (row->group == "Colour") {
                 row->swatch = std::make_unique<Swatch>();
                 row->swatch->onClick = [this, raw] { openColourPicker(*raw); };
@@ -403,11 +431,13 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             editor.setAxisColour(motion::style::axisColour(spec.axis, motion::style::axisZ()));
         }
         const std::string property(spec.id);
+        // Undo names the property: "Undo Change Position X".
+        const auto change = "Change " + juce::String(spec.label.data(), spec.label.size());
         editor.onBegin = [this, property] { beginGesture(property); };
         editor.onChange = [this, property](double value) { previewValue(property, value); };
-        editor.onEnd = [this] { endGesture(); };
+        editor.onEnd = [this, change] { endGesture(change); };
         editor.onCancel = [this] { cancelGesture(); refresh(); };
-        editor.onCommit = [this, property](double value) { commitValue(property, value); };
+        editor.onCommit = [this, property, change](double value) { commitValue(property, value, change); };
         // A modulator dropped here drives this axis; on the row, all of them.
         editor.getProperties().set("routeProperties", juce::String(property));
         auto& routes = rows.back()->getProperties();
@@ -472,7 +502,7 @@ double MotionPropertyInspector::keyTime(const motion::PropertyTarget& found) con
 }
 
 void MotionPropertyInspector::apply(motion::Project& project, const std::string& property, double value, double time) const {
-    auto* curve = motion::findPropertyCurve(project, target, property);
+    auto* curve = motion::ensurePropertyCurve(project, target, property);
     if (curve == nullptr) { curve = createSlider(project, property); }
     if (curve == nullptr) { return; }
     motion::keyedit::setValue(*curve, time, value);
@@ -527,14 +557,14 @@ void MotionPropertyInspector::openColourPicker(Row& row) {
     onShowPopover(std::move(picker), *row.swatch);
 }
 
-void MotionPropertyInspector::commitValue(const std::string& property, double value) {
+void MotionPropertyInspector::commitValue(const std::string& property, double value, const juce::String& label) {
     const auto found = motion::findPropertyTarget(processor.document.project(), target);
     if (!found.has_value() || found->locked) {
         refresh();
         return;
     }
     const auto time = keyTime(*found);
-    processor.document.edit("Change property", [&](motion::Project& project) { apply(project, property, value, time); });
+    processor.document.edit(label, [&](motion::Project& project) { apply(project, property, value, time); });
     if (onPropertySelected) { onPropertySelected(target, property); }
     if (onKeyTimeEdited) { onKeyTimeEdited(); }
 }

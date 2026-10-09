@@ -85,7 +85,7 @@ try:
     command("wait-for-locator", "--name", "Radius.lua", "--role", "label", "--exact", "--timeout-ms", 60000)
     command("wait-for-locator", "--component-name", "slider.a", "--timeout-ms", 20000)
     step("slider", "set-value", "--component-name", "slider.a", "0.6")
-    wait_undo("Change property")
+    wait_undo("Change Slider A")
     tree = None
     for _ in range(60):
         tree = saved()

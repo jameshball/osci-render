@@ -19,7 +19,9 @@ inline Vec3 rotateZ(Vec3 value, double angle) {
     return { c * value.x - s * value.y, s * value.x + c * value.y, value.z };
 }
 struct Affine {
-    Vec3 position, rotation, scale;
+    Vec3 position, rotation, scale, anchor;
+    // A point in the transform's own space, about its anchor.
+    Vec3 point(Vec3 value) const { return direction(value - anchor) + position; }
     Vec3 direction(Vec3 value) const {
         value = { value.x * scale.x, value.y * scale.y, value.z * scale.z };
         return rotateZ(rotateY(rotateX(value, rotation.x), rotation.y), rotation.z);
@@ -31,7 +33,7 @@ struct Affine {
 };
 template <typename PropertyMap>
 std::optional<Affine> evaluate(const PropertyMap& properties, double time) {
-    std::array<double, 9> values;
+    std::array<double, objectPropertySpecs.size()> values;
     for (std::size_t i = 0; i < values.size(); ++i) {
         const auto found = properties.find(objectPropertySpecs[i].id);
         if (found != properties.end() && !found->second.valid()) { return std::nullopt; }
@@ -41,7 +43,8 @@ std::optional<Affine> evaluate(const PropertyMap& properties, double time) {
     constexpr auto radians = std::numbers::pi / 180.0;
     return Affine { { values[0], values[1], values[2] },
         { values[3] * radians, values[4] * radians, values[5] * radians },
-        { values[6], values[7], values[8] } };
+        { values[6], values[7], values[8] },
+        { values[anchorIndex], values[anchorIndex + 1], values[anchorIndex + 2] } };
 }
 inline bool hasEffects(const std::vector<EffectInstance>& effects, double time) {
     for (const auto& effect : effects) {
@@ -116,7 +119,7 @@ std::optional<TransformFrame> clipTransformFrame(const ProjectType& project, Id 
                 }
                 seen[frame.parentCount] = groupId;
                 frame.parents[frame.parentCount++] = *parent;
-                frame.worldOrigin = parent->direction(frame.worldOrigin) + parent->position;
+                frame.worldOrigin = parent->point(frame.worldOrigin);
                 if (!frame.worldOrigin.finite()) { return std::nullopt; }
                 for (auto& basis : frame.parentBasis) {
                     basis = parent->direction(basis);
@@ -141,6 +144,7 @@ struct EulerGizmoFrame {
     TransformFrame parent;
     Vec3 eulerRadians;
     Vec3 evaluatedScale { 1, 1, 1 };
+    Vec3 evaluatedAnchor;
 
     std::optional<Vec3> axisDirection(int axis, bool rotationRing) const {
         if (!validAxis(axis) || !eulerRadians.finite()) { return std::nullopt; }
@@ -206,7 +210,7 @@ std::optional<EulerGizmoFrame> gizmoFrameForClip(const ProjectType& project, Id 
             if (clip.id != clipId) { continue; }
             const auto transform = transform_detail::evaluate(clip.properties, clip.localTime(projectTime, project.tempo()));
             if (!transform.has_value()) { return std::nullopt; }
-            return EulerGizmoFrame { *parent, transform->rotation, transform->scale };
+            return EulerGizmoFrame { *parent, transform->rotation, transform->scale, transform->anchor };
         }
     }
     return std::nullopt;

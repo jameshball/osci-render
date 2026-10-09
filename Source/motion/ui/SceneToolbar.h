@@ -11,11 +11,12 @@ public:
 
     MotionSceneToolbar() {
         setName("Scene tools");
-        for (auto* tool : {&move, &rotate, &scale, &parts}) { tool->setRadioGroupId(91); tool->setClickingTogglesState(true); }
+        for (auto* tool : {&move, &rotate, &scale, &anchor, &parts}) { tool->setRadioGroupId(91); tool->setClickingTogglesState(true); }
         path.setClickingTogglesState(true);
         move.setTooltip("Move (G)");
         rotate.setTooltip("Rotate (R)");
         scale.setTooltip("Scale (S)");
+        anchor.setTooltip("Anchor (Y): drag the point the object rotates and scales about");
         parts.setTooltip("Pick parts (Tab)");
         path.setTooltip("Motion path (P)");
         fly.setTooltip("Fly (N): mouse to look, WASD to move, Esc to finish");
@@ -23,11 +24,11 @@ public:
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
         keyCamera.setTooltip("Key the camera at the playhead: position, rotation and lens");
-        setGroups({{&move, &rotate, &scale, &parts}, {&path, &fly, &frame}, {&lookThrough, &keyCamera}});
+        setGroups({{&move, &rotate, &scale, &anchor, &parts}, {&path, &fly, &frame}, {&lookThrough, &keyCamera}});
         lookThrough.setEnabled(false);
         keyCamera.setEnabled(false);
     }
-    Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale}, parts {"Pick parts", motion::icons::Icon::parts};
+    Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale}, anchor {"Anchor tool", motion::icons::Icon::anchor}, parts {"Pick parts", motion::icons::Icon::parts};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam}, keyCamera {"Key camera", motion::icons::Icon::keyframe};
     Tool path {"Show motion path", motion::icons::Icon::path}, fly {"Navigate composition view", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
     // A short Scene keeps only the transform tools.
@@ -37,7 +38,7 @@ public:
         for (auto* tool : {&path, &fly, &frame}) { tool->setVisible(!compact); }
         resized();
     }
-    int fullHeight() const { return cell * 9 + groupGap * 2 + inset * 2; }
+    int fullHeight() const { return cell * 10 + groupGap * 2 + inset * 2; }
     bool compact = false;
 };
 

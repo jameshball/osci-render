@@ -809,24 +809,38 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
     auto candidate = state;
     auto highest = highestId();
     std::map<Id, Id> owners;
+    // Sources every one of whose clips is split leave the library first, so
+    // the rest can take their names.
     std::map<Id, std::size_t> splitUses;
+    for (const auto& split : splits) {
+        const auto* clip = findClip(state, split.clip);
+        if (clip == nullptr) { return juce::Result::fail("The clip no longer exists."); }
+        ++splitUses[clip->asset];
+    }
+    std::map<Id, std::shared_ptr<const Asset>> originals;
+    for (const auto& [asset, uses] : splitUses) {
+        originals[asset] = findAsset(state.assets, asset);
+        if (assetUses(asset) == uses) { std::erase_if(candidate.assets, [asset = asset](const auto& item) { return item != nullptr && item->id == asset; }); }
+    }
     std::vector<Id> created;
     for (const auto& split : splits) {
-        const auto& [clipId, part, rest] = split;
+        const auto& [clipId, part, rest, name] = split;
         if (part == nullptr || rest == nullptr || part->source == nullptr || rest->source == nullptr) { return juce::Result::fail("The parts could not be prepared."); }
-        const auto trackAt = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [clipId](const auto& track) { return holdsClip(track, clipId); });
+        const auto partName = name.trim();
+        if (partName.isEmpty() || partName.length() > 200 || partName.containsAnyOf("\r\n")) { return juce::Result::fail("Name the part with 1-200 characters on one line."); }
+        const auto trackAt = std::find_if(candidate.tracks.begin(), candidate.tracks.end(), [clipId = clipId](const auto& track) { return holdsClip(track, clipId); });
         if (trackAt == candidate.tracks.end()) { return juce::Result::fail("The clip no longer exists."); }
         if (trackAt->locked) { return juce::Result::fail("Unlock the track before extracting parts."); }
-        const auto clip = *std::find_if(trackAt->clips.begin(), trackAt->clips.end(), [clipId](const auto& item) { return item.id == clipId; });
-        const auto original = findAsset(state.assets, clip.asset);
+        const auto clip = *std::find_if(trackAt->clips.begin(), trackAt->clips.end(), [clipId = clipId](const auto& item) { return item.id == clipId; });
+        const auto original = originals[clip.asset];
         if (original == nullptr) { return juce::Result::fail("The clip's source no longer exists."); }
         const auto required = static_cast<Id>(clip.effects.size() + trackAt->effects.size() + state.routes.size()) + 4;
         if (required > maximumId - highest) { return juce::Result::fail("There are no remaining identities for the parts."); }
-        ++splitUses[original->id];
         const auto stem = original->name.containsChar('.') ? original->name.upToLastOccurrenceOf(".", false, false) : original->name;
-        for (auto [asset, suffix] : {std::pair {part, " part"}, std::pair {rest, " rest"}}) {
+        const auto partStem = partName.endsWithIgnoreCase(part->extension) ? partName.dropLastCharacters(part->extension.length()) : partName;
+        for (auto [asset, named] : {std::pair {part, partStem}, std::pair {rest, stem}}) {
             asset->id = ++highest;
-            asset->name = uniqueAssetName(candidate, stem + suffix + asset->extension);
+            asset->name = uniqueAssetName(candidate, named + asset->extension);
             candidate.assets.push_back(asset);
         }
         auto copy = clip;
@@ -834,13 +848,8 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
         renumber(copy.effects, highest, owners);
         copy.asset = part->id;
         copy.name = part->name.toStdString();
-        auto* kept = changeClip(candidate, clipId);
-        kept->asset = rest->id;
-        // A clip or track still named after its source follows it; a renamed one keeps its name.
-        if (kept->name == original->name.toStdString()) { kept->name = rest->name.toStdString(); }
-        if (trackAt->name == original->name.toStdString() || trackAt->name == clip.name) {
-            candidate.tracks.change(trackAt).name = rest->name.toStdString();
-        }
+        // The clip keeps its name, as its source does.
+        changeClip(candidate, clipId)->asset = rest->id;
         Track track;
         track.id = ++highest;
         track.kind = trackAt->kind;
@@ -857,10 +866,6 @@ juce::Result Document::extractParts(const std::vector<PartSplit>& splits, std::v
         created.push_back(copy.id);
     }
     cloneDrivers(candidate, owners, [&highest] { return ++highest; });
-    // A source every one of whose clips was split leaves the library.
-    for (const auto& [asset, uses] : splitUses) {
-        if (assetUses(asset) == uses) { std::erase_if(candidate.assets, [asset](const auto& item) { return item != nullptr && item->id == asset; }); }
-    }
     lastId = highest;
     partClips = std::move(created);
     edit("Extract parts", [candidate = std::move(candidate)](Project& project) { project = candidate; });
@@ -1554,6 +1559,22 @@ juce::Result Document::routeModulator(Id modulator, Id target, const std::vector
     if (added.empty()) { return juce::Result::fail("It already drives that, or that cannot be modulated."); }
     edit("Route modulator", [added](Project& project) { project.routes.insert(project.routes.end(), added.begin(), added.end()); });
     return juce::Result::ok();
+}
+
+std::optional<Project> Document::previewRoute(Id modulator, Id target, const std::vector<std::string>& properties) const {
+    auto preview = project();
+    if (std::none_of(preview.modulators.begin(), preview.modulators.end(), [&](const auto& item) { return item.id == modulator; }) || beamOutsideMain(target)) { return std::nullopt; }
+    // Identities past every real one; the preview is never recorded.
+    auto next = highestId();
+    bool any = false;
+    for (const auto& property : properties) {
+        const auto routed = std::any_of(preview.routes.begin(), preview.routes.end(), [&](const auto& route) { return route.modulator == modulator && route.target == target && route.property == property; });
+        if (routed || !drivableProperty(preview, target, property)) { continue; }
+        preview.routes.push_back({++next, modulator, target, property, routeAmount(preview, target, property), ModulationMode::add});
+        any = true;
+    }
+    if (!any) { return std::nullopt; }
+    return preview;
 }
 
 juce::Result Document::addRoutedModulator(Modulator modulator, ModulationRoute route, Id& modulatorId) {

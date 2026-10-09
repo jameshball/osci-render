@@ -92,15 +92,19 @@ try:
     if left < 20 or right > 0:
         raise RuntimeError(f"Picked parts should be highlighted only on the left (left {left}, right {right})")
     step("extract the left square", "click", "--name", "Extract parts", "--exact")
+    command("wait-for-locator", "--name", "Part name", "--exact")
+    field = next(node for node in nodes(snapshot()) if node.get("name") == "Part name")
+    step("name the part", "fill", field["ref"], "Left square")
+    step("confirm the name", "click", "--name", "Extract with this name", "--exact")
     session.wait_for_undo("Extract parts")
     after = names()
-    if "Two squares part.svg" not in after or "Two squares rest.svg" not in after:
-        raise RuntimeError("Extraction should leave a part clip and a rest clip")
+    if "Left square.svg" not in after or "Two squares.svg" not in after:
+        raise RuntimeError("Extraction should name the part as typed and keep the rest's name")
     if part_count() != 0:
         raise RuntimeError("Extraction should leave part mode")
     step("undo extraction", "click", "--name", "Undo", "--exact")
     session.wait_for_undo("Import object")
-    if "Two squares part.svg" in names():
+    if "Left square.svg" in names():
         raise RuntimeError("Undo should restore the single source")
     # Escape clears the picked parts, then leaves part mode.
     step("pick parts again", "press", "Tab", "--class", "MotionCompositionView", "--exact")

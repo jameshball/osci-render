@@ -496,7 +496,7 @@ void MotionEditor::closeSceneEditor() {
     sceneEditor.reset();
     assetLibrary.setEditingSource(false);
     textPreviewDue = 0;
-    for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneView, &viewportHeader}) { component->setVisible(true); }
+    for (auto* component : std::initializer_list<juce::Component*> {&composition, &viewportHeader}) { component->setVisible(true); }
     // Drop the preview of what was being edited.
     processor.prepareComposition(processor.document.project());
     resized();
@@ -684,7 +684,7 @@ void MotionEditor::previewDrawing() {
     processor.prepareComposition(project);
 }
 
-void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks) {
+void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks, const juce::String& name) {
     const auto& project = processor.document.project();
     std::vector<motion::Document::PartSplit> splits;
     for (const auto& [clipId, chosen] : picks) {
@@ -715,7 +715,7 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
             statusBar.show("The parts could not be prepared.");
             return;
         }
-        splits.push_back({clipId, std::move(part), std::move(rest)});
+        splits.push_back({clipId, std::move(part), std::move(rest), name});
     }
     std::vector<motion::Id> created;
     const auto result = processor.document.extractParts(splits, created);
@@ -724,6 +724,8 @@ void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView
         return;
     }
     composition.setPartMode(false);
+    selectionBeforeExtract.clear();
+    for (const auto& split : splits) { selectionBeforeExtract.push_back(split.clip); }
     timeline.selectClips(created);
     // The library shows the new part's source, as importing does.
     const auto* made = created.empty() ? nullptr : motion::findClip(processor.document.project(), created.front());

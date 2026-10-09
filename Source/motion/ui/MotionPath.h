@@ -84,11 +84,12 @@ MotionPath buildMotionPath(const ProjectType& project, Id selection) {
         const auto local = selected->localTime(time, project.tempo());
         Vec3 position {value(selected->properties, 0, local), value(selected->properties, 1, local), value(selected->properties, 2, local)};
         for (const auto* group : parents) {
-            std::array<double, 9> values;
-            for (int axis = 0; axis < 9; ++axis) { values[static_cast<std::size_t>(axis)] = value(group->properties, axis, time); }
+            std::array<double, objectPropertySpecs.size()> values;
+            for (std::size_t axis = 0; axis < values.size(); ++axis) { values[axis] = value(group->properties, static_cast<int>(axis), time); }
             constexpr auto radians = std::numbers::pi / 180.0;
-            const transform_detail::Affine transform {{values[0], values[1], values[2]}, {values[3] * radians, values[4] * radians, values[5] * radians}, {values[6], values[7], values[8]}};
-            position = transform.direction(position) + transform.position;
+            const transform_detail::Affine transform {{values[0], values[1], values[2]}, {values[3] * radians, values[4] * radians, values[5] * radians}, {values[6], values[7], values[8]},
+                {values[anchorIndex], values[anchorIndex + 1], values[anchorIndex + 2]}};
+            position = transform.point(position);
         }
         if (!position.finite()) { broken = true; continue; }
         path.points.push_back({time, position, broken || flags.jump, flags.key, flags.dot, flags.contentTime});

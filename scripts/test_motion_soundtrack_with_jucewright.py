@@ -88,7 +88,7 @@ try:
     wait_undo("Set keyframe")
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     step("edit soundtrack gain", "set-value", gain["ref"], "1.25")
-    wait_undo("Change property")
+    wait_undo("Change Gain")
     step("undo gain change", "click", "--name", "Undo", "--exact")
     gain = find(snapshot(), lambda node: node.get("componentName") == "gain" and node.get("visible"))
     if float(gain["value"]) != 1:

@@ -18,7 +18,7 @@
 #include <optional>
 
 namespace motion {
-inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool quaternion, const std::array<Curve, 13>& curves) {
+inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool quaternion, const std::array<Curve, objectPropertySpecs.size()>& curves) {
     auto spatial = std::make_shared<PreparedSpatial>();
     if (path) { spatial->path = PreparedPath::prepare(curves[0], curves[1], curves[2]); }
     if (quaternion) { spatial->orientation = PreparedOrientation::prepare(curves[3], curves[4], curves[5]); }
@@ -26,19 +26,22 @@ inline std::shared_ptr<const PreparedSpatial> prepareSpatial(bool path, bool qua
     return spatial;
 }
 
-// A transform's curves evaluated at one time: scale, then rotation (Euler X,
-// Y, Z, or a keyed orientation after modulation offsets), then translation
-// (along a spatial path when there is one), and colour gains. Evaluated once,
-// it applies to any number of points.
+// A transform's curves evaluated at one time: the anchor taken away, scale,
+// then rotation (Euler X, Y, Z, or a keyed orientation after modulation
+// offsets), then translation (along a spatial path when there is one), and
+// colour gains. Evaluated once, it applies to any number of points.
 struct TransformPose {
     using Matrix = std::array<std::array<float, 3>, 3>;
-    std::array<float, 3> scale {1, 1, 1}, translation {}, colour {1, 1, 1};
+    std::array<float, 3> scale {1, 1, 1}, translation {}, colour {1, 1, 1}, anchor {};
     Matrix rotation {{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
 
-    static TransformPose at(const std::array<Curve, 13>& curves, double time, const PreparedSpatial* spatial) {
+    static TransformPose at(const std::array<Curve, objectPropertySpecs.size()>& curves, double time, const PreparedSpatial* spatial) {
         TransformPose pose;
         constexpr auto radians = std::numbers::pi / 180.0;
-        for (std::size_t axis = 0; axis < 3; ++axis) { pose.scale[axis] = static_cast<float>(curves[6 + axis].evaluate(time)); }
+        for (std::size_t axis = 0; axis < 3; ++axis) {
+            pose.scale[axis] = static_cast<float>(curves[6 + axis].evaluate(time));
+            pose.anchor[axis] = static_cast<float>(curves[anchorIndex + axis].evaluate(time));
+        }
         // A linked rotation axis replaces its keys, so orientation interpolation
         // only applies while every rotation axis is keyed.
         const bool oriented = spatial != nullptr && spatial->orientation != nullptr && !curves[3].linked() && !curves[4].linked() && !curves[5].linked();
@@ -82,8 +85,9 @@ struct TransformPose {
         point.b = std::clamp((uncoloured ? 1.0f : point.b) * colour[2], 0.0f, 1.0f);
         return point;
     }
+    // Scale and rotation turn about the anchor, which lands on the translation.
     osci::Point apply(osci::Point point, bool applyColour) const {
-        const auto x = point.x * scale[0], y = point.y * scale[1], z = point.z * scale[2];
+        const auto x = (point.x - anchor[0]) * scale[0], y = (point.y - anchor[1]) * scale[1], z = (point.z - anchor[2]) * scale[2];
         point.x = rotation[0][0] * x + rotation[0][1] * y + rotation[0][2] * z + translation[0];
         point.y = rotation[1][0] * x + rotation[1][1] * y + rotation[1][2] * z + translation[1];
         point.z = rotation[2][0] * x + rotation[2][1] * y + rotation[2][2] * z + translation[2];
@@ -116,13 +120,13 @@ private:
     }
 };
 
-inline osci::Point applyTransform(osci::Point point, const std::array<Curve, 13>& curves, double time, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
+inline osci::Point applyTransform(osci::Point point, const std::array<Curve, objectPropertySpecs.size()>& curves, double time, bool applyColour = true, const PreparedSpatial* spatial = nullptr) {
     return TransformPose::at(curves, time, spatial).apply(point, applyColour);
 }
 
 struct PreparedGroup {
     Id id;
-    std::array<Curve, 13> curves;
+    std::array<Curve, objectPropertySpecs.size()> curves;
     std::vector<PreparedEffect> effects;
     std::shared_ptr<const PreparedSpatial> spatial;
 
@@ -152,7 +156,7 @@ struct PreparedClipStage {
     Id id = 0;
     double start = 0, end = 0;
     ClipTiming clock; // main seconds -> content, exact under a tempo map
-    std::array<Curve, 13> curves;
+    std::array<Curve, objectPropertySpecs.size()> curves;
     std::vector<PreparedEffect> effects, trackEffects, compositionEffects;
     std::vector<PreparedGroup> groups;
     std::shared_ptr<const PreparedSpatial> spatial;
@@ -234,7 +238,7 @@ struct PreparedClip : PreparedClipStage {
 // clock; a clip link maps project time to its content time.
 struct PreparedChain {
     struct Link {
-        std::array<Curve, 13> curves;
+        std::array<Curve, objectPropertySpecs.size()> curves;
         std::shared_ptr<const PreparedSpatial> spatial;
         ClipTiming clock;
         bool clip = false;
@@ -249,6 +253,13 @@ struct PreparedChain {
         }
         return {point.x, point.y, point.z};
     }
+    // The innermost link's anchor in its own space, where a camera aims.
+    Vec3 anchor(double time) const {
+        if (links.empty()) { return {}; }
+        const auto& link = links.front();
+        const auto local = link.clip ? link.clock.localTime(time) : time;
+        return {link.curves[anchorIndex].evaluate(local), link.curves[anchorIndex + 1].evaluate(local), link.curves[anchorIndex + 2].evaluate(local)};
+    }
 };
 
 struct PreparedCamera {
@@ -262,7 +273,7 @@ struct PreparedCamera {
     };
     // The camera's world position and orthonormal basis at `time`: authored
     // position/rotation (X, then Y, then Z), carried by the parent group,
-    // then aimed at the target's origin with Z rotation kept as roll.
+    // then aimed at the target's anchor with Z rotation kept as roll.
     std::optional<Frame> frame(double time) const {
         std::array<double, 7> values;
         for (std::size_t index = 0; index < values.size(); ++index) {
@@ -297,7 +308,7 @@ struct PreparedCamera {
             result.up = right->cross(*forward);
         }
         if (!target.empty()) {
-            const auto aim = (target.apply({0, 0, 0}, time) - result.position).normalized(minimumAxis);
+            const auto aim = (target.apply(target.anchor(time), time) - result.position).normalized(minimumAxis);
             if (aim.has_value()) {
                 // Level to world up unless looking straight up or down.
                 auto right = aim->cross({0, 1, 0}).normalized(minimumAxis);
