@@ -239,9 +239,24 @@ class BrowserSession:
         """Opens a project in the running app: as Finder does on macOS, by dropping
         the file on the editor elsewhere (the editor opens dropped projects)."""
         if is_macos():
+            # open -a hands the file to the running instance only once macOS
+            # has registered it; before then it starts a second, ordinary copy
+            # of the app (which takes focus and the user's own profile).
+            if self.app_pid is not None:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    found = subprocess.run(["lsappinfo", "find", f"pid={self.app_pid}"], capture_output=True, text=True).stdout
+                    if found.strip():
+                        break
+                    time.sleep(0.1)
+            before = set(self.app_pids())
             # -g hands over the file without bringing the app to the front.
             background = ["-g"] if os.environ.get("OSCI_AUTOMATION_FOREGROUND") != "1" else []
             subprocess.run(["open", *background, "-a", str(self.app_path), str(path)], check=True)
+            # A stray copy started anyway is stopped; the file reached no session.
+            time.sleep(0.3)
+            for pid in set(self.app_pids()) - before - {self.app_pid}:
+                self.terminate_pid(pid)
         else:
             subprocess.run(self.cli("drop-files", "--file", str(path), "--class", editor_class, "--exact"), check=True)
 
@@ -533,6 +548,11 @@ end clickDenyButton
             if match and match.group(1) == self.session:
                 pids.append(int(match.group(2)))
         return pids
+
+    def app_pids(self) -> list[int]:
+        """Every running process of the app bundle under test (macOS)."""
+        completed = subprocess.run(["pgrep", "-f", str(Path(self.app_path)) + "/Contents/MacOS/"], text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        return [int(pid) for pid in completed.stdout.split() if pid.isdigit()]
 
     def terminate_pid(self, pid: int) -> None:
         if is_windows():
