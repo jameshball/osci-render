@@ -294,7 +294,7 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
     }
     project.name = xml.getStringAttribute("name", "Untitled");
     project.duration = xml.getDoubleAttribute("duration", 180);
-    project.frameRate = xml.getDoubleAttribute("fps", 30);
+    project.frameRate = xml.getDoubleAttribute("fps", Composition {}.frameRate);
     project.bpm = xml.getDoubleAttribute("bpm", 120);
     const auto display = xml.getIntAttribute("timeDisplay", 0);
     const auto snap = xml.getIntAttribute("gridSnap", 1);

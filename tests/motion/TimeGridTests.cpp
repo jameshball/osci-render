@@ -8,6 +8,9 @@ bool close(double a, double b) { return std::abs(a - b) <= 1.0e-10 * std::max({ 
 
 int main() {
     motion::TimeGrid grid;
+    assert(grid.frameRate == 60);
+    // These contracts are written at 30 fps.
+    grid.frameRate = 30;
     const auto parses = [&](const std::string& text, double expected) {
         const auto result = grid.parsePosition(text);
         assert(result.has_value() && close(*result, expected));
@@ -39,6 +42,7 @@ int main() {
     grid.bpm = 0; rejects("1.1"); parses("1s", 1);
     grid.bpm = 120; grid.beatsPerBar = 0; rejects("1.1");
     grid = motion::TimeGrid();
+    grid.frameRate = 30;
     assert(close(grid.snap(0.049), 1.0 / 30));
     assert(close(grid.snap(0.051), 2.0 / 30));
     assert(close(grid.snap(-0.051), -2.0 / 30));

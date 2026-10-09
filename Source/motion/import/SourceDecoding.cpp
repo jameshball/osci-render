@@ -155,12 +155,12 @@ juce::Result prepareAnimatedText(Asset& asset, const juce::GlyphArrangement& gly
     }
     const auto centreX = (minX + maxX) / 2, centreY = (minY + maxY) / 2;
     const auto scale = 1.8f / std::max(maxX - minX, maxY - minY);
-    constexpr double frameRate = 30;
+    constexpr double frameRate = 60;
     const auto& settings = asset.textSettings;
     const auto characters = static_cast<int>(paths.size());
     const auto length = std::ceil(settings.animationLength(characters) * frameRate);
     if (length > static_cast<double>(maximumSourceFrames)) {
-        return juce::Result::fail("This text animation lasts over 120 seconds. Shorten the stagger or hold, or split the text.");
+        return juce::Result::fail("This text animation lasts over 60 seconds. Shorten the stagger or hold, or split the text.");
     }
     const auto frames = static_cast<int>(std::max(1.0, length));
     // Once every character has arrived, the remaining (hold) frames repeat.

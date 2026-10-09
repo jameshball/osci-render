@@ -17,7 +17,7 @@ enum class TimeDisplay { seconds, frames, beats };
 
 struct TimeGrid {
     TimeDisplay display = TimeDisplay::seconds;
-    double bpm = 120, frameRate = 30;
+    double bpm = 120, frameRate = 60;
     std::shared_ptr<const std::vector<TempoChange>> tempoChanges;
     int beatsPerBar = 4;
     double snapBeats = 0.25;

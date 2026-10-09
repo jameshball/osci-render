@@ -95,8 +95,9 @@ try:
     enter_position("48f", "48f")
     choose("Bars / beats")
     enter_position("3.2.480", "3.2.480")
-    enter_position("240f", "5.1.000")
-    enter_position("0.2.000", "5.1.000", reject=True)
+    # 240 frames at the default 60 fps is 4 s: bar 3 at 120 BPM in 4/4.
+    enter_position("240f", "3.1.000")
+    enter_position("0.2.000", "3.1.000", reject=True)
     choose("Seconds")
     enter_position("0s", "0.000s")
     choose("Bars / beats")

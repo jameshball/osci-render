@@ -55,7 +55,7 @@ inline void sortMarkers(std::vector<Marker>& markers) {
 struct Composition {
     juce::String name = "Untitled";
     double duration = 180.0;
-    double frameRate = 30.0;
+    double frameRate = 60.0;
     double bpm = 120.0; // initial tempo, from beat 0
     // Tempo changes after the initial tempo, stepped or ramped, by beat (immutable, shared).
     std::shared_ptr<const std::vector<TempoChange>> tempoChanges;
