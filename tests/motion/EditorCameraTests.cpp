@@ -107,5 +107,19 @@ int main() {
     camera = Camera();
     camera.position.x = std::numeric_limits<double>::max();
     check(!camera.valid() && !camera.pan(1, 1, 100), "extreme camera coordinates cannot poison navigation");
+    // Segments are cut at the near plane and far outside the frame, never dropped
+    // for an end behind the eye, and project like points where they are kept.
+    {
+        const auto view = *Camera().view();
+        const auto inside = view.projectSegment(view.toEye({-0.5, 0, 0}), view.toEye({0.5, 0.25, 0}));
+        check(inside.has_value() && near(inside->first.x, -0.5) && near(inside->second.x, 0.5) && near(inside->second.y, 0.25), "a visible segment projects its ends");
+        const auto through = view.projectSegment(view.toEye({0.2, 0, 0}), view.toEye({0.2, 0, 10}));
+        check(through.has_value() && near(through->first.x, 0.2), "a segment passing behind the eye keeps its visible part");
+        check(through.has_value() && std::abs(through->second.x) <= 50 + 1.0e-6, "the cut end stays within the frame margin");
+        check(!view.projectSegment(view.toEye({0, 0, 5}), view.toEye({1, 0, 6})), "a segment wholly behind the eye is dropped");
+        check(!view.projectSegment(view.toEye({1000, 0, 0}), view.toEye({1000, 1, 0})), "a segment far outside the view is dropped");
+        const auto across = view.projectSegment(view.toEye({-1000, 0, 0}), view.toEye({1000, 0, 0}));
+        check(across.has_value() && near(across->first.x, -50, 1.0e-6) && near(across->second.x, 50, 1.0e-6), "a long line is cut to the margin on both sides");
+    }
     std::cout << "Editor camera contracts passed\n";
 }

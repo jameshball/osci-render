@@ -1,7 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <utility>
 #include <numbers>
 #include <optional>
 #include "../model/Vec3.h"
@@ -63,6 +65,39 @@ public:
             Vec2 result { offset.dot(right) / scale / aspect, offset.dot(up) / scale };
             return std::isfinite(result.x) && std::isfinite(result.y) ? std::optional<Vec2>(result) : std::nullopt;
         }
+        // A world point as (right, up, depth) from the eye.
+        Vec3 toEye(Vec3 world) const {
+            const auto offset = world - position;
+            return { offset.dot(right), offset.dot(up), offset.dot(forward) };
+        }
+        // The part of a line (in eye space) in front of the near plane and
+        // within `limit` frame half-widths of the view axis, projected. Lines
+        // through or behind the eye are cut short rather than dropped.
+        std::optional<std::pair<Vec2, Vec2>> projectSegment(Vec3 a, Vec3 b, double limit = 50) const {
+            if (!a.finite() || !b.finite()) { return std::nullopt; }
+            const auto spread = limit * tangent;
+            // Each plane keeps f >= 0, linear along the segment.
+            const std::array<std::pair<double, double>, 5> planes {{
+                {a.z - clipNear, b.z - clipNear},
+                {spread * a.z - a.x, spread * b.z - b.x}, {spread * a.z + a.x, spread * b.z + b.x},
+                {spread * a.z - a.y, spread * b.z - b.y}, {spread * a.z + a.y, spread * b.z + b.y}}};
+            double first = 0, last = 1;
+            for (const auto& [from, to] : planes) {
+                if (from < 0 && to < 0) { return std::nullopt; }
+                if (from < 0) { first = std::max(first, from / (from - to)); }
+                if (to < 0) { last = std::min(last, from / (from - to)); }
+            }
+            if (first > last) { return std::nullopt; }
+            const auto at = [&](double t) {
+                const auto point = a + (b - a) * t;
+                const auto scale = std::max(point.z, clipNear) * tangent;
+                return Vec2 { point.x / scale, point.y / scale };
+            };
+            const auto start = at(first), end = at(last);
+            if (!std::isfinite(start.x) || !std::isfinite(start.y) || !std::isfinite(end.x) || !std::isfinite(end.y)) { return std::nullopt; }
+            return std::make_pair(start, end);
+        }
+        static constexpr double clipNear = 0.001;
     };
     std::optional<View> view() const {
         if (!valid()) {

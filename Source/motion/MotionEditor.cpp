@@ -64,6 +64,15 @@ MotionEditor::MotionEditor(MotionProcessor& ownerProcessor)
     addAndMakeVisible(outputLabel);
     addAndMakeVisible(loopButton);
     addAndMakeVisible(tapButton);
+    removeChildComponent(&undoRedoControls);
+    for (auto* button : {&undoButton, &redoButton}) { addAndMakeVisible(*button); }
+    addAndMakeVisible(undoDescription);
+    undoDescription.setFont(motion::style::caption());
+    undoDescription.setColour(juce::Label::textColourId, osci::Colours::textMuted());
+    undoDescription.setJustificationType(juce::Justification::centredRight);
+    undoDescription.setMinimumHorizontalScale(1.0f);
+    undoButton.onClick = [this] { undoRedoControls.undo(); refreshUndo(); };
+    redoButton.onClick = [this] { undoRedoControls.redo(); refreshUndo(); };
     addChildComponent(effectLibrary);
     addChildComponent(cancelExport);
     addAndMakeVisible(inspectorTitle);
@@ -158,6 +167,41 @@ void MotionEditor::setUpScene() {
         sceneTools.move.setToggleState(tool == MotionTransformTool::move, juce::dontSendNotification);
         sceneTools.rotate.setToggleState(tool == MotionTransformTool::rotate, juce::dontSendNotification);
         sceneTools.scale.setToggleState(tool == MotionTransformTool::scale, juce::dontSendNotification);
+    };
+    sceneTools.parts.onClick = [this] { composition.setPartMode(true); };
+    addChildComponent(partPickTools);
+    partPickTools.box.onClick = [this] { composition.setPartPick(MotionCompositionView::PartPick::box); };
+    partPickTools.lasso.onClick = [this] { composition.setPartPick(MotionCompositionView::PartPick::lasso); };
+    partPickTools.connected.onClick = [this] { composition.setPartPick(MotionCompositionView::PartPick::pieces); };
+    composition.onPartModeChanged = [this](bool active) {
+        const auto tool = composition.viewState().tool;
+        sceneTools.parts.setToggleState(active, juce::dontSendNotification);
+        sceneTools.move.setToggleState(!active && tool == MotionTransformTool::move, juce::dontSendNotification);
+        sceneTools.rotate.setToggleState(!active && tool == MotionTransformTool::rotate, juce::dontSendNotification);
+        sceneTools.scale.setToggleState(!active && tool == MotionTransformTool::scale, juce::dontSendNotification);
+        resized();
+    };
+    composition.onExtractParts = [this](const std::map<motion::Id, MotionCompositionView::Picked>& picks) { extractParts(picks); };
+    composition.onStatus = [this](const juce::String& message) { if (message.isNotEmpty()) { statusBar.show(message); } };
+    composition.onSelectClips = [this](const std::vector<motion::Id>& ids, MotionCompositionView::SelectionChange change) {
+        using Change = MotionCompositionView::SelectionChange;
+        const auto& current = timeline.selectedClipIds();
+        std::vector<motion::Id> chosen;
+        if (change == Change::toggle) {
+            // The clicked object leads the selection, or leaves it.
+            for (const auto id : ids) {
+                if (!current.contains(id)) { chosen.push_back(id); }
+            }
+            for (const auto id : current) {
+                if (std::find(ids.begin(), ids.end(), id) == ids.end()) { chosen.push_back(id); }
+            }
+        } else {
+            if (change == Change::add) { chosen.assign(current.begin(), current.end()); }
+            for (const auto id : ids) {
+                if (std::find(chosen.begin(), chosen.end(), id) == chosen.end()) { chosen.push_back(id); }
+            }
+        }
+        timeline.selectClips(chosen);
     };
     sceneTools.path.onClick = [this] { composition.setMotionPathVisible(sceneTools.path.getToggleState()); };
     composition.onMotionPathChanged = [this](bool visible) { sceneTools.path.setToggleState(visible, juce::dontSendNotification); };
@@ -682,8 +726,14 @@ void MotionEditor::resized() {
     // Without room for the whole description only the buttons stay; a clipped
     // description would wrap onto two lines.
     const auto spare = top.getWidth() - menuWidth - 16 - 390 - 12 - (46 + 160) - 8;
-    const auto wide = spare >= undoRedoControls.getPreferredWidth();
-    undoRedoControls.setBounds(top.removeFromRight(wide ? undoRedoControls.getPreferredWidth() : 54));
+    const auto wide = spare >= 200;
+    {
+        auto undo = top.removeFromRight(wide ? 200 : 56);
+        redoButton.setBounds(undo.removeFromRight(28).reduced(1, 3));
+        undoButton.setBounds(undo.removeFromRight(28).reduced(1, 3));
+        undoDescription.setVisible(wide);
+        undoDescription.setBounds(undo.withTrimmedRight(4));
+    }
     top.removeFromRight(8);
     // Transport sits centred in the menu row, leaving the full height below
     // for the workspace.
@@ -717,7 +767,7 @@ void MotionEditor::resized() {
         refreshTiming();
     }
     transport.removeFromLeft(compact ? 4 : 8);
-    timeLabel.setBounds(transport.removeFromLeft(compact ? 92 : 118).reduced(0, 3));
+    timeLabel.setBounds(transport.removeFromLeft(compact ? 92 : 118).reduced(0, 4));
     transport.removeFromLeft(compact ? 4 : 8);
     tempoValue.setBounds(transport.removeFromLeft(52).reduced(0, 4));
     tempoLabel.setVisible(!compact);
@@ -812,10 +862,14 @@ void MotionEditor::resized() {
     sceneTools.setBounds(editing.getX() + 8, editing.getY() + 9, sceneTools.preferredWidth(), sceneTools.preferredHeight());
     composition.setBounds(editing.withTrimmedTop(1));
     sceneTools.toFront(false);
+    // The ways of picking parts open beside the parts tool while it is on.
+    partPickTools.setVisible(sceneTools.isVisible() && composition.inPartMode());
+    partPickTools.setBounds(sceneTools.getRight() + 4, sceneTools.getY() + sceneTools.parts.getY() - motion::icons::ToolStrip::inset, partPickTools.preferredWidth(), partPickTools.preferredHeight());
+    partPickTools.toFront(false);
     // A drawing or text being edited takes over the Scene.
     if (sceneEditor != nullptr) {
         sceneEditor->setBounds(viewportBounds);
-        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
+        for (auto* component : std::initializer_list<juce::Component*> {&composition, &sceneTools, &partPickTools, &sceneView, &compositionTitle, &viewportHeader}) { component->setVisible(false); }
     }
     // Full screen, the Scope covers everything; its strip stays at the top
     // right, with the recording stopwatch beside it.
@@ -860,7 +914,7 @@ juce::Rectangle<int> MotionEditor::focusedPanel() const {
     if (focused == nullptr) { return {}; }
     const auto within = [focused](const juce::Component& component) { return &component == focused || component.isParentOf(focused); };
     if (within(timeline) || within(curveEditor) || within(curveList) || within(graphSideViewport)) { return timelineBounds; }
-    if (within(composition) || within(sceneTools)) { return viewportBounds; }
+    if (within(composition) || within(sceneTools) || within(partPickTools)) { return viewportBounds; }
     if (within(assetLibrary) || within(effectLibrary) || within(modulatorLibrary)) { return libraryBounds; }
     if (within(propertyInspector) || within(clipTimingPanel)) { return inspectorBounds; }
     return {};
@@ -951,8 +1005,20 @@ void MotionEditor::showOverlay(std::unique_ptr<osci::OverlayComponent> overlay) 
     motion::style::restyleDialog(shown, dialogStyle.look);
 }
 
+void MotionEditor::refreshUndo() {
+    auto& undoManager = processor.getUndoManager();
+    const auto undo = undoManager.getUndoDescription(), redo = undoManager.getRedoDescription();
+    undoButton.setEnabled(undoManager.canUndo());
+    redoButton.setEnabled(undoManager.canRedo());
+    const auto undoKeys = " (" + motion::style::shortcutText("Cmd+Z") + ")", redoKeys = " (" + motion::style::shortcutText("Cmd+Shift+Z") + ")";
+    undoButton.setTooltip((undo.isNotEmpty() ? "Undo " + undo : juce::String("Undo")) + undoKeys);
+    redoButton.setTooltip((redo.isNotEmpty() ? "Redo " + redo : juce::String("Redo")) + redoKeys);
+    undoDescription.setText(undo.isNotEmpty() ? "Undo " + undo : juce::String(), juce::dontSendNotification);
+}
+
 void MotionEditor::timerCallback() {
     continueCommandLineRender();
+    refreshUndo();
     if (textPreviewDue > 0 && juce::Time::getMillisecondCounterHiRes() >= textPreviewDue) { previewText(); }
     processor.showIdleSeek(processor.document.mainProject().duration);
     auto& previewRate = processor.recordingParameters.frameRate;

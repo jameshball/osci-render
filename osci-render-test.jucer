@@ -40,6 +40,8 @@
             resource="0" file="tests/MotionKeyEasingTest.cpp"/>
       <FILE id="MotionDrawing" name="MotionDrawingTest.cpp" compile="1" resource="0"
             file="tests/MotionDrawingTest.cpp"/>
+      <FILE id="MotionParts" name="MotionPartsTest.cpp" compile="1" resource="0"
+            file="tests/MotionPartsTest.cpp"/>
       <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"
             resource="0" file="tests/MotionTypographyTest.cpp"/>
       <FILE id="MotionLuaSlidersT" name="MotionLuaSlidersTest.cpp" compile="1"

@@ -106,6 +106,10 @@ public:
 
     bool empty() const { return shapes.empty() || total <= 0.0; }
     double length() const { return total; }
+    // The exact geometry, for drawing and picking. Evaluating a shape leaves
+    // it unchanged (lengths are cached at construction), as sample() relies on.
+    std::size_t shapeCount() const { return shapes.size(); }
+    osci::Shape* shape(std::size_t index) const { return index < shapes.size() ? shapes[index].get() : nullptr; }
 
 private:
     struct TraversalSegment {

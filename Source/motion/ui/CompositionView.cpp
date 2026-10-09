@@ -1,10 +1,22 @@
 #include "CompositionView.h"
 #include "../model/KeyEdit.h"
+#include "../model/SourceParts.h"
 
 MotionCompositionView::MotionCompositionView(MotionProcessor& processor) : processor(processor) {
     setName("Composition preview");
     setWantsKeyboardFocus(true);
     cameraSync.tick = [this] { syncCamera(); };
+    partCount.setFont(motion::style::body());
+    partCount.setColour(juce::Label::textColourId, osci::Colours::text());
+    partCount.setJustificationType(juce::Justification::centred);
+    partCount.setInterceptsMouseClicks(false, false);
+    extractButton.setTitle("Extract parts");
+    extractButton.setTooltip("Make the picked parts an object of their own (E)");
+    extractButton.setColour(juce::TextButton::buttonColourId, motion::style::accent().withAlpha(.5f));
+    extractButton.setWantsKeyboardFocus(false);
+    extractButton.onClick = [this] { extractPicked(); };
+    addChildComponent(partCount);
+    addChildComponent(extractButton);
 }
 
 MotionCompositionView::~MotionCompositionView() {
@@ -15,7 +27,9 @@ MotionCompositionView::~MotionCompositionView() {
 }
 
 void MotionCompositionView::setTool(MotionTransformTool value) {
-    // Choosing a transform tool ends fly navigation, like any modal tool.
+    // Choosing a transform tool ends fly navigation and part picking, like
+    // any modal tool.
+    setPartMode(false);
     setNavigating(false);
     cancelGesture();
     tool = value;
@@ -162,69 +176,187 @@ void MotionCompositionView::setViewPreset(ViewPreset preset) {
 void MotionCompositionView::preview(const motion::Project& project) {
     pathDirty = true;
     prepared = std::make_unique<motion::PreparedComposition>(project, 48000, nullptr, motion::CompositionPurpose::editorGeometry);
+    ++preparedSerial;
+    prunePicked();
     repaint();
 }
 
 void MotionCompositionView::paint(juce::Graphics& g) {
     const auto liveFrames = processor.liveSourcePreview();
     g.fillAll(osci::Colours::veryDark());
+    // The ground grid; its two axes take X's and Y's colours.
     for (int line = -5; line <= 5; ++line) {
-        g.setColour(osci::Colours::text().withAlpha(line == 0 ? 0.12f : 0.045f));
-        drawWorldLine(g, { static_cast<double>(line), -5, 0 }, { static_cast<double>(line), 5, 0 });
-        drawWorldLine(g, { -5, static_cast<double>(line), 0 }, { 5, static_cast<double>(line), 0 });
+        const auto value = static_cast<double>(line);
+        g.setColour(line == 0 ? motion::style::axisY().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f));
+        drawWorldLine(g, {value, -5, 0}, {value, 5, 0});
+        g.setColour(line == 0 ? motion::style::axisX().withAlpha(.3f) : osci::Colours::text().withAlpha(.045f));
+        drawWorldLine(g, {-5, value, 0}, {5, value, 0});
     }
     if (prepared == nullptr || prepared->clips.empty()) {
         g.setColour(osci::Colours::text().withAlpha(0.5f));
         g.setFont(motion::style::body());
         // Clear of the tool strip on the left; wraps in a narrow Scene.
         g.drawFittedText(prepared == nullptr ? juce::String("Preparing...") : emptyMessage(), getLocalBounds().withTrimmedLeft(48).reduced(12, 0), juce::Justification::centred, 3);
+        paintOrientation(g);
         return;
     }
     juce::Graphics::ScopedSaveState sceneState(g);
     const auto time = editingTime();
-    const auto view = camera.view();
-    for (const auto& clip : prepared->clips) {
-        const auto sampleTime = clip.editorId() == selected && atSelectedPathEnd(time) ? std::nextafter(time, 0.0) : time;
-        if (!clip.active(sampleTime)) {
-            continue;
+    const motion::PreparedClip* clip = nullptr;
+    bool highlighted = false, pickable = false;
+    auto chosen = picked.end();
+    for (const auto& piece : screenPieces()) {
+        if (piece.clip != clip) {
+            clip = piece.clip;
+            const auto id = clip->editorId();
+            highlighted = !partMode && (id == selected || (isSelected && isSelected(id)) || (dropHover.has_value() && *dropHover != 0 && id == *dropHover));
+            // Picking parts, objects that can only be picked whole step back.
+            pickable = partMode && partDrawing(*clip) != nullptr;
+            chosen = pickable ? picked.find(id) : picked.end();
         }
-        // Walk stored point frames at their native density so short lit
-        // runs remain visible in the editing view. Output uses its audio rate.
-        const auto* source = clip.resolveSource(liveFrames.get());
-        if (source == nullptr) { continue; }
-        const auto sampleCount = source->previewSampleCount();
-        const auto previewSpan = source->previewPhaseSpan();
-        const auto firstPoint = clip.sample(sampleTime, 0, previewSpan, 0, liveFrames.get());
-        const auto highlighted = clip.editorId() == selected || (dropHover.has_value() && *dropHover != 0 && clip.editorId() == *dropHover);
-        auto previous = projected(view, firstPoint, time);
-        bool previousLit = firstPoint.r != 0 || firstPoint.g != 0 || firstPoint.b != 0;
-        for (std::size_t i = 1; i <= sampleCount; ++i) {
-            const auto point = clip.sample(sampleTime, static_cast<double>(i) / sampleCount, previewSpan, 0, liveFrames.get());
-            const auto next = projected(view, point, time);
-            const bool lit = point.r != 0 || point.g != 0 || point.b != 0;
-            if (!previous.has_value() || !next.has_value() || !previousLit || !lit) {
-                previous = next;
-                previousLit = lit;
-                continue;
-            }
-            // Long, fast jumps fade so the drawn shape reads over them.
-            const auto distance = previous->getDistanceFrom(*next);
-            const auto alpha = std::min(1.0f, 12.0f / std::max(1.0f, distance));
-            const auto colour = highlighted ? motion::style::selection() : juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1);
-            (highlighted ? highlightedLines : lines).add({ *previous, *next }, colour.withAlpha(alpha * 0.8f));
-            previous = next;
-            previousLit = lit;
+        // Long, fast jumps in a traced beam fade so the shape reads over them.
+        auto alpha = piece.shape < 0 ? std::min(1.0f, 12.0f / std::max(1.0f, piece.line.getLength())) * .8f : .85f;
+        if (partMode && !pickable) { alpha *= .3f; }
+        // Lines beyond the orbit pivot fade with depth, so 3D reads at a glance.
+        alpha *= depthFade(piece.depth);
+        const auto shape = static_cast<std::size_t>(std::max(0, piece.shape));
+        const auto isChosen = chosen != picked.end() && piece.shape >= 0 && chosen->second.shapes.contains(shape);
+        const auto hovered = pickable && piece.shape >= 0 && hoverPart.has_value() && hoverPart->clip == clip->editorId() && hoverShapes.contains(shape);
+        if (highlighted || isChosen) {
+            highlightedLines.add(piece.line, motion::style::selection().withAlpha(alpha));
+        } else if (hovered) {
+            highlightedLines.add(piece.line, juce::Colours::white.withAlpha(.9f));
+        } else {
+            // Unpicked parts are neutral, so the picked ones stand out.
+            lines.add(piece.line, pickable ? osci::Colours::text().withAlpha(.5f * depthFade(piece.depth)) : piece.colour.withAlpha(alpha));
         }
     }
     lines.stroke(g, 1.0f);
     highlightedLines.stroke(g, 1.4f);
     paintCameras(g, time);
     paintMotionPath(g);
-    currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle);
+    if (!partMode) { currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle); }
+    if (marquee.has_value()) {
+        juce::Path region;
+        if (partMode && partPick == PartPick::lasso) {
+            region = lasso;
+            region.closeSubPath();
+        } else {
+            region.addRectangle(*marquee);
+        }
+        g.setColour(osci::Colours::accentColor().withAlpha(.08f));
+        g.fillPath(region);
+        g.setColour(osci::Colours::accentColor().withAlpha(.7f));
+        const float dashes[] {4.0f, 3.0f};
+        juce::Path dashed;
+        juce::PathStrokeType(1.0f).createDashedStroke(dashed, region, dashes, 2);
+        g.fillPath(dashed);
+    }
+    paintOrientation(g);
+    if (partCount.isVisible()) {
+        motion::style::fillFloatingPanel(g, partBar().toFloat(), osci::Colours::veryDark());
+    }
+}
+
+const std::vector<MotionCompositionView::ScreenPiece>& MotionCompositionView::screenPieces() const {
+    auto live = processor.liveSourcePreview();
+    const auto time = editingTime();
+    const PiecesKey key {preparedSerial, live.get(), time, camera.position.x, camera.position.y, camera.position.z, camera.yaw, camera.pitch, camera.fovDegrees, selected, getWidth(), getHeight()};
+    if (pieceKey == key) { return pieceCache; }
+    pieceKey = key;
+    // Held so a later set of live frames cannot reuse this one's address.
+    pieceLive = std::move(live);
+    pieceCache.clear();
+    if (prepared == nullptr) { return pieceCache; }
+    const auto view = camera.view();
+    for (const auto& clip : prepared->clips) {
+        const auto sampleTime = clipTime(clip, time);
+        if (!clip.active(sampleTime)) { continue; }
+        forEachPiece(clip, sampleTime, view, pieceLive.get(), [&](const Piece& piece) {
+            const auto line = screenLine(view, piece.a, piece.b);
+            if (line.has_value()) { pieceCache.push_back({*line, piece.a, piece.b, piece.colour, &clip, piece.shape, static_cast<float>(view->toEye((piece.a + piece.b) * .5).z)}); }
+        });
+    }
+    return pieceCache;
+}
+
+float MotionCompositionView::depthFade(double depth) const {
+    const auto pivot = std::max(1.0e-6, camera.distance());
+    return static_cast<float>(std::clamp(1.0 - (depth - pivot) / pivot, .4, 1.0));
+}
+
+double MotionCompositionView::clipTime(const motion::PreparedClip& clip, double time) const {
+    return clip.editorId() == selected && atSelectedPathEnd(time) ? std::nextafter(time, 0.0) : time;
+}
+
+bool MotionCompositionView::warps(const motion::PreparedClip& clip) const {
+    const auto stage = [](const motion::PreparedClipStage& item) {
+        return !item.effects.empty() || !item.trackEffects.empty() || !item.compositionEffects.empty()
+            || std::any_of(item.groups.begin(), item.groups.end(), [](const auto& group) { return !group.effects.empty(); });
+    };
+    return (prepared != nullptr && prepared->hasCompositionEffects()) || stage(clip) || std::any_of(clip.ancestors.begin(), clip.ancestors.end(), stage);
+}
+
+void MotionCompositionView::forEachPiece(const motion::PreparedClip& clip, double time, const CameraView& view, const motion::LiveSourceFrames* live, const std::function<void(const Piece&)>& visit) const {
+    const auto* source = clip.resolveSource(live);
+    if (source == nullptr || !view.has_value()) { return; }
+    const auto lit = [](const osci::Point& point) { return point.r != 0 || point.g != 0 || point.b != 0; };
+    const auto colourOf = [](const osci::Point& point) { return juce::Colour::fromFloatRGBA(point.r, point.g, point.b, 1.0f); };
+    const auto* drawing = source->drawingAt(source->frameIndex(clip.localTime(time)));
+    if (drawing == nullptr) {
+        // Traced sources walk their stored points at native density, so
+        // short lit runs stay visible. Output uses its audio rate.
+        const auto count = source->previewSampleCount();
+        const auto span = source->previewPhaseSpan();
+        auto previous = clip.sample(time, 0, span, 0, live);
+        for (std::size_t index = 1; index <= count; ++index) {
+            const auto next = clip.sample(time, static_cast<double>(index) / count, span, 0, live);
+            if (lit(previous) && lit(next)) { visit({worldPoint(previous, time), worldPoint(next, time), colourOf(next), -1}); }
+            previous = next;
+        }
+        return;
+    }
+    const auto count = drawing->shapeCount();
+    const auto bent = warps(clip);
+    // Big sources take fewer steps per curve, so the Scene stays quick.
+    const auto mostSteps = static_cast<int>(std::clamp<std::size_t>(60000 / std::max<std::size_t>(1, count), 1, 48));
+    const auto pixels = outputFrame().getHeight() / 2.0;
+    const auto place = [&](osci::Shape& shape, float progress) {
+        const auto point = clip.processPoint(shape.nextVector(progress), time);
+        return std::pair {point, worldPoint(point, time)};
+    };
+    for (std::size_t index = 0; index < count; ++index) {
+        auto* shape = drawing->shape(index);
+        // Shapes of no length never reach the output, so they are not drawn.
+        if (shape == nullptr || !(shape->length() > 0)) { continue; }
+        const auto straight = dynamic_cast<osci::Line*>(shape) != nullptr;
+        const auto start = place(*shape, 0), end = place(*shape, 1);
+        int steps = 1;
+        // About one step per 4 px of curve on screen; effects can bend
+        // straight lines too.
+        if (bent || !straight) {
+            const auto least = straight ? 1 : std::min(4, mostSteps);
+            steps = mostSteps;
+            if (mostSteps > least) {
+                const auto first = view->project(start.second), middle = view->project(place(*shape, .5f).second), last = view->project(end.second);
+                if (first.has_value() && middle.has_value() && last.has_value()) {
+                    const auto span = (std::hypot(middle->x - first->x, middle->y - first->y) + std::hypot(last->x - middle->x, last->y - middle->y)) * pixels;
+                    if (std::isfinite(span)) { steps = static_cast<int>(std::clamp(std::ceil(span / 4), static_cast<double>(least), static_cast<double>(mostSteps))); }
+                }
+            }
+        }
+        auto previous = start;
+        for (int step = 1; step <= steps; ++step) {
+            const auto next = step == steps ? end : place(*shape, static_cast<float>(step) / steps);
+            if (lit(previous.first) && lit(next.first)) { visit({previous.second, next.second, colourOf(next.first), static_cast<int>(index)}); }
+            previous = next;
+        }
+    }
 }
 
 void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
     const auto* active = prepared->activeCamera(time);
+    const auto view = camera.view();
     for (const auto& camera : prepared->cameras) {
         if (camera.id == lockedCamera) { continue; }
         const auto frame = camera.frame(time);
@@ -237,46 +369,109 @@ void MotionCompositionView::paintCameras(juce::Graphics& g, double time) const {
         };
         const bool isActive = &camera == active, isSelected = camera.id == selected;
         const auto colour = isSelected ? motion::style::selection() : isActive ? osci::Colours::text() : osci::Colours::textMuted();
-        g.setColour(colour.withAlpha(isSelected || isActive ? .85f : .5f));
+        // Lines through the eye or out of view are cut where they leave it,
+        // so a camera stays drawn however near it is; it only fades as the
+        // view reaches its own position (a camera added where the view is).
+        const auto nearness = std::clamp(((this->camera.position - position).length() - .15) / .5, 0.0, 1.0);
+        g.setColour(colour.withAlpha((isSelected || isActive ? .85f : .5f) * static_cast<float>(nearness)));
         const auto corners = rectangle(.45);
-        // Seen from (nearly) inside the camera the pyramid would fill
-        // the view, so only its frame in the scene is drawn.
-        juce::Rectangle<float> extent;
-        bool visible = true;
-        for (const auto& corner : corners) {
-            const auto point = screenPoint(corner);
-            visible = visible && point.has_value();
-            if (point.has_value()) { extent = extent.isEmpty() ? juce::Rectangle<float>(*point, *point) : extent.getUnion(juce::Rectangle<float>(*point, *point)); }
+        for (std::size_t index = 0; index < corners.size(); ++index) {
+            drawWorldLine(g, position, corners[index]);
+            drawWorldLine(g, corners[index], corners[(index + 1) % corners.size()]);
         }
-        const auto apex = screenPoint(position);
-        visible = visible && apex.has_value() && getLocalBounds().toFloat().expanded(100.0f).contains(*apex);
-        if (visible && extent.getWidth() < getWidth() * .4f) {
-            for (std::size_t index = 0; index < corners.size(); ++index) {
-                drawWorldLine(g, position, corners[index]);
-                drawWorldLine(g, corners[index], corners[(index + 1) % corners.size()]);
-            }
-            // The triangle above the frame marks which way is up.
-            const auto top = (corners[0] + corners[1]) * .5;
-            const auto width = (corners[1] - corners[0]) * .3;
-            drawWorldLine(g, top - width, top + up * .12);
-            drawWorldLine(g, top + width, top + up * .12);
-        }
+        // The triangle above the frame marks which way is up.
+        const auto top = (corners[0] + corners[1]) * .5;
+        const auto width = (corners[1] - corners[0]) * .3;
+        drawWorldLine(g, top - width, top + up * .12);
+        drawWorldLine(g, top + width, top + up * .12);
         if (!isActive) { continue; }
         const auto depth = (motion::Vec3 {} - position).dot(forward);
         if (depth <= .5) { continue; }
         const auto shot = rectangle(depth);
         g.setColour(colour.withAlpha(isSelected ? .5f : .22f));
         for (std::size_t index = 0; index < shot.size(); ++index) {
-            const auto first = screenPoint(shot[index]), last = screenPoint(shot[(index + 1) % shot.size()]);
-            if (!first.has_value() || !last.has_value()) { continue; }
+            const auto line = screenLine(view, shot[index], shot[(index + 1) % shot.size()]);
+            if (!line.has_value()) { continue; }
             const float dashes[] {5.0f, 4.0f};
-            g.drawDashedLine({*first, *last}, dashes, 2, 1.0f);
+            g.drawDashedLine(*line, dashes, 2, 1.0f);
+        }
+    }
+}
+
+std::optional<MotionCompositionView::ViewPreset> MotionCompositionView::orientationHit(juce::Point<float> position) const {
+    const auto view = camera.view();
+    if (!view.has_value() || getWidth() < 240 || getHeight() < 160 || position.getDistanceFrom(orientationCentre()) > 44) { return std::nullopt; }
+    std::optional<ViewPreset> hit;
+    float nearest = 9;
+    const std::array<std::pair<motion::Vec3, ViewPreset>, 6> axes {{{{1, 0, 0}, ViewPreset::right}, {{-1, 0, 0}, ViewPreset::left}, {{0, 1, 0}, ViewPreset::top},
+        {{0, -1, 0}, ViewPreset::bottom}, {{0, 0, 1}, ViewPreset::front}, {{0, 0, -1}, ViewPreset::back}}};
+    // Ends that overlap go to the nearer one, which paint draws on top.
+    double nearestDepth = 2;
+    for (const auto& [direction, preset] : axes) {
+        const auto end = orientationCentre() + juce::Point<float>(static_cast<float>(direction.dot(view->right)), static_cast<float>(-direction.dot(view->up))) * 30.0f;
+        const auto distance = end.getDistanceFrom(position);
+        const auto depth = direction.dot(view->forward);
+        if (distance < nearest - .5f || (distance <= nearest + .5f && hit.has_value() && depth < nearestDepth)) {
+            nearest = std::min(nearest, distance);
+            nearestDepth = depth;
+            hit = preset;
+        } else if (!hit.has_value() && distance < nearest) {
+            nearest = distance;
+            nearestDepth = depth;
+            hit = preset;
+        }
+    }
+    return hit;
+}
+
+// Positive axes are lettered dots on a line; negative ones are rings. The
+// nearer end draws last.
+void MotionCompositionView::paintOrientation(juce::Graphics& g) const {
+    const auto view = camera.view();
+    if (!view.has_value() || getWidth() < 240 || getHeight() < 160) { return; }
+    const auto centre = orientationCentre();
+    if (hoverCorner) {
+        g.setColour(juce::Colours::white.withAlpha(.05f));
+        g.fillEllipse(juce::Rectangle<float>(80, 80).withCentre(centre));
+    }
+    struct Axis { motion::Vec3 direction; juce::Colour colour; const char* label; ViewPreset preset; };
+    std::array<Axis, 6> axes {{{{1, 0, 0}, motion::style::axisX(), "X", ViewPreset::right}, {{0, 1, 0}, motion::style::axisY(), "Y", ViewPreset::top}, {{0, 0, 1}, motion::style::axisZ(), "Z", ViewPreset::front},
+        {{-1, 0, 0}, motion::style::axisX(), "", ViewPreset::left}, {{0, -1, 0}, motion::style::axisY(), "", ViewPreset::bottom}, {{0, 0, -1}, motion::style::axisZ(), "", ViewPreset::back}}};
+    std::sort(axes.begin(), axes.end(), [&](const Axis& a, const Axis& b) { return a.direction.dot(view->forward) > b.direction.dot(view->forward); });
+    for (const auto& axis : axes) {
+        const auto end = centre + juce::Point<float>(static_cast<float>(axis.direction.dot(view->right)), static_cast<float>(-axis.direction.dot(view->up))) * 30.0f;
+        const auto lit = hoverAxis == axis.preset;
+        const auto dot = juce::Rectangle<float>(16, 16).withCentre(end);
+        if (*axis.label != 0) {
+            g.setColour(axis.colour.withAlpha(.7f));
+            g.drawLine({centre, end}, 2.0f);
+            g.setColour(lit ? axis.colour.brighter(.4f) : axis.colour);
+            g.fillEllipse(dot);
+            // The letter's own outline is centred, not its text box, whose
+            // ascent and side bearings sit it off centre.
+            juce::GlyphArrangement glyph;
+            glyph.addLineOfText(motion::style::heading(), axis.label, 0, 0);
+            juce::Path letter;
+            glyph.createPath(letter);
+            const auto ink = letter.getBounds();
+            g.setColour(osci::Colours::veryDark());
+            g.fillPath(letter, juce::AffineTransform::translation(dot.getCentreX() - ink.getCentreX(), dot.getCentreY() - ink.getCentreY()));
+        } else {
+            g.setColour(osci::Colours::veryDark());
+            g.fillEllipse(dot.reduced(2));
+            g.setColour(axis.colour.withAlpha(lit ? .9f : .55f));
+            g.drawEllipse(dot.reduced(2.5f), 1.5f);
         }
     }
 }
 
 void MotionCompositionView::mouseDoubleClick(const juce::MouseEvent& event) {
-    if (navigating || prepared == nullptr || !event.mods.isLeftButtonDown() || event.mods.isAltDown()) { return; }
+    if (navigating || prepared == nullptr || !event.mods.isLeftButtonDown() || event.mods.isAltDown() || orientationHit(event.position).has_value()) { return; }
+    if (partMode) {
+        const auto part = pickPart(event.position);
+        if (part.has_value()) { pickPath(*part, event.mods.isShiftDown()); }
+        return;
+    }
     const auto hit = pickAt(event.position, nullptr);
     if (hit == 0 || !onOpenSource) { return; }
     cancelGesture();
@@ -288,6 +483,7 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     grabKeyboardFocus();
     cancelGesture();
     dragHint.clear();
+    resetMarquee();
     navigationDrag = event.mods.isAltDown() || event.mods.isMiddleButtonDown();
     panDrag = event.mods.isShiftDown();
     cameraAtDown = camera;
@@ -307,7 +503,28 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
         if (onContextMenu) { onContextMenu(); }
         return;
     }
-    if (!event.mods.isLeftButtonDown() || prepared == nullptr) {
+    if (!event.mods.isLeftButtonDown()) {
+        return;
+    }
+    const auto axis = orientationHit(event.position);
+    if (axis.has_value()) {
+        setViewPreset(*axis);
+        return;
+    }
+    if (prepared == nullptr) { return; }
+    const auto adding = event.mods.isShiftDown();
+    if (partMode) {
+        // A drag picks with the box or lasso from anywhere; a click picks the
+        // part under the pointer (Shift toggles it), or clears on empty space.
+        marqueeArmed = true;
+        marqueeAdds = adding;
+        pressedPart = pickPart(event.position);
+        lasso.clear();
+        if (partPick == PartPick::lasso) { lasso.startNewSubPath(event.position); }
+        if (!pressedPart.has_value()) {
+            const auto whole = pickAt(event.position, nullptr);
+            if (whole != 0 && onStatus) { onStatus(partBlocker(whole)); }
+        }
         return;
     }
     if (showMotionPath && seekMotionKey(event.position)) { return; }
@@ -332,6 +549,15 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     }
     const auto time = editingTime();
     const auto hit = pickAt(event.position, &dragAnchor);
+    // Empty space starts a marquee; Shift adds to the selection.
+    if (hit == 0) {
+        marqueeArmed = true;
+        marqueeAdds = adding;
+        if (adding) { return; }
+    } else if (adding) {
+        if (onSelectClips) { onSelectClips({hit}, SelectionChange::toggle); }
+        return;
+    }
     selected = hit;
     if (onSelection) {
         onSelection(hit);
@@ -355,6 +581,17 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
             camera.orbit(-delta.x * 0.006, delta.y * 0.006);
         }
         repaint();
+        return;
+    }
+    if (marqueeArmed) {
+        if (marquee.has_value() || event.getDistanceFromDragStart() >= 3) {
+            marquee = juce::Rectangle<float>(down, event.position);
+            if (partMode && partPick == PartPick::lasso) {
+                lasso.lineTo(event.position);
+                marquee = lasso.getBounds();
+            }
+            repaint();
+        }
         return;
     }
     if (!validGesture() || !gizmoAtDown.has_value()) { return; }
@@ -449,6 +686,32 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
 
 void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
     navigationDrag = false;
+    if (marqueeArmed) {
+        marqueeArmed = false;
+        const auto area = marquee;
+        marquee.reset();
+        if (area.has_value() && partMode) {
+            juce::Path region;
+            if (partPick == PartPick::lasso) {
+                region = lasso;
+                region.closeSubPath();
+            } else {
+                region.addRectangle(*area);
+            }
+            pickParts(region, marqueeAdds, partPick == PartPick::pieces);
+            lasso.clear();
+        } else if (area.has_value()) {
+            if (onSelectClips) { onSelectClips(clipsIn(*area), marqueeAdds ? SelectionChange::add : SelectionChange::replace); }
+        } else if (partMode && pressedPart.has_value()) {
+            clickPart(*pressedPart, marqueeAdds);
+        } else if (partMode && !marqueeAdds && !picked.empty()) {
+            picked.clear();
+            refreshPartBar();
+        }
+        pressedPart.reset();
+        repaint();
+        return;
+    }
     if (validGesture()) {
         const auto label = tool == MotionTransformTool::move ? "Move object" : tool == MotionTransformTool::rotate ? "Rotate object" : "Scale object";
         // The Graph shows the channel the drag changed.
@@ -458,29 +721,245 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
 }
 
 motion::Id MotionCompositionView::pickAt(juce::Point<float> position, motion::Vec3* anchor) const {
-    const auto liveFrames = processor.liveSourcePreview();
     float nearest = 18;
-    motion::Id hit = 0;
-    const auto time = editingTime();
-    const auto view = camera.view();
-    for (const auto& clip : prepared->clips) {
-        if (!clip.active(time)) {
-            continue;
+    const ScreenPiece* hit = nullptr;
+    for (const auto& piece : screenPieces()) {
+        juce::Point<float> closest;
+        const auto distance = piece.line.getDistanceFromPoint(position, closest);
+        if (distance < nearest) {
+            nearest = distance;
+            hit = &piece;
         }
-        for (int i = 0; i < 256; ++i) {
-            const auto sample = clip.sample(time, i / 256.0, 0, 0, liveFrames.get());
-            if (sample.r == 0 && sample.g == 0 && sample.b == 0) { continue; }
-            const auto point = projected(view, sample, time);
-            if (!point.has_value()) { continue; }
-            const auto distance = point->getDistanceFrom(position);
-            if (distance < nearest) {
-                nearest = distance;
-                hit = clip.editorId();
-                if (anchor != nullptr) { *anchor = worldPoint(sample, time); }
-            }
+    }
+    if (hit == nullptr) { return 0; }
+    if (anchor != nullptr) { *anchor = nearestOnSegment(position, hit->a, hit->b); }
+    return hit->clip->editorId();
+}
+
+// The point of a world segment nearest the pointer's ray: where the pointer
+// is, at the segment's depth.
+motion::Vec3 MotionCompositionView::nearestOnSegment(juce::Point<float> position, motion::Vec3 a, motion::Vec3 b) const {
+    const auto ray = camera.ray(normalized(position));
+    if (!ray.has_value()) { return a; }
+    const auto along = b - a, offset = a - ray->origin;
+    const auto length = along.dot(along), facing = along.dot(ray->direction), lean = along.dot(offset), reach = ray->direction.dot(offset);
+    const auto denominator = length - facing * facing;
+    const auto fraction = std::abs(denominator) > 1.0e-12 ? std::clamp((facing * reach - lean) / denominator, 0.0, 1.0) : 0.0;
+    return a + along * fraction;
+}
+
+std::vector<motion::Id> MotionCompositionView::clipsIn(juce::Rectangle<float> area) const {
+    std::vector<motion::Id> ids;
+    for (const auto& piece : screenPieces()) {
+        const auto id = piece.clip->editorId();
+        if (std::find(ids.begin(), ids.end(), id) == ids.end() && area.intersects(piece.line)) { ids.push_back(id); }
+    }
+    return ids;
+}
+
+const motion::PreparedDrawing* MotionCompositionView::partDrawing(const motion::PreparedClip& clip) const {
+    if (!clip.ancestors.empty() || clip.liveIdentity != nullptr || clip.source == nullptr || clip.source->frameCount() != 1) { return nullptr; }
+    return clip.source->drawingAt(0);
+}
+
+juce::String MotionCompositionView::partBlocker(motion::Id id) const {
+    const auto& project = processor.document.project();
+    const auto* clip = motion::findClip(project, id);
+    if (clip == nullptr || clip->composition != 0) { return "Compositions are picked whole"; }
+    const auto asset = motion::findAsset(project.assets, clip->asset);
+    return asset != nullptr ? motion::parts::unavailableReason(*asset) : juce::String();
+}
+
+std::optional<MotionCompositionView::PartHit> MotionCompositionView::pickPart(juce::Point<float> position) const {
+    std::optional<PartHit> hit;
+    float nearest = 8;
+    for (const auto& piece : screenPieces()) {
+        if (piece.shape < 0 || partDrawing(*piece.clip) == nullptr) { continue; }
+        juce::Point<float> closest;
+        const auto distance = piece.line.getDistanceFromPoint(position, closest);
+        if (distance < nearest) {
+            nearest = distance;
+            hit = PartHit {piece.clip->editorId(), static_cast<std::size_t>(piece.shape)};
         }
     }
     return hit;
+}
+
+// A shape is picked when all of it on screen lies inside the area, as
+// Blender's box select takes edges; picking pieces takes every piece the
+// area touches.
+void MotionCompositionView::pickParts(const juce::Path& area, bool add, bool touching) {
+    if (prepared == nullptr) { return; }
+    if (!add) { picked.clear(); }
+    const auto bounds = area.getBounds();
+    std::map<const motion::PreparedClip*, std::vector<signed char>> inside;
+    for (const auto& piece : screenPieces()) {
+        const auto* drawing = piece.shape >= 0 ? partDrawing(*piece.clip) : nullptr;
+        if (drawing == nullptr) { continue; }
+        auto& states = inside[piece.clip];
+        states.resize(drawing->shapeCount(), -1);
+        auto& state = states[static_cast<std::size_t>(piece.shape)];
+        if (touching) {
+            // Pieces are picked with a box: any crossing counts.
+            state = static_cast<signed char>(state == 1 || bounds.intersects(piece.line) ? 1 : 0);
+        } else {
+            const auto within = area.contains(piece.line.getStart()) && area.contains(piece.line.getEnd());
+            state = static_cast<signed char>(state != 0 && within ? 1 : 0);
+        }
+    }
+    for (const auto& [clip, states] : inside) {
+        const auto paths = touching ? motion::parts::pathIndices(*partDrawing(*clip)) : std::vector<std::size_t>();
+        std::set<std::size_t> touchedPaths;
+        for (std::size_t shape = 0; shape < states.size(); ++shape) {
+            if (states[shape] == 1 && touching) { touchedPaths.insert(paths[shape]); }
+        }
+        for (std::size_t shape = 0; shape < states.size(); ++shape) {
+            if (touching ? !touchedPaths.contains(paths[shape]) : states[shape] != 1) { continue; }
+            auto& entry = picked[clip->editorId()];
+            entry.source = clip->source;
+            entry.shapes.insert(shape);
+        }
+    }
+    refreshPartBar();
+    repaint();
+}
+
+// Every shape of every object whose parts can be picked, on screen or not.
+void MotionCompositionView::pickAllParts() {
+    if (prepared == nullptr) { return; }
+    picked.clear();
+    const auto time = editingTime();
+    for (const auto& clip : prepared->clips) {
+        const auto* drawing = partDrawing(clip);
+        if (drawing == nullptr || !clip.active(clipTime(clip, time))) { continue; }
+        for (std::size_t shape = 0; shape < drawing->shapeCount(); ++shape) {
+            auto* item = drawing->shape(shape);
+            if (item == nullptr || !(item->length() > 0)) { continue; }
+            auto& entry = picked[clip.editorId()];
+            entry.source = clip.source;
+            entry.shapes.insert(shape);
+        }
+    }
+    refreshPartBar();
+    repaint();
+}
+
+// What a click on `part` picks: the shape, or with pieces its whole piece.
+std::set<std::size_t> MotionCompositionView::pickedBy(PartHit part) const {
+    std::set<std::size_t> shapes {part.shape};
+    if (partPick != PartPick::pieces || prepared == nullptr) { return shapes; }
+    const auto clip = std::find_if(prepared->clips.begin(), prepared->clips.end(), [&](const auto& item) { return item.editorId() == part.clip && partDrawing(item) != nullptr; });
+    if (clip == prepared->clips.end()) { return shapes; }
+    const auto paths = motion::parts::pathIndices(*partDrawing(*clip));
+    for (std::size_t shape = 0; shape < paths.size(); ++shape) {
+        if (part.shape < paths.size() && paths[shape] == paths[part.shape]) { shapes.insert(shape); }
+    }
+    return shapes;
+}
+
+// A click picks one shape, or with pieces its whole piece; Shift toggles.
+void MotionCompositionView::clickPart(PartHit part, bool adding) {
+    const auto clip = std::find_if(prepared->clips.begin(), prepared->clips.end(), [&](const auto& item) { return item.editorId() == part.clip && partDrawing(item) != nullptr; });
+    if (clip == prepared->clips.end()) { return; }
+    if (part.shape >= partDrawing(*clip)->shapeCount()) { return; }
+    const auto shapes = pickedBy(part);
+    const auto existing = picked.find(part.clip);
+    const auto already = existing != picked.end() && existing->second.shapes.contains(part.shape);
+    if (adding && already) {
+        for (const auto shape : shapes) { existing->second.shapes.erase(shape); }
+        if (existing->second.shapes.empty()) { picked.erase(existing); }
+    } else {
+        if (!adding && !already) { picked.clear(); }
+        auto& entry = picked[part.clip];
+        entry.source = clip->source;
+        entry.shapes.insert(shapes.begin(), shapes.end());
+    }
+    refreshPartBar();
+}
+
+// The whole path the shape is part of: a letter's outline, a polyline.
+void MotionCompositionView::pickPath(PartHit hit, bool add) {
+    const auto found = std::find_if(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) { return clip.editorId() == hit.clip && partDrawing(clip) != nullptr; });
+    if (found == prepared->clips.end()) { return; }
+    const auto paths = motion::parts::pathIndices(*partDrawing(*found));
+    if (hit.shape >= paths.size()) { return; }
+    if (!add) { picked.clear(); }
+    auto& entry = picked[hit.clip];
+    entry.source = found->source;
+    for (std::size_t shape = 0; shape < paths.size(); ++shape) {
+        if (paths[shape] == paths[hit.shape]) { entry.shapes.insert(shape); }
+    }
+    refreshPartBar();
+    repaint();
+}
+
+// Picks follow their source: a changed or removed source drops them.
+void MotionCompositionView::prunePicked() {
+    for (auto entry = picked.begin(); entry != picked.end();) {
+        const auto still = prepared != nullptr && std::any_of(prepared->clips.begin(), prepared->clips.end(), [&](const auto& clip) {
+            return clip.editorId() == entry->first && clip.source == entry->second.source && partDrawing(clip) != nullptr;
+        });
+        entry = still ? std::next(entry) : picked.erase(entry);
+    }
+    hoverPart.reset();
+    refreshPartBar();
+}
+
+std::size_t MotionCompositionView::pickedPartCount() const {
+    std::size_t count = 0;
+    for (const auto& [id, entry] : picked) { count += entry.shapes.size(); }
+    return count;
+}
+
+void MotionCompositionView::setPartMode(bool enabled) {
+    if (partMode == enabled) { return; }
+    setNavigating(false);
+    cancelGesture();
+    partMode = enabled;
+    resetMarquee();
+    setMouseCursor(enabled ? juce::MouseCursor::CrosshairCursor : juce::MouseCursor::NormalCursor);
+    hoverPart.reset();
+    hoverShapes.clear();
+    hoverHandle = -1;
+    if (!enabled) { picked.clear(); }
+    refreshPartBar();
+    if (onPartModeChanged) { onPartModeChanged(enabled); }
+    repaint();
+}
+
+void MotionCompositionView::extractPicked() {
+    if (!picked.empty() && onExtractParts) { onExtractParts(picked); }
+}
+
+void MotionCompositionView::resetMarquee() {
+    marqueeArmed = false;
+    marquee.reset();
+    lasso.clear();
+    pressedPart.reset();
+}
+
+void MotionCompositionView::refreshPartBar() {
+    const auto count = pickedPartCount();
+    const auto shown = partMode && count > 0;
+    partCount.setText(juce::String(static_cast<juce::uint64>(count)) + (count == 1 ? " part" : " parts"), juce::dontSendNotification);
+    partCount.setVisible(shown);
+    extractButton.setVisible(shown);
+    resized();
+    repaint();
+}
+
+// The part bar: the count, then Extract, 4 px inside a floating panel
+// 12 px above the Scene's foot.
+juce::Rectangle<int> MotionCompositionView::partBar() const {
+    const auto labelWidth = juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(motion::style::body(), partCount.getText()))) + 2 * 12;
+    const auto width = labelWidth + 72 + 2 * 4;
+    return {(getWidth() - width) / 2, getHeight() - 12 - 32, width, 32};
+}
+
+void MotionCompositionView::resized() {
+    auto bar = partBar().reduced(4);
+    extractButton.setBounds(bar.removeFromRight(72));
+    partCount.setBounds(bar);
 }
 
 void MotionCompositionView::itemDragMove(const SourceDetails& details) {
@@ -566,6 +1045,21 @@ void MotionCompositionView::mouseMagnify(const juce::MouseEvent&, float scale) {
 
 void MotionCompositionView::mouseMove(const juce::MouseEvent& event) {
     if (!navigating) {
+        const auto axis = orientationHit(event.position);
+        const auto inCorner = getLocalBounds().toFloat().removeFromTop(96).removeFromRight(96).contains(event.position);
+        if (axis != hoverAxis || inCorner != hoverCorner) {
+            hoverAxis = axis;
+            hoverCorner = inCorner;
+            repaint();
+        }
+        if (partMode) {
+            const auto part = axis.has_value() ? std::nullopt : pickPart(event.position);
+            const auto changed = part.has_value() != hoverPart.has_value() || (part.has_value() && (part->clip != hoverPart->clip || part->shape != hoverPart->shape));
+            hoverPart = part;
+            if (changed) { hoverShapes = part.has_value() ? pickedBy(*part) : std::set<std::size_t>(); }
+            if (changed) { repaint(); }
+            return;
+        }
         const auto hit = currentGizmo().hitTest(event.position);
         if (hit != hoverHandle) { hoverHandle = hit; repaint(); }
         return;
@@ -582,7 +1076,18 @@ bool MotionCompositionView::keyPressed(const juce::KeyPress& key) {
         if (navigating) { setNavigating(false); return true; }
         if (validGesture()) { cancelGesture(); return true; }
         if (navigationDrag) { camera = cameraAtDown; navigationDrag = false; repaint(); return true; }
+        if (marqueeArmed) { resetMarquee(); repaint(); return true; }
+        // Escape clears the picked parts, then leaves part mode.
+        if (partMode && !picked.empty()) { picked.clear(); refreshPartBar(); return true; }
+        if (partMode) { setPartMode(false); return true; }
     }
+    // Tab switches between objects and their parts, as Blender's edit mode.
+    if (key == juce::KeyPress::tabKey && !navigating) { setPartMode(!partMode); return true; }
+    if (partMode && key == juce::KeyPress('a', juce::ModifierKeys::commandModifier, 0)) {
+        pickAllParts();
+        return true;
+    }
+    if (partMode && !key.getModifiers().isAnyModifierKeyDown() && key.getKeyCode() == 'E') { extractPicked(); return true; }
     // Views along an axis: numpad 1, 3, 7 (Ctrl for the opposite side), or
     // 1, 3, 7 on the number row as with Blender's emulated numpad.
     const auto code = key.getKeyCode();
@@ -665,20 +1170,21 @@ void MotionCompositionView::paintMotionPath(juce::Graphics& g) {
     if (!showMotionPath || navigating || selected == 0) { return; }
     updateMotionPath();
     const auto colour = motion::style::motionPath();
-    std::optional<juce::Point<float>> previous;
-    for (const auto& point : motionPath.points) {
-        const auto screen = screenPoint(point.position);
-        if (screen.has_value()) {
-            if (previous.has_value() && !point.breakBefore) {
+    const auto view = camera.view();
+    for (std::size_t index = 0; index < motionPath.points.size(); ++index) {
+        const auto& point = motionPath.points[index];
+        if (index > 0 && !point.breakBefore) {
+            const auto line = screenLine(view, motionPath.points[index - 1].position, point.position);
+            if (line.has_value()) {
                 g.setColour(colour.withAlpha(0.35f));
-                g.drawLine({*previous, *screen}, 1);
-            }
-            if (point.dot) {
-                g.setColour(colour.withAlpha(0.65f));
-                g.fillEllipse(screen->x - 1.5f, screen->y - 1.5f, 3, 3);
+                g.drawLine(*line, 1);
             }
         }
-        previous = screen;
+        const auto screen = screenPoint(point.position);
+        if (screen.has_value() && point.dot) {
+            g.setColour(colour.withAlpha(0.65f));
+            g.fillEllipse(screen->x - 1.5f, screen->y - 1.5f, 3, 3);
+        }
     }
     for (const auto& point : motionPath.points) {
         if (!point.key) { continue; }
@@ -816,8 +1322,19 @@ std::optional<juce::Point<float>> MotionCompositionView::screenPoint(const Camer
 }
 
 void MotionCompositionView::drawWorldLine(juce::Graphics& g, motion::Vec3 start, motion::Vec3 end) const {
-    const auto first = screenPoint(start), last = screenPoint(end);
-    if (first.has_value() && last.has_value()) { g.drawLine({ *first, *last }, 1); }
+    const auto line = screenLine(camera.view(), start, end);
+    if (line.has_value()) { g.drawLine(*line, 1); }
+}
+
+std::optional<juce::Line<float>> MotionCompositionView::screenLine(const CameraView& view, motion::Vec3 start, motion::Vec3 end) const {
+    if (!view.has_value()) { return std::nullopt; }
+    const auto segment = view->projectSegment(view->toEye(start), view->toEye(end));
+    if (!segment.has_value()) { return std::nullopt; }
+    const auto frame = outputFrame();
+    const auto toScreen = [&frame](motion::editor::Vec2 point) {
+        return juce::Point<float>(static_cast<float>(frame.getCentreX() + point.x * frame.getWidth() / 2), static_cast<float>(frame.getCentreY() - point.y * frame.getHeight() / 2));
+    };
+    return juce::Line<float>(toScreen(segment->first), toScreen(segment->second));
 }
 
 bool MotionCompositionView::level(const motion::Curve& curve) {

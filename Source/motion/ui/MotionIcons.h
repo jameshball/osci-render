@@ -8,13 +8,28 @@
 // drawn at 18 px so their 2 px strokes land on whole device pixels on
 // high-density displays. One button draws them all, so toolbars match.
 namespace motion::icons {
-enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, lock, trash, undo, redo, check, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, lineSpacing, keyframe, close };
+enum class Icon { bezier, wave, videocam, visibility, visibilityOff, move, rotate, scale, path, fly, frame, play, pause, start, end, loop, add, select, slip, stretch, ripple, magnet, pen, line, freehand, rectangle, ellipse, erase, lock, trash, undo, redo, check, record, settings, openInNew, fullscreen, fullscreenExit, aspectRatio, cast, bold, italic, alignLeft, alignCentre, alignRight, lineSpacing, keyframe, close, parts, box, lasso, connected };
 
 inline const juce::Path& path(Icon icon) {
     static const auto paths = [] {
         std::map<Icon, juce::Path> result;
         const auto add = [&result](Icon key, const char* data) { result[key] = juce::Drawable::parseSVGPath(data); };
         // A keyframe: an outlined diamond.
+        // Ways of picking parts: a dashed box, a lasso, separate pieces.
+        add(Icon::box, "M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2z");
+        add(Icon::connected, "M12 2l-5.5 9h11L12 2zm0 3.84L13.93 9h-3.87L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5s2.01 4.5 4.5 4.5 4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z");
+        {
+            juce::Path loop, rope, lasso, tail;
+            loop.addEllipse(3.0f, 3.0f, 18.0f, 11.5f);
+            juce::PathStrokeType(2.0f).createStrokedPath(lasso, loop);
+            rope.startNewSubPath(8.5f, 13.8f);
+            rope.cubicTo(6.0f, 16.0f, 10.0f, 18.5f, 7.0f, 21.5f);
+            juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded).createStrokedPath(tail, rope);
+            lasso.addPath(tail);
+            result[Icon::lasso] = lasso;
+        }
+        // A dashed marquee with a pointer: picking parts.
+        add(Icon::parts, "M17 5h-2V3h2v2zm-2 16h2v-2.59L19.59 21 21 19.59 18.41 17H21v-2h-6v6zm4-12h2V7h-2v2zm0 4h2v-2h-2v2zm-8 8h2v-2h-2v2zM7 5h2V3H7v2zM3 17h2v-2H3v2zm2 4v-2H3c0 1.1.9 2 2 2zM19 3v2h2c0-1.1-.9-2-2-2zm-8 2h2V3h-2v2zM3 9h2V7H3v2zm4 12h2v-2H7v2zm-4-8h2v-2H3v2zm0-8h2V3c-1.1 0-2 .9-2 2z");
         add(Icon::close, "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z");
         add(Icon::keyframe, "M12 3l9 9-9 9-9-9 9-9zm0 3.1L6.1 12 12 17.9 17.9 12 12 6.1z");
         add(Icon::move, "M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z");
@@ -188,41 +203,51 @@ public:
         }
         resized();
     }
-    int preferredWidth() const { return cell + 2 * inset; }
-    int preferredHeight() const {
-        int height = inset * 2, shown = 0;
-        for (const auto& group : groups) {
-            const auto count = std::count_if(group.begin(), group.end(), [](const auto* button) { return button->isVisible(); });
-            if (count == 0) { continue; }
-            height += static_cast<int>(count) * cell + (shown++ > 0 ? groupGap : 0);
-        }
-        return height;
-    }
+    // A strip runs down, or across when horizontal.
+    bool horizontal = false;
+    int preferredWidth() const { return horizontal ? length() : cell + 2 * inset; }
+    int preferredHeight() const { return horizontal ? cell + 2 * inset : length(); }
     void paint(juce::Graphics& g) override {
         const auto bounds = getLocalBounds().toFloat();
         // Opaque, so strokes behind it never show through the tools.
         motion::style::fillFloatingPanel(g, bounds, osci::Colours::veryDark());
         g.setColour(juce::Colours::white.withAlpha(.1f));
-        for (const auto y : separators) { g.fillRect(static_cast<float>(inset + 4), static_cast<float>(y), static_cast<float>(cell - 8), 1.0f); }
+        for (const auto at : separators) {
+            const auto across = static_cast<float>(inset + 4), along = static_cast<float>(at), extent = static_cast<float>(cell - 8);
+            if (horizontal) {
+                g.fillRect(along, across, 1.0f, extent);
+            } else {
+                g.fillRect(across, along, extent, 1.0f);
+            }
+        }
     }
     void resized() override {
         separators.clear();
-        int y = inset, shown = 0;
+        int position = inset, shown = 0;
         for (const auto& group : groups) {
             if (std::none_of(group.begin(), group.end(), [](const auto* button) { return button->isVisible(); })) { continue; }
             if (shown++ > 0) {
-                separators.push_back(y + groupGap / 2);
-                y += groupGap;
+                separators.push_back(position + groupGap / 2);
+                position += groupGap;
             }
             for (auto* button : group) {
                 if (!button->isVisible()) { continue; }
-                button->setBounds(inset, y, cell, cell);
-                y += cell;
+                button->setBounds(horizontal ? position : inset, horizontal ? inset : position, cell, cell);
+                position += cell;
             }
         }
         repaint();
     }
 private:
+    int length() const {
+        int total = inset * 2, shown = 0;
+        for (const auto& group : groups) {
+            const auto count = std::count_if(group.begin(), group.end(), [](const auto* button) { return button->isVisible(); });
+            if (count == 0) { continue; }
+            total += static_cast<int>(count) * cell + (shown++ > 0 ? groupGap : 0);
+        }
+        return total;
+    }
     std::vector<std::vector<juce::Button*>> groups;
     std::vector<int> separators;
 };

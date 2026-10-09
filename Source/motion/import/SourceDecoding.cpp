@@ -6,6 +6,7 @@
 #include "../live/BlenderCaptureArchive.h"
 #include "../model/Cancellation.h"
 #include "../model/Drawing.h"
+#include "../model/SourceParts.h"
 #include "FractalPreparation.h"
 #include <cstring>
 #include <new>
@@ -550,6 +551,9 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         for (const auto& segment : prepared.segments) {
             shapes.push_back(std::make_unique<osci::Line>(osci::Point(segment[0], segment[1], 0), osci::Point(segment[2], segment[3], 0)));
         }
+    } else if (extension == ".obj" && parts::isLineSet(content)) {
+        // Parts split from another source keep their place and size.
+        shapes = parts::lineSetShapes(content);
     } else if (extension == ".obj") {
         WorldObject object(content.toStdString());
         shapes = object.draw();

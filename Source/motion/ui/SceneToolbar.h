@@ -11,22 +11,23 @@ public:
 
     MotionSceneToolbar() {
         setName("Scene tools");
-        for (auto* tool : {&move, &rotate, &scale}) { tool->setRadioGroupId(91); tool->setClickingTogglesState(true); }
+        for (auto* tool : {&move, &rotate, &scale, &parts}) { tool->setRadioGroupId(91); tool->setClickingTogglesState(true); }
         path.setClickingTogglesState(true);
         move.setTooltip("Move (G)");
         rotate.setTooltip("Rotate (R)");
         scale.setTooltip("Scale (S)");
+        parts.setTooltip("Pick parts (Tab)");
         path.setTooltip("Motion path (P)");
         fly.setTooltip("Fly (N): mouse to look, WASD to move, Esc to finish");
         frame.setTooltip("Frame selection (F)");
         lookThrough.setClickingTogglesState(true);
         lookThrough.setTooltip("Look through the selected camera: moving the view moves the camera");
         keyCamera.setTooltip("Key the camera at the playhead: position, rotation and lens");
-        setGroups({{&move, &rotate, &scale}, {&path, &fly, &frame}, {&lookThrough, &keyCamera}});
+        setGroups({{&move, &rotate, &scale, &parts}, {&path, &fly, &frame}, {&lookThrough, &keyCamera}});
         lookThrough.setEnabled(false);
         keyCamera.setEnabled(false);
     }
-    Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale};
+    Tool move {"Move tool", motion::icons::Icon::move}, rotate {"Rotate tool", motion::icons::Icon::rotate}, scale {"Scale tool", motion::icons::Icon::scale}, parts {"Pick parts", motion::icons::Icon::parts};
     Tool lookThrough {"Look through camera", motion::icons::Icon::videocam}, keyCamera {"Key camera", motion::icons::Icon::keyframe};
     Tool path {"Show motion path", motion::icons::Icon::path}, fly {"Navigate composition view", motion::icons::Icon::fly}, frame {"Frame composition selection", motion::icons::Icon::frame};
     // A short Scene keeps only the transform tools.
@@ -36,8 +37,27 @@ public:
         for (auto* tool : {&path, &fly, &frame}) { tool->setVisible(!compact); }
         resized();
     }
-    int fullHeight() const { return cell * 8 + groupGap * 2 + inset * 2; }
+    int fullHeight() const { return cell * 9 + groupGap * 2 + inset * 2; }
     bool compact = false;
+};
+
+// How parts are picked, beside the parts tool while it is on: a box, a
+// lasso, or whole separate pieces.
+class MotionPartPickToolbar final : public motion::icons::ToolStrip {
+public:
+    using Tool = motion::icons::Button;
+
+    MotionPartPickToolbar() {
+        setName("Part picking");
+        horizontal = true;
+        for (auto* tool : {&box, &lasso, &connected}) { tool->setRadioGroupId(92); tool->setClickingTogglesState(true); }
+        box.setTooltip("Box");
+        lasso.setTooltip("Lasso");
+        connected.setTooltip("Whole pieces, such as a letter");
+        box.setToggleState(true, juce::dontSendNotification);
+        setGroups({{&box, &lasso, &connected}});
+    }
+    Tool box {"Box pick", motion::icons::Icon::box}, lasso {"Lasso pick", motion::icons::Icon::lasso}, connected {"Pick pieces", motion::icons::Icon::connected};
 };
 
 // The Scope's controls in the same floating strip, at its top right:

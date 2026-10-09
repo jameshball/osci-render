@@ -1,4 +1,5 @@
 #include "MotionEditor.h"
+#include "model/SourceParts.h"
 #include "import/SourceDecoding.h"
 #include "live/BlenderCaptureArchive.h"
 #include "ui/BlenderSourcePanel.h"
@@ -681,6 +682,49 @@ void MotionEditor::previewDrawing() {
         project.tracks.push_back(track);
     }
     processor.prepareComposition(project);
+}
+
+void MotionEditor::extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks) {
+    const auto& project = processor.document.project();
+    std::vector<motion::Document::PartSplit> splits;
+    for (const auto& [clipId, chosen] : picks) {
+        const auto* clip = motion::findClip(project, clipId);
+        const auto asset = clip != nullptr ? motion::findAsset(project.assets, clip->asset) : nullptr;
+        const auto* drawing = asset != nullptr ? motion::parts::drawingOf(*asset) : nullptr;
+        // The picks index the shapes the Scene showed; a source prepared
+        // since then may hold others.
+        if (drawing == nullptr || asset->source != chosen.source) {
+            statusBar.show("The object changed. Pick its parts again.");
+            return;
+        }
+        const auto split = motion::parts::split(*drawing, chosen.shapes);
+        if (!split.has_value()) {
+            statusBar.show("Pick some of the object's parts, not all of them.");
+            return;
+        }
+        // Both halves are small vector sources, prepared here so the split
+        // is one step.
+        const auto prepare = [&split](const juce::String& content) {
+            auto made = std::make_shared<motion::Asset>();
+            made->extension = split->extension;
+            made->data.append(content.toRawUTF8(), content.getNumBytesAsUTF8());
+            return motion::decodeAsset(*made).wasOk() ? made : nullptr;
+        };
+        auto part = prepare(split->part), rest = prepare(split->rest);
+        if (part == nullptr || rest == nullptr) {
+            statusBar.show("The parts could not be prepared.");
+            return;
+        }
+        splits.push_back({clipId, std::move(part), std::move(rest)});
+    }
+    std::vector<motion::Id> created;
+    const auto result = processor.document.extractParts(splits, created);
+    if (result.failed()) {
+        statusBar.show(result.getErrorMessage());
+        return;
+    }
+    composition.setPartMode(false);
+    timeline.selectClips(created);
 }
 
 // Examples are written to a temporary folder and imported like any file;

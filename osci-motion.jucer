@@ -497,6 +497,8 @@
               compile="1" resource="0" file="Source/motion/model/DocumentSerialisation.cpp"/>
         <FILE id="MotmodelDrawingh" name="Drawing.h" compile="0" resource="0"
               file="Source/motion/model/Drawing.h"/>
+        <FILE id="MotmodelSourcePartsh" name="SourceParts.h" compile="0" resource="0"
+              file="Source/motion/model/SourceParts.h"/>
         <FILE id="MotEffects" name="Effects.h" compile="0" resource="0" file="Source/motion/model/Effects.h"/>
         <FILE id="MotmodelFrameTimingh" name="FrameTiming.h" compile="0" resource="0"
               file="Source/motion/model/FrameTiming.h"/>

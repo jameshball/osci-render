@@ -301,7 +301,8 @@ inline void paintComboBox(juce::Graphics& g, int width, int height, juce::ComboB
 // A button's fill: one radius everywhere, and a disabled one goes neutral
 // so a dimmed primary never reads as available.
 inline void paintButtonBackground(juce::Graphics& g, juce::Button& button, juce::Colour colour, bool highlighted, bool down) {
-    const auto bounds = button.getLocalBounds().toFloat().reduced(.5f);
+    // Full bounds, so a button is exactly as tall and wide as a field beside it.
+    const auto bounds = button.getLocalBounds().toFloat();
     auto fill = colour;
     if (!button.isEnabled()) {
         fill = juce::Colours::white.withAlpha(.06f);
@@ -327,13 +328,18 @@ public:
         setColour(juce::ScrollBar::thumbColourId, juce::Colours::white.withAlpha(.16f));
     }
     juce::Font getMenuBarFont(juce::MenuBarComponent&, int, const juce::String&) override { return body(); }
-    // A hovered or open menu lifts slightly and keeps its light text.
+    // The menus sit on the window like the transport beside them, with no
+    // bar of their own.
+    void drawMenuBarBackground(juce::Graphics&, int, int, bool, juce::MenuBarComponent&) override {}
+    static constexpr int menuPadding = 8;
+    int getMenuBarItemWidth(juce::MenuBarComponent&, int, const juce::String& text) override { return juce::roundToInt(std::ceil(juce::TextLayout::getStringWidth(body(), text))) + 2 * menuPadding; }
+    // Quiet like the transport's icons until hovered; an open menu lifts.
     void drawMenuBarItem(juce::Graphics& g, int width, int height, int, const juce::String& text, bool over, bool open, bool, juce::MenuBarComponent& bar) override {
         if (open || (over && bar.isEnabled())) {
-            g.setColour(juce::Colours::white.withAlpha(open ? .12f : .07f));
-            g.fillRoundedRectangle(juce::Rectangle<float>(static_cast<float>(width), static_cast<float>(height)).reduced(1.0f, 3.0f), radius);
+            g.setColour(juce::Colours::white.withAlpha(open ? .12f : .08f));
+            g.fillRoundedRectangle(juce::Rectangle<float>(static_cast<float>(width), static_cast<float>(height)).reduced(0.0f, 4.0f), radius + 1);
         }
-        g.setColour(osci::Colours::text().withAlpha(bar.isEnabled() ? (open || over ? 1.0f : .85f) : .4f));
+        g.setColour(osci::Colours::text().withAlpha(bar.isEnabled() ? (open || over ? 1.0f : .72f) : .4f));
         g.setFont(body());
         g.drawFittedText(text, 0, 0, width, height, juce::Justification::centred, 1);
     }

@@ -78,6 +78,8 @@ private:
         motion::Id track = 0;  // dropped on this timeline track (0: a new track)
     };
     void beginSourceImport(SourceRequest request, motion::BakeSettings settings = {}, motion::RasterSettings rasterSettings = {});
+    // Splits picked shapes off a clip's source into a clip of their own.
+    void extractParts(const std::map<motion::Id, MotionCompositionView::Picked>& picks);
     void showNextPreparationSettings();
     void showBlenderSettings(motion::Id id = 0);
     void chooseSourceFile();
@@ -236,6 +238,7 @@ private:
     int previewWidth = 1, workspaceHeight = 1;
     juce::Label compositionTitle;
     MotionSceneToolbar sceneTools;
+    MotionPartPickToolbar partPickTools;
     MotionScopeToolbar scopeTools;
     // Properties lead: a clip's timing, then a text clip's character animation.
     osci::SectionStack inspectorLead;
@@ -259,6 +262,10 @@ private:
     motion::icons::Button startButton { "Go to start", motion::icons::Icon::start };
     motion::icons::Button endButton { "Go to end", motion::icons::Icon::end };
     motion::icons::Button loopButton { "Loop playback", motion::icons::Icon::loop };
+    // Undo and redo in the transport's style; the shared control stays out.
+    motion::icons::Button undoButton { "Undo", motion::icons::Icon::undo }, redoButton { "Redo", motion::icons::Icon::redo };
+    juce::Label undoDescription;
+    void refreshUndo();
     juce::Label timeLabel;
     motion::TimeGrid positionEditGrid;
     std::uint64_t positionEditGeneration = 0, positionEditRevision = 0;

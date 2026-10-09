@@ -207,6 +207,13 @@ public:
     // Pastes keys with their relative timing so the earliest lands at `time`.
     juce::Result pasteKeys(Id clipId, const std::vector<CopiedKey>& keys, double time);
     juce::Result removeClips(const std::vector<Id>& clipIds, bool ripple = false);
+    // Splits clips' sources into two prepared sources each, in one undo step:
+    // each clip keeps its `rest`, and a copy of it (timing, keys, effects and
+    // routes) plays its `part` on a new track just above, which keeps the
+    // track's effects, mute and solo. An old source leaves the library when
+    // no other clip uses it. Takes over both assets' identities and names.
+    struct PartSplit { Id clip = 0; std::shared_ptr<Asset> part, rest; };
+    juce::Result extractParts(const std::vector<PartSplit>& splits, std::vector<Id>& partClips);
     juce::Result renameAsset(Id assetId, juce::String name);
     // Swaps a source's media in place (same identity, so every clip keeps its
     // timing, keys and effects). The kind must match: visual for visual,
