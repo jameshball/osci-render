@@ -5,7 +5,7 @@
 #include "HiddenLineCrossings.h"
 #include "HiddenLineDepth.h"
 #include "HiddenLineFingerprint.h"
-#include "HiddenLineMidpoints.h"
+#include "HiddenLineDicing.h"
 #include "../model/Vec3.h"
 #include <thread>
 
@@ -62,9 +62,6 @@ inline bool bends(const PreparedClipStage& stage) {
 // The shortest run that culling leaves kept, in output units (the frame
 // spans -1 to 1): anything shorter would only draw a dot.
 inline constexpr double shortestOnScreen = .012;
-// Bent surfaces are diced until each piece is about this many pixels across
-// on screen, judged after every effect, point by point.
-inline constexpr double diceCell = 4;
 // Lines are tested every half pixel along their true path.
 inline constexpr double testStep = DepthBuffer::pixel;
 // A piece this short at the end of a cut run (two pixels) is too small to
@@ -97,12 +94,6 @@ inline void dropUnseen(std::vector<crossing::Triangle>& triangles, std::vector<s
     sources.resize(kept);
 }
 
-// A point of a face being diced: where it is in its source, and on screen.
-struct DiceCorner {
-    osci::Point source;
-    std::optional<Screen> at;
-};
-
 // What culling works in, kept from frame to frame so a worker's buffers are
 // allocated once rather than every frame: the depth buffer, the surfaces
 // gathered for crossings, and the scratch lists of points and runs. One per
@@ -113,7 +104,7 @@ struct Workspace {
     std::vector<std::array<osci::Point, 3>> sources;
     std::vector<std::optional<Vec3>> corners, eyes;
     std::vector<std::pair<double, double>> runs;
-    MidpointCache<DiceCorner> midpoints;
+    Dicer dicer;
 };
 
 // One frame with hidden lines removed, as the active camera sees it.
@@ -165,7 +156,6 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
         if (!point.has_value() || !(point->z > nearPlane)) { return std::nullopt; }
         return Screen {point->x / point->z * view->focalLength, point->y / point->z * view->focalLength, 1 / point->z};
     };
-    const auto pixels = [](const Screen& a, const Screen& b) { return std::hypot(b.x - a.x, b.y - a.y) / DepthBuffer::pixel; };
 
     // What hides. Its triangles are kept too when two or more surfaces could
     // cut through each other.
@@ -177,8 +167,6 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     surfaceSources.clear();
     const auto unproject = [&](const Screen& at) { return Vec3 {at.x / at.w / view->focalLength, at.y / at.w / view->focalLength, 1 / at.w}; };
     auto& corners = workspace.corners;
-    auto& midpoints = workspace.midpoints;
-    using Corner = DiceCorner;
     for (std::uint32_t surface = 0; surface < items.size(); ++surface) {
         const auto& item = items[surface];
         if (item.drawing == nullptr || item.drawing->faces().empty()) { continue; }
@@ -212,61 +200,16 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
                 }
                 continue;
             }
-            // Diced, point by point: halved across its longest edge, through
-            // a new point bent like any other, until no edge is longer than
-            // diceCell on screen. Pieces wholly off the frame hide nothing on
-            // it and are dropped.
-            const auto reach = DepthBuffer::extent;
-            midpoints.clear();
-            const auto off = [reach](const Corner& p, const Corner& q, const Corner& r) {
-                if (!p.at.has_value() && !q.at.has_value() && !r.at.has_value()) { return true; }
-                if (!p.at.has_value() || !q.at.has_value() || !r.at.has_value()) { return false; }
-                const auto past = [&](auto&& test) { return test(*p.at) && test(*q.at) && test(*r.at); };
-                return past([reach](const Screen& s) { return s.x < -reach; }) || past([reach](const Screen& s) { return s.x > reach; })
-                    || past([reach](const Screen& s) { return s.y < -reach; }) || past([reach](const Screen& s) { return s.y > reach; });
-            };
-            const auto split = [&](auto&& self, const Corner& p, const Corner& q, const Corner& r, int depthLeft) -> void {
-                if (off(p, q, r)) { return; }
-                // Lengths are compared squared, in pixels.
-                const auto length = [&](const Corner& u, const Corner& v) {
-                    if (!u.at.has_value() || !v.at.has_value()) { return std::numeric_limits<double>::infinity(); }
-                    const auto dx = (v.at->x - u.at->x) / DepthBuffer::pixel, dy = (v.at->y - u.at->y) / DepthBuffer::pixel;
-                    return dx * dx + dy * dy;
-                };
-                const auto pq = length(p, q), qr = length(q, r), rp = length(r, p);
-                // Behind the eye, a piece is split only so far.
-                if (!p.at.has_value() || !q.at.has_value() || !r.at.has_value()) { depthLeft = std::min(depthLeft, 12); }
-                if (std::max({pq, qr, rp}) <= diceCell * diceCell || depthLeft == 0) {
-                    if (p.at.has_value() && q.at.has_value() && r.at.has_value()) {
-                        depth.triangle(*p.at, *q.at, *r.at);
-                        if (surfaces > 1) {
-                            surfaceTriangles.push_back({{unproject(*p.at), unproject(*q.at), unproject(*r.at)}, surface});
-                            surfaceSources.push_back({p.source, q.source, r.source});
-                        }
+            // Diced point by point into pieces flat enough, once bent, to draw.
+            workspace.dicer.dice({mesh.vertices[triangle[0]], screen(a)}, {mesh.vertices[triangle[1]], screen(b)}, {mesh.vertices[triangle[2]], screen(c)},
+                [&](const osci::Point& point) { return screen(eye(*item.clip, point)); },
+                [&](const DiceCorner& p, const DiceCorner& q, const DiceCorner& r) {
+                    depth.triangle(*p.at, *q.at, *r.at);
+                    if (surfaces > 1) {
+                        surfaceTriangles.push_back({{unproject(*p.at), unproject(*q.at), unproject(*r.at)}, surface});
+                        surfaceSources.push_back({p.source, q.source, r.source});
                     }
-                    return;
-                }
-                const auto halve = [&](const Corner& u, const Corner& v) {
-                    return midpoints.at(u.source, v.source, [&] {
-                        const auto middle = osci::Point((u.source.x + v.source.x) * .5f, (u.source.y + v.source.y) * .5f, (u.source.z + v.source.z) * .5f);
-                        return Corner {middle, screen(eye(*item.clip, middle))};
-                    });
-                };
-                if (pq >= qr && pq >= rp) {
-                    const auto m = halve(p, q);
-                    self(self, p, m, r, depthLeft - 1);
-                    self(self, m, q, r, depthLeft - 1);
-                } else if (qr >= rp) {
-                    const auto m = halve(q, r);
-                    self(self, p, q, m, depthLeft - 1);
-                    self(self, p, m, r, depthLeft - 1);
-                } else {
-                    const auto m = halve(r, p);
-                    self(self, p, q, m, depthLeft - 1);
-                    self(self, m, q, r, depthLeft - 1);
-                }
-            };
-            split(split, {mesh.vertices[triangle[0]], screen(a)}, {mesh.vertices[triangle[1]], screen(b)}, {mesh.vertices[triangle[2]], screen(c)}, 40);
+                });
         }
     }
     if (depth.isEmpty()) { return frame; }
