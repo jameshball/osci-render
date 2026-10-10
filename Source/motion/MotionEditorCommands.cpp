@@ -202,7 +202,10 @@ void MotionEditor::showSceneMenu() {
     menu.addItem(motion::style::menuItem("Frame selection", 7, "F"));
     menu.addItem(motion::style::menuItem("Reset view", 8, "0"));
     juce::PopupMenu from;
-    for (std::size_t index = 0; index < views.size(); ++index) { from.addItem(motion::style::menuItem(views[index].first, static_cast<int>(index) + 1, views[index].second)); }
+    // Each view as the side of a cube it looks at, in the order Side lists them.
+    for (std::size_t index = 0; index < views.size(); ++index) {
+        from.addItem(motion::style::menuItem(views[index].first, static_cast<int>(index) + 1, views[index].second).setImage(motion::ui::menu_icons::viewCube(static_cast<motion::ui::menu_icons::Side>(index))));
+    }
     menu.addSubMenu("View from", from);
     menu.addSeparator();
     menu.addItem(motion::style::menuItem("Pick parts", 40, "Tab"));

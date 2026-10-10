@@ -344,6 +344,12 @@ public:
         g.drawFittedText(text, 0, 0, width, height, juce::Justification::centred, 1);
     }
     juce::Font getPopupMenuFont() override { return body(); }
+    // Room for an icon beside any menu item's name (the width a menu measures
+    // is its text's alone), so a name beside one never squeezes to fit.
+    void getIdealPopupMenuItemSize(const juce::String& text, bool separator, int standardHeight, int& width, int& height) override {
+        PluginLookAndFeel::getIdealPopupMenuItemSize(text, separator, standardHeight, width, height);
+        if (!separator) { width += 22; }
+    }
     juce::Font getTextButtonFont(juce::TextButton&, int) override { return body(); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return body(); }
     void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& colour, bool highlighted, bool down) override { paintButtonBackground(g, button, colour, highlighted, down); }

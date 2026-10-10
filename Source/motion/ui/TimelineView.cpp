@@ -1,4 +1,5 @@
 #include "TimelineView.h"
+#include "MenuIcons.h"
 #include "../model/KeyEdit.h"
 
 namespace {
@@ -2321,12 +2322,19 @@ void MotionTimelineView::addKeyAt(const Row& lane, int x, juce::ModifierKeys mod
 void MotionTimelineView::showKeyMenu() {
     if (selectedKeys.empty()) { return; }
     juce::PopupMenu menu;
-    menu.addItem(1, "Hold");
-    menu.addItem(2, "Linear");
-    menu.addItem(3, "Auto");
-    menu.addItem(4, "Bezier");
+    const char* names[] = {"Hold", "Linear", "Auto", "Bezier"};
+    for (int index = 0; index < 4; ++index) {
+        juce::PopupMenu::Item item(names[index]);
+        item.itemID = index + 1;
+        item.image = motion::ui::menu_icons::interpolation(index);
+        menu.addItem(std::move(item));
+    }
     menu.addSeparator();
-    menu.addItem(10, "Delete");
+    // In line with the shapes' names.
+    juce::PopupMenu::Item remove("Delete");
+    remove.itemID = 10;
+    remove.image = motion::ui::menu_icons::blank();
+    menu.addItem(std::move(remove));
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
         if (result == 10) { deleteSelectedKeys(); return; }
         const auto shape = static_cast<motion::Interpolation>(result - 1);
@@ -3005,8 +3013,12 @@ void MotionTimelineView::showTrackMenu(motion::Id id) {
     juce::PopupMenu labels;
     for (std::size_t index = 0; index < motion::style::trackLabels().size(); ++index) {
         const auto& label = motion::style::trackLabels()[index];
-        const auto colour = label.argb == 0 ? osci::Colours::textMuted() : juce::Colour(label.argb).brighter(.6f);
-        labels.addColouredItem(300 + static_cast<int>(index), label.name, colour, true, found->label == static_cast<int>(index));
+        juce::PopupMenu::Item item(label.name);
+        item.itemID = 300 + static_cast<int>(index);
+        item.isTicked = found->label == static_cast<int>(index);
+        // Brighter than a clip's muted fill, so the colours tell apart this small.
+        item.image = motion::ui::menu_icons::swatch(label.argb == 0 ? std::nullopt : std::optional<juce::Colour>(juce::Colour(label.argb).brighter(.4f)));
+        labels.addItem(std::move(item));
     }
     menu.addSubMenu("Label colour", labels);
     menu.addSeparator();

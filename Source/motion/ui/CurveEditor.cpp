@@ -1,4 +1,5 @@
 #include "CurveEditor.h"
+#include "MenuIcons.h"
 
 MotionCurveEditor::MotionCurveEditor(MotionProcessor& processor) : processor(processor) {
     setName("Animation curve editor");
@@ -1420,12 +1421,22 @@ void MotionCurveEditor::showKeyMenu() {
     juce::PopupMenu menu;
     const char* labels[] = { "Hold", "Linear", "Auto", "Bezier" };
     for (int i = 0; i < 4; ++i) {
-        menu.addItem(i + 1, labels[i], editable, static_cast<int>(key->interpolation) == i);
+        juce::PopupMenu::Item item(labels[i]);
+        item.itemID = i + 1;
+        item.isEnabled = editable;
+        item.isTicked = static_cast<int>(key->interpolation) == i;
+        item.image = motion::ui::menu_icons::interpolation(i);
+        menu.addItem(std::move(item));
     }
     menu.addSeparator();
-    menu.addItem(motion::style::menuItem("Easy ease", 11, "F9").setEnabled(editable));
-    menu.addItem(motion::style::menuItem("Easy ease in", 12, "Shift+F9").setEnabled(editable));
-    menu.addItem(motion::style::menuItem("Easy ease out", 13, "Cmd+Shift+F9").setEnabled(editable));
+    // Each ease as the curve it makes into and out of the key: easing in
+    // arrives flat, easing out leaves flat.
+    const auto ease = [editable](const char* name, int id, const char* shortcut, bool leaving, bool arriving) {
+        return motion::style::menuItem(name, id, shortcut).setEnabled(editable).setImage(motion::ui::menu_icons::ease(leaving, arriving));
+    };
+    menu.addItem(ease("Easy ease", 11, "F9", true, true));
+    menu.addItem(ease("Easy ease in", 12, "Shift+F9", false, true));
+    menu.addItem(ease("Easy ease out", 13, "Cmd+Shift+F9", true, false));
     motion::ui::showDocumentMenu(menu, *this, processor.document, juce::PopupMenu::Options().withTargetComponent(this).withMousePosition(), [this](int result) {
         if (result >= 11 && result <= 13) {
             easeSelected(result != 13, result != 12);

@@ -222,9 +222,17 @@ inline std::unique_ptr<juce::Drawable> picture(const juce::Image& mask) {
     return icon;
 }
 
-// A key as the Timeline and the Graph draw it, filled.
+// A key as the Timeline and the Graph draw it, filled: smaller than a line
+// glyph, as a solid shape weighs more.
 inline std::unique_ptr<juce::Drawable> key(style::KeyShape shape) {
-    return filled(style::keyShapePath({size / 2, size / 2}, 30, shape), ink());
+    return filled(style::keyShapePath({size / 2, size / 2}, 22, shape), ink());
+}
+
+// A key menu's interpolations as their keys are drawn: Hold, Linear, Auto
+// (smooth) and Bezier (eased, as a key with its handles pulled flat is).
+inline std::unique_ptr<juce::Drawable> interpolation(int index) {
+    constexpr std::array<style::KeyShape, 4> shapes {style::KeyShape::hold, style::KeyShape::linear, style::KeyShape::smooth, style::KeyShape::eased};
+    return key(shapes[static_cast<std::size_t>(std::clamp(index, 0, 3))]);
 }
 
 // How a value eases between keys, as a curve rising from lower left to
@@ -240,9 +248,9 @@ inline std::unique_ptr<juce::Drawable> ease(bool leaving, bool arriving) {
 
 // A label colour: a rounded swatch, or an empty outline for none.
 inline std::unique_ptr<juce::Drawable> swatch(std::optional<juce::Colour> colour) {
-    const auto box = juce::Rectangle<float>(64, 64).withCentre({size / 2, size / 2});
+    const auto box = juce::Rectangle<float>(54, 54).withCentre({size / 2, size / 2});
     juce::Path path;
-    path.addRoundedRectangle(box, 14);
+    path.addRoundedRectangle(box, 12);
     if (colour.has_value()) { return filled(path, *colour); }
     return stroked(path, ink().withMultipliedAlpha(.7f));
 }
