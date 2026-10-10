@@ -230,7 +230,8 @@ inline std::unique_ptr<Frame> cull(const PreparedComposition& composition, doubl
     }
     if (depth.isEmpty()) { return frame; }
     dropUnseen(surfaceTriangles, surfaceSources, depth, view->focalLength);
-    const auto crossings = crossing::runs(surfaceTriangles, view->focalLength, reach);
+    const auto crossings = crossing::runs(surfaceTriangles, view->focalLength, reach, cancel);
+    if (cancelled()) { return nullptr; }
 
     // What is hidden, and what would be drawn twice: every line, every pixel
     // along its true path. A point shows where nothing is in front of it and

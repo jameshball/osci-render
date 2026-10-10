@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "HiddenLineDepth.h"
 #include "../model/Vec3.h"
 #include <algorithm>
@@ -241,7 +243,8 @@ inline std::vector<std::vector<Piece>> joined(std::vector<Piece>& pieces, const 
 // a grid over the screen sized to them, and only across surfaces, never
 // within one. `focalLength` projects eye space onto the screen; nothing past
 // what the Scope shows (`reach`) is ever seen.
-inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength, Reach reach = {}) {
+// None, once `cancel` is set partway (a bake stopping, the app closing).
+inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangles, double focalLength, Reach reach = {}, const std::atomic<bool>* cancel = nullptr) {
     std::vector<Piece> pieces;
     if (triangles.size() < 2) { return {}; }
     using detail::Box;
@@ -272,6 +275,7 @@ inline std::vector<std::vector<Piece>> runs(const std::vector<Triangle>& triangl
     if (candidates.size() < 2) { return {}; }
     const detail::ScreenGrid grid(candidates, boxes, extentSum / static_cast<double>(candidates.size()), frame);
     for (int cell = 0; cell < grid.cellCount(); ++cell) {
+        if ((cell & 63) == 0 && cancel != nullptr && cancel->load(std::memory_order_relaxed)) { return {}; }
         const auto members = grid.cell(cell);
         // Members come surface by surface: each surface's run is paired with
         // every later surface's.
