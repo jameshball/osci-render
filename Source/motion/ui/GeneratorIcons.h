@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "../model/GeneratorGeometry.h"
+#include "MenuIcons.h"
 
 namespace motion::ui {
 // A generator's picture at its defaults: its strokes, a solid turned to show
@@ -50,19 +51,6 @@ inline juce::Path generatorPicture(const GeneratorDefinition& definition, float 
 
 // The picture as a menu item's icon, stroked in `colour`.
 inline std::unique_ptr<juce::Drawable> generatorIcon(const GeneratorDefinition& definition, juce::Colour colour) {
-    // A large square, so the stroke is a fine line once the menu shrinks it;
-    // the whole square is the icon, so every one scales alike.
-    constexpr float size = 96, margin = 6;
-    auto picture = std::make_unique<juce::DrawablePath>();
-    picture->setPath(generatorPicture(definition, size, margin));
-    picture->setFill(juce::FillType(juce::Colours::transparentBlack));
-    picture->setStrokeFill(colour);
-    picture->setStrokeType(juce::PathStrokeType(5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    auto icon = std::make_unique<juce::DrawableComposite>();
-    icon->addChild(std::move(picture));
-    const juce::Rectangle<float> square(0, 0, size, size);
-    icon->setContentArea(square);
-    icon->setBoundingBox(square);
-    return icon;
+    return menu_icons::stroked(generatorPicture(definition, menu_icons::size, menu_icons::margin), colour);
 }
 }

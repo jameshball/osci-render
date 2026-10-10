@@ -6,8 +6,9 @@
 namespace motion::ui {
 // One frame of a prepared source as strokes in a unit square, centred and
 // scaled to fit: dark samples and long jumps break the line, as the beam
-// blanks them.
-inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, int steps) {
+// blanks them. `view` places a point on the page (y up), front on unless
+// given.
+inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, int steps, juce::Point<float> (*view)(const osci::Point&) = nullptr) {
     juce::Path path;
     if (frame >= source.frameCount()) { return path; }
     const auto pointFrames = source.drawingAt(frame) == nullptr;
@@ -17,11 +18,11 @@ inline juce::Path traceSource(const PreparedSource& source, std::size_t frame, i
     float left = 1e9f, right = -1e9f, top = 1e9f, bottom = -1e9f;
     for (int index = 0; index <= steps; ++index) {
         const auto point = source.sampleFrame(frame, static_cast<double>(index) / steps, 0);
-        if (!std::isfinite(point.x) || !std::isfinite(point.y)) { continue; }
-        points.emplace_back(point.x, point.y);
+        if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) { continue; }
+        points.push_back(view != nullptr ? view(point) : juce::Point<float>(point.x, point.y));
         lit.push_back(point.r > 0 || point.g > 0 || point.b > 0);
-        left = std::min(left, point.x); right = std::max(right, point.x);
-        top = std::min(top, point.y); bottom = std::max(bottom, point.y);
+        left = std::min(left, points.back().x); right = std::max(right, points.back().x);
+        top = std::min(top, points.back().y); bottom = std::max(bottom, points.back().y);
     }
     if (points.empty()) { return path; }
     // A script that never sets a colour leaves every point unlit; draw it all.

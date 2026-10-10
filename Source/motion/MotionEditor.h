@@ -20,6 +20,7 @@
 #include "model/TapTempo.h"
 #include "model/TempoDetection.h"
 #include "ui/PropertyInspector.h"
+#include "ui/ExamplePictures.h"
 #include "ui/StatusBar.h"
 #include "ui/ShortcutsOverlay.h"
 #include "ui/MotionIcons.h"
@@ -208,6 +209,8 @@ private:
     std::variant<std::monostate, std::vector<motion::Document::CopiedClip>, std::vector<motion::Document::CopiedKey>> clipboard;
     MotionProcessor& processor;
     motion::style::LookAndFeel motionLookAndFeel;
+    // The examples' pictures for the Add source menu, made in the background.
+    motion::ui::ExamplePictures examplePictures;
     // Restyles each dialog after the overlay lays it out.
     struct DialogStyle final : juce::ComponentListener {
         motion::style::DialogLookAndFeel look;

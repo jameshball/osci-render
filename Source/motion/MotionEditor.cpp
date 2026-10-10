@@ -2,6 +2,7 @@
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
 #include "ui/GeneratorIcons.h"
+#include "ui/MenuIcons.h"
 #include "../components/menu/InternalSampleRateMenu.h"
 #include <cstdlib>
 
@@ -451,8 +452,15 @@ void MotionEditor::setUpLibrary() {
     // Double-clicking an effect adds it to what Properties shows.
     effectLibrary.onInsert = [this](const std::string& type) { effectStack.addEffect(type); };
     importButton.onClick = [this] {
+        namespace icons = motion::ui::menu_icons;
         juce::PopupMenu menu;
-        menu.addItem(3, "Draw a shape...");
+        const auto item = [](int id, const juce::String& text, juce::Path glyph) {
+            juce::PopupMenu::Item result(text);
+            result.itemID = id;
+            result.image = icons::stroked(std::move(glyph), icons::ink());
+            return result;
+        };
+        menu.addItem(item(3, "Draw a shape...", icons::glyph::pencil()));
         // Sources made from a few numbers, by category, each with its picture.
         juce::PopupMenu generate;
         for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
@@ -460,29 +468,36 @@ void MotionEditor::setUpLibrary() {
             for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
                 const auto& definition = motion::generatorDefinitions[index];
                 if (definition.category != category) { continue; }
-                juce::PopupMenu::Item item(juce::String(definition.name.data(), definition.name.size()));
-                item.itemID = 1000 + static_cast<int>(index);
-                item.image = motion::ui::generatorIcon(definition, osci::Colours::text().withAlpha(.85f));
-                generate.addItem(std::move(item));
+                juce::PopupMenu::Item entry(juce::String(definition.name.data(), definition.name.size()));
+                entry.itemID = 1000 + static_cast<int>(index);
+                entry.image = motion::ui::generatorIcon(definition, icons::ink());
+                generate.addItem(std::move(entry));
             }
         }
-        menu.addSubMenu("Generate", generate);
-        menu.addItem(1, "Import file...");
-        menu.addItem(2, "Blender live source...");
-        // The examples that ship with osci-render, by kind.
+        menu.addSubMenu("Generate", generate, true, icons::stroked(icons::glyph::shapes(), icons::ink()));
+        menu.addItem(item(1, "Import file...", icons::glyph::folder()));
+        menu.addItem(item(2, "Blender live source...", icons::glyph::live()));
+        // The examples that ship with osci-motion, by kind, each pictured as
+        // it draws (a blank space until its picture is made).
         juce::PopupMenu examples;
         std::vector<juce::String> resources;
-        for (const auto& [title, extension] : std::initializer_list<std::pair<const char*, const char*>> {{"3D models", ".obj"}, {"Lua scripts", ".lua"}, {"Lottie animations", ".lottie"}, {"Fractals", ".lsystem"}, {"Text", ".txt"}}) {
+        const std::array<juce::Path, motion::ui::exampleKinds.size()> kindGlyphs {icons::glyph::cube(), icons::glyph::braces(), icons::glyph::play(), icons::glyph::tree(), icons::glyph::letter()};
+        for (std::size_t kindIndex = 0; kindIndex < motion::ui::exampleKinds.size(); ++kindIndex) {
+            const auto& exampleKind = motion::ui::exampleKinds[kindIndex];
             juce::PopupMenu kind;
             for (int index = 0; index < BinaryData::namedResourceListSize; ++index) {
                 const juce::String file = BinaryData::getNamedResourceOriginalFilename(BinaryData::namedResourceList[index]);
-                if (!file.endsWithIgnoreCase(extension)) { continue; }
+                if (!file.endsWithIgnoreCase(exampleKind.extension)) { continue; }
                 resources.push_back(BinaryData::namedResourceList[index]);
-                kind.addItem(100 + static_cast<int>(resources.size()) - 1, file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
+                juce::PopupMenu::Item entry(file.upToLastOccurrenceOf(".", false, false).replaceCharacter('_', ' '));
+                entry.itemID = 100 + static_cast<int>(resources.size()) - 1;
+                const auto picture = examplePictures.picture(resources.back());
+                entry.image = picture.has_value() ? icons::picture(*picture) : icons::blank();
+                kind.addItem(std::move(entry));
             }
-            examples.addSubMenu(title, kind);
+            if (kind.getNumItems() > 0) { examples.addSubMenu(exampleKind.title, kind, true, icons::stroked(kindGlyphs[kindIndex], icons::ink())); }
         }
-        menu.addSubMenu("Examples", examples);
+        menu.addSubMenu("Examples", examples, true, icons::stroked(icons::glyph::book(), icons::ink()));
         const juce::Component::SafePointer<MotionEditor> owner(this);
         menu.setLookAndFeel(&getLookAndFeel());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&importButton), [owner, resources](int choice) {
