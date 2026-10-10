@@ -572,9 +572,21 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
     }
     // With a group selected, dragging anything in it moves the group.
     const auto hit = inSelectedGroup(object) ? selected : object;
-    selected = hit;
-    if (onSelection) {
-        onSelection(hit);
+    const auto others = selectedObjects ? selectedObjects() : std::vector<motion::Id> {};
+    if (hit != 0 && others.size() > 1 && std::find(others.begin(), others.end(), hit) != others.end()) {
+        // One of several selected: they stay selected, led by this one, so a
+        // drag takes them all.
+        std::vector<motion::Id> led {hit};
+        for (const auto id : others) {
+            if (id != hit) { led.push_back(id); }
+        }
+        selected = hit;
+        if (onSelectClips) { onSelectClips(led, SelectionChange::replace); }
+    } else {
+        selected = hit;
+        if (onSelection) {
+            onSelection(hit);
+        }
     }
     // Move and anchor drag from anywhere on the object, as in After Effects.
     if (hit != 0 && (tool == MotionTransformTool::move || tool == MotionTransformTool::anchor)) {
@@ -623,8 +635,8 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
     }
     std::array<double, 3> offsets { 0, 0, 0 };
     double scaleFactor = 1;
+    std::optional<motion::Vec3> worldDelta;
     if (gesture == Gesture::plane || gesture == Gesture::moveAxis) {
-        std::optional<motion::Vec3> worldDelta;
         if (gesture == Gesture::plane) {
             worldDelta = cameraAtDown.translationOnFacingPlane(normalized(down), normalized(event.position), dragAnchor);
         } else {
@@ -664,8 +676,27 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
         return;
     }
     auto project = edit.start();
-    const auto target = motion::findPropertyTarget(project, editSelection);
-    if (!target.has_value()) { return; }
+    const auto contentTime = pathKey.has_value() && pathKey->selection == editSelection ? std::optional(pathKey->contentTime) : std::nullopt;
+    auto anyChange = applyTransform(project, editSelection, offsets, scaleFactor, contentTime);
+    for (const auto& [id, frame] : companions) {
+        // As far in the world, in its own parent's space; or as much turned
+        // or scaled about its own anchor.
+        auto own = offsets;
+        if (worldDelta.has_value()) {
+            const auto delta = frame.parent.positionDelta(*worldDelta);
+            if (!delta.has_value()) { continue; }
+            own = {delta->x, delta->y, delta->z};
+        }
+        anyChange = applyTransform(project, id, own, scaleFactor, std::nullopt) || anyChange;
+    }
+    edit.show(std::move(project), anyChange);
+    if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
+}
+
+bool MotionCompositionView::applyTransform(motion::Project& project, motion::Id id, const std::array<double, 3>& offsets, double scaleFactor, std::optional<double> contentTime) {
+    const auto target = motion::findPropertyTarget(project, id);
+    if (!target.has_value()) { return false; }
+    const auto localTime = contentTime.value_or(target->localTime(editTime));
     bool anyChange = false;
     for (int axis = 0; axis < 3; ++axis) {
         const auto scaling = gesture == Gesture::uniformScale || gesture == Gesture::scaleAxis;
@@ -674,18 +705,17 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
         const auto property = std::string(prefix) + "xyz"[axis];
         auto* curve = target->curve(property);
         if (curve == nullptr) { continue; }
-        const auto localTime = pathKey.has_value() && pathKey->selection == editSelection ? pathKey->contentTime : target->localTime(editTime);
         const auto base = curve->evaluateBase(localTime);
         // A zero scale can be recovered by dragging; negative scales keep their sign.
         const auto value = scaling ? (base == 0 ? scaleFactor - 1 : base * scaleFactor) : base + offsets[axis];
-        if (!std::isfinite(value)) { return; }
+        if (!std::isfinite(value)) { return false; }
         if (std::abs(value - base) <= 1e-10) { continue; }
         if (curve->animated()) {
             curve->setKeyValue(localTime, value);
         } else {
             curve->base = value;
         }
-        if (!anyChange) { editedProperty = property; }
+        if (!anyChange && id == editSelection) { editedProperty = property; }
         anyChange = true;
     }
     // Position, rotation and scale key as one property, as in After
@@ -693,7 +723,6 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
     if (anyChange) {
         const auto scaling = gesture == Gesture::uniformScale || gesture == Gesture::scaleAxis;
         const std::string prefix = scaling ? "scale." : gesture == Gesture::rotateAxis ? "rotation." : "position.";
-        const auto localTime = pathKey.has_value() && pathKey->selection == editSelection ? pathKey->contentTime : target->localTime(editTime);
         std::array<motion::Curve*, 3> axes {};
         bool animated = false;
         for (int axis = 0; axis < 3; ++axis) {
@@ -704,8 +733,7 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
             if (animated && curve != nullptr) { curve->setKeyValue(localTime, curve->evaluateBase(localTime)); }
         }
     }
-    edit.show(std::move(project), anyChange);
-    if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
+    return anyChange;
 }
 
 void MotionCompositionView::moveAnchor(motion::Vec3 delta) {
@@ -797,7 +825,8 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
     }
     if (validGesture()) {
         const auto noun = motion::findGroup(processor.document.project(), editSelection) != nullptr ? juce::String(" group") : juce::String(" object");
-        const auto label = tool == MotionTransformTool::anchor ? juce::String("Move anchor") : (tool == MotionTransformTool::move ? "Move" : tool == MotionTransformTool::rotate ? "Rotate" : "Scale") + noun;
+        const auto many = !companions.empty() && tool != MotionTransformTool::anchor;
+        const auto label = tool == MotionTransformTool::anchor ? juce::String("Move anchor") : (tool == MotionTransformTool::move ? "Move" : tool == MotionTransformTool::rotate ? "Rotate" : "Scale") + (many ? juce::String(" objects") : noun);
         // The Graph shows the channel the drag changed.
         if (edit.commit(label) && onPropertyEdited && !editedProperty.empty()) { onPropertyEdited(editSelection, editedProperty); }
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
@@ -1443,6 +1472,18 @@ bool MotionCompositionView::beginGesture(double time) {
     // pointer actually drags.
     editTime = time;
     editSelection = selected;
+    companions.clear();
+    if (tool != MotionTransformTool::anchor && selectedObjects) {
+        const auto& project = processor.document.project();
+        for (const auto id : selectedObjects()) {
+            if (id == selected) { continue; }
+            const auto* track = motion::findClipTrack(project, id);
+            const auto* clip = motion::findClip(project, id);
+            if (track == nullptr || clip == nullptr || track->locked || !clip->contains(time, project.tempo())) { continue; }
+            const auto frame = motion::editor::gizmoFrameFor(project, id, time);
+            if (frame.has_value()) { companions.emplace_back(id, *frame); }
+        }
+    }
     edit.begin();
     dragStarted = false;
     return true;

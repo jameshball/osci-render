@@ -294,6 +294,10 @@ void MotionEditor::setUpScene() {
     timeline.onEffectMoved = [this](motion::Id effect, motion::Id owner, bool copy) { moveEffectTo(effect, owner, copy); };
     composition.onPropertyEdited = [this](motion::Id id, const std::string& property) { selectCurveTarget(id, property, false, true); };
     composition.isSelected = [this](motion::Id id) { return timeline.selectedClipIds().contains(id); };
+    composition.selectedObjects = [this] {
+        const auto& ids = timeline.selectedClipIds();
+        return std::vector<motion::Id>(ids.begin(), ids.end());
+    };
     composition.onOpenSource = [this](motion::Id id) {
         const auto& project = processor.document.project();
         const auto* clip = motion::findClip(project, id);

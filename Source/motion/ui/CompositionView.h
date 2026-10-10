@@ -63,6 +63,8 @@ public:
     std::function<void()> onContextMenu;
     std::function<void(motion::Id, const std::string&)> onPropertyEdited;
     std::function<bool(motion::Id)> isSelected;
+    // Every selected object, the one the gizmo is on first.
+    std::function<std::vector<motion::Id>()> selectedObjects;
     std::function<void(MotionTransformTool)> onToolChanged;
     void setTool(MotionTransformTool value);
     std::optional<double> selectedKeyContentTime(motion::Id id) const;
@@ -325,4 +327,11 @@ private:
     double lastTick = 0;
     motion::Id editSelection = 0;
     double editTime = 0;
+    // The other selected objects a move, rotate or scale takes along, as
+    // they were when it began: each moves as far in the world, and turns or
+    // scales as much about its own anchor, as After Effects does.
+    std::vector<std::pair<motion::Id, motion::editor::EulerGizmoFrame>> companions;
+    // Writes a drag's offsets (position or rotation) or scale factor into an
+    // object's own curves at its time; whether anything changed.
+    bool applyTransform(motion::Project& project, motion::Id id, const std::array<double, 3>& offsets, double scaleFactor, std::optional<double> contentTime);
 };
