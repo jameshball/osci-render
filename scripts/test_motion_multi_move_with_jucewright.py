@@ -89,8 +89,9 @@ try:
     before = values("position.x")
     if abs(before[1] - before[0] - .5) > 1e-6:
         raise RuntimeError("The ellipse should start half a unit right of the star: " + str(before))
-    # Drag the star by its top point (half a unit above the middle).
-    tip = (scene["x"] + scene["w"] // 2, scene["y"] + scene["h"] // 2 - round(.225 * (min(scene["w"], scene["h"]) - 48)))
+    # Drag the star by its left point (its top one is a handle).
+    unit = .5 * (min(scene["w"], scene["h"]) - 48)
+    tip = (scene["x"] + scene["w"] // 2 - round(.4755 * unit), scene["y"] + scene["h"] // 2 - round(.1545 * unit))
     step("move both", "drag-xy", tip[0], tip[1], tip[0] + 60, tip[1], "--steps", 12)
     session.wait_for_undo("Move objects")
     after = values("position.x")

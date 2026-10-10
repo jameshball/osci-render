@@ -225,7 +225,8 @@ void MotionCompositionView::paint(juce::Graphics& g) {
     hoveredLines.stroke(g, 2.0f);
     paintCameras(g, time);
     paintMotionPath(g);
-    if (!partMode) { currentGizmo().paint(g, edit.active() ? dragAxis : hoverHandle); }
+    if (!partMode) { currentGizmo().paint(g, edit.active() && !handleDrag.has_value() ? dragAxis : hoverHandle); }
+    paintGeneratorHandles(g);
     if (marquee.has_value()) {
         const auto region = marqueeRegion();
         g.setColour(osci::Colours::accentColor().withAlpha(.08f));
@@ -540,6 +541,22 @@ void MotionCompositionView::mouseDown(const juce::MouseEvent& event) {
         return;
     }
     if (showMotionPath && seekMotionKey(event.position)) { return; }
+    const auto handleIndex = handleAt(event.position);
+    if (handleIndex >= 0) {
+        const auto context = handleContext();
+        const auto shown = context.has_value() ? shownHandles(*context) : std::vector<ShownHandle> {};
+        const auto found = std::find_if(shown.begin(), shown.end(), [&](const auto& item) { return static_cast<int>(item.index) == handleIndex; });
+        if (found != shown.end()) {
+            handleDrag = HandleDrag {found->index, found->handle, *context, context->values, found->handle.at, selected};
+            editTime = editingTime();
+            editSelection = selected;
+            companions.clear();
+            edit.begin();
+            dragStarted = false;
+            repaint();
+            return;
+        }
+    }
     const auto gizmo = currentGizmo();
     const auto handle = gizmo.hitTest(event.position);
     if (handle >= 0) {
@@ -625,6 +642,15 @@ void MotionCompositionView::mouseDrag(const juce::MouseEvent& event) {
             }
             repaint();
         }
+        return;
+    }
+    if (handleDrag.has_value()) {
+        if (!validGesture()) { handleDrag.reset(); return; }
+        if (!dragStarted) {
+            if (event.getDistanceFromDragStart() < 3) { return; }
+            dragStarted = true;
+        }
+        dragHandle(event);
         return;
     }
     if (!validGesture() || !gizmoAtDown.has_value()) { return; }
@@ -820,6 +846,18 @@ void MotionCompositionView::mouseUp(const juce::MouseEvent&) {
             refreshPartBar();
         }
         pressedPart.reset();
+        repaint();
+        return;
+    }
+    if (handleDrag.has_value()) {
+        const auto label = "Change " + juce::String(handleDrag->handle.label);
+        const auto clip = handleDrag->clip;
+        // The Graph shows the number the drag changed.
+        const auto& handle = handleDrag->handle;
+        const auto parameter = handle.kind == motion::generator::Handle::Kind::count ? handle.count : (handle.parameters.empty() ? std::nullopt : std::optional(handle.parameters.front()));
+        const auto property = parameter.has_value() ? std::string(handleDrag->context.definition->parameters[*parameter].id) : std::string();
+        handleDrag.reset();
+        if (validGesture() && edit.commit(label) && onPropertyEdited && !property.empty()) { onPropertyEdited(clip, property); }
         repaint();
         return;
     }
@@ -1229,6 +1267,9 @@ void MotionCompositionView::paintOverChildren(juce::Graphics& g) {
 
 void MotionCompositionView::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) {
     if (navigating || edit.active()) { return; }
+    // Over a handle with a count, scrolling steps it.
+    hoverGeneratorHandle = handleAt(event.position);
+    if (hoverGeneratorHandle >= 0 && !wheel.isInertial && stepHandleCount(std::abs(wheel.deltaY) >= std::abs(wheel.deltaX) ? wheel.deltaY : -wheel.deltaX)) { return; }
     const auto pixels = juce::Point<double>(wheel.deltaX, wheel.deltaY) * 256.0;
     // Orbiting and panning carry on with the trackpad's momentum once the
     // fingers lift, as scrolling does anywhere; zooming stops where it is let go.
@@ -1266,7 +1307,9 @@ void MotionCompositionView::mouseMove(const juce::MouseEvent& event) {
             if (changed) { repaint(); }
             return;
         }
-        const auto hit = currentGizmo().hitTest(event.position);
+        const auto handle = handleAt(event.position);
+        if (handle != hoverGeneratorHandle) { hoverGeneratorHandle = handle; repaint(); }
+        const auto hit = handle >= 0 ? -1 : currentGizmo().hitTest(event.position);
         if (hit != hoverHandle) { hoverHandle = hit; repaint(); }
         return;
     }
@@ -1513,6 +1556,7 @@ void MotionCompositionView::releaseCursor() {
 }
 
 void MotionCompositionView::cancelGesture() {
+    handleDrag.reset();
     if (validGesture()) {
         edit.cancel();
         if (pathKey.has_value()) { pathKey->revision = processor.document.revision(); }
@@ -1633,4 +1677,111 @@ void MotionCompositionView::syncCamera() {
     camera.pivot = camera.position + camera.forward() * distance;
     lastPose = viewPose();
     repaint();
+}
+
+std::optional<motion::ui::generator_handles::Context> MotionCompositionView::handleContext() const {
+    if (navigating || partMode || tool == MotionTransformTool::anchor || selected == 0) { return std::nullopt; }
+    const auto time = editingTime();
+    if (!editable(time)) { return std::nullopt; }
+    return motion::ui::generator_handles::context(processor.document.project(), selected, time);
+}
+
+std::vector<MotionCompositionView::ShownHandle> MotionCompositionView::shownHandles(const motion::ui::generator_handles::Context& context) const {
+    std::vector<ShownHandle> result;
+    const auto view = camera.view();
+    const auto list = motion::generator::handles(*context.definition, context.values);
+    for (std::size_t index = 0; index < list.size(); ++index) {
+        const auto at = screenPoint(view, context.world(list[index].at));
+        if (at.has_value() && getLocalBounds().toFloat().expanded(8).contains(*at)) { result.push_back({index, list[index], *at}); }
+    }
+    return result;
+}
+
+int MotionCompositionView::handleAt(juce::Point<float> position) const {
+    const auto context = handleContext();
+    if (!context.has_value()) { return -1; }
+    // The gizmo's middle stays the gizmo's, whatever handle is under it.
+    const auto gizmo = currentGizmo();
+    if (gizmo.visible && gizmo.origin.getDistanceFrom(position) <= 10) { return -1; }
+    int nearest = -1;
+    auto distance = 8.0f;
+    for (const auto& shown : shownHandles(*context)) {
+        const auto away = shown.at.getDistanceFrom(position);
+        if (away <= distance) {
+            distance = away;
+            nearest = static_cast<int>(shown.index);
+        }
+    }
+    return nearest;
+}
+
+void MotionCompositionView::paintGeneratorHandles(juce::Graphics& g) const {
+    auto context = handleContext();
+    if (!context.has_value()) { return; }
+    // Mid-drag, where the drag has them.
+    if (handleDrag.has_value()) { context->values = handleDrag->values; }
+    const auto shown = shownHandles(*context);
+    const auto lit = handleDrag.has_value() ? static_cast<int>(handleDrag->index) : hoverGeneratorHandle;
+    for (const auto& item : shown) { motion::ui::generator_handles::paint(g, item.at, item.handle, static_cast<int>(item.index) == lit); }
+    for (const auto& item : shown) {
+        if (static_cast<int>(item.index) == lit) { motion::ui::generator_handles::paintHint(g, item.at, motion::ui::generator_handles::hint(*context, item.handle), getLocalBounds().toFloat(), getLocalBounds().toFloat().removeFromTop(96).removeFromRight(96)); }
+    }
+}
+
+void MotionCompositionView::dragHandle(const juce::MouseEvent& event) {
+    auto& drag = *handleDrag;
+    const auto& definition = *drag.context.definition;
+    std::vector<double> next;
+    if (drag.handle.kind == motion::generator::Handle::Kind::count) {
+        // A step for every dozen pixels sideways.
+        next = motion::generator::step(definition, *drag.handle.count, drag.context.values, juce::roundToInt((event.position.x - down.x) / 12.0f));
+    } else {
+        std::optional<motion::Vec3> to;
+        if (drag.handle.axis.has_value()) {
+            // Along its axis, as a gizmo's axis handle drags.
+            const auto direction = drag.context.worldDirection(*drag.handle.axis);
+            const auto length = direction.length();
+            if (!(length > 0)) { return; }
+            const auto distance = motion::editor::gizmo::axisDragDistance(cameraAtDown, normalized(down), normalized(event.position), drag.context.world(drag.handle.at), direction * (1 / length));
+            if (distance.has_value()) { to = drag.handle.at + *drag.handle.axis * (*distance / length); }
+        } else {
+            // Across the drawing's own plane, where the pointer meets it.
+            const auto ray = cameraAtDown.ray(normalized(event.position));
+            const auto origin = ray.has_value() ? drag.context.local(ray->origin) : std::nullopt;
+            const auto direction = ray.has_value() ? drag.context.localDirection(ray->direction) : std::nullopt;
+            if (origin.has_value() && direction.has_value() && std::abs(direction->z) > 1.0e-9) {
+                const auto t = -origin->z / direction->z;
+                if (t > 0) { to = *origin + *direction * t; }
+            }
+        }
+        if (!to.has_value()) { return; }
+        next = motion::generator::drag(definition, drag.index, drag.values, drag.previous, *to, event.mods.isShiftDown());
+        drag.previous = *to;
+    }
+    drag.values = next;
+    auto project = edit.start();
+    const auto changed = motion::ui::generator_handles::write(project, drag.clip, drag.context, next);
+    edit.show(std::move(project), changed);
+    repaint();
+}
+
+bool MotionCompositionView::stepHandleCount(float delta) {
+    const auto context = handleContext();
+    if (!context.has_value()) { return false; }
+    const auto shown = shownHandles(*context);
+    const auto found = std::find_if(shown.begin(), shown.end(), [this](const auto& item) { return static_cast<int>(item.index) == hoverGeneratorHandle; });
+    if (found == shown.end() || !found->handle.count.has_value()) { return false; }
+    // A notch of a wheel is a step; a trackpad's glide adds up to one.
+    wheelSteps += delta * 8;
+    const auto steps = static_cast<int>(wheelSteps);
+    if (steps == 0) { return true; }
+    wheelSteps -= static_cast<float>(steps);
+    const auto parameter = *found->handle.count;
+    const auto next = motion::generator::step(*context->definition, parameter, context->values, steps);
+    const auto& spec = context->definition->parameters[parameter];
+    const auto id = selected;
+    processor.document.tryEdit("Change " + juce::String(spec.label.data(), spec.label.size()), [&](motion::Project& project) { return motion::ui::generator_handles::write(project, id, *context, next); });
+    if (onPropertyEdited) { onPropertyEdited(id, std::string(spec.id)); }
+    repaint();
+    return true;
 }

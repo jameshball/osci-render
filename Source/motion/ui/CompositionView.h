@@ -10,6 +10,7 @@
 #include "MotionPath.h"
 #include "CompositionGizmo.h"
 #include "TransformGizmo.h"
+#include "GeneratorHandlesView.h"
 #include "../model/PropertyTarget.h"
 #include <map>
 #include <set>
@@ -334,4 +335,30 @@ private:
     // Writes a drag's offsets (position or rotation) or scale factor into an
     // object's own curves at its time; whether anything changed.
     bool applyTransform(motion::Project& project, motion::Id id, const std::array<double, 3>& offsets, double scaleFactor, std::optional<double> contentTime);
+
+    // A selected generator's handles, on its drawing: dragged to change its
+    // numbers, scrolled to step a count. They show with any transform tool
+    // but the anchor's, and are picked before the gizmo.
+    struct ShownHandle {
+        std::size_t index;
+        motion::generator::Handle handle;
+        juce::Point<float> at;
+    };
+    std::optional<motion::ui::generator_handles::Context> handleContext() const;
+    std::vector<ShownHandle> shownHandles(const motion::ui::generator_handles::Context& context) const;
+    int handleAt(juce::Point<float> position) const;
+    void paintGeneratorHandles(juce::Graphics& g) const;
+    void dragHandle(const juce::MouseEvent& event);
+    bool stepHandleCount(float delta);
+    struct HandleDrag {
+        std::size_t index;
+        motion::generator::Handle handle;
+        motion::ui::generator_handles::Context context;
+        std::vector<double> values;
+        motion::Vec3 previous;
+        motion::Id clip;
+    };
+    std::optional<HandleDrag> handleDrag;
+    int hoverGeneratorHandle = -1;
+    float wheelSteps = 0;
 };
