@@ -91,6 +91,9 @@ private:
     };
     struct Row : juce::Component {
         juce::String group, section;
+        // A generator's own numbers: what makes it, so they come first, above
+        // the clip's timing.
+        bool first = false;
         std::vector<std::unique_ptr<Field>> fields;
         std::unique_ptr<Swatch> swatch;
         osci::KeyframeButton key;
@@ -116,6 +119,7 @@ private:
     static constexpr int sectionGap = 10, sectionHeading = 26;
     // Which heading a property group sits under.
     juce::String sectionOf(const juce::String& group) const;
+    bool isGeneratorGroup(const juce::String& group) const;
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;

@@ -344,11 +344,16 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
     }
 }
 
+bool MotionPropertyInspector::isGeneratorGroup(const juce::String& group) const {
+    const auto* generator = targetGenerator();
+    if (generator == nullptr) { return false; }
+    return std::any_of(generator->parameters.begin(), generator->parameters.end(), [&](const auto& spec) { return group == juce::String(spec.group.data(), spec.group.size()); });
+}
+
 juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const {
-    if (const auto* generator = targetGenerator()) {
-        for (const auto& spec : generator->parameters) {
-            if (group == juce::String(spec.group.data(), spec.group.size())) { return juce::String(generator->name.data(), generator->name.size()); }
-        }
+    if (isGeneratorGroup(group)) {
+        const auto* generator = targetGenerator();
+        return juce::String(generator->name.data(), generator->name.size());
     }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Beam") { return "Appearance"; }
@@ -376,6 +381,7 @@ void MotionPropertyInspector::build(std::span<const motion::PropertySpec> specs)
             auto row = std::make_unique<Row>();
             row->group = juce::String(spec.group.data(), spec.group.size());
             row->section = sectionOf(row->group);
+            row->first = isGeneratorGroup(row->group);
             row->key.setName("Key " + row->group.toLowerCase());
             // Keys are neutral: filled on a key, outlined off one.
             row->key.setColour(osci::KeyframeButton::keyColourId, osci::Colours::text());
@@ -478,31 +484,39 @@ void MotionPropertyInspector::layoutContent() {
     const auto width = viewport.getWidth() - (viewport.isVerticalScrollBarShown() ? 8 : 0);
     content.sections.clear();
     int y = 0;
+    // Rows from `from` up to `to`, each group opening with a hairline and its
+    // heading; `after` when something is above them.
+    const auto place = [&](std::size_t from, std::size_t to, bool after) {
+        for (auto index = from; index < to; ++index) {
+            auto& row = rows[index];
+            if (index == from || row->section != rows[index - 1]->section) {
+                if (index > from || after) { y += motion::style::gap; }
+                content.sections.emplace_back(y, row->section);
+                y += sectionHeading + motion::style::gap;
+            }
+            row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, row->preferredHeight());
+            // One-line values stack closer, as a list.
+            const auto nextCompact = index + 1 < to && rows[index + 1]->compact();
+            y += row->preferredHeight() + (row->compact() && nextCompact ? motion::style::gap : motion::style::padding);
+        }
+    };
+    std::size_t first = 0;
+    while (first < rows.size() && rows[first]->first) { ++first; }
+    place(0, first, false);
     const auto leading = lead != nullptr && leadHeight ? leadHeight() : 0;
     if (leading > 0) {
-        // A rule under the header, then the lead's own heading on the same
-        // rhythm as the sections below.
-        content.sections.emplace_back(0, juce::String());
-        y = sectionGap;
+        // A rule, then the lead's own heading on the same rhythm as the
+        // sections around it.
+        if (first > 0) { y += motion::style::gap; }
+        content.sections.emplace_back(y, juce::String());
+        y += sectionGap;
     }
     if (lead != nullptr) {
         lead->setBounds(motion::style::padding, y, width - motion::style::padding * 2, leading);
         lead->setVisible(leading > 0);
         y += leading > 0 ? leading + motion::style::gap : 0;
     }
-    for (std::size_t index = 0; index < rows.size(); ++index) {
-        auto& row = rows[index];
-        // Each group of rows opens with a hairline and its heading.
-        if (index == 0 || row->section != rows[index - 1]->section) {
-            if (index > 0) { y += motion::style::gap; }
-            content.sections.emplace_back(y, row->section);
-            y += sectionHeading + motion::style::gap;
-        }
-        row->setBounds(motion::style::padding, y, width - motion::style::padding * 2, row->preferredHeight());
-        // One-line values stack closer, as a list.
-        const auto nextCompact = index + 1 < rows.size() && rows[index + 1]->compact();
-        y += row->preferredHeight() + (row->compact() && nextCompact ? motion::style::gap : motion::style::padding);
-    }
+    place(first, rows.size(), first > 0 && leading == 0);
     const auto trailing = trail != nullptr && trailHeight ? trailHeight() : 0;
     if (trail != nullptr) {
         if (trailing > 0 && trailTitle.isNotEmpty()) {
