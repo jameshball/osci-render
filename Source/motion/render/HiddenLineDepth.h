@@ -51,10 +51,13 @@ public:
         const auto ax = toPixel(a.x), ay = toPixel(a.y), bx = toPixel(b.x), by = toPixel(b.y), cx = toPixel(c.x), cy = toPixel(c.y);
         const auto area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         if (!std::isfinite(area) || std::abs(area) < 1.0e-12) { return; }
-        const auto left = std::max(0, static_cast<int>(std::floor(std::min({ax, bx, cx}))));
-        const auto right = std::min(size - 1, static_cast<int>(std::ceil(std::max({ax, bx, cx}))));
-        const auto bottom = std::max(0, static_cast<int>(std::floor(std::min({ay, by, cy}))));
-        const auto top = std::min(size - 1, static_cast<int>(std::ceil(std::max({ay, by, cy}))));
+        // The pixels whose centres (x + .5) the triangle's box can reach, with
+        // room for a centre right on an edge.
+        constexpr double margin = 1.0e-6;
+        const auto left = std::max(0, static_cast<int>(std::ceil(std::min({ax, bx, cx}) - .5 - margin)));
+        const auto right = std::min(size - 1, static_cast<int>(std::floor(std::max({ax, bx, cx}) - .5 + margin)));
+        const auto bottom = std::max(0, static_cast<int>(std::ceil(std::min({ay, by, cy}) - .5 - margin)));
+        const auto top = std::min(size - 1, static_cast<int>(std::floor(std::max({ay, by, cy}) - .5 + margin)));
         if (left > right || bottom > top) { return; }
         // Inverse depth is linear on screen: its plane, and how steeply it
         // changes across a pixel, which is how far it is pushed back.
