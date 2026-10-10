@@ -173,9 +173,6 @@ private:
     bool dragStarted = false;
     bool editable(double time) const;
     MotionCompositionGizmo currentGizmo() const;
-    // Property values as the Scene draws them (keys, then modulation and
-    // links), so the handles sit on the object as it moves.
-    motion::editor::DrawnValue drawnValue() const;
     bool beginGesture(double time);
     void timerCallback() override;
     void centreCursor() { juce::Desktop::getInstance().getMainMouseSource().setScreenPosition(localPointToGlobal(getLocalBounds().getCentre().toFloat())); }

@@ -1417,33 +1417,9 @@ bool MotionCompositionView::editable(double time) const {
     return motion::findClip(project, selected)->contains(time, project.tempo()) || atSelectedPathEnd(time);
 }
 
-motion::editor::DrawnValue MotionCompositionView::drawnValue() const {
-    if (prepared == nullptr) { return {}; }
-    return [composition = prepared.get()](motion::Id owner, std::size_t property, double time, double keyed) {
-        // The owner's prepared curve: a clip's (or the clip a composition
-        // plays in), or a group's.
-        const motion::Curve* curve = nullptr;
-        for (const auto& clip : composition->clips) {
-            const auto stageOf = [&](const motion::PreparedClipStage& stage) {
-                if (curve == nullptr && stage.id == owner) { curve = &stage.curves[property]; }
-                for (const auto& group : stage.groups) {
-                    if (curve == nullptr && group.id == owner) { curve = &group.curves[property]; }
-                }
-            };
-            stageOf(clip);
-            for (const auto& ancestor : clip.ancestors) { stageOf(ancestor); }
-            if (curve != nullptr) { break; }
-        }
-        if (curve == nullptr) { return keyed; }
-        // A link replaces the keys; modulation adds to the keys as edited
-        // now, so the handles keep up with a drag before the Scene does.
-        return curve->linked() ? curve->evaluate(time) : keyed + curve->evaluate(time) - curve->evaluateBase(time);
-    };
-}
-
 MotionCompositionGizmo MotionCompositionView::currentGizmo() const {
     const auto time = editingTime();
-    gizmoFrame = motion::editor::gizmoFrameFor(processor.document.project(), selected, time, drawnValue());
+    gizmoFrame = motion::editor::gizmoFrameFor(processor.document.project(), selected, time);
     // Effects after the transform (track, group or composition) can move what
     // is drawn away from the handles; as in After Effects, the handles still
     // show and edit the object's own transform.
@@ -1459,7 +1435,7 @@ bool MotionCompositionView::beginGesture(double time) {
             return false;
         }
     }
-    gizmoAtDown = motion::editor::gizmoFrameFor(processor.document.project(), selected, time, drawnValue());
+    gizmoAtDown = motion::editor::gizmoFrameFor(processor.document.project(), selected, time);
     if (!editable(time) || !gizmoAtDown.has_value()) {
         dragHint = "Edit this object's transform in Properties";
         return false;
