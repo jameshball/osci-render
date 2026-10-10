@@ -484,14 +484,19 @@ inline void styleHeading(juce::Label& label, const juce::String& text) {
 // Two fields to a row, each with its caption inside on the left as X, Y
 // and Z carry their axis, and the value on the right. They share the left
 // and right edges of Properties' value columns, clear of the keys' gutter.
+// Visible fields only, two to a line in order.
 inline void layoutFields(juce::Rectangle<int>& area, std::array<juce::Label, 4>& captions, const std::array<juce::Component*, 4>& fields) {
     const PropertyGrid grid(area.getWidth());
     const auto right = grid.value + grid.column;
     const auto half = (right - gap) / 2;
-    for (std::size_t line = 0; line < 2; ++line) {
+    std::vector<std::size_t> shown;
+    for (std::size_t index = 0; index < fields.size(); ++index) {
+        if (fields[index]->isVisible()) { shown.push_back(index); }
+    }
+    for (std::size_t line = 0; line * 2 < shown.size(); ++line) {
         auto bounds = area.removeFromTop(row).withWidth(right);
-        for (std::size_t column = 0; column < 2; ++column) {
-            const auto index = line * 2 + column;
+        for (std::size_t column = 0; column < 2 && line * 2 + column < shown.size(); ++column) {
+            const auto index = shown[line * 2 + column];
             const auto cell = (column == 0 ? bounds.withWidth(half) : bounds.withLeft(bounds.getRight() - half)).reduced(0, 3);
             auto* combo = dynamic_cast<juce::ComboBox*>(fields[index]);
             if (combo != nullptr) { combo->setJustificationType(juce::Justification::centredRight); }

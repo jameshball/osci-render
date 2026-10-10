@@ -14,14 +14,14 @@ class MotionTextAnimationPanel final : public juce::Component {
 public:
     explicit MotionTextAnimationPanel(MotionProcessor& owner) : processor(owner) {
         setName("Text animation inspector");
-        motion::style::inspector::styleHeading(title, "Characters");
+        motion::style::inspector::styleHeading(title, "Text animation");
         addAndMakeVisible(title);
         kinds.setName("Text animation");
         kinds.setTitle("Text animation");
-        const std::array<const char*, 6> kindNames {"None", "Type", "Rise", "Pop", "Wave", "Scatter"};
+        const std::array<const char*, 6> kindNames {"None", "Typewriter", "Rise in", "Pop in", "Wave", "Scatter in"};
         for (std::size_t index = 0; index < kindNames.size(); ++index) { kinds.addItem(kindNames[index], static_cast<int>(index) + 1); }
         kinds.setJustificationType(juce::Justification::centredRight);
-        kinds.setTooltip("None: every character at once. Type: one by one. Rise: into place. Pop: with a small overshoot. Wave: a looping bob. Scatter: in from all around.");
+        kinds.setTooltip("How the letters come in, one after another: Typewriter shows each in turn, Rise in lifts them into place, Pop in grows them with a bounce, Scatter in flies them in from all around. Wave bobs them up and down, over and over.");
         motion::style::styleField(kinds);
         kinds.onChange = [this] {
             if (kinds.getSelectedId() <= 0) { return; }
@@ -33,16 +33,11 @@ public:
         motion::style::inspector::styleCaption(kindCaption, "Animation");
         kindCaption.setInterceptsMouseClicks(false, false);
         addAndMakeVisible(kindCaption);
-        const std::array<const char*, 4> labels {"Stagger", "Each", "Hold", "Amount"};
-        const std::array<const char*, 4> fieldTips {"Seconds between one character starting and the next", "Seconds each character takes to arrive", "Seconds the finished text holds before the source loops", "How far characters travel (1 is one character height)"};
         for (std::size_t index = 0; index < fields.size(); ++index) {
-            motion::style::inspector::styleCaption(captions[index], labels[index]);
+            motion::style::inspector::styleCaption(captions[index], {});
             addAndMakeVisible(captions[index]);
             auto& field = fields[index];
-            field.setName(juce::String("Text animation ") + labels[index]);
-            field.setTitle(field.getName());
             field.setSpec(specs[index]);
-            field.setTooltip(fieldTips[index]);
             // A drag previews its number; the source prepares once, on release.
             field.onCommit = [this](double) { applyFields(); };
             field.onEnd = [this] { applyFields(); };
@@ -62,7 +57,8 @@ public:
     int preferredHeight() const {
         const auto* asset = textAsset();
         if (asset == nullptr) { return 0; }
-        return motion::style::inspector::headingHeight + motion::style::inspector::row + (current().animated() ? 2 * motion::style::inspector::row : 0) + 10;
+        const auto shown = static_cast<int>(std::count_if(namings[kindIndex()].begin(), namings[kindIndex()].end(), [](const Naming& naming) { return naming.label != nullptr; }));
+        return motion::style::inspector::headingHeight + motion::style::inspector::row + (shown + 1) / 2 * motion::style::inspector::row + 10;
     }
     void refresh() {
         const auto previous = lastHeight;
@@ -72,6 +68,18 @@ public:
         const auto locked = isLocked();
         kinds.setSelectedId(static_cast<int>(settings.animation) + 1, juce::dontSendNotification);
         kinds.setEnabled(!locked);
+        // Each setting named for what it does in this animation.
+        for (std::size_t index = 0; index < fields.size(); ++index) {
+            const auto& naming = namings[kindIndex()][index];
+            if (naming.label == nullptr) { continue; }
+            captions[index].setText(naming.label, juce::dontSendNotification);
+            auto spec = specs[index];
+            spec.label = naming.label;
+            fields[index].setSpec(spec);
+            fields[index].setName(juce::String("Text animation ") + naming.label);
+            fields[index].setTitle(fields[index].getName());
+            fields[index].setTooltip(naming.tip);
+        }
         const std::array<double, 4> values {settings.characterDelay, settings.characterDuration, settings.hold, settings.amount};
         for (std::size_t index = 0; index < fields.size(); ++index) {
             fields[index].setValue(values[index]);
@@ -90,12 +98,12 @@ public:
         kinds.setBounds(area.removeFromTop(motion::style::inspector::row).reduced(0, 3).withWidth(grid.value + grid.column));
         kindCaption.setBounds(kinds.getBounds().withTrimmedLeft(6).withWidth(60));
         const auto* asset = textAsset();
-        const auto animated = asset != nullptr && current().animated();
         for (std::size_t index = 0; index < fields.size(); ++index) {
-            captions[index].setVisible(animated);
-            fields[index].setVisible(animated);
+            const auto shown = asset != nullptr && namings[kindIndex()][index].label != nullptr;
+            captions[index].setVisible(shown);
+            fields[index].setVisible(shown);
         }
-        if (animated) { motion::style::inspector::layoutFields(area, captions, {&fields[0], &fields[1], &fields[2], &fields[3]}); }
+        motion::style::inspector::layoutFields(area, captions, {&fields[0], &fields[1], &fields[2], &fields[3]});
     }
 
 private:
@@ -134,10 +142,27 @@ private:
     }
 
     static constexpr std::array<motion::PropertySpec, 4> specs {{
-        {"text.characterDelay", "Stagger", "Characters", "", 0, 30, 0.06, .01, 2, "s"},
-        {"text.characterDuration", "Each", "Characters", "", 0.01, 30, 0.35, .01, 2, "s"},
-        {"text.hold", "Hold", "Characters", "", 0, 30, 1.5, .1, 1, "s"},
-        {"text.amount", "Amount", "Characters", "", -10, 10, 1, .05, 2, ""}}};
+        {"text.characterDelay", "Stagger", "Text animation", "", 0, 30, 0.06, .01, 2, "s"},
+        {"text.characterDuration", "Rise time", "Text animation", "", 0.01, 30, 0.35, .01, 2, "s"},
+        {"text.hold", "Pause", "Text animation", "", 0, 30, 1.5, .1, 1, "s"},
+        {"text.amount", "Distance", "Text animation", "", -10, 10, 1, .05, 2, ""}}};
+    // What each setting is called, and does, in each animation; a setting an
+    // animation does not use is not shown.
+    struct Naming {
+        const char* label;
+        const char* tip;
+    };
+    static constexpr const char* staggerTip = "Seconds between one letter starting and the next";
+    static constexpr const char* pauseTip = "Seconds the finished text stays before it plays again";
+    static constexpr std::array<std::array<Naming, 4>, 6> namings {{
+        {{{nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr}, {nullptr, nullptr}}},
+        {{{"Stagger", "Seconds between one letter appearing and the next"}, {nullptr, nullptr}, {"Pause", pauseTip}, {nullptr, nullptr}}},
+        {{{"Stagger", staggerTip}, {"Rise time", "Seconds each letter takes to rise into place"}, {"Pause", pauseTip}, {"Distance", "How far below its place each letter starts (1 is a letter's height)"}}},
+        {{{"Stagger", staggerTip}, {"Pop time", "Seconds each letter takes to grow to size"}, {"Pause", pauseTip}, {"Bounce", "How far each letter overshoots its size before settling (0 for none)"}}},
+        {{{"Stagger", "Seconds each letter's bob trails the one before"}, {"Period", "Seconds for one bob up and down"}, {nullptr, nullptr}, {"Height", "How high the letters bob (1 is a quarter of a letter's height)"}}},
+        {{{"Stagger", staggerTip}, {"Fly-in time", "Seconds each letter takes to fly into place"}, {"Pause", pauseTip}, {"Spread", "How far away, and how far turned, each letter starts (1 is two letters' heights and half a turn)"}}},
+    }};
+    std::size_t kindIndex() const { return static_cast<std::size_t>(std::clamp(static_cast<int>(current().animation), 0, 5)); }
 
     MotionProcessor& processor;
     motion::Id selected = 0;
