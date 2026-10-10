@@ -967,6 +967,9 @@ void MotionEditor::paintOverChildren(juce::Graphics& graphics) {
     if (scopeFullScreen) { return; }
     // Every panel has the same rounded corners, whatever its content paints.
     const auto scope = outputHeader.getBounds().getUnion(visualiser.getBounds());
+    juce::Graphics::ScopedSaveState state(graphics);
+    // Dialogs sit above the panels, so the corners stay off them.
+    for (const auto& overlay : activeOverlays) { graphics.excludeClipRegion(overlay->getPanelBounds() + overlay->getPosition()); }
     graphics.setColour(osci::Colours::veryDark());
     for (const auto& panel : {libraryBounds, viewportBounds, scope, inspectorBounds, timelineBounds}) {
         if (panel.isEmpty()) { continue; }
