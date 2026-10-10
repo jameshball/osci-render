@@ -477,6 +477,34 @@ void MotionEditor::beginSourceImport(SourceRequest request, motion::BakeSettings
     });
 }
 
+void MotionEditor::addGenerator(const motion::GeneratorDefinition& definition) {
+    auto& document = processor.document;
+    auto asset = std::make_shared<motion::Asset>();
+    asset->id = document.newId();
+    asset->name = motion::Document::uniqueAssetName(document.mainProject(), juce::String(definition.name.data(), definition.name.size()));
+    asset->extension = juce::String(motion::generatorExtension.data(), motion::generatorExtension.size());
+    asset->data.append(definition.id.data(), definition.id.size());
+    // Drawn at its defaults at once: there is nothing to read or wait for.
+    const auto decoded = motion::decodeAsset(*asset);
+    if (decoded.failed()) {
+        statusBar.show(decoded.getErrorMessage(), MotionStatusBar::Kind::error);
+        return;
+    }
+    const auto clip = motion::Document::makeClip(document.newId(), *asset, document.project().frameTime(processor.position.load()));
+    motion::Track track;
+    track.id = document.newId();
+    track.name = asset->name.toStdString();
+    track.insert(clip, document.project().tempo());
+    document.edit("Add " + juce::String(definition.name.data(), definition.name.size()).toLowerCase(), [&](motion::Project& project) {
+        project.assets.push_back(asset);
+        project.tracks.push_back(track);
+        project.duration = std::max(project.duration, clip.timing(project.tempo()).end());
+    });
+    assetLibrary.refresh();
+    assetLibrary.selectAsset(asset->id);
+    select(clip.id);
+}
+
 template <typename Editor>
 Editor& MotionEditor::openSceneEditor(std::unique_ptr<Editor> editor) {
     auto& opened = *editor;

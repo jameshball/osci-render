@@ -140,6 +140,8 @@ private:
     Editor& openSceneEditor(std::unique_ptr<Editor> editor);
     void closeSceneEditor();
     void showDrawingEditor(motion::Id asset);
+    // A generator's source, and a clip of it at the playhead on a new track.
+    void addGenerator(const motion::GeneratorDefinition& definition);
     void previewDrawing();
     motion::Id drawingAsset = 0;
     // Text sources are written in the Scene, with the Scope previewing them.

@@ -1,4 +1,5 @@
 #include "SourceDecoding.h"
+#include "../model/GeneratorDrawing.h"
 #include "BakedSourceArchive.h"
 #include "LuaBaker.h"
 #include "RasterSourcePreparer.h"
@@ -459,6 +460,17 @@ juce::Result decodeAsset(Asset& asset, const std::atomic<bool>* cancel, std::ato
         return juce::Result::fail("Source files must contain data and be no larger than 64 MiB.");
     }
     const auto extension = asset.extension.toLowerCase();
+    if (extension == juce::String(generatorExtension.data(), generatorExtension.size())) {
+        // A generator at its defaults: each clip draws it from its own values.
+        const auto* definition = generatorOf(asset);
+        if (definition == nullptr) { return juce::Result::fail("Unknown generator: " + asset.data.toString().trim()); }
+        std::vector<double> defaults;
+        for (const auto& spec : definition->parameters) { defaults.push_back(spec.defaultValue); }
+        asset.source = generator::clipSource(*definition, 0, 60, [&](double) { return defaults; });
+        asset.liveIdentity.reset(); asset.audio.reset();
+        if (progress != nullptr) { progress->store(1); }
+        return juce::Result::ok();
+    }
     if (extension == ".blender-capture") {
         auto capture = BlenderCaptureArchive::decode({static_cast<const std::uint8_t*>(asset.data.getData()), asset.data.getSize()}, cancel);
         if (!capture) { return juce::Result::fail(capture.error); }

@@ -1695,6 +1695,10 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
         clip.duration = asset.source->duration();
     }
     clip.properties = defaultProperties(objectPropertySpecs);
+    // A generator's clip holds its own values of the generator's parameters.
+    if (const auto* generator = generatorOf(asset)) {
+        for (const auto& spec : generator->parameters) { clip.properties[std::string(spec.id)] = Curve(spec.defaultValue); }
+    }
     // A source without its own colours starts in the phosphor green.
     if (asset.source == nullptr || !asset.source->hasExplicitColour()) {
         clip.properties["red"] = Curve(0.2);

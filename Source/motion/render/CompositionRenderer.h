@@ -2,6 +2,7 @@
 
 #include "../model/Cancellation.h"
 #include "../model/Document.h"
+#include "../model/GeneratorDrawing.h"
 #include "../model/CompositionGraph.h"
 #include "PreparedEffects.h"
 #include "PreparedSoundtrack.h"
@@ -497,6 +498,22 @@ struct PreparedComposition {
             item.rootTrack = stages.front().track->id;
             item.liveIdentity = asset->liveIdentity;
             item.source = clip.luaBake != nullptr && clip.luaBake->source != nullptr ? clip.luaBake->source : asset->source;
+            // A generator is drawn from this clip's own values of its
+            // parameters, keyed, modulated and linked like any property.
+            if (const auto* generator = generatorOf(*asset)) {
+                const auto& scope = scopeOf(stages, stages.size() - 1);
+                std::vector<Curve> parameters;
+                parameters.reserve(generator->parameters.size());
+                for (const auto& spec : generator->parameters) {
+                    parameters.push_back(curveOrDefault(clip.properties, spec));
+                    drivers.drive(parameters.back(), scope, leaf.scopeClock, clip.id, spec.id);
+                }
+                std::vector<double> values(parameters.size());
+                item.source = generator::clipSource(*generator, leaf.clipClock.localTime(leaf.clipClock.end()), project.frameRate, [&](double seconds) {
+                    for (std::size_t index = 0; index < parameters.size(); ++index) { values[index] = parameters[index].evaluate(seconds); }
+                    return values;
+                });
+            }
             for (std::size_t index = stages.size() - 1; index > 0; --index) {
                 item.ancestors.push_back(prepareStage(stages[index - 1], index == 1, scopeOf(stages, index - 1)));
             }

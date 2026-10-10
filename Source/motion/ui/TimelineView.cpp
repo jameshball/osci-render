@@ -3433,7 +3433,15 @@ std::vector<std::string> MotionTimelineView::animatedProperties(const motion::Tr
     std::vector<motion::PropertySpec> specs;
     const auto base = track.kind == motion::TrackKind::audio ? std::span<const motion::PropertySpec>(motion::audioPropertySpecs) : motion::objectPropertySpecs;
     specs.assign(base.begin(), base.end());
-    if (track.kind == motion::TrackKind::visual) { specs.insert(specs.end(), motion::luaSliderSpecs.begin(), motion::luaSliderSpecs.end()); }
+    if (track.kind == motion::TrackKind::visual) {
+        specs.insert(specs.end(), motion::luaSliderSpecs.begin(), motion::luaSliderSpecs.end());
+        // Every generator's parameters, each name once.
+        for (const auto& generator : motion::generatorDefinitions) {
+            for (const auto& spec : generator.parameters) {
+                if (motion::findPropertySpec(specs, spec.id) == nullptr) { specs.push_back(spec); }
+            }
+        }
+    }
     for (const auto& spec : specs) {
         const std::string id(spec.id);
         const bool animated = std::any_of(track.clips.begin(), track.clips.end(), [&](const auto& clip) {

@@ -82,8 +82,10 @@ void MotionPropertyInspector::refresh() {
     if (gesture.stale()) { cancelGesture(); }
     specList.clear();
     if (editable) {
+        const auto* generator = targetGenerator();
+        if (generator != nullptr) { specList.assign(generator->parameters.begin(), generator->parameters.end()); }
         const auto base = motion::propertySpecs(*found);
-        specList.assign(base.begin(), base.end());
+        specList.insert(specList.end(), base.begin(), base.end());
         for (const auto& slider : luaSliders()) { specList.push_back(slider); }
     }
     const auto specs = std::span<const motion::PropertySpec>(specList);
@@ -91,6 +93,11 @@ void MotionPropertyInspector::refresh() {
     motionModes = modes.has_value();
     auto signature = editable ? juce::String(static_cast<int>(found->camera)) + juce::String(static_cast<int>(found->beam)) + juce::String(static_cast<int>(found->isAudio)) + juce::String(static_cast<int>(motionModes)) : juce::String();
     signature << ":" << static_cast<int>(specList.size());
+    // Two generators with as many parameters still differ.
+    if (editable) {
+        const auto* generator = targetGenerator();
+        if (generator != nullptr) { signature << ":" << juce::String(generator->id.data(), generator->id.size()); }
+    }
     if (signature != layoutSignature) {
         layoutSignature = signature;
         build(specs);
@@ -337,7 +344,12 @@ void MotionPropertyInspector::Content::paint(juce::Graphics& g) {
     }
 }
 
-juce::String MotionPropertyInspector::sectionOf(const juce::String& group) {
+juce::String MotionPropertyInspector::sectionOf(const juce::String& group) const {
+    if (const auto* generator = targetGenerator()) {
+        for (const auto& spec : generator->parameters) {
+            if (group == juce::String(spec.group.data(), spec.group.size())) { return juce::String(generator->name.data(), generator->name.size()); }
+        }
+    }
     if (group == "Position" || group == "Rotation" || group == "Scale" || group == "Anchor") { return "Transform"; }
     if (group == "Colour" || group == "Opacity" || group == "Beam") { return "Appearance"; }
     if (group == "Gain" || group == "Pan") { return "Audio"; }
@@ -643,6 +655,7 @@ juce::String MotionPropertyInspector::sourceKind(motion::Id clip) const {
             const auto& asset = *found;
             const auto extension = asset.extension.toLowerCase();
             if (asset.liveIdentity != nullptr) { return "Blender"; }
+            if (const auto* generator = motion::generatorOf(asset)) { return juce::String(motion::generatorCategoryLabel(generator->category).data()); }
             if (extension == ".txt") { return "Text"; }
             if (extension == ".lua") { return "Lua"; }
             if (extension == ".lsystem") { return "Fractal"; }
@@ -676,7 +689,20 @@ std::vector<motion::PropertySpec> MotionPropertyInspector::luaSliders() const {
     return result;
 }
 
+const motion::GeneratorDefinition* MotionPropertyInspector::targetGenerator() const {
+    const auto& project = processor.document.project();
+    for (const auto& track : project.tracks) {
+        for (const auto& clip : track.clips) {
+            if (clip.id != target || clip.composition != 0) { continue; }
+            const auto asset = motion::findAsset(project.assets, clip.asset);
+            return asset != nullptr ? motion::generatorOf(*asset) : nullptr;
+        }
+    }
+    return nullptr;
+}
+
 motion::Curve* MotionPropertyInspector::createSlider(motion::Project& project, const std::string& property) const {
+    if (property.starts_with("generator.")) { return motion::ensurePropertyCurve(project, target, property); }
     if (!property.starts_with("slider.")) { return nullptr; }
     auto found = motion::findPropertyTarget(project, target);
     if (!found.has_value() || found->properties == nullptr) { return nullptr; }

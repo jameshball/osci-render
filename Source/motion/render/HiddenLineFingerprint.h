@@ -6,7 +6,7 @@
 namespace motion::hidden {
 // Everything a frame's hidden lines depend on at a time, as numbers: the
 // active camera and its view, then for each clip whether it plays and shows,
-// which frame of its source it draws, and every pose and effect setting along
+// which drawing of its source it shows, and every pose and effect setting along
 // its chain (colour aside, which hides nothing). Two times with equal
 // fingerprints cull to the same frame, so a bake can reuse one for the other:
 // a still stretch of a project costs one frame.
@@ -30,7 +30,11 @@ public:
             add(active ? 1.0 : 0.0);
             if (!active) { continue; }
             add(clip.visible(time) ? 1.0 : 0.0, clip.liveIdentity != nullptr ? 1.0 : 0.0);
-            add(clip.source != nullptr ? static_cast<double>(clip.source->frameIndex(clip.localTime(time))) : -1.0);
+            // The drawing it shows (frames that repeat one are the same), or
+            // for a point source the frame.
+            const auto frame = clip.source != nullptr ? clip.source->frameIndex(clip.localTime(time)) : 0;
+            const auto* drawing = clip.source != nullptr ? clip.source->drawingAt(frame) : nullptr;
+            add(drawing != nullptr ? static_cast<double>(reinterpret_cast<std::uintptr_t>(drawing)) : -2.0 - static_cast<double>(frame));
             addStage(clip, time);
             for (const auto& ancestor : clip.ancestors) { addStage(ancestor, time); }
         }

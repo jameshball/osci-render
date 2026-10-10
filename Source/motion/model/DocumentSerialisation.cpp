@@ -417,10 +417,12 @@ juce::Result loadCompositionContent(const juce::XmlElement& xml, CompositionType
             // values lie inside its declared range.
             const auto specs = track.kind == TrackKind::audio ? std::span<const PropertySpec>(audioPropertySpecs) : objectPropertySpecs;
             const bool luaClip = clip.composition == 0 && found != nullptr && found->extension.equalsIgnoreCase(".lua");
+            const auto* generator = clip.composition == 0 && found != nullptr ? generatorOf(*found) : nullptr;
             for (auto* property : item->getChildWithTagNameIterator("property")) {
                 const auto name = property->getStringAttribute("name").toStdString();
                 auto* spec = findPropertySpec(specs, name);
                 if (spec == nullptr && luaClip) { spec = findPropertySpec(luaSliderSpecs, name); }
+                if (spec == nullptr && generator != nullptr) { spec = findPropertySpec(generator->parameters, name); }
                 if (spec == nullptr || clip.properties.contains(name)) {
                     return juce::Result::fail("Unknown or duplicate clip property \"" + juce::String(name) + "\".");
                 }

@@ -181,7 +181,9 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
     } else {
         const auto& asset = *assets[static_cast<std::size_t>(row)];
         const auto drawn = asset.extension.equalsIgnoreCase(".svg") && motion::drawing::isDrawing(asset.data.toString());
-        detail = asset.liveIdentity != nullptr ? "Live Blender" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing" : asset.extension.trimCharactersAtStart(".").toUpperCase();
+        const auto* generator = motion::generatorOf(asset);
+        detail = asset.liveIdentity != nullptr ? "Live Blender" : asset.extension.equalsIgnoreCase(".blender-capture") ? "Capture" : drawn ? "Drawing"
+            : generator != nullptr ? juce::String(motion::generatorCategoryLabel(generator->category).data()) : asset.extension.trimCharactersAtStart(".").toUpperCase();
         // Animated sources say how long they run.
         if (asset.source != nullptr && (asset.source->frameCount() > 1 || asset.extension.equalsIgnoreCase(".blender-capture"))) {
             detail += juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(asset.source->duration(), 1) + " s";

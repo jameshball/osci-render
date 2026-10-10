@@ -46,6 +46,8 @@
             file="tests/MotionAnchorTest.cpp"/>
       <FILE id="MotionHiddenLines" name="MotionHiddenLinesTest.cpp" compile="1"
             resource="0" file="tests/MotionHiddenLinesTest.cpp"/>
+      <FILE id="MotionGenerators" name="MotionGeneratorsTest.cpp" compile="1"
+            resource="0" file="tests/MotionGeneratorsTest.cpp"/>
       <FILE id="MotionEffectMove" name="MotionEffectMoveTest.cpp" compile="1"
             resource="0" file="tests/MotionEffectMoveTest.cpp"/>
       <FILE id="MotionTypography" name="MotionTypographyTest.cpp" compile="1"

@@ -1,6 +1,7 @@
 #include "MotionEditor.h"
 #include "ui/CanvasSizeEditor.h"
 #include "ui/MarkerPanel.h"
+#include "ui/GeneratorIcons.h"
 #include "../components/menu/InternalSampleRateMenu.h"
 #include <cstdlib>
 
@@ -452,6 +453,20 @@ void MotionEditor::setUpLibrary() {
     importButton.onClick = [this] {
         juce::PopupMenu menu;
         menu.addItem(3, "Draw a shape...");
+        // Sources made from a few numbers, by category, each with its picture.
+        juce::PopupMenu generate;
+        for (const auto category : {motion::GeneratorCategory::shape, motion::GeneratorCategory::curve, motion::GeneratorCategory::grid, motion::GeneratorCategory::solid}) {
+            generate.addSectionHeader(juce::String(motion::generatorCategoryName(category).data()));
+            for (std::size_t index = 0; index < motion::generatorDefinitions.size(); ++index) {
+                const auto& definition = motion::generatorDefinitions[index];
+                if (definition.category != category) { continue; }
+                juce::PopupMenu::Item item(juce::String(definition.name.data(), definition.name.size()));
+                item.itemID = 1000 + static_cast<int>(index);
+                item.image = motion::ui::generatorIcon(definition, osci::Colours::text().withAlpha(.85f));
+                generate.addItem(std::move(item));
+            }
+        }
+        menu.addSubMenu("Generate", generate);
         menu.addItem(1, "Import file...");
         menu.addItem(2, "Blender live source...");
         // The examples that ship with osci-render, by kind.
@@ -475,6 +490,7 @@ void MotionEditor::setUpLibrary() {
             if (choice == 1) { owner->chooseSourceFile(); }
             if (choice == 2) { owner->showBlenderSettings(); }
             if (choice == 3) { owner->showDrawingEditor(0); }
+            if (choice >= 1000 && choice - 1000 < static_cast<int>(motion::generatorDefinitions.size())) { owner->addGenerator(motion::generatorDefinitions[static_cast<std::size_t>(choice - 1000)]); }
             if (choice >= 100 && choice - 100 < static_cast<int>(resources.size())) { owner->importExample(resources[static_cast<std::size_t>(choice - 100)]); }
         });
     };

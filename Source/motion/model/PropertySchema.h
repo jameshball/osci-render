@@ -2,6 +2,7 @@
 
 #include "PropertyTarget.h"
 #include "PropertySpecs.h"
+#include "Generators.h"
 #include <optional>
 #include <span>
 #include <string_view>
@@ -27,8 +28,28 @@ inline PropertySpec effectPropertySpec(const EffectParameterDefinition& paramete
     return {parameter.id, parameter.name, "Effect", "", parameter.min, parameter.max, parameter.defaultValue, span / 200.0, span >= 50 ? 1 : 3, ""};
 }
 
+// A generator clip's own parameter, when the target is one. Only projects
+// that hold assets have generators; `generatorOf` comes with their assets.
+template <typename ProjectType>
+const PropertySpec* generatorSpec(const ProjectType& project, Id target, std::string_view property) {
+    if constexpr (requires { project.assets; }) {
+        for (const auto& track : project.tracks) {
+            for (const auto& clip : track.clips) {
+                if (clip.id != target || clip.asset == 0) { continue; }
+                for (const auto& asset : project.assets) {
+                    if (asset == nullptr || asset->id != clip.asset) { continue; }
+                    const auto* generator = generatorOf(*asset);
+                    return generator != nullptr ? findPropertySpec(generator->parameters, property) : nullptr;
+                }
+                return nullptr;
+            }
+        }
+    }
+    return nullptr;
+}
+
 // One of a target's properties as specified: an effect parameter, a
-// property of its kind, or a Lua slider.
+// property of its kind, a Lua slider, or a generator's parameter.
 template <typename ProjectType>
 std::optional<PropertySpec> specFor(const ProjectType& project, Id target, std::string_view property) {
     const auto* effect = findEffect(project, target);
@@ -43,6 +64,7 @@ std::optional<PropertySpec> specFor(const ProjectType& project, Id target, std::
     const auto found = findPropertyTarget(project, target);
     const auto* spec = found.has_value() ? findPropertySpec(propertySpecs(*found), property) : nullptr;
     if (spec == nullptr) { spec = findPropertySpec(luaSliderSpecs, property); }
+    if (spec == nullptr) { spec = generatorSpec(project, target, property); }
     return spec != nullptr ? std::optional<PropertySpec>(*spec) : std::nullopt;
 }
 
@@ -56,7 +78,8 @@ Curve* ensurePropertyCurve(ProjectType& project, Id id, std::string_view propert
     if (curve != nullptr || target->isEffect) { return curve; }
     const auto specs = target->beam ? std::span<const PropertySpec>(beamPropertySpecs) : target->camera ? std::span<const PropertySpec>(cameraPropertySpecs)
         : target->isAudio ? std::span<const PropertySpec>(audioPropertySpecs) : std::span<const PropertySpec>(objectPropertySpecs);
-    const auto* spec = findPropertySpec(specs, property);
+    auto* spec = findPropertySpec(specs, property);
+    if (spec == nullptr) { spec = generatorSpec(project, id, property); }
     if (spec == nullptr) { return nullptr; }
     return &target->properties->emplace(std::string(property), Curve(spec->defaultValue)).first->second;
 }

@@ -6,6 +6,7 @@
 #include "Camera.h"
 #include "Beam.h"
 #include "Group.h"
+#include "Generators.h"
 #include "PreparedSource.h"
 #include "LiveSourceIdentity.h"
 #include "BlenderSourceSettings.h"
@@ -132,6 +133,13 @@ inline Clip* changeClip(Composition& composition, Id id) {
 inline std::shared_ptr<const Asset> findAsset(const std::vector<std::shared_ptr<const Asset>>& assets, Id id) {
     const auto found = std::find_if(assets.begin(), assets.end(), [id](const auto& asset) { return asset != nullptr && asset->id == id; });
     return found != assets.end() ? *found : nullptr;
+}
+
+// The generator an asset is, if it is one: a ".generator" whose text is the
+// generator's id.
+inline const GeneratorDefinition* generatorOf(const Asset& asset) {
+    if (!asset.extension.equalsIgnoreCase(juce::String(generatorExtension.data(), generatorExtension.size()))) { return nullptr; }
+    return findGenerator(asset.data.toString().trim().toStdString());
 }
 
 struct Project : Composition {

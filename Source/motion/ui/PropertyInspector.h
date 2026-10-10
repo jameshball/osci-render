@@ -115,7 +115,7 @@ private:
     };
     static constexpr int sectionGap = 10, sectionHeading = 26;
     // Which heading a property group sits under.
-    static juce::String sectionOf(const juce::String& group);
+    juce::String sectionOf(const juce::String& group) const;
 
     // Driven by a link or a shared modulator route.
     bool isModulated(const std::string& property) const;
@@ -146,6 +146,10 @@ private:
     // Sliders a Lua clip's script reads (slider_a ...), plus any it already
     // animates. Their curves are created on first edit.
     std::vector<motion::PropertySpec> luaSliders() const;
+    // A generator clip's parameters, under a heading of the generator's name
+    // above its transform.
+    const motion::GeneratorDefinition* targetGenerator() const;
+    // A Lua slider's or generator parameter's curve, made on first edit.
     motion::Curve* createSlider(motion::Project& project, const std::string& property) const;
     // (spatial path, quaternion rotation) of the target clip or group.
     std::optional<std::pair<bool, bool>> currentModes() const;
