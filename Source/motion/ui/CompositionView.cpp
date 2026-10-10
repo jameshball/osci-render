@@ -1,5 +1,4 @@
 #include "CompositionView.h"
-#include "../model/KeyEdit.h"
 #include "../model/SourceParts.h"
 #include "../model/AnchorEdit.h"
 
@@ -116,34 +115,6 @@ juce::String MotionCompositionView::driveBlocker(motion::Id id) const {
     const auto& routes = project.routes;
     if (std::any_of(routes.begin(), routes.end(), [id](const auto& route) { return route.target == id; })) { return "This camera is modulated"; }
     return {};
-}
-
-bool MotionCompositionView::cameraKeyed(motion::Id id) const {
-    const auto& cameras = processor.document.project().cameras;
-    const auto found = std::find_if(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; });
-    if (found == cameras.end()) { return false; }
-    const auto time = cameraTime();
-    return std::all_of(motion::cameraPropertySpecs.begin(), motion::cameraPropertySpecs.end(), [&](const auto& spec) {
-        const auto curve = found->properties.find(spec.id);
-        return curve != found->properties.end() && (curve->second.link.has_value() || curve->second.hasKeyAt(time));
-    });
-}
-
-void MotionCompositionView::toggleCameraKey(motion::Id id) {
-    const auto& cameras = processor.document.project().cameras;
-    if (std::none_of(cameras.begin(), cameras.end(), [id](const auto& item) { return item.id == id; })) { return; }
-    const auto time = cameraTime();
-    const auto keyed = cameraKeyed(id);
-    processor.document.edit(keyed ? "Remove camera key" : "Key camera", [id, time, keyed](motion::Project& project) {
-        for (auto& item : project.cameras) {
-            if (item.id != id) { continue; }
-            for (const auto& spec : motion::cameraPropertySpecs) {
-                auto& curve = item.properties[std::string(spec.id)];
-                // Without keys the camera keeps the pose it had here.
-                if (!curve.link.has_value()) { motion::keyedit::setKeyed(curve, time, !keyed); }
-            }
-        }
-    });
 }
 
 void MotionCompositionView::setDrivenCamera(motion::Id id) {

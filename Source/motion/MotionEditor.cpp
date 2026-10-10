@@ -254,10 +254,6 @@ void MotionEditor::setUpScene() {
         sceneTools.lookThrough.setToggleState(composition.drivenCamera() != 0, juce::dontSendNotification);
         resized();
     };
-    sceneTools.keyCamera.onClick = [this] {
-        composition.toggleCameraKey(toolCamera());
-        refreshCameraTools();
-    };
     composition.onDrivenCameraChanged = [this](motion::Id id) {
         sceneTools.lookThrough.setToggleState(id != 0, juce::dontSendNotification);
         refreshCameraTools();
@@ -1271,8 +1267,8 @@ motion::Id MotionEditor::toolCamera() const {
     return selectionIsCamera() ? selection : 0;
 }
 
-// Look through and Key camera follow the selection, the playhead and edits;
-// a camera that cannot be looked through says why.
+// Look through follows the selection, the playhead and edits; a camera that
+// cannot be looked through says why.
 void MotionEditor::refreshCameraTools() {
     // The cog is lit while the Scope's properties are shown.
     scopeTools.settings.setToggleState(selection != 0 && selection == processor.document.project().beam.id, juce::dontSendNotification);
@@ -1281,8 +1277,6 @@ void MotionEditor::refreshCameraTools() {
     const auto blocker = composition.driveBlocker(camera);
     sceneTools.lookThrough.setEnabled(driven || blocker.isEmpty());
     sceneTools.lookThrough.setTooltip(driven || blocker.isEmpty() ? "Look through the selected camera: moving the view moves the camera" : blocker);
-    sceneTools.keyCamera.setEnabled(camera != 0);
-    sceneTools.keyCamera.setToggleState(camera != 0 && composition.cameraKeyed(camera), juce::dontSendNotification);
 }
 
 void MotionEditor::enterComposition(motion::Id id, bool fromLibrary) {

@@ -62,6 +62,21 @@ def state(name, field, expected, timeout=5.0):
         time.sleep(0.1)
 
 
+def button_says(text, timeout=5.0):
+    """Waits for a button with these words, enabled: the camera's Keys button
+    says whether it keys or removes."""
+    deadline = time.monotonic() + timeout
+    while True:
+        found = find(lambda n: n.get("name") == text and n.get("role") == "button" and n.get("enabled", True))
+        if found is not None or time.monotonic() > deadline:
+            return found is not None
+        time.sleep(0.1)
+
+
+KEY_ALL = "Key all at the playhead"
+REMOVE_KEYS = "Remove keys at the playhead"
+
+
 def encoded(data):
     alphabet = ".ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+"
     value = int.from_bytes(data, "little")
@@ -106,22 +121,22 @@ try:
     # Between cuts the Cameras band shows the first camera; clicking selects it.
     step("select camera", "click", "--class", "MotionTimelineView", "--position", f"{x_of(4)},39")
     command("wait-for-locator", "--name", "Key rotation", "--exact")
-    assert state("Key camera", "enabled", True), "Key camera is unavailable with a camera selected"
+    assert button_says(KEY_ALL), "The camera's Keys button is unavailable with a camera selected"
     # Keying rotation keys a level Z rotation: the camera stays drivable.
     step("key rotation", "click", "--name", "Key rotation", "--exact")
     session.wait_for_undo("Set keyframe")
     assert state("Look through camera", "enabled", True), "Keyed rotation blocked Look through camera"
     step("look through", "click", "--name", "Look through camera", "--exact")
     assert state("Look through camera", "checked", True), "Look through camera did not lock"
-    step("key whole camera", "click", "--name", "Key camera", "--exact")
+    step("key whole camera", "click", "--name", KEY_ALL, "--exact")
     session.wait_for_undo("Key camera")
-    assert state("Key camera", "checked", True), "Key camera does not show the key at the playhead"
+    assert button_says(REMOVE_KEYS), "The camera's Keys button does not show the key at the playhead"
     camera = saved_camera()
     for name in camera_properties:
         assert key_times(camera, name) == [0.0], (name, key_times(camera, name))
     # A later time: moving the view keys the whole camera there.
     step("playhead to 2 s", "click", "--class", "MotionTimelineView", "--position", f"{x_of(2)},12")
-    assert not state("Key camera", "checked", False), "Key camera shows a key where there is none"
+    assert button_says(KEY_ALL), "The camera's Keys button shows a key where there is none"
     scene = find(lambda n: n.get("class") == "MotionCompositionView")["bounds"]
     step("orbit view", "wheel", scene["x"] + scene["w"] // 2, scene["y"] + scene["h"] // 2, "--dy", "0.2")
     session.wait_for_undo("Move camera")
@@ -152,10 +167,10 @@ try:
     camera = saved_camera()
     for name in camera_properties:
         assert key_times(camera, name) == [0.0], (name, key_times(camera, name))
-    # Removing the key at the playhead with Key camera.
+    # Removing the key at the playhead with the camera's Keys button.
     step("playhead to 0 s", "click", "--class", "MotionTimelineView", "--position", f"{x_of(0)},12")
-    assert state("Key camera", "checked", True), "Key camera does not show the key at 0 s"
-    step("remove camera key", "click", "--name", "Key camera", "--exact")
+    assert button_says(REMOVE_KEYS), "The camera's Keys button does not show the key at 0 s"
+    step("remove camera key", "click", "--name", REMOVE_KEYS, "--exact")
     session.wait_for_undo("Remove camera key")
     camera = saved_camera()
     for name in camera_properties:

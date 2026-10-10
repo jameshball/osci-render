@@ -85,12 +85,6 @@ public:
     // driven; driveBlocker says why.
     bool canDriveCamera(motion::Id id) const { return documentPose(id).has_value(); }
     juce::String driveBlocker(motion::Id id) const;
-    // A key on every camera property at the playhead (linked ones follow
-    // their source and are left alone).
-    bool cameraKeyed(motion::Id id) const;
-    // Keys the whole camera (position, rotation and lens) at the playhead, or
-    // removes that key when it is already there.
-    void toggleCameraKey(motion::Id id);
     motion::Id drivenCamera() const { return lockedCamera; }
     void setDrivenCamera(motion::Id id);
     std::function<void(motion::Id)> onDrivenCameraChanged;
