@@ -192,6 +192,33 @@ public:
             expectEquals(newLines(withSmallCube("position.x", 3.0f)), 0, "a cube apart from it adds nothing");
         }
 
+        beginTest("A bent surface passing behind the eye still hides what it covers at the edge of the view");
+        {
+            // A wall beside the eye, x = 0.25, running from behind it to far in
+            // front: seen nearly edge on, the part just in front of the eye
+            // fills the frame's right edge. Diced as a bent surface is.
+            const auto bend = [](const osci::Point& point) -> std::optional<motion::hidden::Screen> {
+                if (!(point.z > motion::hidden::nearPlane)) { return std::nullopt; }
+                return motion::hidden::Screen {point.x / point.z, point.y / point.z, 1.0 / point.z};
+            };
+            const auto corner = [&](float x, float y, float z) { const osci::Point point(x, y, z); return motion::hidden::DiceCorner {point, bend(point)}; };
+            motion::hidden::DepthBuffer depth;
+            motion::hidden::Dicer dicer;
+            const auto draw = [&](const motion::hidden::DiceCorner& a, const motion::hidden::DiceCorner& b, const motion::hidden::DiceCorner& c) { depth.triangle(*a.at, *b.at, *c.at); };
+            dicer.dice(corner(.25f, -2, -3), corner(.25f, -2, 12), corner(.25f, 2, 12), bend, draw);
+            dicer.dice(corner(.25f, -2, -3), corner(.25f, 2, 12), corner(.25f, 2, -3), bend, draw);
+            int shown = 0, total = 0;
+            for (double x = .8; x < 1.0; x += .01) {
+                for (double y = -.5; y <= .5; y += .25) {
+                    // Twice as far as the wall along the same sight line.
+                    const auto wall = .25 / x;
+                    shown += depth.shows({x, y, 1 / (2 * wall)}) ? 1 : 0;
+                    ++total;
+                }
+            }
+            expectEquals(shown, 0, "nothing behind the wall shows near the frame's edge (" + juce::String(shown) + " of " + juce::String(total) + ")");
+        }
+
         beginTest("A bake reuses a frame for a time that depends on just the same");
         {
             // A still cube: every frame is the first, shared. Turning it, none is.

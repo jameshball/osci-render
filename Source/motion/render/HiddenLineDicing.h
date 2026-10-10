@@ -3,6 +3,7 @@
 #include "HiddenLineDepth.h"
 #include "HiddenLineMidpoints.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -67,11 +68,17 @@ private:
         if (offFrame(p, q, r)) { return; }
         const auto pq = lengthSquared(p, q), qr = lengthSquared(q, r), rp = lengthSquared(r, p);
         const auto longest = std::max({pq, qr, rp});
-        // Behind the eye, a piece is halved only so far.
+        // Partly behind the eye, a piece is halved only so far, then cut
+        // where it crosses into view: dropped, it would leave a hole just
+        // where a surface comes nearest, at the edges of the view.
         const auto whole = p.at.has_value() && q.at.has_value() && r.at.has_value();
         if (!whole) { depthLeft = std::min(depthLeft, 12); }
         if (longest <= cell * cell || depthLeft <= 0) {
-            if (whole) { emit(p, q, r); }
+            if (whole) {
+                emit(p, q, r);
+            } else {
+                clipToView(p, q, r, bend, emit);
+            }
             return;
         }
         if (mayGrid && whole && longest <= gridReach * gridReach) {
@@ -97,6 +104,45 @@ private:
             halve(p, q, m, depthLeft - 1, mayGrid, bend, emit);
             halve(m, q, r, depthLeft - 1, mayGrid, bend, emit);
         }
+    }
+
+    // The part of a piece in view: its corners in front of the eye and, on
+    // each edge that crosses into view, the point it does (found by halving
+    // the edge, as the bend need not keep it straight), as one or two pieces.
+    template <typename Bend, typename Emit>
+    static void clipToView(const DiceCorner& p, const DiceCorner& q, const DiceCorner& r, Bend& bend, Emit& emit) {
+        const std::array<const DiceCorner*, 3> corners {&p, &q, &r};
+        std::array<DiceCorner, 4> kept {};
+        std::size_t count = 0;
+        for (std::size_t index = 0; index < 3; ++index) {
+            const auto& current = *corners[index];
+            const auto& next = *corners[(index + 1) % 3];
+            if (current.at.has_value()) { kept[count++] = current; }
+            if (current.at.has_value() != next.at.has_value()) { kept[count++] = crossing(current, next, bend); }
+        }
+        if (count >= 3) { emit(kept[0], kept[1], kept[2]); }
+        if (count == 4) { emit(kept[0], kept[2], kept[3]); }
+    }
+    // Where an edge from a corner in view to one behind the eye (either way
+    // round) comes into view, to well under a pixel.
+    template <typename Bend>
+    static DiceCorner crossing(const DiceCorner& u, const DiceCorner& v, Bend& bend) {
+        const auto& seen = u.at.has_value() ? u : v;
+        const auto& unseen = u.at.has_value() ? v : u;
+        DiceCorner inside = seen;
+        double low = 0, high = 1;
+        for (int step = 0; step < 24; ++step) {
+            const auto t = (low + high) * .5;
+            const auto source = mix(seen.source, unseen.source, seen.source, t, 0);
+            const auto at = bend(source);
+            if (at.has_value()) {
+                inside = {source, at};
+                low = t;
+            } else {
+                high = t;
+            }
+        }
+        return inside;
     }
 
     // An even grid of n x n pieces, n from the longest edge, each point bent
