@@ -1696,8 +1696,14 @@ Clip Document::makeClip(Id id, const Asset& asset, double time) {
     }
     clip.properties = defaultProperties(objectPropertySpecs);
     // A generator's clip holds its own values of the generator's parameters.
+    // A solid starts turned, seen a little from above and the side, so it
+    // reads as 3D in a camera looking straight at it.
     if (const auto* generator = generatorOf(asset)) {
         for (const auto& spec : generator->parameters) { clip.properties[std::string(spec.id)] = Curve(spec.defaultValue); }
+        if (generator->category == GeneratorCategory::solid) {
+            clip.properties["rotation.x"] = Curve(25);
+            clip.properties["rotation.y"] = Curve(-35);
+        }
     }
     // A source without its own colours starts in the phosphor green.
     if (asset.source == nullptr || !asset.source->hasExplicitColour()) {

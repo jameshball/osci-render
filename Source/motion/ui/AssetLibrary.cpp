@@ -1,6 +1,7 @@
 #include "AssetLibrary.h"
 #include "../../parser/FileFormatRegistry.h"
 #include "SourcePreview.h"
+#include "GeneratorIcons.h"
 
 MotionAssetLibrary::MotionAssetLibrary(motion::Document& document) : document(document), list("Motion assets", this) {
     setName("Asset library");
@@ -193,6 +194,8 @@ void MotionAssetLibrary::paintListBoxItem(int row, juce::Graphics& graphics, int
 }
 
 juce::Path MotionAssetLibrary::traceThumbnail(const motion::Asset& asset) {
+    // A generator shows its picture, a solid turned to show its sides.
+    if (const auto* generator = motion::generatorOf(asset)) { return motion::ui::generatorPicture(*generator, 1, 0); }
     // Enough samples for text's many small outlines; traced once per source.
     if (asset.source == nullptr || asset.source->frameCount() == 0) { return {}; }
     return motion::ui::traceSource(*asset.source, asset.source->frameCount() / 2, 2000);
