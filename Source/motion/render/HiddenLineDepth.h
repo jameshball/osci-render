@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace motion::hidden {
@@ -63,14 +64,15 @@ public:
         const auto push = 1.5 * (std::abs(dwdx) + std::abs(dwdy)) + 1.0e-4 * std::max({a.w, b.w, c.w});
         const auto sign = area > 0 ? 1.0 : -1.0;
         // Each edge's test is linear across the pixels, as is depth. A row of
-        // a larger triangle visits only the span its edges allow (a pixel
-        // wider each side, as rounding may land there); a small one's rows
-        // are too short for that to pay. Every pixel visited is tested exactly.
+        // a wider triangle visits only the span its edges allow (a pixel wider
+        // each side, as rounding may land there); a narrow one's rows are too
+        // short for finding spans to pay. Every pixel visited is tested exactly.
         const Edge edges[3] {Edge::of(ax, ay, bx, by, sign), Edge::of(bx, by, cx, cy, sign), Edge::of(cx, cy, ax, ay, sign)};
-        const auto small = right - left < 6;
+        const auto narrow = right - left < 6;
+        const auto spans = narrow ? std::optional<Spans>() : std::optional<Spans>(Spans(edges));
         for (auto y = bottom; y <= top; ++y) {
             const auto py = y + .5;
-            const auto [first, last] = small ? std::pair {left, right} : span(edges, py, left, right);
+            const auto [first, last] = narrow ? std::pair {left, right} : spans->at(py, left, right);
             if (first > last) { continue; }
             const auto firstX = first + .5;
             // Inside, edges included (with room for rounding, which can put a
@@ -112,24 +114,39 @@ private:
         }
         double at(double x, double y) const { return stepX * x + stepY * y + offset; }
     };
-    // The pixels of a row (centres at `py`) that can be inside all three
-    // edges, within [left, right].
-    static std::pair<int, int> span(const Edge (&edges)[3], double py, int left, int right) {
-        auto low = static_cast<double>(left), high = static_cast<double>(right);
-        for (const auto& edge : edges) {
-            // stepX * (x + .5) + rest >= -edgeSlack
-            const auto rest = edge.stepY * py + edge.offset + edgeSlack;
-            if (edge.stepX > 0) {
-                low = std::max(low, -rest / edge.stepX - .5);
-            } else if (edge.stepX < 0) {
-                high = std::min(high, -rest / edge.stepX - .5);
-            } else if (rest < 0) {
-                return {1, 0};
+    // The pixels of a row that can be inside all three edges. Where an edge
+    // allows a pixel, stepX * (x + .5) + stepY * py + offset >= -edgeSlack,
+    // is a bound on x that moves linearly with the row: each edge's bound is
+    // found once, so a row's span costs no division.
+    class Spans {
+    public:
+        explicit Spans(const Edge (&edges)[3]) {
+            for (const auto& edge : edges) {
+                if (edge.stepX == 0) {
+                    flat[flatCount++] = &edge;
+                    continue;
+                }
+                auto& bound = edge.stepX > 0 ? lower[lowerCount++] : upper[upperCount++];
+                bound = {-edge.stepY / edge.stepX, -(edge.offset + edgeSlack) / edge.stepX - .5};
             }
         }
-        if (!(low <= high + 2)) { return {1, 0}; }
-        return {std::max(left, static_cast<int>(std::floor(low)) - 1), std::min(right, static_cast<int>(std::ceil(high)) + 1)};
-    }
+        std::pair<int, int> at(double py, int left, int right) const {
+            auto low = static_cast<double>(left), high = static_cast<double>(right);
+            for (int index = 0; index < lowerCount; ++index) { low = std::max(low, lower[index].slope * py + lower[index].offset); }
+            for (int index = 0; index < upperCount; ++index) { high = std::min(high, upper[index].slope * py + upper[index].offset); }
+            for (int index = 0; index < flatCount; ++index) {
+                if (flat[index]->stepY * py + flat[index]->offset + edgeSlack < 0) { return {1, 0}; }
+            }
+            if (!(low <= high + 2)) { return {1, 0}; }
+            return {std::max(left, static_cast<int>(std::floor(low)) - 1), std::min(right, static_cast<int>(std::ceil(high)) + 1)};
+        }
+
+    private:
+        struct Bound { double slope, offset; };
+        Bound lower[3] {}, upper[3] {};
+        const Edge* flat[3] {};
+        int lowerCount = 0, upperCount = 0, flatCount = 0;
+    };
 
     std::vector<float> nearest;
     // The pixels drawn since the last clear.

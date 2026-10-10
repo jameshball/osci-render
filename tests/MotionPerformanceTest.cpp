@@ -99,6 +99,8 @@ private:
             last = std::max(last, std::min(clip.end, prepared.duration));
         }
         if (!(last > first)) { first = 0, last = prepared.duration; }
+        // MOTION_BENCHMARK_REPEAT=20 runs the frames over, long enough to profile.
+        const auto repeats = std::max(1, juce::SystemStats::getEnvironmentVariable("MOTION_BENCHMARK_REPEAT", "1").getIntValue());
         const auto perFrame = milliseconds([&] {
             for (int frame = 0; frame < frames; ++frame) {
                 const auto culled = motion::hidden::cull(prepared, first + (last - first) * frame / frames, depth);
@@ -107,7 +109,9 @@ private:
                     shapes += entry.drawing->shapeCount();
                 }
             }
-        }) / frames;
+        }, repeats) / frames;
+        kept /= repeats;
+        shapes /= static_cast<std::size_t>(repeats);
         std::atomic<bool> stop {false};
         const auto bake = milliseconds([&] { motion::hidden::Baker::bakeAll(*prepared.hiddenLines, sampleRate, stop); });
         report("Hidden lines: " + name + " per frame", perFrame, "ms");
